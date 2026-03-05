@@ -249,7 +249,7 @@ NET PAY:      ₦${selectedEmployee.net.toLocaleString()}
                   <TableCell className="font-mono text-red-600">-₦{record.deductions.toLocaleString()}</TableCell>
                   <TableCell className="font-mono font-bold text-slate-900">₦{record.net.toLocaleString()}</TableCell>
                   <TableCell>
-                    <Badge variant={record.status === 'Processed' ? 'success' : 'warning'}>
+                    <Badge variant={(record.status as string) === 'Processed' ? 'success' : 'warning'}>
                       {record.status}
                     </Badge>
                   </TableCell>

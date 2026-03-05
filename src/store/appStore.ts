@@ -169,10 +169,10 @@ export const useAppStore = create<AppState>((set) => ({
   ],
   attendanceRecords: [],
   invoices: [
-    { id: 'INV-2023-001', client: 'Acme Corp', project: 'Website Redesign', amount: 12500000, date: '2023-10-01', dueDate: '2023-10-15', status: 'Paid' },
-    { id: 'INV-2023-002', client: 'Global Tech', project: 'Mobile App Dev', amount: 24000000, date: '2023-10-05', dueDate: '2023-10-20', status: 'Overdue' },
-    { id: 'INV-2023-003', client: 'Stark Industries', project: 'Security Audit', amount: 8500000, date: '2023-10-15', dueDate: '2023-10-30', status: 'Sent' },
-    { id: 'INV-2023-004', client: 'Wayne Enterprises', project: 'Cloud Migration', amount: 32000000, date: '2023-10-20', dueDate: '2023-11-04', status: 'Draft' },
+    { id: 'INV-2023-001', invoiceNumber: 'INV-001', client: 'Acme Corp', project: 'Website Redesign', siteId: 'S-001', siteName: 'Louiseville', amount: 12500000, date: '2023-10-01', dueDate: '2023-10-15', billingCycle: 'Monthly', reminderDate: '2023-10-12', status: 'Paid' },
+    { id: 'INV-2023-002', invoiceNumber: 'INV-002', client: 'Global Tech', project: 'Mobile App Dev', siteId: 'S-002', siteName: 'Bose Enenmon', amount: 24000000, date: '2023-10-05', dueDate: '2023-10-20', billingCycle: 'Monthly', reminderDate: '2023-10-17', status: 'Overdue' },
+    { id: 'INV-2023-003', invoiceNumber: 'INV-003', client: 'Stark Industries', project: 'Security Audit', siteId: 'S-003', siteName: 'CornerView Apartment', amount: 8500000, date: '2023-10-15', dueDate: '2023-10-30', billingCycle: 'Monthly', reminderDate: '2023-10-27', status: 'Sent' },
+    { id: 'INV-2023-004', invoiceNumber: 'INV-004', client: 'Wayne Enterprises', project: 'Cloud Migration', siteId: 'S-004', siteName: 'Office', amount: 32000000, date: '2023-10-20', dueDate: '2023-11-04', billingCycle: 'Monthly', reminderDate: '2023-11-01', status: 'Draft' },
   ],
   salaryAdvances: [
     { id: 'SA-001', employeeId: 'EMP-002', employeeName: 'OBOKIA ALICIA', amount: 100000, requestDate: '2023-10-15', status: 'Pending' },
