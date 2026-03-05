@@ -3,7 +3,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { useAppStore, AttendanceRecord } from '@/src/store/appStore';
-import { Search, Save, Trash2, Calendar as CalendarIcon, Database } from 'lucide-react';
+import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, ChevronDown } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { format } from 'date-fns';
@@ -19,6 +19,9 @@ export function Attendance() {
   const [lastEntryDate, setLastEntryDate] = useState(format(new Date(Date.now() - 86400000), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('entry');
+  const [departmentFilter, setDepartmentFilter] = useState('All');
+  
+  const departments = useAppStore((state) => state.departments);
   
   // State for the current form
   const [attendanceData, setAttendanceData] = useState<Record<string, { day: string, night: string }>>({});
@@ -53,10 +56,12 @@ export function Attendance() {
     }
   }, [registerDate, attendanceRecords]);
 
-  const filteredEmployees = employees.filter(emp => 
-    emp.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.firstname.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredEmployees = employees.filter(emp => {
+    const matchesSearch = emp.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.firstname.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesDept = departmentFilter === 'All' || emp.department === departmentFilter;
+    return matchesSearch && matchesDept;
+  });
 
   const handleSelectChange = (empId: string, shift: 'day' | 'night', value: string) => {
     setAttendanceData(prev => ({
@@ -306,224 +311,254 @@ export function Attendance() {
     alert(`Successfully saved ${records.length} records to the database!`);
   };
 
+  const filledCount = Object.keys(attendanceData).filter(k => attendanceData[k]?.day || attendanceData[k]?.night).length;
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="flex flex-col gap-3 h-full">
+      {/* Compact header bar */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Daily Register</h1>
-          <p className="text-slate-500 mt-1">Manage daily attendance, site allocation, and shifts.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Daily Register</h1>
+          <p className="text-xs text-slate-500">Attendance & site allocation</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <TabsList className="bg-slate-100 h-8">
+            <TabsTrigger 
+              active={activeTab === 'entry'} 
+              onClick={() => setActiveTab('entry')} 
+              className="gap-1.5 text-xs h-7 px-3"
+            >
+              <CalendarIcon className="h-3 w-3" /> Entry
+            </TabsTrigger>
+            <TabsTrigger 
+              active={activeTab === 'database'} 
+              onClick={() => setActiveTab('database')} 
+              className="gap-1.5 text-xs h-7 px-3"
+            >
+              <Database className="h-3 w-3" /> Database
+            </TabsTrigger>
+          </TabsList>
         </div>
       </div>
 
-      <Tabs className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger 
-            active={activeTab === 'entry'} 
-            onClick={() => setActiveTab('entry')} 
-            className="gap-2"
-          >
-            <CalendarIcon className="h-4 w-4" /> Entry Form
-          </TabsTrigger>
-          <TabsTrigger 
-            active={activeTab === 'database'} 
-            onClick={() => setActiveTab('database')} 
-            className="gap-2"
-          >
-            <Database className="h-4 w-4" /> Database View
-          </TabsTrigger>
-        </TabsList>
+      <Tabs className="w-full flex-1 flex flex-col min-h-0">
+        <TabsContent active={activeTab === 'entry'} className="flex-1 flex flex-col min-h-0">
+          {/* Toolbar: date, filters, search, actions — all in one row */}
+          <div className="flex flex-wrap items-center gap-2 py-2 px-0">
+            {/* Date controls */}
+            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1.5 shadow-sm">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Last</span>
+              <span className="text-xs font-mono font-medium text-slate-700">{lastEntryDate}</span>
+              <div className="w-px h-4 bg-slate-200" />
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Date</span>
+              <Input 
+                type="date" 
+                value={registerDate}
+                onChange={(e) => setRegisterDate(e.target.value)}
+                className="h-7 text-xs border-0 bg-transparent p-0 w-28 font-mono focus-visible:ring-0"
+              />
+            </div>
 
-        <TabsContent active={activeTab === 'entry'} className="mt-6">
-          <Card className="border-t-4 border-t-[#002040] shadow-md">
-            <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 bg-[#002040] rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-inner">
-                    DC
-                  </div>
-                  <div>
-                    <CardTitle className="text-[#002040] text-xl">Dewatering Construction</CardTitle>
-                    <CardDescription>Daily Attendance & Site Allocation</CardDescription>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white p-3 rounded-lg border border-slate-200 shadow-sm w-full md:w-auto">
-                  <div className="flex flex-col w-full sm:w-auto">
-                    <span className="text-xs font-bold text-slate-500 uppercase">Last Entry Date</span>
-                    <span className="text-sm font-medium text-slate-900">{lastEntryDate}</span>
-                  </div>
-                  <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
-                  <div className="flex flex-col w-full sm:w-auto">
-                    <span className="text-xs font-bold text-slate-500 uppercase">Current Date</span>
-                    <Input 
-                      type="date" 
-                      value={registerDate}
-                      onChange={(e) => setRegisterDate(e.target.value)}
-                      className="h-8 text-sm border-slate-300 w-full sm:w-36"
-                    />
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            
-            <CardContent className="p-0">
-              <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50/50">
-                <div className="relative w-full sm:w-72">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
-                  <Input
-                    placeholder="Search staff..."
-                    className="pl-9 bg-white"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <Button onClick={handleClear} variant="outline" className="flex-1 sm:flex-none gap-2 text-red-600 hover:text-red-700 hover:bg-red-50">
-                    <Trash2 className="h-4 w-4" /> Clear
-                  </Button>
-                  <Button onClick={handleSubmit} className="flex-1 sm:flex-none gap-2 bg-[#002040] hover:bg-[#003060] text-white shadow-md">
-                    <Save className="h-4 w-4" /> Submit Register
-                  </Button>
-                </div>
-              </div>
+            {/* Department filter */}
+            <div className="relative">
+              <select
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+                className="h-8 pl-7 pr-3 text-xs rounded-lg border border-slate-200 bg-white shadow-sm appearance-none cursor-pointer focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none"
+              >
+                <option value="All">All Departments</option>
+                {departments.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+              <Filter className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            </div>
 
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-[#002040]">
-                    <TableRow className="hover:bg-[#002040]">
-                      <TableHead className="text-white font-semibold py-3 min-w-[150px]">Staff Name</TableHead>
-                      <TableHead className="text-white font-semibold py-3 min-w-[120px]">Position</TableHead>
-                      <TableHead className="text-white font-semibold py-3 border-l border-white/20 min-w-[150px]">Day Site / Status</TableHead>
-                      <TableHead className="text-white font-semibold py-3 border-l border-white/20 min-w-[150px]">Night Site / Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredEmployees.map((employee) => (
-                      <TableRow key={employee.id} className="hover:bg-slate-50">
-                        <TableCell className="font-bold text-slate-800 py-2">
-                          {employee.surname} {employee.firstname}
-                        </TableCell>
-                        <TableCell className="text-slate-500 text-sm py-2">
-                          {employee.position}
-                        </TableCell>
-                        <TableCell className="p-2 border-l border-slate-100">
-                          <select 
-                            className="w-full h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm focus:ring-2 focus:ring-[#002040] focus:border-transparent outline-none transition-all"
-                            value={attendanceData[employee.id]?.day || ''}
-                            onChange={(e) => handleSelectChange(employee.id, 'day', e.target.value)}
-                          >
-                            <option value="">-- Select --</option>
-                            <optgroup label="Active Sites">
-                              {sites.filter(s => s.status === 'Active').map(site => (
-                                <option key={`day-${site.id}`} value={site.name}>{site.name}</option>
-                              ))}
-                            </optgroup>
-                            <optgroup label="Statuses">
-                              {statuses.map(status => (
-                                <option key={`day-${status}`} value={status}>{status}</option>
-                              ))}
-                            </optgroup>
-                          </select>
-                        </TableCell>
-                        <TableCell className="p-2 border-l border-slate-100">
-                          <select 
-                            className="w-full h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm focus:ring-2 focus:ring-[#002040] focus:border-transparent outline-none transition-all"
-                            value={attendanceData[employee.id]?.night || ''}
-                            onChange={(e) => handleSelectChange(employee.id, 'night', e.target.value)}
-                          >
-                            <option value="">-- Select --</option>
-                            <optgroup label="Active Sites">
-                              {sites.filter(s => s.status === 'Active').map(site => (
-                                <option key={`night-${site.id}`} value={site.name}>{site.name}</option>
-                              ))}
-                            </optgroup>
-                            <optgroup label="Statuses">
-                              {statuses.map(status => (
-                                <option key={`night-${status}`} value={status}>{status}</option>
-                              ))}
-                            </optgroup>
-                          </select>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Search */}
+            <div className="relative flex-1 min-w-[140px] max-w-[220px]">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <Input
+                placeholder="Search..."
+                className="h-8 pl-7 text-xs bg-white shadow-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <div className="flex-1" />
+
+            {/* Stats pill */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 rounded-full px-3 py-1 border border-slate-100">
+              <Users className="h-3 w-3" />
+              <span className="font-medium text-slate-700">{filledCount}</span>
+              <span>/</span>
+              <span>{filteredEmployees.length}</span>
+              <span className="hidden sm:inline">filled</span>
+            </div>
+
+            {/* Actions */}
+            <Button onClick={handleClear} variant="outline" size="sm" className="h-8 text-xs gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200">
+              <Trash2 className="h-3 w-3" /> Clear
+            </Button>
+            <Button onClick={handleSubmit} size="sm" className="h-8 text-xs gap-1 bg-slate-900 hover:bg-slate-800 text-white shadow-sm">
+              <Save className="h-3 w-3" /> Submit
+            </Button>
+          </div>
+
+          {/* Compact entry table */}
+          <div className="rounded-lg border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
+            <div className="overflow-y-auto flex-1">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-900 text-white sticky top-0 z-10">
+                  <tr>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 w-[30%]">Staff Name</th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">Day Site / Status</th>
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">Night Site / Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredEmployees.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="text-center py-8 text-slate-400 text-sm">No employees match your filters.</td>
+                    </tr>
+                  ) : (
+                    filteredEmployees.map((employee, idx) => {
+                      const dayVal = attendanceData[employee.id]?.day || '';
+                      const nightVal = attendanceData[employee.id]?.night || '';
+                      const hasEntry = dayVal || nightVal;
+                      const isAbsent = dayVal && isAbsentStatus(dayVal);
+
+                      return (
+                        <tr 
+                          key={employee.id} 
+                          className={`transition-colors ${
+                            isAbsent ? 'bg-red-50/50' : 
+                            hasEntry ? 'bg-emerald-50/40' : 
+                            idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
+                          } hover:bg-slate-100/60`}
+                        >
+                          <td className="py-1 px-3">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                isAbsent ? 'bg-red-400' : hasEntry ? 'bg-emerald-400' : 'bg-slate-300'
+                              }`} />
+                              <span className="font-medium text-slate-800 text-xs truncate">
+                                {employee.surname} {employee.firstname}
+                              </span>
+                              <span className="text-[10px] text-slate-400 bg-slate-100 rounded px-1 py-0.5 flex-shrink-0 hidden sm:inline">
+                                {employee.department}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-1 px-2 border-l border-slate-100">
+                            <select 
+                              className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${
+                                dayVal && !isAbsentStatus(dayVal) 
+                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800 font-medium' 
+                                  : dayVal && isAbsentStatus(dayVal)
+                                  ? 'border-red-300 bg-red-50 text-red-700 font-medium'
+                                  : 'border-slate-200 bg-white text-slate-700'
+                              } focus:ring-1 focus:ring-slate-400`}
+                              value={dayVal}
+                              onChange={(e) => handleSelectChange(employee.id, 'day', e.target.value)}
+                            >
+                              <option value="">—</option>
+                              <optgroup label="Sites">
+                                {sites.filter(s => s.status === 'Active').map(site => (
+                                  <option key={`d-${site.id}`} value={site.name}>{site.name}</option>
+                                ))}
+                              </optgroup>
+                              <optgroup label="Status">
+                                {statuses.map(status => (
+                                  <option key={`d-${status}`} value={status}>{status}</option>
+                                ))}
+                              </optgroup>
+                            </select>
+                          </td>
+                          <td className="py-1 px-2 border-l border-slate-100">
+                            <select 
+                              className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${
+                                nightVal && !isAbsentStatus(nightVal)
+                                  ? 'border-indigo-300 bg-indigo-50 text-indigo-800 font-medium'
+                                  : nightVal && isAbsentStatus(nightVal)
+                                  ? 'border-red-300 bg-red-50 text-red-700 font-medium'
+                                  : 'border-slate-200 bg-white text-slate-700'
+                              } focus:ring-1 focus:ring-slate-400`}
+                              value={nightVal}
+                              onChange={(e) => handleSelectChange(employee.id, 'night', e.target.value)}
+                            >
+                              <option value="">—</option>
+                              <optgroup label="Sites">
+                                {sites.filter(s => s.status === 'Active').map(site => (
+                                  <option key={`n-${site.id}`} value={site.name}>{site.name}</option>
+                                ))}
+                              </optgroup>
+                              <optgroup label="Status">
+                                {statuses.map(status => (
+                                  <option key={`n-${status}`} value={status}>{status}</option>
+                                ))}
+                              </optgroup>
+                            </select>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </TabsContent>
 
-        <TabsContent active={activeTab === 'database'} className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Attendance Database</CardTitle>
-              <CardDescription>View all submitted attendance records and calculated fields.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto rounded-md border border-slate-200">
-                <Table className="text-xs whitespace-nowrap">
-                  <TableHeader className="bg-slate-100">
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Staff</TableHead>
-                      <TableHead>Position</TableHead>
-                      <TableHead>Day_Client</TableHead>
-                      <TableHead>Day Site</TableHead>
-                      <TableHead>Night_Client</TableHead>
-                      <TableHead>Night Site</TableHead>
-                      <TableHead>Day</TableHead>
-                      <TableHead>Night</TableHead>
-                      <TableHead>Absent Status</TableHead>
-                      <TableHead>Night_wk</TableHead>
-                      <TableHead>OT</TableHead>
-                      <TableHead>OT_SITE</TableHead>
-                      <TableHead>Day_Wk</TableHead>
-                      <TableHead>DOW</TableHead>
-                      <TableHead>NDW</TableHead>
-                      <TableHead>Mth</TableHead>
-                      <TableHead>IS PRESENT</TableHead>
-                      <TableHead>day2</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {attendanceRecords.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={19} className="text-center py-8 text-slate-500">
-                          No records found. Submit entries from the Entry Form to populate this database.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      attendanceRecords.map((record) => (
-                        <TableRow key={record.id}>
-                          <TableCell>{record.date}</TableCell>
-                          <TableCell className="font-medium">{record.staffName}</TableCell>
-                          <TableCell>{record.position}</TableCell>
-                          <TableCell>{record.dayClient}</TableCell>
-                          <TableCell>{record.daySite}</TableCell>
-                          <TableCell>{record.nightClient}</TableCell>
-                          <TableCell>{record.nightSite}</TableCell>
-                          <TableCell>{record.day}</TableCell>
-                          <TableCell>{record.night}</TableCell>
-                          <TableCell className="text-red-500">{record.absentStatus}</TableCell>
-                          <TableCell>{record.nightWk}</TableCell>
-                          <TableCell className="font-bold text-indigo-600">{record.ot}</TableCell>
-                          <TableCell>{record.otSite}</TableCell>
-                          <TableCell>{record.dayWk}</TableCell>
-                          <TableCell>{record.dow}</TableCell>
-                          <TableCell>{record.ndw}</TableCell>
-                          <TableCell>{record.mth}</TableCell>
-                          <TableCell className={record.isPresent === 'Yes' ? 'text-emerald-600 font-bold' : 'text-slate-400'}>
-                            {record.isPresent}
-                          </TableCell>
-                          <TableCell>{record.day2}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent active={activeTab === 'database'} className="flex-1">
+          <div className="rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px] whitespace-nowrap">
+                <thead className="bg-slate-100 sticky top-0">
+                  <tr>
+                    {['Date','Staff','Position','Day Client','Day Site','Night Client','Night Site','Day','Night','Absent','Night_wk','OT','OT Site','Day_Wk','DOW','NDW','Mth','Present','day2'].map(h => (
+                      <th key={h} className="text-left font-semibold text-slate-600 py-2 px-2 border-b border-slate-200">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {attendanceRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={19} className="text-center py-8 text-slate-400 text-sm">
+                        No records yet. Submit from the Entry tab.
+                      </td>
+                    </tr>
+                  ) : (
+                    attendanceRecords.map((r) => (
+                      <tr key={r.id} className="hover:bg-slate-50">
+                        <td className="py-1.5 px-2 font-mono">{r.date}</td>
+                        <td className="py-1.5 px-2 font-medium text-slate-800">{r.staffName}</td>
+                        <td className="py-1.5 px-2 text-slate-500">{r.position}</td>
+                        <td className="py-1.5 px-2">{r.dayClient}</td>
+                        <td className="py-1.5 px-2">{r.daySite}</td>
+                        <td className="py-1.5 px-2">{r.nightClient}</td>
+                        <td className="py-1.5 px-2">{r.nightSite}</td>
+                        <td className="py-1.5 px-2">{r.day}</td>
+                        <td className="py-1.5 px-2">{r.night}</td>
+                        <td className="py-1.5 px-2 text-red-500">{r.absentStatus}</td>
+                        <td className="py-1.5 px-2 text-center">{r.nightWk}</td>
+                        <td className="py-1.5 px-2 text-center font-bold text-indigo-600">{r.ot}</td>
+                        <td className="py-1.5 px-2">{r.otSite}</td>
+                        <td className="py-1.5 px-2 text-center">{r.dayWk}</td>
+                        <td className="py-1.5 px-2 text-center">{r.dow}</td>
+                        <td className="py-1.5 px-2 text-center">{r.ndw}</td>
+                        <td className="py-1.5 px-2 text-center">{r.mth}</td>
+                        <td className={`py-1.5 px-2 text-center font-bold ${r.isPresent === 'Yes' ? 'text-emerald-600' : 'text-slate-300'}`}>
+                          {r.isPresent === 'Yes' ? '✓' : '—'}
+                        </td>
+                        <td className="py-1.5 px-2 text-center">{r.day2}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
