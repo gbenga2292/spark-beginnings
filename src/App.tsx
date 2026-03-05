@@ -1,27 +1,43 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
-const queryClient = new QueryClient();
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Layout } from './components/layout/Layout';
+import { Login } from './pages/Login';
+import { Dashboard } from './pages/Dashboard';
+import { Employees } from './pages/Employees';
+import { Sites } from './pages/Sites';
+import { Attendance } from './pages/Attendance';
+import { Payroll } from './pages/Payroll';
+import { Billing } from './pages/Billing';
+import { Onboarding } from './pages/Onboarding';
+import { Reports } from './pages/Reports';
+import { Settings } from './pages/Settings';
+import { Variables } from './pages/Variables';
+import { SalaryLoans } from './pages/SalaryLoans';
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
-
-export default App;
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="attendance" element={<Attendance />} />
+          <Route path="employees" element={<Employees />} />
+          <Route path="sites" element={<Sites />} />
+          <Route path="payroll" element={<Payroll />} />
+          <Route path="salary-loans" element={<SalaryLoans />} />
+          <Route path="billing" element={<Billing />} />
+          <Route path="onboarding" element={<Onboarding />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="variables" element={<Variables />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
