@@ -133,14 +133,14 @@ export function SalaryLoans() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs>
         <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="advances">Salary Advances</TabsTrigger>
-          <TabsTrigger value="loans">Loans</TabsTrigger>
+          <TabsTrigger active={activeTab === 'advances'} onClick={() => setActiveTab('advances')}>Salary Advances</TabsTrigger>
+          <TabsTrigger active={activeTab === 'loans'} onClick={() => setActiveTab('loans')}>Loans</TabsTrigger>
         </TabsList>
 
         {/* Salary Advances Tab */}
-        <TabsContent value="advances" className="space-y-6">
+        <TabsContent active={activeTab === 'advances'} className="space-y-6">
           <div className="flex justify-end">
             <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700" onClick={() => setShowAdvanceForm(true)}>
               <Plus className="h-4 w-4" /> Request Advance
@@ -307,7 +307,7 @@ export function SalaryLoans() {
         </TabsContent>
 
         {/* Loans Tab */}
-        <TabsContent value="loans" className="space-y-6">
+        <TabsContent active={activeTab === 'loans'} className="space-y-6">
           <div className="flex justify-end">
             <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700" onClick={() => setShowLoanForm(true)}>
               <Plus className="h-4 w-4" /> Request Loan

@@ -91,6 +91,34 @@ export function Attendance() {
     return { site: src, shift: "Yes", reason: currentReason };
   };
 
+  // Public holidays from Variables page (in a real app, this would come from the store)
+  const publicHolidays = [
+    '2026-01-01', '2026-01-02', '2026-01-03', '2026-03-20', '2026-03-21',
+    '2026-04-03', '2026-04-06', '2026-05-01', '2026-05-27', '2026-05-28',
+    '2026-06-12', '2026-08-26', '2026-10-01', '2026-12-25'
+  ];
+
+  // Monthly overtime rates (from MonthsValues table equivalent)
+  const overtimeRates: Record<number, number> = {
+    1: 0.5, 2: 0.5, 3: 0.5, 4: 0.5, 5: 0.5, 6: 0.5,
+    7: 0.5, 8: 0.5, 9: 0.5, 10: 0.5, 11: 0.5, 12: 0.5
+  };
+
+  const isHoliday = (dateStr: string) => publicHolidays.includes(dateStr);
+
+  const getNextDayStr = (dateStr: string, offset: number = 1) => {
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() + offset);
+    return format(d, 'yyyy-MM-dd');
+  };
+
+  // Excel DOW: WEEKDAY(date, 2) → 1=Monday, 7=Sunday
+  const getDOW = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const jsDay = d.getDay(); // 0=Sun, 1=Mon...6=Sat
+    return jsDay === 0 ? 7 : jsDay; // Convert to 1=Mon...7=Sun
+  };
+
   const handleSubmit = () => {
     const existingRecords = attendanceRecords.filter(r => r.date === registerDate);
     if (existingRecords.length > 0) {
@@ -100,16 +128,26 @@ export function Attendance() {
       removeAttendanceRecordsByDate(registerDate);
     }
 
-    const records: AttendanceRecord[] = [];
-    
-    // Simple public holidays list for OT calculation (mocked based on screenshot)
-    const publicHolidays = ['2026-01-01', '2026-01-02', '2026-01-03', '2026-03-20', '2026-03-21', '2026-04-03', '2026-04-06', '2026-05-01', '2026-05-27', '2026-05-28', '2026-06-12', '2026-08-26', '2026-10-01', '2026-12-25'];
-
     const dateObj = new Date(registerDate);
-    const dow = dateObj.getDay(); // 0 is Sunday
-    const isSunday = dow === 0;
-    const isHoliday = publicHolidays.includes(registerDate);
-    const fillData = !(isSunday || isHoliday);
+    const dow = getDOW(registerDate);
+    const isSunday = dow === 7;
+    const dateIsHoliday = isHoliday(registerDate);
+
+    // First pass: build raw records with day/night/site info
+    type RawRecord = {
+      empId: string;
+      staffName: string;
+      position: string;
+      daySite: string;
+      nightSite: string;
+      dayClient: string;
+      nightClient: string;
+      day: 'Yes' | 'No';
+      night: 'Yes' | 'No';
+      absentStatus: string;
+    };
+
+    const rawRecords: RawRecord[] = [];
 
     employees.forEach(emp => {
       const formDaySite = attendanceData[emp.id]?.day || '';
@@ -119,72 +157,149 @@ export function Attendance() {
       if (formDaySite && !isAbsentStatus(formDaySite)) staffHasWorkEntry = true;
       if (formNightSite && !isAbsentStatus(formNightSite)) staffHasWorkEntry = true;
 
-      // Skip if it's a Sunday/Holiday and they didn't explicitly work
-      if (!fillData && !staffHasWorkEntry) return;
+      // Default: on weekdays that aren't holidays, everyone is at Office for day shift
+      const fillData = !(isSunday || dateIsHoliday);
+      if (!fillData && !staffHasWorkEntry && !formDaySite && !formNightSite) return;
 
       let daySite = fillData ? "Office" : "";
       let nightSite = "";
-      let dayShift = fillData ? "Yes" : "No";
-      let nightShift = "No";
+      let dayShift: 'Yes' | 'No' = fillData ? "Yes" : "No";
+      let nightShift: 'Yes' | 'No' = "No";
       let absentReason = "";
 
       const dayOverride = applyOverride(formDaySite, daySite, dayShift, absentReason);
       daySite = dayOverride.site;
-      dayShift = dayOverride.shift;
+      dayShift = dayOverride.shift as 'Yes' | 'No';
       absentReason = dayOverride.reason;
 
       const nightOverride = applyOverride(formNightSite, nightSite, nightShift, absentReason);
       nightSite = nightOverride.site;
-      nightShift = nightOverride.shift;
+      nightShift = nightOverride.shift as 'Yes' | 'No';
       absentReason = nightOverride.reason;
 
-      // Clear site names if they are actually statuses
       const finalDaySite = isAbsentStatus(daySite) ? '' : daySite;
       const finalNightSite = isAbsentStatus(nightSite) ? '' : nightSite;
 
       const dayClient = sites.find(s => s.name === finalDaySite)?.client || '';
       const nightClient = sites.find(s => s.name === finalNightSite)?.client || '';
 
-      const mth = dateObj.getMonth() + 1;
-
-      // Basic OT logic: if weekend (6=Sat, 0=Sun) or public holiday, and they worked
-      let ot = 0;
-      let otSite = '';
-      
-      if ((dow === 6 || dow === 0 || isHoliday) && (dayShift === 'Yes' || nightShift === 'Yes')) {
-         ot = 0.5; // Emulating the 0.5 OT rate from the screenshot
-         otSite = finalDaySite || finalNightSite;
-      }
-
-      records.push({
-         id: crypto.randomUUID(),
-         date: registerDate,
-         staffId: emp.id,
-         staffName: `${emp.surname} ${emp.firstname}`,
-         position: emp.position,
-         dayClient,
-         daySite: finalDaySite,
-         nightClient,
-         nightSite: finalNightSite,
-         day: dayShift as 'Yes'|'No',
-         night: nightShift as 'Yes'|'No',
-         absentStatus: absentReason,
-         nightWk: nightShift === 'Yes' ? 1 : 0,
-         ot,
-         otSite,
-         dayWk: dayShift === 'Yes' ? 1 : 0,
-         dow: dow === 0 ? 7 : dow, // Match Excel DOW (1-7, Mon-Sun)
-         ndw: (dow > 0 && dow < 6 && absentReason === '' && !isHoliday) ? 'Yes' : 'No',
-         mth,
-         isPresent: (dayShift === 'Yes' || nightShift === 'Yes') ? 'Yes' : 'No',
-         day2: dayShift === 'Yes' ? 1 : 0
+      rawRecords.push({
+        empId: emp.id,
+        staffName: `${emp.surname} ${emp.firstname}`,
+        position: emp.position,
+        daySite: finalDaySite,
+        nightSite: finalNightSite,
+        dayClient,
+        nightClient,
+        day: dayShift,
+        night: nightShift,
+        absentStatus: absentReason,
       });
     });
 
-    if (records.length === 0) {
+    if (rawRecords.length === 0) {
       alert("No attendance data selected to submit.");
       return;
     }
+
+    // Second pass: calculate NDW (needs to look at next day's records)
+    // NDW checks if this staff works the next day (or day after if next day is Sunday/holiday)
+    const nextDayStr = getNextDayStr(registerDate);
+    const nextNextDayStr = getNextDayStr(registerDate, 2);
+    const existingNextDay = attendanceRecords.filter(r => r.date === nextDayStr);
+    const existingNextNextDay = attendanceRecords.filter(r => r.date === nextNextDayStr);
+
+    const mth = dateObj.getMonth() + 1;
+
+    const records: AttendanceRecord[] = rawRecords.map(raw => {
+      // Col 11: Night_wk = IF(Night="Yes",1,0)
+      const nightWk = raw.night === 'Yes' ? 1 : 0;
+
+      // Col 15: DOW
+      // Already calculated above as `dow`
+
+      // Col 16: NDW - Next Day Work
+      // If Sunday, NDW is blank ("")
+      // Otherwise check if staff works next day, or if next day is Sunday/holiday, check day after
+      let ndw: 'Yes' | 'No' = 'No';
+      if (dow !== 7) {
+        const staffWorksNextDay = existingNextDay.some(
+          r => r.staffName === raw.staffName && (r.day === 'Yes' || r.night === 'Yes')
+        );
+        const nextDayDow = getDOW(nextDayStr);
+        const nextDayIsHolidayOrSunday = nextDayDow === 7 || isHoliday(nextDayStr);
+        const staffWorksNextNextDay = existingNextNextDay.some(
+          r => r.staffName === raw.staffName && (r.day === 'Yes' || r.night === 'Yes')
+        );
+
+        if (staffWorksNextDay || (nextDayIsHolidayOrSunday && staffWorksNextNextDay)) {
+          ndw = 'Yes';
+        }
+      }
+
+      // Col 12: OT (Overtime)
+      // Three conditions:
+      // 1. Sunday + worked → OT
+      // 2. Public holiday + worked → OT
+      // 3. Day=Yes AND Night=Yes AND NDW=Yes → OT
+      const worked = raw.day === 'Yes' || raw.night === 'Yes';
+      let ot = 0;
+      if (
+        (dow === 7 && worked) ||
+        (dateIsHoliday && worked) ||
+        (raw.day === 'Yes' && raw.night === 'Yes' && ndw === 'Yes')
+      ) {
+        ot = overtimeRates[mth] || 0;
+      }
+
+      // Col 13: OT_SITE = IF(OT>0, IF(Night="Yes", NightSite, DaySite), "")
+      const otSite = ot > 0 ? (raw.night === 'Yes' ? raw.nightSite : raw.daySite) : '';
+
+      // Col 14: Day_Wk
+      // =IF(OT="Yes",1, IF(AND(Day="No",Night="No"),0, IF(Day="No",1, IF(Night="Yes",2,1))))
+      let dayWk = 0;
+      if (ot > 0) {
+        dayWk = 1;
+      } else if (raw.day === 'No' && raw.night === 'No') {
+        dayWk = 0;
+      } else if (raw.day === 'No') {
+        dayWk = 1; // Night only
+      } else if (raw.night === 'Yes') {
+        dayWk = 2; // Day + Night
+      } else {
+        dayWk = 1; // Day only
+      }
+
+      // Col 18: IS PRESENT = IF(OR(Day="Yes",Night="Yes",NDW="Yes"),1,0)
+      const isPresent = (raw.day === 'Yes' || raw.night === 'Yes' || ndw === 'Yes') ? 'Yes' : 'No';
+
+      // Col 19: day2 = IF(Day="Yes",1,0) + IF(Night="Yes",1,0)
+      const day2 = (raw.day === 'Yes' ? 1 : 0) + (raw.night === 'Yes' ? 1 : 0);
+
+      return {
+        id: crypto.randomUUID(),
+        date: registerDate,
+        staffId: raw.empId,
+        staffName: raw.staffName,
+        position: raw.position,
+        dayClient: raw.dayClient,
+        daySite: raw.daySite,
+        nightClient: raw.nightClient,
+        nightSite: raw.nightSite,
+        day: raw.day,
+        night: raw.night,
+        absentStatus: raw.absentStatus,
+        nightWk,
+        ot,
+        otSite,
+        dayWk,
+        dow,
+        ndw,
+        mth,
+        isPresent,
+        day2,
+      };
+    });
 
     addAttendanceRecords(records);
     setLastEntryDate(registerDate);

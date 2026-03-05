@@ -24,23 +24,23 @@ export function Settings() {
         </div>
       </div>
 
-<Tabs defaultValue="general" className="w-full">
+<Tabs className="w-full">
         <TabsList className="mb-8 bg-slate-100">
-          <TabsTrigger value="general" className="w-32">
+          <TabsTrigger active={activeTab === 'general'} onClick={() => setActiveTab('general')} className="w-32">
             <Building className="mr-2 h-4 w-4" /> General
           </TabsTrigger>
-          <TabsTrigger value="security" className="w-32">
+          <TabsTrigger active={activeTab === 'security'} onClick={() => setActiveTab('security')} className="w-32">
             <Shield className="mr-2 h-4 w-4" /> Security
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="w-32">
+          <TabsTrigger active={activeTab === 'notifications'} onClick={() => setActiveTab('notifications')} className="w-32">
             <Bell className="mr-2 h-4 w-4" /> Notifications
           </TabsTrigger>
-          <TabsTrigger value="integrations" className="w-32">
+          <TabsTrigger active={activeTab === 'integrations'} onClick={() => setActiveTab('integrations')} className="w-32">
             <LinkIcon className="mr-2 h-4 w-4" /> Integrations
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general">
+        <TabsContent active={activeTab === 'general'}>
           <Card>
             <CardHeader>
               <CardTitle>Company Information</CardTitle>
@@ -72,7 +72,7 @@ export function Settings() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="security">
+        <TabsContent active={activeTab === 'security'}>
           <Card>
             <CardHeader>
               <CardTitle>Authentication & Access</CardTitle>
@@ -105,7 +105,7 @@ export function Settings() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications">
+        <TabsContent active={activeTab === 'notifications'}>
           <Card>
             <CardHeader>
               <CardTitle>Email & SMS Alerts</CardTitle>
@@ -135,7 +135,7 @@ export function Settings() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="integrations">
+        <TabsContent active={activeTab === 'integrations'}>
           <Card>
             <CardHeader>
               <CardTitle>Connected Services</CardTitle>
