@@ -16,28 +16,31 @@ import { Onboarding } from './pages/Onboarding';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 import { Variables } from './pages/Variables';
-import { SalaryLoans } from './pages/SalaryLoans';
+import { ToastContainer, ConfirmDialog } from './components/ui/toast';
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="attendance" element={<Attendance />} />
-          <Route path="employees" element={<Employees />} />
-          <Route path="sites" element={<Sites />} />
-          <Route path="payroll" element={<Payroll />} />
-          <Route path="salary-loans" element={<SalaryLoans />} />
-          <Route path="billing" element={<Billing />} />
-          <Route path="onboarding" element={<Onboarding />} />
-          <Route path="reports" element={<Reports />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="variables" element={<Variables />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <>
+      <ToastContainer />
+      <ConfirmDialog />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="attendance" element={<Attendance />} />
+            <Route path="employees" element={<Employees />} />
+            <Route path="sites" element={<Sites />} />
+            <Route path="payroll" element={<Payroll />} />
+            <Route path="billing" element={<Billing />} />
+            <Route path="onboarding" element={<Onboarding />} />
+            <Route path="reports" element={<Reports />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="variables" element={<Variables />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </>
   );
 }

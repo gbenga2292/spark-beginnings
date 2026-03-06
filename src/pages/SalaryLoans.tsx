@@ -4,504 +4,333 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import { Plus, X, Save, DollarSign, CreditCard, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { CheckCircle, XCircle, ArrowLeft } from 'lucide-react';
 import { useAppStore, SalaryAdvance, Loan } from '@/src/store/appStore';
+import logoSrc from '../../logo/logo-1.png';
+import { toast } from '@/src/components/ui/toast';
 
 export function SalaryLoans() {
-  const [activeTab, setActiveTab] = useState('advances');
-  const [showAdvanceForm, setShowAdvanceForm] = useState(false);
-  const [showLoanForm, setShowLoanForm] = useState(false);
-  
+  const [requestType, setRequestType] = useState('Salary Advance');
+  const [staffId, setStaffId] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [amount, setAmount] = useState('');
+  const [duration, setDuration] = useState('');
+  const [payStartDate, setPayStartDate] = useState('');
+
+  const [viewMode, setViewMode] = useState(false);
+
   const employees = useAppStore((state) => state.employees);
   const salaryAdvances = useAppStore((state) => state.salaryAdvances);
   const loans = useAppStore((state) => state.loans);
+
   const addSalaryAdvance = useAppStore((state) => state.addSalaryAdvance);
-  const updateSalaryAdvance = useAppStore((state) => state.updateSalaryAdvance);
   const addLoan = useAppStore((state) => state.addLoan);
+
+  const updateSalaryAdvance = useAppStore((state) => state.updateSalaryAdvance);
   const updateLoan = useAppStore((state) => state.updateLoan);
 
-  const [advanceForm, setAdvanceForm] = useState({
-    employeeId: '',
-    amount: 0,
-    requestDate: ''
-  });
+  const handleClear = () => {
+    setRequestType('Salary Advance');
+    setStaffId('');
+    setDate(new Date().toISOString().split('T')[0]);
+    setAmount('');
+    setDuration('');
+    setPayStartDate('');
+  };
 
-  const [loanForm, setLoanForm] = useState({
-    employeeId: '',
-    loanType: 'Personal Loan',
-    principalAmount: 0,
-    duration: 12,
-    paymentStartDate: ''
-  });
-
-  const handleSubmitAdvance = () => {
-    const emp = employees.find(e => e.id === advanceForm.employeeId);
-    if (!emp || !advanceForm.amount || !advanceForm.requestDate) {
-      alert("Please select an employee, enter amount and date");
+  const handleSubmit = () => {
+    const emp = employees.find(e => e.id === staffId);
+    if (!emp) {
+      toast.error('Please select a staff member');
       return;
     }
 
-    const newAdvance: SalaryAdvance = {
-      id: `SA-${Date.now()}`,
-      employeeId: advanceForm.employeeId,
-      employeeName: `${emp.surname} ${emp.firstname}`,
-      amount: advanceForm.amount,
-      requestDate: advanceForm.requestDate,
-      status: 'Pending'
-    };
-
-    addSalaryAdvance(newAdvance);
-    setShowAdvanceForm(false);
-    setAdvanceForm({ employeeId: '', amount: 0, requestDate: '' });
-  };
-
-  const handleSubmitLoan = () => {
-    const emp = employees.find(e => e.id === loanForm.employeeId);
-    if (!emp || !loanForm.principalAmount || !loanForm.paymentStartDate) {
-      alert("Please select an employee, enter amount, duration and payment start date");
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      toast.error('Please enter a valid amount');
       return;
     }
 
-    const monthlyDeduction = loanForm.principalAmount / loanForm.duration;
+    if (requestType === 'Salary Advance') {
+      const newAdvance: SalaryAdvance = {
+        id: `SA-${Date.now()}`,
+        employeeId: staffId,
+        employeeName: `${emp.surname} ${emp.firstname}`,
+        amount: Number(amount),
+        requestDate: date,
+        status: 'Pending'
+      };
+      addSalaryAdvance(newAdvance);
+      toast.success('Salary Advance Request Submitted Successfully');
+    } else {
+      if (!duration || isNaN(Number(duration)) || Number(duration) <= 0) {
+        toast.error('Please enter a valid duration in months for the loan');
+        return;
+      }
+      if (!payStartDate) {
+        toast.error('Please enter a Pay Start Date');
+        return;
+      }
 
-    const newLoan: Loan = {
-      id: `LN-${Date.now()}`,
-      employeeId: loanForm.employeeId,
-      employeeName: `${emp.surname} ${emp.firstname}`,
-      loanType: loanForm.loanType,
-      principalAmount: loanForm.principalAmount,
-      monthlyDeduction: monthlyDeduction,
-      duration: loanForm.duration,
-      startDate: new Date().toISOString().split('T')[0],
-      paymentStartDate: loanForm.paymentStartDate,
-      remainingBalance: loanForm.principalAmount,
-      status: 'Pending'
-    };
+      const principal = Number(amount);
+      const mths = Number(duration);
+      const monthlyDeduction = principal / mths;
 
-    addLoan(newLoan);
-    setShowLoanForm(false);
-    setLoanForm({
-      employeeId: '',
-      loanType: 'Personal Loan',
-      principalAmount: 0,
-      duration: 12,
-      paymentStartDate: ''
-    });
-  };
-
-  const handleApproveAdvance = (id: string) => {
-    updateSalaryAdvance(id, { status: 'Approved' });
-  };
-
-  const handleRejectAdvance = (id: string) => {
-    updateSalaryAdvance(id, { status: 'Rejected' });
-  };
-
-  const handleApproveLoan = (id: string) => {
-    updateLoan(id, { status: 'Active' });
-  };
-
-  const handleRejectLoan = (id: string) => {
-    updateLoan(id, { status: 'Rejected' });
+      const newLoan: Loan = {
+        id: `LN-${Date.now()}`,
+        employeeId: staffId,
+        employeeName: `${emp.surname} ${emp.firstname}`,
+        loanType: requestType,
+        principalAmount: principal,
+        monthlyDeduction: monthlyDeduction,
+        duration: mths,
+        startDate: date,
+        paymentStartDate: payStartDate,
+        remainingBalance: principal,
+        status: 'Pending'
+      };
+      addLoan(newLoan);
+      toast.success('Loan Request Submitted Successfully');
+    }
+    handleClear();
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Approved':
       case 'Active':
-        return <Badge variant="success" className="flex items-center gap-1"><CheckCircle className="h-3 w-3" /> {status}</Badge>;
+        return <Badge variant="success" className="flex items-center gap-1 w-max"><CheckCircle className="h-3 w-3" /> {status}</Badge>;
       case 'Rejected':
-        return <Badge variant="destructive" className="flex items-center gap-1"><XCircle className="h-3 w-3" /> {status}</Badge>;
+        return <Badge variant="destructive" className="flex items-center gap-1 w-max"><XCircle className="h-3 w-3" /> {status}</Badge>;
       case 'Pending':
-        return <Badge variant="warning" className="flex items-center gap-1"><Clock className="h-3 w-3" /> {status}</Badge>;
+        return <Badge variant="warning" className="flex items-center gap-1 w-max"> {status}</Badge>;
       case 'Deducted':
-        return <Badge className="bg-slate-500 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> {status}</Badge>;
       case 'Completed':
-        return <Badge variant="outline" className="flex items-center gap-1"><CheckCircle className="h-3 w-3" /> {status}</Badge>;
+        return <Badge className="bg-slate-500 w-max">{status}</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
   };
 
-  return (
-    <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Salary Advances & Loans</h1>
-          <p className="text-slate-500 mt-2">Manage employee salary advances and loan requests.</p>
+  if (viewMode) {
+    return (
+      <div className="flex flex-col gap-8 max-w-6xl mx-auto">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold">Entries Database</h2>
+          <Button onClick={() => setViewMode(false)} variant="outline" className="gap-2">
+            <ArrowLeft className="h-4 w-4" /> Back to Form
+          </Button>
         </div>
-      </div>
 
-      <Tabs>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger active={activeTab === 'advances'} onClick={() => setActiveTab('advances')}>Salary Advances</TabsTrigger>
-          <TabsTrigger active={activeTab === 'loans'} onClick={() => setActiveTab('loans')}>Loans</TabsTrigger>
-        </TabsList>
-
-        {/* Salary Advances Tab */}
-        <TabsContent active={activeTab === 'advances'} className="space-y-6">
-          <div className="flex justify-end">
-            <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700" onClick={() => setShowAdvanceForm(true)}>
-              <Plus className="h-4 w-4" /> Request Advance
-            </Button>
-          </div>
-
-          {showAdvanceForm && (
-            <Card className="border-t-4 border-t-indigo-600 shadow-md">
-              <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4 flex flex-row justify-between items-center">
-                <CardTitle className="text-indigo-900 text-xl">New Salary Advance Request</CardTitle>
-                <Button variant="ghost" size="icon" onClick={() => setShowAdvanceForm(false)}>
-                  <X className="h-5 w-5" />
-                </Button>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Employee</label>
-                    <select 
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                      value={advanceForm.employeeId}
-                      onChange={(e) => setAdvanceForm({...advanceForm, employeeId: e.target.value})}
-                    >
-                      <option value="">Select Employee</option>
-                      {employees.map(emp => (
-                        <option key={emp.id} value={emp.id}>{emp.surname} {emp.firstname}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Amount (₦)</label>
-                    <Input 
-                      type="number"
-                      placeholder="e.g. 100000"
-                      value={advanceForm.amount || ''}
-                      onChange={(e) => setAdvanceForm({...advanceForm, amount: parseFloat(e.target.value) || 0})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Request Date</label>
-                    <Input 
-                      type="date"
-                      value={advanceForm.requestDate}
-                      onChange={(e) => setAdvanceForm({...advanceForm, requestDate: e.target.value})}
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-4 mt-6">
-                  <Button variant="outline" onClick={() => setShowAdvanceForm(false)}>Cancel</Button>
-                  <Button onClick={handleSubmitAdvance} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
-                    <Save className="h-4 w-4" /> Submit Request
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Stats */}
-          <div className="grid gap-6 md:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">Total Requests</CardTitle>
-                <DollarSign className="h-4 w-4 text-slate-400" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-slate-900">{salaryAdvances.length}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">Pending</CardTitle>
-                <Clock className="h-4 w-4 text-amber-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-amber-600">
-                  {salaryAdvances.filter(a => a.status === 'Pending').length}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">Approved</CardTitle>
-                <CheckCircle className="h-4 w-4 text-emerald-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-emerald-600">
-                  {salaryAdvances.filter(a => a.status === 'Approved' || a.status === 'Deducted').length}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">Total Value</CardTitle>
-                <CreditCard className="h-4 w-4 text-indigo-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-slate-900">
-                  ₦{salaryAdvances.reduce((sum, a) => sum + a.amount, 0).toLocaleString()}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <Card>
-            <CardHeader className="border-b border-slate-100 pb-4">
-              <CardTitle>Salary Advance Requests</CardTitle>
+            <CardHeader>
+              <CardTitle>Salary Advances</CardTitle>
             </CardHeader>
-            <CardContent className="pt-4">
+            <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Employee</TableHead>
                     <TableHead>Amount</TableHead>
-                    <TableHead>Request Date</TableHead>
+                    <TableHead>Date</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {salaryAdvances.map((advance) => (
-                    <TableRow key={advance.id}>
-                      <TableCell className="font-medium">{advance.employeeName}</TableCell>
-                      <TableCell className="font-mono">₦{advance.amount.toLocaleString()}</TableCell>
-                      <TableCell>{advance.requestDate}</TableCell>
-                      <TableCell>{getStatusBadge(advance.status)}</TableCell>
+                  {salaryAdvances.map(sa => (
+                    <TableRow key={sa.id}>
+                      <TableCell className="font-medium">{sa.employeeName}</TableCell>
+                      <TableCell>₦{sa.amount.toLocaleString()}</TableCell>
+                      <TableCell>{sa.requestDate}</TableCell>
+                      <TableCell>{getStatusBadge(sa.status)}</TableCell>
                       <TableCell className="text-right">
-                        {advance.status === 'Pending' && (
-                          <div className="flex justify-end gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="text-emerald-600"
-                              onClick={() => handleApproveAdvance(advance.id)}
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="text-red-600"
-                              onClick={() => handleRejectAdvance(advance.id)}
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </Button>
+                        {sa.status === 'Pending' && (
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="ghost" className="text-emerald-600 h-8" onClick={() => updateSalaryAdvance(sa.id, { status: 'Approved' })}>Approve</Button>
+                            <Button size="sm" variant="ghost" className="text-red-600 h-8" onClick={() => updateSalaryAdvance(sa.id, { status: 'Rejected' })}>Reject</Button>
                           </div>
                         )}
-                        {advance.status === 'Approved' && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-indigo-600"
-                            onClick={() => updateSalaryAdvance(advance.id, { status: 'Deducted' })}
-                          >
-                            Mark as Deducted
-                          </Button>
+                        {sa.status === 'Approved' && (
+                          <span className="text-[11px] text-slate-400 font-medium italic">Auto-deducted</span>
                         )}
                       </TableCell>
                     </TableRow>
                   ))}
+                  {salaryAdvances.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-slate-500">No salary advances requested.</TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Loans Tab */}
-        <TabsContent active={activeTab === 'loans'} className="space-y-6">
-          <div className="flex justify-end">
-            <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700" onClick={() => setShowLoanForm(true)}>
-              <Plus className="h-4 w-4" /> Request Loan
-            </Button>
-          </div>
-
-          {showLoanForm && (
-            <Card className="border-t-4 border-t-indigo-600 shadow-md">
-              <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4 flex flex-row justify-between items-center">
-                <CardTitle className="text-indigo-900 text-xl">New Loan Request</CardTitle>
-                <Button variant="ghost" size="icon" onClick={() => setShowLoanForm(false)}>
-                  <X className="h-5 w-5" />
-                </Button>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Employee</label>
-                    <select 
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                      value={loanForm.employeeId}
-                      onChange={(e) => setLoanForm({...loanForm, employeeId: e.target.value})}
-                    >
-                      <option value="">Select Employee</option>
-                      {employees.map(emp => (
-                        <option key={emp.id} value={emp.id}>{emp.surname} {emp.firstname}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Loan Type</label>
-                    <select 
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                      value={loanForm.loanType}
-                      onChange={(e) => setLoanForm({...loanForm, loanType: e.target.value})}
-                    >
-                      <option value="Personal Loan">Personal Loan</option>
-                      <option value="Emergency Loan">Emergency Loan</option>
-                      <option value="Housing Loan">Housing Loan</option>
-                      <option value="Car Loan">Car Loan</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Principal Amount (₦)</label>
-                    <Input 
-                      type="number"
-                      placeholder="e.g. 500000"
-                      value={loanForm.principalAmount || ''}
-                      onChange={(e) => setLoanForm({...loanForm, principalAmount: parseFloat(e.target.value) || 0})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Duration (Months)</label>
-                    <Input 
-                      type="number"
-                      placeholder="e.g. 12"
-                      value={loanForm.duration || ''}
-                      onChange={(e) => setLoanForm({...loanForm, duration: parseInt(e.target.value) || 0})}
-                    />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium text-slate-700">Payment Start Date</label>
-                    <Input 
-                      type="date"
-                      value={loanForm.paymentStartDate}
-                      onChange={(e) => setLoanForm({...loanForm, paymentStartDate: e.target.value})}
-                    />
-                  </div>
-                  {loanForm.principalAmount > 0 && loanForm.duration > 0 && (
-                    <div className="md:col-span-2 p-4 bg-indigo-50 rounded-lg">
-                      <p className="text-sm text-indigo-700">
-                        <strong>Monthly Deduction:</strong> ₦{(loanForm.principalAmount / loanForm.duration).toLocaleString()} 
-                        <span className="text-xs ml-2">({loanForm.duration} months)</span>
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <div className="flex justify-end gap-4 mt-6">
-                  <Button variant="outline" onClick={() => setShowLoanForm(false)}>Cancel</Button>
-                  <Button onClick={handleSubmitLoan} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
-                    <Save className="h-4 w-4" /> Submit Request
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Stats */}
-          <div className="grid gap-6 md:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">Total Loans</CardTitle>
-                <DollarSign className="h-4 w-4 text-slate-400" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-slate-900">{loans.length}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">Pending</CardTitle>
-                <Clock className="h-4 w-4 text-amber-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-amber-600">
-                  {loans.filter(l => l.status === 'Pending').length}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">Active</CardTitle>
-                <CheckCircle className="h-4 w-4 text-emerald-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-emerald-600">
-                  {loans.filter(l => l.status === 'Active').length}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">Total Outstanding</CardTitle>
-                <CreditCard className="h-4 w-4 text-indigo-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-slate-900">
-                  ₦{loans.reduce((sum, l) => sum + l.remainingBalance, 0).toLocaleString()}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
 
           <Card>
-            <CardHeader className="border-b border-slate-100 pb-4">
-              <CardTitle>Loan Requests</CardTitle>
+            <CardHeader>
+              <CardTitle>Loans</CardTitle>
             </CardHeader>
-            <CardContent className="pt-4">
+            <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Employee</TableHead>
-                    <TableHead>Loan Type</TableHead>
-                    <TableHead>Principal</TableHead>
-                    <TableHead>Monthly Ded.</TableHead>
+                    <TableHead>Amount</TableHead>
                     <TableHead>Duration</TableHead>
-                    <TableHead>Balance</TableHead>
-                    <TableHead>Start Date</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {loans.map((loan) => (
-                    <TableRow key={loan.id}>
-                      <TableCell className="font-medium">{loan.employeeName}</TableCell>
-                      <TableCell>{loan.loanType}</TableCell>
-                      <TableCell className="font-mono">₦{loan.principalAmount.toLocaleString()}</TableCell>
-                      <TableCell className="font-mono">₦{loan.monthlyDeduction.toLocaleString()}</TableCell>
-                      <TableCell>{loan.duration} months</TableCell>
-                      <TableCell className="font-mono">₦{loan.remainingBalance.toLocaleString()}</TableCell>
-                      <TableCell>{loan.paymentStartDate}</TableCell>
-                      <TableCell>{getStatusBadge(loan.status)}</TableCell>
+                  {loans.map(ln => (
+                    <TableRow key={ln.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex flex-col">
+                          <span>{ln.employeeName}</span>
+                          <span className="text-xs text-slate-500">{ln.loanType}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>₦{ln.principalAmount.toLocaleString()}</TableCell>
+                      <TableCell>{ln.duration} mos</TableCell>
+                      <TableCell>{getStatusBadge(ln.status)}</TableCell>
                       <TableCell className="text-right">
-                        {loan.status === 'Pending' && (
-                          <div className="flex justify-end gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="text-emerald-600"
-                              onClick={() => handleApproveLoan(loan.id)}
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="text-red-600"
-                              onClick={() => handleRejectLoan(loan.id)}
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </Button>
+                        {ln.status === 'Pending' && (
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="ghost" className="text-emerald-600 h-8" onClick={() => updateLoan(ln.id, { status: 'Active' })}>Approve</Button>
+                            <Button size="sm" variant="ghost" className="text-red-600 h-8" onClick={() => updateLoan(ln.id, { status: 'Rejected' })}>Reject</Button>
                           </div>
+                        )}
+                        {ln.status === 'Active' && (
+                          <span className="text-[11px] text-slate-400 font-medium italic">Auto-deducted</span>
                         )}
                       </TableCell>
                     </TableRow>
                   ))}
+                  {loans.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-slate-500">No loans requested.</TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-center min-h-[80vh] bg-slate-50/50 p-4">
+      <div className="bg-white rounded-lg shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden w-full max-w-xl">
+        <div className="p-8 pb-10">
+          <div className="flex justify-center mb-6">
+            <img src={logoSrc} alt="Dewatering Construction etc ltd" className="h-28 object-contain" />
+          </div>
+
+          <h1 className="text-center text-2xl font-black mb-8 uppercase tracking-wide">
+            LOANS AND SALARY ADVANCE FORM
+          </h1>
+
+          <div className="space-y-5 px-4 md:px-8">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <label className="sm:w-32 font-bold text-sm shrink-0">Request Type:</label>
+              <select
+                value={requestType}
+                onChange={(e) => setRequestType(e.target.value)}
+                className="flex-1 h-10 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm font-semibold"
+              >
+                <option value="Salary Advance">Salary Advance</option>
+                <option value="Personal Loan">Personal Loan</option>
+                <option value="Emergency Loan">Emergency Loan</option>
+                <option value="Housing Loan">Housing Loan</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <label className="sm:w-32 font-bold text-sm shrink-0">Staff:</label>
+              <select
+                value={staffId}
+                onChange={(e) => setStaffId(e.target.value)}
+                className="flex-1 h-10 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm font-semibold"
+              >
+                <option value="">Select Staff</option>
+                {employees.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.surname} {emp.firstname}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <label className="sm:w-32 font-bold text-sm shrink-0">Date:</label>
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="flex-1 font-semibold"
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <label className="sm:w-32 font-bold text-sm shrink-0">Amount:</label>
+              <Input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="e.g. 50000"
+                className="flex-1 font-semibold"
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <label className="sm:w-32 font-bold text-sm shrink-0">Duration:</label>
+              <div className="flex-1 flex items-center gap-3">
+                <Input
+                  type="number"
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                  disabled={requestType === 'Salary Advance'}
+                  className="w-24 font-semibold"
+                />
+                <span className="font-bold text-sm">Months</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <label className="sm:w-32 font-bold text-sm shrink-0">Pay Start Date:</label>
+              <Input
+                type="date"
+                value={payStartDate}
+                onChange={(e) => setPayStartDate(e.target.value)}
+                disabled={requestType === 'Salary Advance'}
+                className="flex-1 font-semibold"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="px-8 pb-8 flex justify-center gap-4">
+          <Button
+            onClick={handleClear}
+            className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 h-10 border-2 border-red-700 w-32"
+          >
+            Clear Form
+          </Button>
+          <Button
+            onClick={() => setViewMode(true)}
+            className="bg-slate-600 hover:bg-slate-700 text-white font-bold px-6 h-10 border-2 border-slate-700 w-32"
+          >
+            View Entries
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            className="bg-[#0078d4] hover:bg-[#0060a8] text-white font-bold px-6 h-10 border-2 border-[#005a9e] shadow-[0_2px_4px_rgba(0,120,212,0.4)] w-32"
+          >
+            Submit Entry
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
-

@@ -6,6 +6,7 @@ import { Badge } from '@/src/components/ui/badge';
 import { Input } from '@/src/components/ui/input';
 import { Download, Plus, FileText, Send, MoreHorizontal, X, Save } from 'lucide-react';
 import { useAppStore, Invoice } from '@/src/store/appStore';
+import { toast, showConfirm } from '@/src/components/ui/toast';
 
 export function Billing() {
   const [isAdding, setIsAdding] = useState(false);
@@ -21,7 +22,7 @@ export function Billing() {
     reminderDate: '',
     status: 'Draft' as 'Draft' | 'Sent' | 'Paid' | 'Overdue'
   });
-  
+
   const invoices = useAppStore((state) => state.invoices);
   const sites = useAppStore((state) => state.sites);
   const addInvoice = useAppStore((state) => state.addInvoice);
@@ -32,15 +33,15 @@ export function Billing() {
   const totalOutstanding = invoices
     .filter(inv => inv.status !== 'Paid')
     .reduce((sum, inv) => sum + inv.amount, 0);
-  
+
   const overdueAmount = invoices
     .filter(inv => inv.status === 'Overdue')
     .reduce((sum, inv) => sum + inv.amount, 0);
-  
+
   const paidThisMonth = invoices
     .filter(inv => inv.status === 'Paid')
     .reduce((sum, inv) => sum + inv.amount, 0);
-  
+
   const draftAmount = invoices
     .filter(inv => inv.status === 'Draft')
     .reduce((sum, inv) => sum + inv.amount, 0);
@@ -58,10 +59,10 @@ export function Billing() {
 
   const handleCreateInvoice = () => {
     if (!newInvoice.client || !newInvoice.amount || !newInvoice.date) {
-      alert("Client, Amount, and Date are required.");
+      toast.error('Client, Amount, and Date are required.');
       return;
     }
-    
+
     const invoice: Invoice = {
       id: generateInvoiceNumber(),
       invoiceNumber: generateInvoiceNumber(),
@@ -76,9 +77,10 @@ export function Billing() {
       reminderDate: newInvoice.reminderDate,
       status: newInvoice.status
     };
-    
+
     addInvoice(invoice);
     setIsAdding(false);
+    toast.success('Invoice created successfully.');
     setNewInvoice({ client: '', project: '', siteId: '', siteName: '', amount: 0, date: '', dueDate: '', billingCycle: 'Monthly', reminderDate: '', status: 'Draft' });
   };
 
@@ -116,19 +118,22 @@ Thank you for your continued business. We look forward to serving you.
 Best regards,
 Finance Team
     `.trim();
-    
+
     // Open email client with pre-filled content
     const subject = encodeURIComponent(`Invoice ${invoice.invoiceNumber || invoice.id} - Payment Due`);
     const body = encodeURIComponent(emailContent);
     window.open(`mailto:?subject=${subject}&body=${body}`);
-    
+
     // Also update status
     updateInvoice(invoice.id, { status: 'Sent' });
+    toast.success('Invoice marked as sent.');
   };
 
-  const handleDeleteInvoice = (id: string) => {
-    if (confirm("Are you sure you want to delete this invoice?")) {
+  const handleDeleteInvoice = async (id: string) => {
+    const ok = await showConfirm('Are you sure you want to delete this invoice?', { variant: 'danger', confirmLabel: 'Delete' });
+    if (ok) {
       deleteInvoice(id);
+      toast.success('Invoice deleted.');
     }
   };
 
@@ -163,28 +168,28 @@ Finance Team
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Client</label>
-                <Input 
-                  placeholder="e.g. Acme Corp" 
-                  value={newInvoice.client} 
-                  onChange={(e) => setNewInvoice({...newInvoice, client: e.target.value})} 
+                <Input
+                  placeholder="e.g. Acme Corp"
+                  value={newInvoice.client}
+                  onChange={(e) => setNewInvoice({ ...newInvoice, client: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Project</label>
-                <Input 
-                  placeholder="e.g. Website Redesign" 
-                  value={newInvoice.project} 
-                  onChange={(e) => setNewInvoice({...newInvoice, project: e.target.value})} 
+                <Input
+                  placeholder="e.g. Website Redesign"
+                  value={newInvoice.project}
+                  onChange={(e) => setNewInvoice({ ...newInvoice, project: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Site</label>
-                <select 
+                <select
                   className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
                   value={newInvoice.siteId}
                   onChange={(e) => {
                     const site = sites.find(s => s.id === e.target.value);
-                    setNewInvoice({...newInvoice, siteId: e.target.value, siteName: site?.name || ''});
+                    setNewInvoice({ ...newInvoice, siteId: e.target.value, siteName: site?.name || '' });
                   }}
                 >
                   <option value="">Select Site (Optional)</option>
@@ -195,19 +200,19 @@ Finance Team
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Amount (₦)</label>
-                <Input 
+                <Input
                   type="number"
-                  placeholder="e.g. 1000000" 
-                  value={newInvoice.amount || ''} 
-                  onChange={(e) => setNewInvoice({...newInvoice, amount: parseFloat(e.target.value) || 0})} 
+                  placeholder="e.g. 1000000"
+                  value={newInvoice.amount || ''}
+                  onChange={(e) => setNewInvoice({ ...newInvoice, amount: parseFloat(e.target.value) || 0 })}
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Billing Cycle</label>
-                <select 
+                <select
                   className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
                   value={newInvoice.billingCycle}
-                  onChange={(e) => setNewInvoice({...newInvoice, billingCycle: e.target.value as any})}
+                  onChange={(e) => setNewInvoice({ ...newInvoice, billingCycle: e.target.value as any })}
                 >
                   <option value="Weekly">Weekly</option>
                   <option value="Bi-Weekly">Bi-Weekly</option>
@@ -217,34 +222,34 @@ Finance Team
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Issue Date</label>
-                <Input 
+                <Input
                   type="date"
-                  value={newInvoice.date} 
-                  onChange={(e) => setNewInvoice({...newInvoice, date: e.target.value})} 
+                  value={newInvoice.date}
+                  onChange={(e) => setNewInvoice({ ...newInvoice, date: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Due Date</label>
-                <Input 
+                <Input
                   type="date"
-                  value={newInvoice.dueDate} 
-                  onChange={(e) => setNewInvoice({...newInvoice, dueDate: e.target.value})} 
+                  value={newInvoice.dueDate}
+                  onChange={(e) => setNewInvoice({ ...newInvoice, dueDate: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Reminder Date</label>
-                <Input 
+                <Input
                   type="date"
-                  value={newInvoice.reminderDate} 
-                  onChange={(e) => setNewInvoice({...newInvoice, reminderDate: e.target.value})} 
+                  value={newInvoice.reminderDate}
+                  onChange={(e) => setNewInvoice({ ...newInvoice, reminderDate: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Status</label>
-                <select 
+                <select
                   className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
                   value={newInvoice.status}
-                  onChange={(e) => setNewInvoice({...newInvoice, status: e.target.value as any})}
+                  onChange={(e) => setNewInvoice({ ...newInvoice, status: e.target.value as any })}
                 >
                   <option value="Draft">Draft</option>
                   <option value="Sent">Sent</option>
@@ -329,11 +334,11 @@ Finance Team
                   <TableCell className="text-slate-500">{invoice.date}</TableCell>
                   <TableCell className="text-slate-500">{invoice.dueDate}</TableCell>
                   <TableCell>
-                    <Badge 
+                    <Badge
                       variant={
-                        invoice.status === 'Paid' ? 'success' : 
-                        invoice.status === 'Overdue' ? 'destructive' : 
-                        invoice.status === 'Sent' ? 'secondary' : 'outline'
+                        invoice.status === 'Paid' ? 'success' :
+                          invoice.status === 'Overdue' ? 'destructive' :
+                            invoice.status === 'Sent' ? 'secondary' : 'outline'
                       }
                     >
                       {invoice.status}
@@ -342,10 +347,10 @@ Finance Team
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       {invoice.status === 'Draft' && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-indigo-600" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-indigo-600"
                           title="Send"
                           onClick={() => handleSendInvoice(invoice)}
                         >
@@ -355,9 +360,9 @@ Finance Team
                       <Button variant="ghost" size="icon" className="text-slate-500" title="View PDF">
                         <FileText className="h-4 w-4" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="text-red-500"
                         title="Delete"
                         onClick={() => handleDeleteInvoice(invoice.id)}

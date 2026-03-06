@@ -4,110 +4,157 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
-import { useAppStore } from '@/src/store/appStore';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2 } from 'lucide-react';
+import { useAppStore, Site } from '@/src/store/appStore';
+import { toast, showConfirm } from '@/src/components/ui/toast';
+
+const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No', status: 'Active' as 'Active' | 'Inactive' };
 
 export function Sites() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [newSiteName, setNewSiteName] = useState('');
-  const [newClientName, setNewClientName] = useState('');
-  const [editForm, setEditForm] = useState({ name: '', client: '', status: 'Active' as 'Active' | 'Inactive' });
-  
-  const sites = useAppStore((state) => state.sites);
-  const addSite = useAppStore((state) => state.addSite);
-  const updateSite = useAppStore((state) => state.updateSite);
-  const deleteSite = useAppStore((state) => state.deleteSite);
+  const [addForm, setAddForm] = useState({ ...EMPTY_FORM });
+  const [editForm, setEditForm] = useState({ ...EMPTY_FORM });
+  const [addError, setAddError] = useState('');
 
-  const filteredSites = sites.filter(site => 
+  const sites = useAppStore((s) => s.sites);
+  const addSite = useAppStore((s) => s.addSite);
+  const updateSite = useAppStore((s) => s.updateSite);
+  const deleteSite = useAppStore((s) => s.deleteSite);
+
+  const filteredSites = sites.filter(site =>
     site.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     site.client.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAddSite = () => {
-    if (!newSiteName || !newClientName) {
-      alert("Site Name and Client are required.");
+  const isDuplicate = (name: string, client: string, excludeId?: string) =>
+    sites.some(s =>
+      s.name.trim().toLowerCase() === name.trim().toLowerCase() &&
+      s.client.trim().toLowerCase() === client.trim().toLowerCase() &&
+      s.id !== excludeId
+    );
+
+  const handleAdd = () => {
+    if (!addForm.name || !addForm.client) { setAddError('Site name and client are required.'); return; }
+    if (isDuplicate(addForm.name, addForm.client)) {
+      setAddError(`"${addForm.client} – ${addForm.name}" already exists. Client + Site combination must be unique.`);
       return;
     }
-    
     addSite({
-      id: `S-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-      name: newSiteName,
-      client: newClientName,
-      status: 'Active'
+      id: `S-${Date.now().toString().slice(-4)}`,
+      name: addForm.name.trim(),
+      client: addForm.client.trim(),
+      vat: addForm.vat,
+      status: addForm.status,
     });
-    
-    setNewSiteName('');
-    setNewClientName('');
+    setAddForm({ ...EMPTY_FORM });
+    setAddError('');
     setIsAdding(false);
   };
 
-  const handleEditClick = (site: { id: string; name: string; client: string; status: 'Active' | 'Inactive' }) => {
+  const handleEditStart = (site: Site) => {
     setEditingId(site.id);
-    setEditForm({ name: site.name, client: site.client, status: site.status });
+    setEditForm({ name: site.name, client: site.client, vat: site.vat, status: site.status });
   };
 
   const handleSaveEdit = () => {
-    if (editingId) {
-      updateSite(editingId, editForm);
-      setEditingId(null);
+    if (!editingId) return;
+    if (!editForm.name || !editForm.client) return;
+    if (isDuplicate(editForm.name, editForm.client, editingId)) {
+      toast.error(`"${editForm.client} – ${editForm.name}" already exists. Client + Site must be unique.`);
+      return;
     }
+    updateSite(editingId, editForm);
+    setEditingId(null);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this site?")) {
-      deleteSite(id);
-    }
+  const handleDelete = async (id: string) => {
+    const ok = await showConfirm('Delete this site?', { variant: 'danger', confirmLabel: 'Delete' });
+    if (ok) { deleteSite(id); toast.success('Site deleted.'); }
   };
+
+  const uniqueClients = new Set(sites.map(s => s.client)).size;
 
   return (
     <div className="flex flex-col gap-8">
+      {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Sites & Clients</h1>
-          <p className="text-slate-500 mt-2">Manage your project sites, locations, and client catalog.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Sites &amp; Clients</h1>
+          <p className="text-slate-500 mt-2">
+            Manage project sites and clients. Each <strong>Client + Site</strong> combination is unique.
+          </p>
         </div>
-        <div className="flex gap-3">
-          {!isAdding && (
-            <Button onClick={() => setIsAdding(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
-              <Plus className="h-4 w-4" />
-              Add New Site
-            </Button>
-          )}
-        </div>
+        {!isAdding && (
+          <Button onClick={() => setIsAdding(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+            <Plus className="h-4 w-4" /> Add New Site
+          </Button>
+        )}
       </div>
 
+      {/* ── Add form ─────────────────────────────────────────────── */}
       {isAdding && (
         <Card className="border-t-4 border-t-indigo-600 shadow-md">
           <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4 flex flex-row justify-between items-center">
             <CardTitle className="text-indigo-900 text-xl">Add New Site</CardTitle>
-            <Button variant="ghost" size="icon" onClick={() => setIsAdding(false)}>
+            <Button variant="ghost" size="icon" onClick={() => { setIsAdding(false); setAddError(''); }}>
               <X className="h-5 w-5" />
             </Button>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Site Name</label>
-                <Input 
-                  placeholder="e.g. Louiseville" 
-                  value={newSiteName} 
-                  onChange={(e) => setNewSiteName(e.target.value)} 
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-slate-700">Client <span className="text-red-500">*</span></label>
+                <Input
+                  placeholder="Select or type client name"
+                  list="existing-clients"
+                  value={addForm.client}
+                  onChange={e => setAddForm({ ...addForm, client: e.target.value })}
                 />
+                <datalist id="existing-clients">
+                  {[...new Set(sites.map(s => s.client))].map(c => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+                <p className="text-xs text-slate-400">A client can have multiple sites</p>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Client</label>
-                <Input 
-                  placeholder="e.g. Alpha Corp" 
-                  value={newClientName} 
-                  onChange={(e) => setNewClientName(e.target.value)} 
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-slate-700">Site Name <span className="text-red-500">*</span></label>
+                <Input
+                  placeholder="e.g. Louiseville"
+                  value={addForm.name}
+                  onChange={e => setAddForm({ ...addForm, name: e.target.value })}
                 />
+                <p className="text-xs text-slate-400">Must be unique per client</p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-slate-700">VAT</label>
+                <select
+                  value={addForm.vat}
+                  onChange={e => setAddForm({ ...addForm, vat: e.target.value as 'Yes' | 'No' })}
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-slate-700">Status</label>
+                <select
+                  value={addForm.status}
+                  onChange={e => setAddForm({ ...addForm, status: e.target.value as 'Active' | 'Inactive' })}
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
               </div>
             </div>
-            <div className="flex justify-end gap-4 mt-6">
-              <Button variant="outline" onClick={() => setIsAdding(false)}>Cancel</Button>
-              <Button onClick={handleAddSite} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
+            {addError && <p className="text-sm text-red-600 mb-4">{addError}</p>}
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => { setIsAdding(false); setAddError(''); }}>Cancel</Button>
+              <Button onClick={handleAdd} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
                 <Save className="h-4 w-4" /> Save Site
               </Button>
             </div>
@@ -115,8 +162,9 @@ export function Sites() {
         </Card>
       )}
 
+      {/* ── Summary cards ─────────────────────────────────────────── */}
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="col-span-1 border-indigo-100 bg-indigo-50/50">
+        <Card className="border-indigo-100 bg-indigo-50/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-indigo-900">Total Active Sites</CardTitle>
             <MapPin className="h-4 w-4 text-indigo-600" />
@@ -126,116 +174,131 @@ export function Sites() {
             <p className="text-xs text-indigo-600 mt-1">Currently operational</p>
           </CardContent>
         </Card>
-        <Card className="col-span-1 border-slate-200">
+        <Card className="border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-slate-500">Total Clients</CardTitle>
             <Building2 className="h-4 w-4 text-slate-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-slate-900">
-              {new Set(sites.map(s => s.client)).size}
-            </div>
+            <div className="text-3xl font-bold text-slate-900">{uniqueClients}</div>
             <p className="text-xs text-slate-500 mt-1">Unique clients</p>
+          </CardContent>
+        </Card>
+        <Card className="border-emerald-100 bg-emerald-50/50">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-emerald-900">VAT Registered Sites</CardTitle>
+            <span className="text-emerald-600 font-bold text-sm">VAT</span>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-emerald-900">{sites.filter(s => s.vat === 'Yes').length}</div>
+            <p className="text-xs text-emerald-600 mt-1">Sites with VAT enabled</p>
           </CardContent>
         </Card>
       </div>
 
+      {/* ── Table ─────────────────────────────────────────────────── */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-          <div className="relative w-72">
+        <div className="p-4 border-b border-slate-200 flex items-center gap-3">
+          <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
             <Input
               placeholder="Search sites or clients..."
               className="pl-9"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
+          <span className="text-xs text-slate-400">{filteredSites.length} of {sites.length} sites</span>
         </div>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Site ID</TableHead>
-              <TableHead>Site Name</TableHead>
               <TableHead>Client</TableHead>
+              <TableHead>Site Name</TableHead>
+              <TableHead className="text-center">VAT</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredSites.map((site) => (
+            {filteredSites.map(site => (
               <TableRow key={site.id}>
                 <TableCell className="font-mono text-xs text-slate-500">{site.id}</TableCell>
+
+                {/* Client */}
                 <TableCell className="font-medium text-slate-900">
                   {editingId === site.id ? (
-                    <Input 
-                      value={editForm.name}
-                      onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                      className="h-8"
-                    />
-                  ) : site.name}
-                </TableCell>
-                <TableCell>
-                  {editingId === site.id ? (
-                    <Input 
-                      value={editForm.client}
-                      onChange={(e) => setEditForm({...editForm, client: e.target.value})}
-                      className="h-8"
-                    />
+                    <>
+                      <Input value={editForm.client} className="h-8" list="edit-clients"
+                        onChange={e => setEditForm({ ...editForm, client: e.target.value })} />
+                      <datalist id="edit-clients">
+                        {[...new Set(sites.map(s => s.client))].map(c => (
+                          <option key={c} value={c} />
+                        ))}
+                      </datalist>
+                    </>
                   ) : site.client}
                 </TableCell>
+
+                {/* Site Name */}
+                <TableCell>
+                  {editingId === site.id
+                    ? <Input value={editForm.name} className="h-8" onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+                    : site.name}
+                </TableCell>
+
+                {/* VAT */}
+                <TableCell className="text-center">
+                  {editingId === site.id ? (
+                    <select
+                      value={editForm.vat}
+                      onChange={e => setEditForm({ ...editForm, vat: e.target.value as 'Yes' | 'No' })}
+                      className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm"
+                    >
+                      <option value="No">No</option>
+                      <option value="Yes">Yes</option>
+                    </select>
+                  ) : (
+                    <Badge variant={site.vat === 'Yes' ? 'success' : 'secondary'}>
+                      {site.vat}
+                    </Badge>
+                  )}
+                </TableCell>
+
+                {/* Status */}
                 <TableCell>
                   {editingId === site.id ? (
-                    <select 
+                    <select
                       value={editForm.status}
-                      onChange={(e) => setEditForm({...editForm, status: e.target.value as 'Active' | 'Inactive'})}
-                      className="flex h-8 rounded-md border border-slate-200 bg-white px-2 py-1 text-sm"
+                      onChange={e => setEditForm({ ...editForm, status: e.target.value as 'Active' | 'Inactive' })}
+                      className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm"
                     >
                       <option value="Active">Active</option>
                       <option value="Inactive">Inactive</option>
                     </select>
                   ) : (
-                    <Badge variant={site.status === 'Active' ? 'success' : 'secondary'}>
-                      {site.status}
-                    </Badge>
+                    <Badge variant={site.status === 'Active' ? 'success' : 'secondary'}>{site.status}</Badge>
                   )}
                 </TableCell>
+
+                {/* Actions */}
                 <TableCell className="text-right">
                   {editingId === site.id ? (
                     <div className="flex justify-end gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-emerald-600"
-                        onClick={handleSaveEdit}
-                      >
+                      <Button variant="ghost" size="sm" className="text-emerald-600" onClick={handleSaveEdit}>
                         <Save className="h-4 w-4" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-slate-500"
-                        onClick={() => setEditingId(null)}
-                      >
+                      <Button variant="ghost" size="sm" className="text-slate-500" onClick={() => setEditingId(null)}>
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
                   ) : (
                     <div className="flex justify-end gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-indigo-600"
-                        onClick={() => handleEditClick(site)}
-                      >
+                      <Button variant="ghost" size="sm" className="text-indigo-600" onClick={() => handleEditStart(site)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-red-600"
-                        onClick={() => handleDelete(site.id)}
-                      >
+                      <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDelete(site.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -245,7 +308,7 @@ export function Sites() {
             ))}
             {filteredSites.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                <TableCell colSpan={6} className="text-center py-8 text-slate-500">
                   No sites found matching your search.
                 </TableCell>
               </TableRow>
@@ -253,6 +316,8 @@ export function Sites() {
           </TableBody>
         </Table>
       </div>
+
+      {/* ── Tax Brackets (Variables.tsx handles this now — just link hint) */}
     </div>
   );
 }

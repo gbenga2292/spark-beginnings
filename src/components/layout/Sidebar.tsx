@@ -1,11 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/src/lib/utils';
-import { 
-  LayoutDashboard, 
-  Users, 
-  CalendarClock, 
-  Wallet, 
-  FileText, 
+import {
+  LayoutDashboard,
+  Users,
+  CalendarClock,
+  Wallet,
+  FileText,
   Settings,
   UserPlus,
   Briefcase,
@@ -27,7 +27,6 @@ const navigation = [
   { name: 'Sites & Clients', href: '/sites', icon: MapPin },
   { name: 'Onboarding', href: '/onboarding', icon: UserPlus },
   { name: 'Payroll', href: '/payroll', icon: Wallet },
-  { name: 'Salary & Loans', href: '/salary-loans', icon: CreditCard },
   { name: 'Billing', href: '/billing', icon: Briefcase },
   { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Variables', href: '/variables', icon: Library },
@@ -37,7 +36,7 @@ const navigation = [
 export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const location = useLocation();
 
-return (
+  return (
     <div className="flex h-full w-64 flex-col border-r border-slate-200 bg-slate-50">
       <div className="flex h-16 shrink-0 items-center px-6">
         <div className="flex items-center gap-2 font-bold text-xl text-indigo-600">

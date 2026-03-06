@@ -7,6 +7,7 @@ import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { format } from 'date-fns';
+import { toast, showConfirm } from '@/src/components/ui/toast';
 
 export function Attendance() {
   const employees = useAppStore((state) => state.employees);
@@ -20,9 +21,9 @@ export function Attendance() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('entry');
   const [departmentFilter, setDepartmentFilter] = useState('All');
-  
+
   const departments = useAppStore((state) => state.departments);
-  
+
   // State for the current form
   const [attendanceData, setAttendanceData] = useState<Record<string, { day: string, night: string }>>({});
 
@@ -73,10 +74,9 @@ export function Attendance() {
     }));
   };
 
-  const handleClear = () => {
-    if (confirm('Are you sure you want to clear the current form?')) {
-      setAttendanceData({});
-    }
+  const handleClear = async () => {
+    const ok = await showConfirm('Are you sure you want to clear the current form?', { variant: 'danger', confirmLabel: 'Clear' });
+    if (ok) setAttendanceData({});
   };
 
   const isAbsentStatus = (txt: string) => {
@@ -88,10 +88,10 @@ export function Attendance() {
     if (!src) return { site: currentSite, shift: currentShift, reason: currentReason };
     const upperSrc = src.toUpperCase();
     if (["ABSENT", "NO WORK", "ABSENT WITHOUT PERMIT", "SUSPENSION", "OFF DUTY"].includes(upperSrc)) {
-        return { site: src, shift: "No", reason: src };
+      return { site: src, shift: "No", reason: src };
     }
     if (["ABSENT WITH PERMIT", "ON LEAVE", "SICK LEAVE", "MATERNITY LEAVE", "ANNUAL LEAVE", "PUBLIC HOLIDAY"].includes(upperSrc)) {
-        return { site: src, shift: "Yes", reason: src };
+      return { site: src, shift: "Yes", reason: src };
     }
     return { site: src, shift: "Yes", reason: currentReason };
   };
@@ -124,12 +124,11 @@ export function Attendance() {
     return jsDay === 0 ? 7 : jsDay; // Convert to 1=Mon...7=Sun
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const existingRecords = attendanceRecords.filter(r => r.date === registerDate);
     if (existingRecords.length > 0) {
-      if (!confirm(`Entries already exist for ${registerDate}. Click OK to overwrite them, or Cancel to abort.`)) {
-        return;
-      }
+      const ok = await showConfirm(`Entries already exist for ${registerDate}. Click OK to overwrite them, or Cancel to abort.`, { confirmLabel: 'Overwrite' });
+      if (!ok) return;
       removeAttendanceRecordsByDate(registerDate);
     }
 
@@ -203,7 +202,7 @@ export function Attendance() {
     });
 
     if (rawRecords.length === 0) {
-      alert("No attendance data selected to submit.");
+      toast.error('No attendance data selected to submit.');
       return;
     }
 
@@ -308,7 +307,7 @@ export function Attendance() {
 
     addAttendanceRecords(records);
     setLastEntryDate(registerDate);
-    alert(`Successfully saved ${records.length} records to the database!`);
+    toast.success(`Successfully saved ${records.length} records to the database!`);
   };
 
   const filledCount = Object.keys(attendanceData).filter(k => attendanceData[k]?.day || attendanceData[k]?.night).length;
@@ -323,16 +322,16 @@ export function Attendance() {
         </div>
         <div className="flex items-center gap-2">
           <TabsList className="bg-slate-100 h-8">
-            <TabsTrigger 
-              active={activeTab === 'entry'} 
-              onClick={() => setActiveTab('entry')} 
+            <TabsTrigger
+              active={activeTab === 'entry'}
+              onClick={() => setActiveTab('entry')}
               className="gap-1.5 text-xs h-7 px-3"
             >
               <CalendarIcon className="h-3 w-3" /> Entry
             </TabsTrigger>
-            <TabsTrigger 
-              active={activeTab === 'database'} 
-              onClick={() => setActiveTab('database')} 
+            <TabsTrigger
+              active={activeTab === 'database'}
+              onClick={() => setActiveTab('database')}
               className="gap-1.5 text-xs h-7 px-3"
             >
               <Database className="h-3 w-3" /> Database
@@ -351,8 +350,8 @@ export function Attendance() {
               <span className="text-xs font-mono font-medium text-slate-700">{lastEntryDate}</span>
               <div className="w-px h-4 bg-slate-200" />
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Date</span>
-              <Input 
-                type="date" 
+              <Input
+                type="date"
                 value={registerDate}
                 onChange={(e) => setRegisterDate(e.target.value)}
                 className="h-7 text-xs border-0 bg-transparent p-0 w-28 font-mono focus-visible:ring-0"
@@ -429,19 +428,17 @@ export function Attendance() {
                       const isAbsent = dayVal && isAbsentStatus(dayVal);
 
                       return (
-                        <tr 
-                          key={employee.id} 
-                          className={`transition-colors ${
-                            isAbsent ? 'bg-red-50/50' : 
-                            hasEntry ? 'bg-emerald-50/40' : 
-                            idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
-                          } hover:bg-slate-100/60`}
+                        <tr
+                          key={employee.id}
+                          className={`transition-colors ${isAbsent ? 'bg-red-50/50' :
+                              hasEntry ? 'bg-emerald-50/40' :
+                                idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
+                            } hover:bg-slate-100/60`}
                         >
                           <td className="py-1 px-3">
                             <div className="flex items-center gap-2">
-                              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                                isAbsent ? 'bg-red-400' : hasEntry ? 'bg-emerald-400' : 'bg-slate-300'
-                              }`} />
+                              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isAbsent ? 'bg-red-400' : hasEntry ? 'bg-emerald-400' : 'bg-slate-300'
+                                }`} />
                               <span className="font-medium text-slate-800 text-xs truncate">
                                 {employee.surname} {employee.firstname}
                               </span>
@@ -451,14 +448,13 @@ export function Attendance() {
                             </div>
                           </td>
                           <td className="py-1 px-2 border-l border-slate-100">
-                            <select 
-                              className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${
-                                dayVal && !isAbsentStatus(dayVal) 
-                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800 font-medium' 
+                            <select
+                              className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${dayVal && !isAbsentStatus(dayVal)
+                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800 font-medium'
                                   : dayVal && isAbsentStatus(dayVal)
-                                  ? 'border-red-300 bg-red-50 text-red-700 font-medium'
-                                  : 'border-slate-200 bg-white text-slate-700'
-                              } focus:ring-1 focus:ring-slate-400`}
+                                    ? 'border-red-300 bg-red-50 text-red-700 font-medium'
+                                    : 'border-slate-200 bg-white text-slate-700'
+                                } focus:ring-1 focus:ring-slate-400`}
                               value={dayVal}
                               onChange={(e) => handleSelectChange(employee.id, 'day', e.target.value)}
                             >
@@ -476,14 +472,13 @@ export function Attendance() {
                             </select>
                           </td>
                           <td className="py-1 px-2 border-l border-slate-100">
-                            <select 
-                              className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${
-                                nightVal && !isAbsentStatus(nightVal)
+                            <select
+                              className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${nightVal && !isAbsentStatus(nightVal)
                                   ? 'border-indigo-300 bg-indigo-50 text-indigo-800 font-medium'
                                   : nightVal && isAbsentStatus(nightVal)
-                                  ? 'border-red-300 bg-red-50 text-red-700 font-medium'
-                                  : 'border-slate-200 bg-white text-slate-700'
-                              } focus:ring-1 focus:ring-slate-400`}
+                                    ? 'border-red-300 bg-red-50 text-red-700 font-medium'
+                                    : 'border-slate-200 bg-white text-slate-700'
+                                } focus:ring-1 focus:ring-slate-400`}
                               value={nightVal}
                               onChange={(e) => handleSelectChange(employee.id, 'night', e.target.value)}
                             >
@@ -516,7 +511,7 @@ export function Attendance() {
               <table className="w-full text-[11px] whitespace-nowrap">
                 <thead className="bg-slate-100 sticky top-0">
                   <tr>
-                    {['Date','Staff','Position','Day Client','Day Site','Night Client','Night Site','Day','Night','Absent','Night_wk','OT','OT Site','Day_Wk','DOW','NDW','Mth','Present','day2'].map(h => (
+                    {['Date', 'Staff', 'Position', 'Day Client', 'Day Site', 'Night Client', 'Night Site', 'Day', 'Night', 'Absent', 'Night_wk', 'OT', 'OT Site', 'Day_Wk', 'DOW', 'NDW', 'Mth', 'Present', 'day2'].map(h => (
                       <th key={h} className="text-left font-semibold text-slate-600 py-2 px-2 border-b border-slate-200">{h}</th>
                     ))}
                   </tr>
