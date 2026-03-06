@@ -24,7 +24,7 @@ export function Settings() {
         </div>
       </div>
 
-<Tabs className="w-full">
+      <Tabs className="w-full">
         <TabsList className="mb-8 bg-slate-100">
           <TabsTrigger active={activeTab === 'general'} onClick={() => setActiveTab('general')} className="w-32">
             <Building className="mr-2 h-4 w-4" /> General
@@ -49,7 +49,7 @@ export function Settings() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-sm font-medium leading-none">Company Name</label>
-                  <Input defaultValue="DCEL Nigeria Limited" />
+                  <Input defaultValue="Dewatering Construction Etc Limited" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium leading-none">Registration Number</label>

@@ -33,12 +33,19 @@ export function Variables() {
   const addTaxBracket = useAppStore((state) => state.addTaxBracket);
   const updateTaxBracket = useAppStore((state) => state.updateTaxBracket);
   const removeTaxBracket = useAppStore((state) => state.removeTaxBracket);
+  const departmentTasksList = useAppStore((state) => state.departmentTasksList);
+  const updateDepartmentTasks = useAppStore((state) => state.updateDepartmentTasks);
 
   const [newExtraLabel, setNewExtraLabel] = useState('');
   const [newExtraAmount, setNewExtraAmount] = useState('');
   const [newBracketLabel, setNewBracketLabel] = useState('');
   const [newBracketUpTo, setNewBracketUpTo] = useState('');
   const [newBracketRate, setNewBracketRate] = useState('');
+
+  const [taskDeptFilter, setTaskDeptFilter] = useState('ALL');
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskAssignee, setNewTaskAssignee] = useState('');
+  const [taskDirection, setTaskDirection] = useState<'onboarding' | 'offboarding'>('onboarding');
 
   // Payroll year is always the current year
   const payrollYear = new Date().getFullYear();
@@ -97,85 +104,246 @@ export function Variables() {
     toast.success('Variables saved successfully!');
   };
 
+  const handleAddTask = () => {
+    if (!newTaskTitle || !newTaskAssignee) return;
+    const currentTasks = departmentTasksList.find(d => d.department === taskDeptFilter) ||
+      { department: taskDeptFilter, onboardingTasks: [], offboardingTasks: [] };
+
+    if (taskDirection === 'onboarding') {
+      currentTasks.onboardingTasks.push({ title: newTaskTitle, assignee: newTaskAssignee });
+    } else {
+      currentTasks.offboardingTasks.push({ title: newTaskTitle, assignee: newTaskAssignee });
+    }
+    updateDepartmentTasks(currentTasks);
+    setNewTaskTitle('');
+    setNewTaskAssignee('');
+  };
+
+  const handleRemoveTask = (title: string, direction: 'onboarding' | 'offboarding') => {
+    const currentTasks = departmentTasksList.find(d => d.department === taskDeptFilter);
+    if (!currentTasks) return;
+
+    if (direction === 'onboarding') {
+      currentTasks.onboardingTasks = currentTasks.onboardingTasks.filter(t => t.title !== title);
+    } else {
+      currentTasks.offboardingTasks = currentTasks.offboardingTasks.filter(t => t.title !== title);
+    }
+    updateDepartmentTasks(currentTasks);
+  };
+
+  const currentTaskView = departmentTasksList.find(d => d.department === taskDeptFilter) ||
+    { department: taskDeptFilter, onboardingTasks: [], offboardingTasks: [] };
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Variables Used</h1>
-          <p className="text-slate-500 mt-1">Manage reusable values and libraries like Public Holidays, Positions, and Departments.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-slate-700 to-slate-400">
+            System Variables
+          </h1>
+          <p className="text-sm font-medium text-slate-500 mt-1">Configure global application variables, templates, and statutory parameters.</p>
         </div>
-        <Button onClick={handleSave} className="bg-[#002040] hover:bg-[#003060] text-white gap-2">
+        <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md font-semibold gap-2 transition-all">
           <Save className="h-4 w-4" /> Save Changes
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Public Holidays</CardTitle>
-            <CardDescription>Dates defined here are used to calculate OT in the Daily Register.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2 mb-4">
-              <Input
-                type="date"
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-                className="w-40"
-              />
-              <Input
-                placeholder="Holiday Name"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="flex-1"
-              />
-              <Button onClick={handleAddHoliday} variant="outline" className="gap-2">
-                <Plus className="h-4 w-4" /> Add
-              </Button>
-            </div>
-
-            <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto">
-              <Table>
-                <TableHeader className="bg-slate-50 sticky top-0">
-                  <TableRow>
-                    <TableHead className="w-32">Date</TableHead>
-                    <TableHead>Holiday Name</TableHead>
-                    <TableHead className="w-16 text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {publicHolidays.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center text-slate-500 py-4">No holidays defined.</TableCell>
-                    </TableRow>
-                  ) : (
-                    publicHolidays.map((holiday) => (
-                      <TableRow key={holiday.id}>
-                        <TableCell className="font-medium">{holiday.date}</TableCell>
-                        <TableCell>{holiday.name}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveHoliday(holiday.id)}
-                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+        {/* --- LEFT COLUMN --- */}
         <div className="flex flex-col gap-6">
-          <Card>
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
+              <CardTitle className="text-slate-800">Public Holidays</CardTitle>
+              <CardDescription>Dates defined here are used to calculate OT in the Daily Register.</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="flex gap-2 mb-4">
+                <Input
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="w-40"
+                />
+                <Input
+                  placeholder="Holiday Name"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="flex-1"
+                />
+                <Button onClick={handleAddHoliday} variant="outline" className="gap-2">
+                  <Plus className="h-4 w-4" /> Add
+                </Button>
+              </div>
+
+              <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto">
+                <Table>
+                  <TableHeader className="bg-slate-50 sticky top-0">
+                    <TableRow>
+                      <TableHead className="w-32">Date</TableHead>
+                      <TableHead>Holiday Name</TableHead>
+                      <TableHead className="w-16 text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {publicHolidays.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center text-slate-500 py-4">No holidays defined.</TableCell>
+                      </TableRow>
+                    ) : (
+                      publicHolidays.map((holiday) => (
+                        <TableRow key={holiday.id}>
+                          <TableCell className="font-medium">{holiday.date}</TableCell>
+                          <TableCell>{holiday.name}</TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveHoliday(holiday.id)}
+                              className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* --- MOVED POSITIONS --- */}
+          <Card className="shadow-sm border-slate-200">
             <CardHeader>
-              <CardTitle>Payroll Breakdown Variables (%)</CardTitle>
+              <CardTitle>Positions</CardTitle>
+              <CardDescription>Manage available job positions for employees.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2 mb-4">
+                <Input placeholder="New Position" value={newPosition} onChange={(e) => setNewPosition(e.target.value)} className="flex-1" />
+                <Button onClick={handleAddPosition} variant="outline" className="gap-2">
+                  <Plus className="h-4 w-4" /> Add
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {positions.map(pos => (
+                  <div key={pos} className="bg-slate-100 border border-slate-200 rounded-full px-3 py-1 text-sm flex items-center gap-2">
+                    {pos}
+                    <button onClick={() => removePosition(pos)} className="text-slate-400 hover:text-red-500">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* --- MOVED DEPARTMENTS --- */}
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader>
+              <CardTitle>Departments</CardTitle>
+              <CardDescription>Manage available departments.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2 mb-4">
+                <Input placeholder="New Department" value={newDepartment} onChange={(e) => setNewDepartment(e.target.value)} className="flex-1" />
+                <Button onClick={handleAddDepartment} variant="outline" className="gap-2">
+                  <Plus className="h-4 w-4" /> Add
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {departments.map(dep => (
+                  <div key={dep} className="bg-slate-100 border border-slate-200 rounded-full px-3 py-1 text-sm flex items-center gap-2">
+                    {dep}
+                    <button onClick={() => removeDepartment(dep)} className="text-slate-400 hover:text-red-500">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* --- MOVED TASK TEMPLATES --- */}
+          <Card className="shadow-sm border-slate-200 border-t-4 border-t-indigo-500">
+            <CardHeader className="bg-indigo-50/30 rounded-t-lg border-b border-indigo-100">
+              <CardTitle className="text-indigo-900">Task Templates</CardTitle>
+              <CardDescription>Configure default onboarding/offboarding tasks by department.</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              <div className="flex gap-2 mb-4">
+                <select className="flex-1 h-10 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer" value={taskDeptFilter} onChange={(e) => setTaskDeptFilter(e.target.value)}>
+                  <option value="ALL">ALL DEPARTMENTS (Always added)</option>
+                  {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <select className="w-40 h-10 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer" value={taskDirection} onChange={(e) => setTaskDirection(e.target.value as 'onboarding' | 'offboarding')}>
+                  <option value="onboarding">Onboarding</option>
+                  <option value="offboarding">Offboarding</option>
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <Input placeholder="Task Title (e.g. Provide Laptop)" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} className="flex-1" />
+                <Input placeholder="Assignee (e.g. IT)" value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)} className="w-32" />
+                <Button variant="outline" onClick={handleAddTask} className="gap-2 shrink-0">
+                  <Plus className="h-4 w-4" /> Add
+                </Button>
+              </div>
+              <div className="border rounded-md overflow-hidden max-h-[300px] overflow-y-auto">
+                <Table>
+                  <TableHeader className="bg-slate-50 sticky top-0">
+                    <TableRow>
+                      <TableHead>Task Title</TableHead>
+                      <TableHead className="w-40">Assignee</TableHead>
+                      <TableHead className="w-12 text-center"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {taskDirection === 'onboarding' ? (
+                      currentTaskView.onboardingTasks.length === 0 ? (
+                        <TableRow><TableCell colSpan={3} className="text-center text-slate-500 py-4">No specific onboarding tasks.</TableCell></TableRow>
+                      ) : (
+                        currentTaskView.onboardingTasks.map((t, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-medium">{t.title}</TableCell>
+                            <TableCell className="text-slate-500">{t.assignee}</TableCell>
+                            <TableCell className="text-center">
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" onClick={() => handleRemoveTask(t.title, 'onboarding')}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )
+                    ) : (
+                      currentTaskView.offboardingTasks.length === 0 ? (
+                        <TableRow><TableCell colSpan={3} className="text-center text-slate-500 py-4">No specific offboarding tasks.</TableCell></TableRow>
+                      ) : (
+                        currentTaskView.offboardingTasks.map((t, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-medium">{t.title}</TableCell>
+                            <TableCell className="text-slate-500">{t.assignee}</TableCell>
+                            <TableCell className="text-center">
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" onClick={() => handleRemoveTask(t.title, 'offboarding')}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div> {/* END LEFT COLUMN */}
+
+        {/* --- RIGHT COLUMN --- */}
+        <div className="flex flex-col gap-6">
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
+              <CardTitle className="text-slate-800">Payroll Breakdown Variables (%)</CardTitle>
               <CardDescription>Adjust the percentage breakdown for components of basic salary and automated deductions.</CardDescription>
             </CardHeader>
             <CardContent>
@@ -468,68 +636,9 @@ export function Variables() {
 
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Positions</CardTitle>
-              <CardDescription>Manage available job positions for employees.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2 mb-4">
-                <Input
-                  placeholder="New Position"
-                  value={newPosition}
-                  onChange={(e) => setNewPosition(e.target.value)}
-                  className="flex-1"
-                />
-                <Button onClick={handleAddPosition} variant="outline" className="gap-2">
-                  <Plus className="h-4 w-4" /> Add
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {positions.map(pos => (
-                  <div key={pos} className="bg-slate-100 border border-slate-200 rounded-full px-3 py-1 text-sm flex items-center gap-2">
-                    {pos}
-                    <button onClick={() => removePosition(pos)} className="text-slate-400 hover:text-red-500">
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Departments</CardTitle>
-              <CardDescription>Manage available departments.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2 mb-4">
-                <Input
-                  placeholder="New Department"
-                  value={newDepartment}
-                  onChange={(e) => setNewDepartment(e.target.value)}
-                  className="flex-1"
-                />
-                <Button onClick={handleAddDepartment} variant="outline" className="gap-2">
-                  <Plus className="h-4 w-4" /> Add
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {departments.map(dep => (
-                  <div key={dep} className="bg-slate-100 border border-slate-200 rounded-full px-3 py-1 text-sm flex items-center gap-2">
-                    {dep}
-                    <button onClick={() => removeDepartment(dep)} className="text-slate-400 hover:text-red-500">
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>
   );
 }
+

@@ -16,6 +16,7 @@ import { Onboarding } from './pages/Onboarding';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 import { Variables } from './pages/Variables';
+import { Leaves } from './pages/Leaves';
 import { ToastContainer, ConfirmDialog } from './components/ui/toast';
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />
             <Route path="variables" element={<Variables />} />
+            <Route path="leaves" element={<Leaves />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

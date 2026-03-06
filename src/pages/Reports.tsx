@@ -6,7 +6,7 @@ import { useAppStore } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
 
 export function Reports() {
-  const employees = useAppStore((state) => state.employees);
+  const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
   const sites = useAppStore((state) => state.sites);
   const invoices = useAppStore((state) => state.invoices);
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);

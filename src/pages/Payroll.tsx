@@ -44,7 +44,7 @@ export function Payroll() {
   const [printSelectedMonths, setPrintSelectedMonths] = useState<string[]>([]);
   const [printSelectedEmployees, setPrintSelectedEmployees] = useState<string[]>([]);
 
-  const employees = useAppStore((state) => state.employees);
+  const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
   const salaryAdvances = useAppStore((state) => state.salaryAdvances);
   const loans = useAppStore((state) => state.loans);
   const payrollVariables = useAppStore((state) => state.payrollVariables);
@@ -55,7 +55,7 @@ export function Payroll() {
   const [selectedMonth, setSelectedMonth] = useState('jan');
 
   // OPERATIONS departments – purely attendance-based pay
-  const OPERATIONS_DEPARTMENTS = ['HEAD OF OPERATIONS', 'ENGINEERING'];
+  const OPERATIONS_DEPARTMENTS = ['OPERATIONS', 'ENGINEERING'];
 
   const months = [
     { key: 'jan', label: 'January' },
@@ -294,7 +294,7 @@ export function Payroll() {
     const slipsHtml = payslipsToPrint.map((slip, i) => `
       <div class="payslip${i === payslipsToPrint.length - 1 ? ' last' : ''}">
         <div class="header">
-          <img src="${logoSrc}" alt="DCEL Logo" style="height: 48px; width: auto; margin-bottom: 8px;" />
+          <img src="${logoSrc}" alt="Company Logo" style="height: 48px; width: auto; margin-bottom: 8px;" />
           <p>Employee Payslip &ndash; ${slip.monthLabel} ${currentYear}</p>
         </div>
         <div class="two-col">
@@ -651,7 +651,7 @@ export function Payroll() {
                     <div key={`${slip.monthKey}-${slip.record.id}`} className="bg-white p-10 mb-8 mx-auto shadow-sm max-w-3xl rounded-sm print-break">
                       {/* Company Header */}
                       <div className="border-b-2 border-indigo-600 pb-4 mb-6">
-                        <img src={logoSrc} alt="DCEL Logo" className="h-12 w-auto mb-2" />
+                        <img src={logoSrc} alt="Company Logo" className="h-12 w-auto mb-2" />
                         <p className="text-sm text-slate-500">Employee Payslip - {slip.monthLabel} {currentYear}</p>
                       </div>
 

@@ -5,7 +5,7 @@ import { useAppStore } from '@/src/store/appStore';
 import { useMemo } from 'react';
 
 export function Dashboard() {
-  const employees = useAppStore((state) => state.employees);
+  const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
   const sites = useAppStore((state) => state.sites);
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
 
@@ -13,21 +13,21 @@ export function Dashboard() {
   const stats = useMemo(() => {
     const totalEmployees = employees.length;
     const activeEmployees = employees.filter(e => e.status === 'Active').length;
-    
+
     // Get today's attendance
     const today = new Date().toISOString().split('T')[0];
     const todayRecords = attendanceRecords.filter(r => r.date === today);
     const presentToday = todayRecords.filter(r => r.isPresent === 'Yes').length;
     const attendanceRate = todayRecords.length > 0 ? Math.round((presentToday / todayRecords.length) * 100) : 0;
-    
+
     // Calculate monthly payroll (using January as default)
     const monthlyPayroll = employees
       .filter(e => e.status === 'Active')
       .reduce((sum, e) => sum + (e.monthlySalaries.jan || 0), 0);
-    
+
     // On leave count
     const onLeave = employees.filter(e => e.status === 'On Leave').length;
-    
+
     return { totalEmployees, activeEmployees, presentToday, attendanceRate, monthlyPayroll, onLeave, activeSites: sites.filter(s => s.status === 'Active').length };
   }, [employees, sites, attendanceRecords]);
 
@@ -50,7 +50,7 @@ export function Dashboard() {
         <p className="text-slate-500 mt-2">Overview of your organization's HR metrics.</p>
       </div>
 
-<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-slate-500">Total Employees</CardTitle>
@@ -107,7 +107,7 @@ export function Dashboard() {
           <CardContent className="pl-2">
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-<AreaChart data={payrollData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <AreaChart data={payrollData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorEmployees" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.3} />
@@ -117,7 +117,7 @@ export function Dashboard() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   />
                   <Area type="monotone" dataKey="employees" stroke="#4f46e5" strokeWidth={2} fillOpacity={1} fill="url(#colorEmployees)" />
@@ -126,7 +126,7 @@ export function Dashboard() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="col-span-3">
           <CardHeader>
             <CardTitle>Upcoming Events</CardTitle>

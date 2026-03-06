@@ -24,6 +24,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Daily Register', href: '/attendance', icon: CalendarClock },
   { name: 'Employees', href: '/employees', icon: Users },
+  { name: 'Leaves', href: '/leaves', icon: CalendarClock },
   { name: 'Sites & Clients', href: '/sites', icon: MapPin },
   { name: 'Onboarding', href: '/onboarding', icon: UserPlus },
   { name: 'Payroll', href: '/payroll', icon: Wallet },
@@ -40,7 +41,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
     <div className="flex h-full w-64 flex-col border-r border-slate-200 bg-slate-50">
       <div className="flex h-16 shrink-0 items-center px-6">
         <div className="flex items-center gap-2 font-bold text-xl text-indigo-600">
-          <img src="/logo/logo-2.png" alt="DCEL HR" className="h-10 w-auto" />
+          <img src="/logo/logo-2.png" alt="HR System" className="h-10 w-auto" />
         </div>
       </div>
       <div className="flex flex-1 flex-col overflow-y-auto">

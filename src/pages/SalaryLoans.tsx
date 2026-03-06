@@ -4,9 +4,8 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
-import { CheckCircle, XCircle, ArrowLeft } from 'lucide-react';
+import { CheckCircle, ArrowLeft, List, Wallet, CalendarRange, Landmark, Banknote, User, CreditCard } from 'lucide-react';
 import { useAppStore, SalaryAdvance, Loan } from '@/src/store/appStore';
-import logoSrc from '../../logo/logo-1.png';
 import { toast } from '@/src/components/ui/toast';
 
 export function SalaryLoans() {
@@ -19,15 +18,12 @@ export function SalaryLoans() {
 
   const [viewMode, setViewMode] = useState(false);
 
-  const employees = useAppStore((state) => state.employees);
+  const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
   const salaryAdvances = useAppStore((state) => state.salaryAdvances);
   const loans = useAppStore((state) => state.loans);
 
   const addSalaryAdvance = useAppStore((state) => state.addSalaryAdvance);
   const addLoan = useAppStore((state) => state.addLoan);
-
-  const updateSalaryAdvance = useAppStore((state) => state.updateSalaryAdvance);
-  const updateLoan = useAppStore((state) => state.updateLoan);
 
   const handleClear = () => {
     setRequestType('Salary Advance');
@@ -57,10 +53,10 @@ export function SalaryLoans() {
         employeeName: `${emp.surname} ${emp.firstname}`,
         amount: Number(amount),
         requestDate: date,
-        status: 'Pending'
+        status: 'Approved' // Auto-approved upon entry
       };
       addSalaryAdvance(newAdvance);
-      toast.success('Salary Advance Request Submitted Successfully');
+      toast.success('Salary Advance Approved and Recorded');
     } else {
       if (!duration || isNaN(Number(duration)) || Number(duration) <= 0) {
         toast.error('Please enter a valid duration in months for the loan');
@@ -86,10 +82,10 @@ export function SalaryLoans() {
         startDate: date,
         paymentStartDate: payStartDate,
         remainingBalance: principal,
-        status: 'Pending'
+        status: 'Active' // Auto-active upon entry
       };
       addLoan(newLoan);
-      toast.success('Loan Request Submitted Successfully');
+      toast.success('Loan Approved and Recorded');
     }
     handleClear();
   };
@@ -98,68 +94,57 @@ export function SalaryLoans() {
     switch (status) {
       case 'Approved':
       case 'Active':
-        return <Badge variant="success" className="flex items-center gap-1 w-max"><CheckCircle className="h-3 w-3" /> {status}</Badge>;
-      case 'Rejected':
-        return <Badge variant="destructive" className="flex items-center gap-1 w-max"><XCircle className="h-3 w-3" /> {status}</Badge>;
-      case 'Pending':
-        return <Badge variant="warning" className="flex items-center gap-1 w-max"> {status}</Badge>;
+        return <Badge className="bg-emerald-100 text-emerald-800 border-0 flex items-center gap-1 w-max px-2.5 py-0.5 font-medium"><CheckCircle className="h-3 w-3" /> {status}</Badge>;
       case 'Deducted':
       case 'Completed':
-        return <Badge className="bg-slate-500 w-max">{status}</Badge>;
+        return <Badge className="bg-slate-100 text-slate-600 border-0 flex items-center gap-1 w-max px-2.5 py-0.5 font-medium"><CheckCircle className="h-3 w-3" /> {status}</Badge>;
       default:
-        return <Badge>{status}</Badge>;
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
   if (viewMode) {
     return (
-      <div className="flex flex-col gap-8 max-w-6xl mx-auto">
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold">Entries Database</h2>
-          <Button onClick={() => setViewMode(false)} variant="outline" className="gap-2">
+      <div className="flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Financial Entries Database</h2>
+            <p className="text-slate-500 mt-1">View all recorded salary advances and loans</p>
+          </div>
+          <Button onClick={() => setViewMode(false)} className="gap-2 bg-indigo-600 hover:bg-indigo-700 rounded-xl h-10 px-5">
             <ArrowLeft className="h-4 w-4" /> Back to Form
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Salary Advances</CardTitle>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <Card className="shadow-md border-0 ring-1 ring-slate-100 rounded-2xl overflow-hidden">
+            <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-5">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Banknote className="h-5 w-5 text-indigo-500" /> Salary Advances
+              </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-slate-50">
                   <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="px-6 h-12 text-xs uppercase tracking-wider">Employee</TableHead>
+                    <TableHead className="h-12 text-xs uppercase tracking-wider">Amount</TableHead>
+                    <TableHead className="h-12 text-xs uppercase tracking-wider">Date</TableHead>
+                    <TableHead className="h-12 text-xs uppercase tracking-wider">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {salaryAdvances.map(sa => (
-                    <TableRow key={sa.id}>
-                      <TableCell className="font-medium">{sa.employeeName}</TableCell>
-                      <TableCell>₦{sa.amount.toLocaleString()}</TableCell>
-                      <TableCell>{sa.requestDate}</TableCell>
+                    <TableRow key={sa.id} className="hover:bg-slate-50/50">
+                      <TableCell className="font-medium px-6 text-slate-900">{sa.employeeName}</TableCell>
+                      <TableCell className="font-mono font-medium text-slate-700">₦{sa.amount.toLocaleString()}</TableCell>
+                      <TableCell className="text-slate-500 text-sm">{sa.requestDate}</TableCell>
                       <TableCell>{getStatusBadge(sa.status)}</TableCell>
-                      <TableCell className="text-right">
-                        {sa.status === 'Pending' && (
-                          <div className="flex justify-end gap-1">
-                            <Button size="sm" variant="ghost" className="text-emerald-600 h-8" onClick={() => updateSalaryAdvance(sa.id, { status: 'Approved' })}>Approve</Button>
-                            <Button size="sm" variant="ghost" className="text-red-600 h-8" onClick={() => updateSalaryAdvance(sa.id, { status: 'Rejected' })}>Reject</Button>
-                          </div>
-                        )}
-                        {sa.status === 'Approved' && (
-                          <span className="text-[11px] text-slate-400 font-medium italic">Auto-deducted</span>
-                        )}
-                      </TableCell>
                     </TableRow>
                   ))}
                   {salaryAdvances.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-slate-500">No salary advances requested.</TableCell>
+                      <TableCell colSpan={4} className="text-center py-12 text-slate-400">No salary advances recorded.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -167,49 +152,41 @@ export function SalaryLoans() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Loans</CardTitle>
+          <Card className="shadow-md border-0 ring-1 ring-slate-100 rounded-2xl overflow-hidden">
+            <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-5">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Landmark className="h-5 w-5 text-emerald-500" /> Active Loans
+              </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-slate-50">
                   <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="px-6 h-12 text-xs uppercase tracking-wider">Employee</TableHead>
+                    <TableHead className="h-12 text-xs uppercase tracking-wider">Amount</TableHead>
+                    <TableHead className="h-12 text-xs uppercase tracking-wider">Pay Start Date</TableHead>
+                    <TableHead className="h-12 text-xs uppercase tracking-wider">Duration</TableHead>
+                    <TableHead className="h-12 text-xs uppercase tracking-wider">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loans.map(ln => (
-                    <TableRow key={ln.id}>
-                      <TableCell className="font-medium">
+                    <TableRow key={ln.id} className="hover:bg-slate-50/50">
+                      <TableCell className="font-medium px-6">
                         <div className="flex flex-col">
-                          <span>{ln.employeeName}</span>
-                          <span className="text-xs text-slate-500">{ln.loanType}</span>
+                          <span className="text-slate-900">{ln.employeeName}</span>
+                          <span className="text-[10px] uppercase tracking-wider text-slate-400 mt-0.5 font-semibold">{ln.loanType}</span>
                         </div>
                       </TableCell>
-                      <TableCell>₦{ln.principalAmount.toLocaleString()}</TableCell>
-                      <TableCell>{ln.duration} mos</TableCell>
+                      <TableCell className="font-mono font-medium text-slate-700">₦{ln.principalAmount.toLocaleString()}</TableCell>
+                      <TableCell className="text-slate-500 text-sm">{ln.paymentStartDate}</TableCell>
+                      <TableCell className="text-slate-500 text-sm">{ln.duration} mos</TableCell>
                       <TableCell>{getStatusBadge(ln.status)}</TableCell>
-                      <TableCell className="text-right">
-                        {ln.status === 'Pending' && (
-                          <div className="flex justify-end gap-1">
-                            <Button size="sm" variant="ghost" className="text-emerald-600 h-8" onClick={() => updateLoan(ln.id, { status: 'Active' })}>Approve</Button>
-                            <Button size="sm" variant="ghost" className="text-red-600 h-8" onClick={() => updateLoan(ln.id, { status: 'Rejected' })}>Reject</Button>
-                          </div>
-                        )}
-                        {ln.status === 'Active' && (
-                          <span className="text-[11px] text-slate-400 font-medium italic">Auto-deducted</span>
-                        )}
-                      </TableCell>
                     </TableRow>
                   ))}
                   {loans.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-slate-500">No loans requested.</TableCell>
+                      <TableCell colSpan={5} className="text-center py-12 text-slate-400">No loans recorded.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -222,24 +199,46 @@ export function SalaryLoans() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-[80vh] bg-slate-50/50 p-4">
-      <div className="bg-white rounded-lg shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden w-full max-w-xl">
-        <div className="p-8 pb-10">
-          <div className="flex justify-center mb-6">
-            <img src={logoSrc} alt="Dewatering Construction etc ltd" className="h-28 object-contain" />
+    <div className="flex items-center justify-center min-h-[80vh] p-4 lg:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="w-full max-w-4xl bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden flex flex-col md:flex-row">
+
+        {/* Left Side: Gradient Banner */}
+        <div className="md:w-[40%] bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-900 p-10 text-white flex flex-col justify-between relative overflow-hidden">
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
+
+          <div className="relative z-10">
+            <div className="inline-flex items-center justify-center p-3 font-bold bg-white/10 backdrop-blur-md rounded-2xl mb-8 border border-white/20">
+              <Wallet className="h-8 w-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight mb-3">Financial Request</h1>
+            <p className="text-indigo-100 text-sm leading-relaxed mb-8 opacity-90">
+              Seamlessly record salary advances or long-term loans. Submissions are instantly approved and scheduled for automated payroll deduction.
+            </p>
           </div>
 
-          <h1 className="text-center text-2xl font-black mb-8 uppercase tracking-wide">
-            LOANS AND SALARY ADVANCE FORM
-          </h1>
+          <div className="relative z-10 space-y-4">
+            <Button
+              onClick={() => setViewMode(true)}
+              variant="outline"
+              className="w-full bg-white/10 hover:bg-white/20 text-white border-white/30 backdrop-blur-sm gap-2 h-12 rounded-xl transition-all"
+            >
+              <List className="h-5 w-5" /> View Database
+            </Button>
+          </div>
+        </div>
 
-          <div className="space-y-5 px-4 md:px-8">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <label className="sm:w-32 font-bold text-sm shrink-0">Request Type:</label>
+        {/* Right Side: Form */}
+        <div className="md:w-[60%] p-8 lg:p-12 bg-slate-50/50">
+          <div className="space-y-6">
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-slate-400" /> Request Type
+              </label>
               <select
                 value={requestType}
                 onChange={(e) => setRequestType(e.target.value)}
-                className="flex-1 h-10 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm font-semibold"
+                className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow appearance-none cursor-pointer"
               >
                 <option value="Salary Advance">Salary Advance</option>
                 <option value="Personal Loan">Personal Loan</option>
@@ -248,87 +247,90 @@ export function SalaryLoans() {
               </select>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <label className="sm:w-32 font-bold text-sm shrink-0">Staff:</label>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <User className="h-4 w-4 text-slate-400" /> Select Staff
+              </label>
               <select
                 value={staffId}
                 onChange={(e) => setStaffId(e.target.value)}
-                className="flex-1 h-10 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm font-semibold"
+                className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow appearance-none cursor-pointer"
               >
-                <option value="">Select Staff</option>
+                <option value="">Choose an employee...</option>
                 {employees.map(emp => (
-                  <option key={emp.id} value={emp.id}>{emp.surname} {emp.firstname}</option>
+                  <option key={emp.id} value={emp.id}>{emp.surname} {emp.firstname} — {emp.position}</option>
                 ))}
               </select>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <label className="sm:w-32 font-bold text-sm shrink-0">Date:</label>
-              <Input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="flex-1 font-semibold"
-              />
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <label className="sm:w-32 font-bold text-sm shrink-0">Amount:</label>
-              <Input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="e.g. 50000"
-                className="flex-1 font-semibold"
-              />
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <label className="sm:w-32 font-bold text-sm shrink-0">Duration:</label>
-              <div className="flex-1 flex items-center gap-3">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <Banknote className="h-4 w-4 text-slate-400" /> Amount (₦)
+                </label>
                 <Input
                   type="number"
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  disabled={requestType === 'Salary Advance'}
-                  className="w-24 font-semibold"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="e.g. 50000"
+                  className="h-12 rounded-xl border-slate-200 font-medium text-lg focus:ring-indigo-500 bg-white"
                 />
-                <span className="font-bold text-sm">Months</span>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <CalendarRange className="h-4 w-4 text-slate-400" /> Request Date
+                </label>
+                <Input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="h-12 rounded-xl border-slate-200 font-medium bg-white"
+                />
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <label className="sm:w-32 font-bold text-sm shrink-0">Pay Start Date:</label>
-              <Input
-                type="date"
-                value={payStartDate}
-                onChange={(e) => setPayStartDate(e.target.value)}
-                disabled={requestType === 'Salary Advance'}
-                className="flex-1 font-semibold"
-              />
-            </div>
-          </div>
-        </div>
+            {requestType !== 'Salary Advance' && (
+              <div className="grid grid-cols-2 gap-6 p-5 bg-indigo-50/40 rounded-2xl border border-indigo-100 animate-in fade-in slide-in-from-top-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-indigo-900">Duration (Months)</label>
+                  <Input
+                    type="number"
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value)}
+                    placeholder="e.g. 6"
+                    className="h-11 rounded-lg border-indigo-200 bg-white text-indigo-900 font-medium focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-indigo-900">Pay Start Date</label>
+                  <Input
+                    type="date"
+                    value={payStartDate}
+                    onChange={(e) => setPayStartDate(e.target.value)}
+                    className="h-11 rounded-lg border-indigo-200 bg-white text-indigo-900 font-medium focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+            )}
 
-        <div className="px-8 pb-8 flex justify-center gap-4">
-          <Button
-            onClick={handleClear}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 h-10 border-2 border-red-700 w-32"
-          >
-            Clear Form
-          </Button>
-          <Button
-            onClick={() => setViewMode(true)}
-            className="bg-slate-600 hover:bg-slate-700 text-white font-bold px-6 h-10 border-2 border-slate-700 w-32"
-          >
-            View Entries
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            className="bg-[#0078d4] hover:bg-[#0060a8] text-white font-bold px-6 h-10 border-2 border-[#005a9e] shadow-[0_2px_4px_rgba(0,120,212,0.4)] w-32"
-          >
-            Submit Entry
-          </Button>
+            <div className="pt-6 flex gap-4">
+              <Button
+                onClick={handleClear}
+                variant="ghost"
+                className="h-12 px-6 rounded-xl font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+              >
+                Clear
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                className="flex-1 h-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-base shadow-lg shadow-indigo-200 transition-all hover:shadow-indigo-300 hover:-translate-y-0.5"
+              >
+                Process Request
+              </Button>
+            </div>
+
+          </div>
         </div>
       </div>
     </div>

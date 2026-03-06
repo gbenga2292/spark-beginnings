@@ -4,9 +4,11 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2 } from 'lucide-react';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload } from 'lucide-react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
+import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
 
 const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No', status: 'Active' as 'Active' | 'Inactive' };
 
@@ -20,6 +22,7 @@ export function Sites() {
 
   const sites = useAppStore((s) => s.sites);
   const addSite = useAppStore((s) => s.addSite);
+  const setSites = useAppStore((s) => s.setSites);
   const updateSite = useAppStore((s) => s.updateSite);
   const deleteSite = useAppStore((s) => s.deleteSite);
 
@@ -75,6 +78,105 @@ export function Sites() {
   };
 
   const uniqueClients = new Set(sites.map(s => s.client)).size;
+
+  const handleExportExcel = () => {
+    if (filteredSites.length === 0) {
+      toast.error('No sites to export');
+      return;
+    }
+    const ws = XLSX.utils.json_to_sheet(filteredSites);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sites");
+    XLSX.writeFile(wb, `Sites_Export_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  };
+
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const confirmProceed = await showConfirm(`File selected: ${file.name}\n\nDo you want to proceed with the import process?`, { confirmLabel: "Proceed", cancelLabel: "Cancel" });
+    if (!confirmProceed) {
+      e.target.value = '';
+      return;
+    }
+
+    const isClear = await showConfirm("CLEAR EXISTING DATA?\n\n- Click 'Clear & Replace' to wipe all existing sites and replace them completely.\n- Click 'Append Data' to safely add to your existing list.", {
+      confirmLabel: "Clear & Replace",
+      cancelLabel: "Append Data",
+      variant: "danger"
+    });
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result as string;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json<Site>(ws);
+
+        if (data && data.length > 0) {
+          let count = 0;
+          let skippedCount = 0;
+          const validNewSites: Site[] = [];
+
+          const importedPairs = new Set<string>();
+          const importedIds = new Set<string>(!isClear ? sites.map(s => s.id) : []);
+
+          data.forEach(importedSite => {
+            const name = (importedSite.name || '').toString().trim();
+            const client = (importedSite.client || '').toString().trim();
+
+            if (!name || !client) {
+              skippedCount++;
+              return;
+            }
+
+            const pairKey = `${client.toLowerCase()}::${name.toLowerCase()}`;
+            const isDupWithStore = !isClear ? isDuplicate(name, client) : false;
+
+            if (isDupWithStore || importedPairs.has(pairKey)) {
+              skippedCount++;
+              return;
+            }
+
+            let newId = importedSite.id ? importedSite.id.toString().trim() : '';
+            if (!newId || importedIds.has(newId)) {
+              do {
+                newId = `S-${Date.now().toString().slice(-4)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+              } while (importedIds.has(newId) || sites.some(s => s.id === newId));
+            }
+
+            importedPairs.add(pairKey);
+            importedIds.add(newId);
+
+            validNewSites.push({
+              id: newId,
+              name: name,
+              client: client,
+              vat: importedSite.vat === 'Yes' ? 'Yes' : 'No',
+              status: importedSite.status === 'Inactive' ? 'Inactive' : 'Active'
+            });
+            count++;
+          });
+
+          if (isClear) {
+            setSites(validNewSites);
+            toast.success(`Replaced database with ${count} sites! (${skippedCount} duplicates/invalid rows skipped)`);
+          } else {
+            validNewSites.forEach(s => addSite(s));
+            toast.success(`Appended ${count} new sites! (${skippedCount} duplicates/invalid rows skipped)`);
+          }
+        } else {
+          toast.error('The file appears to be empty or improperly formatted.');
+        }
+      } catch (err) {
+        toast.error('Failed to parse file.');
+      }
+      e.target.value = ''; // Reset input
+    };
+    reader.readAsBinaryString(file);
+  };
 
   return (
     <div className="flex flex-col gap-8">
@@ -203,12 +305,24 @@ export function Sites() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
             <Input
               placeholder="Search sites or clients..."
-              className="pl-9"
+              className="pl-9 text-sm h-9"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
-          <span className="text-xs text-slate-400">{filteredSites.length} of {sites.length} sites</span>
+          <span className="text-xs text-slate-400 mr-auto">{filteredSites.length} of {sites.length} sites</span>
+
+          <div className="flex items-center gap-2">
+            <label className="cursor-pointer">
+              <Input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
+              <Button variant="outline" size="sm" className="h-9 gap-2 pointer-events-none text-slate-600">
+                <Upload className="h-4 w-4" /> Import
+              </Button>
+            </label>
+            <Button onClick={handleExportExcel} size="sm" className="h-9 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Download className="h-4 w-4" /> Export Excel
+            </Button>
+          </div>
         </div>
         <Table>
           <TableHeader>

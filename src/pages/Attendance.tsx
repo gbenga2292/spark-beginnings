@@ -3,14 +3,15 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { useAppStore, AttendanceRecord } from '@/src/store/appStore';
-import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, ChevronDown } from 'lucide-react';
+import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { format } from 'date-fns';
 import { toast, showConfirm } from '@/src/components/ui/toast';
+import * as XLSX from 'xlsx';
 
 export function Attendance() {
-  const employees = useAppStore((state) => state.employees);
+  const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
   const sites = useAppStore((state) => state.sites);
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const addAttendanceRecords = useAppStore((state) => state.addAttendanceRecords);
@@ -20,7 +21,13 @@ export function Attendance() {
   const [lastEntryDate, setLastEntryDate] = useState(format(new Date(Date.now() - 86400000), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('entry');
-  const [departmentFilter, setDepartmentFilter] = useState('All');
+  const [departmentFilter, setDepartmentFilter] = useState('');
+
+  // Database filters
+  const [dbSearchTerm, setDbSearchTerm] = useState('');
+  const [dbDepartmentFilter, setDbDepartmentFilter] = useState('All');
+  const [dbSiteFilter, setDbSiteFilter] = useState('All');
+  const [dbShiftFilter, setDbShiftFilter] = useState('All');
 
   const departments = useAppStore((state) => state.departments);
 
@@ -63,6 +70,62 @@ export function Attendance() {
     const matchesDept = departmentFilter === 'All' || emp.department === departmentFilter;
     return matchesSearch && matchesDept;
   });
+
+  const filteredDbRecords = attendanceRecords.filter(r => {
+    const emp = employees.find(e => e.id === r.staffId);
+    if (dbDepartmentFilter !== 'All' && emp?.department !== dbDepartmentFilter) return false;
+    if (dbSearchTerm) {
+      const matchName = r.staffName.toLowerCase().includes(dbSearchTerm.toLowerCase());
+      if (!matchName) return false;
+    }
+    if (dbSiteFilter !== 'All') {
+      if (r.daySite !== dbSiteFilter && r.nightSite !== dbSiteFilter) return false;
+    }
+    if (dbShiftFilter !== 'All') {
+      if (dbShiftFilter === 'Day' && r.day !== 'Yes') return false;
+      if (dbShiftFilter === 'Night' && r.night !== 'Yes') return false;
+    }
+    return true;
+  });
+
+  // DB Export & Import
+  const handleExportExcel = () => {
+    if (filteredDbRecords.length === 0) {
+      toast.error('No records to export');
+      return;
+    }
+    const ws = XLSX.utils.json_to_sheet(filteredDbRecords);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+    XLSX.writeFile(wb, `Attendance_Export_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  };
+
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result as string;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json<AttendanceRecord>(ws);
+
+        if (data && data.length > 0 && data[0].staffId) {
+          addAttendanceRecords(data);
+          toast.success(`Successfully imported ${data.length} records!`);
+        } else {
+          toast.error('Invalid Excel file format.');
+        }
+      } catch (err) {
+        toast.error('Failed to parse Excel file.');
+      }
+      e.target.value = ''; // Reset input
+    };
+    reader.readAsBinaryString(file);
+  };
 
   const handleSelectChange = (empId: string, shift: 'day' | 'night', value: string) => {
     setAttendanceData(prev => ({
@@ -431,8 +494,8 @@ export function Attendance() {
                         <tr
                           key={employee.id}
                           className={`transition-colors ${isAbsent ? 'bg-red-50/50' :
-                              hasEntry ? 'bg-emerald-50/40' :
-                                idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
+                            hasEntry ? 'bg-emerald-50/40' :
+                              idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
                             } hover:bg-slate-100/60`}
                         >
                           <td className="py-1 px-3">
@@ -450,10 +513,10 @@ export function Attendance() {
                           <td className="py-1 px-2 border-l border-slate-100">
                             <select
                               className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${dayVal && !isAbsentStatus(dayVal)
-                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800 font-medium'
-                                  : dayVal && isAbsentStatus(dayVal)
-                                    ? 'border-red-300 bg-red-50 text-red-700 font-medium'
-                                    : 'border-slate-200 bg-white text-slate-700'
+                                ? 'border-emerald-300 bg-emerald-50 text-emerald-800 font-medium'
+                                : dayVal && isAbsentStatus(dayVal)
+                                  ? 'border-red-300 bg-red-50 text-red-700 font-medium'
+                                  : 'border-slate-200 bg-white text-slate-700'
                                 } focus:ring-1 focus:ring-slate-400`}
                               value={dayVal}
                               onChange={(e) => handleSelectChange(employee.id, 'day', e.target.value)}
@@ -474,10 +537,10 @@ export function Attendance() {
                           <td className="py-1 px-2 border-l border-slate-100">
                             <select
                               className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${nightVal && !isAbsentStatus(nightVal)
-                                  ? 'border-indigo-300 bg-indigo-50 text-indigo-800 font-medium'
-                                  : nightVal && isAbsentStatus(nightVal)
-                                    ? 'border-red-300 bg-red-50 text-red-700 font-medium'
-                                    : 'border-slate-200 bg-white text-slate-700'
+                                ? 'border-indigo-300 bg-indigo-50 text-indigo-800 font-medium'
+                                : nightVal && isAbsentStatus(nightVal)
+                                  ? 'border-red-300 bg-red-50 text-red-700 font-medium'
+                                  : 'border-slate-200 bg-white text-slate-700'
                                 } focus:ring-1 focus:ring-slate-400`}
                               value={nightVal}
                               onChange={(e) => handleSelectChange(employee.id, 'night', e.target.value)}
@@ -505,11 +568,78 @@ export function Attendance() {
           </div>
         </TabsContent>
 
-        <TabsContent active={activeTab === 'database'} className="flex-1">
-          <div className="rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+        <TabsContent active={activeTab === 'database'} className="flex-1 flex flex-col min-h-0">
+          <div className="flex flex-wrap items-center gap-2 py-2 px-0 bg-white">
+            <div className="relative">
+              <select
+                value={dbDepartmentFilter}
+                onChange={(e) => setDbDepartmentFilter(e.target.value)}
+                className="h-8 pl-7 pr-3 text-xs rounded-lg border border-slate-200 bg-white shadow-sm appearance-none cursor-pointer focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none"
+              >
+                <option value="All">All Departs.</option>
+                {departments.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+              <Filter className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            </div>
+
+            <div className="relative">
+              <select
+                value={dbSiteFilter}
+                onChange={(e) => setDbSiteFilter(e.target.value)}
+                className="h-8 pl-7 pr-3 text-xs rounded-lg border border-slate-200 bg-white shadow-sm appearance-none cursor-pointer focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none max-w-[140px] truncate"
+              >
+                <option value="All">All Sites</option>
+                {sites.filter(s => s.status === 'Active').map(site => (
+                  <option key={site.id} value={site.name}>{site.name}</option>
+                ))}
+              </select>
+              <Filter className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            </div>
+
+            <div className="relative">
+              <select
+                value={dbShiftFilter}
+                onChange={(e) => setDbShiftFilter(e.target.value)}
+                className="h-8 pl-7 pr-3 text-xs rounded-lg border border-slate-200 bg-white shadow-sm appearance-none cursor-pointer focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none"
+              >
+                <option value="All">All Shifts</option>
+                <option value="Day">Day</option>
+                <option value="Night">Night</option>
+              </select>
+              <Filter className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            </div>
+
+            <div className="relative flex-1 min-w-[140px] max-w-[220px]">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <Input
+                placeholder="Search Database..."
+                className="h-8 pl-7 text-xs bg-white shadow-sm"
+                value={dbSearchTerm}
+                onChange={(e) => setDbSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <div className="flex-1" />
+
+            <div className="flex items-center gap-2">
+              <label className="cursor-pointer">
+                <Input type="file" accept=".xlsx" className="hidden" onChange={handleImportExcel} />
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1 pointer-events-none">
+                  <Upload className="h-3 w-3" /> Import
+                </Button>
+              </label>
+              <Button onClick={handleExportExcel} size="sm" className="h-8 text-xs gap-1 bg-green-700 hover:bg-green-800 text-white shadow-sm">
+                <Download className="h-3 w-3" /> Export Excel
+              </Button>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
+            <div className="overflow-auto flex-1 h-full max-h-[calc(100vh-250px)]">
               <table className="w-full text-[11px] whitespace-nowrap">
-                <thead className="bg-slate-100 sticky top-0">
+                <thead className="bg-slate-100 sticky top-0 shadow-sm z-10">
                   <tr>
                     {['Date', 'Staff', 'Position', 'Day Client', 'Day Site', 'Night Client', 'Night Site', 'Day', 'Night', 'Absent', 'Night_wk', 'OT', 'OT Site', 'Day_Wk', 'DOW', 'NDW', 'Mth', 'Present', 'day2'].map(h => (
                       <th key={h} className="text-left font-semibold text-slate-600 py-2 px-2 border-b border-slate-200">{h}</th>
@@ -517,14 +647,14 @@ export function Attendance() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {attendanceRecords.length === 0 ? (
+                  {filteredDbRecords.length === 0 ? (
                     <tr>
                       <td colSpan={19} className="text-center py-8 text-slate-400 text-sm">
-                        No records yet. Submit from the Entry tab.
+                        No records match filters.
                       </td>
                     </tr>
                   ) : (
-                    attendanceRecords.map((r) => (
+                    filteredDbRecords.map((r) => (
                       <tr key={r.id} className="hover:bg-slate-50">
                         <td className="py-1.5 px-2 font-mono">{r.date}</td>
                         <td className="py-1.5 px-2 font-medium text-slate-800">{r.staffName}</td>

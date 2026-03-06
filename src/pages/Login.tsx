@@ -24,16 +24,16 @@ export function Login() {
     navigate('/');
   };
 
-return (
+  return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
-        <div className="flex flex-col items-center">
-          <img src="/logo/logo-2.png" alt="DCEL HR" className="h-16 w-auto" />
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-slate-900">
-            Sign in to DCEL HR
-          </h2>
-          <p className="mt-2 text-center text-sm text-slate-600">
-            Manage your workforce efficiently
+        <div className="flex flex-col items-center space-y-4 text-center">
+          <img src="/logo/logo-2.png" alt="Company Logo" className="h-16 w-auto" />
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 mt-4">
+            Sign in to Dewatering Construction HR
+          </h1>
+          <p className="text-slate-600">
+            Enter your credentials to access the secure HR portal
           </p>
         </div>
 
