@@ -33,6 +33,7 @@ interface PayrollRecord {
   pension: number;
   employerPension: number;
   takeHomePay: number;
+  nsitf: number;
   status: 'Pending' | 'Processed';
 }
 
@@ -41,7 +42,7 @@ interface PayrollRecord {
 export function Payroll() {
   const [activeTab, setActiveTab] = useState('processing');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [printType, setPrintType] = useState<'PAYSLIPS' | 'PAYE' | 'PENSION' | null>(null);
+  const [printType, setPrintType] = useState<'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF' | null>(null);
   const [printSelectedMonths, setPrintSelectedMonths] = useState<string[]>([]);
   const [printSelectedEmployees, setPrintSelectedEmployees] = useState<string[]>([]);
 
@@ -224,6 +225,7 @@ export function Payroll() {
         const takeHomePay = grossPay - (paye + loanRepayment + pension);
 
         const employerPension = emp.payeTax ? pensionSum * (payrollVariables.employerPensionRate / 100) : 0;
+        const nsitf = emp.payeTax ? grossPay * (payrollVariables.nsitfRate / 100) : 0;
 
         return {
           id: emp.id,
@@ -246,6 +248,7 @@ export function Payroll() {
           loanRepayment,
           pension,
           employerPension,
+          nsitf,
           takeHomePay,
           status: 'Pending' as const,
         };
@@ -289,16 +292,16 @@ export function Payroll() {
     setTimeout(() => setIsProcessing(false), 2000);
   };
 
-  const handleOpenPrintDialog = (type: 'PAYSLIPS' | 'PAYE' | 'PENSION') => {
+  const handleOpenPrintDialog = (type: 'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF') => {
     setPrintSelectedMonths([selectedMonth]);
     setPrintSelectedEmployees([]);
     setPrintType(type);
   };
 
   const handlePrint = () => {
-    if (payslipsToPrint.length === 0) return;
+    if (!payslipsToPrint || payslipsToPrint.length === 0) return;
 
-    if (printType === 'PAYE' || printType === 'PENSION') {
+    if (printType === 'PAYE' || printType === 'PENSION' || printType === 'NSITF') {
       const el = document.getElementById('print-area-content');
       if (!el) return;
       const html = `
@@ -443,6 +446,14 @@ export function Payroll() {
           csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.monthLabel}","${fmCSV(penSum)}","${fmCSV(slip.record.pension)}","${fmCSV(slip.record.employerPension)}","${fmCSV(totalPen)}"\n`;
         }
       });
+    } else if (printType === 'NSITF') {
+      csvStr = 'S/N,Employee Name,Month,Gross Pay (₦),NSITF Rate (%),NSITF Amount (₦)\n';
+      let sn = 1;
+      payslipsToPrint.forEach(slip => {
+        if (slip.record.nsitf > 0) {
+          csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.monthLabel}","${fmCSV(slip.record.grossPay)}","${payrollVariables.nsitfRate}","${fmCSV(slip.record.nsitf)}"\n`;
+        }
+      });
     }
 
     if (!csvStr) return;
@@ -503,6 +514,9 @@ export function Payroll() {
                   </Button>
                   <Button onClick={() => handleOpenPrintDialog('PENSION')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
                     <FileText className="h-4 w-4 text-emerald-500" /> Pension Schedule
+                  </Button>
+                  <Button onClick={() => handleOpenPrintDialog('NSITF')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
+                    <FileText className="h-4 w-4 text-blue-500" /> NSITF Schedule
                   </Button>
                 </div>
               </div>
@@ -654,6 +668,7 @@ export function Payroll() {
                 {printType === 'PAYSLIPS' && "Print Bulk Payslips"}
                 {printType === 'PAYE' && "Generate PAYE Schedule"}
                 {printType === 'PENSION' && "Generate Pension Schedule"}
+                {printType === 'NSITF' && "Generate NSITF Schedule"}
               </h3>
               <div className="flex gap-2">
                 {printType !== 'PAYSLIPS' && (
@@ -815,21 +830,21 @@ export function Payroll() {
 
                     </div>
                   ))
-                ) : printType === 'PAYE' || printType === 'PENSION' ? (
+                ) : printType === 'PAYE' || printType === 'PENSION' || printType === 'NSITF' ? (
                   <div className="bg-white p-10 mx-auto shadow-sm max-w-5xl rounded-sm print-break" id="print-area-content">
-                    <div className="border-b-2 border-indigo-600 pb-4 mb-6">
-                      <div className="flex justify-between items-end">
+                    <div className="border-b-2 border-indigo-600 pb-4 mb-6" style={{ borderBottom: '2px solid #4f46e5', paddingBottom: '16px', marginBottom: '24px' }}>
+                      <div className="flex justify-between items-end" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                         <div>
                           <img src={logoSrc} alt="Company Logo" className="h-12 w-auto mb-2" style={{ height: '48px', width: 'auto', marginBottom: '8px' }} />
-                          <h2 className="text-xl font-bold uppercase tracking-wider text-slate-900">
-                            {printType === 'PAYE' ? 'PAYE TAX SCHEDULE' : 'PENSION CONTRIBUTION SCHEDULE'}
+                          <h2 className="text-xl font-bold uppercase tracking-wider text-slate-900" style={{ fontSize: '20px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', margin: '0' }}>
+                            {printType === 'PAYE' ? 'PAYE TAX SCHEDULE' : printType === 'PENSION' ? 'PENSION CONTRIBUTION SCHEDULE' : 'NSITF SCHEDULE'}
                           </h2>
-                          <p className="text-sm text-slate-500 mt-1">
+                          <p className="text-sm text-slate-500 mt-1" style={{ fontSize: '14px', color: '#64748b', marginTop: '4px', marginBottom: '0' }}>
                             Generated on {new Date().toLocaleDateString()}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-sm text-slate-600">Total Valid Records: {payslipsToPrint.filter(s => printType === 'PAYE' ? s.record.paye > 0 : s.record.pension > 0).length}</p>
+                        <div className="text-right" style={{ textAlign: 'right' }}>
+                          <p className="font-semibold text-sm text-slate-600" style={{ fontWeight: 600, fontSize: '14px', color: '#475569', margin: '0' }}>Total Valid Records: {payslipsToPrint.filter(s => printType === 'PAYE' ? s.record.paye > 0 : printType === 'PENSION' ? s.record.pension > 0 : s.record.nsitf > 0).length}</p>
                         </div>
                       </div>
                     </div>
@@ -849,19 +864,25 @@ export function Payroll() {
                               <th className="py-3 px-2 text-right text-slate-600">Gross Pay (₦)</th>
                               <th className="py-3 px-2 text-right text-slate-600">PAYE Deducted (₦)</th>
                             </>
-                          ) : (
+                          ) : printType === 'PENSION' ? (
                             <>
                               <th className="py-3 px-2 text-right text-slate-600">Pensionable Sum (₦)</th>
                               <th className="py-3 px-2 text-right text-slate-600">Employee (₦)</th>
                               <th className="py-3 px-2 text-right text-slate-600">Employer (₦)</th>
                               <th className="py-3 px-2 text-right font-bold text-slate-800">Total (₦)</th>
                             </>
+                          ) : (
+                            <>
+                              <th className="py-3 px-2 text-right text-slate-600">Gross Pay (₦)</th>
+                              <th className="py-3 px-2 text-right text-slate-600">NSITF Ratio (%)</th>
+                              <th className="py-3 px-2 text-right font-bold text-slate-800">Amount (₦)</th>
+                            </>
                           )}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {payslipsToPrint
-                          .filter(slip => printType === 'PAYE' ? slip.record.paye > 0 : slip.record.pension > 0)
+                          .filter(slip => printType === 'PAYE' ? slip.record.paye > 0 : printType === 'PENSION' ? slip.record.pension > 0 : slip.record.nsitf > 0)
                           .map((slip, idx) => {
                             const pSum = slip.record.basicSalary + slip.record.housing + slip.record.transport;
                             return (
@@ -878,12 +899,18 @@ export function Payroll() {
                                     <td className="py-2.5 px-2 text-right font-mono">{fm(slip.record.grossPay)}</td>
                                     <td className="py-2.5 px-2 text-right font-mono font-bold text-red-600">{fm(slip.record.paye)}</td>
                                   </>
-                                ) : (
+                                ) : printType === 'PENSION' ? (
                                   <>
                                     <td className="py-2.5 px-2 text-right font-mono">{fm(pSum)}</td>
                                     <td className="py-2.5 px-2 text-right font-mono text-amber-600">{fm(slip.record.pension)}</td>
                                     <td className="py-2.5 px-2 text-right font-mono text-indigo-600">{fm(slip.record.employerPension)}</td>
                                     <td className="py-2.5 px-2 text-right font-mono font-bold text-emerald-700">{fm(slip.record.pension + slip.record.employerPension)}</td>
+                                  </>
+                                ) : (
+                                  <>
+                                    <td className="py-2.5 px-2 text-right font-mono">{fm(slip.record.grossPay)}</td>
+                                    <td className="py-2.5 px-2 text-right font-mono text-slate-500">{payrollVariables.nsitfRate}%</td>
+                                    <td className="py-2.5 px-2 text-right font-mono font-bold text-emerald-700">{fm(slip.record.nsitf)}</td>
                                   </>
                                 )}
                               </tr>
@@ -902,7 +929,7 @@ export function Payroll() {
                               <td className="py-3 px-2 text-right font-mono font-bold">{fm(payslipsToPrint.reduce((s, x) => s + x.record.grossPay, 0))}</td>
                               <td className="py-3 px-2 text-right font-mono font-bold text-red-600">{fm(payslipsToPrint.reduce((s, x) => s + x.record.paye, 0))}</td>
                             </>
-                          ) : (
+                          ) : printType === 'PENSION' ? (
                             <>
                               <td className="py-3 px-2 text-right font-mono font-bold text-slate-700">
                                 {fm(payslipsToPrint.reduce((s, x) => s + (x.record.pension > 0 ? (x.record.basicSalary + x.record.housing + x.record.transport) : 0), 0))}
@@ -915,6 +942,16 @@ export function Payroll() {
                               </td>
                               <td className="py-3 px-2 text-right font-mono font-bold text-emerald-700">
                                 {fm(payslipsToPrint.reduce((s, x) => s + (x.record.pension + x.record.employerPension), 0))}
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="py-3 px-2 text-right font-mono font-bold text-slate-700">
+                                {fm(payslipsToPrint.reduce((s, x) => s + (x.record.nsitf > 0 ? x.record.grossPay : 0), 0))}
+                              </td>
+                              <td className="py-3 px-2"></td>
+                              <td className="py-3 px-2 text-right font-mono font-bold text-emerald-700">
+                                {fm(payslipsToPrint.reduce((s, x) => s + x.record.nsitf, 0))}
                               </td>
                             </>
                           )}

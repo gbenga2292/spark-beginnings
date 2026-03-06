@@ -411,6 +411,16 @@ export function Variables() {
                   />
                   <p className="text-xs text-slate-400">Applied when employee has Withholding Tax</p>
                 </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700 uppercase">NSITF Rate (%)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={payrollVariables.nsitfRate}
+                    onChange={e => updatePayrollVariables({ nsitfRate: Number(e.target.value) })}
+                  />
+                  <p className="text-xs text-slate-400">Company's NSITF contribution (1% by default)</p>
+                </div>
               </div>
             </CardContent>
           </Card>

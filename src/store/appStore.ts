@@ -61,6 +61,7 @@ interface AppState {
     employeePensionRate: number;
     employerPensionRate: number;
     withholdingTaxRate: number;
+    nsitfRate: number;
   };
   updatePayrollVariables: (variables: Partial<AppState['payrollVariables']>) => void;
   payeTaxVariables: {
@@ -220,7 +221,7 @@ export const useAppStore = create<AppState>()(
         { id: 'S-004', name: 'Office', client: 'Internal', vat: 'No', status: 'Active' },
       ],
       positions: ['CEO', 'Head of Admin', 'Head of Operations', 'Projects Supervisor', 'Site Engineer', 'Technician', 'Security'],
-      departments: ['ADMIN', 'HEAD OF OPERATIONS', 'ENGINEERING', 'HR', 'FINANCE'],
+      departments: ['ADMIN', 'OPERATIONS', 'ENGINEERING', 'HR', 'FINANCE'],
       departmentTasksList: [
         {
           department: 'ALL',
@@ -254,7 +255,7 @@ export const useAppStore = create<AppState>()(
           monthlySalaries: { ...defaultSalary, jan: 400000, feb: 400000, mar: 400000, apr: 400000, may: 400000, jun: 400000, jul: 400000, aug: 400000, sep: 400000, oct: 400000, nov: 400000, dec: 400000 }
         },
         {
-          id: 'EMP-003', surname: 'IDIAFEHI', firstname: 'ELIJAH', department: 'HEAD OF OPERATIONS', staffType: 'INTERNAL', position: 'Head of Operations',
+          id: 'EMP-003', surname: 'IDIAFEHI', firstname: 'ELIJAH', department: 'OPERATIONS', staffType: 'INTERNAL', position: 'Head of Operations',
           startDate: '2025-03-01', endDate: '', yearlyLeave: 20, bankName: 'STANBIC', accountNo: '0026639919',
           payeTax: true, withholdingTax: false, taxId: 'TAX-003', pensionNumber: 'PEN-003', status: 'Active',
           monthlySalaries: { ...defaultSalary, jan: 400000, feb: 400000, mar: 400000, apr: 400000, may: 400000, jun: 400000, jul: 400000, aug: 400000, sep: 400000, oct: 400000, nov: 400000, dec: 400000 }
@@ -331,6 +332,7 @@ export const useAppStore = create<AppState>()(
         employeePensionRate: 8,
         employerPensionRate: 10,
         withholdingTaxRate: 0.05,
+        nsitfRate: 1,
       },
       updatePayrollVariables: (variables) => set((state) => ({
         payrollVariables: { ...state.payrollVariables, ...variables }

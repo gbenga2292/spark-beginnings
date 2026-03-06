@@ -21,11 +21,11 @@ export function Attendance() {
   const [lastEntryDate, setLastEntryDate] = useState(format(new Date(Date.now() - 86400000), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('entry');
-  const [departmentFilter, setDepartmentFilter] = useState('Operations');
+  const [departmentFilter, setDepartmentFilter] = useState('OPERATIONS');
 
   // Database filters
   const [dbSearchTerm, setDbSearchTerm] = useState('');
-  const [dbDepartmentFilter, setDbDepartmentFilter] = useState('Operations');
+  const [dbDepartmentFilter, setDbDepartmentFilter] = useState('OPERATIONS');
   const [dbSiteFilter, setDbSiteFilter] = useState('All');
   const [dbShiftFilter, setDbShiftFilter] = useState('All');
 
@@ -363,6 +363,9 @@ export function Attendance() {
 
     addAttendanceRecords(records);
     setLastEntryDate(registerDate);
+    // Increment date locally so user can immediately record the next day
+    setRegisterDate(prev => getNextDayStr(prev));
+    setAttendanceData({});
     toast.success(`Successfully saved ${records.length} records to the database!`);
   };
 

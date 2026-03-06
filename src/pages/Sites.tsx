@@ -4,7 +4,8 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, Calculator } from 'lucide-react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import * as XLSX from 'xlsx';
@@ -12,7 +13,160 @@ import { format } from 'date-fns';
 
 const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No', status: 'Active' as 'Active' | 'Inactive' };
 
+function ClientSummary() {
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const monthValues = useAppStore(s => s.monthValues);
+  const attendanceRecords = useAppStore(s => s.attendanceRecords);
+  const employees = useAppStore(s => s.employees);
+  const sites = useAppStore(s => s.sites);
+
+  const monthsMap = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'] as const;
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+  const currentMonthKey = monthsMap[selectedMonth - 1];
+  const { workDays, overtimeRate } = monthValues[currentMonthKey];
+
+  const results: { name: string; client: string; cost: number; teamSize: number }[] = [];
+  let grandTotal = 0;
+
+  if (workDays > 0) {
+    const salaryDict: Record<string, number> = {};
+    employees.forEach(emp => {
+      salaryDict[emp.id] = emp.monthlySalaries[currentMonthKey] || 0;
+    });
+
+    const monthRecords = attendanceRecords.filter(r => r.mth === selectedMonth);
+
+    sites.forEach(site => {
+      const siteName = site.name.toLowerCase().trim();
+      const staffDays: Record<string, number> = {};
+
+      monthRecords.forEach(r => {
+        let matched = false;
+        let increment = 0;
+
+        if (r.daySite && r.daySite.toLowerCase().trim() === siteName) {
+          matched = true;
+          increment = 1;
+        } else if (r.nightSite && r.nightSite.toLowerCase().trim() === siteName) {
+          matched = true;
+          increment = 1;
+        } else if (r.otSite && r.otSite.toLowerCase().trim() === siteName) {
+          matched = true;
+          increment = overtimeRate;
+        }
+
+        if (matched) {
+          staffDays[r.staffId] = (staffDays[r.staffId] || 0) + increment;
+        }
+      });
+
+      let siteTotalCost = 0;
+      Object.keys(staffDays).forEach(staffId => {
+        const salary = salaryDict[staffId] || 0;
+        const days = staffDays[staffId];
+        if (salary > 0) {
+          siteTotalCost += (salary / workDays) * days;
+        }
+      });
+
+      if (siteTotalCost > 0) {
+        results.push({
+          name: site.name,
+          client: site.client,
+          cost: siteTotalCost,
+          teamSize: Object.keys(staffDays).length
+        });
+        grandTotal += siteTotalCost;
+      }
+    });
+  }
+
+  results.sort((a, b) => b.cost - a.cost);
+
+  const handleExportSummaryCSV = () => {
+    if (results.length === 0) return;
+    const ws = XLSX.utils.json_to_sheet(results.map((r, i) => ({
+      "S/N": i + 1,
+      "Client": r.client,
+      "Site": r.name,
+      "Team Size": r.teamSize,
+      "Total Cost (₦)": r.cost.toFixed(2)
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Client Summary");
+    XLSX.writeFile(wb, `Client_Summary_${monthNames[selectedMonth - 1]}_${format(new Date(), 'yyyy')}.xlsx`);
+  };
+
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
+      <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <select
+            value={selectedMonth}
+            onChange={e => setSelectedMonth(Number(e.target.value))}
+            className="h-9 px-3 border border-slate-200 rounded-md bg-white text-sm font-medium"
+          >
+            {monthNames.map((m, i) => (
+              <option key={m} value={i + 1}>{m}</option>
+            ))}
+          </select>
+          <div className="text-sm text-slate-500">
+            Work Days: <span className="font-semibold text-slate-700">{workDays}</span> |
+            Overtime Rate: <span className="font-semibold text-slate-700">{overtimeRate}</span>
+          </div>
+        </div>
+        <Button onClick={handleExportSummaryCSV} variant="outline" size="sm" className="gap-2" disabled={results.length === 0}>
+          <Download className="h-4 w-4" /> Export Excel
+        </Button>
+      </div>
+
+      <div className="flex-1 overflow-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>S/N</TableHead>
+              <TableHead>Client</TableHead>
+              <TableHead>Site Name</TableHead>
+              <TableHead className="text-right">Staff Handled</TableHead>
+              <TableHead className="text-right">Total Cost (₦)</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {results.map((r, idx) => (
+              <TableRow key={idx}>
+                <TableCell>{idx + 1}</TableCell>
+                <TableCell className="font-medium text-indigo-900">{r.client}</TableCell>
+                <TableCell>{r.name}</TableCell>
+                <TableCell className="text-right text-slate-500">{r.teamSize}</TableCell>
+                <TableCell className="text-right font-bold text-slate-700">₦{r.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+              </TableRow>
+            ))}
+            {results.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                  No costs recorded for this month.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+          {results.length > 0 && (
+            <tfoot>
+              <tr className="bg-slate-50/80 font-bold border-t-2">
+                <td colSpan={3} className="px-4 py-3 text-right">GRAND TOTAL:</td>
+                <td className="px-4 py-3 text-right text-slate-600">{results.reduce((s, r) => s + r.teamSize, 0)}</td>
+                <td className="px-4 py-3 text-right text-indigo-700 text-lg">₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              </tr>
+            </tfoot>
+          )}
+        </Table>
+      </div>
+    </div>
+  );
+}
+
 export function Sites() {
+  const [activeTab, setActiveTab] = useState('sites');
   const [searchTerm, setSearchTerm] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -179,7 +333,7 @@ export function Sites() {
   };
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6 h-full">
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
@@ -188,249 +342,273 @@ export function Sites() {
             Manage project sites and clients. Each <strong>Client + Site</strong> combination is unique.
           </p>
         </div>
-        {!isAdding && (
-          <Button onClick={() => setIsAdding(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
-            <Plus className="h-4 w-4" /> Add New Site
-          </Button>
-        )}
-      </div>
-
-      {/* ── Add form ─────────────────────────────────────────────── */}
-      {isAdding && (
-        <Card className="border-t-4 border-t-indigo-600 shadow-md">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4 flex flex-row justify-between items-center">
-            <CardTitle className="text-indigo-900 text-xl">Add New Site</CardTitle>
-            <Button variant="ghost" size="icon" onClick={() => { setIsAdding(false); setAddError(''); }}>
-              <X className="h-5 w-5" />
+        <div className="flex items-center gap-4">
+          <TabsList className="bg-slate-100 h-9">
+            <TabsTrigger
+              active={activeTab === 'sites'}
+              onClick={() => setActiveTab('sites')}
+              className="gap-2 text-sm px-4"
+            >
+              <Building2 className="h-4 w-4" /> Sites List
+            </TabsTrigger>
+            <TabsTrigger
+              active={activeTab === 'summary'}
+              onClick={() => setActiveTab('summary')}
+              className="gap-2 text-sm px-4"
+            >
+              <Calculator className="h-4 w-4" /> Client Summary
+            </TabsTrigger>
+          </TabsList>
+          {activeTab === 'sites' && !isAdding && (
+            <Button onClick={() => setIsAdding(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+              <Plus className="h-4 w-4" /> Add New Site
             </Button>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-700">Client <span className="text-red-500">*</span></label>
-                <Input
-                  placeholder="Select or type client name"
-                  list="existing-clients"
-                  value={addForm.client}
-                  onChange={e => setAddForm({ ...addForm, client: e.target.value })}
-                />
-                <datalist id="existing-clients">
-                  {[...new Set(sites.map(s => s.client))].map(c => (
-                    <option key={c} value={c} />
-                  ))}
-                </datalist>
-                <p className="text-xs text-slate-400">A client can have multiple sites</p>
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-700">Site Name <span className="text-red-500">*</span></label>
-                <Input
-                  placeholder="e.g. Louiseville"
-                  value={addForm.name}
-                  onChange={e => setAddForm({ ...addForm, name: e.target.value })}
-                />
-                <p className="text-xs text-slate-400">Must be unique per client</p>
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-700">VAT</label>
-                <select
-                  value={addForm.vat}
-                  onChange={e => setAddForm({ ...addForm, vat: e.target.value as 'Yes' | 'No' })}
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="No">No</option>
-                  <option value="Yes">Yes</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-700">Status</label>
-                <select
-                  value={addForm.status}
-                  onChange={e => setAddForm({ ...addForm, status: e.target.value as 'Active' | 'Inactive' })}
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-              </div>
-            </div>
-            {addError && <p className="text-sm text-red-600 mb-4">{addError}</p>}
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => { setIsAdding(false); setAddError(''); }}>Cancel</Button>
-              <Button onClick={handleAdd} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
-                <Save className="h-4 w-4" /> Save Site
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ── Summary cards ─────────────────────────────────────────── */}
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card className="border-indigo-100 bg-indigo-50/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-indigo-900">Total Active Sites</CardTitle>
-            <MapPin className="h-4 w-4 text-indigo-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-indigo-900">{sites.filter(s => s.status === 'Active').length}</div>
-            <p className="text-xs text-indigo-600 mt-1">Currently operational</p>
-          </CardContent>
-        </Card>
-        <Card className="border-slate-200">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Total Clients</CardTitle>
-            <Building2 className="h-4 w-4 text-slate-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-slate-900">{uniqueClients}</div>
-            <p className="text-xs text-slate-500 mt-1">Unique clients</p>
-          </CardContent>
-        </Card>
-        <Card className="border-emerald-100 bg-emerald-50/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-emerald-900">VAT Registered Sites</CardTitle>
-            <span className="text-emerald-600 font-bold text-sm">VAT</span>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-emerald-900">{sites.filter(s => s.vat === 'Yes').length}</div>
-            <p className="text-xs text-emerald-600 mt-1">Sites with VAT enabled</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── Table ─────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="p-4 border-b border-slate-200 flex items-center gap-3">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
-            <Input
-              placeholder="Search sites or clients..."
-              className="pl-9 text-sm h-9"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <span className="text-xs text-slate-400 mr-auto">{filteredSites.length} of {sites.length} sites</span>
-
-          <div className="flex items-center gap-2">
-            <label className="cursor-pointer">
-              <Input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
-              <Button variant="outline" size="sm" className="h-9 gap-2 pointer-events-none text-slate-600">
-                <Upload className="h-4 w-4" /> Import
-              </Button>
-            </label>
-            <Button onClick={handleExportExcel} size="sm" className="h-9 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
-              <Download className="h-4 w-4" /> Export Excel
-            </Button>
-          </div>
+          )}
         </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Site ID</TableHead>
-              <TableHead>Client</TableHead>
-              <TableHead>Site Name</TableHead>
-              <TableHead className="text-center">VAT</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredSites.map(site => (
-              <TableRow key={site.id}>
-                <TableCell className="font-mono text-xs text-slate-500">{site.id}</TableCell>
+      </div>
 
-                {/* Client */}
-                <TableCell className="font-medium text-slate-900">
-                  {editingId === site.id ? (
-                    <>
-                      <Input value={editForm.client} className="h-8" list="edit-clients"
-                        onChange={e => setEditForm({ ...editForm, client: e.target.value })} />
-                      <datalist id="edit-clients">
-                        {[...new Set(sites.map(s => s.client))].map(c => (
-                          <option key={c} value={c} />
-                        ))}
-                      </datalist>
-                    </>
-                  ) : site.client}
-                </TableCell>
-
-                {/* Site Name */}
-                <TableCell>
-                  {editingId === site.id
-                    ? <Input value={editForm.name} className="h-8" onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
-                    : site.name}
-                </TableCell>
-
-                {/* VAT */}
-                <TableCell className="text-center">
-                  {editingId === site.id ? (
+      <Tabs className="w-full flex-1 flex flex-col min-h-0">
+        <TabsContent active={activeTab === 'sites'} className="flex-1 flex flex-col min-h-0 gap-8">
+          {/* ── Add form ─────────────────────────────────────────────── */}
+          {isAdding && (
+            <Card className="border-t-4 border-t-indigo-600 shadow-md">
+              <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4 flex flex-row justify-between items-center">
+                <CardTitle className="text-indigo-900 text-xl">Add New Site</CardTitle>
+                <Button variant="ghost" size="icon" onClick={() => { setIsAdding(false); setAddError(''); }}>
+                  <X className="h-5 w-5" />
+                </Button>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700">Client <span className="text-red-500">*</span></label>
+                    <Input
+                      placeholder="Select or type client name"
+                      list="existing-clients"
+                      value={addForm.client}
+                      onChange={e => setAddForm({ ...addForm, client: e.target.value })}
+                    />
+                    <datalist id="existing-clients">
+                      {[...new Set(sites.map(s => s.client))].map(c => (
+                        <option key={c} value={c} />
+                      ))}
+                    </datalist>
+                    <p className="text-xs text-slate-400">A client can have multiple sites</p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700">Site Name <span className="text-red-500">*</span></label>
+                    <Input
+                      placeholder="e.g. Louiseville"
+                      value={addForm.name}
+                      onChange={e => setAddForm({ ...addForm, name: e.target.value })}
+                    />
+                    <p className="text-xs text-slate-400">Must be unique per client</p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700">VAT</label>
                     <select
-                      value={editForm.vat}
-                      onChange={e => setEditForm({ ...editForm, vat: e.target.value as 'Yes' | 'No' })}
-                      className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm"
+                      value={addForm.vat}
+                      onChange={e => setAddForm({ ...addForm, vat: e.target.value as 'Yes' | 'No' })}
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
                     >
                       <option value="No">No</option>
                       <option value="Yes">Yes</option>
                     </select>
-                  ) : (
-                    <Badge variant={site.vat === 'Yes' ? 'success' : 'secondary'}>
-                      {site.vat}
-                    </Badge>
-                  )}
-                </TableCell>
-
-                {/* Status */}
-                <TableCell>
-                  {editingId === site.id ? (
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700">Status</label>
                     <select
-                      value={editForm.status}
-                      onChange={e => setEditForm({ ...editForm, status: e.target.value as 'Active' | 'Inactive' })}
-                      className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm"
+                      value={addForm.status}
+                      onChange={e => setAddForm({ ...addForm, status: e.target.value as 'Active' | 'Inactive' })}
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
                     >
                       <option value="Active">Active</option>
                       <option value="Inactive">Inactive</option>
                     </select>
-                  ) : (
-                    <Badge variant={site.status === 'Active' ? 'success' : 'secondary'}>{site.status}</Badge>
-                  )}
-                </TableCell>
+                  </div>
+                </div>
+                {addError && <p className="text-sm text-red-600 mb-4">{addError}</p>}
+                <div className="flex justify-end gap-3">
+                  <Button variant="outline" onClick={() => { setIsAdding(false); setAddError(''); }}>Cancel</Button>
+                  <Button onClick={handleAdd} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
+                    <Save className="h-4 w-4" /> Save Site
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-                {/* Actions */}
-                <TableCell className="text-right">
-                  {editingId === site.id ? (
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="sm" className="text-emerald-600" onClick={handleSaveEdit}>
-                        <Save className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-slate-500" onClick={() => setEditingId(null)}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="sm" className="text-indigo-600" onClick={() => handleEditStart(site)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDelete(site.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-            {filteredSites.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-slate-500">
-                  No sites found matching your search.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+          {/* ── Summary cards ─────────────────────────────────────────── */}
+          <div className="grid gap-6 md:grid-cols-3">
+            <Card className="border-indigo-100 bg-indigo-50/50">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-indigo-900">Total Active Sites</CardTitle>
+                <MapPin className="h-4 w-4 text-indigo-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-indigo-900">{sites.filter(s => s.status === 'Active').length}</div>
+                <p className="text-xs text-indigo-600 mt-1">Currently operational</p>
+              </CardContent>
+            </Card>
+            <Card className="border-slate-200">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-slate-500">Total Clients</CardTitle>
+                <Building2 className="h-4 w-4 text-slate-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-slate-900">{uniqueClients}</div>
+                <p className="text-xs text-slate-500 mt-1">Unique clients</p>
+              </CardContent>
+            </Card>
+            <Card className="border-emerald-100 bg-emerald-50/50">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-emerald-900">VAT Registered Sites</CardTitle>
+                <span className="text-emerald-600 font-bold text-sm">VAT</span>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-emerald-900">{sites.filter(s => s.vat === 'Yes').length}</div>
+                <p className="text-xs text-emerald-600 mt-1">Sites with VAT enabled</p>
+              </CardContent>
+            </Card>
+          </div>
 
+          {/* ── Table ─────────────────────────────────────────────────── */}
+          <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="p-4 border-b border-slate-200 flex items-center gap-3">
+              <div className="relative flex-1 max-w-xs">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
+                <Input
+                  placeholder="Search sites or clients..."
+                  className="pl-9 text-sm h-9"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <span className="text-xs text-slate-400 mr-auto">{filteredSites.length} of {sites.length} sites</span>
+
+              <div className="flex items-center gap-2">
+                <label className="cursor-pointer">
+                  <Input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
+                  <Button variant="outline" size="sm" className="h-9 gap-2 pointer-events-none text-slate-600">
+                    <Upload className="h-4 w-4" /> Import
+                  </Button>
+                </label>
+                <Button onClick={handleExportExcel} size="sm" className="h-9 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+                  <Download className="h-4 w-4" /> Export Excel
+                </Button>
+              </div>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Site ID</TableHead>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Site Name</TableHead>
+                  <TableHead className="text-center">VAT</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredSites.map(site => (
+                  <TableRow key={site.id}>
+                    <TableCell className="font-mono text-xs text-slate-500">{site.id}</TableCell>
+
+                    {/* Client */}
+                    <TableCell className="font-medium text-slate-900">
+                      {editingId === site.id ? (
+                        <>
+                          <Input value={editForm.client} className="h-8" list="edit-clients"
+                            onChange={e => setEditForm({ ...editForm, client: e.target.value })} />
+                          <datalist id="edit-clients">
+                            {[...new Set(sites.map(s => s.client))].map(c => (
+                              <option key={c} value={c} />
+                            ))}
+                          </datalist>
+                        </>
+                      ) : site.client}
+                    </TableCell>
+
+                    {/* Site Name */}
+                    <TableCell>
+                      {editingId === site.id
+                        ? <Input value={editForm.name} className="h-8" onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+                        : site.name}
+                    </TableCell>
+
+                    {/* VAT */}
+                    <TableCell className="text-center">
+                      {editingId === site.id ? (
+                        <select
+                          value={editForm.vat}
+                          onChange={e => setEditForm({ ...editForm, vat: e.target.value as 'Yes' | 'No' })}
+                          className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm"
+                        >
+                          <option value="No">No</option>
+                          <option value="Yes">Yes</option>
+                        </select>
+                      ) : (
+                        <Badge variant={site.vat === 'Yes' ? 'success' : 'secondary'}>
+                          {site.vat}
+                        </Badge>
+                      )}
+                    </TableCell>
+
+                    {/* Status */}
+                    <TableCell>
+                      {editingId === site.id ? (
+                        <select
+                          value={editForm.status}
+                          onChange={e => setEditForm({ ...editForm, status: e.target.value as 'Active' | 'Inactive' })}
+                          className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm"
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                        </select>
+                      ) : (
+                        <Badge variant={site.status === 'Active' ? 'success' : 'secondary'}>{site.status}</Badge>
+                      )}
+                    </TableCell>
+
+                    {/* Actions */}
+                    <TableCell className="text-right">
+                      {editingId === site.id ? (
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="sm" className="text-emerald-600" onClick={handleSaveEdit}>
+                            <Save className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-slate-500" onClick={() => setEditingId(null)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="sm" className="text-indigo-600" onClick={() => handleEditStart(site)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDelete(site.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredSites.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                      No sites found matching your search.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+        <TabsContent active={activeTab === 'summary'} className="flex-1 min-h-0">
+          <ClientSummary />
+        </TabsContent>
+      </Tabs>
       {/* ── Tax Brackets (Variables.tsx handles this now — just link hint) */}
     </div>
   );
