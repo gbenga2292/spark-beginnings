@@ -21,11 +21,11 @@ export function Attendance() {
   const [lastEntryDate, setLastEntryDate] = useState(format(new Date(Date.now() - 86400000), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('entry');
-  const [departmentFilter, setDepartmentFilter] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('Operations');
 
   // Database filters
   const [dbSearchTerm, setDbSearchTerm] = useState('');
-  const [dbDepartmentFilter, setDbDepartmentFilter] = useState('All');
+  const [dbDepartmentFilter, setDbDepartmentFilter] = useState('Operations');
   const [dbSiteFilter, setDbSiteFilter] = useState('All');
   const [dbShiftFilter, setDbShiftFilter] = useState('All');
 
@@ -37,14 +37,7 @@ export function Attendance() {
   const statuses = [
     "Absent",
     "Absent with Permit",
-    "Absent without Permit",
-    "Sick Leave",
-    "Maternity Leave",
-    "Annual Leave",
-    "Suspension",
-    "Public Holiday",
-    "Off Duty",
-    "No Work"
+    "On Leave"
   ];
 
   // Auto-load existing records when date changes
@@ -344,7 +337,7 @@ export function Attendance() {
       const day2 = (raw.day === 'Yes' ? 1 : 0) + (raw.night === 'Yes' ? 1 : 0);
 
       return {
-        id: crypto.randomUUID(),
+        id: Math.random().toString(36).slice(2),
         date: registerDate,
         staffId: raw.empId,
         staffName: raw.staffName,

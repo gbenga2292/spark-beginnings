@@ -76,7 +76,7 @@ export function Variables() {
 
   const handleAddHoliday = () => {
     if (!newDate || !newName) return;
-    addPublicHoliday({ id: crypto.randomUUID(), date: newDate, name: newName });
+    addPublicHoliday({ id: Math.random().toString(36).slice(2), date: newDate, name: newName });
     setNewDate('');
     setNewName('');
   };
@@ -380,21 +380,36 @@ export function Variables() {
                     onChange={e => updatePayrollVariables({ otherAllowances: Number(e.target.value) })}
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-700 uppercase">Rent Relief (₦)</label>
+                  <label className="text-xs font-semibold text-slate-700 uppercase">Employee Pension Rate (%)</label>
                   <Input
                     type="number"
-                    value={payrollVariables.rentRelief || 0}
-                    onChange={e => updatePayrollVariables({ rentRelief: Number(e.target.value) })}
+                    step="0.01"
+                    value={payrollVariables.employeePensionRate}
+                    onChange={e => updatePayrollVariables({ employeePensionRate: Number(e.target.value) })}
                   />
+                  <p className="text-xs text-slate-400">Deducted from employee salary (default 8%)</p>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-700 uppercase">Pension</label>
+                  <label className="text-xs font-semibold text-slate-700 uppercase">Employer Pension Rate (%)</label>
                   <Input
                     type="number"
-                    value={payrollVariables.pension}
-                    onChange={e => updatePayrollVariables({ pension: Number(e.target.value) })}
+                    step="0.01"
+                    value={payrollVariables.employerPensionRate}
+                    onChange={e => updatePayrollVariables({ employerPensionRate: Number(e.target.value) })}
                   />
+                  <p className="text-xs text-slate-400">Company's contribution to pension (default 10%)</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700 uppercase">Withholding Tax Rate (%)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={(payrollVariables.withholdingTaxRate * 100).toFixed(1)}
+                    onChange={e => updatePayrollVariables({ withholdingTaxRate: Number(e.target.value) / 100 })}
+                  />
+                  <p className="text-xs text-slate-400">Applied when employee has Withholding Tax</p>
                 </div>
               </div>
             </CardContent>
@@ -469,7 +484,7 @@ export function Variables() {
               <CardTitle className="text-amber-900">PAYE Tax Variables (NIGERIATAX)</CardTitle>
               <CardDescription>
                 These values drive the <code className="text-xs bg-amber-100 px-1 rounded">NIGERIATAX()</code> function.
-                CRA = <em>CRA Base + RentRelief + Pension</em>. Taxable = AnnualGross &minus; CRA.
+                CRA = <em>CRA Base + Pension Contribution</em>. Taxable = AnnualGross &minus; CRA.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-4 space-y-6">
@@ -485,16 +500,10 @@ export function Variables() {
                     <p className="text-xs text-slate-400">Fixed statutory amount (default ₦800,000)</p>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Pension Rate (%)</label>
-                    <Input type="number" step="0.01" value={(payeTaxVariables.pensionRate * 100).toFixed(1)}
-                      onChange={e => updatePayeTaxVariables({ pensionRate: Number(e.target.value) / 100 })} />
-                    <p className="text-xs text-slate-400">Employee pension contribution (default 8%)</p>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Withholding Tax Rate (%)</label>
-                    <Input type="number" step="0.01" value={(payeTaxVariables.withholdingTaxRate * 100).toFixed(1)}
-                      onChange={e => updatePayeTaxVariables({ withholdingTaxRate: Number(e.target.value) / 100 })} />
-                    <p className="text-xs text-slate-400">Applied when employee has Withholding Tax (not PAYE)</p>
+                    <label className="text-xs font-semibold text-slate-700">Rent Relief Rate (%)</label>
+                    <Input type="number" step="0.1" value={(payeTaxVariables.rentReliefRate * 100).toFixed(1)}
+                      onChange={e => updatePayeTaxVariables({ rentReliefRate: Number(e.target.value) / 100 })} />
+                    <p className="text-xs text-slate-400">Applied to input Rent to compute Relief (default 20%)</p>
                   </div>
                 </div>
               </div>
@@ -567,7 +576,7 @@ export function Variables() {
                   <Button variant="outline" className="gap-1 shrink-0" onClick={() => {
                     if (!newBracketLabel || !newBracketRate) return;
                     addTaxBracket({
-                      id: crypto.randomUUID(),
+                      id: Math.random().toString(36).slice(2),
                       label: newBracketLabel,
                       upTo: newBracketUpTo !== '' ? Number(newBracketUpTo) : null,
                       rate: Number(newBracketRate) / 100,
@@ -590,7 +599,7 @@ export function Variables() {
                     onChange={e => setNewExtraAmount(e.target.value)} className="w-36" />
                   <Button variant="outline" className="gap-1" onClick={() => {
                     if (!newExtraLabel || !newExtraAmount) return;
-                    addPayeTaxExtraCondition({ id: crypto.randomUUID(), label: newExtraLabel, amount: Number(newExtraAmount), enabled: true });
+                    addPayeTaxExtraCondition({ id: Math.random().toString(36).slice(2), label: newExtraLabel, amount: Number(newExtraAmount), enabled: true });
                     setNewExtraLabel(''); setNewExtraAmount('');
                   }}><Plus className="h-4 w-4" /> Add</Button>
                 </div>

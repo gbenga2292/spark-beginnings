@@ -31,6 +31,7 @@ interface PayrollRecord {
   paye: number;
   loanRepayment: number;
   pension: number;
+  employerPension: number;
   takeHomePay: number;
   status: 'Pending' | 'Processed';
 }
@@ -40,7 +41,7 @@ interface PayrollRecord {
 export function Payroll() {
   const [activeTab, setActiveTab] = useState('processing');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [printType, setPrintType] = useState<'PAYSLIPS' | 'PAYE' | 'PENSION' | null>(null);
   const [printSelectedMonths, setPrintSelectedMonths] = useState<string[]>([]);
   const [printSelectedEmployees, setPrintSelectedEmployees] = useState<string[]>([]);
 
@@ -151,7 +152,7 @@ export function Payroll() {
         const grossPay = salary + overtime;
 
         // PENSION deduction (on pensionSum, not totalAllowances)
-        const pension = emp.payeTax ? pensionSum * (payrollVariables.pension / 100) : 0;
+        const pension = emp.payeTax ? pensionSum * (payrollVariables.employeePensionRate / 100) : 0;
 
         // ── PAYE calculation matching Excel formula exactly: ────────────────
         // =IF(payeTax="Yes", NIGERIATAX(salary, SUM(Basic:Transport), overtime, rentRelief),
@@ -160,32 +161,37 @@ export function Payroll() {
         if (emp.payeTax) {
           const tv = payeTaxVariables;
           const annualGross = (salary * 12) + overtime;
-          const pensionAmt = (pensionSum * 12) * tv.pensionRate;
+          const pensionAmt = (pensionSum * 12) * (payrollVariables.employeePensionRate / 100);
           const extraCRA = tv.extraConditions.filter(c => c.enabled).reduce((s, c) => s + c.amount, 0);
-          const cra = tv.craBase + payrollVariables.rentRelief + pensionAmt + extraCRA;
+          const rentRelief = Math.min((emp.rent || 0) * (tv.rentReliefRate ?? 0.20), 500000);
+          const cra = tv.craBase + rentRelief + pensionAmt + extraCRA;
           const annualTaxable = Math.max(annualGross - cra, 0);
+          // Old Excel Logic Translation
+          // Case Is <= 0: AnnualTax = 0
+          // Case Is <= 2200000: AnnualTax = AnnualTaxable * 0.15
+          // Case Is <= 11200000: AnnualTax = (AnnualTaxable - 2200000) * 0.18 + (330000)
+          // Case Is <= 24200000: AnnualTax = (AnnualTaxable - 11200000) * 0.21 + (330000 + 1620000)
+          // Case Is <= 49200000: AnnualTax = (AnnualTaxable - 24200000) * 0.23 + (330000 + 1620000 + 2730000)
+          // Case Else: AnnualTax = (AnnualTaxable - 49200000) * 0.25 + (330000 + 1620000 + 2730000 + 5750000)
 
-          // Sort brackets: upTo ascending, null (top bracket) goes last
-          const sorted = [...tv.taxBrackets].sort((a, b) => {
-            if (a.upTo === null) return 1;
-            if (b.upTo === null) return -1;
-            return a.upTo - b.upTo;
-          });
-
-          // Incremental bracket loop — works for any number of brackets
           let annualTax = 0;
-          let prevLimit = 0;
-          for (const bracket of sorted) {
-            if (annualTaxable <= prevLimit) break;
-            const ceiling = bracket.upTo !== null ? bracket.upTo : Infinity;
-            const taxable = Math.min(annualTaxable, ceiling) - prevLimit;
-            annualTax += taxable * bracket.rate;
-            prevLimit = ceiling === Infinity ? annualTaxable : ceiling;
+          if (annualTaxable <= 0) {
+            annualTax = 0;
+          } else if (annualTaxable <= 2200000) {
+            annualTax = annualTaxable * 0.15;
+          } else if (annualTaxable <= 11200000) {
+            annualTax = (annualTaxable - 2200000) * 0.18 + 330000;
+          } else if (annualTaxable <= 24200000) {
+            annualTax = (annualTaxable - 11200000) * 0.21 + (330000 + 1620000);
+          } else if (annualTaxable <= 49200000) {
+            annualTax = (annualTaxable - 24200000) * 0.23 + (330000 + 1620000 + 2730000);
+          } else {
+            annualTax = (annualTaxable - 49200000) * 0.25 + (330000 + 1620000 + 2730000 + 5750000);
           }
 
           paye = annualTax / 12;
         } else if (emp.withholdingTax) {
-          paye = salary * (payeTaxVariables.withholdingTaxRate ?? 0);
+          paye = salary * (payrollVariables.withholdingTaxRate ?? 0);
         }
 
         // LOAN REPAYMENT: Sum of Advances and Monthly Repayments
@@ -217,6 +223,8 @@ export function Payroll() {
         // TAKE HOME PAY: GROSS PAY - (PAYE + LOAN REPAYMENT + PENSION)
         const takeHomePay = grossPay - (paye + loanRepayment + pension);
 
+        const employerPension = emp.payeTax ? pensionSum * (payrollVariables.employerPensionRate / 100) : 0;
+
         return {
           id: emp.id,
           sn: snCounter++,
@@ -237,6 +245,7 @@ export function Payroll() {
           paye,
           loanRepayment,
           pension,
+          employerPension,
           takeHomePay,
           status: 'Pending' as const,
         };
@@ -248,7 +257,7 @@ export function Payroll() {
 
   // Derived filtered print dataset
   const payslipsToPrint = useMemo(() => {
-    if (!showPrintDialog) return [];
+    if (!printType) return [];
     let slips: Array<{ monthLabel: string, monthKey: string, record: PayrollRecord }> = [];
     const monthsToUse = printSelectedMonths.length > 0 ? printSelectedMonths : [selectedMonth];
 
@@ -262,7 +271,7 @@ export function Payroll() {
       });
     });
     return slips;
-  }, [showPrintDialog, printSelectedMonths, printSelectedEmployees, calculatePayrollForMonth, selectedMonth, months]);
+  }, [printType, printSelectedMonths, printSelectedEmployees, calculatePayrollForMonth, selectedMonth, months]);
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -280,14 +289,46 @@ export function Payroll() {
     setTimeout(() => setIsProcessing(false), 2000);
   };
 
-  const handleOpenPrintDialog = () => {
+  const handleOpenPrintDialog = (type: 'PAYSLIPS' | 'PAYE' | 'PENSION') => {
     setPrintSelectedMonths([selectedMonth]);
     setPrintSelectedEmployees([]);
-    setShowPrintDialog(true);
+    setPrintType(type);
   };
 
   const handlePrint = () => {
     if (payslipsToPrint.length === 0) return;
+
+    if (printType === 'PAYE' || printType === 'PENSION') {
+      const el = document.getElementById('print-area-content');
+      if (!el) return;
+      const html = `
+        <!DOCTYPE html>
+        <html><head>
+          <title>${printType} Schedule</title>
+          <style>
+             body { font-family: sans-serif; color: #333; }
+             table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+             th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; }
+             th { background-color: #f1f5f9; font-weight: bold; }
+             .text-right { text-align: right; }
+             .text-center { text-align: center; }
+             .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #4f46e5; padding-bottom: 10px; }
+             .header img { height: 48px; margin-bottom: 10px; }
+             .header h2 { margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px; }
+           </style>
+        </head><body>${el.innerHTML}</body></html>`;
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:21cm;height:29.7cm;border:none';
+      document.body.appendChild(iframe);
+      iframe.contentDocument!.write(html);
+      iframe.contentDocument!.close();
+      iframe.contentWindow!.focus();
+      setTimeout(() => {
+        iframe.contentWindow!.print();
+        setTimeout(() => document.body.removeChild(iframe), 1000);
+      }, 300);
+      return;
+    }
 
     // Build self-contained HTML for every payslip so all appear in one print job
     const currency = (n: number) => '₦' + n.toLocaleString();
@@ -298,81 +339,71 @@ export function Payroll() {
           <p>Employee Payslip &ndash; ${slip.monthLabel} ${currentYear}</p>
         </div>
         <div class="two-col">
-          <div>
-            <h3>EMPLOYEE DETAILS</h3>
-            <table><tbody>
-              <tr><td>Name:</td><td><strong>${slip.record.firstname} ${slip.record.surname}</strong></td></tr>
-              <tr><td>Employee ID:</td><td>${slip.record.id}</td></tr>
-              <tr><td>Position:</td><td>${slip.record.position}</td></tr>
-              <tr><td>Department:</td><td>${slip.record.department}</td></tr>
-            </tbody></table>
-          </div>
-          <div>
-            <h3>PAYMENT DETAILS</h3>
-            <table><tbody>
-              <tr><td>Pay Period:</td><td><strong>${slip.monthLabel}</strong></td></tr>
-              <tr><td>Bank:</td><td>${slip.record.bankName}</td></tr>
-              <tr><td>Account No:</td><td>${slip.record.accountNo}</td></tr>
-            </tbody></table>
-          </div>
+          <table class="info-table">
+            <tr><td>Name:</td><td><strong>${slip.record.firstname} ${slip.record.surname}</strong></td></tr>
+            <tr><td>ID:</td><td>${slip.record.id}</td></tr>
+            <tr><td>Position:</td><td>${slip.record.position}</td></tr>
+          </table>
+          <table class="info-table">
+            <tr><td>Bank:</td><td>${slip.record.bankName}</td></tr>
+            <tr><td>Account:</td><td>${slip.record.accountNo}</td></tr>
+          </table>
         </div>
-        <div class="section">
-          <h3>EARNINGS</h3>
-          <table class="amounts"><thead><tr><th>Description</th><th class="r">Amount (₦)</th></tr></thead><tbody>
-            <tr><td>Basic Salary</td><td class="r">${currency(slip.record.basicSalary)}</td></tr>
-            ${slip.record.housing > 0 ? `<tr><td>Housing Allowance</td><td class="r">${currency(slip.record.housing)}</td></tr>` : ''}
-            ${slip.record.transport > 0 ? `<tr><td>Transport Allowance</td><td class="r">${currency(slip.record.transport)}</td></tr>` : ''}
-            ${slip.record.otherAllowances > 0 ? `<tr><td>Other Allowances</td><td class="r">${currency(slip.record.otherAllowances)}</td></tr>` : ''}
-            ${slip.record.overtime > 0 ? `<tr><td>Overtime Pay</td><td class="r em">${currency(slip.record.overtime)}</td></tr>` : ''}
-            <tr class="total"><td>GROSS PAY</td><td class="r">${currency(slip.record.grossPay)}</td></tr>
-          </tbody></table>
-        </div>
-        <div class="section">
-          <h3>DEDUCTIONS</h3>
-          <table class="amounts"><thead><tr><th>Description</th><th class="r">Amount (₦)</th></tr></thead><tbody>
-            ${slip.record.paye > 0 ? `<tr><td>PAYE Tax</td><td class="r red">${currency(slip.record.paye)}</td></tr>` : ''}
-            ${slip.record.loanRepayment > 0 ? `<tr><td>Loan &amp; Advance Repayment</td><td class="r red">${currency(slip.record.loanRepayment)}</td></tr>` : ''}
-            ${slip.record.pension > 0 ? `<tr><td>Pension Contribution</td><td class="r red">${currency(slip.record.pension)}</td></tr>` : ''}
-            <tr class="total"><td>TOTAL DEDUCTIONS</td><td class="r red">${currency(slip.record.paye + slip.record.loanRepayment + slip.record.pension)}</td></tr>
-          </tbody></table>
-        </div>
+        
+        <table class="breakdown-table">
+          <thead><tr><th>Earnings</th><th class="text-right">Amount (₦)</th></tr></thead>
+          <tbody>
+            <tr><td>Basic Salary</td><td class="text-right">${currency(slip.record.basicSalary)}</td></tr>
+            ${slip.record.housing > 0 ? `<tr><td>Housing Allowance</td><td class="text-right">${currency(slip.record.housing)}</td></tr>` : ''}
+            ${slip.record.transport > 0 ? `<tr><td>Transport Allowance</td><td class="text-right">${currency(slip.record.transport)}</td></tr>` : ''}
+            ${slip.record.otherAllowances > 0 ? `<tr><td>Other Allowances</td><td class="text-right">${currency(slip.record.otherAllowances)}</td></tr>` : ''}
+            ${slip.record.overtime > 0 ? `<tr><td>Overtime Pay</td><td class="text-right">${currency(slip.record.overtime)}</td></tr>` : ''}
+            <tr class="sum"><td>GROSS PAY</td><td class="text-right">${currency(slip.record.grossPay)}</td></tr>
+          </tbody>
+        </table>
+
+        <table class="breakdown-table">
+          <thead><tr><th>Deductions</th><th class="text-right">Amount (₦)</th></tr></thead>
+          <tbody>
+            ${slip.record.paye > 0 ? `<tr><td>PAYE Tax</td><td class="text-right">-${currency(slip.record.paye)}</td></tr>` : ''}
+            ${slip.record.loanRepayment > 0 ? `<tr><td>Loan & Advance</td><td class="text-right">-${currency(slip.record.loanRepayment)}</td></tr>` : ''}
+            ${slip.record.pension > 0 ? `<tr><td>Pension</td><td class="text-right">-${currency(slip.record.pension)}</td></tr>` : ''}
+            <tr class="sum"><td>TOTAL DEDUCTIONS</td><td class="text-right">-${currency(slip.record.paye + slip.record.loanRepayment + slip.record.pension)}</td></tr>
+          </tbody>
+        </table>
+
         <div class="net-pay">
-          <span>TAKE HOME PAY</span>
-          <span>${currency(slip.record.takeHomePay)}</span>
+            <span>TAKE HOME PAY</span>
+            <span>${currency(slip.record.takeHomePay)}</span>
         </div>
-        <div class="footer">
-          <p>This is a computer-generated document. No signature required.</p>
-          <p>Generated on ${new Date().toLocaleDateString()}</p>
-        </div>
+        
+        <div class="footer">This is a system generated payslip. No signature is required. Generated on ${new Date().toLocaleDateString()}</div>
       </div>
     `).join('');
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
-      <title>Payslips</title>
+    const html = `
+    <!DOCTYPE html>
+    <html><head>
+      <title>Print Bulk Payslips</title>
       <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: Arial, sans-serif; font-size: 13px; color: #1e293b; }
-        .payslip { padding: 40px; page-break-after: always; }
+        body { font-family: sans-serif; color: #333; }
+        .payslip { page-break-after: always; max-width: 800px; margin: 0 auto; padding: 20px; }
         .payslip.last { page-break-after: auto; }
-        .header { border-bottom: 3px solid #4338ca; padding-bottom: 12px; margin-bottom: 20px; }
-        .header h1 { font-size: 22px; color: #1e1b4b; font-weight: bold; }
-        .header p  { font-size: 12px; color: #64748b; margin-top: 2px; }
-        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 20px; }
-        h3 { font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 8px; }
-        table { width: 100%; border-collapse: collapse; }
-        td, th { padding: 4px 6px; }
-        th { font-weight: 600; color: #64748b; }
-        td:first-child { color: #64748b; }
-        td:last-child { font-weight: 500; }
-        .amounts thead tr { border-bottom: 1px solid #e2e8f0; }
-        .amounts tbody tr { border-bottom: 1px solid #f1f5f9; }
-        .r { text-align: right; font-family: monospace; }
-        .red { color: #dc2626; }
-        .em { color: #059669; }
-        .total td { font-weight: bold; border-top: 2px solid #e2e8f0; padding-top: 6px; }
-        .section { margin-bottom: 20px; }
-        .net-pay { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin: 16px 0; }
-        .net-pay span:first-child { font-size: 14px; font-weight: bold; }
+        .header { text-align: center; border-bottom: 2px solid #4f46e5; padding-bottom: 16px; margin-bottom: 24px; }
+        .header h2 { margin: 0; color: #1e293b; }
+        .header p { margin: 4px 0 0 0; color: #64748b; font-size: 14px; }
+        .two-col { display: flex; justify-content: space-between; margin-bottom: 24px; gap: 40px; }
+        .info-table { flex: 1; font-size: 14px; }
+        .info-table td { padding: 4px 0; border: none; }
+        .info-table td:first-child { color: #64748b; width: 80px; }
+        .breakdown-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px; }
+        .breakdown-table th { background: #f8fafc; text-align: left; padding: 8px; border-bottom: 1px solid #cbd5e1; }
+        .breakdown-table td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
+        .breakdown-table .sum { font-weight: bold; font-size: 15px; }
+        .breakdown-table .sum td { border-top: 1px solid #94a3b8; border-bottom: none; }
+        .text-right { text-align: right !important; }
+        .net-pay { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-top: 24px;}
+        .net-pay span:first-child { font-size: 16px; font-weight: bold; color: #1e293b; }
         .net-pay span:last-child  { font-size: 22px; font-weight: bold; color: #15803d; font-family: monospace; }
         .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 10px; text-align: center; font-size: 11px; color: #94a3b8; }
       </style>
@@ -390,7 +421,43 @@ export function Payroll() {
     }, 300);
   };
 
+  const handleExportScheduleCSV = () => {
+    let csvStr = '';
+    const fmCSV = (n: number) => n.toFixed(2);
+
+    if (printType === 'PAYE') {
+      csvStr = 'S/N,Employee Name,Month,Basic Salary (₦),Housing (₦),Transport (₦),Other Allowances (₦),Gross Pay (₦),PAYE Deducted (₦)\n';
+      let sn = 1;
+      payslipsToPrint.forEach(slip => {
+        if (slip.record.paye > 0) {
+          csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.monthLabel}","${fmCSV(slip.record.basicSalary)}","${fmCSV(slip.record.housing)}","${fmCSV(slip.record.transport)}","${fmCSV(slip.record.otherAllowances)}","${fmCSV(slip.record.grossPay)}","${fmCSV(slip.record.paye)}"\n`;
+        }
+      });
+    } else if (printType === 'PENSION') {
+      csvStr = 'S/N,Employee Name,Month,Pensionable Sum (₦),Employee Contrib. (₦),Employer Contrib. (₦),Total Contrib. (₦)\n';
+      let sn = 1;
+      payslipsToPrint.forEach(slip => {
+        if (slip.record.pension > 0) {
+          const penSum = slip.record.basicSalary + slip.record.housing + slip.record.transport;
+          const totalPen = slip.record.pension + slip.record.employerPension;
+          csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.monthLabel}","${fmCSV(penSum)}","${fmCSV(slip.record.pension)}","${fmCSV(slip.record.employerPension)}","${fmCSV(totalPen)}"\n`;
+        }
+      });
+    }
+
+    if (!csvStr) return;
+    const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${printType}_Schedule.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const selectedMonthLabel = months.find(m => m.key === selectedMonth)?.label || selectedMonth;
+
+  const fm = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div className="flex flex-col gap-8">
@@ -425,10 +492,20 @@ export function Payroll() {
             </div>
 
             <div className="flex gap-3">
-              <Button onClick={handleOpenPrintDialog} variant="outline" className="gap-2">
-                <Printer className="h-4 w-4" />
-                Print Payslips
-              </Button>
+              <div className="flex gap-2 relative group">
+                <Button onClick={() => handleOpenPrintDialog('PAYSLIPS')} variant="outline" className="gap-2 shrink-0 border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700">
+                  <Printer className="h-4 w-4" />
+                  Print Payslips
+                </Button>
+                <div className="absolute top-full left-0 mt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 flex flex-col gap-1 w-full pt-1">
+                  <Button onClick={() => handleOpenPrintDialog('PAYE')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
+                    <FileText className="h-4 w-4 text-rose-500" /> PAYE Schedule
+                  </Button>
+                  <Button onClick={() => handleOpenPrintDialog('PENSION')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
+                    <FileText className="h-4 w-4 text-emerald-500" /> Pension Schedule
+                  </Button>
+                </div>
+              </div>
               <Button variant="outline" className="gap-2">
                 <Download className="h-4 w-4" />
                 Export CSV
@@ -568,18 +645,26 @@ export function Payroll() {
         </TabsContent>
       </Tabs>
 
-      {/* Print Payslips Dialog */}
-      {showPrintDialog && (
+      {printType && (
         <div className="fixed inset-0 bg-black/50 flex flex-col z-50 overflow-hidden items-center justify-center p-4">
           <div className="bg-slate-100 rounded-lg shadow-xl flex flex-col w-full max-w-6xl h-[calc(100vh-2rem)] relative">
 
             <div className="flex bg-indigo-600 p-4 justify-between items-center rounded-t-lg shrink-0 z-10">
-              <h3 className="text-white font-bold text-lg">Print Bulk Payslips</h3>
+              <h3 className="text-white font-bold text-lg">
+                {printType === 'PAYSLIPS' && "Print Bulk Payslips"}
+                {printType === 'PAYE' && "Generate PAYE Schedule"}
+                {printType === 'PENSION' && "Generate Pension Schedule"}
+              </h3>
               <div className="flex gap-2">
+                {printType !== 'PAYSLIPS' && (
+                  <Button variant="secondary" size="sm" className="gap-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800" onClick={handleExportScheduleCSV} disabled={payslipsToPrint.length === 0}>
+                    <Download className="h-4 w-4" /> Export CSV
+                  </Button>
+                )}
                 <Button variant="secondary" size="sm" className="gap-1" onClick={handlePrint} disabled={payslipsToPrint.length === 0}>
-                  <Printer className="h-4 w-4" /> Print All ({payslipsToPrint.length})
+                  <Printer className="h-4 w-4" /> Print Document
                 </Button>
-                <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={() => setShowPrintDialog(false)}>
+                <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={() => setPrintType(null)}>
                   <X className="h-5 w-5" />
                 </Button>
               </div>
@@ -644,9 +729,9 @@ export function Payroll() {
               <div className="flex-1 p-8 overflow-y-auto bg-slate-200" id="print-area">
                 {payslipsToPrint.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-slate-400 font-medium pb-20">
-                    No payslips match your selection.
+                    No records match your selection.
                   </div>
-                ) : (
+                ) : printType === 'PAYSLIPS' ? (
                   payslipsToPrint.map((slip, i) => (
                     <div key={`${slip.monthKey}-${slip.record.id}`} className="bg-white p-10 mb-8 mx-auto shadow-sm max-w-3xl rounded-sm print-break">
                       {/* Company Header */}
@@ -730,7 +815,114 @@ export function Payroll() {
 
                     </div>
                   ))
-                )}
+                ) : printType === 'PAYE' || printType === 'PENSION' ? (
+                  <div className="bg-white p-10 mx-auto shadow-sm max-w-5xl rounded-sm print-break" id="print-area-content">
+                    <div className="border-b-2 border-indigo-600 pb-4 mb-6">
+                      <div className="flex justify-between items-end">
+                        <div>
+                          <img src={logoSrc} alt="Company Logo" className="h-12 w-auto mb-2" style={{ height: '48px', width: 'auto', marginBottom: '8px' }} />
+                          <h2 className="text-xl font-bold uppercase tracking-wider text-slate-900">
+                            {printType === 'PAYE' ? 'PAYE TAX SCHEDULE' : 'PENSION CONTRIBUTION SCHEDULE'}
+                          </h2>
+                          <p className="text-sm text-slate-500 mt-1">
+                            Generated on {new Date().toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-sm text-slate-600">Total Valid Records: {payslipsToPrint.filter(s => printType === 'PAYE' ? s.record.paye > 0 : s.record.pension > 0).length}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left bg-slate-50 border-b-2">
+                          <th className="py-3 px-2 text-slate-600">S/N</th>
+                          <th className="py-3 px-2 text-slate-600">Employee Name</th>
+                          <th className="py-3 px-2 text-slate-600">Month</th>
+                          {printType === 'PAYE' ? (
+                            <>
+                              <th className="py-3 px-2 text-right text-slate-600">Basic (₦)</th>
+                              <th className="py-3 px-2 text-right text-slate-600">Housing (₦)</th>
+                              <th className="py-3 px-2 text-right text-slate-600">Transport (₦)</th>
+                              <th className="py-3 px-2 text-right text-slate-600">Other (₦)</th>
+                              <th className="py-3 px-2 text-right text-slate-600">Gross Pay (₦)</th>
+                              <th className="py-3 px-2 text-right text-slate-600">PAYE Deducted (₦)</th>
+                            </>
+                          ) : (
+                            <>
+                              <th className="py-3 px-2 text-right text-slate-600">Pensionable Sum (₦)</th>
+                              <th className="py-3 px-2 text-right text-slate-600">Employee (₦)</th>
+                              <th className="py-3 px-2 text-right text-slate-600">Employer (₦)</th>
+                              <th className="py-3 px-2 text-right font-bold text-slate-800">Total (₦)</th>
+                            </>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {payslipsToPrint
+                          .filter(slip => printType === 'PAYE' ? slip.record.paye > 0 : slip.record.pension > 0)
+                          .map((slip, idx) => {
+                            const pSum = slip.record.basicSalary + slip.record.housing + slip.record.transport;
+                            return (
+                              <tr key={idx} className="hover:bg-slate-50">
+                                <td className="py-2.5 px-2">{idx + 1}</td>
+                                <td className="py-2.5 px-2 font-medium">{slip.record.surname} {slip.record.firstname}</td>
+                                <td className="py-2.5 px-2 text-slate-500">{slip.monthLabel}</td>
+                                {printType === 'PAYE' ? (
+                                  <>
+                                    <td className="py-2.5 px-2 text-right font-mono">{fm(slip.record.basicSalary)}</td>
+                                    <td className="py-2.5 px-2 text-right font-mono">{fm(slip.record.housing)}</td>
+                                    <td className="py-2.5 px-2 text-right font-mono">{fm(slip.record.transport)}</td>
+                                    <td className="py-2.5 px-2 text-right font-mono">{fm(slip.record.otherAllowances)}</td>
+                                    <td className="py-2.5 px-2 text-right font-mono">{fm(slip.record.grossPay)}</td>
+                                    <td className="py-2.5 px-2 text-right font-mono font-bold text-red-600">{fm(slip.record.paye)}</td>
+                                  </>
+                                ) : (
+                                  <>
+                                    <td className="py-2.5 px-2 text-right font-mono">{fm(pSum)}</td>
+                                    <td className="py-2.5 px-2 text-right font-mono text-amber-600">{fm(slip.record.pension)}</td>
+                                    <td className="py-2.5 px-2 text-right font-mono text-indigo-600">{fm(slip.record.employerPension)}</td>
+                                    <td className="py-2.5 px-2 text-right font-mono font-bold text-emerald-700">{fm(slip.record.pension + slip.record.employerPension)}</td>
+                                  </>
+                                )}
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2 bg-slate-50">
+                          <td colSpan={3} className="py-3 px-2 text-right font-bold text-slate-700">GRAND TOTAL:</td>
+                          {printType === 'PAYE' ? (
+                            <>
+                              <td className="py-3 px-2 text-right font-mono text-slate-600">{fm(payslipsToPrint.reduce((s, x) => s + x.record.basicSalary, 0))}</td>
+                              <td className="py-3 px-2 text-right font-mono text-slate-600">{fm(payslipsToPrint.reduce((s, x) => s + x.record.housing, 0))}</td>
+                              <td className="py-3 px-2 text-right font-mono text-slate-600">{fm(payslipsToPrint.reduce((s, x) => s + x.record.transport, 0))}</td>
+                              <td className="py-3 px-2 text-right font-mono text-slate-600">{fm(payslipsToPrint.reduce((s, x) => s + x.record.otherAllowances, 0))}</td>
+                              <td className="py-3 px-2 text-right font-mono font-bold">{fm(payslipsToPrint.reduce((s, x) => s + x.record.grossPay, 0))}</td>
+                              <td className="py-3 px-2 text-right font-mono font-bold text-red-600">{fm(payslipsToPrint.reduce((s, x) => s + x.record.paye, 0))}</td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="py-3 px-2 text-right font-mono font-bold text-slate-700">
+                                {fm(payslipsToPrint.reduce((s, x) => s + (x.record.pension > 0 ? (x.record.basicSalary + x.record.housing + x.record.transport) : 0), 0))}
+                              </td>
+                              <td className="py-3 px-2 text-right font-mono font-bold text-amber-600">
+                                {fm(payslipsToPrint.reduce((s, x) => s + x.record.pension, 0))}
+                              </td>
+                              <td className="py-3 px-2 text-right font-mono font-bold text-indigo-600">
+                                {fm(payslipsToPrint.reduce((s, x) => s + x.record.employerPension, 0))}
+                              </td>
+                              <td className="py-3 px-2 text-right font-mono font-bold text-emerald-700">
+                                {fm(payslipsToPrint.reduce((s, x) => s + (x.record.pension + x.record.employerPension), 0))}
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                ) : null}
               </div>
             </div>
 

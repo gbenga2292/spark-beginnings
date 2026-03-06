@@ -69,6 +69,7 @@ export function Employees() {
       monthlySalaries: formData.monthlySalaries as MonthlySalary,
       avatar: formData.avatar || '',
       excludeFromOnboarding: formData.excludeFromOnboarding || false,
+      rent: formData.rent || 0,
     };
 
     addEmployee(newEmployee);
@@ -140,7 +141,7 @@ export function Employees() {
         toast.info('No employees to export');
         return;
       }
-      const headers = ['id', 'surname', 'firstname', 'department', 'staffType', 'position', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'taxId', 'pensionNumber', 'payeTax', 'withholdingTax', 'excludeFromOnboarding', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      const headers = ['id', 'surname', 'firstname', 'department', 'staffType', 'position', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'taxId', 'pensionNumber', 'payeTax', 'withholdingTax', 'excludeFromOnboarding', 'rent', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
       const extractCSV = (str: any) => `"${String(str).replace(/"/g, '""')}"`;
 
       const rows = employees.map(emp => {
@@ -148,7 +149,7 @@ export function Employees() {
           emp.id, emp.surname, emp.firstname, emp.department, emp.staffType,
           emp.position, emp.status, emp.yearlyLeave, emp.startDate || '',
           emp.endDate || '', emp.bankName || '', emp.accountNo || '', emp.taxId || '',
-          emp.pensionNumber || '', emp.payeTax, emp.withholdingTax, emp.excludeFromOnboarding || false,
+          emp.pensionNumber || '', emp.payeTax, emp.withholdingTax, emp.excludeFromOnboarding || false, emp.rent || 0,
           emp.monthlySalaries.jan, emp.monthlySalaries.feb, emp.monthlySalaries.mar,
           emp.monthlySalaries.apr, emp.monthlySalaries.may, emp.monthlySalaries.jun,
           emp.monthlySalaries.jul, emp.monthlySalaries.aug, emp.monthlySalaries.sep,
@@ -202,11 +203,12 @@ export function Employees() {
               payeTax: vals[14] === 'true' || vals[14] === 'Yes',
               withholdingTax: vals[15] === 'true' || vals[15] === 'Yes',
               excludeFromOnboarding: vals[16] === 'true' || vals[16] === 'Yes',
+              rent: parseFloat(vals[17]) || 0,
               monthlySalaries: {
-                jan: parseFloat(vals[17]) || 0, feb: parseFloat(vals[18]) || 0, mar: parseFloat(vals[19]) || 0,
-                apr: parseFloat(vals[20]) || 0, may: parseFloat(vals[21]) || 0, jun: parseFloat(vals[22]) || 0,
-                jul: parseFloat(vals[23]) || 0, aug: parseFloat(vals[24]) || 0, sep: parseFloat(vals[25]) || 0,
-                oct: parseFloat(vals[26]) || 0, nov: parseFloat(vals[27]) || 0, dec: parseFloat(vals[28]) || 0
+                jan: parseFloat(vals[18]) || 0, feb: parseFloat(vals[19]) || 0, mar: parseFloat(vals[20]) || 0,
+                apr: parseFloat(vals[21]) || 0, may: parseFloat(vals[22]) || 0, jun: parseFloat(vals[23]) || 0,
+                jul: parseFloat(vals[24]) || 0, aug: parseFloat(vals[25]) || 0, sep: parseFloat(vals[26]) || 0,
+                oct: parseFloat(vals[27]) || 0, nov: parseFloat(vals[28]) || 0, dec: parseFloat(vals[29]) || 0
               }
             };
             const existing = employees.find(e => e.id === parsedEmp.id);
@@ -391,6 +393,10 @@ export function Employees() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Pension Number</label>
                   <Input value={formData.pensionNumber || ''} onChange={e => setFormData({ ...formData, pensionNumber: e.target.value })} className="font-mono bg-slate-50 focus:bg-white" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Rent (₦)</label>
+                  <Input type="number" value={formData.rent || 0} onChange={e => setFormData({ ...formData, rent: Number(e.target.value) })} className="font-mono bg-slate-50 focus:bg-white" />
                 </div>
               </div>
 

@@ -58,14 +58,14 @@ interface AppState {
     housing: number;
     transport: number;
     otherAllowances: number;
-    rentRelief: number;
-    pension: number;
+    employeePensionRate: number;
+    employerPensionRate: number;
+    withholdingTaxRate: number;
   };
   updatePayrollVariables: (variables: Partial<AppState['payrollVariables']>) => void;
   payeTaxVariables: {
     craBase: number;
-    pensionRate: number;
-    withholdingTaxRate: number;
+    rentReliefRate: number;
     taxBrackets: TaxBracket[];
     extraConditions: { id: string; label: string; amount: number; enabled: boolean }[];
   };
@@ -128,6 +128,7 @@ export interface Employee {
   monthlySalaries: MonthlySalary;
   avatar?: string;
   excludeFromOnboarding?: boolean;
+  rent?: number;
 }
 
 export interface AttendanceRecord {
@@ -327,16 +328,16 @@ export const useAppStore = create<AppState>()(
         housing: 30,
         transport: 20,
         otherAllowances: 10,
-        rentRelief: 0,
-        pension: 8,
+        employeePensionRate: 8,
+        employerPensionRate: 10,
+        withholdingTaxRate: 0.05,
       },
       updatePayrollVariables: (variables) => set((state) => ({
         payrollVariables: { ...state.payrollVariables, ...variables }
       })),
       payeTaxVariables: {
         craBase: 800000,
-        pensionRate: 0.08,
-        withholdingTaxRate: 0.05,
+        rentReliefRate: 0.20,
         taxBrackets: [
           { id: 'tb-1', upTo: 2200000, rate: 0.15, label: 'First ₦2.2m' },
           { id: 'tb-2', upTo: 11200000, rate: 0.18, label: 'Next ₦9m' },
