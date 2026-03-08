@@ -1,382 +1,583 @@
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
+import { useState, useMemo } from 'react';
+import { useAppStore, PendingInvoice, Invoice } from '@/src/store/appStore';
+import { toast, showConfirm } from '@/src/components/ui/toast';
+import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle } from 'lucide-react';
+import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
-import { Input } from '@/src/components/ui/input';
-import { Download, Plus, FileText, Send, MoreHorizontal, X, Save } from 'lucide-react';
-import { useAppStore, Invoice } from '@/src/store/appStore';
-import { toast, showConfirm } from '@/src/components/ui/toast';
 
 export function Billing() {
-  const [isAdding, setIsAdding] = useState(false);
-  const [newInvoice, setNewInvoice] = useState({
-    client: '',
-    project: '',
-    siteId: '',
-    siteName: '',
-    amount: 0,
-    date: '',
-    dueDate: '',
-    billingCycle: 'Monthly' as 'Weekly' | 'Bi-Weekly' | 'Monthly' | 'Custom',
-    reminderDate: '',
-    status: 'Draft' as 'Draft' | 'Sent' | 'Paid' | 'Overdue'
-  });
-
-  const invoices = useAppStore((state) => state.invoices);
   const sites = useAppStore((state) => state.sites);
-  const addInvoice = useAppStore((state) => state.addInvoice);
-  const updateInvoice = useAppStore((state) => state.updateInvoice);
-  const deleteInvoice = useAppStore((state) => state.deleteInvoice);
+  const pendingInvoices = useAppStore((state) => state.pendingInvoices);
+  const invoices = useAppStore((state) => state.invoices);
+  const addPendingInvoice = useAppStore(state => state.addPendingInvoice);
+  const updatePendingInvoice = useAppStore(state => state.updatePendingInvoice);
+  const deletePendingInvoice = useAppStore(state => state.deletePendingInvoice);
+  const addInvoice = useAppStore(state => state.addInvoice);
+  const updateInvoice = useAppStore(state => state.updateInvoice);
+  const deleteInvoice = useAppStore(state => state.deleteInvoice);
+  const vatRate = useAppStore(state => state.payrollVariables.vatRate);
 
-  // Calculate stats from store data
-  const totalOutstanding = invoices
-    .filter(inv => inv.status !== 'Paid')
-    .reduce((sum, inv) => sum + inv.amount, 0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isViewingActive, setIsViewingActive] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const overdueAmount = invoices
-    .filter(inv => inv.status === 'Overdue')
-    .reduce((sum, inv) => sum + inv.amount, 0);
+  const initialForm = {
+    destination: 'Pending' as 'Pending' | 'Active',
+    startDate: '',
+    duration: '',
+    invoiceNo: '',
+    client: '',
+    site: '',
+    noOfMachine: '',
+    dailyRentalCost: '',
+    noOfTechnician: '',
+    techniciansDailyRate: '',
+    dieselCostPerLtr: '',
+    dailyUsage: '',
+    mobDemob: '',
+    installation: '',
+    damages: '',
+  };
+  const [form, setForm] = useState(initialForm);
 
-  const paidThisMonth = invoices
-    .filter(inv => inv.status === 'Paid')
-    .reduce((sum, inv) => sum + inv.amount, 0);
-
-  const draftAmount = invoices
-    .filter(inv => inv.status === 'Draft')
-    .reduce((sum, inv) => sum + inv.amount, 0);
-
-  // Generate truly unique invoice number based on existing invoices
-  const generateInvoiceNumber = () => {
-    const year = new Date().getFullYear();
-    const yearInvoices = invoices.filter(inv => inv.id.includes(year.toString()));
-    const maxNum = yearInvoices.reduce((max, inv) => {
-      const num = parseInt(inv.id.split('-').pop() || '0');
-      return num > max ? num : max;
-    }, 0);
-    return `INV-${year}-${String(maxNum + 1).padStart(3, '0')}`;
+  const handleChange = (field: string, value: string) => {
+    setForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleCreateInvoice = () => {
-    if (!newInvoice.client || !newInvoice.amount || !newInvoice.date) {
-      toast.error('Client, Amount, and Date are required.');
-      return;
+  const handleClear = () => {
+    setForm(initialForm);
+    setSelectedId(null);
+  };
+
+  const livePreview = useMemo(() => {
+    const duration = parseFloat(form.duration) || 0;
+    const noOfMachine = parseFloat(form.noOfMachine) || 0;
+    const dailyRentalCost = parseFloat(form.dailyRentalCost) || 0;
+    const noOfTechnician = parseFloat(form.noOfTechnician) || 0;
+    const techniciansDailyRate = parseFloat(form.techniciansDailyRate) || 0;
+    const dieselCostPerLtr = parseFloat(form.dieselCostPerLtr) || 0;
+    const dailyUsage = parseFloat(form.dailyUsage) || 0;
+    const mobDemob = parseFloat(form.mobDemob) || 0;
+    const installation = parseFloat(form.installation) || 0;
+    const damages = parseFloat(form.damages) || 0;
+
+    const rentalCost = noOfMachine * dailyRentalCost * duration;
+    const dieselCost = noOfMachine * dailyUsage * dieselCostPerLtr * duration;
+    const techniciansCost = noOfTechnician * techniciansDailyRate * duration;
+    const instMobDemob = mobDemob + installation;
+    const otherCosts = damages;
+
+    const totalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
+
+    const siteObj = sites.find(s => s.name === form.site && s.client === form.client);
+    const vatInc = siteObj ? siteObj.vat : 'No';
+
+    let vat = 0;
+    if (vatInc === 'Yes') {
+      vat = (totalCost / (100 + vatRate)) * vatRate;
+    } else if (vatInc === 'Add') {
+      vat = totalCost * (vatRate / 100);
     }
 
-    const invoice: Invoice = {
-      id: generateInvoiceNumber(),
-      invoiceNumber: generateInvoiceNumber(),
-      client: newInvoice.client,
-      project: newInvoice.project,
-      siteId: newInvoice.siteId,
-      siteName: newInvoice.siteName,
-      amount: newInvoice.amount,
-      date: newInvoice.date,
-      dueDate: newInvoice.dueDate || newInvoice.date,
-      billingCycle: newInvoice.billingCycle,
-      reminderDate: newInvoice.reminderDate,
-      status: newInvoice.status
+    let totalCharge = totalCost;
+    if (vatInc === 'Add') {
+      totalCharge = totalCost + vat;
+    }
+
+    return { totalCost, vat, totalCharge, vatInc };
+  }, [form, sites, vatRate]);
+
+  const calculateInvoice = (): Omit<PendingInvoice, 'id'> | null => {
+    if (!form.invoiceNo || !form.client || !form.site) {
+      toast.error('Invoice Number, Client, and Site are required');
+      return null;
+    }
+
+    const duration = parseFloat(form.duration) || 0;
+    const noOfMachine = parseFloat(form.noOfMachine) || 0;
+    const dailyRentalCost = parseFloat(form.dailyRentalCost) || 0;
+    const noOfTechnician = parseFloat(form.noOfTechnician) || 0;
+    const techniciansDailyRate = parseFloat(form.techniciansDailyRate) || 0;
+    const dieselCostPerLtr = parseFloat(form.dieselCostPerLtr) || 0;
+    const dailyUsage = parseFloat(form.dailyUsage) || 0;
+    const mobDemob = parseFloat(form.mobDemob) || 0;
+    const installation = parseFloat(form.installation) || 0;
+    const damages = parseFloat(form.damages) || 0;
+
+    let endDate = '';
+    if (form.startDate && duration > 0) {
+      const start = new Date(form.startDate);
+      start.setDate(start.getDate() + duration - 1);
+      endDate = start.toISOString().split('T')[0];
+    }
+
+    const rentalCost = noOfMachine * dailyRentalCost * duration;
+    const dieselCost = noOfMachine * dailyUsage * dieselCostPerLtr * duration;
+    const techniciansCost = noOfTechnician * techniciansDailyRate * duration;
+    const instMobDemob = mobDemob + installation;
+    const otherCosts = damages;
+
+    const totalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
+
+    const siteObj = sites.find(s => s.name === form.site && s.client === form.client);
+    const vatInc = siteObj ? siteObj.vat : 'No';
+
+    let vat = 0;
+    if (vatInc === 'Yes') {
+      vat = (totalCost / (100 + vatRate)) * vatRate;
+    } else if (vatInc === 'Add') {
+      vat = totalCost * (vatRate / 100);
+    }
+
+    let totalCharge = totalCost;
+    if (vatInc === 'Add') {
+      totalCharge = totalCost + vat;
+    }
+
+    const totalExclusiveOfVat = totalCharge - vat;
+
+    return {
+      invoiceNo: form.invoiceNo,
+      client: form.client,
+      site: form.site,
+      vatInc,
+      noOfMachine,
+      dailyRentalCost,
+      dieselCostPerLtr,
+      dailyUsage,
+      noOfTechnician,
+      techniciansDailyRate,
+      startDate: form.startDate,
+      duration,
+      endDate,
+      mobDemob,
+      installation,
+      damages,
+      rentalCost,
+      dieselCost,
+      techniciansCost,
+      totalCost,
+      vat,
+      totalCharge,
+      totalExclusiveOfVat,
     };
-
-    addInvoice(invoice);
-    setIsAdding(false);
-    toast.success('Invoice created successfully.');
-    setNewInvoice({ client: '', project: '', siteId: '', siteName: '', amount: 0, date: '', dueDate: '', billingCycle: 'Monthly', reminderDate: '', status: 'Draft' });
   };
 
-  const handleSendInvoice = (invoice: Invoice) => {
-    // Show email compose modal with professional write-up
-    const emailContent = `
-Dear ${invoice.client},
+  const handleSubmit = () => {
+    const data = calculateInvoice();
+    if (!data) return;
 
-RE: INVOICE NOTIFICATION - ${invoice.invoiceNumber || invoice.id}
+    if (form.destination === 'Active') {
+      // Create an Active Invoice directly
+      const newInvoice: Invoice = {
+        id: `INV-${Date.now()}`,
+        invoiceNumber: data.invoiceNo,
+        client: data.client,
+        project: 'Billed',
+        siteId: sites.find(s => s.name === data.site)?.id || '',
+        siteName: data.site,
+        amount: data.totalCharge,
+        date: data.startDate,
+        dueDate: data.endDate || data.startDate,
+        billingCycle: 'Custom',
+        reminderDate: '',
+        status: 'Sent',
+        // Sync pending properties
+        vatInc: data.vatInc,
+        noOfMachine: data.noOfMachine,
+        dailyRentalCost: data.dailyRentalCost,
+        dieselCostPerLtr: data.dieselCostPerLtr,
+        dailyUsage: data.dailyUsage,
+        noOfTechnician: data.noOfTechnician,
+        techniciansDailyRate: data.techniciansDailyRate,
+        mobDemob: data.mobDemob,
+        installation: data.installation,
+        damages: data.damages,
+        duration: data.duration,
+        rentalCost: data.rentalCost,
+        dieselCost: data.dieselCost,
+        techniciansCost: data.techniciansCost,
+        totalCost: data.totalCost,
+        vat: data.vat,
+        totalCharge: data.totalCharge,
+        totalExclusiveOfVat: data.totalExclusiveOfVat
+      };
 
-We hope this message finds you well. Please find below the details of your invoice for the services rendered.
+      if (selectedId) {
+        // If we are somehow editing and moving it to Active directly
+        updateInvoice(selectedId, newInvoice);
+        toast.success('Active Invoice updated successfully');
+      } else {
+        addInvoice(newInvoice);
+        toast.success('Active Invoice created successfully');
+      }
 
-========================================
-INVOICE DETAILS
-========================================
-Invoice Number: ${invoice.invoiceNumber || invoice.id}
-Project: ${invoice.project}
-Site: ${invoice.siteName || 'N/A'}
-Billing Cycle: ${invoice.billingCycle}
+    } else {
+      // Destination is Pending
+      if (selectedId) {
+        updatePendingInvoice(selectedId, data);
+        toast.success('Pending Invoice updated successfully');
+      } else {
+        addPendingInvoice({ ...data, id: `PI-${Date.now()}` });
+        toast.success('Pending Invoice created successfully');
+      }
+    }
 
-Issue Date: ${invoice.date}
-Due Date: ${invoice.dueDate}
-
-AMOUNT DUE: ₦${invoice.amount.toLocaleString()}
-========================================
-
-Payment is due by ${invoice.dueDate}. Please make payment to the bank account details provided in our contract.
-
-For your convenience, we have also attached the detailed invoice document for your records.
-
-If you have any questions regarding this invoice or require any clarification, please don't hesitate to contact us.
-
-Thank you for your continued business. We look forward to serving you.
-
-Best regards,
-Finance Team
-    `.trim();
-
-    // Open email client with pre-filled content
-    const subject = encodeURIComponent(`Invoice ${invoice.invoiceNumber || invoice.id} - Payment Due`);
-    const body = encodeURIComponent(emailContent);
-    window.open(`mailto:?subject=${subject}&body=${body}`);
-
-    // Also update status
-    updateInvoice(invoice.id, { status: 'Sent' });
-    toast.success('Invoice marked as sent.');
+    setIsModalOpen(false);
+    handleClear();
   };
 
-  const handleDeleteInvoice = async (id: string) => {
-    const ok = await showConfirm('Are you sure you want to delete this invoice?', { variant: 'danger', confirmLabel: 'Delete' });
-    if (ok) {
+  const handleEdit = (inv: PendingInvoice | Invoice) => {
+    setSelectedId(inv.id);
+    setForm({
+      destination: 'totalCost' in inv ? 'Pending' : 'Active',
+      startDate: 'startDate' in inv ? inv.startDate : inv.date,
+      duration: 'duration' in inv ? inv.duration.toString() : '0',
+      invoiceNo: 'invoiceNo' in inv ? inv.invoiceNo : inv.invoiceNumber,
+      client: inv.client,
+      site: 'site' in inv ? inv.site : inv.siteName,
+      noOfMachine: 'noOfMachine' in inv ? inv.noOfMachine.toString() : '0',
+      dailyRentalCost: 'dailyRentalCost' in inv ? inv.dailyRentalCost.toString() : '0',
+      noOfTechnician: 'noOfTechnician' in inv ? inv.noOfTechnician.toString() : '0',
+      techniciansDailyRate: 'techniciansDailyRate' in inv ? inv.techniciansDailyRate.toString() : '0',
+      dieselCostPerLtr: 'dieselCostPerLtr' in inv ? inv.dieselCostPerLtr.toString() : '0',
+      dailyUsage: 'dailyUsage' in inv ? inv.dailyUsage.toString() : '0',
+      mobDemob: 'mobDemob' in inv ? inv.mobDemob.toString() : '0',
+      installation: 'installation' in inv ? inv.installation.toString() : '0',
+      damages: 'damages' in inv ? inv.damages.toString() : '0',
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string, removeOnly: boolean = false) => {
+    if (!removeOnly) {
+      const ok = await showConfirm('Are you sure you want to delete this invoice?', { variant: 'danger' });
+      if (!ok) return;
+    }
+
+    if (isViewingActive) {
       deleteInvoice(id);
-      toast.success('Invoice deleted.');
+    } else {
+      deletePendingInvoice(id);
+    }
+    if (selectedId === id) handleClear();
+    if (!removeOnly) toast.success('Invoice deleted');
+  };
+
+  const handleMakeActive = async (inv: PendingInvoice) => {
+    const ok = await showConfirm('Do you want to add this to the Active Invoices?', { confirmLabel: "Yes", cancelLabel: "No" });
+    if (ok) {
+      addInvoice({
+        id: `INV-${Date.now()}`,
+        invoiceNumber: inv.invoiceNo,
+        client: inv.client,
+        project: 'Billed',
+        siteId: sites.find(s => s.name === inv.site)?.id || '',
+        siteName: inv.site,
+        amount: inv.totalCharge,
+        date: inv.startDate,
+        dueDate: inv.endDate || inv.startDate,
+        billingCycle: 'Custom',
+        reminderDate: '',
+        status: 'Sent',
+        vatInc: inv.vatInc,
+        noOfMachine: inv.noOfMachine,
+        dailyRentalCost: inv.dailyRentalCost,
+        dieselCostPerLtr: inv.dieselCostPerLtr,
+        dailyUsage: inv.dailyUsage,
+        noOfTechnician: inv.noOfTechnician,
+        techniciansDailyRate: inv.techniciansDailyRate,
+        mobDemob: inv.mobDemob,
+        installation: inv.installation,
+        damages: inv.damages,
+        duration: inv.duration,
+        rentalCost: inv.rentalCost,
+        dieselCost: inv.dieselCost,
+        techniciansCost: inv.techniciansCost,
+        totalCost: inv.totalCost,
+        vat: inv.vat,
+        totalCharge: inv.totalCharge,
+        totalExclusiveOfVat: inv.totalExclusiveOfVat
+      });
+      deletePendingInvoice(inv.id);
+      if (selectedId === inv.id) handleClear();
+      toast.success('Moved to Active Invoices');
     }
   };
+
+  const currentList = isViewingActive ? invoices : pendingInvoices;
+
+  const uniqueClients = useMemo(() => Array.from(new Set(sites.map(s => s.client))), [sites]);
+  const sitesForClient = useMemo(() => form.client ? sites.filter(s => s.client === form.client) : sites, [sites, form.client]);
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Client Billing</h1>
-          <p className="text-slate-500 mt-2">Manage invoices, track payments, and export to accounting.</p>
+    <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
+
+      {/* Top action bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex bg-slate-200/50 p-1 rounded-lg">
+          <button
+            className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${!isViewingActive ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            onClick={() => setIsViewingActive(false)}
+          >
+            Pending Invoices
+            <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${!isViewingActive ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{pendingInvoices.length}</Badge>
+          </button>
+          <button
+            className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${isViewingActive ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            onClick={() => setIsViewingActive(true)}
+          >
+            Active Invoices
+            <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${isViewingActive ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{invoices.length}</Badge>
+          </button>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
-            Export to QuickBooks
-          </Button>
-          <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700" onClick={() => setIsAdding(true)}>
-            <Plus className="h-4 w-4" />
-            Create Invoice
-          </Button>
-        </div>
+
+        <Button
+          className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-10 px-5"
+          onClick={() => { handleClear(); setIsModalOpen(true); }}
+        >
+          <Plus className="w-5 h-5" /> Add Invoice
+        </Button>
       </div>
 
-      {isAdding && (
-        <Card className="border-t-4 border-t-indigo-600 shadow-md">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4 flex flex-row justify-between items-center">
-            <CardTitle className="text-indigo-900 text-xl">Create New Invoice</CardTitle>
-            <Button variant="ghost" size="icon" onClick={() => setIsAdding(false)}>
-              <X className="h-5 w-5" />
-            </Button>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Client</label>
-                <Input
-                  placeholder="e.g. Acme Corp"
-                  value={newInvoice.client}
-                  onChange={(e) => setNewInvoice({ ...newInvoice, client: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Project</label>
-                <Input
-                  placeholder="e.g. Website Redesign"
-                  value={newInvoice.project}
-                  onChange={(e) => setNewInvoice({ ...newInvoice, project: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Site</label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                  value={newInvoice.siteId}
-                  onChange={(e) => {
-                    const site = sites.find(s => s.id === e.target.value);
-                    setNewInvoice({ ...newInvoice, siteId: e.target.value, siteName: site?.name || '' });
-                  }}
-                >
-                  <option value="">Select Site (Optional)</option>
-                  {sites.map(site => (
-                    <option key={site.id} value={site.id}>{site.name} - {site.client}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Amount (₦)</label>
-                <Input
-                  type="number"
-                  placeholder="e.g. 1000000"
-                  value={newInvoice.amount || ''}
-                  onChange={(e) => setNewInvoice({ ...newInvoice, amount: parseFloat(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Billing Cycle</label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                  value={newInvoice.billingCycle}
-                  onChange={(e) => setNewInvoice({ ...newInvoice, billingCycle: e.target.value as any })}
-                >
-                  <option value="Weekly">Weekly</option>
-                  <option value="Bi-Weekly">Bi-Weekly</option>
-                  <option value="Monthly">Monthly</option>
-                  <option value="Custom">Custom</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Issue Date</label>
-                <Input
-                  type="date"
-                  value={newInvoice.date}
-                  onChange={(e) => setNewInvoice({ ...newInvoice, date: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Due Date</label>
-                <Input
-                  type="date"
-                  value={newInvoice.dueDate}
-                  onChange={(e) => setNewInvoice({ ...newInvoice, dueDate: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Reminder Date</label>
-                <Input
-                  type="date"
-                  value={newInvoice.reminderDate}
-                  onChange={(e) => setNewInvoice({ ...newInvoice, reminderDate: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Status</label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                  value={newInvoice.status}
-                  onChange={(e) => setNewInvoice({ ...newInvoice, status: e.target.value as any })}
-                >
-                  <option value="Draft">Draft</option>
-                  <option value="Sent">Sent</option>
-                  <option value="Paid">Paid</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex justify-end gap-4 mt-6">
-              <Button variant="outline" onClick={() => setIsAdding(false)}>Cancel</Button>
-              <Button onClick={handleCreateInvoice} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
-                <Save className="h-4 w-4" /> Create Invoice
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Main Table View */}
+      <div className="flex-1 w-full bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col min-w-0 min-h-[400px]">
+        <div className="border-b border-slate-100 p-4 bg-slate-50/50 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+              {isViewingActive ? 'Active Invoices' : 'Pending Invoices'}
+            </h3>
+            <Badge variant="secondary" className="ml-2 font-mono">{currentList.length}</Badge>
+          </div>
+          {!isViewingActive && <p className="text-xs text-slate-500">Double click row or click action arrow to transition to Active.</p>}
+        </div>
 
-      <div className="grid gap-6 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Total Outstanding</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900">₦{totalOutstanding.toLocaleString()}</div>
-            <p className="text-xs text-slate-500 mt-1">Across {invoices.filter(inv => inv.status !== 'Paid').length} invoices</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Overdue</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">₦{overdueAmount.toLocaleString()}</div>
-            <p className="text-xs text-slate-500 mt-1">{invoices.filter(inv => inv.status === 'Overdue').length} invoice(s)</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Paid This Month</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">₦{paidThisMonth.toLocaleString()}</div>
-            <p className="text-xs text-slate-500 mt-1">{invoices.filter(inv => inv.status === 'Paid').length} invoice(s)</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Drafts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900">₦{draftAmount.toLocaleString()}</div>
-            <p className="text-xs text-slate-500 mt-1">{invoices.filter(inv => inv.status === 'Draft').length} invoice(s) pending review</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader className="border-b border-slate-100 pb-4">
-          <CardTitle>Recent Invoices</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <Table>
-            <TableHeader>
+        <div className="flex-1 overflow-x-auto">
+          <Table className="whitespace-nowrap min-w-full text-xs sm:text-sm">
+            <TableHeader className="bg-slate-50 sticky top-0 z-10">
               <TableRow>
-                <TableHead>Invoice ID</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Project</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Issue Date</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="font-semibold px-4 py-3">Inv #</TableHead>
+                <TableHead className="font-semibold px-4 py-3">Client / Site</TableHead>
+                <TableHead className="font-semibold px-4 py-3 text-right">Equipment</TableHead>
+                <TableHead className="font-semibold px-4 py-3 text-right">Dates & Dur</TableHead>
+                <TableHead className="font-semibold px-4 py-3 text-right">Cost Bkdn</TableHead>
+                <TableHead className="font-semibold px-4 py-3 text-right">Totals (₦)</TableHead>
+                <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invoices.map((invoice) => (
-                <TableRow key={invoice.id}>
-                  <TableCell className="font-mono text-xs font-medium text-slate-900">{invoice.id}</TableCell>
-                  <TableCell className="font-medium">{invoice.client}</TableCell>
-                  <TableCell className="text-slate-500">{invoice.project}</TableCell>
-                  <TableCell className="font-mono font-medium">₦{invoice.amount.toLocaleString()}</TableCell>
-                  <TableCell className="text-slate-500">{invoice.date}</TableCell>
-                  <TableCell className="text-slate-500">{invoice.dueDate}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        invoice.status === 'Paid' ? 'success' :
-                          invoice.status === 'Overdue' ? 'destructive' :
-                            invoice.status === 'Sent' ? 'secondary' : 'outline'
-                      }
-                    >
-                      {invoice.status}
-                    </Badge>
+              {currentList.map((inv: any) => (
+                <TableRow key={inv.id} onDoubleClick={() => { if (!isViewingActive) handleMakeActive(inv) }} className="hover:bg-slate-50 transition-colors cursor-pointer">
+                  <TableCell className="px-4 py-3 font-mono font-bold text-slate-700">{inv.invoiceNo || inv.invoiceNumber}</TableCell>
+                  <TableCell className="px-4 py-3 text-slate-700">
+                    <div className="font-semibold">{inv.client}</div>
+                    <div className="text-slate-500 text-xs">{inv.site || inv.siteName} <span className="ml-1 px-1 rounded bg-slate-100 border text-[10px]">{inv.vatInc || 'No VAT'}</span></div>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      {invoice.status === 'Draft' && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-indigo-600"
-                          title="Send"
-                          onClick={() => handleSendInvoice(invoice)}
-                        >
-                          <Send className="h-4 w-4" />
+                  <TableCell className="px-4 py-3 text-right text-slate-600">
+                    <div><span className="text-slate-400">Mac:</span> {inv.noOfMachine || 0} x {(inv.dailyRentalCost || 0).toLocaleString()}</div>
+                    <div><span className="text-slate-400">Tech:</span> {inv.noOfTechnician || 0} x {(inv.techniciansDailyRate || 0).toLocaleString()}</div>
+                    <div><span className="text-slate-400">DsLtr:</span> {(inv.dieselCostPerLtr || 0).toLocaleString()} ({(inv.dailyUsage || 0)}L)</div>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-right text-slate-600">
+                    <div className="font-medium text-slate-800">{inv.duration || 0} Days</div>
+                    <div className="text-slate-500 text-xs">{inv.startDate || inv.date} - {inv.endDate || inv.dueDate}</div>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-right text-slate-600">
+                    <div><span className="text-slate-400">Rent:</span> {(inv.rentalCost || 0).toLocaleString()}</div>
+                    <div><span className="text-slate-400">Fuel:</span> {(inv.dieselCost || 0).toLocaleString()}</div>
+                    <div><span className="text-slate-400">Other:</span> {((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)).toLocaleString()}</div>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-right">
+                    <div className="text-slate-500 text-xs">Gross: {(inv.totalCost || 0).toLocaleString()}</div>
+                    <div className="text-slate-500 text-xs">VAT: {(inv.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div className="font-bold text-indigo-700 mt-1">{(inv.totalCharge || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                    <div className="flex items-center justify-center gap-1">
+                      {!isViewingActive && (
+                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleMakeActive(inv); }} className="h-8 w-8 text-emerald-600 hover:bg-emerald-50" title="Move to Active">
+                          <ArrowRightCircle className="w-4 h-4" />
                         </Button>
                       )}
-                      <Button variant="ghost" size="icon" className="text-slate-500" title="View PDF">
-                        <FileText className="h-4 w-4" />
+                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(inv); }} className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit row">
+                        <Edit className="w-4 h-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-red-500"
-                        title="Delete"
-                        onClick={() => handleDeleteInvoice(invoice.id)}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
+                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(inv.id); }} className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete row">
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </TableCell>
                 </TableRow>
               ))}
+              {currentList.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="px-4 py-12 text-center text-slate-500 font-medium tracking-wide">
+                    No {isViewingActive ? 'active' : 'pending'} records found.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
+      {/* Modern Modal Overlay */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white max-w-2xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="bg-slate-50/50 p-5 border-b border-slate-100 flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">{selectedId ? 'Edit Invoice' : 'Create Invoice'}</h2>
+                <p className="text-xs text-slate-500">Auto-calculate totals by entering valid numbers.</p>
+              </div>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-800" onClick={() => setIsModalOpen(false)}>
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+
+              <div className="space-y-1.5 p-4 bg-indigo-50/50 border border-indigo-100 rounded-lg pb-5">
+                <label className="text-xs font-bold uppercase tracking-wider text-indigo-800">Destination</label>
+                <select
+                  value={form.destination}
+                  onChange={e => handleChange('destination', e.target.value)}
+                  className="flex h-11 w-full rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none font-semibold text-slate-700 shadow-sm"
+                >
+                  <option value="Pending">Pending Invoices</option>
+                  <option value="Active">Active Invoices</option>
+                </select>
+                <p className="text-[11px] text-indigo-600 mt-1 pl-1">Select where you want this record to be inserted.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Date</label>
+                  <Input type="date" value={form.startDate} onChange={e => handleChange('startDate', e.target.value)} className="bg-slate-50 h-11" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Duration (Days)</label>
+                  <Input type="number" min="0" value={form.duration} onChange={e => handleChange('duration', e.target.value)} className="bg-slate-50 h-11" />
+                </div>
+              </div>
+
+              <div className="space-y-1.5 border-t border-slate-100 pt-5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Invoice No</label>
+                <Input type="text" value={form.invoiceNo} onChange={e => handleChange('invoiceNo', e.target.value)} placeholder="e.g. 144" className="bg-slate-50 font-semibold text-lg h-11" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Client</label>
+                  <select
+                    value={form.client}
+                    onChange={e => { handleChange('client', e.target.value); handleChange('site', ''); }}
+                    className="flex h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                  >
+                    <option value="">Select Client...</option>
+                    {uniqueClients.map((c, i) => <option key={i} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Site</label>
+                  <select
+                    value={form.site}
+                    onChange={e => handleChange('site', e.target.value)}
+                    disabled={!form.client}
+                    className="flex h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <option value="">Select Site...</option>
+                    {sitesForClient.map((s, i) => <option key={i} value={s.name}>{s.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 pt-5 border-t border-slate-100">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Machines</label>
+                  <Input type="number" min="0" value={form.noOfMachine} onChange={e => handleChange('noOfMachine', e.target.value)} className="bg-slate-50" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Daily R. Cost</label>
+                  <Input type="number" min="0" value={form.dailyRentalCost} onChange={e => handleChange('dailyRentalCost', e.target.value)} className="bg-slate-50" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Technicians</label>
+                  <Input type="number" min="0" value={form.noOfTechnician} onChange={e => handleChange('noOfTechnician', e.target.value)} className="bg-slate-50" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Daily Tech Rate</label>
+                  <Input type="number" min="0" value={form.techniciansDailyRate} onChange={e => handleChange('techniciansDailyRate', e.target.value)} className="bg-slate-50" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Daily Usage (L)</label>
+                  <Input type="number" min="0" value={form.dailyUsage} onChange={e => handleChange('dailyUsage', e.target.value)} className="bg-slate-50" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Diesel / Ltr</label>
+                  <Input type="number" min="0" value={form.dieselCostPerLtr} onChange={e => handleChange('dieselCostPerLtr', e.target.value)} className="bg-slate-50" />
+                </div>
+              </div>
+
+              <div className="pt-5 border-t border-slate-100">
+                <label className="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-3 block">Other Costs</label>
+                <div className="grid grid-cols-3 gap-5">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Mob/Demob</label>
+                    <Input type="number" min="0" value={form.mobDemob} onChange={e => handleChange('mobDemob', e.target.value)} className="bg-slate-50" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Install</label>
+                    <Input type="number" min="0" value={form.installation} onChange={e => handleChange('installation', e.target.value)} className="bg-slate-50" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Damages</label>
+                    <Input type="number" min="0" value={form.damages} onChange={e => handleChange('damages', e.target.value)} className="bg-slate-50" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Preview of Calculation */}
+              <div className="mt-6 border-t border-slate-200 pt-5">
+                <div className="bg-slate-900 rounded-xl p-5 shadow-inner">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-slate-400 text-xs font-bold uppercase tracking-widest">Live Auto-Calculation</span>
+                    <Badge variant="outline" className={`text-[10px] uppercase font-bold tracking-wider rounded-sm px-2 py-0 border-slate-700 ${livePreview.vatInc === 'Yes' ? 'text-indigo-400 bg-indigo-950/50' : livePreview.vatInc === 'Add' ? 'text-amber-400 bg-amber-950/50' : 'text-slate-400 bg-slate-800'}`}>
+                      VAT: {livePreview.vatInc}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Gross Total</span>
+                      <span className="font-mono text-slate-200 font-medium text-sm">₦{livePreview.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex flex-col border-l border-slate-700 pl-4">
+                      <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Tax (VAT {livePreview.vatInc})</span>
+                      <span className="font-mono text-indigo-400 font-medium text-sm">₦{livePreview.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex flex-col border-l border-slate-700 pl-4">
+                      <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Final Amount Due</span>
+                      <span className="font-mono text-emerald-400 font-bold text-lg leading-none">₦{livePreview.totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <div className="p-5 border-t border-slate-100 bg-slate-50 flex gap-3">
+              <Button variant="outline" className="flex-1 border-slate-300 h-11 text-slate-600 hover:bg-slate-100" onClick={() => setIsModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSubmit} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-11 shadow-md">
+                <CheckCircle className="w-4 h-4" /> {selectedId ? 'Update Invoice' : 'Submit Invoice'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -12,7 +12,8 @@ import {
   MapPin,
   Library,
   X,
-  CreditCard
+  CreditCard,
+  Landmark
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,7 +29,7 @@ const navigation = [
   { name: 'Sites & Clients', href: '/sites', icon: MapPin },
   { name: 'Onboarding', href: '/onboarding', icon: UserPlus },
   { name: 'Payroll', href: '/payroll', icon: Wallet },
-  { name: 'Billing', href: '/billing', icon: Briefcase },
+  { name: 'Financial Hub', href: '/finance', icon: Landmark },
   { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Variables', href: '/variables', icon: Library },
   { name: 'Settings', href: '/settings', icon: Settings },

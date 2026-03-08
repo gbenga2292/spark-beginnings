@@ -5,7 +5,7 @@ export interface Site {
   id: string;
   name: string;
   client: string;
-  vat: 'Yes' | 'No';
+  vat: 'Yes' | 'No' | 'Add';
   status: 'Active' | 'Inactive';
 }
 
@@ -29,8 +29,11 @@ interface AppState {
   positions: string[];
   departments: string[];
   invoices: Invoice[];
+  pendingInvoices: PendingInvoice[];
   salaryAdvances: SalaryAdvance[];
   loans: Loan[];
+  payments: Payment[];
+  vatPayments: VatPayment[];
   addSite: (site: Site) => void;
   setSites: (sites: Site[]) => void;
   updateSite: (id: string, site: Partial<Site>) => void;
@@ -47,12 +50,21 @@ interface AppState {
   addInvoice: (invoice: Invoice) => void;
   updateInvoice: (id: string, invoice: Partial<Invoice>) => void;
   deleteInvoice: (id: string) => void;
+  addPendingInvoice: (inv: PendingInvoice) => void;
+  updatePendingInvoice: (id: string, inv: Partial<PendingInvoice>) => void;
+  deletePendingInvoice: (id: string) => void;
   addSalaryAdvance: (advance: SalaryAdvance) => void;
   updateSalaryAdvance: (id: string, advance: Partial<SalaryAdvance>) => void;
   deleteSalaryAdvance: (id: string) => void;
   addLoan: (loan: Loan) => void;
   updateLoan: (id: string, loan: Partial<Loan>) => void;
   deleteLoan: (id: string) => void;
+  addPayment: (payment: Payment) => void;
+  updatePayment: (id: string, payment: Partial<Payment>) => void;
+  deletePayment: (id: string) => void;
+  addVatPayment: (payment: VatPayment) => void;
+  updateVatPayment: (id: string, payment: Partial<VatPayment>) => void;
+  deleteVatPayment: (id: string) => void;
   payrollVariables: {
     basic: number;
     housing: number;
@@ -62,6 +74,7 @@ interface AppState {
     employerPensionRate: number;
     withholdingTaxRate: number;
     nsitfRate: number;
+    vatRate: number;
   };
   updatePayrollVariables: (variables: Partial<AppState['payrollVariables']>) => void;
   payeTaxVariables: {
@@ -156,6 +169,33 @@ export interface AttendanceRecord {
   day2: number;
 }
 
+export interface PendingInvoice {
+  id: string;
+  invoiceNo: string;
+  client: string;
+  site: string;
+  vatInc: 'Yes' | 'No' | 'Add';
+  noOfMachine: number;
+  dailyRentalCost: number;
+  dieselCostPerLtr: number;
+  dailyUsage: number;
+  noOfTechnician: number;
+  techniciansDailyRate: number;
+  mobDemob: number;
+  installation: number;
+  damages: number;
+  startDate: string;
+  duration: number;
+  endDate: string;
+  rentalCost: number;
+  dieselCost: number;
+  techniciansCost: number;
+  totalCost: number;
+  vat: number;
+  totalCharge: number;
+  totalExclusiveOfVat: number;
+}
+
 export interface Invoice {
   id: string;
   invoiceNumber: string;
@@ -169,6 +209,25 @@ export interface Invoice {
   billingCycle: 'Weekly' | 'Bi-Weekly' | 'Monthly' | 'Custom';
   reminderDate: string;
   status: 'Paid' | 'Overdue' | 'Sent' | 'Draft';
+  // Additional metrics synced from PendingInvoices
+  vatInc?: 'Yes' | 'No' | 'Add';
+  noOfMachine?: number;
+  dailyRentalCost?: number;
+  dieselCostPerLtr?: number;
+  dailyUsage?: number;
+  noOfTechnician?: number;
+  techniciansDailyRate?: number;
+  mobDemob?: number;
+  installation?: number;
+  damages?: number;
+  duration?: number;
+  rentalCost?: number;
+  dieselCost?: number;
+  techniciansCost?: number;
+  totalCost?: number;
+  vat?: number;
+  totalCharge?: number;
+  totalExclusiveOfVat?: number;
 }
 
 export interface SalaryAdvance {
@@ -192,6 +251,27 @@ export interface Loan {
   paymentStartDate: string;
   remainingBalance: number;
   status: 'Pending' | 'Approved' | 'Rejected' | 'Active' | 'Completed';
+}
+
+export interface Payment {
+  id: string;
+  client: string;
+  site: string;
+  date: string;
+  amount: number;
+  withholdingTax: number;
+  discount: number;
+  payVat: 'Yes' | 'No' | 'Add';
+  vat: number;
+  amountForVat: number;
+}
+
+export interface VatPayment {
+  id: string;
+  client: string;
+  date: string;
+  month: string;
+  amount: number;
 }
 
 export interface MonthValue {
@@ -268,6 +348,34 @@ export const useAppStore = create<AppState>()(
         },
       ],
       attendanceRecords: [],
+      pendingInvoices: [
+        {
+          id: 'PI-001',
+          invoiceNo: '144',
+          client: 'HiTech',
+          site: 'Louiseville',
+          vatInc: 'Yes',
+          noOfMachine: 4,
+          dailyRentalCost: 120000,
+          dieselCostPerLtr: 1110,
+          dailyUsage: 18,
+          noOfTechnician: 2,
+          techniciansDailyRate: 12200,
+          mobDemob: 0,
+          installation: 0,
+          damages: 0,
+          startDate: '2023-11-01',
+          duration: 100,
+          endDate: '2024-02-08',
+          rentalCost: 48000000,
+          dieselCost: 7992000,
+          techniciansCost: 2440000,
+          totalCost: 58432000,
+          vat: 4076651.16,
+          totalCharge: 58432000,
+          totalExclusiveOfVat: 54355348.84
+        }
+      ],
       invoices: [
         { id: 'INV-2023-001', invoiceNumber: 'INV-001', client: 'Acme Corp', project: 'Website Redesign', siteId: 'S-001', siteName: 'Louiseville', amount: 12500000, date: '2023-10-01', dueDate: '2023-10-15', billingCycle: 'Monthly', reminderDate: '2023-10-12', status: 'Paid' },
         { id: 'INV-2023-002', invoiceNumber: 'INV-002', client: 'Global Tech', project: 'Mobile App Dev', siteId: 'S-002', siteName: 'Bose Enenmon', amount: 24000000, date: '2023-10-05', dueDate: '2023-10-20', billingCycle: 'Monthly', reminderDate: '2023-10-17', status: 'Overdue' },
@@ -281,6 +389,29 @@ export const useAppStore = create<AppState>()(
       loans: [
         { id: 'LN-001', employeeId: 'EMP-003', employeeName: 'IDIAFEHI ELIJAH', loanType: 'Personal Loan', principalAmount: 500000, monthlyDeduction: 50000, duration: 10, startDate: '2023-01-01', paymentStartDate: '2023-02-01', remainingBalance: 450000, status: 'Active' },
         { id: 'LN-002', employeeId: 'EMP-004', employeeName: 'ALONGE OLATUNDE GBENGA', loanType: 'Emergency Loan', principalAmount: 200000, monthlyDeduction: 40000, duration: 5, startDate: '2023-06-01', paymentStartDate: '2023-07-01', remainingBalance: 120000, status: 'Active' },
+      ],
+      payments: [
+        {
+          id: 'PAY-001',
+          client: 'HiTech',
+          site: 'Louiseville',
+          date: '2025-12-15',
+          amount: 1000000,
+          withholdingTax: 0,
+          discount: 0,
+          payVat: 'No',
+          vat: 0,
+          amountForVat: 1000000
+        }
+      ],
+      vatPayments: [
+        {
+          id: 'VAT-001',
+          client: 'Monterosa',
+          date: '2025-10-15',
+          month: 'October',
+          amount: 75000
+        }
       ],
       addSite: (site) => set((state) => ({ sites: [...state.sites, site] })),
       setSites: (sites) => set({ sites }),
@@ -310,6 +441,13 @@ export const useAppStore = create<AppState>()(
       deleteInvoice: (id) => set((state) => ({
         invoices: state.invoices.filter(inv => inv.id !== id)
       })),
+      addPendingInvoice: (inv) => set((state) => ({ pendingInvoices: [...state.pendingInvoices, inv] })),
+      updatePendingInvoice: (id, updated) => set((state) => ({
+        pendingInvoices: state.pendingInvoices.map(inv => inv.id === id ? { ...inv, ...updated } : inv)
+      })),
+      deletePendingInvoice: (id) => set((state) => ({
+        pendingInvoices: state.pendingInvoices.filter(inv => inv.id !== id)
+      })),
       addSalaryAdvance: (advance) => set((state) => ({ salaryAdvances: [...state.salaryAdvances, advance] })),
       updateSalaryAdvance: (id, updatedAdvance) => set((state) => ({
         salaryAdvances: state.salaryAdvances.map(adv => adv.id === id ? { ...adv, ...updatedAdvance } : adv)
@@ -324,6 +462,20 @@ export const useAppStore = create<AppState>()(
       deleteLoan: (id) => set((state) => ({
         loans: state.loans.filter(ln => ln.id !== id)
       })),
+      addPayment: (payment) => set((state) => ({ payments: [...state.payments, payment] })),
+      updatePayment: (id, updatedPayment) => set((state) => ({
+        payments: state.payments.map(p => p.id === id ? { ...p, ...updatedPayment } : p)
+      })),
+      deletePayment: (id) => set((state) => ({
+        payments: state.payments.filter(p => p.id !== id)
+      })),
+      addVatPayment: (payment) => set((state) => ({ vatPayments: [...state.vatPayments, payment] })),
+      updateVatPayment: (id, updatedPayment) => set((state) => ({
+        vatPayments: state.vatPayments.map(p => p.id === id ? { ...p, ...updatedPayment } : p)
+      })),
+      deleteVatPayment: (id) => set((state) => ({
+        vatPayments: state.vatPayments.filter(p => p.id !== id)
+      })),
       payrollVariables: {
         basic: 40,
         housing: 30,
@@ -333,6 +485,7 @@ export const useAppStore = create<AppState>()(
         employerPensionRate: 10,
         withholdingTaxRate: 0.05,
         nsitfRate: 1,
+        vatRate: 7.5,
       },
       updatePayrollVariables: (variables) => set((state) => ({
         payrollVariables: { ...state.payrollVariables, ...variables }

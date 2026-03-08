@@ -11,7 +11,7 @@ import { toast, showConfirm } from '@/src/components/ui/toast';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 
-const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No', status: 'Active' as 'Active' | 'Inactive' };
+const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive' };
 
 function ClientSummary() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -308,7 +308,7 @@ export function Sites() {
               id: newId,
               name: name,
               client: client,
-              vat: importedSite.vat === 'Yes' ? 'Yes' : 'No',
+              vat: importedSite.vat === 'Yes' ? 'Yes' : (importedSite.vat === 'Add' ? 'Add' : 'No'),
               status: importedSite.status === 'Inactive' ? 'Inactive' : 'Active'
             });
             count++;
@@ -408,11 +408,12 @@ export function Sites() {
                     <label className="text-sm font-medium text-slate-700">VAT</label>
                     <select
                       value={addForm.vat}
-                      onChange={e => setAddForm({ ...addForm, vat: e.target.value as 'Yes' | 'No' })}
+                      onChange={e => setAddForm({ ...addForm, vat: e.target.value as 'Yes' | 'No' | 'Add' })}
                       className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
                     >
                       <option value="No">No</option>
                       <option value="Yes">Yes</option>
+                      <option value="Add">Add</option>
                     </select>
                   </div>
                   <div className="space-y-1">
@@ -541,11 +542,12 @@ export function Sites() {
                       {editingId === site.id ? (
                         <select
                           value={editForm.vat}
-                          onChange={e => setEditForm({ ...editForm, vat: e.target.value as 'Yes' | 'No' })}
+                          onChange={e => setEditForm({ ...editForm, vat: e.target.value as 'Yes' | 'No' | 'Add' })}
                           className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm"
                         >
                           <option value="No">No</option>
                           <option value="Yes">Yes</option>
+                          <option value="Add">Add</option>
                         </select>
                       ) : (
                         <Badge variant={site.vat === 'Yes' ? 'success' : 'secondary'}>

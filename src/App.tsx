@@ -11,7 +11,7 @@ import { Employees } from './pages/Employees';
 import { Sites } from './pages/Sites';
 import { Attendance } from './pages/Attendance';
 import { Payroll } from './pages/Payroll';
-import { Billing } from './pages/Billing';
+import { FinanceHub } from './pages/FinanceHub';
 import { Onboarding } from './pages/Onboarding';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
@@ -33,7 +33,7 @@ export default function App() {
             <Route path="employees" element={<Employees />} />
             <Route path="sites" element={<Sites />} />
             <Route path="payroll" element={<Payroll />} />
-            <Route path="billing" element={<Billing />} />
+            <Route path="finance" element={<FinanceHub />} />
             <Route path="onboarding" element={<Onboarding />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />
