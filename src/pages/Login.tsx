@@ -1,26 +1,48 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/src/store/auth';
+import { useUserStore } from '@/src/store/userStore';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/src/components/ui/card';
-import { Users, Mail, Lock } from 'lucide-react';
+import { Mail, Lock, AlertCircle } from 'lucide-react';
 
 export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const login = useAuthStore((state) => state.login);
+  const { users, setCurrentUser } = useUserStore();
   const navigate = useNavigate();
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+
+    // Find user by email
+    const user = users.find((u) => u.email.toLowerCase() === (email || '').toLowerCase());
+    if (!user) {
+      setError('No account found with that email.');
+      return;
+    }
+    if (user.password !== password) {
+      setError('Incorrect password.');
+      return;
+    }
+    if (!user.isActive) {
+      setError('Your account has been disabled. Contact an administrator.');
+      return;
+    }
+
+    // Set auth state
     login({
-      id: '1',
-      name: 'Admin User',
-      email: email || 'admin@hrnexus.com',
-      role: 'Super Admin',
-      avatar: 'https://picsum.photos/seed/admin/200/200'
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: 'Super Admin', // Role is now driven by privileges, not this field
+      avatar: user.avatar,
     });
+    setCurrentUser(user.id);
     navigate('/');
   };
 
@@ -44,16 +66,20 @@ export function Login() {
               <CardDescription>Enter your credentials to access your account.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {error && (
+                <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                  <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                  {error}
+                </div>
+              )}
               <div className="space-y-2">
-                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="email">
-                  Email
-                </label>
+                <label className="text-sm font-medium leading-none" htmlFor="email">Email</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
                   <Input
                     id="email"
                     type="email"
-                    placeholder="admin@hrnexus.com"
+                    placeholder="admin@company.com"
                     className="pl-10"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -61,14 +87,7 @@ export function Login() {
                 </div>
               </div>
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="password">
-                    Password
-                  </label>
-                  <a href="#" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
-                    Forgot password?
-                  </a>
-                </div>
+                <label className="text-sm font-medium leading-none" htmlFor="password">Password</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
                   <Input
@@ -82,26 +101,10 @@ export function Login() {
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex flex-col gap-4">
+            <CardFooter>
               <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700">
                 Sign in
               </Button>
-              <div className="relative w-full">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-2 text-slate-500">Or continue with</span>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 w-full">
-                <Button variant="outline" type="button" className="w-full">
-                  Google
-                </Button>
-                <Button variant="outline" type="button" className="w-full">
-                  Microsoft
-                </Button>
-              </div>
             </CardFooter>
           </form>
         </Card>
