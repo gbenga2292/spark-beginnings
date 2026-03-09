@@ -291,8 +291,15 @@ export function Header({ onMenuClick }: HeaderProps) {
                 </div>
               </div>
 
-              {/* Menu Items */}
+{/* Menu Items */}
               <div className="py-1">
+                <button
+                  onClick={() => { setProfileOpen(false); navigate('/profile'); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  <User className="h-3.5 w-3.5 text-slate-400" />
+                  My Profile
+                </button>
                 <button
                   onClick={() => { setProfileOpen(false); navigate('/settings'); }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors"

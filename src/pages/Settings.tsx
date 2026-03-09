@@ -3,7 +3,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Badge } from '@/src/components/ui/badge';
-import { Save, Shield, Building, Bell, Link as LinkIcon } from 'lucide-react';
+import { Save, Building, Bell, Link as LinkIcon } from 'lucide-react';
 import { useState } from 'react';
 
 export function Settings() {
@@ -25,12 +25,9 @@ export function Settings() {
       </div>
 
       <Tabs className="w-full">
-        <TabsList className="mb-8 bg-slate-100">
+<TabsList className="mb-8 bg-slate-100">
           <TabsTrigger active={activeTab === 'general'} onClick={() => setActiveTab('general')} className="w-32">
             <Building className="mr-2 h-4 w-4" /> General
-          </TabsTrigger>
-          <TabsTrigger active={activeTab === 'security'} onClick={() => setActiveTab('security')} className="w-32">
-            <Shield className="mr-2 h-4 w-4" /> Security
           </TabsTrigger>
           <TabsTrigger active={activeTab === 'notifications'} onClick={() => setActiveTab('notifications')} className="w-32">
             <Bell className="mr-2 h-4 w-4" /> Notifications
@@ -70,40 +67,7 @@ export function Settings() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent active={activeTab === 'security'}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Authentication & Access</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <div>
-                    <p className="font-medium text-slate-900">Two-Factor Authentication (2FA)</p>
-                    <p className="text-sm text-slate-500">Require all users to use 2FA when logging in.</p>
-                  </div>
-                  <Button variant="outline">Enable</Button>
-                </div>
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <div>
-                    <p className="font-medium text-slate-900">Single Sign-On (SSO)</p>
-                    <p className="text-sm text-slate-500">Configure SAML or OIDC for enterprise login.</p>
-                  </div>
-                  <Button variant="outline">Configure</Button>
-                </div>
-                <div className="flex items-center justify-between pb-4">
-                  <div>
-                    <p className="font-medium text-slate-900">Password Policy</p>
-                    <p className="text-sm text-slate-500">Set minimum length and complexity requirements.</p>
-                  </div>
-                  <Button variant="outline">Edit Policy</Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+</TabsContent>
 
         <TabsContent active={activeTab === 'notifications'}>
           <Card>

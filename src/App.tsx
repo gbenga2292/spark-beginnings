@@ -16,6 +16,7 @@ import { FinanceHub } from './pages/FinanceHub';
 import { Onboarding } from './pages/Onboarding';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
+import { Profile } from './pages/Profile';
 import { Variables } from './pages/Variables';
 import { Leaves } from './pages/Leaves';
 import { Users } from './pages/Users';
@@ -39,7 +40,8 @@ export default function App() {
             <Route path="finance" element={<FinanceHub />} />
             <Route path="onboarding" element={<Onboarding />} />
             <Route path="reports" element={<Reports />} />
-            <Route path="settings" element={<Settings />} />
+<Route path="settings" element={<Settings />} />
+            <Route path="profile" element={<Profile />} />
             <Route path="variables" element={<Variables />} />
             <Route path="leaves" element={<Leaves />} />
             <Route path="users" element={<Users />} />
