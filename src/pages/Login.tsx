@@ -77,15 +77,14 @@ export function Login() {
               <Building2 className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-white">Dewatering</h2>
+<h2 className="text-2xl font-bold text-white">Dewatering Construction Etc Limited</h2>
               <p className="text-slate-400 text-sm">Construction HR</p>
             </div>
           </div>
 
           {/* Headline */}
-          <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-6">
-            Human Resources<br />
-            <span className="text-indigo-400">Management System</span>
+<h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-6">
+            Office management system
           </h1>
           
           <p className="text-slate-400 text-lg max-w-md mb-12">
@@ -105,7 +104,7 @@ export function Login() {
               <div className="w-8 h-8 bg-indigo-500/20 rounded-lg flex items-center justify-center">
                 <Building2 className="w-4 h-4 text-indigo-400" />
               </div>
-              <span>Built for construction industry</span>
+<span>Built for construction industry but DCEL Office System</span>
             </div>
           </div>
         </div>
@@ -123,7 +122,7 @@ export function Login() {
               <Building2 className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Dewatering</h2>
+<h2 className="text-xl font-bold text-slate-900">Dewatering Construction Etc Limited</h2>
               <p className="text-slate-500 text-xs">Construction HR</p>
             </div>
           </div>

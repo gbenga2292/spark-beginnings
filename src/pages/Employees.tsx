@@ -23,6 +23,8 @@ export function Employees() {
   const deleteEmployee = useAppStore((state) => state.deleteEmployee);
   const positions = useAppStore((state) => state.positions);
   const departments = useAppStore((state) => state.departments);
+  const addPosition = useAppStore((state) => state.addPosition);
+  const addDepartment = useAppStore((state) => state.addDepartment);
 
   const filteredEmployees = employees.filter(emp => {
     const matchesSearch = emp.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -187,6 +189,8 @@ export function Employees() {
 
         let importedCount = 0;
         let updatedCount = 0;
+        const newDepartments = new Set<string>();
+        const newPositions = new Set<string>();
 
         for (let i = 1; i < lines.length; i++) {
           const row = lines[i];
@@ -194,6 +198,18 @@ export function Employees() {
           const vals = matches ? matches.map(m => m.replace(/^"|"$/g, '').trim()) : row.split(',').map(v => v.trim());
 
           if (vals.length >= 17) {
+            // Extract department and position for auto-adding
+            const importedDept = vals[3]?.trim();
+            const importedPosition = vals[5]?.trim();
+            
+            // Track new departments and positions to add
+            if (importedDept && !departments.includes(importedDept)) {
+              newDepartments.add(importedDept);
+            }
+            if (importedPosition && !positions.includes(importedPosition)) {
+              newPositions.add(importedPosition);
+            }
+
             const parsedEmp: Employee = {
               id: vals[0] || `EMP-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
               surname: vals[1], firstname: vals[2], department: vals[3], staffType: vals[4] as any,
@@ -216,7 +232,25 @@ export function Employees() {
             else { addEmployee(parsedEmp); importedCount++; }
           }
         }
-        toast.success(`Import complete: ${importedCount} Added | ${updatedCount} Updated`);
+
+        // Auto-add new departments and positions to the store
+        let addedDeptCount = 0;
+        let addedPosCount = 0;
+        newDepartments.forEach(dept => {
+          addDepartment(dept);
+          addedDeptCount++;
+        });
+        newPositions.forEach(pos => {
+          addPosition(pos);
+          addedPosCount++;
+        });
+
+        // Show appropriate toast message
+        let message = `Import complete: ${importedCount} Added | ${updatedCount} Updated`;
+        if (addedDeptCount > 0 || addedPosCount > 0) {
+          message += `. ${addedDeptCount} new department(s) and ${addedPosCount} new position(s) added to Variables.`;
+        }
+        toast.success(message);
       } catch (err) {
         toast.error('Failed to parse CSV file');
       }
