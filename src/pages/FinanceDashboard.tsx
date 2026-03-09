@@ -458,7 +458,7 @@ export function FinanceDashboard() {
                                     <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
                                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `₦${val / 1000000}M`} />
                                     <RechartsTooltip
-                                        formatter={(value: number) => formatCurr(value)}
+formatter={(value: number | undefined) => formatCurr(value ?? 0)}
                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                     />
                                     <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '13px' }} />
