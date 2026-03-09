@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/src/lib/utils';
+import { useUserStore, UserPrivileges } from '@/src/store/userStore';
 import {
   LayoutDashboard,
   Users,
@@ -8,12 +9,10 @@ import {
   FileText,
   Settings,
   UserPlus,
-  Briefcase,
   MapPin,
   Library,
-  X,
-  CreditCard,
-  Landmark
+  Landmark,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -21,22 +20,32 @@ interface SidebarProps {
   setIsOpen?: (open: boolean) => void;
 }
 
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Daily Register', href: '/attendance', icon: CalendarClock },
-  { name: 'Employees', href: '/employees', icon: Users },
-  { name: 'Leaves', href: '/leaves', icon: CalendarClock },
-  { name: 'Sites & Clients', href: '/sites', icon: MapPin },
-  { name: 'Onboarding', href: '/onboarding', icon: UserPlus },
-  { name: 'Payroll', href: '/payroll', icon: Wallet },
-  { name: 'Financial Hub', href: '/finance', icon: Landmark },
-  { name: 'Reports', href: '/reports', icon: FileText },
-  { name: 'Variables', href: '/variables', icon: Library },
-  { name: 'Settings', href: '/settings', icon: Settings },
+// Map nav items to privilege keys
+const navigation: { name: string; href: string; icon: any; privKey: keyof UserPrivileges; privField: string }[] = [
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard, privKey: 'dashboard', privField: 'canView' },
+  { name: 'Daily Register', href: '/attendance', icon: CalendarClock, privKey: 'attendance', privField: 'canView' },
+  { name: 'Employees', href: '/employees', icon: Users, privKey: 'employees', privField: 'canView' },
+  { name: 'Leaves', href: '/leaves', icon: CalendarClock, privKey: 'leaves', privField: 'canView' },
+  { name: 'Sites & Clients', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView' },
+  { name: 'Onboarding', href: '/onboarding', icon: UserPlus, privKey: 'employees', privField: 'canView' },
+  { name: 'Payroll', href: '/payroll', icon: Wallet, privKey: 'payroll', privField: 'canView' },
+  { name: 'Financial Hub', href: '/finance', icon: Landmark, privKey: 'financeDashboard', privField: 'canView' },
+  { name: 'Reports', href: '/reports', icon: FileText, privKey: 'reports', privField: 'canView' },
+  { name: 'Variables', href: '/variables', icon: Library, privKey: 'variables', privField: 'canView' },
+  { name: 'Settings', href: '/settings', icon: Settings, privKey: 'variables', privField: 'canView' },
+  { name: 'Users', href: '/users', icon: ShieldCheck, privKey: 'users', privField: 'canView' },
 ];
 
 export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const location = useLocation();
+  const currentUser = useUserStore((s) => s.getCurrentUser());
+
+  // Filter nav items based on privileges
+  const visibleNav = navigation.filter((item) => {
+    if (!currentUser) return true; // Shouldn't happen since we're behind auth
+    const pagePriv = currentUser.privileges[item.privKey] as Record<string, boolean>;
+    return pagePriv?.[item.privField] === true;
+  });
 
   return (
     <div className="flex h-full w-64 flex-col border-r border-slate-200 bg-slate-50">
@@ -47,7 +56,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       </div>
       <div className="flex flex-1 flex-col overflow-y-auto">
         <nav className="flex-1 space-y-1 px-4 py-4">
-          {navigation.map((item) => {
+          {visibleNav.map((item) => {
             const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
             return (
               <Link

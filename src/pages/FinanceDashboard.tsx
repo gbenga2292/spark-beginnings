@@ -458,7 +458,7 @@ export function FinanceDashboard() {
                                     <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
                                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `₦${val / 1000000}M`} />
                                     <RechartsTooltip
-                                        formatter={(value: number) => formatCurr(value)}
+formatter={(value: number | undefined) => formatCurr(value ?? 0)}
                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                     />
                                     <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '13px' }} />
@@ -507,7 +507,7 @@ export function FinanceDashboard() {
                                             <Cell fill="#10b981" /> {/* Remitted */}
                                             <Cell fill="#f43f5e" /> {/* Deficit */}
                                         </Pie>
-                                        <RechartsTooltip formatter={(value: number) => formatCurr(value)} />
+                                        <RechartsTooltip formatter={(value: number | undefined) => formatCurr(value ?? 0)} />
                                     </PieChart>
                                 </ResponsiveContainer>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4">
@@ -572,7 +572,7 @@ export function FinanceDashboard() {
                                     <YAxis type="category" dataKey="name" width={debtorView === 'site' ? 180 : 100} axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: '#334155' }} />
                                     <RechartsTooltip
                                         cursor={{ fill: '#f1f5f9' }}
-                                        formatter={(value: number) => formatCurr(value)}
+                                        formatter={(value: number | undefined) => formatCurr(value ?? 0)}
                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                     />
                                     <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', fontSize: '13px' }} />
