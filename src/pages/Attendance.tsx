@@ -29,6 +29,9 @@ export function Attendance() {
   const [dbSiteFilter, setDbSiteFilter] = useState('All');
   const [dbShiftFilter, setDbShiftFilter] = useState('All');
 
+  const isOperationsDepartment = departmentFilter === 'OPERATIONS';
+  const isAllDepartments = departmentFilter === 'All';
+  
   const departments = useAppStore((state) => state.departments);
 
   // State for the current form
@@ -471,13 +474,17 @@ export function Attendance() {
                   <tr>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 w-[30%]">Staff Name</th>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">Day Site / Status</th>
-                    <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">Night Site / Status</th>
+                    {isOperationsDepartment && (
+                      <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">
+                        Night Site / Status
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredEmployees.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="text-center py-8 text-slate-400 text-sm">No employees match your filters.</td>
+                      <td colSpan={isOperationsDepartment ? 3 : 2} className="text-center py-8 text-slate-400 text-sm">No employees match your filters.</td>
                     </tr>
                   ) : (
                     filteredEmployees.map((employee, idx) => {
@@ -530,30 +537,32 @@ export function Attendance() {
                               </optgroup>
                             </select>
                           </td>
-                          <td className="py-1 px-2 border-l border-slate-100">
-                            <select
-                              className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${nightVal && !isAbsentStatus(nightVal)
-                                ? 'border-indigo-300 bg-indigo-50 text-indigo-800 font-medium'
-                                : nightVal && isAbsentStatus(nightVal)
-                                  ? 'border-red-300 bg-red-50 text-red-700 font-medium'
-                                  : 'border-slate-200 bg-white text-slate-700'
-                                } focus:ring-1 focus:ring-slate-400`}
-                              value={nightVal}
-                              onChange={(e) => handleSelectChange(employee.id, 'night', e.target.value)}
-                            >
-                              <option value="">—</option>
-                              <optgroup label="Sites">
-                                {sites.filter(s => s.status === 'Active').map(site => (
-                                  <option key={`n-${site.id}`} value={site.name}>{site.name}</option>
-                                ))}
-                              </optgroup>
-                              <optgroup label="Status">
-                                {statuses.map(status => (
-                                  <option key={`n-${status}`} value={status}>{status}</option>
-                                ))}
-                              </optgroup>
-                            </select>
-                          </td>
+                          {isOperationsDepartment && (
+                            <td className="py-1 px-2 border-l border-slate-100">
+                              <select
+                                className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${nightVal && !isAbsentStatus(nightVal)
+                                  ? 'border-indigo-300 bg-indigo-50 text-indigo-800 font-medium'
+                                  : nightVal && isAbsentStatus(nightVal)
+                                    ? 'border-red-300 bg-red-50 text-red-700 font-medium'
+                                    : 'border-slate-200 bg-white text-slate-700'
+                                  } focus:ring-1 focus:ring-slate-400`}
+                                value={nightVal}
+                                onChange={(e) => handleSelectChange(employee.id, 'night', e.target.value)}
+                              >
+                                <option value="">—</option>
+                                <optgroup label="Sites">
+                                  {sites.filter(s => s.status === 'Active').map(site => (
+                                    <option key={`n-${site.id}`} value={site.name}>{site.name}</option>
+                                  ))}
+                                </optgroup>
+                                <optgroup label="Status">
+                                  {statuses.map(status => (
+                                    <option key={`n-${status}`} value={status}>{status}</option>
+                                  ))}
+                                </optgroup>
+                              </select>
+                            </td>
+                          )}
                         </tr>
                       );
                     })

@@ -467,7 +467,7 @@ export function Sites() {
                 <span className="text-emerald-600 font-bold text-sm">VAT</span>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-emerald-900">{sites.filter(s => s.vat === 'Yes').length}</div>
+                <div className="text-3xl font-bold text-emerald-900">{sites.filter(s => s.vat === 'Yes' || s.vat === 'Add').length}</div>
                 <p className="text-xs text-emerald-600 mt-1">Sites with VAT enabled</p>
               </CardContent>
             </Card>
@@ -550,7 +550,7 @@ export function Sites() {
                           <option value="Add">Add</option>
                         </select>
                       ) : (
-                        <Badge variant={site.vat === 'Yes' ? 'success' : 'secondary'}>
+                        <Badge variant={site.vat === 'Yes' || site.vat === 'Add' ? 'success' : 'secondary'}>
                           {site.vat}
                         </Badge>
                       )}

@@ -57,9 +57,9 @@ export function Dashboard() {
 
     // Global Filters
     const [filterYear, setFilterYear] = useState<number>(currentDate.getFullYear());
-    const [filterMonth, setFilterMonth] = useState<number>(currentDate.getMonth() + 1);
+    const [filterMonth, setFilterMonth] = useState<number | null>(currentDate.getMonth() + 1);
 
-    const monthKey = MONTHS.find(m => m.value === filterMonth)?.key || 'jan';
+    const monthKey = filterMonth ? MONTHS.find(m => m.value === filterMonth)?.key || 'jan' : null;
 
     // 1. FINANCIAL CALCULATIONS (For Selected Month & Year)
     const financeStats = useMemo(() => {
@@ -67,62 +67,69 @@ export function Dashboard() {
         let totalStatutory = 0;
         let totalOvertimeCost = 0;
 
-        const officialWorkdays = computeWorkDays(filterYear, filterMonth, holidays.map(h => h.date));
-        const monthConfig = monthValues[monthKey] || { workDays: officialWorkdays, overtimeRate: 0.5 };
-        const otRate = monthConfig.overtimeRate;
+        // Get months to process: either single month or all 12 months
+        const monthsToProcess = filterMonth ? [filterMonth] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
         employees.filter(e => e.status === 'Active').forEach(emp => {
-            const standardSalary = emp.monthlySalaries[monthKey as keyof typeof emp.monthlySalaries] || 0;
-            let daysWorked = 0;
-            let daysAbsent = 0;
-            let otInstances = 0;
+            monthsToProcess.forEach(targetMonth => {
+                const targetMonthKey = MONTHS.find(m => m.value === targetMonth)?.key || 'jan';
+                const standardSalary = (emp.monthlySalaries[targetMonthKey as keyof typeof emp.monthlySalaries] as number) || 0;
+                
+                const officialWorkdays = computeWorkDays(filterYear, targetMonth, holidays.map(h => h.date));
+                const monthConfig = monthValues[targetMonthKey] || { workDays: officialWorkdays, overtimeRate: 0.5 };
+                const otRate = monthConfig.overtimeRate;
 
-            for (const r of attendanceRecords) {
-                if (r.staffId === emp.id && r.mth === filterMonth && r.date.startsWith(filterYear.toString())) {
-                    if (r.day?.toLowerCase() === 'yes') {
-                        daysWorked++;
-                        if (r.ot > 0) otInstances++;
-                    } else if (r.day?.toLowerCase() === 'no') {
-                        daysAbsent++;
+                let daysWorked = 0;
+                let daysAbsent = 0;
+                let otInstances = 0;
+
+                for (const r of attendanceRecords) {
+                    if (r.staffId === emp.id && r.mth === targetMonth && r.date.startsWith(filterYear.toString())) {
+                        if (r.day?.toLowerCase() === 'yes') {
+                            daysWorked++;
+                            if (r.ot > 0) otInstances++;
+                        } else if (r.day?.toLowerCase() === 'no') {
+                            daysAbsent++;
+                        }
                     }
                 }
-            }
 
-            if (daysWorked > officialWorkdays) daysWorked = officialWorkdays;
+                if (daysWorked > officialWorkdays) daysWorked = officialWorkdays;
 
-            let salary = 0;
-            let overtime = 0;
+                let salary = 0;
+                let overtime = 0;
 
-            if (standardSalary > 0 && officialWorkdays > 0) {
-                const dailyRate = standardSalary / officialWorkdays;
-                const isOperations = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase());
+                if (standardSalary > 0 && officialWorkdays > 0) {
+                    const dailyRate = standardSalary / officialWorkdays;
+                    const isOperations = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase());
 
-                if (isOperations) {
-                    salary = dailyRate * daysWorked;
-                } else {
-                    salary = standardSalary - (dailyRate * daysAbsent);
-                    if (salary < 0) salary = 0;
+                    if (isOperations) {
+                        salary = dailyRate * daysWorked;
+                    } else {
+                        salary = standardSalary - (dailyRate * daysAbsent);
+                        if (salary < 0) salary = 0;
+                    }
+                    overtime = otInstances * (dailyRate * (1 + otRate));
+                    totalOvertimeCost += overtime;
                 }
-                overtime = otInstances * (dailyRate * (1 + otRate));
-                totalOvertimeCost += overtime;
-            }
 
-            const grossPay = salary + overtime;
-            totalGrossExposure += grossPay;
+                const grossPay = salary + overtime;
+                totalGrossExposure += grossPay;
 
-            if (emp.payeTax) {
-                const basic = salary * (payrollVariables.basic / 100);
-                const housing = salary * (payrollVariables.housing / 100);
-                const transport = salary * (payrollVariables.transport / 100);
-                const pensionSum = basic + housing + transport;
+                if (emp.payeTax) {
+                    const basic = salary * (payrollVariables.basic / 100);
+                    const housing = salary * (payrollVariables.housing / 100);
+                    const transport = salary * (payrollVariables.transport / 100);
+                    const pensionSum = basic + housing + transport;
 
-                const pension = pensionSum * (payrollVariables.employeePensionRate / 100);
-                const employerPension = pensionSum * (payrollVariables.employerPensionRate / 100);
-                const nsitf = grossPay * ((payrollVariables.nsitfRate || 1) / 100);
+                    const pension = pensionSum * (payrollVariables.employeePensionRate / 100);
+                    const employerPension = pensionSum * (payrollVariables.employerPensionRate / 100);
+                    const nsitf = grossPay * ((payrollVariables.nsitfRate || 1) / 100);
 
-                const estimatedPAYE = grossPay > 60000 ? (grossPay * 0.10) : 0;
-                totalStatutory += (pension + employerPension + nsitf + estimatedPAYE);
-            }
+                    const estimatedPAYE = grossPay > 60000 ? (grossPay * 0.10) : 0;
+                    totalStatutory += (pension + employerPension + nsitf + estimatedPAYE);
+                }
+            });
         });
 
         let outstandingLoans = 0;
@@ -143,19 +150,25 @@ export function Dashboard() {
         let presentOps = 0;
         let possibleOpsDays = 0;
 
-        const officialWorkdays = computeWorkDays(filterYear, filterMonth, holidays.map(h => h.date));
+        // Get months to process: either single month or all 12 months
+        const monthsToProcess = filterMonth ? [filterMonth] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        
         const opsStaff = activeStaff.filter(e => ['OPERATIONS', 'ENGINEERING'].includes(e.department.toUpperCase()));
 
-        // We calculate an aggregate attendance rate for the entire selected month
-        opsStaff.forEach(emp => {
-            let presentCount = 0;
-            for (const r of attendanceRecords) {
-                if (r.staffId === emp.id && r.mth === filterMonth && r.date.startsWith(filterYear.toString())) {
-                    if (r.day?.toLowerCase() === 'yes') presentCount++;
+        // We calculate an aggregate attendance rate for the selected months
+        monthsToProcess.forEach(targetMonth => {
+            const officialWorkdays = computeWorkDays(filterYear, targetMonth, holidays.map(h => h.date));
+            
+            opsStaff.forEach(emp => {
+                let presentCount = 0;
+                for (const r of attendanceRecords) {
+                    if (r.staffId === emp.id && r.mth === targetMonth && r.date.startsWith(filterYear.toString())) {
+                        if (r.day?.toLowerCase() === 'yes') presentCount++;
+                    }
                 }
-            }
-            presentOps += presentCount;
-            possibleOpsDays += officialWorkdays; // assuming they should be there every workday
+                presentOps += presentCount;
+                possibleOpsDays += officialWorkdays;
+            });
         });
 
         let attendanceRate = 0;
@@ -287,9 +300,10 @@ export function Dashboard() {
                     <Filter className="h-4 w-4 text-slate-400 mx-2" />
                     <select
                         className="bg-transparent text-sm font-medium outline-none py-1 pr-2 text-slate-700 hover:text-indigo-600 cursor-pointer border-r border-slate-200"
-                        value={filterMonth}
-                        onChange={e => setFilterMonth(Number(e.target.value))}
+                        value={filterMonth ?? ''}
+                        onChange={e => setFilterMonth(e.target.value === '' ? null : Number(e.target.value))}
                     >
+                        <option value="">All Months</option>
                         {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                     </select>
                     <select
@@ -310,7 +324,7 @@ export function Dashboard() {
                     </div>
                     <CardHeader className="pb-2 relative z-10">
                         <CardTitle className="text-sm font-medium text-indigo-200 uppercase tracking-widest flex justify-between">
-                            Payroll Exposure <Badge variant="outline" className="text-[10px] text-white/60 border-white/20">{MONTHS.find(m => m.value === filterMonth)?.label} {filterYear}</Badge>
+                            Payroll Exposure <Badge variant="outline" className="text-[10px] text-white/60 border-white/20">{filterMonth ? MONTHS.find(m => m.value === filterMonth)?.label : 'All Months'} {filterYear}</Badge>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="relative z-10">
@@ -413,7 +427,7 @@ export function Dashboard() {
                             <div className="text-center">
                                 <div className="text-6xl font-black text-emerald-600">{opsStats.attendanceRate}%</div>
                                 <div className="text-sm font-semibold text-slate-500 mt-2 uppercase tracking-wider">Average Attendance rate</div>
-                                <div className="text-[10px] text-slate-400 mt-1">For Operations across {MONTHS.find(m => m.value === filterMonth)?.label}</div>
+                                <div className="text-[10px] text-slate-400 mt-1">For Operations across {filterMonth ? MONTHS.find(m => m.value === filterMonth)?.label : 'All Months'}</div>
                             </div>
 
                             <div className="h-20 w-px bg-slate-200 hidden sm:block"></div>
@@ -421,7 +435,7 @@ export function Dashboard() {
                             <div className="text-center">
                                 <div className="text-4xl font-bold text-amber-500">₦{fm(financeStats.totalOvertimeCost)}</div>
                                 <div className="text-sm font-semibold text-slate-500 mt-2 uppercase tracking-wider">Total Overtime Burn</div>
-                                <div className="text-[10px] text-slate-400 mt-1">Paid to Ops staff in {MONTHS.find(m => m.value === filterMonth)?.label}</div>
+                                <div className="text-[10px] text-slate-400 mt-1">Paid to Ops staff in {filterMonth ? MONTHS.find(m => m.value === filterMonth)?.label : 'All Months'}</div>
                             </div>
                         </div>
 
