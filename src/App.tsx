@@ -20,6 +20,8 @@ import { Profile } from './pages/Profile';
 import { Variables } from './pages/Variables';
 import { Leaves } from './pages/Leaves';
 import { Users } from './pages/Users';
+import { SalaryLoans } from './pages/SalaryLoans';
+import { ClientSummary } from './pages/ClientSummary';
 import { ToastContainer, ConfirmDialog } from './components/ui/toast';
 
 export default function App() {
@@ -40,11 +42,13 @@ export default function App() {
             <Route path="finance" element={<FinanceHub />} />
             <Route path="onboarding" element={<Onboarding />} />
             <Route path="reports" element={<Reports />} />
-<Route path="settings" element={<Settings />} />
+            <Route path="settings" element={<Settings />} />
             <Route path="profile" element={<Profile />} />
             <Route path="variables" element={<Variables />} />
             <Route path="leaves" element={<Leaves />} />
             <Route path="users" element={<Users />} />
+            <Route path="salary-loans" element={<SalaryLoans />} />
+            <Route path="client-summary" element={<ClientSummary />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

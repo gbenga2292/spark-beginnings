@@ -14,10 +14,13 @@ export function Variables() {
 
   const positions = useAppStore((state) => state.positions);
   const departments = useAppStore((state) => state.departments);
+  const clients = useAppStore((state) => state.clients);
   const addPosition = useAppStore((state) => state.addPosition);
   const removePosition = useAppStore((state) => state.removePosition);
   const addDepartment = useAppStore((state) => state.addDepartment);
   const removeDepartment = useAppStore((state) => state.removeDepartment);
+  const addClient = useAppStore((state) => state.addClient);
+  const removeClient = useAppStore((state) => state.removeClient);
   const payrollVariables = useAppStore((state) => state.payrollVariables);
   const updatePayrollVariables = useAppStore((state) => state.updatePayrollVariables);
   const monthValues = useAppStore((state) => state.monthValues);
@@ -73,6 +76,7 @@ export function Variables() {
 
   const [newPosition, setNewPosition] = useState('');
   const [newDepartment, setNewDepartment] = useState('');
+  const [newClient, setNewClient] = useState('');
 
   const handleAddHoliday = () => {
     if (!newDate || !newName) return;

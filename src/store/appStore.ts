@@ -24,6 +24,7 @@ export interface DepartmentTasks {
 
 interface AppState {
   sites: Site[];
+  clients: string[];
   employees: Employee[];
   attendanceRecords: AttendanceRecord[];
   positions: string[];
@@ -38,6 +39,8 @@ interface AppState {
   setSites: (sites: Site[]) => void;
   updateSite: (id: string, site: Partial<Site>) => void;
   deleteSite: (id: string) => void;
+  addClient: (client: string) => void;
+  removeClient: (client: string) => void;
   addEmployee: (employee: Employee) => void;
   updateEmployee: (id: string, employee: Partial<Employee>) => void;
   deleteEmployee: (id: string) => void;
@@ -300,6 +303,7 @@ export const useAppStore = create<AppState>()(
         { id: 'S-003', name: 'CornerView Apartment', client: 'Gamma Inc', vat: 'No', status: 'Active' },
         { id: 'S-004', name: 'Office', client: 'Internal', vat: 'No', status: 'Active' },
       ],
+      clients: ['Alpha Corp', 'Beta LLC', 'Gamma Inc', 'Internal'],
       positions: ['CEO', 'Head of Admin', 'Head of Operations', 'Projects Supervisor', 'Site Engineer', 'Technician', 'Security'],
       departments: ['ADMIN', 'OPERATIONS', 'ENGINEERING', 'HR', 'FINANCE'],
       departmentTasksList: [
@@ -420,6 +424,14 @@ export const useAppStore = create<AppState>()(
       })),
       deleteSite: (id) => set((state) => ({
         sites: state.sites.filter(site => site.id !== id)
+      })),
+      addClient: (client) => set((state) => ({ 
+        clients: state.clients.includes(client) 
+          ? state.clients 
+          : [...state.clients, client] 
+      })),
+      removeClient: (client) => set((state) => ({ 
+        clients: state.clients.filter(c => c !== client) 
       })),
       addEmployee: (employee) => set((state) => ({ employees: [...state.employees, employee] })),
       updateEmployee: (id, updatedEmployee) => set((state) => ({

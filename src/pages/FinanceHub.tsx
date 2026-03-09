@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { FinanceDashboard } from './FinanceDashboard';
 import { Billing } from './Billing';
 import { Payments } from './Payments';
@@ -6,7 +7,16 @@ import { VatPayments } from './VatPayments';
 import { Receipt, CreditCard, Landmark, LayoutDashboard } from 'lucide-react';
 
 export function FinanceHub() {
-    const [activeTab, setActiveTab] = useState('dashboard');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const initialTab = searchParams.get('tab') || 'dashboard';
+    const [activeTab, setActiveTab] = useState(initialTab);
+
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab && ['dashboard', 'invoices', 'payments', 'vat'].includes(tab)) {
+            setActiveTab(tab);
+        }
+    }, [searchParams]);
 
     return (
         <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
@@ -24,25 +34,25 @@ export function FinanceHub() {
                     <div className="flex bg-slate-200/50 p-1 rounded-lg overflow-x-auto w-full sm:w-auto">
                         <button
                             className={`flex items-center whitespace-nowrap gap-2 px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTab === 'dashboard' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            onClick={() => setActiveTab('dashboard')}
+                            onClick={() => { setActiveTab('dashboard'); setSearchParams({}); }}
                         >
                             <LayoutDashboard className="w-4 h-4" /> Dashboard
                         </button>
                         <button
                             className={`flex items-center whitespace-nowrap gap-2 px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTab === 'invoices' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            onClick={() => setActiveTab('invoices')}
+                            onClick={() => { setActiveTab('invoices'); setSearchParams({ tab: 'invoices' }); }}
                         >
                             <Receipt className="w-4 h-4" /> Invoices
                         </button>
                         <button
                             className={`flex items-center whitespace-nowrap gap-2 px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTab === 'payments' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            onClick={() => setActiveTab('payments')}
+                            onClick={() => { setActiveTab('payments'); setSearchParams({ tab: 'payments' }); }}
                         >
                             <CreditCard className="w-4 h-4" /> Payments
                         </button>
                         <button
                             className={`flex items-center whitespace-nowrap gap-2 px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTab === 'vat' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            onClick={() => setActiveTab('vat')}
+                            onClick={() => { setActiveTab('vat'); setSearchParams({ tab: 'vat' }); }}
                         >
                             <Landmark className="w-4 h-4" /> VAT to FIRS
                         </button>

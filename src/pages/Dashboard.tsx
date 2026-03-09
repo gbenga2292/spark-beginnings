@@ -505,9 +505,6 @@ export function Dashboard() {
                                 <Button variant="outline" className="justify-start gap-2 h-12 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-semibold" onClick={() => window.location.href = '/onboarding'}>
                                     <UserPlus className="h-4 w-4 text-indigo-500" /> Hire Staff
                                 </Button>
-                                <Button variant="outline" className="justify-start gap-2 h-12 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 transition-all font-semibold" onClick={() => window.location.href = '/payroll'}>
-                                    <FileSpreadsheet className="h-4 w-4 text-emerald-500" /> Run Payroll
-                                </Button>
                             </div>
 
                         </CardContent>

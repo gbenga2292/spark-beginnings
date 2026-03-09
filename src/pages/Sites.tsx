@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
 import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, Calculator } from 'lucide-react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -166,16 +168,22 @@ function ClientSummary() {
 }
 
 export function Sites() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('sites');
   const [searchTerm, setSearchTerm] = useState('');
-  const [isAdding, setIsAdding] = useState(false);
+  const [isAddingSite, setIsAddingSite] = useState(searchParams.get('action') === 'add');
+  const [isAddingClient, setIsAddingClient] = useState(searchParams.get('action') === 'addClient');
+  const [newClientName, setNewClientName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addForm, setAddForm] = useState({ ...EMPTY_FORM });
   const [editForm, setEditForm] = useState({ ...EMPTY_FORM });
   const [addError, setAddError] = useState('');
 
   const sites = useAppStore((s) => s.sites);
+  const clients = useAppStore((s) => s.clients);
   const addSite = useAppStore((s) => s.addSite);
+  const addClient = useAppStore((s) => s.addClient);
   const setSites = useAppStore((s) => s.setSites);
   const updateSite = useAppStore((s) => s.updateSite);
   const deleteSite = useAppStore((s) => s.deleteSite);
@@ -205,9 +213,27 @@ export function Sites() {
       vat: addForm.vat,
       status: addForm.status,
     });
+    if (!clients.includes(addForm.client.trim())) {
+      addClient(addForm.client.trim());
+    }
     setAddForm({ ...EMPTY_FORM });
     setAddError('');
-    setIsAdding(false);
+    setIsAddingSite(false);
+  };
+
+  const handleAddClient = () => {
+    if (!newClientName.trim()) {
+      toast.error('Please enter a client name');
+      return;
+    }
+    if (clients.includes(newClientName.trim())) {
+      toast.error('Client already exists');
+      return;
+    }
+    addClient(newClientName.trim());
+    setNewClientName('');
+    setIsAddingClient(false);
+    toast.success('Client added successfully');
   };
 
   const handleEditStart = (site: Site) => {
@@ -327,14 +353,13 @@ export function Sites() {
       } catch (err) {
         toast.error('Failed to parse file.');
       }
-      e.target.value = ''; // Reset input
+      e.target.value = '';
     };
     reader.readAsBinaryString(file);
   };
 
   return (
     <div className="flex flex-col gap-6 h-full">
-      {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Sites &amp; Clients</h1>
@@ -359,87 +384,21 @@ export function Sites() {
               <Calculator className="h-4 w-4" /> Client Summary
             </TabsTrigger>
           </TabsList>
-          {activeTab === 'sites' && !isAdding && (
-            <Button onClick={() => setIsAdding(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
-              <Plus className="h-4 w-4" /> Add New Site
-            </Button>
+          {activeTab === 'sites' && (
+            <div className="flex gap-2">
+              <Button onClick={() => setIsAddingSite(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+                <Plus className="h-4 w-4" /> Add New Site
+              </Button>
+              <Button onClick={() => setIsAddingClient(true)} variant="outline" className="gap-2">
+                <Plus className="h-4 w-4" /> Add Client
+              </Button>
+            </div>
           )}
         </div>
       </div>
 
       <Tabs className="w-full flex-1 flex flex-col min-h-0">
         <TabsContent active={activeTab === 'sites'} className="flex-1 flex flex-col min-h-0 gap-8">
-          {/* ── Add form ─────────────────────────────────────────────── */}
-          {isAdding && (
-            <Card className="border-t-4 border-t-indigo-600 shadow-md">
-              <CardHeader className="bg-slate-50 border-b border-slate-100 pb-4 flex flex-row justify-between items-center">
-                <CardTitle className="text-indigo-900 text-xl">Add New Site</CardTitle>
-                <Button variant="ghost" size="icon" onClick={() => { setIsAdding(false); setAddError(''); }}>
-                  <X className="h-5 w-5" />
-                </Button>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium text-slate-700">Client <span className="text-red-500">*</span></label>
-                    <Input
-                      placeholder="Select or type client name"
-                      list="existing-clients"
-                      value={addForm.client}
-                      onChange={e => setAddForm({ ...addForm, client: e.target.value })}
-                    />
-                    <datalist id="existing-clients">
-                      {[...new Set(sites.map(s => s.client))].map(c => (
-                        <option key={c} value={c} />
-                      ))}
-                    </datalist>
-                    <p className="text-xs text-slate-400">A client can have multiple sites</p>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium text-slate-700">Site Name <span className="text-red-500">*</span></label>
-                    <Input
-                      placeholder="e.g. Louiseville"
-                      value={addForm.name}
-                      onChange={e => setAddForm({ ...addForm, name: e.target.value })}
-                    />
-                    <p className="text-xs text-slate-400">Must be unique per client</p>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium text-slate-700">VAT</label>
-                    <select
-                      value={addForm.vat}
-                      onChange={e => setAddForm({ ...addForm, vat: e.target.value as 'Yes' | 'No' | 'Add' })}
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                    >
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                      <option value="Add">Add</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium text-slate-700">Status</label>
-                    <select
-                      value={addForm.status}
-                      onChange={e => setAddForm({ ...addForm, status: e.target.value as 'Active' | 'Inactive' })}
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                    >
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
-                  </div>
-                </div>
-                {addError && <p className="text-sm text-red-600 mb-4">{addError}</p>}
-                <div className="flex justify-end gap-3">
-                  <Button variant="outline" onClick={() => { setIsAdding(false); setAddError(''); }}>Cancel</Button>
-                  <Button onClick={handleAdd} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
-                    <Save className="h-4 w-4" /> Save Site
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* ── Summary cards ─────────────────────────────────────────── */}
           <div className="grid gap-6 md:grid-cols-3">
             <Card className="border-indigo-100 bg-indigo-50/50">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -473,7 +432,6 @@ export function Sites() {
             </Card>
           </div>
 
-          {/* ── Table ─────────────────────────────────────────────────── */}
           <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="p-4 border-b border-slate-200 flex items-center gap-3">
               <div className="relative flex-1 max-w-xs">
@@ -514,8 +472,6 @@ export function Sites() {
                 {filteredSites.map(site => (
                   <TableRow key={site.id}>
                     <TableCell className="font-mono text-xs text-slate-500">{site.id}</TableCell>
-
-                    {/* Client */}
                     <TableCell className="font-medium text-slate-900">
                       {editingId === site.id ? (
                         <>
@@ -529,15 +485,11 @@ export function Sites() {
                         </>
                       ) : site.client}
                     </TableCell>
-
-                    {/* Site Name */}
                     <TableCell>
                       {editingId === site.id
                         ? <Input value={editForm.name} className="h-8" onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
                         : site.name}
                     </TableCell>
-
-                    {/* VAT */}
                     <TableCell className="text-center">
                       {editingId === site.id ? (
                         <select
@@ -555,8 +507,6 @@ export function Sites() {
                         </Badge>
                       )}
                     </TableCell>
-
-                    {/* Status */}
                     <TableCell>
                       {editingId === site.id ? (
                         <select
@@ -571,8 +521,6 @@ export function Sites() {
                         <Badge variant={site.status === 'Active' ? 'success' : 'secondary'}>{site.status}</Badge>
                       )}
                     </TableCell>
-
-                    {/* Actions */}
                     <TableCell className="text-right">
                       {editingId === site.id ? (
                         <div className="flex justify-end gap-2">
@@ -611,7 +559,89 @@ export function Sites() {
           <ClientSummary />
         </TabsContent>
       </Tabs>
-      {/* ── Tax Brackets (Variables.tsx handles this now — just link hint) */}
+
+      {/* Floating Dialogs */}
+      <Dialog open={isAddingSite} onClose={() => { setIsAddingSite(false); setAddError(''); navigate('/sites', { replace: true }); }} title="Add New Site">
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-slate-700">Client <span className="text-red-500">*</span></label>
+            <Input
+              placeholder="Select or type client name"
+              list="dialog-clients"
+              value={addForm.client}
+              onChange={e => setAddForm({ ...addForm, client: e.target.value })}
+            />
+            <datalist id="dialog-clients">
+              {[...new Set(sites.map(s => s.client))].map(c => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+            <p className="text-xs text-slate-400">A client can have multiple sites</p>
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-slate-700">Site Name <span className="text-red-500">*</span></label>
+            <Input
+              placeholder="e.g. Louiseville"
+              value={addForm.name}
+              onChange={e => setAddForm({ ...addForm, name: e.target.value })}
+            />
+            <p className="text-xs text-slate-400">Must be unique per client</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">VAT</label>
+              <select
+                value={addForm.vat}
+                onChange={e => setAddForm({ ...addForm, vat: e.target.value as 'Yes' | 'No' | 'Add' })}
+                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+              >
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+                <option value="Add">Add</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Status</label>
+              <select
+                value={addForm.status}
+                onChange={e => setAddForm({ ...addForm, status: e.target.value as 'Active' | 'Inactive' })}
+                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+              >
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+          {addError && <p className="text-sm text-red-600">{addError}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { setIsAddingSite(false); setAddError(''); navigate('/sites', { replace: true }); }}>Cancel</Button>
+          <Button onClick={handleAdd} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
+            <Save className="h-4 w-4" /> Save Site
+          </Button>
+        </DialogFooter>
+      </Dialog>
+
+      <Dialog open={isAddingClient} onClose={() => { setIsAddingClient(false); setNewClientName(''); navigate('/sites', { replace: true }); }} title="Add New Client">
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-slate-700">Client Name <span className="text-red-500">*</span></label>
+            <Input
+              placeholder="Enter client name"
+              value={newClientName}
+              onChange={e => setNewClientName(e.target.value)}
+            />
+            <p className="text-xs text-slate-400">A client can have multiple sites</p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { setIsAddingClient(false); setNewClientName(''); navigate('/sites', { replace: true }); }}>Cancel</Button>
+          <Button onClick={handleAddClient} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+            <Save className="h-4 w-4" /> Save Client
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }
+

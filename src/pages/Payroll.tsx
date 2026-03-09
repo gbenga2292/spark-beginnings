@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/ta
 import { Input } from '@/src/components/ui/input';
 import { Download, FileText, Calculator, CreditCard, ChevronDown, X, Printer } from 'lucide-react';
 import { useAppStore, Employee } from '@/src/store/appStore';
-import { SalaryLoans } from './SalaryLoans';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import logoSrc from '../../logo/logo-2.png';
 
@@ -478,12 +477,9 @@ export function Payroll() {
       </div>
 
       <Tabs>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-xs grid-cols-1">
           <TabsTrigger active={activeTab === 'processing'} onClick={() => setActiveTab('processing')}>
             Payroll Processing
-          </TabsTrigger>
-          <TabsTrigger active={activeTab === 'loans'} onClick={() => setActiveTab('loans')}>
-            Salary Advances & Loans
           </TabsTrigger>
         </TabsList>
 
@@ -523,20 +519,6 @@ export function Payroll() {
               <Button variant="outline" className="gap-2">
                 <Download className="h-4 w-4" />
                 Export CSV
-              </Button>
-              <Button
-                className="gap-2 bg-indigo-600 hover:bg-indigo-700"
-                onClick={handleProcess}
-                disabled={isProcessing}
-              >
-                {isProcessing ? (
-                  <span className="flex items-center gap-2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Processing...
-                  </span>
-                ) : (
-                  <><Calculator className="h-4 w-4" /> Run Payroll</>
-                )}
               </Button>
             </div>
           </div>
@@ -654,9 +636,6 @@ export function Payroll() {
           </Card>
         </TabsContent>
 
-        <TabsContent active={activeTab === 'loans'} className="mt-6">
-          <SalaryLoans />
-        </TabsContent>
       </Tabs>
 
       {printType && (
