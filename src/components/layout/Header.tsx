@@ -14,8 +14,11 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
 
+  const { setCurrentUser } = useUserStore();
+
   const handleLogout = () => {
     logout();
+    setCurrentUser(null);
     navigate('/login');
   };
 
