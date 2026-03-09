@@ -507,7 +507,7 @@ formatter={(value: number | undefined) => formatCurr(value ?? 0)}
                                             <Cell fill="#10b981" /> {/* Remitted */}
                                             <Cell fill="#f43f5e" /> {/* Deficit */}
                                         </Pie>
-                                        <RechartsTooltip formatter={(value: number) => formatCurr(value)} />
+                                        <RechartsTooltip formatter={(value: number | undefined) => formatCurr(value ?? 0)} />
                                     </PieChart>
                                 </ResponsiveContainer>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4">
