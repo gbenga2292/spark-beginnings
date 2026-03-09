@@ -387,7 +387,7 @@ export function Dashboard() {
                                 />
                                 <Tooltip
                                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    formatter={(value: number) => `₦${value.toLocaleString()}`}
+                                    formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString()}`}
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
                                 <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />

@@ -572,7 +572,7 @@ formatter={(value: number | undefined) => formatCurr(value ?? 0)}
                                     <YAxis type="category" dataKey="name" width={debtorView === 'site' ? 180 : 100} axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: '#334155' }} />
                                     <RechartsTooltip
                                         cursor={{ fill: '#f1f5f9' }}
-                                        formatter={(value: number) => formatCurr(value)}
+                                        formatter={(value: number | undefined) => formatCurr(value ?? 0)}
                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                     />
                                     <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', fontSize: '13px' }} />
