@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -54,6 +54,35 @@ export function Payroll() {
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const publicHolidays = useAppStore((state) => state.publicHolidays);
   const [selectedMonth, setSelectedMonth] = useState('jan');
+  
+  // Drag to pan functionality
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!tableContainerRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - tableContainerRef.current.offsetLeft);
+    setScrollLeft(tableContainerRef.current.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging || !tableContainerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - tableContainerRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5;
+    tableContainerRef.current.scrollLeft = scrollLeft - walk;
+  };
 
   // OPERATIONS departments – purely attendance-based pay
   const OPERATIONS_DEPARTMENTS = ['OPERATIONS', 'ENGINEERING'];
@@ -582,7 +611,14 @@ export function Payroll() {
                 Filter <ChevronDown className="h-4 w-4" />
               </Button>
             </CardHeader>
-            <CardContent className="pt-4 overflow-x-auto">
+<CardContent 
+              ref={tableContainerRef}
+              onMouseDown={handleMouseDown}
+              onMouseLeave={handleMouseLeave}
+              onMouseUp={handleMouseUp}
+              onMouseMove={handleMouseMove}
+              className={`pt-4 overflow-x-auto ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            >
               {/* Table mimicking Excel specific columns precisely */}
               <Table className="whitespace-nowrap w-full text-xs">
                 <TableHeader>
