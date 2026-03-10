@@ -28,6 +28,7 @@
 - ✅ Added real statistics cards
 - ✅ Connected to store
 - ✅ Custom Report Builder generates CSV
+- ✅ Operations Staff Site Work Report with month/year filters
 
 ### 6. Onboarding Page (src/pages/Onboarding.tsx)
 - ✅ Connected to store

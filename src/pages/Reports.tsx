@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Download, FileSpreadsheet, FileText, PieChart as PieChartIcon, Users, Building2, Activity, CheckCircle2, CalendarClock } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
@@ -26,6 +27,28 @@ export function Reports() {
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
 
+  // Filter state for Operations Staff Site Work Report
+  const currentYear = new Date().getFullYear();
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+
+  const months = [
+    { value: 1, label: 'January' },
+    { value: 2, label: 'February' },
+    { value: 3, label: 'March' },
+    { value: 4, label: 'April' },
+    { value: 5, label: 'May' },
+    { value: 6, label: 'June' },
+    { value: 7, label: 'July' },
+    { value: 8, label: 'August' },
+    { value: 9, label: 'September' },
+    { value: 10, label: 'October' },
+    { value: 11, label: 'November' },
+    { value: 12, label: 'December' },
+  ];
+
+  const years = [currentYear, currentYear - 1, currentYear - 2];
+
   const totalEmployees = employees.length;
   const activeEmployees = employees.filter(e => e.status === 'Active').length;
   const inactiveEmployees = employees.filter(e => e.status !== 'Active').length;
@@ -47,6 +70,42 @@ export function Reports() {
     { name: 'Active', value: activeEmployees, color: '#10b981' },
     { name: 'Inactive', value: inactiveEmployees, color: '#f43f5e' }
   ], [activeEmployees, inactiveEmployees]);
+
+  // Filter operations staff
+  const operationsStaff = employees.filter(emp => emp.department === 'OPERATIONS');
+
+  // Calculate site work data for operations staff
+  const operationsStaffSiteData = useMemo(() => {
+    const filteredRecords = attendanceRecords.filter(rec => {
+      const recDate = new Date(rec.date);
+      return recDate.getMonth() + 1 === selectedMonth && recDate.getFullYear() === selectedYear;
+    });
+
+    const siteCounts: Record<string, Record<string, number>> = {};
+
+    operationsStaff.forEach(emp => {
+      siteCounts[emp.id] = {};
+      sites.forEach(site => {
+        siteCounts[emp.id][site.name] = 0;
+      });
+    });
+
+    filteredRecords.forEach(rec => {
+      const empId = rec.staffId;
+      if (siteCounts[empId]) {
+        // Count day site
+        if (rec.daySite && rec.day === 'Yes') {
+          siteCounts[empId][rec.daySite] = (siteCounts[empId][rec.daySite] || 0) + 1;
+        }
+        // Count night site
+        if (rec.nightSite && rec.night === 'Yes') {
+          siteCounts[empId][rec.nightSite] = (siteCounts[empId][rec.nightSite] || 0) + 1;
+        }
+      }
+    });
+
+    return { siteCounts, totalRecords: filteredRecords.length };
+  }, [attendanceRecords, selectedMonth, selectedYear, operationsStaff, sites]);
 
   const toggleField = (field: string) => {
     setSelectedFields(prev => prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]);
@@ -280,6 +339,97 @@ export function Reports() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Operations Staff Site Work Report */}
+      <Card className="bg-white border-slate-200">
+        <CardHeader className="border-b border-slate-100 pb-4">
+          <CardTitle className="text-slate-900 flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-indigo-600" />
+            Operations Staff Site Work Report
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-4 mb-6">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-slate-700">Month:</label>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              >
+                {months.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-slate-700">Year:</label>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              >
+                {years.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+            <div className="ml-auto text-sm text-slate-500">
+              {operationsStaffSiteData.totalRecords} attendance records for {months.find(m => m.value === selectedMonth)?.label} {selectedYear}
+            </div>
+          </div>
+
+          {/* Operations Staff Site Table */}
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-slate-50">
+                  <TableHead className="text-left font-semibold text-slate-900">Employee</TableHead>
+                  {sites.filter(s => s.status === 'Active').map(site => (
+                    <TableHead key={site.id} className="text-center font-semibold text-slate-900">{site.name}</TableHead>
+                  ))}
+                  <TableHead className="text-center font-semibold text-slate-900 bg-slate-100">Total Days</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {operationsStaff.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={sites.filter(s => s.status === 'Active').length + 2} className="text-center py-8 text-slate-500">
+                      No operations staff found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  operationsStaff.map(emp => {
+                    const empSiteCounts = operationsStaffSiteData.siteCounts[emp.id] || {};
+                    const totalDays = Object.values(empSiteCounts).reduce((sum: number, count) => sum + (count as number), 0);
+                    
+                    return (
+                      <TableRow key={emp.id} className="hover:bg-slate-50/50">
+                        <TableCell className="font-medium text-slate-800">
+                          {emp.surname} {emp.firstname}
+                          <div className="text-xs text-slate-500">{emp.position}</div>
+                        </TableCell>
+                        {sites.filter(s => s.status === 'Active').map(site => {
+                          const days = empSiteCounts[site.name] || 0;
+                          return (
+                            <TableCell key={site.id} className={`text-center py-3 ${days > 0 ? 'bg-emerald-50 font-medium text-emerald-700' : 'text-slate-400'}`}>
+                              {days > 0 ? days : '—'}
+                            </TableCell>
+                          );
+                        })}
+                        <TableCell className="text-center font-semibold bg-slate-50 text-slate-800">
+                          {totalDays}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Custom Employee Report Builder */}
       <Card className="bg-white border-slate-200 mb-6">
