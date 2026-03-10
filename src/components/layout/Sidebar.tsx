@@ -46,7 +46,6 @@ const navigation: NavCategory[] = [
     icon: LayoutDashboard,
     items: [
       { name: 'Dashboard', href: '/', icon: LayoutDashboard, privKey: 'dashboard', privField: 'canView' },
-      { name: 'Financial Dashboard', href: '/finance', icon: Landmark, privKey: 'financeDashboard', privField: 'canView' },
     ],
   },
   {
@@ -75,10 +74,10 @@ const navigation: NavCategory[] = [
     name: 'Account',
     icon: Landmark,
     items: [
-      { name: 'Invoices', href: '/finance?tab=invoices', icon: Receipt, privKey: 'financeDashboard', privField: 'canView' },
-      { name: 'Payments', href: '/finance?tab=payments', icon: DollarSign, privKey: 'financeDashboard', privField: 'canView' },
+      { name: 'Invoices', href: '/invoices', icon: Receipt, privKey: 'financeDashboard', privField: 'canView' },
+      { name: 'Payments', href: '/payments', icon: DollarSign, privKey: 'financeDashboard', privField: 'canView' },
       { name: 'Payrolls', href: '/payroll', icon: Wallet, privKey: 'payroll', privField: 'canView' },
-      { name: 'VAT & Tax Filing', href: '/finance?tab=vat', icon: Landmark, privKey: 'financeDashboard', privField: 'canView' },
+      { name: 'VAT & Tax Filing', href: '/vat', icon: Landmark, privKey: 'financeDashboard', privField: 'canView' },
       { name: 'Reports', href: '/financial-reports', icon: BarChart3, privKey: 'reports', privField: 'canView' },
     ],
   },

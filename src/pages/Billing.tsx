@@ -313,7 +313,16 @@ export function Billing() {
   const sitesForClient = useMemo(() => form.client ? sites.filter(s => s.client === form.client) : sites, [sites, form.client]);
 
   return (
-    <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <div>
+                    <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">
+                        Invoices
+                    </h1>
+                    <p className="text-sm font-medium text-slate-500 mt-1">Manage active and pending invoices.</p>
+                </div>
+            </div>
+            <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
 
       {/* Top action bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -579,5 +588,6 @@ export function Billing() {
         </div>
       )}
     </div>
-  );
+        </div>
+    );
 }

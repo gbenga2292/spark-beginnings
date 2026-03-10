@@ -136,7 +136,16 @@ export function VatPayments() {
     }, [totalsData]);
 
     return (
-        <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
+        <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <div>
+                    <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">
+                        VAT Remittance
+                    </h1>
+                    <p className="text-sm font-medium text-slate-500 mt-1">Record VAT remittances to FIRS.</p>
+                </div>
+            </div>
+            <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
             <div className="flex justify-end">
                 <Button
                     className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-10 px-5"
@@ -329,6 +338,7 @@ export function VatPayments() {
                     </div>
                 </div>
             )}
+        </div>
         </div>
     );
 }

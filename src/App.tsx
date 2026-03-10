@@ -12,7 +12,9 @@ import { Employees } from './pages/Employees';
 import { Sites } from './pages/Sites';
 import { Attendance } from './pages/Attendance';
 import { Payroll } from './pages/Payroll';
-import { FinanceHub } from './pages/FinanceHub';
+import { Billing } from './pages/Billing';
+import { Payments } from './pages/Payments';
+import { VatPayments } from './pages/VatPayments';
 import { Onboarding } from './pages/Onboarding';
 import { Reports } from './pages/Reports';
 import { FinancialReports } from './pages/FinancialReports';
@@ -42,7 +44,9 @@ export default function App() {
             <Route path="employees" element={<Employees />} />
             <Route path="sites" element={<Sites />} />
             <Route path="payroll" element={<Payroll />} />
-            <Route path="finance" element={<FinanceHub />} />
+            <Route path="invoices" element={<Billing />} />
+            <Route path="payments" element={<Payments />} />
+            <Route path="vat" element={<VatPayments />} />
             <Route path="onboarding" element={<Onboarding />} />
             <Route path="reports" element={<Reports />} />
             <Route path="financial-reports" element={<FinancialReports />} />
