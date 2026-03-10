@@ -250,7 +250,7 @@ export function FinancialReports() {
   const exportVatReport = () => {
     let csv = "data:text/csv;charset=utf-8,";
     csv += "VAT ID,Client,Date,Amount,Status\n";
-    vatPayments.forEach(v => { csv += `${v.id},${v.client},${v.date},${v.amount},${v.status || 'N/A'}\n`; });
+    vatPayments.forEach(v => { csv += `${v.id},${v.client},${v.date},${v.amount}\n`; });
     const link = document.createElement("a");
     link.setAttribute("href", encodeURI(csv));
     link.setAttribute("download", "vat_report.csv");
