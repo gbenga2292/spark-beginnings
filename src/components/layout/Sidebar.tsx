@@ -79,7 +79,7 @@ const navigation: NavCategory[] = [
       { name: 'Payments', href: '/finance?tab=payments', icon: DollarSign, privKey: 'financeDashboard', privField: 'canView' },
       { name: 'Payrolls', href: '/payroll', icon: Wallet, privKey: 'payroll', privField: 'canView' },
       { name: 'VAT & Tax Filing', href: '/finance?tab=vat', icon: Landmark, privKey: 'financeDashboard', privField: 'canView' },
-      { name: 'Reports', href: '/reports', icon: BarChart3, privKey: 'reports', privField: 'canView' },
+      { name: 'Reports', href: '/financial-reports', icon: BarChart3, privKey: 'reports', privField: 'canView' },
     ],
   },
   {
