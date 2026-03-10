@@ -36,12 +36,20 @@ export function FinancialReports() {
   const rawVatPayments = useAppStore(state => state.vatPayments);
   const sites = useAppStore(state => state.sites);
 
+  const employees = useAppStore(state => state.employees);
+  const loans = useAppStore(state => state.loans);
+  const salaryAdvances = useAppStore(state => state.salaryAdvances);
+  const [accountsTab, setAccountsTab] = useState<'payroll' | 'loans'>('payroll');
+  const [payrollYear, setPayrollYear] = useState<number>(new Date().getFullYear());
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear, currentYear - 1, currentYear - 2];
   const [filterYear, setFilterYear] = useState<string>('All');
   const [filterClient, setFilterClient] = useState<string>('All');
   const [summaryTab, setSummaryTab] = useState<'client' | 'site'>('client');
   const [debtorView, setDebtorView] = useState<'client' | 'site'>('client');
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [activeFinBuilderTab, setActiveFinBuilderTab] = useState<string>("Revenue & Billing");
 
   // Filters
   const availableYears = useMemo(() => {
@@ -272,10 +280,30 @@ export function FinancialReports() {
     setSelectedFields(prev => prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]);
   };
 
-  const financialReportFields = [
-    'Invoice Summary', 'Payment Summary', 'Outstanding Balances', 'VAT Remittance',
-    'WHT Deductions', 'Client Balances', 'Site Revenue', 'Collection Efficiency'
+  const FINANCIAL_REPORT_GROUPS = [
+    {
+      group: 'Revenue & Billing',
+      color: 'indigo',
+      fields: ['Invoice Summary', 'Outstanding Balances', 'Client Balances', 'Site Revenue', 'Overdue Invoices'],
+    },
+    {
+      group: 'Collections & Payments',
+      color: 'emerald',
+      fields: ['Payment Summary', 'WHT Deductions', 'Discounts Applied', 'Payment by Client', 'Payment by Site'],
+    },
+    {
+      group: 'Tax & Compliance',
+      color: 'amber',
+      fields: ['VAT Remittance', 'VAT Collected vs Remitted', 'WHT Summary by Client'],
+    },
+    {
+      group: 'Performance',
+      color: 'violet',
+      fields: ['Collection Efficiency', 'Monthly Revenue Trend', 'Top Debtors', 'VAT Deficit Alert'],
+    },
   ];
+
+  const ALL_FINANCIAL_FIELDS = FINANCIAL_REPORT_GROUPS.flatMap(g => g.fields);
 
   const generateCustomReport = () => {
     if (selectedFields.length === 0) { toast.error('Please select at least one data point.'); return; }
@@ -283,45 +311,120 @@ export function FinancialReports() {
     const wb = XLSX.utils.book_new();
 
     if (selectedFields.includes('Invoice Summary')) {
-      const ws = XLSX.utils.json_to_sheet(invoices.map(i => ({ ID: i.id, Client: i.client, Site: i.siteName, Date: i.date, Amount: i.amount, Status: i.status })));
-      XLSX.utils.book_append_sheet(wb, ws, "Invoices");
+      const ws = XLSX.utils.json_to_sheet(invoices.map(i => ({ ID: i.id, Client: i.client, Site: i.siteName, Date: i.date, Amount: i.amount, Status: i.status, DueDate: i.dueDate || '', BillingCycle: i.billingCycle || '' })));
+      XLSX.utils.book_append_sheet(wb, ws, 'Invoices');
     }
     if (selectedFields.includes('Payment Summary')) {
       const ws = XLSX.utils.json_to_sheet(payments.map(p => ({ ID: p.id, Client: p.client, Site: p.site, Date: p.date, Amount: p.amount, WHT: p.withholdingTax || 0, VAT: p.vat || 0, Discount: p.discount || 0 })));
-      XLSX.utils.book_append_sheet(wb, ws, "Payments");
+      XLSX.utils.book_append_sheet(wb, ws, 'Payments');
     }
     if (selectedFields.includes('Outstanding Balances')) {
       const ws = XLSX.utils.json_to_sheet(summaryData.filter(r => r.balance > 0).map(r => ({ Client: r.client, Site: r.site, Invoiced: r.totalInvoices, Paid: r.totalPayment, Balance: r.balance, Status: r.status })));
-      XLSX.utils.book_append_sheet(wb, ws, "Outstanding");
+      XLSX.utils.book_append_sheet(wb, ws, 'Outstanding');
+    }
+    if (selectedFields.includes('Overdue Invoices')) {
+      const today = new Date().toISOString().split('T')[0];
+      const ws = XLSX.utils.json_to_sheet(rawInvoices.filter(i => i.status !== 'Paid' && i.dueDate && i.dueDate < today).map(i => ({ ID: i.id, Client: i.client, Site: i.siteName, Amount: i.amount, DueDate: i.dueDate, Status: i.status })));
+      XLSX.utils.book_append_sheet(wb, ws, 'Overdue Invoices');
     }
     if (selectedFields.includes('VAT Remittance')) {
-      const ws = XLSX.utils.json_to_sheet(vatPayments.map(v => ({ ID: v.id, Client: v.client, Date: v.date, Amount: v.amount })));
-      XLSX.utils.book_append_sheet(wb, ws, "VAT");
+      const ws = XLSX.utils.json_to_sheet(vatPayments.map(v => ({ ID: v.id, Client: v.client, Month: v.month || '', Date: v.date, Amount: v.amount })));
+      XLSX.utils.book_append_sheet(wb, ws, 'VAT Remittance');
+    }
+    if (selectedFields.includes('VAT Collected vs Remitted')) {
+      const ws = XLSX.utils.json_to_sheet([{ VATCollected: globalStats.totalVATCollected, VATRemitted: globalStats.totalVATRemitted, VATDeficit: globalStats.vatDeficit }]);
+      XLSX.utils.book_append_sheet(wb, ws, 'VAT Summary');
     }
     if (selectedFields.includes('WHT Deductions')) {
       const ws = XLSX.utils.json_to_sheet(payments.filter(p => (p.withholdingTax || 0) > 0).map(p => ({ Client: p.client, Site: p.site, Date: p.date, Amount: p.amount, WHT: p.withholdingTax })));
-      XLSX.utils.book_append_sheet(wb, ws, "WHT");
+      XLSX.utils.book_append_sheet(wb, ws, 'WHT');
+    }
+    if (selectedFields.includes('WHT Summary by Client')) {
+      const whtMap: Record<string, number> = {};
+      payments.forEach(p => { if (p.withholdingTax) whtMap[p.client] = (whtMap[p.client] || 0) + p.withholdingTax; });
+      const ws = XLSX.utils.json_to_sheet(Object.entries(whtMap).map(([client, total]) => ({ Client: client, TotalWHT: total })));
+      XLSX.utils.book_append_sheet(wb, ws, 'WHT By Client');
+    }
+    if (selectedFields.includes('Discounts Applied')) {
+      const ws = XLSX.utils.json_to_sheet(payments.filter(p => (p.discount || 0) > 0).map(p => ({ Client: p.client, Site: p.site, Date: p.date, Amount: p.amount, Discount: p.discount })));
+      XLSX.utils.book_append_sheet(wb, ws, 'Discounts');
     }
     if (selectedFields.includes('Client Balances')) {
       const ws = XLSX.utils.json_to_sheet(summaryData.map(r => ({ Client: r.client, Invoiced: r.totalInvoices, Paid: r.totalPayment, Discount: r.discount, WHT: r.withholdingTax, VAT: r.vat, Balance: r.balance, Status: r.status })));
-      XLSX.utils.book_append_sheet(wb, ws, "Client Balances");
+      XLSX.utils.book_append_sheet(wb, ws, 'Client Balances');
+    }
+    if (selectedFields.includes('Payment by Client')) {
+      const clientPay: Record<string, number> = {};
+      payments.forEach(p => { clientPay[p.client] = (clientPay[p.client] || 0) + p.amount; });
+      const ws = XLSX.utils.json_to_sheet(Object.entries(clientPay).map(([client, total]) => ({ Client: client, TotalPaid: total })));
+      XLSX.utils.book_append_sheet(wb, ws, 'Pay By Client');
+    }
+    if (selectedFields.includes('Payment by Site')) {
+      const sitePay: Record<string, number> = {};
+      payments.forEach(p => { sitePay[p.site] = (sitePay[p.site] || 0) + p.amount; });
+      const ws = XLSX.utils.json_to_sheet(Object.entries(sitePay).map(([site, total]) => ({ Site: site, TotalPaid: total })));
+      XLSX.utils.book_append_sheet(wb, ws, 'Pay By Site');
     }
     if (selectedFields.includes('Site Revenue')) {
       const ws = XLSX.utils.json_to_sheet(siteFinancialData.map(s => ({ Site: s.name, PaidInvoices: s.paid, PendingInvoices: s.pending, Total: s.paid + s.pending })));
-      XLSX.utils.book_append_sheet(wb, ws, "Site Revenue");
+      XLSX.utils.book_append_sheet(wb, ws, 'Site Revenue');
     }
     if (selectedFields.includes('Collection Efficiency')) {
-      const ws = XLSX.utils.json_to_sheet([{
-        TotalBilled: globalStats.totalBilled, TotalCollected: globalStats.totalCollectedCash,
-        TotalWHT: globalStats.totalWHT, TotalDiscount: globalStats.totalDiscount,
-        TotalOutstanding: globalStats.totalOutstanding, CollectionRate: `${collectionRate}%`,
-        VATCollected: globalStats.totalVATCollected, VATRemitted: globalStats.totalVATRemitted, VATDeficit: globalStats.vatDeficit
-      }]);
-      XLSX.utils.book_append_sheet(wb, ws, "Efficiency");
+      const ws = XLSX.utils.json_to_sheet([{ TotalBilled: globalStats.totalBilled, TotalCollected: globalStats.totalCollectedCash, TotalWHT: globalStats.totalWHT, TotalDiscount: globalStats.totalDiscount, TotalOutstanding: globalStats.totalOutstanding, CollectionRate: `${collectionRate}%`, VATCollected: globalStats.totalVATCollected, VATRemitted: globalStats.totalVATRemitted, VATDeficit: globalStats.vatDeficit }]);
+      XLSX.utils.book_append_sheet(wb, ws, 'Efficiency');
+    }
+    if (selectedFields.includes('Monthly Revenue Trend')) {
+      const ws = XLSX.utils.json_to_sheet(trendData.map(t => ({ Month: t.month, Billed: t.Billed, Collected: t.Collected })));
+      XLSX.utils.book_append_sheet(wb, ws, 'Monthly Trend');
+    }
+    if (selectedFields.includes('Top Debtors')) {
+      const ws = XLSX.utils.json_to_sheet(clientDebtData.map(d => ({ Name: d.name, Billed: d.Billed, Cleared: d.Cleared, Outstanding: d.Outstanding })));
+      XLSX.utils.book_append_sheet(wb, ws, 'Top Debtors');
+    }
+    if (selectedFields.includes('VAT Deficit Alert')) {
+      const ws = XLSX.utils.json_to_sheet([{ VATCollected: globalStats.totalVATCollected, VATRemitted: globalStats.totalVATRemitted, Deficit: globalStats.vatDeficit, DeficitPct: globalStats.totalVATCollected > 0 ? `${Math.round((globalStats.vatDeficit / globalStats.totalVATCollected) * 100)}%` : '0%' }]);
+      XLSX.utils.book_append_sheet(wb, ws, 'VAT Alert');
     }
 
-    XLSX.writeFile(wb, "Custom_Financial_Report.xlsx");
-    showExportMessage("Custom Financial Report generated!");
+    XLSX.writeFile(wb, 'Custom_Financial_Report.xlsx');
+    showExportMessage('Custom Financial Report (Excel) generated!');
+  };
+
+  const generateCustomReportPdf = () => {
+    if (selectedFields.length === 0) { toast.error('Please select at least one data point.'); return; }
+    // Build a single-sheet summary PDF of selected metrics
+    const head = [['Metric', 'Value']];
+    const body: string[][] = [];
+    if (selectedFields.includes('Invoice Summary') || selectedFields.includes('Revenue & Billing')) {
+      body.push(['Total Invoices', invoices.length.toString()]);
+      body.push(['Total Billed', `₦${globalStats.totalBilled.toLocaleString()}`]);
+    }
+    if (selectedFields.includes('Payment Summary') || selectedFields.includes('Collections & Payments')) {
+      body.push(['Total Payments (Cash)', `₦${globalStats.totalCollectedCash.toLocaleString()}`]);
+      body.push(['Total WHT', `₦${globalStats.totalWHT.toLocaleString()}`]);
+      body.push(['Total Discounts', `₦${globalStats.totalDiscount.toLocaleString()}`]);
+    }
+    if (selectedFields.includes('Outstanding Balances') || selectedFields.includes('Client Balances')) {
+      body.push(['Outstanding Receivables', `₦${globalStats.totalOutstanding.toLocaleString()}`]);
+    }
+    if (selectedFields.includes('Collection Efficiency')) {
+      body.push(['Collection Efficiency Rate', `${collectionRate}%`]);
+    }
+    if (selectedFields.includes('VAT Remittance') || selectedFields.includes('VAT Collected vs Remitted')) {
+      body.push(['VAT Collected', `₦${globalStats.totalVATCollected.toLocaleString()}`]);
+      body.push(['VAT Remitted', `₦${globalStats.totalVATRemitted.toLocaleString()}`]);
+      body.push(['VAT Deficit', `₦${globalStats.vatDeficit.toLocaleString()}`]);
+    }
+    if (selectedFields.includes('Site Revenue')) {
+      siteFinancialData.forEach(s => body.push([`Site: ${s.name}`, `₦${(s.paid + s.pending).toLocaleString()} total (₦${s.paid.toLocaleString()} paid)`]));
+    }
+    if (selectedFields.includes('Top Debtors')) {
+      clientDebtData.slice(0, 5).forEach(d => body.push([`Debtor: ${d.name}`, `₦${d.Outstanding.toLocaleString()} outstanding`]));
+    }
+    if (body.length === 0) {
+      body.push(['Selected fields', 'No numeric summary available — use Excel export for full detail.']);
+    }
+    generatePdf(`Financial Report Summary (${filterYear === 'All' ? 'All Time' : filterYear})`, head, body, 'custom_financial_report.pdf');
   };
 
   return (
@@ -711,26 +814,411 @@ export function FinancialReports() {
       {/* Custom Financial Report Builder */}
       <Card className="bg-white border-slate-200 mb-6">
         <CardHeader className="border-b border-slate-100 pb-4">
-          <CardTitle className="text-slate-900">Custom Financial Report Builder</CardTitle>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <CardTitle className="text-slate-900">Custom Financial Report Builder</CardTitle>
+              <p className="text-sm text-slate-500 mt-1">Pick the data modules you need — export as a multi-sheet Excel or a PDF summary.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSelectedFields(selectedFields.length === ALL_FINANCIAL_FIELDS.length ? [] : ALL_FINANCIAL_FIELDS)}
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline underline-offset-2 transition-colors"
+              >
+                {selectedFields.length === ALL_FINANCIAL_FIELDS.length ? 'Deselect All' : 'Select All'}
+              </button>
+              <span className="text-xs text-slate-400">{selectedFields.length} / {ALL_FINANCIAL_FIELDS.length} modules</span>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="space-y-4">
-            <p className="text-sm text-slate-500">Select financial data points to generate a custom Excel report.</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-6 rounded-lg border border-slate-100">
-              {financialReportFields.map((item) => (
-                <label key={item} className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
-                  <input type="checkbox" checked={selectedFields.includes(item)} onChange={() => toggleField(item)}
-                    className="rounded border-slate-300 bg-white text-indigo-600 focus:ring-indigo-600 h-4 w-4 transition-all" />
-                  {item}
-                </label>
-              ))}
+          <div className="space-y-6">
+            {/* Tab Navigation */}
+            <div className="flex overflow-x-auto gap-2 pb-2 hide-scrollbar border-b border-slate-100">
+              {FINANCIAL_REPORT_GROUPS.map(group => {
+                const isActive = activeFinBuilderTab === group.group;
+                const groupSelectedCount = group.fields.filter(f => selectedFields.includes(f)).length;
+                return (
+                  <button
+                    key={group.group}
+                    onClick={() => setActiveFinBuilderTab(group.group)}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors whitespace-nowrap border-b-2 ${
+                      isActive 
+                        ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50' 
+                        : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                    }`}
+                  >
+                    {group.group}
+                    {groupSelectedCount > 0 && (
+                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-100 text-indigo-800 text-[10px]">
+                        {groupSelectedCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-            <div className="pt-4 flex justify-end">
-              <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={generateCustomReport}>
-                <Download className="h-4 w-4" /> Generate Financial Report
+
+            {/* Active Tab Content */}
+            {FINANCIAL_REPORT_GROUPS.filter(g => g.group === activeFinBuilderTab).map(group => {
+              const checkColor: Record<string, string> = {
+                indigo:  'accent-indigo-600',
+                emerald: 'accent-emerald-600',
+                amber:   'accent-amber-500',
+                violet:  'accent-violet-600',
+              };
+              const allGroupSelected = group.fields.every(f => selectedFields.includes(f));
+              return (
+                <div key={group.group} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex items-center justify-between mb-3 px-1">
+                    <p className="text-sm font-medium text-slate-500">Select modules to include in your report:</p>
+                    <button
+                      onClick={() => {
+                        if (allGroupSelected) {
+                          setSelectedFields(prev => prev.filter(f => !group.fields.includes(f)));
+                        } else {
+                          setSelectedFields(prev => [...new Set([...prev, ...group.fields])]);
+                        }
+                      }}
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                    >
+                      {allGroupSelected ? '- Deselect Group' : '+ Select Group'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 bg-slate-50 p-5 rounded-xl border border-slate-100">
+                    {group.fields.map(field => (
+                      <label key={field} className="flex items-start gap-3 text-sm font-medium text-slate-700 cursor-pointer hover:text-slate-900 transition-colors bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedFields.includes(field)}
+                          onChange={() => toggleField(field)}
+                          className={`mt-0.5 h-4 w-4 rounded border-slate-300 ${checkColor[group.color]} transition-all`}
+                        />
+                        <span className="leading-tight">{field}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Preview bar */}
+            {selectedFields.length > 0 && (
+              <div className="flex items-start sm:items-center gap-3 text-xs text-slate-500 bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 sm:px-4 sm:py-3 animate-in fade-in">
+                <CheckCircle2 className="h-5 w-5 text-indigo-500 flex-shrink-0 mt-0.5 sm:mt-0" />
+                <div>
+                  Report will include <strong className="text-indigo-700">{selectedFields.length} module{selectedFields.length > 1 ? 's' : ''}</strong>. Excel = one sheet per module. PDF = key metric summary.
+                  <div className="text-indigo-600/80 italic mt-0.5">{selectedFields.slice(0, 5).join(', ')}{selectedFields.length > 5 ? ` +${selectedFields.length - 5} more` : ''}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Export buttons */}
+            <div className="pt-2 flex flex-wrap items-center justify-end gap-3">
+              <Button
+                variant="outline"
+                className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                onClick={generateCustomReport}
+                disabled={selectedFields.length === 0}
+              >
+                <FileSpreadsheet className="h-4 w-4" /> Export Excel
+              </Button>
+              <Button
+                className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                onClick={generateCustomReportPdf}
+                disabled={selectedFields.length === 0}
+              >
+                <FileText className="h-4 w-4" /> Export PDF Summary
               </Button>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ───────────────── ACCOUNTS REPORTS ───────────────── */}
+      <Card className="bg-white border-slate-200 mb-6">
+        <CardHeader className="border-b border-slate-100 pb-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <CardTitle className="text-slate-900 flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border text-amber-700 bg-amber-50 border-amber-200">Accounts</span>
+              Financial Staff Reports
+            </CardTitle>
+            {/* Tab switcher */}
+            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+              <button onClick={() => setAccountsTab('payroll')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  accountsTab === 'payroll' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}>
+                <FileText className="h-3.5 w-3.5" /> Payroll Summary
+              </button>
+              <button onClick={() => setAccountsTab('loans')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  accountsTab === 'loans' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}>
+                <FileSpreadsheet className="h-3.5 w-3.5" /> Loans & Advances
+              </button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {accountsTab === 'payroll' ? (
+            /* ── PAYROLL SUMMARY ── */
+            (() => {
+              const MONTH_KEYS: (keyof typeof employees[0]['monthlySalaries'])[] = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+              const monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+              const activeEmps = employees.filter(e => e.status === 'Active');
+
+              const exportPayrollCsv = () => {
+                let csv = 'data:text/csv;charset=utf-8,';
+                csv += `Employee,Department,Position,${monthLabels.join(',')},Annual Total\n`;
+                activeEmps.forEach(emp => {
+                  const monthVals = MONTH_KEYS.map(k => emp.monthlySalaries?.[k] ?? 0);
+                  const annual = monthVals.reduce((s, v) => s + v, 0);
+                  csv += `"${emp.surname} ${emp.firstname}",${emp.department},${emp.position},${monthVals.join(',')},${annual}\n`;
+                });
+                const link = document.createElement('a');
+                link.setAttribute('href', encodeURI(csv));
+                link.setAttribute('download', `payroll_summary_${payrollYear}.csv`);
+                document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                showExportMessage('Payroll Summary (CSV) exported!');
+              };
+
+              const exportPayrollPdf = () => {
+                const head = [['Employee', 'Dept', ...monthLabels, 'Annual']];
+                const body = activeEmps.map(emp => {
+                  const monthVals = MONTH_KEYS.map(k => (emp.monthlySalaries?.[k] ?? 0).toLocaleString());
+                  const annual = MONTH_KEYS.reduce((s, k) => s + (emp.monthlySalaries?.[k] ?? 0), 0);
+                  return [`${emp.surname} ${emp.firstname}`, emp.department, ...monthVals, annual.toLocaleString()];
+                });
+                generatePdf(`Payroll Summary ${payrollYear}`, head, body, `payroll_summary_${payrollYear}.pdf`);
+              };
+
+              return (
+                <>
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-slate-700">Year:</label>
+                      <select value={payrollYear} onChange={e => setPayrollYear(Number(e.target.value))}
+                        className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20">
+                        {years.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportPayrollCsv}>
+                        <FileSpreadsheet className="h-4 w-4" /> CSV
+                      </Button>
+                      <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700 text-white" onClick={exportPayrollPdf}>
+                        <FileText className="h-4 w-4" /> PDF
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <div className="overflow-y-auto" style={{ maxHeight: '420px' }}>
+                        <Table>
+                          <TableHeader className="sticky top-0 z-10">
+                            <TableRow className="bg-gradient-to-r from-amber-700 to-amber-600">
+                              <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap sticky left-0 bg-amber-700 z-20">Employee</TableHead>
+                              <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Dept</TableHead>
+                              {monthLabels.map(m => (
+                                <TableHead key={m} className="text-white font-semibold py-2 px-3 whitespace-nowrap text-right">{m}</TableHead>
+                              ))}
+                              <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap text-right bg-amber-900/40">Annual</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {activeEmps.length === 0 ? (
+                              <TableRow><TableCell colSpan={15} className="text-center py-8 text-slate-400">No active employees.</TableCell></TableRow>
+                            ) : (
+                              <>
+                                {activeEmps.map((emp, idx) => {
+                                  const annual = MONTH_KEYS.reduce((s, k) => s + (emp.monthlySalaries?.[k] ?? 0), 0);
+                                  return (
+                                    <TableRow key={emp.id} className={`hover:bg-amber-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                                      <TableCell className={`py-1.5 px-3 text-sm font-medium text-slate-800 whitespace-nowrap sticky left-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+                                        {emp.surname} {emp.firstname}
+                                      </TableCell>
+                                      <TableCell className="py-1.5 px-3 text-xs text-slate-500 whitespace-nowrap">{emp.department}</TableCell>
+                                      {MONTH_KEYS.map(k => (
+                                        <TableCell key={k} className="py-1.5 px-3 text-xs text-right text-slate-700">
+                                          {(emp.monthlySalaries?.[k] ?? 0).toLocaleString()}
+                                        </TableCell>
+                                      ))}
+                                      <TableCell className="py-1.5 px-3 text-xs text-right font-bold text-amber-700 bg-amber-50/60">
+                                        {annual.toLocaleString()}
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                                {/* Totals row */}
+                                <TableRow className="bg-slate-900 hover:bg-slate-900 sticky bottom-0 z-10">
+                                  <TableCell className="text-white font-semibold py-2 px-3 sticky left-0 bg-slate-900 text-sm">Team Total</TableCell>
+                                  <TableCell className="py-2 px-3"></TableCell>
+                                  {MONTH_KEYS.map(k => (
+                                    <TableCell key={k} className="text-right text-amber-300 font-semibold text-xs py-2 px-3">
+                                      {activeEmps.reduce((s, e) => s + (e.monthlySalaries?.[k] ?? 0), 0).toLocaleString()}
+                                    </TableCell>
+                                  ))}
+                                  <TableCell className="text-right text-white font-bold text-xs py-2 px-3 bg-amber-900/40">
+                                    {activeEmps.reduce((s, e) => s + MONTH_KEYS.reduce((ms, k) => ms + (e.monthlySalaries?.[k] ?? 0), 0), 0).toLocaleString()}
+                                  </TableCell>
+                                </TableRow>
+                              </>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()
+          ) : (
+            /* ── LOANS & ADVANCES ── */
+            (() => {
+              const activeLoans = loans.filter(l => l.status === 'Active' || l.status === 'Approved');
+              const pendingAdvances = salaryAdvances.filter(a => a.status !== 'Deducted');
+
+              const exportLoansCsv = () => {
+                let csv = 'data:text/csv;charset=utf-8,';
+                csv += 'Type,Employee,Loan Type,Principal,Monthly Deduction,Remaining Balance,Duration,Start Date,Status\n';
+                loans.forEach(l => {
+                  csv += `Loan,"${l.employeeName}","${l.loanType}",${l.principalAmount},${l.monthlyDeduction},${l.remainingBalance},${l.duration} months,${l.startDate},${l.status}\n`;
+                });
+                salaryAdvances.forEach(a => {
+                  csv += `Advance,"${a.employeeName}",,${a.amount},,,,,${a.status}\n`;
+                });
+                const link = document.createElement('a');
+                link.setAttribute('href', encodeURI(csv));
+                link.setAttribute('download', 'loans_advances_report.csv');
+                document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                showExportMessage('Loans & Advances (CSV) exported!');
+              };
+
+              const exportLoansPdf = () => {
+                const head = [['Type', 'Employee', 'Loan Type', 'Principal', 'Monthly Ded.', 'Balance', 'Status']];
+                const body = [
+                  ...loans.map(l => ['Loan', l.employeeName, l.loanType, l.principalAmount.toLocaleString(), l.monthlyDeduction.toLocaleString(), l.remainingBalance.toLocaleString(), l.status]),
+                  ...salaryAdvances.map(a => ['Advance', a.employeeName, '-', a.amount.toLocaleString(), '-', '-', a.status]),
+                ];
+                generatePdf('Loans & Advances Report', head, body, 'loans_advances_report.pdf');
+              };
+
+              return (
+                <>
+                  {/* Summary tiles */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+                    {[
+                      { label: 'Active Loans', value: activeLoans.length, color: 'amber' },
+                      { label: 'Total Loan Balance', value: `₦${activeLoans.reduce((s, l) => s + l.remainingBalance, 0).toLocaleString()}`, color: 'amber' },
+                      { label: 'Pending Advances', value: pendingAdvances.length, color: 'rose' },
+                      { label: 'Total Advance Amount', value: `₦${pendingAdvances.reduce((s, a) => s + a.amount, 0).toLocaleString()}`, color: 'rose' },
+                    ].map(tile => (
+                      <div key={tile.label} className={`rounded-xl border p-4 ${
+                        tile.color === 'amber' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200'
+                      }`}>
+                        <div className={`text-lg font-bold ${
+                          tile.color === 'amber' ? 'text-amber-800' : 'text-rose-800'
+                        }`}>{tile.value}</div>
+                        <div className="text-xs text-slate-500 mt-0.5">{tile.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-end gap-2 mb-4">
+                    <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportLoansCsv}>
+                      <FileSpreadsheet className="h-4 w-4" /> CSV
+                    </Button>
+                    <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700 text-white" onClick={exportLoansPdf}>
+                      <FileText className="h-4 w-4" /> PDF
+                    </Button>
+                  </div>
+
+                  {/* Loans table */}
+                  <div className="mb-6">
+                    <div className="text-xs font-bold uppercase tracking-widest text-amber-700 mb-2 px-1">Staff Loans</div>
+                    <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-gradient-to-r from-amber-700 to-amber-600">
+                              <TableHead className="text-white font-semibold py-2 px-3">Employee</TableHead>
+                              <TableHead className="text-white font-semibold py-2 px-3">Loan Type</TableHead>
+                              <TableHead className="text-white font-semibold py-2 px-3 text-right">Principal</TableHead>
+                              <TableHead className="text-white font-semibold py-2 px-3 text-right">Monthly Deduction</TableHead>
+                              <TableHead className="text-white font-semibold py-2 px-3 text-right">Remaining Balance</TableHead>
+                              <TableHead className="text-white font-semibold py-2 px-3 text-center">Duration</TableHead>
+                              <TableHead className="text-white font-semibold py-2 px-3">Start Date</TableHead>
+                              <TableHead className="text-white font-semibold py-2 px-3 text-center">Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {loans.length === 0 ? (
+                              <TableRow><TableCell colSpan={8} className="text-center py-6 text-slate-400">No loan records.</TableCell></TableRow>
+                            ) : loans.map((loan, idx) => (
+                              <TableRow key={loan.id} className={`hover:bg-amber-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                                <TableCell className="py-1.5 px-3 text-sm font-medium text-slate-800">{loan.employeeName}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-slate-600">{loan.loanType}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right text-slate-700">₦{loan.principalAmount.toLocaleString()}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right text-slate-700">₦{loan.monthlyDeduction.toLocaleString()}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right font-semibold text-amber-700">₦{loan.remainingBalance.toLocaleString()}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-center text-slate-600">{loan.duration}m</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{loan.startDate}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-center">
+                                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                    loan.status === 'Active' ? 'bg-emerald-100 text-emerald-700' :
+                                    loan.status === 'Completed' ? 'bg-slate-100 text-slate-500' :
+                                    loan.status === 'Approved' ? 'bg-blue-100 text-blue-700' :
+                                    'bg-amber-100 text-amber-700'
+                                  }`}>{loan.status}</span>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Salary Advances table */}
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-widest text-rose-700 mb-2 px-1">Salary Advances</div>
+                    <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-gradient-to-r from-rose-700 to-rose-600">
+                              <TableHead className="text-white font-semibold py-2 px-3">Employee</TableHead>
+                              <TableHead className="text-white font-semibold py-2 px-3 text-right">Amount</TableHead>
+                              <TableHead className="text-white font-semibold py-2 px-3">Request Date</TableHead>
+                              <TableHead className="text-white font-semibold py-2 px-3 text-center">Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {salaryAdvances.length === 0 ? (
+                              <TableRow><TableCell colSpan={4} className="text-center py-6 text-slate-400">No salary advance records.</TableCell></TableRow>
+                            ) : salaryAdvances.map((adv, idx) => (
+                              <TableRow key={adv.id} className={`hover:bg-rose-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                                <TableCell className="py-1.5 px-3 text-sm font-medium text-slate-800">{adv.employeeName}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right font-semibold text-rose-700">₦{adv.amount.toLocaleString()}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{adv.requestDate}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-center">
+                                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                    adv.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' :
+                                    adv.status === 'Deducted' ? 'bg-slate-100 text-slate-500' :
+                                    adv.status === 'Rejected' ? 'bg-red-100 text-red-700' :
+                                    'bg-amber-100 text-amber-700'
+                                  }`}>{adv.status}</span>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()
+          )}
         </CardContent>
       </Card>
     </div>

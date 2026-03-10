@@ -24,10 +24,12 @@ import { Users } from './pages/Users';
 import { SalaryLoans } from './pages/SalaryLoans';
 import { ClientSummary } from './pages/ClientSummary';
 import { ToastContainer, ConfirmDialog } from './components/ui/toast';
+import { GlobalDragScroll } from './components/ui/GlobalDragScroll';
 
 export default function App() {
   return (
     <>
+      <GlobalDragScroll />
       <ToastContainer />
       <ConfirmDialog />
       <BrowserRouter>
