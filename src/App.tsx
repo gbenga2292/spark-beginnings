@@ -15,6 +15,7 @@ import { Payroll } from './pages/Payroll';
 import { FinanceHub } from './pages/FinanceHub';
 import { Onboarding } from './pages/Onboarding';
 import { Reports } from './pages/Reports';
+import { FinancialReports } from './pages/FinancialReports';
 import { Settings } from './pages/Settings';
 import { Profile } from './pages/Profile';
 import { Variables } from './pages/Variables';
@@ -42,6 +43,7 @@ export default function App() {
             <Route path="finance" element={<FinanceHub />} />
             <Route path="onboarding" element={<Onboarding />} />
             <Route path="reports" element={<Reports />} />
+            <Route path="financial-reports" element={<FinancialReports />} />
             <Route path="settings" element={<Settings />} />
             <Route path="profile" element={<Profile />} />
             <Route path="variables" element={<Variables />} />
