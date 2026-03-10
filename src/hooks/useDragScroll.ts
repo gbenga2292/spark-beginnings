@@ -28,54 +28,52 @@ export function attachDragScroll(el: HTMLElement): () => void {
   let scrollLeft = 0;
   let scrollTop = 0;
 
-  const onMouseDown = (e: MouseEvent) => {
-    // Only trigger on left button; ignore clicks on interactive elements
-    if (e.button !== 0) return;
-    const target = e.target as HTMLElement;
-    if (
-      target.closest('button, a, input, select, textarea, [role="button"], [tabindex]')
-    ) return;
-
-    isDown = true;
-    el.dataset.dragScrolling = 'true';
-    startX = e.pageX - el.offsetLeft;
-    startY = e.pageY - el.offsetTop;
-    scrollLeft = el.scrollLeft;
-    scrollTop = el.scrollTop;
-    e.preventDefault();
-  };
-
-  const onMouseLeave = () => {
-    isDown = false;
-    delete el.dataset.dragScrolling;
-  };
-
   const onMouseUp = () => {
+    if (!isDown) return;
     isDown = false;
     delete el.dataset.dragScrolling;
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
   };
 
   const onMouseMove = (e: MouseEvent) => {
     if (!isDown) return;
     e.preventDefault();
-    const x = e.pageX - el.offsetLeft;
-    const y = e.pageY - el.offsetTop;
-    const walkX = (x - startX) * 1.2; // slight multiplier for snappy feel
-    const walkY = (y - startY) * 1.2;
+    const x = e.clientX;
+    const y = e.clientY;
+    const walkX = (x - startX) * 1.25; // Adjusted for a completely natural feel
+    const walkY = (y - startY) * 1.25;
     el.scrollLeft = scrollLeft - walkX;
     el.scrollTop  = scrollTop  - walkY;
   };
 
+  const onMouseDown = (e: MouseEvent) => {
+    // Only trigger on left button; ignore clicks on interactive elements
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('button, a, input, select, textarea, [role="button"], [tabindex]') || 
+      target.closest('.no-drag')
+    ) return;
+
+    isDown = true;
+    el.dataset.dragScrolling = 'true';
+    startX = e.clientX;
+    startY = e.clientY;
+    scrollLeft = el.scrollLeft;
+    scrollTop = el.scrollTop;
+    
+    // Attach to window so fast dragging doesn't lose the cursor outside the element
+    window.addEventListener('mousemove', onMouseMove, { passive: false });
+    window.addEventListener('mouseup', onMouseUp);
+  };
+
   el.addEventListener('mousedown', onMouseDown);
-  el.addEventListener('mouseleave', onMouseLeave);
-  el.addEventListener('mouseup', onMouseUp);
-  el.addEventListener('mousemove', onMouseMove);
 
   return () => {
     el.removeEventListener('mousedown', onMouseDown);
-    el.removeEventListener('mouseleave', onMouseLeave);
-    el.removeEventListener('mouseup', onMouseUp);
-    el.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
     delete el.dataset.dragScrolling;
   };
 }

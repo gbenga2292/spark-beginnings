@@ -1,22 +1,22 @@
+
 /**
  * Global drag-scroll styles.
  * Applied automatically to every .overflow-x-auto and .overflow-y-auto container
- * that has been enhanced by the GlobalDragScroll initialiser.
  */
 
 /* Default grab cursor on scrollable containers */
 .drag-scroll {
   cursor: grab !important;
-  user-select: none;
 }
 
 /* Active grabbing cursor while mouse is held */
 .drag-scroll[data-drag-scrolling='true'] {
   cursor: grabbing !important;
+  user-select: none !important;
 }
 
-/* Disable pointer-events on child images/text while dragging to prevent text-selection flicker */
+/* Disable pointer-events on child elements while dragging to prevent text-selection flicker */
 .drag-scroll[data-drag-scrolling='true'] * {
-  pointer-events: none;
-  user-select: none;
+  user-select: none !important;
+  pointer-events: none !important;
 }
