@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import {
   Download, Upload, Receipt, Wallet, TrendingUp, Landmark, Activity, AlertCircle,
-  PieChart as PieChartIcon, BarChart3, Filter, X, CheckCircle2, FileSpreadsheet, FileText, DollarSign
+  PieChart as PieChartIcon, BarChart3, Filter, X, CheckCircle2, FileSpreadsheet, FileText, DollarSign, Backpack, CreditCard
 } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
