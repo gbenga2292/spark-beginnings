@@ -46,12 +46,9 @@ const MONTHS = [
 export function Dashboard() {
     const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
     const attendanceRecords = useAppStore((state) => state.attendanceRecords);
-    const salaryAdvances = useAppStore((state) => state.salaryAdvances);
-    const loans = useAppStore((state) => state.loans);
     const leaves = useAppStore((state) => state.leaves);
     const holidays = useAppStore((state) => state.publicHolidays);
     const monthValues = useAppStore((state) => state.monthValues);
-    const payrollVariables = useAppStore((state) => state.payrollVariables);
 
     const currentDate = new Date();
 
