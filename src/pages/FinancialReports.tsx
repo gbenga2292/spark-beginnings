@@ -589,6 +589,90 @@ export function FinancialReports() {
         </div>
       </div>
 
+      {/* PAYROLL EXPOSURE SECTION */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800 flex items-center gap-2">
+          <DollarSign className="w-5 h-5 text-indigo-600" /> Payroll & Statutory Overview
+        </h2>
+        <div className="flex items-center gap-2">
+          <select value={payrollMonth ?? ''} onChange={e => setPayrollMonth(e.target.value === '' ? null : Number(e.target.value))}
+            className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
+            <option value="">All Months</option>
+            {MONTHS_LIST.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
+          <select value={payrollYear} onChange={e => setPayrollYear(Number(e.target.value))}
+            className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
+            {[currentYear, currentYear - 1, currentYear - 2].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card className="bg-gradient-to-br from-slate-900 to-indigo-900 text-white border-0 shadow-xl overflow-hidden relative">
+          <div className="absolute right-0 top-0 opacity-10"><DollarSign className="w-32 h-32 -mt-4 -mr-4" /></div>
+          <CardHeader className="pb-2 relative z-10">
+            <CardTitle className="text-sm font-medium text-indigo-200 uppercase tracking-widest flex justify-between">
+              Payroll Exposure <Badge variant="outline" className="text-[10px] text-white/60 border-white/20">{payrollMonth ? MONTHS_LIST.find(m => m.value === payrollMonth)?.label : 'All Months'} {payrollYear}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="relative z-10">
+            <div className="text-4xl font-black mb-1">₦{fm(payrollStats.totalGrossExposure)}</div>
+            <p className="text-xs text-indigo-300 flex items-center mt-1 font-medium">Gross liability based on attendance.</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute right-0 top-0 opacity-[0.03] text-rose-500"><Backpack className="w-32 h-32 -mt-4 -mr-4" /></div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Est. Statutory Liab.</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(payrollStats.totalStatutory)}</div>
+            <p className="text-xs text-slate-500 flex items-center mt-1">Projected PAYE, Pension & NSITF.</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute right-0 top-0 opacity-[0.03] text-amber-500"><CreditCard className="w-32 h-32 -mt-4 -mr-4" /></div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Active Outstanding Adv.</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(payrollStats.outstandingLoans)}</div>
+            <p className="text-xs text-slate-500 flex items-center mt-1"><TrendingUp className="h-3 w-3 mr-1 text-slate-400" /> Capital returning to company.</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Annual Payroll & Overtime Trend */}
+      <Card className="shadow-sm border-slate-200">
+        <CardHeader className="bg-slate-50/50 border-b pb-4">
+          <CardTitle className="text-lg flex items-center justify-between gap-2 text-slate-800">
+            <span className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-indigo-600" /> Annual Payroll & Overtime Trend (Gross)</span>
+            <Badge variant="outline" className="font-normal text-xs bg-white text-slate-500">{payrollYear} Performance</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={payrollChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis yAxisId="left" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false}
+                  tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
+                <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false}
+                  tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
+                <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString()}`} />
+                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                <Line yAxisId="right" type="monotone" name="Overtime Burn" dataKey="Overtime" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Top Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="shadow-sm border-slate-200">
