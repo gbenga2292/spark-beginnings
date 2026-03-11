@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
-import { LineChart, Line, AreaChart, Area, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts';
+import { AreaChart, Area, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 function computeWorkDays(year: number, monthNum: number, holidayDates: string[]): number {
     const startDate = new Date(year, monthNum - 1, 1);
