@@ -238,9 +238,6 @@ export function Leaves() {
         .field-inline .field-line { flex: 1; }
         .checkbox-row { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
         .checkbox-row span { display: flex; align-items: center; gap: 3px; margin-right: 6px; }
-        .cb { width: 11px; height: 11px; border: 1px solid #333; display: inline-block; }
-        .cb.checked { background: #111; position: relative; }
-        .cb.checked::after { content: '\2713'; color: white; font-size: 8px; position: absolute; top: 0; left: 1px; }
         .reason-box { border: 1px solid #111; min-height: 40px; width: 100%; margin-top: 2px; display: block; }
         .sig-section { margin-top: 14px; }
         .sig-row { display: flex; gap: 16px; margin-bottom: 10px; align-items: flex-end; }

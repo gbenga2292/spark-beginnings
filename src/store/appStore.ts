@@ -359,10 +359,6 @@ export const useAppStore = create<AppState>()(
         },
       ],
       attendanceRecords: [],
-      leaves: [],
-      addLeave: (leave) => set((state) => ({ leaves: [...state.leaves, leave] })),
-      updateLeave: (id, update) => set((state) => ({ leaves: state.leaves.map(l => l.id === id ? { ...l, ...update } : l) })),
-      deleteLeave: (id) => set((state) => ({ leaves: state.leaves.filter(l => l.id !== id) })),
       pendingInvoices: [
         {
           id: 'PI-001',
