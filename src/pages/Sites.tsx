@@ -5,9 +5,8 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, Calculator } from 'lucide-react';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload } from 'lucide-react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import * as XLSX from 'xlsx';
@@ -170,7 +169,6 @@ function ClientSummary() {
 export function Sites() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('sites');
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddingSite, setIsAddingSite] = useState(searchParams.get('action') === 'add');
   const [isAddingClient, setIsAddingClient] = useState(searchParams.get('action') === 'addClient');
@@ -368,37 +366,18 @@ export function Sites() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <TabsList className="bg-slate-100 h-9">
-            <TabsTrigger
-              active={activeTab === 'sites'}
-              onClick={() => setActiveTab('sites')}
-              className="gap-2 text-sm px-4"
-            >
-              <Building2 className="h-4 w-4" /> Sites List
-            </TabsTrigger>
-            <TabsTrigger
-              active={activeTab === 'summary'}
-              onClick={() => setActiveTab('summary')}
-              className="gap-2 text-sm px-4"
-            >
-              <Calculator className="h-4 w-4" /> Client Summary
-            </TabsTrigger>
-          </TabsList>
-          {activeTab === 'sites' && (
-            <div className="flex gap-2">
-              <Button onClick={() => setIsAddingSite(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
-                <Plus className="h-4 w-4" /> Add New Site
-              </Button>
-              <Button onClick={() => setIsAddingClient(true)} variant="outline" className="gap-2">
-                <Plus className="h-4 w-4" /> Add Client
-              </Button>
-            </div>
-          )}
+          <div className="flex gap-2">
+            <Button onClick={() => setIsAddingSite(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+              <Plus className="h-4 w-4" /> Add New Site
+            </Button>
+            <Button onClick={() => setIsAddingClient(true)} variant="outline" className="gap-2">
+              <Plus className="h-4 w-4" /> Add Client
+            </Button>
+          </div>
         </div>
       </div>
 
-      <Tabs className="w-full flex-1 flex flex-col min-h-0">
-        <TabsContent active={activeTab === 'sites'} className="flex-1 flex flex-col min-h-0 gap-8">
+      <div className="flex flex-col flex-1 min-h-0 gap-8">
           <div className="grid gap-6 md:grid-cols-3">
             <Card className="border-indigo-100 bg-indigo-50/50">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -554,11 +533,7 @@ export function Sites() {
               </TableBody>
             </Table>
           </div>
-        </TabsContent>
-        <TabsContent active={activeTab === 'summary'} className="flex-1 min-h-0">
-          <ClientSummary />
-        </TabsContent>
-      </Tabs>
+        </div>
 
       {/* Floating Dialogs */}
       <Dialog open={isAddingSite} onClose={() => { setIsAddingSite(false); setAddError(''); navigate('/sites', { replace: true }); }} title="Add New Site">

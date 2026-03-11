@@ -52,41 +52,41 @@ const navigation: NavCategory[] = [
     name: 'HR',
     icon: Users,
     items: [
-      { name: 'Employees', href: '/employees', icon: Users, privKey: 'employees', privField: 'canView' },
-      { name: 'Onboarding', href: '/onboarding', icon: UserPlus, privKey: 'employees', privField: 'canView' },
-      { name: 'Daily Register', href: '/attendance', icon: CalendarClock, privKey: 'attendance', privField: 'canView' },
-      { name: 'Leaves', href: '/leaves', icon: CalendarClock, privKey: 'leaves', privField: 'canView' },
-      { name: 'Salary & Loan Advance', href: '/salary-loans', icon: DollarSign, privKey: 'payroll', privField: 'canView' },
-      { name: 'Employee Reports', href: '/reports', icon: FileText, privKey: 'reports', privField: 'canView' },
+      { name: 'Employees',           href: '/employees',   icon: Users,        privKey: 'employees',   privField: 'canView' },
+      { name: 'Onboarding',          href: '/onboarding',  icon: UserPlus,     privKey: 'onboarding',  privField: 'canView' },
+      { name: 'Daily Register',      href: '/attendance',  icon: CalendarClock,privKey: 'attendance',  privField: 'canView' },
+      { name: 'Leaves',              href: '/leaves',      icon: CalendarClock,privKey: 'leaves',      privField: 'canView' },
+      { name: 'Salary & Loan Advance', href: '/salary-loans', icon: DollarSign, privKey: 'salaryLoans', privField: 'canView' },
+      { name: 'Employee Reports',    href: '/reports',     icon: FileText,     privKey: 'reports',     privField: 'canView' },
     ],
   },
   {
     name: 'Admin',
     icon: Building2,
     items: [
-      { name: 'Add Client', href: '/sites?action=addClient', icon: MapPin, privKey: 'sites', privField: 'canView' },
-      { name: 'Add Site', href: '/sites?action=add', icon: MapPin, privKey: 'sites', privField: 'canView' },
-      { name: 'Client Summary', href: '/client-summary', icon: BarChart3, privKey: 'sites', privField: 'canView' },
-      { name: 'Reports', href: '/reports', icon: BarChart3, privKey: 'reports', privField: 'canView' },
+      { name: 'Add Client',          href: '/sites?action=addClient', icon: MapPin,   privKey: 'sites', privField: 'canAddClient' },
+      { name: 'Add Site',            href: '/sites?action=add',       icon: MapPin,   privKey: 'sites', privField: 'canAddSite' },
+      { name: 'Sites & Clients',     href: '/sites',                  icon: MapPin,   privKey: 'sites', privField: 'canView' },
+      { name: 'Client Summary',      href: '/client-summary',         icon: BarChart3,privKey: 'sites', privField: 'canViewClientSummary' },
     ],
   },
   {
     name: 'Account',
     icon: Landmark,
     items: [
-      { name: 'Invoices', href: '/invoices', icon: Receipt, privKey: 'financeDashboard', privField: 'canView' },
-      { name: 'Payments', href: '/payments', icon: DollarSign, privKey: 'financeDashboard', privField: 'canView' },
-      { name: 'Payrolls', href: '/payroll', icon: Wallet, privKey: 'payroll', privField: 'canView' },
-      { name: 'VAT & Tax Filing', href: '/vat', icon: Landmark, privKey: 'financeDashboard', privField: 'canView' },
-      { name: 'Reports', href: '/financial-reports', icon: BarChart3, privKey: 'reports', privField: 'canView' },
+      { name: 'Invoices',            href: '/invoices',          icon: Receipt,      privKey: 'billing',          privField: 'canView' },
+      { name: 'Payments',            href: '/payments',          icon: DollarSign,   privKey: 'payments',         privField: 'canView' },
+      { name: 'Payrolls',            href: '/payroll',           icon: Wallet,       privKey: 'payroll',          privField: 'canView' },
+      { name: 'VAT & Tax Filing',    href: '/vat',               icon: Landmark,     privKey: 'payments',         privField: 'canViewVat' },
+      { name: 'Reports',             href: '/financial-reports', icon: BarChart3,    privKey: 'financialReports', privField: 'canView' },
     ],
   },
   {
     name: 'Settings',
     icon: Settings,
     items: [
-      { name: 'Variables', href: '/variables', icon: Library, privKey: 'variables', privField: 'canView' },
-      { name: 'Users', href: '/users', icon: ShieldCheck, privKey: 'users', privField: 'canView' },
+      { name: 'Variables', href: '/variables', icon: Library,     privKey: 'variables', privField: 'canView' },
+      { name: 'Users',     href: '/users',     icon: ShieldCheck, privKey: 'users',     privField: 'canView' },
     ],
   },
 ];
@@ -100,7 +100,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const getVisibleItems = (items: NavItem[]) => {
     return items.filter((item) => {
       if (!currentUser) return true;
-      const pagePriv = currentUser.privileges[item.privKey] as Record<string, boolean>;
+      const pagePriv = (currentUser.privileges[item.privKey] as unknown) as Record<string, boolean>;
       return pagePriv?.[item.privField] === true;
     });
   };

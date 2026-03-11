@@ -13,7 +13,7 @@ export function Layout() {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-slate-50 text-slate-900 font-sans">
+    <div className="flex h-full w-full overflow-hidden bg-slate-50 text-slate-900 font-sans">
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       <div className="flex flex-1 flex-col overflow-hidden w-full">
         <Header onMenuClick={() => setIsSidebarOpen(true)} />

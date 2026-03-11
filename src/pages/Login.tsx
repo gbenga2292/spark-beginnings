@@ -55,7 +55,7 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-full flex">
       {/* Left Side - Branding Panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
         {/* Decorative Elements */}

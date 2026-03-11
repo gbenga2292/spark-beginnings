@@ -24,18 +24,22 @@ import { Variables } from './pages/Variables';
 import { Leaves } from './pages/Leaves';
 import { LeaveSummary } from './pages/LeaveSummary';
 import { Users } from './pages/Users';
+import { UserForm } from './pages/UserForm';
 import { SalaryLoans } from './pages/SalaryLoans';
 import { ClientSummary } from './pages/ClientSummary';
+import { TitleBar } from './components/layout/TitleBar';
 import { ToastContainer, ConfirmDialog } from './components/ui/toast';
 import { GlobalDragScroll } from './components/ui/GlobalDragScroll';
 
 export default function App() {
   return (
-    <>
-      <GlobalDragScroll />
-      <ToastContainer />
-      <ConfirmDialog />
-      <BrowserRouter>
+    <div className="flex flex-col h-[100dvh]">
+      <TitleBar />
+      <div className="flex-1 min-h-0 bg-slate-50 relative">
+        <GlobalDragScroll />
+        <ToastContainer />
+        <ConfirmDialog />
+        <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/setup" element={<SuperAdminSetup />} />
@@ -57,12 +61,15 @@ export default function App() {
             <Route path="leaves" element={<Leaves />} />
             <Route path="leave-summary" element={<LeaveSummary />} />
             <Route path="users" element={<Users />} />
+            <Route path="users/new" element={<UserForm />} />
+            <Route path="users/:id/edit" element={<UserForm />} />
             <Route path="salary-loans" element={<SalaryLoans />} />
             <Route path="client-summary" element={<ClientSummary />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>
-    </>
+      </div>
+    </div>
   );
 }

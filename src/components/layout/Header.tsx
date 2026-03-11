@@ -122,7 +122,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     return ALL_SEARCH_ITEMS.filter((item) => {
       // Check privilege
       if (currentUser) {
-        const pagePriv = currentUser.privileges[item.privKey] as Record<string, boolean>;
+        const pagePriv = (currentUser.privileges[item.privKey] as unknown) as Record<string, boolean>;
         if (!pagePriv?.[item.privField]) return false;
       }
       // Check query match

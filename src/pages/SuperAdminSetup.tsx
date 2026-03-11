@@ -16,7 +16,7 @@ export function SuperAdminSetup() {
   // If already created or disabled, redirect
   if (superAdminCreated || !superAdminSignupEnabled) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <div className="flex min-h-full items-center justify-center bg-slate-50 px-4">
         <Card className="w-full max-w-md">
           <CardContent className="py-12 text-center">
             <Shield className="h-12 w-12 text-slate-300 mx-auto mb-4" />
@@ -53,7 +53,7 @@ export function SuperAdminSetup() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-full items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center space-y-3 text-center">
           <div className="h-14 w-14 rounded-xl bg-indigo-600 flex items-center justify-center">
