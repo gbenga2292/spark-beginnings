@@ -73,13 +73,7 @@ export function Login() {
         <div className="relative z-10 flex flex-col justify-center px-16 xl:px-24">
           {/* Logo */}
           <div className="flex items-center gap-4 mb-12">
-            <div className="w-14 h-14 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <Building2 className="w-8 h-8 text-white" />
-            </div>
-            <div>
-<h2 className="text-2xl font-bold text-white">Dewatering Construction Etc Limited</h2>
-              <p className="text-slate-400 text-sm">Construction HR</p>
-            </div>
+            <img src="/logo/logo-2.png" alt="DCEL HR" className="h-16 xl:h-20 w-auto drop-shadow-lg" />
           </div>
 
           {/* Headline */}

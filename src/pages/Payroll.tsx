@@ -9,6 +9,7 @@ import { Download, FileText, Calculator, CreditCard, ChevronDown, X, Printer } f
 import { useAppStore, Employee } from '@/src/store/appStore';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import logoSrc from '../../logo/logo-2.png';
+import { usePriv } from '@/src/hooks/usePriv';
 
 interface PayrollRecord {
   id: string;
@@ -54,6 +55,10 @@ export function Payroll() {
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const publicHolidays = useAppStore((state) => state.publicHolidays);
   const [selectedMonth, setSelectedMonth] = useState('jan');
+
+  // ─── Permissions ───────────────────────────────────────────
+  const priv = usePriv('payroll');
+  const finRepPriv = usePriv('financialReports');
   
   // Drag to pan functionality
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -528,27 +533,37 @@ export function Payroll() {
             </div>
 
             <div className="flex gap-3">
-              <div className="flex gap-2 relative group">
-                <Button onClick={() => handleOpenPrintDialog('PAYSLIPS')} variant="outline" className="gap-2 shrink-0 border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700">
-                  <Printer className="h-4 w-4" />
-                  Print Payslips
-                </Button>
-                <div className="absolute top-full left-0 mt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 flex flex-col gap-1 w-full pt-1">
-                  <Button onClick={() => handleOpenPrintDialog('PAYE')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
-                    <FileText className="h-4 w-4 text-rose-500" /> PAYE Schedule
+              {priv.canGenerate && (
+                <div className="flex gap-2 relative group">
+                  <Button onClick={() => handleOpenPrintDialog('PAYSLIPS')} variant="outline" className="gap-2 shrink-0 border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700">
+                    <Printer className="h-4 w-4" />
+                    Print Payslips
                   </Button>
-                  <Button onClick={() => handleOpenPrintDialog('PENSION')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
-                    <FileText className="h-4 w-4 text-emerald-500" /> Pension Schedule
-                  </Button>
-                  <Button onClick={() => handleOpenPrintDialog('NSITF')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
-                    <FileText className="h-4 w-4 text-blue-500" /> NSITF Schedule
-                  </Button>
+                  <div className="absolute top-full left-0 mt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 flex flex-col gap-1 w-full pt-1">
+                    {priv.canViewPayeSchedule && (
+                      <Button onClick={() => handleOpenPrintDialog('PAYE')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
+                        <FileText className="h-4 w-4 text-rose-500" /> PAYE Schedule
+                      </Button>
+                    )}
+                    {priv.canViewPensionSchedule && (
+                      <Button onClick={() => handleOpenPrintDialog('PENSION')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
+                        <FileText className="h-4 w-4 text-emerald-500" /> Pension Schedule
+                      </Button>
+                    )}
+                    {priv.canViewNsitfSchedule && (
+                      <Button onClick={() => handleOpenPrintDialog('NSITF')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
+                        <FileText className="h-4 w-4 text-blue-500" /> NSITF Schedule
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <Button variant="outline" className="gap-2">
-                <Download className="h-4 w-4" />
-                Export CSV
-              </Button>
+              )}
+              {finRepPriv.canExport && (
+                <Button variant="outline" className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Export CSV
+                </Button>
+              )}
             </div>
           </div>
 

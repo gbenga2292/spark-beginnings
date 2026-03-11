@@ -1,0 +1,41 @@
+name: Build/Release Electron App
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger workflow on version tags, e.g. v1.0.0
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    permissions:
+      contents: write # Needed to create a GitHub Release
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Vite App
+        run: npm run build:dev
+
+      - name: Build & Release Electron App
+        uses: samuelmeuli/action-electron-builder@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release: true
+          mac_certs: false
+          windows_certs: false # set these up if you intend to sign the executable eventually
+          build_script_name: false
+        env:
+          # Required for some builder setups
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

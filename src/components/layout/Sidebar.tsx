@@ -85,7 +85,7 @@ const navigation: NavCategory[] = [
     name: 'Settings',
     icon: Settings,
     items: [
-      { name: 'Variables', href: '/variables', icon: Library,     privKey: 'variables', privField: 'canView' },
+      { name: 'Settings',  href: '/settings',  icon: Settings,    privKey: 'variables', privField: 'canView' },
       { name: 'Users',     href: '/users',     icon: ShieldCheck, privKey: 'users',     privField: 'canView' },
     ],
   },
@@ -101,6 +101,10 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
     return items.filter((item) => {
       if (!currentUser) return true;
       const pagePriv = (currentUser.privileges[item.privKey] as unknown) as Record<string, boolean>;
+      // If the field being checked is not canView itself, also require canView = true
+      // This prevents sub-actions (Add Site, Add Client, etc.) leaking into
+      // the sidebar for pages the user cannot even open.
+      if (item.privField !== 'canView' && pagePriv?.['canView'] !== true) return false;
       return pagePriv?.[item.privField] === true;
     });
   };

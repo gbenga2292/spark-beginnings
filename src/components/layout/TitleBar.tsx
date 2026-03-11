@@ -6,6 +6,8 @@ declare global {
       isElectron: boolean;
       platform: string;
       showMenu: (id: string, x: number, y: number) => void;
+      getVersion: () => Promise<string>;
+      checkForUpdates: () => void;
     };
   }
 }

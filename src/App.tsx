@@ -20,7 +20,6 @@ import { Reports } from './pages/Reports';
 import { FinancialReports } from './pages/FinancialReports';
 import { Settings } from './pages/Settings';
 import { Profile } from './pages/Profile';
-import { Variables } from './pages/Variables';
 import { Leaves } from './pages/Leaves';
 import { LeaveSummary } from './pages/LeaveSummary';
 import { Users } from './pages/Users';
@@ -57,7 +56,7 @@ export default function App() {
             <Route path="financial-reports" element={<FinancialReports />} />
             <Route path="settings" element={<Settings />} />
             <Route path="profile" element={<Profile />} />
-            <Route path="variables" element={<Variables />} />
+            <Route path="variables" element={<Navigate to="/settings" replace />} />
             <Route path="leaves" element={<Leaves />} />
             <Route path="leave-summary" element={<LeaveSummary />} />
             <Route path="users" element={<Users />} />

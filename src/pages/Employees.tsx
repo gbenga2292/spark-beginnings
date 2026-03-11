@@ -8,6 +8,8 @@ import { Search, Plus, MoreHorizontal, Download, Upload, ArrowLeft, Save, Pencil
 import { useAppStore, Employee, MonthlySalary } from '@/src/store/appStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { toast, showConfirm } from '@/src/components/ui/toast';
+import { usePriv } from '@/src/hooks/usePriv';
+import { useRedaction } from '@/src/hooks/useRedaction';
 
 export function Employees() {
   const [activeTab, setActiveTab] = useState<'Active' | 'Delisted'>('Active');
@@ -25,6 +27,10 @@ export function Employees() {
   const departments = useAppStore((state) => state.departments);
   const addPosition = useAppStore((state) => state.addPosition);
   const addDepartment = useAppStore((state) => state.addDepartment);
+
+  // ─── Permissions ───────────────────────────────────────────
+  const priv = usePriv('employees');
+  const canSeeSalary = useRedaction('employees');
 
   const filteredEmployees = employees.filter(emp => {
     const matchesSearch = emp.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -525,20 +531,27 @@ export function Employees() {
 
             <div className="mt-6">
               <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Salary Information</h4>
-              <div className="bg-slate-50 rounded-lg p-4">
-                <div className="grid grid-cols-4 gap-2 text-sm mb-3">
-                  {Object.entries(emp.monthlySalaries).map(([month, amount]) => (
-                    <div key={month} className="flex justify-between">
-                      <span className="text-slate-500 uppercase text-xs">{month}:</span>
-                      <span className="font-mono">₦{amount.toLocaleString()}</span>
-                    </div>
-                  ))}
+              {canSeeSalary ? (
+                <div className="bg-slate-50 rounded-lg p-4">
+                  <div className="grid grid-cols-4 gap-2 text-sm mb-3">
+                    {Object.entries(emp.monthlySalaries).map(([month, amount]) => (
+                      <div key={month} className="flex justify-between">
+                        <span className="text-slate-500 uppercase text-xs">{month}:</span>
+                        <span className="font-mono">₦{amount.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t border-slate-200 pt-3 flex justify-between items-center">
+                    <span className="font-semibold">Annual Total:</span>
+                    <span className="text-xl font-bold text-indigo-600">₦{totalSalary.toLocaleString()}</span>
+                  </div>
                 </div>
-                <div className="border-t border-slate-200 pt-3 flex justify-between items-center">
-                  <span className="font-semibold">Annual Total:</span>
-                  <span className="text-xl font-bold text-indigo-600">₦{totalSalary.toLocaleString()}</span>
+              ) : (
+                <div className="bg-slate-50 rounded-lg p-4 flex items-center justify-center gap-2 text-slate-400 text-sm">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                  Salary data is restricted for your role.
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -570,13 +583,17 @@ export function Employees() {
           <Button variant="outline" className="gap-2 bg-white text-slate-700 hover:bg-slate-50 shadow-sm border-slate-200" onClick={handleExportCSV}>
             <Download className="h-4 w-4 text-slate-500" /> Export CSV
           </Button>
-          <label className="flex items-center gap-2 bg-white text-slate-700 hover:bg-slate-50 shadow-sm border border-slate-200 rounded-md h-9 px-4 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap">
-            <Upload className="h-4 w-4 text-slate-500" /> Import Data
-            <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
-          </label>
-          <Button className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md mx-2 transition-all" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'INTERNAL', status: 'Active', payeTax: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
-            <Plus className="h-4 w-4" /> Add Employee
-          </Button>
+          {priv.canAdd && (
+            <label className="flex items-center gap-2 bg-white text-slate-700 hover:bg-slate-50 shadow-sm border border-slate-200 rounded-md h-9 px-4 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap">
+              <Upload className="h-4 w-4 text-slate-500" /> Import Data
+              <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
+            </label>
+          )}
+          {priv.canAdd && (
+            <Button className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md mx-2 transition-all" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'INTERNAL', status: 'Active', payeTax: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
+              <Plus className="h-4 w-4" /> Add Employee
+            </Button>
+          )}
         </div>
       </div>
 
@@ -667,15 +684,19 @@ export function Employees() {
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" title="View details" onClick={() => handleView(employee)}>
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" title="Edit employee" onClick={() => handleEdit(employee)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50" title="Delete employee" onClick={async () => {
-                      const ok = await showConfirm(`Are you sure you want to delete ${employee.surname} ${employee.firstname}?`, { variant: 'danger', confirmLabel: 'Delete' });
-                      if (ok) { deleteEmployee(employee.id); toast.success('Employee record deleted'); }
-                    }}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {priv.canEdit && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" title="Edit employee" onClick={() => handleEdit(employee)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {priv.canDelete && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50" title="Delete employee" onClick={async () => {
+                        const ok = await showConfirm(`Are you sure you want to delete ${employee.surname} ${employee.firstname}?`, { variant: 'danger', confirmLabel: 'Delete' });
+                        if (ok) { deleteEmployee(employee.id); toast.success('Employee record deleted'); }
+                      }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

@@ -7,6 +7,7 @@ import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
+import { usePriv } from '@/src/hooks/usePriv';
 
 export function Payments() {
     const sites = useAppStore((state) => state.sites);
@@ -16,6 +17,8 @@ export function Payments() {
     const deletePayment = useAppStore((state) => state.deletePayment);
     const vatRate = useAppStore((state) => state.payrollVariables.vatRate);
 
+    // ─── Permissions ───────────────────────────────────────────
+    const priv = usePriv('payments');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -149,12 +152,14 @@ export function Payments() {
             <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
 
             <div className="flex justify-end">
-                <Button
-                    className="gap-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-md transition-all h-10 px-5"
-                    onClick={() => { handleClear(); setIsModalOpen(true); }}
-                >
-                    <Plus className="w-5 h-5" /> Add Payment
-                </Button>
+                {priv.canAdd && (
+                  <Button
+                      className="gap-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-md transition-all h-10 px-5"
+                      onClick={() => { handleClear(); setIsModalOpen(true); }}
+                  >
+                      <Plus className="w-5 h-5" /> Add Payment
+                  </Button>
+                )}
             </div>
 
             <div className="flex flex-1 gap-6 items-start flex-col">
@@ -212,13 +217,17 @@ export function Payments() {
                                             {(p.amountForVat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                                            <div className="flex items-center justify-center gap-1">
-                                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(p); }} className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit record">
-                                                    <Edit className="w-4 h-4" />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete record">
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
+                                        <div className="flex items-center justify-center gap-1">
+                                                {priv.canEdit && (
+                                                  <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(p); }} className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit record">
+                                                      <Edit className="w-4 h-4" />
+                                                  </Button>
+                                                )}
+                                                {priv.canDelete && (
+                                                  <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete record">
+                                                      <Trash2 className="w-4 h-4" />
+                                                  </Button>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>
