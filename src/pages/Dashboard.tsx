@@ -95,8 +95,8 @@ export function Dashboard() {
         // Unpaid invoices count
         const unpaidInvoices = invoices.filter(inv => inv.status !== 'Paid').length;
 
-        // Pending leave requests
-        const pendingLeaves = leaves.filter(l => l.status === 'Pending').length;
+        // Pending leave requests (leaves without a return date are considered pending)
+        const pendingLeaves = leaves.filter(l => !l.dateReturned || l.dateReturned === '').length;
 
         // Pending salary advance requests
         const pendingAdvances = salaryAdvances.filter(a => a.status === 'Pending').length;
