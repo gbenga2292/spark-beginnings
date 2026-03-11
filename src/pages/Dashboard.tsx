@@ -182,12 +182,11 @@ export function Dashboard() {
     // ── LEAVE TYPE BREAKDOWN ──
     const leaveBreakdown = useMemo(() => {
         const typeMap: Record<string, number> = {};
-        const monthsToProcess = filterMonth ? [filterMonth] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
         leaves.forEach(l => {
             if (l.startDate) {
                 const d = new Date(l.startDate);
                 if (d.getFullYear() === filterYear && (filterMonth === null || d.getMonth() + 1 === filterMonth)) {
-                    const type = l.leaveType || 'Other';
+                    const type = l.reason?.split(' ')[0] || 'Leave';
                     typeMap[type] = (typeMap[type] || 0) + 1;
                 }
             }
