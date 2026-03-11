@@ -190,6 +190,16 @@ function initIPC() {
       });
     }
   });
+
+  ipcMain.handle('get-version', () => app.getVersion());
+  
+  ipcMain.on('check-for-updates', () => {
+    if (isDev) {
+      dialog.showMessageBox(mainWindow, { type: 'info', message: 'Updates are disabled in development mode.' });
+    } else {
+      autoUpdater.checkForUpdates();
+    }
+  });
 }
 
 /* ─── Main Window ──────────────────────────────────────────────── */

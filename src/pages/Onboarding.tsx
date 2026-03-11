@@ -7,6 +7,7 @@ import { CheckCircle2, Circle, Clock, FileText, Mail, UserPlus, X, Save, UserMin
 import { useAppStore, Employee, MonthlySalary } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
 import logoSrc from '../../logo/logo-2.png';
+import { usePriv } from '@/src/hooks/usePriv';
 
 interface OnboardingTask {
   id: string;
@@ -23,6 +24,9 @@ export function Onboarding() {
   const departmentTasksList = useAppStore((state) => state.departmentTasksList);
   const addEmployee = useAppStore((state) => state.addEmployee);
   const updateEmployee = useAppStore((state) => state.updateEmployee);
+
+  // ─── Permissions ───────────────────────────────────────────
+  const priv = usePriv('onboarding');
 
   const [showNewHireForm, setShowNewHireForm] = useState(false);
   const [showOffboardForm, setShowOffboardForm] = useState(false);
@@ -367,17 +371,21 @@ export function Onboarding() {
           <p className="text-sm font-medium text-slate-500 mt-1">Manage onboarding, offboarding, and seamless employee transitions.</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Button variant="outline" className="gap-2 shadow-sm whitespace-nowrap" onClick={() => { setShowContractForm(true); setShowNewHireForm(false); setShowOffboardForm(false); }}>
-            <FileText className="h-4 w-4 text-indigo-500" />
-            Generate Contract
-          </Button>
-          <Button
-            className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all sm:whitespace-nowrap"
-            onClick={() => { setShowNewHireForm(true); setShowOffboardForm(false); setShowContractForm(false); }}
-          >
-            <UserPlus className="h-4 w-4" />
-            Start New Hire
-          </Button>
+          {priv.canAdd && (
+            <Button variant="outline" className="gap-2 shadow-sm whitespace-nowrap" onClick={() => { setShowContractForm(true); setShowNewHireForm(false); setShowOffboardForm(false); }}>
+              <FileText className="h-4 w-4 text-indigo-500" />
+              Generate Contract
+            </Button>
+          )}
+          {priv.canAdd && (
+            <Button
+              className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all sm:whitespace-nowrap"
+              onClick={() => { setShowNewHireForm(true); setShowOffboardForm(false); setShowContractForm(false); }}
+            >
+              <UserPlus className="h-4 w-4" />
+              Start New Hire
+            </Button>
+          )}
         </div>
       </div>
 
@@ -786,7 +794,7 @@ export function Onboarding() {
                     </p>
                   )}
                 </div>
-                {viewingHistoryEmployee && (
+                {viewingHistoryEmployee && priv.canDelete && (
                   <Button className="shrink-0 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold shadow-sm w-fit mr-4" onClick={() => {
                     setOffboardEmployeeId(viewingHistoryEmployee.id);
                     setShowOffboardForm(true);

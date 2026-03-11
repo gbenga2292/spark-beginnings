@@ -4,16 +4,15 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import {
   ArrowLeft, Save, Eye, EyeOff, Shield, ChevronDown, ChevronRight,
-  AlertTriangle, CheckCircle2, X, BookmarkPlus, Lock,
-  LayoutDashboard, Users as UsersIcon, UserPlus, CalendarClock, DollarSign,
-  FileText, MapPin, Building2, Landmark, Receipt, Wallet, BarChart3, Settings,
+  CheckCircle2, X, BookmarkPlus,
+  LayoutDashboard, Users as UsersIcon, Building2, Landmark, Settings,
 } from 'lucide-react';
 import { useUserStore, AppUser, UserPrivileges, FULL_ACCESS, NO_ACCESS, PrivilegePreset } from '@/src/store/userStore';
 
 /* ═══════════════════════════════════════════════════════════════════
    Privilege tree definition (mirrors sidebar structure)
    ═══════════════════════════════════════════════════════════════════ */
-interface PF { key: string; label: string; isRedact?: boolean; danger?: boolean; }
+interface PF { key: string; label: string; danger?: boolean; special?: boolean; }
 interface PP { key: string; label: string; parentKey: keyof UserPrivileges; fields: PF[]; masterField?: string; }
 interface PG { name: string; icon: any; color: string; pages: PP[]; }
 
@@ -24,14 +23,14 @@ const PRIV_GROUPS: PG[] = [
       { key: 'dashboard', label: 'Main Dashboard', parentKey: 'dashboard', masterField: 'canView',
         fields: [{ key: 'canView', label: 'Can View' }] },
       { key: 'financeDashboard', label: 'Finance Dashboard', parentKey: 'financeDashboard', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'Can View' }, { key: 'redactAmounts', label: 'Redact Amounts', isRedact: true }] },
+        fields: [{ key: 'canView', label: 'Can View' }, { key: 'canViewAmounts', label: 'View Amounts', special: true }] },
     ],
   },
   {
     name: 'HR', icon: UsersIcon, color: 'teal',
     pages: [
       { key: 'employees', label: 'Employees', parentKey: 'employees', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'redactSalary', label: 'Redact Salary', isRedact: true }] },
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewSalary', label: 'View Salary', special: true }] },
       { key: 'onboarding', label: 'Onboarding', parentKey: 'onboarding', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
       { key: 'attendance', label: 'Daily Register', parentKey: 'attendance', masterField: 'canView',
@@ -39,7 +38,7 @@ const PRIV_GROUPS: PG[] = [
       { key: 'leaves', label: 'Leaves', parentKey: 'leaves', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewSummary', label: 'View Summary Page' }] },
       { key: 'salaryLoans', label: 'Salary Advances & Loans', parentKey: 'salaryLoans', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Approve / Delete', danger: true }, { key: 'redactAmounts', label: 'Redact Amounts', isRedact: true }] },
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Approve / Delete', danger: true }, { key: 'canViewAmounts', label: 'View Amounts', special: true }] },
       { key: 'reports', label: 'Employee Reports', parentKey: 'reports', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canExport', label: 'Export' }] },
     ],
@@ -58,13 +57,13 @@ const PRIV_GROUPS: PG[] = [
     name: 'Account', icon: Landmark, color: 'amber',
     pages: [
       { key: 'billing', label: 'Invoices & Billing', parentKey: 'billing', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canCreate', label: 'Create' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'redactAmounts', label: 'Redact Amounts', isRedact: true }] },
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canCreate', label: 'Create' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewAmounts', label: 'View Amounts', special: true }] },
       { key: 'payments', label: 'Payments', parentKey: 'payments', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'redactAmounts', label: 'Redact Amounts', isRedact: true }, { key: 'canViewVat', label: 'View VAT Tab' }, { key: 'canManageVat', label: 'Manage VAT' }] },
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canViewVat', label: 'View VAT Tab' }, { key: 'canManageVat', label: 'Manage VAT' }] },
       { key: 'payroll', label: 'Payroll', parentKey: 'payroll', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canGenerate', label: 'Generate / Edit' }, { key: 'redactAmounts', label: 'Redact Amounts', isRedact: true }, { key: 'canViewPayeSchedule', label: 'PAYE Schedule' }, { key: 'canViewPensionSchedule', label: 'Pension Schedule' }, { key: 'canViewNsitfSchedule', label: 'NSITF Schedule' }] },
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canGenerate', label: 'Generate / Edit' }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canViewPayeSchedule', label: 'PAYE Schedule' }, { key: 'canViewPensionSchedule', label: 'Pension Schedule' }, { key: 'canViewNsitfSchedule', label: 'NSITF Schedule' }] },
       { key: 'financialReports', label: 'Financial Reports', parentKey: 'financialReports', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canExport', label: 'Export' }, { key: 'redactAmounts', label: 'Redact Amounts', isRedact: true }, { key: 'canViewPayrollSummary', label: 'Payroll Summary Tab' }, { key: 'canViewLoansAndAdvances', label: 'Loans & Advances Tab' }] },
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canExport', label: 'Export' }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canViewPayrollSummary', label: 'Payroll Summary Tab' }, { key: 'canViewLoansAndAdvances', label: 'Loans & Advances Tab' }] },
     ],
   },
   {
@@ -158,21 +157,23 @@ export function UserForm() {
 
   // group stats
   const groupStats = useMemo(() => {
-    const m: Record<string, { g: number; t: number; r: number }> = {};
+    const m: Record<string, { g: number; t: number }> = {};
     PRIV_GROUPS.forEach((gr) => {
-      let g = 0, t = 0, r = 0;
+      let g = 0, t = 0;
       gr.pages.forEach((pg) => {
         const o = getPrivObj(privileges, pg.parentKey);
-        pg.fields.forEach((f) => { if (f.isRedact) { if (o[f.key]) r++; } else { t++; if (o[f.key]) g++; } });
+        pg.fields.forEach((f) => {
+          t++;
+          if (o[f.key]) g++;
+        });
       });
-      m[gr.name] = { g, t, r };
+      m[gr.name] = { g, t };
     });
     return m;
   }, [privileges]);
 
   const totalG = PRIV_GROUPS.reduce((a, g) => a + (groupStats[g.name]?.g ?? 0), 0);
   const totalT = PRIV_GROUPS.reduce((a, g) => a + (groupStats[g.name]?.t ?? 0), 0);
-  const totalR = PRIV_GROUPS.reduce((a, g) => a + (groupStats[g.name]?.r ?? 0), 0);
 
   const handleSave = () => {
     if (!name.trim() || !email.trim()) return;
@@ -279,14 +280,13 @@ export function UserForm() {
           </h2>
           <span className="text-xs text-slate-500">
             <strong className="text-slate-700">{totalG}/{totalT}</strong> granted
-            {totalR > 0 && <>, <strong className="text-orange-600">{totalR}</strong> redacted</>}
           </span>
         </div>
 
         {PRIV_GROUPS.map((group) => {
           const C = COLORS[group.color];
           const open = expandedGroups.has(group.name);
-          const { g, t, r } = groupStats[group.name] ?? { g: 0, t: 0, r: 0 };
+          const { g, t } = groupStats[group.name] ?? { g: 0, t: 0 };
           const isOn = group.pages.some((p) => {
             const o = getPrivObj(privileges, p.parentKey);
             return p.masterField ? (o[p.masterField] ?? false) : false;
@@ -301,11 +301,6 @@ export function UserForm() {
                   <group.icon className={`h-4 w-4 ${isOn ? C.text : 'text-slate-400'}`} />
                   <span className={`text-sm font-bold ${isOn ? C.text : 'text-slate-400'}`}>{group.name}</span>
                   {!isOn && <span className="text-[10px] text-slate-400 italic">disabled</span>}
-                  {isOn && r > 0 && (
-                    <span className="text-[10px] font-bold bg-orange-100 text-orange-700 border border-orange-200 rounded-full px-2 py-0.5 flex items-center gap-0.5">
-                      <AlertTriangle className="h-2.5 w-2.5" /> {r}
-                    </span>
-                  )}
                 </button>
                 {isOn && (
                   <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${g === t ? 'bg-emerald-100 text-emerald-700' : g > 0 ? C.badge : 'bg-slate-100 text-slate-400'}`}>
@@ -324,9 +319,8 @@ export function UserForm() {
                     const obj = getPrivObj(privileges, page.parentKey);
                     const master = page.masterField ? (obj[page.masterField] ?? false) : true;
                     const pOpen = expandedPages.has(page.key);
-                    const pChecked = page.fields.filter((f) => !f.isRedact && obj[f.key]).length;
-                    const pTotal   = page.fields.filter((f) => !f.isRedact).length;
-                    const hasRedact = page.fields.some((f) => f.isRedact && obj[f.key]);
+                    const pChecked = page.fields.filter((f) => obj[f.key]).length;
+                    const pTotal   = page.fields.length;
 
                     return (
                       <div key={page.key}>
@@ -337,19 +331,24 @@ export function UserForm() {
                           </button>
                           {page.masterField && (
                             <Sw size="sm" on={master} set={(v) => {
-                              setField(page.parentKey, page.masterField!, v);
-                              if (v) setExpandedPages((p) => new Set([...p, page.key]));
-                              else setExpandedPages((p) => { const s = new Set(p); s.delete(page.key); return s; });
+                              if (v) {
+                                setField(page.parentKey, page.masterField!, true);
+                                setExpandedPages((p) => new Set([...p, page.key]));
+                              } else {
+                                setPrivileges((prev) => {
+                                  const next = { ...prev };
+                                  const w: Record<string, boolean> = {};
+                                  Object.keys((prev[page.parentKey] as any)).forEach((k) => w[k] = false);
+                                  (next as any)[page.parentKey] = w;
+                                  return next;
+                                });
+                                setExpandedPages((p) => { const s = new Set(p); s.delete(page.key); return s; });
+                              }
                             }} />
                           )}
                           <button onClick={() => togglePage(page.key)} className="flex-1 text-left">
                             <span className={`text-sm font-medium ${master ? 'text-slate-800' : 'text-slate-400'}`}>{page.label}</span>
                           </button>
-                          {hasRedact && (
-                            <span className="text-[10px] bg-orange-50 text-orange-500 border border-orange-200 rounded-full px-1.5 py-0.5 font-semibold flex items-center gap-0.5">
-                              <Lock className="h-2.5 w-2.5" />
-                            </span>
-                          )}
                           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${pChecked === pTotal && pTotal > 0 ? 'bg-emerald-100 text-emerald-700' : pChecked > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-400'}`}>
                             {pChecked}/{pTotal}
                           </span>
@@ -358,22 +357,15 @@ export function UserForm() {
                         {/* Field checkboxes */}
                         {pOpen && (
                           <div className="px-14 pb-3 pt-1 flex flex-wrap gap-x-5 gap-y-2 bg-slate-50/50 border-t border-slate-100">
-                            {page.fields.map((f) => {
+                            {page.fields.filter((f) => f.key !== page.masterField).map((f) => {
                               const checked = obj[f.key] ?? false;
-                              const dis = !master && f.key !== page.masterField;
-                              return f.isRedact ? (
-                                <label key={f.key} className={`flex items-center gap-2 text-xs select-none ${dis ? 'opacity-40' : ''}`}>
-                                  <Sw size="sm" on={checked} set={(v) => !dis && setField(page.parentKey, f.key, v)} disabled={dis} />
-                                  <span className="font-semibold text-orange-600 flex items-center gap-1">
-                                    <AlertTriangle className="h-3 w-3" /> {f.label}
-                                  </span>
-                                </label>
-                              ) : (
+                              const dis = !master;
+                              return (
                                 <label key={f.key} className={`flex items-center gap-2 text-xs cursor-pointer select-none ${dis ? 'opacity-40 cursor-not-allowed' : ''}`}>
                                   <input type="checkbox" checked={checked} disabled={dis}
                                     onChange={(e) => setField(page.parentKey, f.key, e.target.checked)}
-                                    className={`h-3.5 w-3.5 rounded border-slate-300 focus:ring-indigo-500 ${f.danger ? 'accent-amber-600' : 'accent-indigo-600'}`} />
-                                  <span className={`font-medium ${f.danger ? 'text-amber-700' : 'text-slate-700'}`}>{f.label}</span>
+                                    className={`h-3.5 w-3.5 rounded border-slate-300 focus:ring-indigo-500 ${f.danger ? 'accent-amber-600' : f.special ? 'accent-emerald-600' : 'accent-indigo-600'}`} />
+                                  <span className={`font-medium ${f.danger ? 'text-amber-700' : f.special ? 'text-emerald-700' : 'text-slate-700'}`}>{f.label}</span>
                                 </label>
                               );
                             })}
@@ -393,7 +385,6 @@ export function UserForm() {
       <div className="sticky bottom-0 mt-6 -mx-2 px-2 py-4 bg-gradient-to-t from-slate-100 via-slate-100/95 to-transparent flex items-center justify-between rounded-b-xl">
         <span className="text-xs text-slate-500">
           <strong className="text-slate-700">{totalG}/{totalT}</strong> permissions
-          {totalR > 0 && <>, <strong className="text-orange-600">{totalR}</strong> redacted</>}
         </span>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => navigate('/users')} className="h-9 text-sm">Cancel</Button>

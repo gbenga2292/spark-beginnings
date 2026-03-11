@@ -4,6 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "main": "electron/main.cjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gbenga2292/dcel-hr-app.git"
+  },
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "tsc --noEmit && vite build",
@@ -71,6 +75,14 @@
       "oneClick": false,
       "perMachine": true,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "your-username",
+        "repo": "dcel-hr-app",
+        "releaseType": "release"
+      }
+    ]
   }
 }

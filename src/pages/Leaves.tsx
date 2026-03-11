@@ -6,10 +6,10 @@ import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
 import { CalendarDays, Filter, ChevronDown, CheckCircle2, UserCheck, Mail, Phone, Download, Printer, Eye, X, Upload, Plus, Edit, Trash2, Ban, Search, ListFilter, CalendarClock, FileText } from 'lucide-react';
 import { useAppStore, LeaveRecord } from '@/src/store/appStore';
-import { useUserStore } from '@/src/store/userStore';
+import { useNavigate } from 'react-router-dom';
+import { usePriv } from '@/src/hooks/usePriv';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { addDays, parseISO, format, isWithinInterval } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
 
 /* ─────────────────────────────────── helpers ─── */
 function calcExpectedEnd(startDate: string, duration: number): string {
@@ -35,9 +35,8 @@ export function Leaves() {
     leaveTypes, updateEmployee,
   } = useAppStore();
 
-  const { getCurrentUser } = useUserStore();
-  const currentUser = getCurrentUser();
-  const canDelete = currentUser?.privileges?.leaves?.canDelete ?? true;
+  // ─── Permissions ───────────────────────────────────────────
+  const priv = usePriv('leaves');
 
   const activeEmployees = useMemo(
     () => employees.filter(e => e.status === 'Active' || e.status === 'On Leave'),
@@ -542,15 +541,17 @@ export function Leaves() {
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50" title="Print Preview" onClick={() => openPrintPreview(leave)}>
                           <Printer className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit" onClick={() => handleEdit(leave)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {leave.status !== 'Cancelled' && (
+                        {priv.canEdit && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit" onClick={() => handleEdit(leave)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {priv.canEdit && leave.status !== 'Cancelled' && (
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50" title="Cancel Leave" onClick={() => handleCancel(leave)}>
                             <Ban className="h-4 w-4" />
                           </Button>
                         )}
-                        {canDelete && (
+                        {priv.canDelete && (
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete (Admin only)" onClick={() => handleDelete(leave)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>

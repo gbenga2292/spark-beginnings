@@ -9,6 +9,7 @@ import { Download, FileText, Calculator, CreditCard, ChevronDown, X, Printer } f
 import { useAppStore, Employee } from '@/src/store/appStore';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import logoSrc from '../../logo/logo-2.png';
+import { usePriv } from '@/src/hooks/usePriv';
 
 interface PayrollRecord {
   id: string;
@@ -41,9 +42,13 @@ interface PayrollRecord {
 export function Payroll() {
   const [activeTab, setActiveTab] = useState('processing');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [printType, setPrintType] = useState<'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF' | null>(null);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [printType, setPrintType] = useState<'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF'>('PAYSLIPS');
   const [printSelectedMonths, setPrintSelectedMonths] = useState<string[]>([]);
   const [printSelectedEmployees, setPrintSelectedEmployees] = useState<string[]>([]);
+  const [printSelectedDepts, setPrintSelectedDepts] = useState<string[]>([]);
+  const [filterDept, setFilterDept] = useState<string>('');
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
 
   const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
   const salaryAdvances = useAppStore((state) => state.salaryAdvances);
@@ -54,6 +59,10 @@ export function Payroll() {
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const publicHolidays = useAppStore((state) => state.publicHolidays);
   const [selectedMonth, setSelectedMonth] = useState('jan');
+
+  // ─── Permissions ───────────────────────────────────────────
+  const priv = usePriv('payroll');
+  const finRepPriv = usePriv('financialReports');
   
   // Drag to pan functionality
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -506,13 +515,29 @@ export function Payroll() {
       </div>
 
       <Tabs>
-        <TabsList className="grid w-full max-w-xs grid-cols-1">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4">
           <TabsTrigger active={activeTab === 'processing'} onClick={() => setActiveTab('processing')}>
             Payroll Processing
           </TabsTrigger>
+          {priv.canViewPayeSchedule && (
+            <TabsTrigger active={activeTab === 'paye'} onClick={() => setActiveTab('paye')}>
+              PAYE
+            </TabsTrigger>
+          )}
+          {priv.canViewPensionSchedule && (
+            <TabsTrigger active={activeTab === 'pension'} onClick={() => setActiveTab('pension')}>
+              Pension
+            </TabsTrigger>
+          )}
+          {priv.canViewNsitfSchedule && (
+            <TabsTrigger active={activeTab === 'nsitf'} onClick={() => setActiveTab('nsitf')}>
+              NSITF
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent active={activeTab === 'processing'} className="space-y-6 mt-6">
+          {/* ── Month selector + Print/Export button ── */}
           <div className="flex items-center justify-between">
             <div className="flex gap-4 items-center">
               <label className="text-sm font-medium text-slate-700">Select Month:</label>
@@ -528,27 +553,20 @@ export function Payroll() {
             </div>
 
             <div className="flex gap-3">
-              <div className="flex gap-2 relative group">
-                <Button onClick={() => handleOpenPrintDialog('PAYSLIPS')} variant="outline" className="gap-2 shrink-0 border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700">
-                  <Printer className="h-4 w-4" />
-                  Print Payslips
+              {(priv.canGenerate || priv.canViewPayeSchedule || priv.canViewPensionSchedule || priv.canViewNsitfSchedule) && (
+                <Button
+                  onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintSelectedDepts([]); setPrintDialogOpen(true); }}
+                  variant="outline"
+                  className="gap-2 border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+                >
+                  <Printer className="h-4 w-4" /> Print / Export
                 </Button>
-                <div className="absolute top-full left-0 mt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 flex flex-col gap-1 w-full pt-1">
-                  <Button onClick={() => handleOpenPrintDialog('PAYE')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
-                    <FileText className="h-4 w-4 text-rose-500" /> PAYE Schedule
-                  </Button>
-                  <Button onClick={() => handleOpenPrintDialog('PENSION')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
-                    <FileText className="h-4 w-4 text-emerald-500" /> Pension Schedule
-                  </Button>
-                  <Button onClick={() => handleOpenPrintDialog('NSITF')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
-                    <FileText className="h-4 w-4 text-blue-500" /> NSITF Schedule
-                  </Button>
-                </div>
-              </div>
-              <Button variant="outline" className="gap-2">
-                <Download className="h-4 w-4" />
-                Export CSV
-              </Button>
+              )}
+              {finRepPriv.canExport && (
+                <Button variant="outline" className="gap-2">
+                  <Download className="h-4 w-4" /> Export CSV
+                </Button>
+              )}
             </div>
           </div>
 
@@ -607,9 +625,27 @@ export function Payroll() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
               <CardTitle>Master Payroll Register: {selectedMonthLabel}</CardTitle>
-              <Button variant="outline" size="sm" className="gap-2">
-                Filter <ChevronDown className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                {showFilterPanel && (
+                  <select
+                    className="h-8 rounded-md border border-slate-200 bg-white px-2 py-1 text-sm"
+                    value={filterDept}
+                    onChange={(e) => setFilterDept(e.target.value)}
+                  >
+                    <option value="">All Departments</option>
+                    {[...new Set(employees.map(e => e.department).filter(Boolean))].sort().map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                )}
+                <Button
+                  variant="outline" size="sm"
+                  className={`gap-2 ${showFilterPanel ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : ''}`}
+                  onClick={() => { setShowFilterPanel(p => !p); if (showFilterPanel) setFilterDept(''); }}
+                >
+                  Filter <ChevronDown className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
 <CardContent 
               ref={tableContainerRef}
@@ -644,7 +680,7 @@ export function Payroll() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {payrollData.map((record) => (
+                  {payrollData.filter(r => !filterDept || r.department === filterDept).map((record) => (
                     <TableRow key={record.id} className="hover:bg-slate-50/50 transition-colors">
                       <TableCell>{record.sn}</TableCell>
                       <TableCell className="font-medium">{record.surname}</TableCell>
@@ -672,9 +708,204 @@ export function Payroll() {
           </Card>
         </TabsContent>
 
+        {/* ─────────── PAYE TAB ─────────────────────────────────────── */}
+        {priv.canViewPayeSchedule && (
+          <TabsContent active={activeTab === 'paye'} className="space-y-6 mt-6">
+            <div className="flex gap-4 items-center">
+              <label className="text-sm font-medium text-slate-700">Month:</label>
+              <select
+                className="flex h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}
+              >
+                {months.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+              </select>
+            </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
+                <CardTitle>PAYE Tax Schedule: {selectedMonthLabel}</CardTitle>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-500 font-medium">Total PAYE: <span className="text-red-600 font-bold">₦{totals.totalPAYE.toLocaleString()}</span></span>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintDialogOpen(true); setPrintType('PAYE'); }}>
+                    <Printer className="h-4 w-4" /> Print Schedule
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4 overflow-x-auto cursor-grab">
+                <Table className="whitespace-nowrap w-full text-xs">
+                  <TableHeader>
+                    <TableRow className="bg-red-50">
+                      <TableHead className="font-bold">S/N</TableHead>
+                      <TableHead className="font-bold">Surname</TableHead>
+                      <TableHead className="font-bold">Firstname</TableHead>
+                      <TableHead className="font-bold">Department</TableHead>
+                      <TableHead className="font-bold text-right">Basic (₦)</TableHead>
+                      <TableHead className="font-bold text-right">Housing (₦)</TableHead>
+                      <TableHead className="font-bold text-right">Transport (₦)</TableHead>
+                      <TableHead className="font-bold text-right">Other (₦)</TableHead>
+                      <TableHead className="font-bold text-right bg-slate-100">Gross Pay (₦)</TableHead>
+                      <TableHead className="font-bold text-right text-red-600">PAYE (₦)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payrollData.filter(r => r.paye > 0).map((r, i) => (
+                      <TableRow key={r.id} className="hover:bg-red-50/30">
+                        <TableCell>{i + 1}</TableCell>
+                        <TableCell className="font-medium">{r.surname}</TableCell>
+                        <TableCell>{r.firstname}</TableCell>
+                        <TableCell className="text-slate-500">{r.department}</TableCell>
+                        <TableCell className="text-right font-mono">{fm(r.basicSalary)}</TableCell>
+                        <TableCell className="text-right font-mono">{fm(r.housing)}</TableCell>
+                        <TableCell className="text-right font-mono">{fm(r.transport)}</TableCell>
+                        <TableCell className="text-right font-mono">{fm(r.otherAllowances)}</TableCell>
+                        <TableCell className="text-right font-mono font-semibold bg-slate-50">{fm(r.grossPay)}</TableCell>
+                        <TableCell className="text-right font-mono font-bold text-red-600">{fm(r.paye)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="border-t-2 bg-red-50 font-bold">
+                      <TableCell colSpan={4} className="text-right font-bold">TOTALS</TableCell>
+                      <TableCell className="text-right font-mono">{fm(payrollData.reduce((s,r)=>s+r.basicSalary,0))}</TableCell>
+                      <TableCell className="text-right font-mono">{fm(payrollData.reduce((s,r)=>s+r.housing,0))}</TableCell>
+                      <TableCell className="text-right font-mono">{fm(payrollData.reduce((s,r)=>s+r.transport,0))}</TableCell>
+                      <TableCell className="text-right font-mono">{fm(payrollData.reduce((s,r)=>s+r.otherAllowances,0))}</TableCell>
+                      <TableCell className="text-right font-mono">{fm(payrollData.reduce((s,r)=>s+r.grossPay,0))}</TableCell>
+                      <TableCell className="text-right font-mono text-red-600">{fm(totals.totalPAYE)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {/* ─────────── PENSION TAB ──────────────────────────────────── */}
+        {priv.canViewPensionSchedule && (
+          <TabsContent active={activeTab === 'pension'} className="space-y-6 mt-6">
+            <div className="flex gap-4 items-center">
+              <label className="text-sm font-medium text-slate-700">Month:</label>
+              <select
+                className="flex h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}
+              >
+                {months.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+              </select>
+            </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
+                <CardTitle>Pension Schedule: {selectedMonthLabel}</CardTitle>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-500 font-medium">Total Pension: <span className="text-amber-600 font-bold">₦{totals.totalPension.toLocaleString()}</span></span>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintDialogOpen(true); setPrintType('PENSION'); }}>
+                    <Printer className="h-4 w-4" /> Print Schedule
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4 overflow-x-auto cursor-grab">
+                <Table className="whitespace-nowrap w-full text-xs">
+                  <TableHeader>
+                    <TableRow className="bg-amber-50">
+                      <TableHead className="font-bold">S/N</TableHead>
+                      <TableHead className="font-bold">Surname</TableHead>
+                      <TableHead className="font-bold">Firstname</TableHead>
+                      <TableHead className="font-bold">Department</TableHead>
+                      <TableHead className="font-bold text-right">Pensionable Sum (₦)</TableHead>
+                      <TableHead className="font-bold text-right text-amber-700">Employee (₦)</TableHead>
+                      <TableHead className="font-bold text-right text-indigo-700">Employer (₦)</TableHead>
+                      <TableHead className="font-bold text-right text-emerald-700 bg-emerald-50">Total (₦)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payrollData.filter(r => r.pension > 0).map((r, i) => {
+                      const penSum = r.basicSalary + r.housing + r.transport;
+                      return (
+                        <TableRow key={r.id} className="hover:bg-amber-50/30">
+                          <TableCell>{i + 1}</TableCell>
+                          <TableCell className="font-medium">{r.surname}</TableCell>
+                          <TableCell>{r.firstname}</TableCell>
+                          <TableCell className="text-slate-500">{r.department}</TableCell>
+                          <TableCell className="text-right font-mono">{fm(penSum)}</TableCell>
+                          <TableCell className="text-right font-mono text-amber-600 font-semibold">{fm(r.pension)}</TableCell>
+                          <TableCell className="text-right font-mono text-indigo-600 font-semibold">{fm(r.employerPension)}</TableCell>
+                          <TableCell className="text-right font-mono text-emerald-700 font-bold bg-emerald-50/50">{fm(r.pension + r.employerPension)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    <TableRow className="border-t-2 bg-amber-50 font-bold">
+                      <TableCell colSpan={4} className="text-right font-bold">TOTALS</TableCell>
+                      <TableCell className="text-right font-mono">{fm(payrollData.filter(r=>r.pension>0).reduce((s,r)=>s+(r.basicSalary+r.housing+r.transport),0))}</TableCell>
+                      <TableCell className="text-right font-mono text-amber-600">{fm(totals.totalPension)}</TableCell>
+                      <TableCell className="text-right font-mono text-indigo-600">{fm(payrollData.reduce((s,r)=>s+r.employerPension,0))}</TableCell>
+                      <TableCell className="text-right font-mono text-emerald-700">{fm(payrollData.reduce((s,r)=>s+r.pension+r.employerPension,0))}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {/* ─────────── NSITF TAB ────────────────────────────────────── */}
+        {priv.canViewNsitfSchedule && (
+          <TabsContent active={activeTab === 'nsitf'} className="space-y-6 mt-6">
+            <div className="flex gap-4 items-center">
+              <label className="text-sm font-medium text-slate-700">Month:</label>
+              <select
+                className="flex h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}
+              >
+                {months.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+              </select>
+            </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
+                <CardTitle>NSITF Schedule: {selectedMonthLabel}</CardTitle>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-500 font-medium">Total NSITF: <span className="text-blue-600 font-bold">₦{fm(payrollData.reduce((s,r)=>s+r.nsitf,0))}</span></span>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintDialogOpen(true); setPrintType('NSITF'); }}>
+                    <Printer className="h-4 w-4" /> Print Schedule
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4 overflow-x-auto cursor-grab">
+                <Table className="whitespace-nowrap w-full text-xs">
+                  <TableHeader>
+                    <TableRow className="bg-blue-50">
+                      <TableHead className="font-bold">S/N</TableHead>
+                      <TableHead className="font-bold">Surname</TableHead>
+                      <TableHead className="font-bold">Firstname</TableHead>
+                      <TableHead className="font-bold">Department</TableHead>
+                      <TableHead className="font-bold text-right">Gross Pay (₦)</TableHead>
+                      <TableHead className="font-bold text-center">Rate (%)</TableHead>
+                      <TableHead className="font-bold text-right text-blue-700 bg-blue-50">NSITF (₦)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payrollData.filter(r => r.nsitf > 0).map((r, i) => (
+                      <TableRow key={r.id} className="hover:bg-blue-50/30">
+                        <TableCell>{i + 1}</TableCell>
+                        <TableCell className="font-medium">{r.surname}</TableCell>
+                        <TableCell>{r.firstname}</TableCell>
+                        <TableCell className="text-slate-500">{r.department}</TableCell>
+                        <TableCell className="text-right font-mono">{fm(r.grossPay)}</TableCell>
+                        <TableCell className="text-center font-mono text-slate-500">{payrollVariables.nsitfRate}%</TableCell>
+                        <TableCell className="text-right font-mono text-blue-600 font-bold bg-blue-50/50">{fm(r.nsitf)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="border-t-2 bg-blue-50 font-bold">
+                      <TableCell colSpan={4} className="text-right font-bold">TOTALS</TableCell>
+                      <TableCell className="text-right font-mono">{fm(payrollData.filter(r=>r.nsitf>0).reduce((s,r)=>s+r.grossPay,0))}</TableCell>
+                      <TableCell />
+                      <TableCell className="text-right font-mono text-blue-600">{fm(payrollData.reduce((s,r)=>s+r.nsitf,0))}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
       </Tabs>
 
-      {printType && (
+      {printDialogOpen && (
         <div className="fixed inset-0 bg-black/50 flex flex-col z-50 overflow-hidden items-center justify-center p-4">
           <div className="bg-slate-100 rounded-lg shadow-xl flex flex-col w-full max-w-6xl h-[calc(100vh-2rem)] relative">
 
@@ -694,7 +925,7 @@ export function Payroll() {
                 <Button variant="secondary" size="sm" className="gap-1" onClick={handlePrint} disabled={payslipsToPrint.length === 0}>
                   <Printer className="h-4 w-4" /> Print Document
                 </Button>
-                <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={() => setPrintType(null)}>
+                <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={() => setPrintDialogOpen(false)}>
                   <X className="h-5 w-5" />
                 </Button>
               </div>
@@ -703,6 +934,21 @@ export function Payroll() {
             <div className="flex flex-1 overflow-hidden print-hide">
               {/* Filter Sidebar */}
               <div className="w-1/3 max-w-[300px] border-r border-slate-200 bg-white p-4 overflow-y-auto flex flex-col gap-6 hide-on-print shadow-sm z-10">
+                {/* Schedule type selector */}
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1">Schedule Type</h4>
+                  <select
+                    className="w-full h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm mt-2"
+                    value={printType}
+                    onChange={(e) => setPrintType(e.target.value as any)}
+                  >
+                    {priv.canGenerate && <option value="PAYSLIPS">Bulk Payslips</option>}
+                    {priv.canViewPayeSchedule && <option value="PAYE">PAYE Schedule</option>}
+                    {priv.canViewPensionSchedule && <option value="PENSION">Pension Schedule</option>}
+                    {priv.canViewNsitfSchedule && <option value="NSITF">NSITF Schedule</option>}
+                  </select>
+                </div>
+
                 <div>
                   <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1">Select Months</h4>
                   <div className="space-y-2 mt-2">
@@ -718,6 +964,46 @@ export function Payroll() {
                           }}
                         />
                         {m.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Department filter */}
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1 flex justify-between items-center">
+                    Filter by Department
+                    <button
+                      className="text-xs text-indigo-600 font-medium hover:underline"
+                      onClick={() => { setPrintSelectedDepts([]); setPrintSelectedEmployees([]); }}
+                    >
+                      Clear
+                    </button>
+                  </h4>
+                  <div className="space-y-2 mt-2">
+                    {[...new Set(employees.filter(e => e.status === 'Active').map(e => e.department).filter(Boolean))].sort().map(dept => (
+                      <label key={dept} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="rounded border-slate-300 text-indigo-600"
+                          checked={printSelectedDepts.includes(dept)}
+                          onChange={(e) => {
+                            const newDepts = e.target.checked
+                              ? [...printSelectedDepts, dept]
+                              : printSelectedDepts.filter(d => d !== dept);
+                            setPrintSelectedDepts(newDepts);
+                            // Auto-select employees in checked departments
+                            if (newDepts.length > 0) {
+                              const deptEmployeeIds = employees
+                                .filter(emp => emp.status === 'Active' && newDepts.includes(emp.department))
+                                .map(emp => emp.id);
+                              setPrintSelectedEmployees(deptEmployeeIds);
+                            } else {
+                              setPrintSelectedEmployees([]);
+                            }
+                          }}
+                        />
+                        {dept}
                       </label>
                     ))}
                   </div>
@@ -749,6 +1035,7 @@ export function Payroll() {
                           }}
                         />
                         {emp.firstname} {emp.surname}
+                        {emp.department && <span className="text-[10px] text-slate-400 ml-auto shrink-0">{emp.department}</span>}
                       </label>
                     ))}
                   </div>

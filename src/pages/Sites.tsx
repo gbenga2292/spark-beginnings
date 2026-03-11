@@ -11,6 +11,7 @@ import { useAppStore, Site } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
+import { useUserStore } from '@/src/store/userStore';
 
 const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive' };
 
@@ -177,6 +178,16 @@ export function Sites() {
   const [addForm, setAddForm] = useState({ ...EMPTY_FORM });
   const [editForm, setEditForm] = useState({ ...EMPTY_FORM });
   const [addError, setAddError] = useState('');
+
+  // ── Permission checks ──────────────────────────────────────────
+  const currentUser = useUserStore((s) => s.getCurrentUser());
+  const sitePriv = currentUser?.privileges?.sites;
+  // Super-admin (no currentUser in store) gets full access
+  const canAddSite    = !currentUser || (sitePriv?.canView === true && sitePriv?.canAddSite === true);
+  const canAddClient  = !currentUser || (sitePriv?.canView === true && sitePriv?.canAddClient === true);
+  const canEditSite   = !currentUser || (sitePriv?.canView === true && sitePriv?.canEditSite === true);
+  const canDeleteSite = !currentUser || (sitePriv?.canView === true && sitePriv?.canDeleteSite === true);
+  const hasActions    = canEditSite || canDeleteSite;
 
   const sites = useAppStore((s) => s.sites);
   const clients = useAppStore((s) => s.clients);
@@ -365,16 +376,22 @@ export function Sites() {
             Manage project sites and clients. Each <strong>Client + Site</strong> combination is unique.
           </p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex gap-2">
-            <Button onClick={() => setIsAddingSite(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
-              <Plus className="h-4 w-4" /> Add New Site
-            </Button>
-            <Button onClick={() => setIsAddingClient(true)} variant="outline" className="gap-2">
-              <Plus className="h-4 w-4" /> Add Client
-            </Button>
+        {(canAddSite || canAddClient) && (
+          <div className="flex items-center gap-4">
+            <div className="flex gap-2">
+              {canAddSite && (
+                <Button onClick={() => setIsAddingSite(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+                  <Plus className="h-4 w-4" /> Add New Site
+                </Button>
+              )}
+              {canAddClient && (
+                <Button onClick={() => setIsAddingClient(true)} variant="outline" className="gap-2">
+                  <Plus className="h-4 w-4" /> Add Client
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="flex flex-col flex-1 min-h-0 gap-8">
@@ -444,7 +461,7 @@ export function Sites() {
                   <TableHead>Site Name</TableHead>
                   <TableHead className="text-center">VAT</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  {hasActions && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -500,32 +517,38 @@ export function Sites() {
                         <Badge variant={site.status === 'Active' ? 'success' : 'secondary'}>{site.status}</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
-                      {editingId === site.id ? (
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" className="text-emerald-600" onClick={handleSaveEdit}>
-                            <Save className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-slate-500" onClick={() => setEditingId(null)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" className="text-indigo-600" onClick={() => handleEditStart(site)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDelete(site.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </TableCell>
+                    {hasActions && (
+                      <TableCell className="text-right">
+                        {editingId === site.id ? (
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="sm" className="text-emerald-600" onClick={handleSaveEdit}>
+                              <Save className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="text-slate-500" onClick={() => setEditingId(null)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex justify-end gap-2">
+                            {canEditSite && (
+                              <Button variant="ghost" size="sm" className="text-indigo-600" onClick={() => handleEditStart(site)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {canDeleteSite && (
+                              <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDelete(site.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
                 {filteredSites.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={hasActions ? 6 : 5} className="text-center py-8 text-slate-500">
                       No sites found matching your search.
                     </TableCell>
                   </TableRow>

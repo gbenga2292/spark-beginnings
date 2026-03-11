@@ -6,6 +6,7 @@ import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
+import { usePriv } from '@/src/hooks/usePriv';
 
 export function Billing() {
   const sites = useAppStore((state) => state.sites);
@@ -18,6 +19,9 @@ export function Billing() {
   const updateInvoice = useAppStore(state => state.updateInvoice);
   const deleteInvoice = useAppStore(state => state.deleteInvoice);
   const vatRate = useAppStore(state => state.payrollVariables.vatRate);
+
+  // ─── Permissions ───────────────────────────────────────────
+  const priv = usePriv('billing');
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isViewingActive, setIsViewingActive] = useState(true);

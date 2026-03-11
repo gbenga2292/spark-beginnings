@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src
 import { format } from 'date-fns';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import * as XLSX from 'xlsx';
+import { usePriv } from '@/src/hooks/usePriv';
 
 export function Attendance() {
   const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
@@ -22,6 +23,11 @@ export function Attendance() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('entry');
   const [departmentFilter, setDepartmentFilter] = useState('OPERATIONS');
+
+  // ─── Permissions ───────────────────────────────────────────
+  const priv = usePriv('attendance');
+  // For export we piggyback off the reports canExport privilege
+  const reportPriv = usePriv('reports');
 
   // Database filters
   const [dbSearchTerm, setDbSearchTerm] = useState('');
@@ -458,12 +464,20 @@ export function Attendance() {
             </div>
 
             {/* Actions */}
-            <Button onClick={handleClear} variant="outline" size="sm" className="h-8 text-xs gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200">
-              <Trash2 className="h-3 w-3" /> Clear
-            </Button>
-            <Button onClick={handleSubmit} size="sm" className="h-8 text-xs gap-1 bg-slate-900 hover:bg-slate-800 text-white shadow-sm">
-              <Save className="h-3 w-3" /> Submit
-            </Button>
+            {priv.canDelete && (
+              <Button onClick={handleClear} variant="outline" size="sm" className="h-8 text-xs gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200">
+                <Trash2 className="h-3 w-3" /> Clear
+              </Button>
+            )}
+            {priv.canAdd ? (
+              <Button onClick={handleSubmit} size="sm" className="h-8 text-xs gap-1 bg-slate-900 hover:bg-slate-800 text-white shadow-sm">
+                <Save className="h-3 w-3" /> Submit
+              </Button>
+            ) : (
+              <Button disabled size="sm" className="h-8 text-xs gap-1 opacity-40 cursor-not-allowed bg-slate-300 text-slate-500" title="You don't have permission to submit attendance">
+                <Save className="h-3 w-3" /> Submit
+              </Button>
+            )}
           </div>
 
           {/* Compact entry table */}
@@ -629,15 +643,19 @@ export function Attendance() {
             <div className="flex-1" />
 
             <div className="flex items-center gap-2">
-              <label className="cursor-pointer">
-                <Input type="file" accept=".xlsx" className="hidden" onChange={handleImportExcel} />
-                <Button variant="outline" size="sm" className="h-8 text-xs gap-1 pointer-events-none">
-                  <Upload className="h-3 w-3" /> Import
+              {priv.canAdd && (
+                <label className="cursor-pointer">
+                  <Input type="file" accept=".xlsx" className="hidden" onChange={handleImportExcel} />
+                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1 pointer-events-none">
+                    <Upload className="h-3 w-3" /> Import
+                  </Button>
+                </label>
+              )}
+              {reportPriv.canExport && (
+                <Button onClick={handleExportExcel} size="sm" className="h-8 text-xs gap-1 bg-green-700 hover:bg-green-800 text-white shadow-sm">
+                  <Download className="h-3 w-3" /> Export Excel
                 </Button>
-              </label>
-              <Button onClick={handleExportExcel} size="sm" className="h-8 text-xs gap-1 bg-green-700 hover:bg-green-800 text-white shadow-sm">
-                <Download className="h-3 w-3" /> Export Excel
-              </Button>
+              )}
             </div>
           </div>
 

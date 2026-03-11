@@ -22,13 +22,13 @@ export function useRedaction(page: RedactionKey): boolean {
   const priv = currentUser.privileges;
 
   switch (page) {
-    case 'employees':        return !(priv.employees?.redactSalary ?? false);
-    case 'financeDashboard': return !(priv.financeDashboard?.redactAmounts ?? false);
-    case 'salaryLoans':      return !(priv.salaryLoans?.redactAmounts ?? false);
-    case 'billing':          return !(priv.billing?.redactAmounts ?? false);
-    case 'payments':         return !(priv.payments?.redactAmounts ?? false);
-    case 'payroll':          return !(priv.payroll?.redactAmounts ?? false);
-    case 'financialReports': return !(priv.financialReports?.redactAmounts ?? false);
+    case 'employees':        return priv.employees?.canViewSalary ?? false;
+    case 'financeDashboard': return priv.financeDashboard?.canViewAmounts ?? false;
+    case 'salaryLoans':      return priv.salaryLoans?.canViewAmounts ?? false;
+    case 'billing':          return priv.billing?.canViewAmounts ?? false;
+    case 'payments':         return priv.payments?.canViewAmounts ?? false;
+    case 'payroll':          return priv.payroll?.canViewAmounts ?? false;
+    case 'financialReports': return priv.financialReports?.canViewAmounts ?? false;
     default:                 return true;
   }
 }
