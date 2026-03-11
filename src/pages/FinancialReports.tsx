@@ -5,13 +5,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import {
   Download, Upload, Receipt, Wallet, TrendingUp, Landmark, Activity, AlertCircle,
-  PieChart as PieChartIcon, BarChart3, Filter, X, CheckCircle2, FileSpreadsheet, FileText, DollarSign
+  PieChart as PieChartIcon, BarChart3, Filter, X, CheckCircle2, FileSpreadsheet, FileText, DollarSign, Backpack, CreditCard
 } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
 import {
   BarChart, Bar, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend,
-  AreaChart, Area, PieChart, Pie, Cell
+  AreaChart, Area, PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -36,13 +36,131 @@ export function FinancialReports() {
   const rawVatPayments = useAppStore(state => state.vatPayments);
   const sites = useAppStore(state => state.sites);
 
-  const employees = useAppStore(state => state.employees);
+  const employees = useAppStore(state => state.employees).filter(e => e.status !== 'Terminated');
+  const attendanceRecords = useAppStore(state => state.attendanceRecords);
   const loans = useAppStore(state => state.loans);
   const salaryAdvances = useAppStore(state => state.salaryAdvances);
+  const holidays = useAppStore(state => state.publicHolidays);
+  const monthValues = useAppStore(state => state.monthValues);
+  const payrollVariables = useAppStore(state => state.payrollVariables);
   const [accountsTab, setAccountsTab] = useState<'payroll' | 'loans'>('payroll');
   const [payrollYear, setPayrollYear] = useState<number>(new Date().getFullYear());
+  const [payrollMonth, setPayrollMonth] = useState<number | null>(new Date().getMonth() + 1);
   const currentYear = new Date().getFullYear();
   const years = [currentYear, currentYear - 1, currentYear - 2];
+
+  const MONTHS_LIST = [
+    { label: 'January', value: 1, key: 'jan' }, { label: 'February', value: 2, key: 'feb' },
+    { label: 'March', value: 3, key: 'mar' }, { label: 'April', value: 4, key: 'apr' },
+    { label: 'May', value: 5, key: 'may' }, { label: 'June', value: 6, key: 'jun' },
+    { label: 'July', value: 7, key: 'jul' }, { label: 'August', value: 8, key: 'aug' },
+    { label: 'September', value: 9, key: 'sep' }, { label: 'October', value: 10, key: 'oct' },
+    { label: 'November', value: 11, key: 'nov' }, { label: 'December', value: 12, key: 'dec' },
+  ];
+
+  function computeWorkDays(year: number, monthNum: number, holidayDates: string[]): number {
+    const startDate = new Date(year, monthNum - 1, 1);
+    const endDate = new Date(year, monthNum, 0);
+    let days = 0;
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const dayOfWeek = d.getDay();
+      if (dayOfWeek === 0) continue;
+      const isHoliday = holidayDates.some(hd => {
+        const hDate = new Date(hd);
+        return hDate.getDate() === d.getDate() && hDate.getMonth() === d.getMonth() && hDate.getFullYear() === d.getFullYear();
+      });
+      if (!isHoliday) days++;
+    }
+    return days;
+  }
+
+  const fm = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+  // Payroll Exposure calculations
+  const payrollStats = useMemo(() => {
+    let totalGrossExposure = 0;
+    let totalStatutory = 0;
+    let totalOvertimeCost = 0;
+    const monthsToProcess = payrollMonth ? [payrollMonth] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+    employees.filter(e => e.status === 'Active').forEach(emp => {
+      monthsToProcess.forEach(targetMonth => {
+        const targetMonthKey = MONTHS_LIST.find(m => m.value === targetMonth)?.key || 'jan';
+        const standardSalary = (emp.monthlySalaries[targetMonthKey as keyof typeof emp.monthlySalaries] as number) || 0;
+        const officialWorkdays = computeWorkDays(payrollYear, targetMonth, holidays.map(h => h.date));
+        const monthConfig = monthValues[targetMonthKey] || { workDays: officialWorkdays, overtimeRate: 0.5 };
+        const otRate = monthConfig.overtimeRate;
+        let daysWorked = 0, daysAbsent = 0, otInstances = 0;
+        for (const r of attendanceRecords) {
+          if (r.staffId === emp.id && r.mth === targetMonth && r.date.startsWith(payrollYear.toString())) {
+            if (r.day?.toLowerCase() === 'yes') { daysWorked++; if (r.ot > 0) otInstances++; }
+            else if (r.day?.toLowerCase() === 'no') { daysAbsent++; }
+          }
+        }
+        if (daysWorked > officialWorkdays) daysWorked = officialWorkdays;
+        let salary = 0, overtime = 0;
+        if (standardSalary > 0 && officialWorkdays > 0) {
+          const dailyRate = standardSalary / officialWorkdays;
+          const isOperations = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase());
+          if (isOperations) { salary = dailyRate * daysWorked; }
+          else { salary = standardSalary - (dailyRate * daysAbsent); if (salary < 0) salary = 0; }
+          overtime = otInstances * (dailyRate * (1 + otRate));
+          totalOvertimeCost += overtime;
+        }
+        const grossPay = salary + overtime;
+        totalGrossExposure += grossPay;
+        if (emp.payeTax) {
+          const basic = salary * (payrollVariables.basic / 100);
+          const housing = salary * (payrollVariables.housing / 100);
+          const transport = salary * (payrollVariables.transport / 100);
+          const pensionSum = basic + housing + transport;
+          const pension = pensionSum * (payrollVariables.employeePensionRate / 100);
+          const employerPension = pensionSum * (payrollVariables.employerPensionRate / 100);
+          const nsitf = grossPay * ((payrollVariables.nsitfRate || 1) / 100);
+          const estimatedPAYE = grossPay > 60000 ? (grossPay * 0.10) : 0;
+          totalStatutory += (pension + employerPension + nsitf + estimatedPAYE);
+        }
+      });
+    });
+
+    let outstandingLoans = 0;
+    salaryAdvances.forEach(a => { if (a.status === 'Approved') outstandingLoans += a.amount; });
+    loans.forEach(l => { if (l.status === 'Active') outstandingLoans += l.remainingBalance; });
+
+    return { totalGrossExposure, totalStatutory, totalOvertimeCost, outstandingLoans };
+  }, [employees, attendanceRecords, holidays, payrollVariables, monthValues, payrollMonth, payrollYear, salaryAdvances, loans]);
+
+  // Annual Payroll & Overtime Trend
+  const payrollChartData = useMemo(() => {
+    return MONTHS_LIST.map((m) => {
+      let totalPayroll = 0, totalOvertime = 0;
+      const officialWorkdays = computeWorkDays(payrollYear, m.value, holidays.map(h => h.date));
+      const monthConfig = monthValues[m.key] || { workDays: officialWorkdays, overtimeRate: 0.5 };
+      const otRate = monthConfig.overtimeRate;
+      employees.filter(e => e.status === 'Active').forEach(emp => {
+        const standardSalary = emp.monthlySalaries[m.key as keyof typeof emp.monthlySalaries] || 0;
+        let daysWorked = 0, daysAbsent = 0, otInstances = 0;
+        for (const r of attendanceRecords) {
+          if (r.staffId === emp.id && r.mth === m.value && r.date.startsWith(payrollYear.toString())) {
+            if (r.day?.toLowerCase() === 'yes') { daysWorked++; if (r.ot > 0) otInstances++; }
+            else if (r.day?.toLowerCase() === 'no') { daysAbsent++; }
+          }
+        }
+        if (daysWorked > officialWorkdays) daysWorked = officialWorkdays;
+        let salary = 0, overtime = 0;
+        if (standardSalary > 0 && officialWorkdays > 0) {
+          const dailyRate = standardSalary / officialWorkdays;
+          const isOperations = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase());
+          if (isOperations) { salary = dailyRate * daysWorked; }
+          else { salary = standardSalary - (dailyRate * daysAbsent); if (salary < 0) salary = 0; }
+          overtime = otInstances * (dailyRate * (1 + otRate));
+        }
+        totalPayroll += (salary + overtime);
+        totalOvertime += overtime;
+      });
+      return { name: m.label.substring(0, 3), Payroll: totalPayroll, Overtime: totalOvertime };
+    });
+  }, [employees, attendanceRecords, holidays, monthValues, payrollYear]);
   const [filterYear, setFilterYear] = useState<string>('All');
   const [filterClient, setFilterClient] = useState<string>('All');
   const [summaryTab, setSummaryTab] = useState<'client' | 'site'>('client');
@@ -470,6 +588,90 @@ export function FinancialReports() {
           </div>
         </div>
       </div>
+
+      {/* PAYROLL EXPOSURE SECTION */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800 flex items-center gap-2">
+          <DollarSign className="w-5 h-5 text-indigo-600" /> Payroll & Statutory Overview
+        </h2>
+        <div className="flex items-center gap-2">
+          <select value={payrollMonth ?? ''} onChange={e => setPayrollMonth(e.target.value === '' ? null : Number(e.target.value))}
+            className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
+            <option value="">All Months</option>
+            {MONTHS_LIST.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
+          <select value={payrollYear} onChange={e => setPayrollYear(Number(e.target.value))}
+            className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
+            {[currentYear, currentYear - 1, currentYear - 2].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card className="bg-gradient-to-br from-slate-900 to-indigo-900 text-white border-0 shadow-xl overflow-hidden relative">
+          <div className="absolute right-0 top-0 opacity-10"><DollarSign className="w-32 h-32 -mt-4 -mr-4" /></div>
+          <CardHeader className="pb-2 relative z-10">
+            <CardTitle className="text-sm font-medium text-indigo-200 uppercase tracking-widest flex justify-between">
+              Payroll Exposure <Badge variant="outline" className="text-[10px] text-white/60 border-white/20">{payrollMonth ? MONTHS_LIST.find(m => m.value === payrollMonth)?.label : 'All Months'} {payrollYear}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="relative z-10">
+            <div className="text-4xl font-black mb-1">₦{fm(payrollStats.totalGrossExposure)}</div>
+            <p className="text-xs text-indigo-300 flex items-center mt-1 font-medium">Gross liability based on attendance.</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute right-0 top-0 opacity-[0.03] text-rose-500"><Backpack className="w-32 h-32 -mt-4 -mr-4" /></div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Est. Statutory Liab.</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(payrollStats.totalStatutory)}</div>
+            <p className="text-xs text-slate-500 flex items-center mt-1">Projected PAYE, Pension & NSITF.</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute right-0 top-0 opacity-[0.03] text-amber-500"><CreditCard className="w-32 h-32 -mt-4 -mr-4" /></div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Active Outstanding Adv.</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(payrollStats.outstandingLoans)}</div>
+            <p className="text-xs text-slate-500 flex items-center mt-1"><TrendingUp className="h-3 w-3 mr-1 text-slate-400" /> Capital returning to company.</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Annual Payroll & Overtime Trend */}
+      <Card className="shadow-sm border-slate-200">
+        <CardHeader className="bg-slate-50/50 border-b pb-4">
+          <CardTitle className="text-lg flex items-center justify-between gap-2 text-slate-800">
+            <span className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-indigo-600" /> Annual Payroll & Overtime Trend (Gross)</span>
+            <Badge variant="outline" className="font-normal text-xs bg-white text-slate-500">{payrollYear} Performance</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={payrollChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis yAxisId="left" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false}
+                  tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
+                <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false}
+                  tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
+                <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString()}`} />
+                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                <Line yAxisId="right" type="monotone" name="Overtime Burn" dataKey="Overtime" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Top Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

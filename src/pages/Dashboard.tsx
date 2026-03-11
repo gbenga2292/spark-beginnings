@@ -2,13 +2,13 @@ import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { useAppStore } from '@/src/store/appStore';
 import {
-    Users, UserMinus, DollarSign, TrendingUp, AlertCircle,
-    Clock, UserPlus, FileSpreadsheet, CheckCircle2, CreditCard, Backpack,
+    Users, AlertCircle,
+    Clock, UserPlus, CheckCircle2,
     Filter
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
-import { LineChart, Line, AreaChart, Area, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts';
+import { AreaChart, Area, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 function computeWorkDays(year: number, monthNum: number, holidayDates: string[]): number {
     const startDate = new Date(year, monthNum - 1, 1);
@@ -46,12 +46,9 @@ const MONTHS = [
 export function Dashboard() {
     const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
     const attendanceRecords = useAppStore((state) => state.attendanceRecords);
-    const salaryAdvances = useAppStore((state) => state.salaryAdvances);
-    const loans = useAppStore((state) => state.loans);
     const leaves = useAppStore((state) => state.leaves);
     const holidays = useAppStore((state) => state.publicHolidays);
     const monthValues = useAppStore((state) => state.monthValues);
-    const payrollVariables = useAppStore((state) => state.payrollVariables);
 
     const currentDate = new Date();
 
@@ -61,87 +58,33 @@ export function Dashboard() {
 
     const monthKey = filterMonth ? MONTHS.find(m => m.value === filterMonth)?.key || 'jan' : null;
 
-    // 1. FINANCIAL CALCULATIONS (For Selected Month & Year)
-    const financeStats = useMemo(() => {
-        let totalGrossExposure = 0;
-        let totalStatutory = 0;
+    // Overtime cost calculation (for display in Headcount section)
+    const overtimeCost = useMemo(() => {
         let totalOvertimeCost = 0;
-
-        // Get months to process: either single month or all 12 months
         const monthsToProcess = filterMonth ? [filterMonth] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
         employees.filter(e => e.status === 'Active').forEach(emp => {
             monthsToProcess.forEach(targetMonth => {
                 const targetMonthKey = MONTHS.find(m => m.value === targetMonth)?.key || 'jan';
                 const standardSalary = (emp.monthlySalaries[targetMonthKey as keyof typeof emp.monthlySalaries] as number) || 0;
-                
                 const officialWorkdays = computeWorkDays(filterYear, targetMonth, holidays.map(h => h.date));
                 const monthConfig = monthValues[targetMonthKey] || { workDays: officialWorkdays, overtimeRate: 0.5 };
                 const otRate = monthConfig.overtimeRate;
-
-                let daysWorked = 0;
-                let daysAbsent = 0;
-                let otInstances = 0;
-
+                let daysWorked = 0, otInstances = 0;
                 for (const r of attendanceRecords) {
                     if (r.staffId === emp.id && r.mth === targetMonth && r.date.startsWith(filterYear.toString())) {
-                        if (r.day?.toLowerCase() === 'yes') {
-                            daysWorked++;
-                            if (r.ot > 0) otInstances++;
-                        } else if (r.day?.toLowerCase() === 'no') {
-                            daysAbsent++;
-                        }
+                        if (r.day?.toLowerCase() === 'yes') { daysWorked++; if (r.ot > 0) otInstances++; }
                     }
                 }
-
                 if (daysWorked > officialWorkdays) daysWorked = officialWorkdays;
-
-                let salary = 0;
-                let overtime = 0;
-
                 if (standardSalary > 0 && officialWorkdays > 0) {
                     const dailyRate = standardSalary / officialWorkdays;
-                    const isOperations = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase());
-
-                    if (isOperations) {
-                        salary = dailyRate * daysWorked;
-                    } else {
-                        salary = standardSalary - (dailyRate * daysAbsent);
-                        if (salary < 0) salary = 0;
-                    }
-                    overtime = otInstances * (dailyRate * (1 + otRate));
-                    totalOvertimeCost += overtime;
-                }
-
-                const grossPay = salary + overtime;
-                totalGrossExposure += grossPay;
-
-                if (emp.payeTax) {
-                    const basic = salary * (payrollVariables.basic / 100);
-                    const housing = salary * (payrollVariables.housing / 100);
-                    const transport = salary * (payrollVariables.transport / 100);
-                    const pensionSum = basic + housing + transport;
-
-                    const pension = pensionSum * (payrollVariables.employeePensionRate / 100);
-                    const employerPension = pensionSum * (payrollVariables.employerPensionRate / 100);
-                    const nsitf = grossPay * ((payrollVariables.nsitfRate || 1) / 100);
-
-                    const estimatedPAYE = grossPay > 60000 ? (grossPay * 0.10) : 0;
-                    totalStatutory += (pension + employerPension + nsitf + estimatedPAYE);
+                    totalOvertimeCost += otInstances * (dailyRate * (1 + otRate));
                 }
             });
         });
-
-        let outstandingLoans = 0;
-        salaryAdvances.forEach(a => {
-            if (a.status === 'Approved') outstandingLoans += a.amount;
-        });
-        loans.forEach(l => {
-            if (l.status === 'Active') outstandingLoans += l.remainingBalance;
-        });
-
-        return { totalGrossExposure, totalStatutory, totalOvertimeCost, outstandingLoans };
-    }, [employees, attendanceRecords, monthKey, holidays, payrollVariables, monthValues, filterMonth, filterYear, salaryAdvances, loans]);
+        return totalOvertimeCost;
+    }, [employees, attendanceRecords, holidays, monthValues, filterMonth, filterYear]);
 
     // 2. OPERATIONAL HEALTH (For Selected Month & Year)
     const opsStats = useMemo(() => {
@@ -208,63 +151,6 @@ export function Dashboard() {
     }, [employees, filterYear]);
 
 
-    // Annual Payroll & Overtime Trend (based on filterYear)
-    const chartData = useMemo(() => {
-        return MONTHS.map((m) => {
-            const targetMonthIdx = m.value;
-            let totalPayroll = 0;
-            let totalOvertime = 0;
-
-            const officialWorkdays = computeWorkDays(filterYear, targetMonthIdx, holidays.map(h => h.date));
-            const monthConfig = monthValues[m.key] || { workDays: officialWorkdays, overtimeRate: 0.5 };
-            const otRate = monthConfig.overtimeRate;
-
-            employees.filter(e => e.status === 'Active').forEach(emp => {
-                const standardSalary = emp.monthlySalaries[m.key as keyof typeof emp.monthlySalaries] || 0;
-                let daysWorked = 0;
-                let daysAbsent = 0;
-                let otInstances = 0;
-
-                for (const r of attendanceRecords) {
-                    if (r.staffId === emp.id && r.mth === targetMonthIdx && r.date.startsWith(filterYear.toString())) {
-                        if (r.day?.toLowerCase() === 'yes') {
-                            daysWorked++;
-                            if (r.ot > 0) otInstances++;
-                        } else if (r.day?.toLowerCase() === 'no') {
-                            daysAbsent++;
-                        }
-                    }
-                }
-
-                if (daysWorked > officialWorkdays) daysWorked = officialWorkdays;
-
-                let salary = 0;
-                let overtime = 0;
-
-                if (standardSalary > 0 && officialWorkdays > 0) {
-                    const dailyRate = standardSalary / officialWorkdays;
-                    const isOperations = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase());
-
-                    if (isOperations) {
-                        salary = dailyRate * daysWorked;
-                    } else {
-                        salary = standardSalary - (dailyRate * daysAbsent);
-                        if (salary < 0) salary = 0;
-                    }
-                    overtime = otInstances * (dailyRate * (1 + otRate));
-                }
-
-                totalPayroll += (salary + overtime);
-                totalOvertime += overtime;
-            });
-
-            return {
-                name: m.label.substring(0, 3),
-                Payroll: totalPayroll,
-                Overtime: totalOvertime,
-            };
-        });
-    }, [employees, attendanceRecords, holidays, monthValues, filterYear]);
 
 
     // 4. ACTIONABLE ALERTS (Removed salary advances / loans per user request)
@@ -316,102 +202,6 @@ export function Dashboard() {
                 </div>
             </div>
 
-            {/* ZONE 1: FINANCIAL HEADER */}
-            <div className="grid gap-6 md:grid-cols-3">
-                <Card className="bg-gradient-to-br from-slate-900 to-indigo-900 text-white border-0 shadow-xl overflow-hidden relative">
-                    <div className="absolute right-0 top-0 opacity-10">
-                        <DollarSign className="w-32 h-32 -mt-4 -mr-4" />
-                    </div>
-                    <CardHeader className="pb-2 relative z-10">
-                        <CardTitle className="text-sm font-medium text-indigo-200 uppercase tracking-widest flex justify-between">
-                            Payroll Exposure <Badge variant="outline" className="text-[10px] text-white/60 border-white/20">{filterMonth ? MONTHS.find(m => m.value === filterMonth)?.label : 'All Months'} {filterYear}</Badge>
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="relative z-10">
-                        <div className="text-4xl font-black mb-1">₦{fm(financeStats.totalGrossExposure)}</div>
-                        <p className="text-xs text-indigo-300 flex items-center mt-1 font-medium">
-                            Gross liability based on specific month attendance.
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card className="bg-white border-slate-200 shadow-sm relative overflow-hidden">
-                    <div className="absolute right-0 top-0 opacity-[0.03] text-rose-500">
-                        <Backpack className="w-32 h-32 -mt-4 -mr-4" />
-                    </div>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest flex justify-between items-center gap-2">
-                            Est. Statutory Liab.
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(financeStats.totalStatutory)}</div>
-                        <p className="text-xs text-slate-500 flex items-center mt-1">
-                            Projected PAYE, Pension & NSITF.
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card className="bg-white border-slate-200 shadow-sm relative overflow-hidden">
-                    <div className="absolute right-0 top-0 opacity-[0.03] text-amber-500">
-                        <CreditCard className="w-32 h-32 -mt-4 -mr-4" />
-                    </div>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Active Outstanding Adv.</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(financeStats.outstandingLoans)}</div>
-                        <p className="text-xs text-slate-500 flex items-center mt-1">
-                            <TrendingUp className="h-3 w-3 mr-1 text-slate-400" /> Capital returning to company.
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* ZONE 1.5: PAYROLL CHART */}
-            <Card className="shadow-sm border-slate-200">
-                <CardHeader className="bg-slate-50/50 border-b pb-4">
-                    <CardTitle className="text-lg flex items-center justify-between gap-2 text-slate-800">
-                        <span className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-indigo-600" /> Annual Payroll & Overtime Trend (Gross)</span>
-                        <Badge variant="outline" className="font-normal text-xs bg-white text-slate-500">{filterYear} Performance</Badge>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis
-                                    yAxisId="left"
-                                    stroke="#64748b"
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`}
-                                />
-                                <YAxis
-                                    yAxisId="right"
-                                    orientation="right"
-                                    stroke="#f59e0b"
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`}
-                                />
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString()}`}
-                                />
-                                <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                                <Line yAxisId="right" type="monotone" name="Overtime Burn" dataKey="Overtime" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
-                </CardContent>
-            </Card>
-
             <div className="grid gap-6 md:grid-cols-12">
                 {/* ZONE 2: OPERATIONS & HEADCOUNT TREND */}
                 <Card className="md:col-span-7 flex flex-col shadow-sm border-slate-200">
@@ -433,7 +223,7 @@ export function Dashboard() {
                             <div className="h-20 w-px bg-slate-200 hidden sm:block"></div>
 
                             <div className="text-center">
-                                <div className="text-4xl font-bold text-amber-500">₦{fm(financeStats.totalOvertimeCost)}</div>
+                                <div className="text-4xl font-bold text-amber-500">₦{fm(overtimeCost)}</div>
                                 <div className="text-sm font-semibold text-slate-500 mt-2 uppercase tracking-wider">Total Overtime Burn</div>
                                 <div className="text-[10px] text-slate-400 mt-1">Paid to Ops staff in {filterMonth ? MONTHS.find(m => m.value === filterMonth)?.label : 'All Months'}</div>
                             </div>
