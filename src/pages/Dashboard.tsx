@@ -2,8 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { useAppStore } from '@/src/store/appStore';
 import {
-    Users, UserMinus, DollarSign, TrendingUp, AlertCircle,
-    Clock, UserPlus, FileSpreadsheet, CheckCircle2, CreditCard, Backpack,
+    Users, AlertCircle,
+    Clock, UserPlus, CheckCircle2,
     Filter
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
