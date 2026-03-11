@@ -11,7 +11,7 @@ import { useAppStore } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
 import {
   BarChart, Bar, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend,
-  AreaChart, Area, PieChart, Pie, Cell
+  AreaChart, Area, PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
