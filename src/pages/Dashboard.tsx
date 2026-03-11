@@ -283,7 +283,7 @@ export function Dashboard() {
                             <div className="h-20 w-px bg-slate-200 hidden sm:block"></div>
 
                             <div className="text-center">
-                                <div className="text-4xl font-bold text-amber-500">₦{fm(financeStats.totalOvertimeCost)}</div>
+                                <div className="text-4xl font-bold text-amber-500">₦{fm(overtimeCost)}</div>
                                 <div className="text-sm font-semibold text-slate-500 mt-2 uppercase tracking-wider">Total Overtime Burn</div>
                                 <div className="text-[10px] text-slate-400 mt-1">Paid to Ops staff in {filterMonth ? MONTHS.find(m => m.value === filterMonth)?.label : 'All Months'}</div>
                             </div>
