@@ -38,6 +38,9 @@ export function Variables() {
   const removeTaxBracket = useAppStore((state) => state.removeTaxBracket);
   const departmentTasksList = useAppStore((state) => state.departmentTasksList);
   const updateDepartmentTasks = useAppStore((state) => state.updateDepartmentTasks);
+  const leaveTypes = useAppStore((state) => state.leaveTypes);
+  const addLeaveType = useAppStore((state) => state.addLeaveType);
+  const removeLeaveType = useAppStore((state) => state.removeLeaveType);
 
   const [newExtraLabel, setNewExtraLabel] = useState('');
   const [newExtraAmount, setNewExtraAmount] = useState('');
@@ -77,6 +80,7 @@ export function Variables() {
   const [newPosition, setNewPosition] = useState('');
   const [newDepartment, setNewDepartment] = useState('');
   const [newClient, setNewClient] = useState('');
+  const [newLeaveType, setNewLeaveType] = useState('');
 
   const handleAddHoliday = () => {
     if (!newDate || !newName) return;
@@ -269,7 +273,33 @@ export function Variables() {
             </CardContent>
           </Card>
 
-          {/* --- MOVED TASK TEMPLATES --- */}
+          {/* ——— LEAVE TYPES ——— */}
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader>
+              <CardTitle>Leave Types</CardTitle>
+              <CardDescription>Manage the types of leave available on employee leave forms.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2 mb-4">
+                <Input placeholder="e.g. Compassionate Leave" value={newLeaveType} onChange={(e) => setNewLeaveType(e.target.value)} className="flex-1" />
+                <Button onClick={() => { if (newLeaveType && !leaveTypes.includes(newLeaveType)) { addLeaveType(newLeaveType); setNewLeaveType(''); } }} variant="outline" className="gap-2">
+                  <Plus className="h-4 w-4" /> Add
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {leaveTypes.map(lt => (
+                  <div key={lt} className="bg-teal-50 border border-teal-200 rounded-full px-3 py-1 text-sm flex items-center gap-2 text-teal-800">
+                    {lt}
+                    <button onClick={() => removeLeaveType(lt)} className="text-teal-400 hover:text-rose-500">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ——— MOVED TASK TEMPLATES ——— */}
           <Card className="shadow-sm border-slate-200 border-t-4 border-t-indigo-500">
             <CardHeader className="bg-indigo-50/30 rounded-t-lg border-b border-indigo-100">
               <CardTitle className="text-indigo-900">Task Templates</CardTitle>

@@ -1,327 +1,782 @@
-import { useState, useMemo } from 'react';
+
+import { useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
-import { Search, Plus, Building, User, CalendarDays, FileText, CheckCircle2, ChevronDown, ListFilter, PlaySquare, X } from 'lucide-react';
-import { useAppStore, LeaveRecord, Employee } from '@/src/store/appStore';
-import { toast } from '@/src/components/ui/toast';
-import { addDays, parseISO, format } from 'date-fns';
+import { Badge } from '@/src/components/ui/badge';
+import {
+  Search, Plus, CalendarDays, ListFilter, X, Trash2, Edit,
+  Printer, Upload, Eye, Ban, ChevronDown, FileText
+} from 'lucide-react';
+import { useAppStore, LeaveRecord } from '@/src/store/appStore';
+import { useUserStore } from '@/src/store/userStore';
+import { toast, showConfirm } from '@/src/components/ui/toast';
+import { addDays, parseISO, format, isWithinInterval } from 'date-fns';
 
+/* ─────────────────────────────────── helpers ─── */
+function calcExpectedEnd(startDate: string, duration: number): string {
+  if (!startDate || !duration || duration < 1) return '';
+  return format(addDays(parseISO(startDate), duration), 'yyyy-MM-dd');
+}
+
+function isOnLeave(leave: LeaveRecord, date: Date): boolean {
+  if (leave.status === 'Cancelled') return false;
+  try {
+    return isWithinInterval(date, {
+      start: parseISO(leave.startDate),
+      end: parseISO(leave.expectedEndDate),
+    });
+  } catch { return false; }
+}
+
+/* ─────────────────────────────────── component ─ */
 export function Leaves() {
-    const { employees, leaves, addLeave, updateLeave, deleteLeave } = useAppStore();
-    const activeEmployees = useMemo(() => employees.filter(e => e.status === 'Active' || e.status === 'On Leave'), [employees]);
+  const {
+    employees, leaves, addLeave, updateLeave, deleteLeave,
+    leaveTypes, updateEmployee,
+  } = useAppStore();
 
-    const [showForm, setShowForm] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filterView, setFilterView] = useState<'All' | 'Active' | 'Completed'>('All');
+  const { getCurrentUser } = useUserStore();
+  const currentUser = getCurrentUser();
+  const canDelete = currentUser?.privileges?.leaves?.canDelete ?? true;
 
-    // Form State
-    const [formId, setFormId] = useState<string | null>(null);
-    const [staffId, setStaffId] = useState('');
-    const [startDate, setStartDate] = useState('');
-    const [duration, setDuration] = useState('');
-    const [reason, setReason] = useState('');
-    const [dateReturned, setDateReturned] = useState('');
-    const [canBeContacted, setCanBeContacted] = useState<'Yes' | 'No'>('No');
+  const activeEmployees = useMemo(
+    () => employees.filter(e => e.status === 'Active' || e.status === 'On Leave'),
+    [employees]
+  );
 
-    // Calculate Expected End Date based on Start Date and Duration (excluding weekends if that's standard, but here just simple addition)
-    const expectedEndDate = useMemo(() => {
-        if (startDate && duration) {
-            const days = parseInt(duration);
-            if (!isNaN(days) && days > 0) {
-                return format(addDays(parseISO(startDate), days), 'yyyy-MM-dd');
-            }
-        }
-        return '';
-    }, [startDate, duration]);
+  /* ── filter state ── */
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterView, setFilterView] = useState<'All' | 'Active' | 'Completed' | 'Cancelled'>('All');
 
-    const filteredLeaves = useMemo(() => {
-        let result = leaves;
-        if (filterView === 'Active') {
-            result = result.filter(l => !l.dateReturned);
-        } else if (filterView === 'Completed') {
-            result = result.filter(l => !!l.dateReturned);
-        }
+  /* ── form state ── */
+  const [showForm, setShowForm] = useState(false);
+  const [formId, setFormId] = useState<string | null>(null);
+  const [staffId, setStaffId] = useState('');
+  const [leaveType, setLeaveType] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [duration, setDuration] = useState('');
+  const [reason, setReason] = useState('');
+  const [dateReturned, setDateReturned] = useState('');
+  const [canBeContacted, setCanBeContacted] = useState<'Yes' | 'No'>('No');
+  const [uploadedFile, setUploadedFile] = useState<string | undefined>(undefined);
+  const [uploadedFileName, setUploadedFileName] = useState<string | undefined>(undefined);
 
-        if (searchQuery) {
-            const q = searchQuery.toLowerCase();
-            result = result.filter(l =>
-                l.employeeName.toLowerCase().includes(q) ||
-                l.reason.toLowerCase().includes(q)
-            );
-        }
-        return result.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-    }, [leaves, filterView, searchQuery]);
+  /* ── print / preview state ── */
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [previewLeave, setPreviewLeave] = useState<LeaveRecord | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
 
-    const handleCreateOrUpdate = () => {
-        if (!staffId || !startDate || !duration || !reason) {
-            toast.error('Please fill in all required fields (Staff, Start Date, Duration, Reason).');
-            return;
-        }
+  /* ── file upload preview ── */
+  const [filePreviewLeave, setFilePreviewLeave] = useState<LeaveRecord | null>(null);
 
-        const emp = employees.find(e => e.id === staffId);
-        if (!emp) {
-            toast.error('Employee not found.');
-            return;
-        }
+  const expectedEndDate = useMemo(
+    () => calcExpectedEnd(startDate, parseInt(duration) || 0),
+    [startDate, duration]
+  );
 
-        if (formId) {
-            updateLeave(formId, {
-                startDate,
-                duration: parseInt(duration),
-                expectedEndDate,
-                reason,
-                dateReturned,
-                canBeContacted,
-            });
-            toast.success('Leave entry updated successfully!');
-        } else {
-            addLeave({
-                id: `LV-${Date.now()}`,
-                employeeId: staffId,
-                employeeName: `${emp.surname} ${emp.firstname}`,
-                startDate,
-                duration: parseInt(duration),
-                expectedEndDate,
-                reason,
-                dateReturned,
-                canBeContacted,
-            });
-            toast.success('Leave form submitted successfully!');
-        }
+  /* ── derived data ── */
+  const filteredLeaves = useMemo(() => {
+    let result = leaves;
+    if (filterView === 'Active') result = result.filter(l => !l.dateReturned && l.status !== 'Cancelled');
+    else if (filterView === 'Completed') result = result.filter(l => !!l.dateReturned);
+    else if (filterView === 'Cancelled') result = result.filter(l => l.status === 'Cancelled');
 
-        setShowForm(false);
-        resetForm();
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(l =>
+        l.employeeName.toLowerCase().includes(q) ||
+        l.reason.toLowerCase().includes(q) ||
+        (l.leaveType || '').toLowerCase().includes(q)
+      );
+    }
+    return [...result].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+  }, [leaves, filterView, searchQuery]);
+
+  /* leave summary per employee */
+  const leaveSummary = useMemo(() => {
+    return activeEmployees.map(emp => {
+      const empLeaves = leaves.filter(l => l.employeeId === emp.id && l.status !== 'Cancelled');
+      const totalTaken = empLeaves.reduce((s, l) => s + l.duration, 0);
+      const entitlement = emp.yearlyLeave || 20;
+      const remaining = entitlement - totalTaken;
+      const isCurrentlyOnLeave = empLeaves.some(l => isOnLeave(l, new Date()));
+      return { emp, totalTaken, remaining, entitlement, isCurrentlyOnLeave };
+    });
+  }, [activeEmployees, leaves]);
+
+  /* ── form helpers ── */
+  const resetForm = () => {
+    setFormId(null); setStaffId(''); setLeaveType(''); setStartDate('');
+    setDuration(''); setReason(''); setDateReturned(''); setCanBeContacted('No');
+    setUploadedFile(undefined); setUploadedFileName(undefined);
+  };
+
+  const handleEdit = (leave: LeaveRecord) => {
+    setFormId(leave.id);
+    setStaffId(leave.employeeId);
+    setLeaveType(leave.leaveType || '');
+    setStartDate(leave.startDate);
+    setDuration(leave.duration.toString());
+    setReason(leave.reason);
+    setDateReturned(leave.dateReturned || '');
+    setCanBeContacted(leave.canBeContacted);
+    setUploadedFile(leave.uploadedFile);
+    setUploadedFileName(leave.uploadedFileName);
+    setShowForm(true);
+  };
+
+  /* auto-sync employee status when a leave is added/updated */
+  const syncEmployeeStatus = (empId: string) => {
+    const today = new Date();
+    const empActiveLeaves = leaves.filter(
+      l => l.employeeId === empId && l.status !== 'Cancelled' && isOnLeave(l, today)
+    );
+    const emp = employees.find(e => e.id === empId);
+    if (!emp) return;
+    const shouldBeOnLeave = empActiveLeaves.length > 0;
+    if (shouldBeOnLeave && emp.status !== 'On Leave') updateEmployee(empId, { status: 'On Leave' });
+    if (!shouldBeOnLeave && emp.status === 'On Leave') updateEmployee(empId, { status: 'Active' });
+  };
+
+  const handleCreateOrUpdate = () => {
+    if (!staffId || !startDate || !duration || !reason || !leaveType) {
+      toast.error('Please fill in all required fields (Staff, Type, Start Date, Duration, Reason).');
+      return;
+    }
+    const emp = employees.find(e => e.id === staffId);
+    if (!emp) { toast.error('Employee not found.'); return; }
+
+    const endDate = expectedEndDate;
+
+    if (formId) {
+      updateLeave(formId, {
+        leaveType, startDate, duration: parseInt(duration),
+        expectedEndDate: endDate, reason, dateReturned, canBeContacted,
+        uploadedFile, uploadedFileName,
+      });
+      toast.success('Leave entry updated!');
+      setTimeout(() => syncEmployeeStatus(staffId), 100);
+    } else {
+      const newLeave: LeaveRecord = {
+        id: `LV-${Date.now()}`,
+        employeeId: staffId,
+        employeeName: `${emp.surname} ${emp.firstname}`,
+        leaveType, startDate, duration: parseInt(duration),
+        expectedEndDate: endDate, reason, dateReturned,
+        canBeContacted, status: 'Active',
+        uploadedFile, uploadedFileName,
+      };
+      addLeave(newLeave);
+      toast.success('Leave filed successfully!');
+      setTimeout(() => syncEmployeeStatus(staffId), 100);
+      // Offer immediate print preview
+      setPreviewLeave(newLeave);
+      setShowPrintPreview(true);
+    }
+    setShowForm(false);
+    resetForm();
+  };
+
+  const handleDelete = async (leave: LeaveRecord) => {
+    const ok = await showConfirm(`Permanently delete leave for ${leave.employeeName}?`, { variant: 'danger' });
+    if (!ok) return;
+    deleteLeave(leave.id);
+    syncEmployeeStatus(leave.employeeId);
+    toast.success('Leave record deleted.');
+  };
+
+  const handleCancel = async (leave: LeaveRecord) => {
+    const ok = await showConfirm(`Cancel leave request for ${leave.employeeName}?`, { confirmLabel: 'Yes, Cancel it' });
+    if (!ok) return;
+    updateLeave(leave.id, { status: 'Cancelled' });
+    syncEmployeeStatus(leave.employeeId);
+    toast.success('Leave cancelled.');
+  };
+
+  /* ── file upload ── */
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, leaveId?: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      if (leaveId) {
+        updateLeave(leaveId, { uploadedFile: base64, uploadedFileName: file.name });
+        toast.success('File uploaded and saved.');
+      } else {
+        setUploadedFile(base64);
+        setUploadedFileName(file.name);
+      }
     };
+    reader.readAsDataURL(file);
+  };
 
-    const resetForm = () => {
-        setFormId(null);
-        setStaffId('');
-        setStartDate('');
-        setDuration('');
-        setReason('');
-        setDateReturned('');
-        setCanBeContacted('No');
-    };
+  /* ── print ── */
+  const handlePrint = () => {
+    const content = printRef.current;
+    if (!content) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html><head><title>Staff Leave Application Form</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; font-size: 11px; color: #111; background: white; }
+        .page { width: 100%; padding: 24px 32px; }
+        .logo-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .logo-header img { height: 48px; }
+        .form-title { text-align: center; font-size: 14px; font-weight: bold; text-transform: uppercase; margin: 10px 0 18px 0; letter-spacing: 0.5px; }
+        .two-col { display: flex; gap: 40px; }
+        .col { flex: 1; }
+        .section-heading { font-size: 10px; font-weight: bold; text-transform: uppercase; margin-bottom: 6px; margin-top: 16px; }
+        .field-row { margin-bottom: 10px; }
+        .field-label { font-size: 10px; color: #333; margin-bottom: 2px; }
+        .field-line { border-bottom: 1px solid #111; min-width: 160px; display: inline-block; width: 100%; height: 14px; }
+        .field-inline { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px; }
+        .field-inline .field-label { white-space: nowrap; flex-shrink: 0; }
+        .field-inline .field-line { flex: 1; }
+        .checkbox-row { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+        .checkbox-row span { display: flex; align-items: center; gap: 3px; margin-right: 6px; }
+        .cb { width: 11px; height: 11px; border: 1px solid #333; display: inline-block; }
+        .cb.checked { background: #111; position: relative; }
+        .cb.checked::after { content: '\2713'; color: white; font-size: 8px; position: absolute; top: 0; left: 1px; }
+        .reason-box { border: 1px solid #111; min-height: 40px; width: 100%; margin-top: 2px; display: block; }
+        .sig-section { margin-top: 14px; }
+        .sig-row { display: flex; gap: 16px; margin-bottom: 10px; align-items: flex-end; }
+        .sig-row .label { font-size: 10px; flex-shrink: 0; white-space: nowrap; }
+        .sig-row .sig-line { flex: 1; border-bottom: 1px solid #111; height: 14px; }
+        .approval-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 8px; }
+        .approval-row .label { font-size: 10px; flex-shrink: 0; }
+        .approval-row .line { border-bottom: 1px solid #111; height: 14px; flex: 1; }
+        .divider { border-top: 1px solid #555; margin: 14px 0; }
+        .hr-section-title { font-size: 10px; font-weight: bold; margin-bottom: 8px; }
+        .ack-text { font-size: 10px; line-height: 1.6; margin-bottom: 8px; }
+        @media print { body { -webkit-print-color-adjust: exact; } }
+      </style></head><body>
+      ${content.innerHTML}
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); }, 400);
+  };
 
-    const handleEdit = (leave: LeaveRecord) => {
-        setFormId(leave.id);
-        setStaffId(leave.employeeId);
-        setStartDate(leave.startDate);
-        setDuration(leave.duration.toString());
-        setReason(leave.reason);
-        setDateReturned(leave.dateReturned || '');
-        setCanBeContacted(leave.canBeContacted);
-        setShowForm(true);
-    };
+  const openPrintPreview = (leave: LeaveRecord) => {
+    setPreviewLeave(leave);
+    setShowPrintPreview(true);
+  };
 
-    const totalLeavesActive = leaves.filter(l => !l.dateReturned).length;
+  /* ─────────────────────────────── render ──── */
+  return (
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
 
-    return (
-        <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-teal-400">
+            Staff Leave Management
+          </h1>
+          <p className="text-sm font-medium text-slate-500 mt-1">File, track, and manage employee leave requests.</p>
+        </div>
+        <Button
+          className="gap-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white shadow-md"
+          onClick={() => { resetForm(); setShowForm(true); }}
+        >
+          <Plus className="h-4 w-4" /> File Leave Entry
+        </Button>
+      </div>
 
-            {/* Header section with sleek styling */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-teal-400">
-                        Staff Leave Summary
-                    </h1>
-                    <p className="text-sm font-medium text-slate-500 mt-1">Manage and track employee absences, vacations, and sick leaves.</p>
+      {/* ── Leave Form Overlay ── */}
+      {showForm && (
+        <Card className="border-none shadow-2xl ring-1 ring-black/5 bg-white relative overflow-hidden animate-in slide-in-from-top-4 fade-in duration-300 z-10 w-full max-w-2xl mx-auto">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 to-emerald-400" />
+          <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-5 pt-6 px-6 sm:px-8 flex flex-row justify-between items-center">
+            <div>
+              <CardTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 text-teal-500" />
+                {formId ? 'Edit Leave Form' : 'New Leave Form'}
+              </CardTitle>
+              <CardDescription className="mt-1">Fill out this form to log an employee absence.</CardDescription>
+            </div>
+            <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200" onClick={() => { setShowForm(false); resetForm(); }}>
+              <X className="h-5 w-5 text-slate-500" />
+            </Button>
+          </CardHeader>
+          <CardContent className="p-6 sm:p-8 space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+              {/* Staff Selector */}
+              <div className="sm:col-span-2 space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Staff <span className="text-rose-500">*</span></label>
+                <select
+                  className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
+                  value={staffId} onChange={e => setStaffId(e.target.value)} disabled={!!formId}
+                >
+                  <option value="" disabled>— Select Staff Member —</option>
+                  {activeEmployees.map(emp => (
+                    <option key={emp.id} value={emp.id}>{emp.surname} {emp.firstname} ({emp.department})</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Leave Type */}
+              <div className="sm:col-span-2 space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Leave Type <span className="text-rose-500">*</span></label>
+                <select
+                  className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
+                  value={leaveType} onChange={e => setLeaveType(e.target.value)}
+                >
+                  <option value="" disabled>— Select Leave Type —</option>
+                  {leaveTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+
+              {/* Dates */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start of Leave <span className="text-rose-500">*</span></label>
+                <Input type="date" className="h-11 bg-slate-50 border-slate-200 focus-visible:ring-teal-500/30" value={startDate} onChange={e => setStartDate(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Duration (Days) <span className="text-rose-500">*</span></label>
+                <Input type="number" min="1" className="h-11 bg-slate-50 border-slate-200 focus-visible:ring-teal-500/30" value={duration} onChange={e => setDuration(e.target.value)} placeholder="e.g. 5" />
+              </div>
+
+              <div className="sm:col-span-2 space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Expected End of Leave</label>
+                <Input className="h-11 bg-slate-100 border-slate-200 text-slate-500 font-medium cursor-not-allowed" value={expectedEndDate} disabled readOnly placeholder="Auto-calculated..." />
+              </div>
+
+              {/* Reason */}
+              <div className="sm:col-span-2 space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Reason for Leave <span className="text-rose-500">*</span></label>
+                <textarea
+                  className="w-full text-sm rounded-md border border-slate-200 bg-slate-50 p-3 h-24 focus:bg-white focus:ring-2 focus:ring-teal-500/20 outline-none transition-all resize-none"
+                  value={reason} onChange={e => setReason(e.target.value)} placeholder="Enter details..."
+                />
+              </div>
+
+              {/* Return Date + Contactable */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                  Date Returned <span className="px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-700 text-[10px] font-bold">OPTIONAL</span>
+                </label>
+                <Input type="date" className="h-11 bg-slate-50 border-slate-200 focus-visible:ring-teal-500/30" value={dateReturned} onChange={e => setDateReturned(e.target.value)} />
+              </div>
+              <div className="space-y-3">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block">Can be contacted?</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                    <input type="radio" className="accent-teal-600 w-4 h-4" checked={canBeContacted === 'Yes'} onChange={() => setCanBeContacted('Yes')} /> Yes
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                    <input type="radio" className="accent-teal-600 w-4 h-4" checked={canBeContacted === 'No'} onChange={() => setCanBeContacted('No')} /> No
+                  </label>
                 </div>
-                <div className="flex gap-3">
-                    <Button
-                        className="gap-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white shadow-md transition-all whitespace-nowrap"
-                        onClick={() => { resetForm(); setShowForm(true); }}
-                    >
-                        <Plus className="h-4 w-4" />
-                        File Leave Entry
-                    </Button>
-                </div>
+              </div>
+
+              {/* File Upload */}
+              <div className="sm:col-span-2 space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Upload Leave Form (JPG / PDF)</label>
+                <label className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-slate-200 rounded-lg cursor-pointer hover:border-teal-400 hover:bg-teal-50/30 transition-all">
+                  <Upload className="h-5 w-5 text-teal-500" />
+                  <span className="text-sm text-slate-600">
+                    {uploadedFileName ? <span className="font-semibold text-teal-700">{uploadedFileName}</span> : 'Click to upload a signed leave form'}
+                  </span>
+                  <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => handleFileUpload(e)} />
+                </label>
+              </div>
             </div>
 
-            {/* Form Overlay Area */}
-            {showForm && (
-                <Card className="border-none shadow-2xl ring-1 ring-black/5 bg-white relative overflow-hidden animate-in slide-in-from-top-4 fade-in duration-300 z-10 w-full max-w-2xl mx-auto">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 to-emerald-400"></div>
-                    <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-5 pt-6 px-6 sm:px-8 flex flex-row justify-between items-center">
-                        <div>
-                            <CardTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                                <CalendarDays className="h-5 w-5 text-teal-500" /> {formId ? 'Edit Leave Form' : 'Staff Leave Entry Form'}
-                            </CardTitle>
-                            <CardDescription className="mt-1 pb-0">Fill out this entry form to log employee absences.</CardDescription>
-                        </div>
-                        <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200" onClick={() => { setShowForm(false); resetForm(); }}>
-                            <X className="h-5 w-5 text-slate-500" />
-                        </Button>
-                    </CardHeader>
-                    <CardContent className="p-6 sm:p-8 space-y-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                            <div className="sm:col-span-2 space-y-2">
-                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Staff <span className="text-rose-500">*</span></label>
-                                <select
-                                    className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
-                                    value={staffId} onChange={e => setStaffId(e.target.value)} disabled={!!formId}
-                                >
-                                    <option value="" disabled>--- Select Staff Member ---</option>
-                                    {activeEmployees.map(emp => (
-                                        <option key={emp.id} value={emp.id}>{emp.surname} {emp.firstname} ({emp.department})</option>
-                                    ))}
-                                </select>
-                            </div>
+            <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 pt-6 border-t border-slate-100">
+              <Button variant="ghost" className="text-rose-600 hover:bg-rose-50 font-medium sm:mr-auto h-11" onClick={resetForm}>Clear Form</Button>
+              <Button variant="outline" className="text-slate-600 h-11" onClick={() => setShowForm(false)}>View Entries</Button>
+              <Button onClick={handleCreateOrUpdate} className="bg-teal-600 hover:bg-teal-700 text-white font-semibold h-11 px-8 shadow-md gap-2">
+                <FileText className="h-4 w-4" /> {formId ? 'Update Entry' : 'Submit & Preview'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start of Leave <span className="text-rose-500">*</span></label>
-                                <Input type="date" className="h-11 bg-slate-50 border-slate-200 focus-visible:ring-teal-500/30" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                            </div>
+      {/* ─── Leave Records Table ─── */}
+      <Card className="border-none shadow-sm overflow-hidden bg-white flex-1 flex flex-col min-h-[500px]">
+        <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
+          <div className="flex items-center gap-2 ml-1">
+            <div className="h-8 w-8 rounded-lg bg-teal-100 flex items-center justify-center text-teal-600">
+              <ListFilter className="h-4 w-4" />
+            </div>
+            <p className="font-semibold text-slate-700 text-sm">Leave Records <span className="text-slate-400 font-normal">({filteredLeaves.length})</span></p>
+          </div>
 
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Duration (Days) <span className="text-rose-500">*</span></label>
-                                <Input type="number" min="1" className="h-11 bg-slate-50 border-slate-200 focus-visible:ring-teal-500/30" value={duration} onChange={e => setDuration(e.target.value)} placeholder="e.g. 5" />
-                            </div>
-
-                            <div className="sm:col-span-2 space-y-2">
-                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Expected End of Leave</label>
-                                <Input className="h-11 bg-slate-100 border-slate-200 text-slate-500 font-medium cursor-not-allowed" value={expectedEndDate} disabled readOnly placeholder="Auto-calculated..." />
-                            </div>
-
-                            <div className="sm:col-span-2 space-y-2">
-                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Reason for Leave <span className="text-rose-500">*</span></label>
-                                <textarea
-                                    className="w-full text-sm rounded-md border border-slate-200 bg-slate-50 p-3 h-24 focus:bg-white focus:ring-2 focus:ring-teal-500/20 outline-none transition-all resize-none"
-                                    value={reason} onChange={e => setReason(e.target.value)} placeholder="Enter details regarding this leave..."
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-                                    Date Returned <span className="px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-700 text-[10px] font-bold">OPTIONAL</span>
-                                </label>
-                                <Input type="date" className="h-11 bg-slate-50 border-slate-200 focus-visible:ring-teal-500/30" value={dateReturned} onChange={e => setDateReturned(e.target.value)} />
-                            </div>
-
-                            <div className="space-y-3">
-                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block">Can be contacted during leave?</label>
-                                <div className="flex gap-4">
-                                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
-                                        <input type="radio" className="accent-teal-600 w-4 h-4" checked={canBeContacted === 'Yes'} onChange={() => setCanBeContacted('Yes')} />
-                                        Yes
-                                    </label>
-                                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
-                                        <input type="radio" className="accent-teal-600 w-4 h-4" checked={canBeContacted === 'No'} onChange={() => setCanBeContacted('No')} />
-                                        No
-                                    </label>
-                                </div>
-                            </div>
-
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row justify-end gap-3 mt-8 pt-6 border-t border-slate-100">
-                            <Button variant="ghost" className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-medium sm:mr-auto h-11" onClick={resetForm}>
-                                Clear Form
-                            </Button>
-                            <Button variant="outline" className="text-slate-600 font-medium h-11" onClick={() => setShowForm(false)}>
-                                View Entries
-                            </Button>
-                            <Button onClick={handleCreateOrUpdate} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold h-11 px-8 shadow-md">
-                                Submit Entry
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Main Datatable Card */}
-            <Card className="border-none shadow-sm overflow-hidden bg-white flex-1 flex flex-col min-h-[500px]">
-                {/* Table Filters & Header */}
-                <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
-                    <div className="flex items-center gap-2 ml-1">
-                        <div className="h-8 w-8 rounded-lg bg-teal-100 flex items-center justify-center text-teal-600">
-                            <ListFilter className="h-4 w-4" />
-                        </div>
-                        <p className="font-semibold text-slate-700 text-sm">Leave Forms Database <span className="text-slate-400 font-normal">({filteredLeaves.length})</span></p>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                        <div className="flex bg-slate-200/50 p-1 rounded-lg">
-                            {(['All', 'Active', 'Completed'] as const).map(tab => (
-                                <button
-                                    key={tab}
-                                    className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${filterView === tab ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                    onClick={() => setFilterView(tab)}
-                                >
-                                    {tab}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="relative w-full sm:w-72">
-                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                            <Input
-                                placeholder="Search staff or reason..."
-                                className="pl-9 bg-white border-slate-200 h-9 text-sm focus-visible:ring-teal-500/50 rounded-lg shadow-sm"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Table Datagrid */}
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-teal-700 border-b border-teal-800 text-teal-50 uppercase text-[11px] tracking-wider font-bold">
-                                <th className="px-5 py-4 whitespace-nowrap rounded-tl-lg">Name</th>
-                                <th className="px-5 py-4 whitespace-nowrap">Start of Leave</th>
-                                <th className="px-5 py-4 whitespace-nowrap">Duration</th>
-                                <th className="px-5 py-4 whitespace-nowrap">Expected End of Leave</th>
-                                <th className="px-5 py-4 min-w-[300px]">Reason for Leave</th>
-                                <th className="px-5 py-4 whitespace-nowrap">Date Returned</th>
-                                <th className="px-5 py-4 whitespace-nowrap text-center">Contactable</th>
-                                <th className="px-5 py-4 whitespace-nowrap rounded-tr-lg">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 text-sm">
-                            {filteredLeaves.length === 0 ? (
-                                <tr>
-                                    <td colSpan={8} className="px-5 py-12 text-center text-slate-500">
-                                        <div className="flex flex-col items-center gap-3">
-                                            <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
-                                                <CalendarDays className="h-5 w-5 text-slate-400" />
-                                            </div>
-                                            <p>No leave records found.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredLeaves.map(leave => (
-                                    <tr key={leave.id} className="hover:bg-slate-50/80 transition-colors group">
-                                        <td className="px-5 py-4 font-bold text-slate-800 uppercase text-xs">{leave.employeeName}</td>
-                                        <td className="px-5 py-4 font-medium text-slate-600">{format(parseISO(leave.startDate), 'dd-MM-yy')}</td>
-                                        <td className="px-5 py-4 font-bold text-slate-700">{leave.duration}</td>
-                                        <td className="px-5 py-4 font-medium-text-slate-600">{format(parseISO(leave.expectedEndDate), 'dd-MM-yyyy')}</td>
-                                        <td className="px-5 py-4 max-w-xs text-slate-700">
-                                            <span className={`inline-block border px-3 py-2 rounded border-teal-600/30 text-xs font-medium`}>{leave.reason}</span>
-                                        </td>
-                                        <td className="px-5 py-4 font-medium text-slate-600">
-                                            {leave.dateReturned ? format(parseISO(leave.dateReturned), 'dd-MM-yy') : '-'}
-                                        </td>
-                                        <td className="px-5 py-4 text-center">
-                                            <span className={`text-xs font-bold ${leave.canBeContacted === 'Yes' ? 'text-teal-600' : 'text-slate-400'}`}>{leave.canBeContacted}</span>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <Button variant="outline" size="sm" className="h-8 text-xs font-semibold text-teal-700 border-teal-200 hover:bg-teal-50" onClick={() => handleEdit(leave)}>
-                                                Edit
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </Card>
-
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <div className="flex bg-slate-200/50 p-1 rounded-lg">
+              {(['All', 'Active', 'Completed', 'Cancelled'] as const).map(tab => (
+                <button
+                  key={tab}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${filterView === tab ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  onClick={() => setFilterView(tab)}
+                >{tab}</button>
+              ))}
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input placeholder="Search staff or reason..." className="pl-9 bg-white border-slate-200 h-9 text-sm focus-visible:ring-teal-500/50 rounded-lg shadow-sm" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+            </div>
+          </div>
         </div>
-    );
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-teal-700 border-b border-teal-800 text-teal-50 uppercase text-[11px] tracking-wider font-bold">
+                <th className="px-5 py-4 whitespace-nowrap">Name</th>
+                <th className="px-5 py-4 whitespace-nowrap">Leave Type</th>
+                <th className="px-5 py-4 whitespace-nowrap">Start</th>
+                <th className="px-5 py-4 whitespace-nowrap">Days</th>
+                <th className="px-5 py-4 whitespace-nowrap">Expected End</th>
+                <th className="px-5 py-4 whitespace-nowrap">Returned</th>
+                <th className="px-5 py-4 min-w-[200px]">Reason</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center">Contact</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center">Status</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center">File</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {filteredLeaves.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="px-5 py-12 text-center text-slate-500">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border">
+                        <CalendarDays className="h-5 w-5 text-slate-400" />
+                      </div>
+                      <p>No leave records found.</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredLeaves.map(leave => (
+                  <tr key={leave.id} className={`hover:bg-slate-50/80 transition-colors group ${leave.status === 'Cancelled' ? 'opacity-60' : ''}`}>
+                    <td className="px-5 py-4 font-bold text-slate-800 uppercase text-xs">{leave.employeeName}</td>
+                    <td className="px-5 py-4">
+                      <span className="inline-block px-2 py-1 text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200 rounded-full whitespace-nowrap">
+                        {leave.leaveType || '—'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 font-medium text-slate-600 whitespace-nowrap">
+                      {leave.startDate ? format(parseISO(leave.startDate), 'dd-MMM-yy') : '—'}
+                    </td>
+                    <td className="px-5 py-4 font-bold text-slate-700">{leave.duration}</td>
+                    <td className="px-5 py-4 font-medium text-slate-600 whitespace-nowrap">
+                      {leave.expectedEndDate ? format(parseISO(leave.expectedEndDate), 'dd-MMM-yy') : '—'}
+                    </td>
+                    <td className="px-5 py-4 font-medium text-slate-600 whitespace-nowrap">
+                      {leave.dateReturned ? format(parseISO(leave.dateReturned), 'dd-MMM-yy') : '—'}
+                    </td>
+                    <td className="px-5 py-4 max-w-xs text-slate-700 text-xs">{leave.reason}</td>
+                    <td className="px-5 py-4 text-center">
+                      <span className={`text-xs font-bold ${leave.canBeContacted === 'Yes' ? 'text-teal-600' : 'text-slate-400'}`}>{leave.canBeContacted}</span>
+                    </td>
+                    <td className="px-5 py-4 text-center whitespace-nowrap">
+                      <Badge className={
+                        leave.status === 'Cancelled' ? 'bg-rose-100 text-rose-700 border-rose-200' :
+                        leave.dateReturned ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                        'bg-amber-100 text-amber-700 border-amber-200'
+                      } variant="outline">
+                        {leave.status === 'Cancelled' ? 'Cancelled' : leave.dateReturned ? 'Completed' : 'On Leave'}
+                      </Badge>
+                    </td>
+                    <td className="px-5 py-4 text-center">
+                      {leave.uploadedFile ? (
+                        <button
+                          className="text-indigo-600 hover:text-indigo-800 flex items-center justify-center gap-1 mx-auto text-xs font-semibold"
+                          onClick={() => setFilePreviewLeave(leave)}
+                        >
+                          <Eye className="h-4 w-4" /> View
+                        </button>
+                      ) : (
+                        <label className="cursor-pointer text-slate-400 hover:text-teal-600 flex items-center justify-center gap-1 mx-auto text-xs font-semibold transition-colors">
+                          <Upload className="h-4 w-4" /> Upload
+                          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => handleFileUpload(e, leave.id)} />
+                        </label>
+                      )}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center justify-center gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50" title="Print Preview" onClick={() => openPrintPreview(leave)}>
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit" onClick={() => handleEdit(leave)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        {leave.status !== 'Cancelled' && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50" title="Cancel Leave" onClick={() => handleCancel(leave)}>
+                            <Ban className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete (Admin only)" onClick={() => handleDelete(leave)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* ─── Leave Summary ─── */}
+      <Card className="border-none shadow-sm overflow-hidden bg-white">
+        <CardHeader className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-t-xl">
+          <CardTitle className="text-white text-base">Leave Entitlement Summary</CardTitle>
+          <CardDescription className="text-slate-400 text-xs">Overview of all employee leave balances for the current year.</CardDescription>
+        </CardHeader>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr className="bg-slate-100 text-slate-600 uppercase text-[11px] tracking-wider font-bold">
+                <th className="px-5 py-3">Employee</th>
+                <th className="px-5 py-3">Department</th>
+                <th className="px-5 py-3 text-center">Entitlement</th>
+                <th className="px-5 py-3 text-center">Days Taken</th>
+                <th className="px-5 py-3 text-center">Remaining</th>
+                <th className="px-5 py-3 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {leaveSummary.map(({ emp, totalTaken, remaining, entitlement, isCurrentlyOnLeave }) => (
+                <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-5 py-3 font-bold text-slate-800 uppercase text-xs">{emp.surname} {emp.firstname}</td>
+                  <td className="px-5 py-3 text-slate-500 text-xs">{emp.department}</td>
+                  <td className="px-5 py-3 text-center font-mono font-semibold">{entitlement}</td>
+                  <td className="px-5 py-3 text-center">
+                    <span className={`font-mono font-bold ${totalTaken > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{totalTaken}</span>
+                  </td>
+                  <td className="px-5 py-3 text-center">
+                    <span className={`font-mono font-bold ${remaining < 5 ? 'text-rose-600' : 'text-emerald-600'}`}>{remaining}</span>
+                  </td>
+                  <td className="px-5 py-3 text-center">
+                    <Badge variant="outline" className={isCurrentlyOnLeave ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}>
+                      {isCurrentlyOnLeave ? 'On Leave' : 'Active'}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* ─── Print Preview Modal ─── */}
+      {showPrintPreview && previewLeave && (() => {
+        const lv = previewLeave;
+        const emp = employees.find(e => e.id === lv.employeeId);
+        const leaveTypeOptions = ['Annual', 'Emergency', 'Maternity/Paternity', 'Study', 'Others'];
+        return (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white max-w-4xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
+              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <Printer className="h-5 w-5 text-teal-600" /> Staff Annual Leave Application Form — Preview
+                </h2>
+                <div className="flex gap-2">
+                  <Button onClick={handlePrint} className="bg-teal-600 hover:bg-teal-700 text-white gap-2 h-9 text-sm">
+                    <Printer className="h-4 w-4" /> Print
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowPrintPreview(false)}>
+                    <X className="h-5 w-5 text-slate-500" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Scrollable preview area */}
+              <div className="overflow-y-auto flex-1 bg-gray-200 p-4">
+                <div ref={printRef} className="bg-white mx-auto shadow-sm" style={{ maxWidth: 900, padding: '28px 36px', fontSize: 11, fontFamily: 'Arial, sans-serif', color: '#111' }}>
+
+                  {/* Two-column form layout */}
+                  <div style={{ display: 'flex', gap: 40 }}>
+
+                    {/* ── LEFT COLUMN ── */}
+                    <div style={{ flex: 1 }}>
+                      {/* Logo + Title */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                        <img src="/logo/logo-2.png" alt="logo" style={{ height: 48 }} />
+                      </div>
+                      <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 'bold', textTransform: 'uppercase', margin: '10px 0 18px', letterSpacing: '0.5px' }}>
+                        STAFF ANNUAL LEAVE APPLICATION FORM
+                      </div>
+
+                      {/* 1. Employee Details */}
+                      <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', marginBottom: 8 }}>1. Employee Details</div>
+                      {[['Employee Full Name', lv.employeeName], ['Supervisor / Line Manager', ''], ['Management Staff', '']].map(([label, val]) => (
+                        <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 10 }}>
+                          <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}:</span>
+                          <span style={{ borderBottom: '1px solid #111', flex: 1, display: 'inline-block', minHeight: 14, paddingBottom: 1, fontSize: 10 }}>{val}</span>
+                        </div>
+                      ))}
+
+                      {/* 2. Leave Details */}
+                      <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '14px 0 8px' }}>2. Leave Details</div>
+                      <div style={{ fontSize: 10, marginBottom: 6 }}>Type of Leave:</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                        {leaveTypeOptions.map(opt => {
+                          const matched = (lv.leaveType || '').toLowerCase().includes(opt.toLowerCase());
+                          return (
+                            <span key={opt} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10 }}>
+                              <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: matched ? '#111' : 'white', color: 'white', fontSize: 8 }}>{matched ? '✓' : ''}</span>
+                              {opt}
+                            </span>
+                          );
+                        })}
+                      </div>
+
+                      <div style={{ fontSize: 10, marginBottom: 4 }}>Reason For Leave:</div>
+                      <div style={{ border: '1px solid #111', minHeight: 44, padding: 4, fontSize: 10, marginBottom: 10 }}>{lv.reason}</div>
+
+                      {[['Leave Start Date', lv.startDate ? format(parseISO(lv.startDate), 'dd/MM/yyyy') : ''], ['Leave End Date', lv.expectedEndDate ? format(parseISO(lv.expectedEndDate), 'dd/MM/yyyy') : ''], ['Date Returning to Work', lv.dateReturned ? format(parseISO(lv.dateReturned), 'dd/MM/yyyy') : '']].map(([label, val]) => (
+                        <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 9 }}>
+                          <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}:</span>
+                          <span style={{ borderBottom: '1px solid #111', flex: 1, display: 'inline-block', minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{val}</span>
+                        </div>
+                      ))}
+
+                      {/* 3. Handover Details */}
+                      <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '14px 0 8px' }}>3. Handover Details</div>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 10 }}>
+                        <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>Person Responsible During Absence:</span>
+                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                      </div>
+                      <div style={{ fontSize: 10, marginBottom: 4 }}>Key Duties Handed Over:</div>
+                      <div style={{ borderBottom: '1px solid #111', marginBottom: 8, minHeight: 14 }} />
+                      <div style={{ borderBottom: '1px solid #111', marginBottom: 8, minHeight: 14 }} />
+                      <div style={{ borderBottom: '1px solid #111', marginBottom: 16, minHeight: 14 }} />
+
+                      {/* 5. Contact During Leave */}
+                      <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '4px 0 8px' }}>5. Contact During Leave</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 10 }}>
+                        <span>Can be Contacted:</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: lv.canBeContacted === 'Yes' ? '#111' : 'white', color: 'white', fontSize: 8 }}>{lv.canBeContacted === 'Yes' ? '✓' : ''}</span> Yes
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: lv.canBeContacted === 'No' ? '#111' : 'white', color: 'white', fontSize: 8 }}>{lv.canBeContacted === 'No' ? '✓' : ''}</span> No
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* ── RIGHT COLUMN ── */}
+                    <div style={{ flex: 1 }}>
+                      {/* Logo repeat */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22 }}>
+                        <img src="/logo/logo-2.png" alt="logo" style={{ height: 48, marginLeft: 'auto' }} />
+                      </div>
+
+                      {/* Phone / Email */}
+                      {[['Phone Number', emp?.accountNo ? '' : ''], ['Email Address', '']].map(([label]) => (
+                        <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 10 }}>
+                          <span style={{ fontSize: 10, flexShrink: 0 }}>{label}:</span>
+                          <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                        </div>
+                      ))}
+
+                      {/* 6. Signatures */}
+                      <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '14px 0 8px' }}>6. Signatures</div>
+
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 10 }}>
+                        <span style={{ fontSize: 10, flexShrink: 0 }}>Employee Signature:</span>
+                        <span style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }} />
+                        <span style={{ fontSize: 10, flexShrink: 0 }}>Date</span>
+                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                      </div>
+
+                      {["Supervisor's", "Management's"].map(who => (
+                        <div key={who} style={{ marginBottom: 10 }}>
+                          <div style={{ display: 'flex', gap: 8, fontSize: 10, marginBottom: 6 }}>
+                            <span style={{ flexShrink: 0 }}>{who} Approval:</span>
+                            <span>Approved</span>
+                            <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                            <span style={{ flexShrink: 0 }}>Not Approved</span>
+                            <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10 }}>
+                            <span style={{ flexShrink: 0 }}>{who.replace("'s", '')} Signature:</span>
+                            <span style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }} />
+                            <span style={{ flexShrink: 0 }}>Date</span>
+                            <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* HR Section */}
+                      <div style={{ borderTop: '1px solid #555', margin: '14px 0 10px' }} />
+                      <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 8 }}>To be Completed by Human Resources</div>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 9, fontSize: 10 }}>
+                        <span style={{ flexShrink: 0 }}>Leave approved from:</span>
+                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                        <span style={{ flexShrink: 0 }}>to</span>
+                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                      </div>
+                      {[['Human Resource & Admin Manager', ''], ['Date', '']].map(([label]) => (
+                        <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 9, fontSize: 10 }}>
+                          <span style={{ flexShrink: 0 }}>{label}:</span>
+                          <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                        </div>
+                      ))}
+
+                      {/* Leave Acknowledgement */}
+                      <div style={{ borderTop: '1px solid #555', margin: '14px 0 10px' }} />
+                      <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 8 }}>Leave Acknowledgement:</div>
+                      <div style={{ fontSize: 10, lineHeight: 1.7, marginBottom: 8 }}>
+                        I <span style={{ borderBottom: '1px solid #111', display: 'inline-block', minWidth: 120, marginBottom: -2 }}>&nbsp;</span> hereby notify the Human Resources and Administrative department that I have resumed duty as of:
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10, marginBottom: 10 }}>
+                        <span style={{ flexShrink: 0 }}>Employee's Signature:</span>
+                        <span style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }} />
+                        <span style={{ flexShrink: 0 }}>Date:</span>
+                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10 }}>
+                        <span style={{ flexShrink: 0 }}>Head of Dept/Line Manager Signature:</span>
+                        <span style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }} />
+                        <span style={{ flexShrink: 0 }}>Date:</span>
+                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ─── Uploaded File Preview Modal ─── */}
+      {filePreviewLeave && filePreviewLeave.uploadedFile && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setFilePreviewLeave(null)}>
+          <div className="bg-white max-w-3xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <FileText className="h-5 w-5 text-indigo-600" /> {filePreviewLeave.uploadedFileName || 'Uploaded File'}
+              </h2>
+              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setFilePreviewLeave(null)}>
+                <X className="h-5 w-5 text-slate-500" />
+              </Button>
+            </div>
+            <div className="p-4 overflow-auto flex-1 flex items-center justify-center bg-slate-100">
+              {filePreviewLeave.uploadedFile.startsWith('data:image') ? (
+                <img src={filePreviewLeave.uploadedFile} alt="Uploaded leave form" className="max-w-full max-h-[70vh] rounded-lg shadow-lg" />
+              ) : (
+                <iframe src={filePreviewLeave.uploadedFile} className="w-full h-[70vh] rounded-lg border border-slate-200" title="PDF Preview" />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

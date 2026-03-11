@@ -104,6 +104,9 @@ interface AppState {
   addLeave: (leave: LeaveRecord) => void;
   updateLeave: (id: string, leave: Partial<LeaveRecord>) => void;
   deleteLeave: (id: string) => void;
+  leaveTypes: string[];
+  addLeaveType: (type: string) => void;
+  removeLeaveType: (type: string) => void;
 }
 
 
@@ -111,12 +114,16 @@ export interface LeaveRecord {
   id: string;
   employeeId: string;
   employeeName: string;
+  leaveType: string;
   startDate: string;
   duration: number;
   expectedEndDate: string;
   reason: string;
   dateReturned: string;
   canBeContacted: 'Yes' | 'No';
+  status: 'Active' | 'Cancelled';
+  uploadedFile?: string; // base64 or filename
+  uploadedFileName?: string;
 }
 
 export interface MonthlySalary {
@@ -352,6 +359,10 @@ export const useAppStore = create<AppState>()(
         },
       ],
       attendanceRecords: [],
+      leaves: [],
+      addLeave: (leave) => set((state) => ({ leaves: [...state.leaves, leave] })),
+      updateLeave: (id, update) => set((state) => ({ leaves: state.leaves.map(l => l.id === id ? { ...l, ...update } : l) })),
+      deleteLeave: (id) => set((state) => ({ leaves: state.leaves.filter(l => l.id !== id) })),
       pendingInvoices: [
         {
           id: 'PI-001',
@@ -611,6 +622,9 @@ export const useAppStore = create<AppState>()(
           };
         }
       }),
+      leaveTypes: ['Annual Leave', 'Sick Leave', 'Maternity Leave', 'Paternity Leave', 'Compassionate Leave', 'Study Leave', 'Unpaid Leave'],
+      addLeaveType: (type) => set((state) => ({ leaveTypes: state.leaveTypes.includes(type) ? state.leaveTypes : [...state.leaveTypes, type] })),
+      removeLeaveType: (type) => set((state) => ({ leaveTypes: state.leaveTypes.filter(t => t !== type) })),
     }),
     {
       name: 'spark-beginnings-storage',
