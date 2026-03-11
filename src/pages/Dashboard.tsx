@@ -151,63 +151,6 @@ export function Dashboard() {
     }, [employees, filterYear]);
 
 
-    // Annual Payroll & Overtime Trend (based on filterYear)
-    const chartData = useMemo(() => {
-        return MONTHS.map((m) => {
-            const targetMonthIdx = m.value;
-            let totalPayroll = 0;
-            let totalOvertime = 0;
-
-            const officialWorkdays = computeWorkDays(filterYear, targetMonthIdx, holidays.map(h => h.date));
-            const monthConfig = monthValues[m.key] || { workDays: officialWorkdays, overtimeRate: 0.5 };
-            const otRate = monthConfig.overtimeRate;
-
-            employees.filter(e => e.status === 'Active').forEach(emp => {
-                const standardSalary = emp.monthlySalaries[m.key as keyof typeof emp.monthlySalaries] || 0;
-                let daysWorked = 0;
-                let daysAbsent = 0;
-                let otInstances = 0;
-
-                for (const r of attendanceRecords) {
-                    if (r.staffId === emp.id && r.mth === targetMonthIdx && r.date.startsWith(filterYear.toString())) {
-                        if (r.day?.toLowerCase() === 'yes') {
-                            daysWorked++;
-                            if (r.ot > 0) otInstances++;
-                        } else if (r.day?.toLowerCase() === 'no') {
-                            daysAbsent++;
-                        }
-                    }
-                }
-
-                if (daysWorked > officialWorkdays) daysWorked = officialWorkdays;
-
-                let salary = 0;
-                let overtime = 0;
-
-                if (standardSalary > 0 && officialWorkdays > 0) {
-                    const dailyRate = standardSalary / officialWorkdays;
-                    const isOperations = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase());
-
-                    if (isOperations) {
-                        salary = dailyRate * daysWorked;
-                    } else {
-                        salary = standardSalary - (dailyRate * daysAbsent);
-                        if (salary < 0) salary = 0;
-                    }
-                    overtime = otInstances * (dailyRate * (1 + otRate));
-                }
-
-                totalPayroll += (salary + overtime);
-                totalOvertime += overtime;
-            });
-
-            return {
-                name: m.label.substring(0, 3),
-                Payroll: totalPayroll,
-                Overtime: totalOvertime,
-            };
-        });
-    }, [employees, attendanceRecords, holidays, monthValues, filterYear]);
 
 
     // 4. ACTIONABLE ALERTS (Removed salary advances / loans per user request)
