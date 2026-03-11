@@ -61,87 +61,33 @@ export function Dashboard() {
 
     const monthKey = filterMonth ? MONTHS.find(m => m.value === filterMonth)?.key || 'jan' : null;
 
-    // 1. FINANCIAL CALCULATIONS (For Selected Month & Year)
-    const financeStats = useMemo(() => {
-        let totalGrossExposure = 0;
-        let totalStatutory = 0;
+    // Overtime cost calculation (for display in Headcount section)
+    const overtimeCost = useMemo(() => {
         let totalOvertimeCost = 0;
-
-        // Get months to process: either single month or all 12 months
         const monthsToProcess = filterMonth ? [filterMonth] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
         employees.filter(e => e.status === 'Active').forEach(emp => {
             monthsToProcess.forEach(targetMonth => {
                 const targetMonthKey = MONTHS.find(m => m.value === targetMonth)?.key || 'jan';
                 const standardSalary = (emp.monthlySalaries[targetMonthKey as keyof typeof emp.monthlySalaries] as number) || 0;
-                
                 const officialWorkdays = computeWorkDays(filterYear, targetMonth, holidays.map(h => h.date));
                 const monthConfig = monthValues[targetMonthKey] || { workDays: officialWorkdays, overtimeRate: 0.5 };
                 const otRate = monthConfig.overtimeRate;
-
-                let daysWorked = 0;
-                let daysAbsent = 0;
-                let otInstances = 0;
-
+                let daysWorked = 0, otInstances = 0;
                 for (const r of attendanceRecords) {
                     if (r.staffId === emp.id && r.mth === targetMonth && r.date.startsWith(filterYear.toString())) {
-                        if (r.day?.toLowerCase() === 'yes') {
-                            daysWorked++;
-                            if (r.ot > 0) otInstances++;
-                        } else if (r.day?.toLowerCase() === 'no') {
-                            daysAbsent++;
-                        }
+                        if (r.day?.toLowerCase() === 'yes') { daysWorked++; if (r.ot > 0) otInstances++; }
                     }
                 }
-
                 if (daysWorked > officialWorkdays) daysWorked = officialWorkdays;
-
-                let salary = 0;
-                let overtime = 0;
-
                 if (standardSalary > 0 && officialWorkdays > 0) {
                     const dailyRate = standardSalary / officialWorkdays;
-                    const isOperations = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase());
-
-                    if (isOperations) {
-                        salary = dailyRate * daysWorked;
-                    } else {
-                        salary = standardSalary - (dailyRate * daysAbsent);
-                        if (salary < 0) salary = 0;
-                    }
-                    overtime = otInstances * (dailyRate * (1 + otRate));
-                    totalOvertimeCost += overtime;
-                }
-
-                const grossPay = salary + overtime;
-                totalGrossExposure += grossPay;
-
-                if (emp.payeTax) {
-                    const basic = salary * (payrollVariables.basic / 100);
-                    const housing = salary * (payrollVariables.housing / 100);
-                    const transport = salary * (payrollVariables.transport / 100);
-                    const pensionSum = basic + housing + transport;
-
-                    const pension = pensionSum * (payrollVariables.employeePensionRate / 100);
-                    const employerPension = pensionSum * (payrollVariables.employerPensionRate / 100);
-                    const nsitf = grossPay * ((payrollVariables.nsitfRate || 1) / 100);
-
-                    const estimatedPAYE = grossPay > 60000 ? (grossPay * 0.10) : 0;
-                    totalStatutory += (pension + employerPension + nsitf + estimatedPAYE);
+                    totalOvertimeCost += otInstances * (dailyRate * (1 + otRate));
                 }
             });
         });
-
-        let outstandingLoans = 0;
-        salaryAdvances.forEach(a => {
-            if (a.status === 'Approved') outstandingLoans += a.amount;
-        });
-        loans.forEach(l => {
-            if (l.status === 'Active') outstandingLoans += l.remainingBalance;
-        });
-
-        return { totalGrossExposure, totalStatutory, totalOvertimeCost, outstandingLoans };
-    }, [employees, attendanceRecords, monthKey, holidays, payrollVariables, monthValues, filterMonth, filterYear, salaryAdvances, loans]);
+        return totalOvertimeCost;
+    }, [employees, attendanceRecords, holidays, monthValues, filterMonth, filterYear]);
 
     // 2. OPERATIONAL HEALTH (For Selected Month & Year)
     const opsStats = useMemo(() => {
