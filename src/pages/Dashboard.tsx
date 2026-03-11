@@ -10,7 +10,7 @@ import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import {
     AreaChart, Area, BarChart, Bar, CartesianGrid, ResponsiveContainer,
-    Tooltip, XAxis, YAxis, Legend, PieChart, Pie, Cell
+    Tooltip, XAxis, YAxis, Legend, PieChart, Pie, Cell, LabelList
 } from 'recharts';
 
 function computeWorkDays(year: number, monthNum: number, holidayDates: string[]): number {
@@ -331,9 +331,15 @@ export function Dashboard() {
                                     <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
                                     <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                                     <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                    <Bar dataKey="Present" fill="#10b981" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="Absent" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="Overtime" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="Present" fill="#10b981" radius={[4, 4, 0, 0]}>
+                                        <LabelList dataKey="Present" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: number) => v > 0 ? v : ''} />
+                                    </Bar>
+                                    <Bar dataKey="Absent" fill="#ef4444" radius={[4, 4, 0, 0]}>
+                                        <LabelList dataKey="Absent" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#ef4444' }} formatter={(v: number) => v > 0 ? v : ''} />
+                                    </Bar>
+                                    <Bar dataKey="Overtime" fill="#8b5cf6" radius={[4, 4, 0, 0]}>
+                                        <LabelList dataKey="Overtime" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#8b5cf6' }} formatter={(v: number) => v > 0 ? v : ''} />
+                                    </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -406,7 +412,9 @@ export function Dashboard() {
                                     <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
                                     <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
                                     <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                                    <Area type="monotone" name="Headcount" dataKey="Headcount" stroke="#10b981" strokeWidth={2} fill="url(#colorHeadcount)" />
+                                    <Area type="monotone" name="Headcount" dataKey="Headcount" stroke="#10b981" strokeWidth={2} fill="url(#colorHeadcount)">
+                                        <LabelList dataKey="Headcount" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} />
+                                    </Area>
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
@@ -480,7 +488,9 @@ export function Dashboard() {
                                         <XAxis type="number" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
                                         <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} width={100} />
                                         <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                                        <Bar dataKey="count" name="Staff Count" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={18} />
+                                        <Bar dataKey="count" name="Staff Count" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={18}>
+                                            <LabelList dataKey="count" position="right" style={{ fontSize: 11, fontWeight: 700, fill: '#6366f1' }} />
+                                        </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -509,14 +519,6 @@ export function Dashboard() {
                                         <p>{alert.msg}</p>
                                     </div>
                                 ))}
-                            </div>
-                            <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-100">
-                                <Button variant="outline" className="justify-start gap-2 h-12 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-semibold" onClick={() => window.location.href = '/onboarding'}>
-                                    <UserPlus className="h-4 w-4 text-indigo-500" /> Hire Staff
-                                </Button>
-                                <Button variant="outline" className="justify-start gap-2 h-12 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-semibold" onClick={() => window.location.href = '/attendance'}>
-                                    <CalendarCheck className="h-4 w-4 text-indigo-500" /> Attendance
-                                </Button>
                             </div>
                         </CardContent>
                     </Card>

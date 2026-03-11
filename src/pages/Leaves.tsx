@@ -4,14 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
-import {
-  Search, Plus, CalendarDays, ListFilter, X, Trash2, Edit,
-  Printer, Upload, Eye, Ban, ChevronDown, FileText
-} from 'lucide-react';
+import { CalendarDays, Filter, ChevronDown, CheckCircle2, UserCheck, Mail, Phone, Download, Printer, Eye, X, Upload, Plus, Edit, Trash2, Ban, Search, ListFilter, CalendarClock, FileText } from 'lucide-react';
 import { useAppStore, LeaveRecord } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { addDays, parseISO, format, isWithinInterval } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 /* ─────────────────────────────────── helpers ─── */
 function calcExpectedEnd(startDate: string, duration: number): string {
@@ -31,6 +29,7 @@ function isOnLeave(leave: LeaveRecord, date: Date): boolean {
 
 /* ─────────────────────────────────── component ─ */
 export function Leaves() {
+  const navigate = useNavigate();
   const {
     employees, leaves, addLeave, updateLeave, deleteLeave,
     leaveTypes, updateEmployee,
@@ -175,7 +174,34 @@ export function Leaves() {
       setShowPrintPreview(true);
     }
     setShowForm(false);
+    setShowForm(false);
     resetForm();
+  };
+
+  const handlePreviewCurrentForm = () => {
+    if (!staffId) {
+      toast.error('Please select an employee first to preview the form.');
+      return;
+    }
+    const emp = employees.find(e => e.id === staffId);
+    
+    // Construct a temporary leave object for preview
+    const tempLeave: LeaveRecord = {
+      id: formId || `PREVIEW`,
+      employeeId: staffId,
+      employeeName: emp ? `${emp.surname} ${emp.firstname}` : '',
+      leaveType: leaveType || '',
+      startDate: startDate || '',
+      duration: duration ? parseInt(duration) : 0,
+      expectedEndDate: expectedEndDate || '',
+      reason: reason || '',
+      dateReturned: dateReturned || '',
+      canBeContacted: canBeContacted || 'Yes',
+      status: 'Active',
+    };
+    
+    setPreviewLeave(tempLeave);
+    setShowPrintPreview(true);
   };
 
   const handleDelete = async (leave: LeaveRecord) => {
@@ -276,12 +302,21 @@ export function Leaves() {
           </h1>
           <p className="text-sm font-medium text-slate-500 mt-1">File, track, and manage employee leave requests.</p>
         </div>
-        <Button
-          className="gap-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white shadow-md"
-          onClick={() => { resetForm(); setShowForm(true); }}
-        >
-          <Plus className="h-4 w-4" /> File Leave Entry
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-sm"
+            onClick={() => navigate('/leave-summary')}
+          >
+            <CalendarClock className="h-4 w-4" /> Go to Summary
+          </Button>
+          <Button
+            className="gap-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white shadow-md"
+            onClick={() => { resetForm(); setShowForm(true); }}
+          >
+            <Plus className="h-4 w-4" /> File Leave Entry
+          </Button>
+        </div>
       </div>
 
       {/* ── Leave Form Overlay ── */}
@@ -388,8 +423,11 @@ export function Leaves() {
             <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 pt-6 border-t border-slate-100">
               <Button variant="ghost" className="text-rose-600 hover:bg-rose-50 font-medium sm:mr-auto h-11" onClick={resetForm}>Clear Form</Button>
               <Button variant="outline" className="text-slate-600 h-11" onClick={() => setShowForm(false)}>View Entries</Button>
+              <Button onClick={handlePreviewCurrentForm} className="bg-slate-800 hover:bg-slate-900 text-white font-semibold h-11 px-6 shadow-sm gap-2">
+                <Printer className="h-4 w-4" /> Preview Form
+              </Button>
               <Button onClick={handleCreateOrUpdate} className="bg-teal-600 hover:bg-teal-700 text-white font-semibold h-11 px-8 shadow-md gap-2">
-                <FileText className="h-4 w-4" /> {formId ? 'Update Entry' : 'Submit & Preview'}
+                <FileText className="h-4 w-4" /> {formId ? 'Update Entry' : 'Submit Entry'}
               </Button>
             </div>
           </CardContent>
@@ -527,47 +565,7 @@ export function Leaves() {
         </div>
       </Card>
 
-      {/* ─── Leave Summary ─── */}
-      <Card className="border-none shadow-sm overflow-hidden bg-white">
-        <CardHeader className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-t-xl">
-          <CardTitle className="text-white text-base">Leave Entitlement Summary</CardTitle>
-          <CardDescription className="text-slate-400 text-xs">Overview of all employee leave balances for the current year.</CardDescription>
-        </CardHeader>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="bg-slate-100 text-slate-600 uppercase text-[11px] tracking-wider font-bold">
-                <th className="px-5 py-3">Employee</th>
-                <th className="px-5 py-3">Department</th>
-                <th className="px-5 py-3 text-center">Entitlement</th>
-                <th className="px-5 py-3 text-center">Days Taken</th>
-                <th className="px-5 py-3 text-center">Remaining</th>
-                <th className="px-5 py-3 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {leaveSummary.map(({ emp, totalTaken, remaining, entitlement, isCurrentlyOnLeave }) => (
-                <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3 font-bold text-slate-800 uppercase text-xs">{emp.surname} {emp.firstname}</td>
-                  <td className="px-5 py-3 text-slate-500 text-xs">{emp.department}</td>
-                  <td className="px-5 py-3 text-center font-mono font-semibold">{entitlement}</td>
-                  <td className="px-5 py-3 text-center">
-                    <span className={`font-mono font-bold ${totalTaken > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{totalTaken}</span>
-                  </td>
-                  <td className="px-5 py-3 text-center">
-                    <span className={`font-mono font-bold ${remaining < 5 ? 'text-rose-600' : 'text-emerald-600'}`}>{remaining}</span>
-                  </td>
-                  <td className="px-5 py-3 text-center">
-                    <Badge variant="outline" className={isCurrentlyOnLeave ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}>
-                      {isCurrentlyOnLeave ? 'On Leave' : 'Active'}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+
 
       {/* ─── Print Preview Modal ─── */}
       {showPrintPreview && previewLeave && (() => {
@@ -613,7 +611,7 @@ export function Leaves() {
                       {[['Employee Full Name', lv.employeeName], ['Supervisor / Line Manager', ''], ['Management Staff', '']].map(([label, val]) => (
                         <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 10 }}>
                           <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}:</span>
-                          <span style={{ borderBottom: '1px solid #111', flex: 1, display: 'inline-block', minHeight: 14, paddingBottom: 1, fontSize: 10 }}>{val}</span>
+                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, display: 'inline-block', minHeight: 14, paddingBottom: 1, fontSize: 10 }}>{val}</span>
                         </div>
                       ))}
 
@@ -633,12 +631,12 @@ export function Leaves() {
                       </div>
 
                       <div style={{ fontSize: 10, marginBottom: 4 }}>Reason For Leave:</div>
-                      <div style={{ border: '1px solid #111', minHeight: 44, padding: 4, fontSize: 10, marginBottom: 10 }}>{lv.reason}</div>
+                      <div contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ border: '1px solid #111', minHeight: 44, padding: 4, fontSize: 10, marginBottom: 10 }}>{lv.reason}</div>
 
                       {[['Leave Start Date', lv.startDate ? format(parseISO(lv.startDate), 'dd/MM/yyyy') : ''], ['Leave End Date', lv.expectedEndDate ? format(parseISO(lv.expectedEndDate), 'dd/MM/yyyy') : ''], ['Date Returning to Work', lv.dateReturned ? format(parseISO(lv.dateReturned), 'dd/MM/yyyy') : '']].map(([label, val]) => (
                         <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 9 }}>
                           <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}:</span>
-                          <span style={{ borderBottom: '1px solid #111', flex: 1, display: 'inline-block', minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{val}</span>
+                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, display: 'inline-block', minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{val}</span>
                         </div>
                       ))}
 
@@ -646,12 +644,12 @@ export function Leaves() {
                       <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '14px 0 8px' }}>3. Handover Details</div>
                       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 10 }}>
                         <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>Person Responsible During Absence:</span>
-                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
                       </div>
                       <div style={{ fontSize: 10, marginBottom: 4 }}>Key Duties Handed Over:</div>
-                      <div style={{ borderBottom: '1px solid #111', marginBottom: 8, minHeight: 14 }} />
-                      <div style={{ borderBottom: '1px solid #111', marginBottom: 8, minHeight: 14 }} />
-                      <div style={{ borderBottom: '1px solid #111', marginBottom: 16, minHeight: 14 }} />
+                      <div contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', marginBottom: 8, minHeight: 14 }}></div>
+                      <div contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', marginBottom: 8, minHeight: 14 }}></div>
+                      <div contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', marginBottom: 16, minHeight: 14 }}></div>
 
                       {/* 5. Contact During Leave */}
                       <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '4px 0 8px' }}>5. Contact During Leave</div>
@@ -677,7 +675,7 @@ export function Leaves() {
                       {[['Phone Number', emp?.accountNo ? '' : ''], ['Email Address', '']].map(([label]) => (
                         <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 10 }}>
                           <span style={{ fontSize: 10, flexShrink: 0 }}>{label}:</span>
-                          <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
                         </div>
                       ))}
 
@@ -686,9 +684,9 @@ export function Leaves() {
 
                       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 10 }}>
                         <span style={{ fontSize: 10, flexShrink: 0 }}>Employee Signature:</span>
-                        <span style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }} />
+                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }}></span>
                         <span style={{ fontSize: 10, flexShrink: 0 }}>Date</span>
-                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
                       </div>
 
                       {["Supervisor's", "Management's"].map(who => (
@@ -696,15 +694,15 @@ export function Leaves() {
                           <div style={{ display: 'flex', gap: 8, fontSize: 10, marginBottom: 6 }}>
                             <span style={{ flexShrink: 0 }}>{who} Approval:</span>
                             <span>Approved</span>
-                            <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                            <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
                             <span style={{ flexShrink: 0 }}>Not Approved</span>
-                            <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                            <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10 }}>
                             <span style={{ flexShrink: 0 }}>{who.replace("'s", '')} Signature:</span>
-                            <span style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }} />
+                            <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }}></span>
                             <span style={{ flexShrink: 0 }}>Date</span>
-                            <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                            <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
                           </div>
                         </div>
                       ))}
@@ -714,14 +712,14 @@ export function Leaves() {
                       <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 8 }}>To be Completed by Human Resources</div>
                       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 9, fontSize: 10 }}>
                         <span style={{ flexShrink: 0 }}>Leave approved from:</span>
-                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
                         <span style={{ flexShrink: 0 }}>to</span>
-                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
                       </div>
                       {[['Human Resource & Admin Manager', ''], ['Date', '']].map(([label]) => (
                         <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 9, fontSize: 10 }}>
                           <span style={{ flexShrink: 0 }}>{label}:</span>
-                          <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
                         </div>
                       ))}
 
@@ -729,19 +727,19 @@ export function Leaves() {
                       <div style={{ borderTop: '1px solid #555', margin: '14px 0 10px' }} />
                       <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 8 }}>Leave Acknowledgement:</div>
                       <div style={{ fontSize: 10, lineHeight: 1.7, marginBottom: 8 }}>
-                        I <span style={{ borderBottom: '1px solid #111', display: 'inline-block', minWidth: 120, marginBottom: -2 }}>&nbsp;</span> hereby notify the Human Resources and Administrative department that I have resumed duty as of:
+                        I <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', display: 'inline-block', minWidth: 120, marginBottom: -2 }}>&nbsp;</span> hereby notify the Human Resources and Administrative department that I have resumed duty as of:
                       </div>
                       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10, marginBottom: 10 }}>
                         <span style={{ flexShrink: 0 }}>Employee's Signature:</span>
-                        <span style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }} />
+                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }}></span>
                         <span style={{ flexShrink: 0 }}>Date:</span>
-                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10 }}>
                         <span style={{ flexShrink: 0 }}>Head of Dept/Line Manager Signature:</span>
-                        <span style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }} />
+                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }}></span>
                         <span style={{ flexShrink: 0 }}>Date:</span>
-                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }} />
+                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
                       </div>
                     </div>
                   </div>

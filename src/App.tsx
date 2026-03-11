@@ -22,6 +22,7 @@ import { Settings } from './pages/Settings';
 import { Profile } from './pages/Profile';
 import { Variables } from './pages/Variables';
 import { Leaves } from './pages/Leaves';
+import { LeaveSummary } from './pages/LeaveSummary';
 import { Users } from './pages/Users';
 import { SalaryLoans } from './pages/SalaryLoans';
 import { ClientSummary } from './pages/ClientSummary';
@@ -54,6 +55,7 @@ export default function App() {
             <Route path="profile" element={<Profile />} />
             <Route path="variables" element={<Variables />} />
             <Route path="leaves" element={<Leaves />} />
+            <Route path="leave-summary" element={<LeaveSummary />} />
             <Route path="users" element={<Users />} />
             <Route path="salary-loans" element={<SalaryLoans />} />
             <Route path="client-summary" element={<ClientSummary />} />

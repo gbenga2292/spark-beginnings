@@ -11,11 +11,12 @@ import { useAppStore } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
 import {
   BarChart, Bar, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend,
-  AreaChart, Area, PieChart, Pie, Cell, LineChart, Line
+  AreaChart, Area, PieChart, Pie, Cell, LineChart, Line, LabelList
 } from 'recharts';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { usePayrollCalculator } from '@/src/hooks/usePayrollCalculator';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -57,6 +58,8 @@ export function FinancialReports() {
     { label: 'September', value: 9, key: 'sep' }, { label: 'October', value: 10, key: 'oct' },
     { label: 'November', value: 11, key: 'nov' }, { label: 'December', value: 12, key: 'dec' },
   ];
+
+  const { calculatePayrollForMonth, MONTHS } = usePayrollCalculator();
 
   function computeWorkDays(year: number, monthNum: number, holidayDates: string[]): number {
     const startDate = new Date(year, monthNum - 1, 1);
@@ -665,8 +668,12 @@ export function FinancialReports() {
                 <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString()}`} />
                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                <Line yAxisId="right" type="monotone" name="Overtime Burn" dataKey="Overtime" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
+                  <LabelList dataKey="Payroll" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: number) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                </Line>
+                <Line yAxisId="right" type="monotone" name="Overtime Burn" dataKey="Overtime" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
+                  <LabelList dataKey="Overtime" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#f59e0b' }} formatter={(v: number) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                </Line>
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -841,8 +848,12 @@ export function FinancialReports() {
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `₦${val / 1000000}M`} />
                   <RechartsTooltip formatter={(value: number | undefined) => formatCurr(value ?? 0)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                   <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '13px' }} />
-                  <Area type="monotone" dataKey="Billed" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorBilledR)" />
-                  <Area type="monotone" dataKey="Collected" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorCollectedR)" />
+                  <Area type="monotone" dataKey="Billed" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorBilledR)">
+                    <LabelList dataKey="Billed" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#6366f1' }} formatter={(v: number) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
+                  </Area>
+                  <Area type="monotone" dataKey="Collected" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorCollectedR)">
+                    <LabelList dataKey="Collected" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: number) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
+                  </Area>
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
@@ -923,7 +934,9 @@ export function FinancialReports() {
                   <RechartsTooltip cursor={{ fill: '#f1f5f9' }} formatter={(value: number | undefined) => formatCurr(value ?? 0)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                   <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', fontSize: '13px' }} />
                   <Bar dataKey="Cleared" stackId="a" fill="#cbd5e1" name="Received" />
-                  <Bar dataKey="Outstanding" stackId="a" fill="#f59e0b" name="Outstanding" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="Outstanding" stackId="a" fill="#f59e0b" name="Outstanding" radius={[0, 4, 4, 0]}>
+                    <LabelList dataKey="Outstanding" position="right" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: number) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -951,8 +964,12 @@ export function FinancialReports() {
                 <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
                 <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString()}`} />
                 <Legend verticalAlign="bottom" height={36} />
-                <Bar dataKey="paid" stackId="a" fill="#10b981" name="Paid Invoice" />
-                <Bar dataKey="pending" stackId="a" fill="#f59e0b" name="Pending Invoice" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="paid" stackId="a" fill="#10b981" name="Paid Invoice">
+                  <LabelList dataKey="paid" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: number) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                </Bar>
+                <Bar dataKey="pending" stackId="a" fill="#f59e0b" name="Pending Invoice" radius={[4, 4, 0, 0]}>
+                  <LabelList dataKey="pending" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: number) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -1165,18 +1182,51 @@ export function FinancialReports() {
           {accountsTab === 'payroll' ? (
             /* ── PAYROLL SUMMARY ── */
             (() => {
-              const MONTH_KEYS: (keyof typeof employees[0]['monthlySalaries'])[] = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
-              const monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-              const activeEmps = employees.filter(e => e.status === 'Active');
+              const payrollSummaryData = MONTHS.map(month => {
+                const results = calculatePayrollForMonth(month.key);
+                let salary = 0;
+                let overtime = 0;
+                let grossPay = 0;
+                let otherPay = 0;
+                let paye = 0;
 
-              const exportPayrollCsv = () => {
-                let csv = 'data:text/csv;charset=utf-8,';
-                csv += `Employee,Department,Position,${monthLabels.join(',')},Annual Total\n`;
-                activeEmps.forEach(emp => {
-                  const monthVals = MONTH_KEYS.map(k => emp.monthlySalaries?.[k] ?? 0);
-                  const annual = monthVals.reduce((s, v) => s + v, 0);
-                  csv += `"${emp.surname} ${emp.firstname}",${emp.department},${emp.position},${monthVals.join(',')},${annual}\n`;
+                results.forEach(r => {
+                  salary += r.salary;
+                  overtime += r.overtime;
+                  grossPay += (r.salary + r.overtime);
+                  otherPay += r.totalAllowances;
+                  paye += r.paye;
                 });
+                const totalPayout = grossPay + otherPay;
+
+                return {
+                  monthLabel: month.label,
+                  salary,
+                  overtime,
+                  grossPay,
+                  otherPay,
+                  paye,
+                  totalPayout
+                };
+              });
+
+              // compute Grand Totals
+              const gSalary = payrollSummaryData.reduce((s, row) => s + row.salary, 0);
+              const gOvertime = payrollSummaryData.reduce((s, row) => s + row.overtime, 0);
+              const gGrossPay = payrollSummaryData.reduce((s, row) => s + row.grossPay, 0);
+              const gOtherPay = payrollSummaryData.reduce((s, row) => s + row.otherPay, 0);
+              const gPaye = payrollSummaryData.reduce((s, row) => s + row.paye, 0);
+              const gTotalPayout = payrollSummaryData.reduce((s, row) => s + row.totalPayout, 0);
+
+              const fm = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+              const exportPayrollSummaryCsv = () => {
+                let csv = 'data:text/csv;charset=utf-8,';
+                csv += 'MONTH,SALARY,OVERTIME,GROSS PAY,OTHER PAY,PAYE,TOTAL PAYOUT\n';
+                payrollSummaryData.forEach(r => {
+                  csv += `"${r.monthLabel}",${fm(r.salary)},${fm(r.overtime)},${fm(r.grossPay)},${fm(r.otherPay)},${fm(r.paye)},${fm(r.totalPayout)}\n`;
+                });
+                csv += `"GRAND TOTAL",${fm(gSalary)},${fm(gOvertime)},${fm(gGrossPay)},${fm(gOtherPay)},${fm(gPaye)},${fm(gTotalPayout)}\n`;
                 const link = document.createElement('a');
                 link.setAttribute('href', encodeURI(csv));
                 link.setAttribute('download', `payroll_summary_${payrollYear}.csv`);
@@ -1184,13 +1234,28 @@ export function FinancialReports() {
                 showExportMessage('Payroll Summary (CSV) exported!');
               };
 
-              const exportPayrollPdf = () => {
-                const head = [['Employee', 'Dept', ...monthLabels, 'Annual']];
-                const body = activeEmps.map(emp => {
-                  const monthVals = MONTH_KEYS.map(k => (emp.monthlySalaries?.[k] ?? 0).toLocaleString());
-                  const annual = MONTH_KEYS.reduce((s, k) => s + (emp.monthlySalaries?.[k] ?? 0), 0);
-                  return [`${emp.surname} ${emp.firstname}`, emp.department, ...monthVals, annual.toLocaleString()];
-                });
+              const exportPayrollSummaryPdf = () => {
+                const head = [['MONTH', 'SALARY', 'OVERTIME', 'GROSS PAY', 'OTHER PAY', 'PAYE', 'TOTAL PAYOUT']];
+                const body = [
+                  ...payrollSummaryData.map(r => [
+                    r.monthLabel,
+                    fm(r.salary),
+                    fm(r.overtime),
+                    fm(r.grossPay),
+                    fm(r.otherPay),
+                    fm(r.paye),
+                    fm(r.totalPayout)
+                  ]),
+                  [
+                     'GRAND TOTAL',
+                     fm(gSalary),
+                     fm(gOvertime),
+                     fm(gGrossPay),
+                     fm(gOtherPay),
+                     fm(gPaye),
+                     fm(gTotalPayout)
+                  ]
+                ];
                 generatePdf(`Payroll Summary ${payrollYear}`, head, body, `payroll_summary_${payrollYear}.pdf`);
               };
 
@@ -1205,70 +1270,135 @@ export function FinancialReports() {
                       </select>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportPayrollCsv}>
+                      <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportPayrollSummaryCsv}>
                         <FileSpreadsheet className="h-4 w-4" /> CSV
                       </Button>
-                      <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700 text-white" onClick={exportPayrollPdf}>
+                      <Button size="sm" className="gap-2 bg-[#2c7793] hover:bg-[#1a556b] text-white" onClick={exportPayrollSummaryPdf}>
                         <FileText className="h-4 w-4" /> PDF
                       </Button>
                     </div>
                   </div>
-                  <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <div className="overflow-y-auto" style={{ maxHeight: '420px' }}>
-                        <Table>
-                          <TableHeader className="sticky top-0 z-10">
-                            <TableRow className="bg-gradient-to-r from-amber-700 to-amber-600">
-                              <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap sticky left-0 bg-amber-700 z-20">Employee</TableHead>
-                              <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Dept</TableHead>
-                              {monthLabels.map(m => (
-                                <TableHead key={m} className="text-white font-semibold py-2 px-3 whitespace-nowrap text-right">{m}</TableHead>
-                              ))}
-                              <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap text-right bg-amber-900/40">Annual</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {activeEmps.length === 0 ? (
-                              <TableRow><TableCell colSpan={15} className="text-center py-8 text-slate-400">No active employees.</TableCell></TableRow>
-                            ) : (
-                              <>
-                                {activeEmps.map((emp, idx) => {
-                                  const annual = MONTH_KEYS.reduce((s, k) => s + (emp.monthlySalaries?.[k] ?? 0), 0);
-                                  return (
-                                    <TableRow key={emp.id} className={`hover:bg-amber-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                                      <TableCell className={`py-1.5 px-3 text-sm font-medium text-slate-800 whitespace-nowrap sticky left-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
-                                        {emp.surname} {emp.firstname}
-                                      </TableCell>
-                                      <TableCell className="py-1.5 px-3 text-xs text-slate-500 whitespace-nowrap">{emp.department}</TableCell>
-                                      {MONTH_KEYS.map(k => (
-                                        <TableCell key={k} className="py-1.5 px-3 text-xs text-right text-slate-700">
-                                          {(emp.monthlySalaries?.[k] ?? 0).toLocaleString()}
-                                        </TableCell>
-                                      ))}
-                                      <TableCell className="py-1.5 px-3 text-xs text-right font-bold text-amber-700 bg-amber-50/60">
-                                        {annual.toLocaleString()}
-                                      </TableCell>
-                                    </TableRow>
-                                  );
-                                })}
-                                {/* Totals row */}
-                                <TableRow className="bg-slate-900 hover:bg-slate-900 sticky bottom-0 z-10">
-                                  <TableCell className="text-white font-semibold py-2 px-3 sticky left-0 bg-slate-900 text-sm">Team Total</TableCell>
-                                  <TableCell className="py-2 px-3"></TableCell>
-                                  {MONTH_KEYS.map(k => (
-                                    <TableCell key={k} className="text-right text-amber-300 font-semibold text-xs py-2 px-3">
-                                      {activeEmps.reduce((s, e) => s + (e.monthlySalaries?.[k] ?? 0), 0).toLocaleString()}
-                                    </TableCell>
-                                  ))}
-                                  <TableCell className="text-right text-white font-bold text-xs py-2 px-3 bg-amber-900/40">
-                                    {activeEmps.reduce((s, e) => s + MONTH_KEYS.reduce((ms, k) => ms + (e.monthlySalaries?.[k] ?? 0), 0), 0).toLocaleString()}
-                                  </TableCell>
-                                </TableRow>
-                              </>
-                            )}
-                          </TableBody>
-                        </Table>
+                  <div className="rounded-2xl border border-slate-200 shadow-lg overflow-hidden" style={{ background: 'linear-gradient(to bottom, #f8fafc, #ffffff)' }}>
+                    {/* column legend bar */}
+                    <div className="grid grid-cols-7 text-[10px] font-bold tracking-widest uppercase px-0 bg-gradient-to-r from-[#1a4a5c] via-[#1f6075] to-[#1a4a5c] border-b border-[#0d3344]">
+                      {[
+                        { label: 'MONTH',        align: 'left',  accent: false, wide: true },
+                        { label: 'SALARY',       align: 'right', accent: false },
+                        { label: 'OVERTIME',     align: 'right', accent: false },
+                        { label: 'GROSS PAY',    align: 'right', accent: true  },
+                        { label: 'OTHER PAY',    align: 'right', accent: false },
+                        { label: 'PAYE',         align: 'right', accent: false },
+                        { label: 'TOTAL PAYOUT', align: 'right', accent: true  },
+                      ].map(col => (
+                        <div
+                          key={col.label}
+                          className={`py-3.5 px-4 text-${col.align} ${
+                            col.accent
+                              ? 'text-amber-300 bg-[#0d3344]/40 border-l border-r border-[#0d3344]/60'
+                              : 'text-[#9ecfe8]'
+                          } ${col.label === 'MONTH' ? 'col-span-1' : ''}`}
+                        >
+                          {col.label}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* rows */}
+                    <div className="divide-y divide-slate-100">
+                      {payrollSummaryData.map((row, idx) => {
+                        const maxPayout = Math.max(...payrollSummaryData.map(r => r.totalPayout), 1);
+                        const pct = Math.round((row.totalPayout / maxPayout) * 100);
+                        const isEven = idx % 2 === 0;
+                        return (
+                          <div
+                            key={row.monthLabel}
+                            className={`grid grid-cols-7 items-center group transition-all duration-150 hover:shadow-md hover:z-10 relative ${
+                              isEven ? 'bg-white' : 'bg-slate-50/70'
+                            } hover:bg-teal-50/60`}
+                          >
+                            {/* Month */}
+                            <div className="py-3 px-4 flex items-center gap-2.5">
+                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-[10px] font-black bg-gradient-to-br from-[#1f6075] to-[#1a4a5c] text-white shadow-sm shrink-0">
+                                {row.monthLabel.slice(0, 3).toUpperCase()}
+                              </span>
+                              <span className="text-sm font-semibold text-slate-800">{row.monthLabel}</span>
+                            </div>
+
+                            {/* Salary */}
+                            <div className="py-3 px-4 text-right">
+                              <span className="text-sm font-mono text-slate-700">₦{fm(row.salary)}</span>
+                            </div>
+
+                            {/* Overtime */}
+                            <div className="py-3 px-4 text-right">
+                              {row.overtime > 0 ? (
+                                <span className="inline-flex items-center gap-1 text-sm font-mono text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5">
+                                  ₦{fm(row.overtime)}
+                                </span>
+                              ) : (
+                                <span className="text-sm font-mono text-slate-400">—</span>
+                              )}
+                            </div>
+
+                            {/* Gross Pay – accent col */}
+                            <div className="py-3 px-4 text-right bg-teal-50/50 border-l border-r border-teal-100 group-hover:bg-teal-100/40">
+                              <span className="text-sm font-mono font-bold text-teal-800">₦{fm(row.grossPay)}</span>
+                            </div>
+
+                            {/* Other Pay */}
+                            <div className="py-3 px-4 text-right">
+                              <span className="text-sm font-mono text-slate-600">₦{fm(row.otherPay)}</span>
+                            </div>
+
+                            {/* PAYE */}
+                            <div className="py-3 px-4 text-right">
+                              <span className="inline-flex items-center gap-1 text-xs font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-0.5">
+                                ₦{fm(row.paye)}
+                              </span>
+                            </div>
+
+                            {/* Total Payout – accent col */}
+                            <div className="py-3 px-4 bg-slate-800/[0.03] border-l border-slate-200 group-hover:bg-slate-800/[0.06]">
+                              <div className="flex flex-col items-end gap-1">
+                                <span className="text-sm font-mono font-extrabold text-slate-900">₦{fm(row.totalPayout)}</span>
+                                <div className="w-full max-w-[80px] h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full bg-gradient-to-r from-[#1f6075] to-[#2aa0c8]"
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Grand Total footer */}
+                    <div className="grid grid-cols-7 items-center bg-gradient-to-r from-[#1a4a5c] via-[#1f6075] to-[#1a4a5c] border-t-2 border-[#0d3344] shadow-inner">
+                      <div className="py-4 px-4 flex items-center gap-2">
+                        <span className="text-xs font-black uppercase tracking-widest text-white/90 bg-white/10 border border-white/20 rounded-lg px-2.5 py-1">
+                          GRAND TOTAL
+                        </span>
                       </div>
+                      {[gSalary, gOvertime, gGrossPay, gOtherPay, gPaye, gTotalPayout].map((val, i) => {
+                        const isAccent = i === 2 || i === 5; // grossPay & totalPayout
+                        const isPaye   = i === 4;
+                        return (
+                          <div
+                            key={i}
+                            className={`py-4 px-4 text-right ${
+                              isAccent ? 'bg-white/10' : ''
+                            } ${isPaye ? '' : ''}`}
+                          >
+                            <span className={`text-sm font-mono font-extrabold tracking-wide ${
+                              isAccent ? 'text-amber-300' : isPaye ? 'text-rose-300' : 'text-white'
+                            }`}>
+                              ₦{fm(val)}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </>
