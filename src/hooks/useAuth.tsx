@@ -18,16 +18,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // getSession() is the authoritative source for the initial session.
+    // It resolves once Supabase has read persisted storage, then we set loading=false.
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // onAuthStateChange handles subsequent changes ONLY (sign in, sign out, token refresh).
+    // It must NOT call setLoading so it can't cause a premature redirect.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();

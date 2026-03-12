@@ -1,7 +1,26 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '@/src/store/appStore';
-import { useUserStore } from '@/src/store/userStore';
+import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets } from '@/src/lib/supabaseService';
+
+/** Fills in any missing privilege sections using NO_ACCESS defaults. */
+function backfillPrivileges(
+  defaults: UserPrivileges,
+  stored: Partial<UserPrivileges>
+): UserPrivileges {
+  const result = { ...defaults };
+  for (const key of Object.keys(defaults) as (keyof UserPrivileges)[]) {
+    result[key] = { ...defaults[key], ...(stored[key] ?? {}) } as any;
+  }
+  return result;
+}
+
+/** Returns true if a privileges object has at least one permission set to true. */
+function hasAnyGrant(privs: Partial<UserPrivileges>): boolean {
+  return Object.values(privs).some(
+    (section) => section && Object.values(section as object).some(Boolean)
+  );
+}
 
 /**
  * Loads all data from Supabase into Zustand stores when authenticated.
@@ -22,7 +41,7 @@ export function useDataLoader(isAuthenticated: boolean) {
           fetchPresets(),
         ]);
 
-        // Hydrate appStore (cast settings from JSONB to proper types)
+        // Hydrate appStore
         useAppStore.setState({
           sites: appData.sites,
           clients: appData.clients,
@@ -45,9 +64,40 @@ export function useDataLoader(isAuthenticated: boolean) {
           ...(appData.monthValues && Object.keys(appData.monthValues as any).length > 0 ? { monthValues: appData.monthValues as any } : {}),
         });
 
-        // Hydrate userStore
+        // ── Merge user data ──────────────────────────────────────────
+        // Strategy:
+        //  - Supabase is the source of truth for identity (name, email, etc.)
+        //  - For privileges: prefer Supabase IF it has actual grants.
+        //    If Supabase returns empty/null privileges (e.g. due to RLS blocking
+        //    the UPDATE, or auth-trigger created the profile without privileges),
+        //    fall back to the locally-stored privileges so admin changes survive reload.
+        //  - Locally-created users not yet in Supabase are preserved as-is.
+        const localUsers = useUserStore.getState().users;
+        const localMap = new Map(localUsers.map((u) => [u.id, u]));
+        const remoteIds = new Set(users.map((u) => u.id));
+
+        const mergedUsers = users.map((remoteUser) => {
+          const localUser = localMap.get(remoteUser.id);
+          const remotePrivs = backfillPrivileges(NO_ACCESS, remoteUser.privileges ?? {});
+
+          // If Supabase has real grants, use them.
+          if (hasAnyGrant(remotePrivs)) {
+            return { ...remoteUser, privileges: remotePrivs };
+          }
+
+          // Supabase returned empty privileges — fall back to local if available.
+          if (localUser && hasAnyGrant(localUser.privileges)) {
+            return { ...remoteUser, privileges: localUser.privileges };
+          }
+
+          return { ...remoteUser, privileges: remotePrivs };
+        });
+
+        // Preserve any locally-created users not yet in Supabase
+        const localOnlyUsers = localUsers.filter((u) => !remoteIds.has(u.id));
+
         useUserStore.setState({
-          users: users,
+          users: [...mergedUsers, ...localOnlyUsers],
           presets: presets.length > 0 ? presets : useUserStore.getState().presets,
           superAdminCreated: appData.superAdminCreated,
           superAdminSignupEnabled: appData.superAdminSignupEnabled,

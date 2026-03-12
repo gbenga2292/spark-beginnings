@@ -1,0 +1,24 @@
+✅ Header crash fix
+✅ Billing - Add Invoice gated
+✅ Billing - Edit gated
+✅ Billing - Delete gated
+✅ Leaves - File Leave Entry gated
+✅ Leaves - Edit gated
+✅ Leaves - Delete gated
+✅ VatPayments - all actions gated
+✅ Variables - mutations gated
+✅ Sites - Add Site gated
+✅ Sites - Add Client gated
+✅ Sites - Edit gated
+✅ Sites - Delete gated
+✅ Payroll - Generate gated
+✅ Payroll - PAYE/Pension/NSITF tabs gated
+✅ Attendance - Submit gated
+✅ Attendance - Clear gated
+✅ Onboarding - Actions gated
+✅ Employees - Add gated
+✅ Employees - Edit gated
+✅ Employees - Delete gated
+✅ Payments - Add gated
+✅ Payments - Edit gated
+✅ Payments - Delete gated

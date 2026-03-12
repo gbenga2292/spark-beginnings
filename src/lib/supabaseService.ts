@@ -247,7 +247,7 @@ export async function fetchAllAppData() {
     supabase.from('department_tasks').select('*'),
     supabase.from('leaves').select('*').order('start_date', { ascending: false }),
     supabase.from('leave_types').select('*').order('name'),
-    supabase.from('app_settings').select('*').limit(1).single(),
+    supabase.from('app_settings').select('*').limit(1).maybeSingle(),
     supabase.from('positions').select('*').order('name'),
     supabase.from('departments').select('*').order('name'),
   ]);
@@ -616,7 +616,9 @@ export const db = {
 
   // Profiles / Users
   async updateProfile(id: string, data: Partial<{ name: string; email: string; avatar: string; privileges: any; is_active: boolean }>) {
-    const { error } = await supabase.from('profiles').update(data).eq('id', id);
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({ id, ...data }, { onConflict: 'id' });
     if (error) console.error('updateProfile:', error);
   },
 

@@ -86,7 +86,7 @@ const COLORS: Record<string, { bg: string; text: string; border: string; badge: 
 };
 
 function getPrivObj(privs: UserPrivileges, key: keyof UserPrivileges): Record<string, boolean> {
-  return (privs[key] as unknown) as Record<string, boolean>;
+  return ((privs[key] ?? NO_ACCESS[key]) as unknown) as Record<string, boolean>;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -119,9 +119,16 @@ export function UserForm() {
   const [email, setEmail] = useState(editingUser?.email ?? '');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
-  const [privileges, setPrivileges] = useState<UserPrivileges>(
-    editingUser ? JSON.parse(JSON.stringify(editingUser.privileges)) : JSON.parse(JSON.stringify(NO_ACCESS))
-  );
+  const [privileges, setPrivileges] = useState<UserPrivileges>(() => {
+    if (!editingUser) return JSON.parse(JSON.stringify(NO_ACCESS));
+    // Backfill: merge stored privileges on top of NO_ACCESS so any section
+    // added after the user was created won't be undefined.
+    const base = JSON.parse(JSON.stringify(NO_ACCESS)) as UserPrivileges;
+    (Object.keys(base) as (keyof UserPrivileges)[]).forEach((k) => {
+      base[k] = { ...base[k], ...(editingUser.privileges[k] ?? {}) } as any;
+    });
+    return base;
+  });
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Dashboard', 'HR']));
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [presetName, setPresetName] = useState('');

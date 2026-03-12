@@ -2,13 +2,16 @@ import { useState } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
-import { useAuthStore } from '@/src/store/auth';
+import { useAuth } from '@/src/hooks/useAuth';
 
 export function Layout() {
-  const { isAuthenticated } = useAuthStore();
+  const { user, loading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  if (!isAuthenticated) {
+  // Still loading the Supabase session — don't redirect yet
+  if (loading) return null;
+
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 
