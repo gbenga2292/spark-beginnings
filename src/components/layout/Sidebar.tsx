@@ -64,8 +64,6 @@ const navigation: NavCategory[] = [
     name: 'Admin',
     icon: Building2,
     items: [
-      { name: 'Add Client',          href: '/sites?action=addClient', icon: MapPin,   privKey: 'sites', privField: 'canAddClient' },
-      { name: 'Add Site',            href: '/sites?action=add',       icon: MapPin,   privKey: 'sites', privField: 'canAddSite' },
       { name: 'Sites & Clients',     href: '/sites',                  icon: MapPin,   privKey: 'sites', privField: 'canView' },
       { name: 'Client Summary',      href: '/client-summary',         icon: BarChart3,privKey: 'sites', privField: 'canViewClientSummary' },
     ],
@@ -74,11 +72,11 @@ const navigation: NavCategory[] = [
     name: 'Account',
     icon: Landmark,
     items: [
-      { name: 'Invoices',            href: '/invoices',          icon: Receipt,      privKey: 'billing',          privField: 'canView' },
-      { name: 'Payments',            href: '/payments',          icon: DollarSign,   privKey: 'payments',         privField: 'canView' },
-      { name: 'Payrolls',            href: '/payroll',           icon: Wallet,       privKey: 'payroll',          privField: 'canView' },
-      { name: 'VAT & Tax Filing',    href: '/vat',               icon: Landmark,     privKey: 'payments',         privField: 'canViewVat' },
-      { name: 'Reports',             href: '/financial-reports', icon: BarChart3,    privKey: 'financialReports', privField: 'canView' },
+      { name: 'Invoice',             href: '/invoices',          icon: Receipt,      privKey: 'billing',          privField: 'canView' },
+      { name: 'Payment',             href: '/payments',          icon: DollarSign,   privKey: 'payments',         privField: 'canView' },
+      { name: 'VAT',                 href: '/vat',               icon: Landmark,     privKey: 'payments',         privField: 'canViewVat' },
+      { name: 'Payroll',             href: '/payroll',           icon: Wallet,       privKey: 'payroll',          privField: 'canView' },
+      { name: 'Account Reports',     href: '/financial-reports', icon: BarChart3,    privKey: 'financialReports', privField: 'canView' },
     ],
   },
   {

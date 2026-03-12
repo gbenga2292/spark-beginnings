@@ -30,7 +30,7 @@ export function TitleBar() {
     >
       {/* Title / Logo */}
       <div className="flex items-center gap-2 mr-6 text-slate-800 font-bold text-xs tracking-wide">
-        DCEL HR
+        DCEL Office Suite
       </div>
 
       {/* Menu Buttons */}

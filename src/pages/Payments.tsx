@@ -197,7 +197,7 @@ export function Payments() {
                                         <TableCell className="px-4 py-3 font-semibold text-slate-800">{p.client}</TableCell>
                                         <TableCell className="px-4 py-3 text-slate-600">{p.site}</TableCell>
                                         <TableCell className="px-4 py-3 text-right font-mono font-bold text-slate-900">
-                                            {(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {priv?.canViewAmounts === false ? '***' : (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-right text-slate-500 font-mono">
                                             {p.withholdingTax ? p.withholdingTax.toLocaleString() : '-'}
@@ -211,10 +211,10 @@ export function Payments() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-right text-indigo-600 font-mono font-medium">
-                                            {(p.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {priv?.canViewAmounts === false ? '***' : (p.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-right text-emerald-600 font-mono font-medium">
-                                            {(p.amountForVat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {priv?.canViewAmounts === false ? '***' : (p.amountForVat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
                                         <div className="flex items-center justify-center gap-1">
@@ -319,11 +319,11 @@ export function Payments() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="flex flex-col">
                                             <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Gross Payment</span>
-                                            <span className="font-mono text-slate-200 font-medium text-sm">₦{livePreview.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            <span className="font-mono text-slate-200 font-medium text-sm">₦{priv?.canViewAmounts === false ? '***' : livePreview.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
                                         <div className="flex flex-col border-l border-slate-700 pl-4">
                                             <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Tax Component (VAT {livePreview.payVat})</span>
-                                            <span className="font-mono text-indigo-400 font-medium text-sm">₦{livePreview.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            <span className="font-mono text-indigo-400 font-medium text-sm">₦{priv?.canViewAmounts === false ? '***' : livePreview.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
                                     </div>
                                 </div>

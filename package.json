@@ -57,7 +57,7 @@
   },
   "build": {
     "appId": "com.dcel.hr",
-    "productName": "DCEL HR",
+    "productName": "DCEL Office Suite",
     "directories": {
       "output": "release"
     },

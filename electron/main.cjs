@@ -83,7 +83,7 @@ function buildMenu() {
           accelerator: 'CmdOrCtrl+S',
           click: async () => {
             const { filePath } = await dialog.showSaveDialog(mainWindow, {
-              defaultPath: `DCEL-HR_${new Date().toISOString().slice(0, 10)}.pdf`,
+              defaultPath: `DCEL-OfficeSuite_${new Date().toISOString().slice(0, 10)}.pdf`,
               filters: [{ name: 'PDF', extensions: ['pdf'] }],
             });
             if (filePath) {
@@ -137,12 +137,12 @@ function buildMenu() {
       label: 'Help',
       submenu: [
         {
-          label: 'About DCEL HR',
+          label: 'About DCEL Office Suite',
           click: () => {
             dialog.showMessageBox(mainWindow, {
               type: 'info',
-              title: 'About DCEL HR',
-              message: 'DCEL HR Management System',
+              title: 'About DCEL Office Suite',
+              message: 'DCEL Office Management System',
               detail: `Version: ${app.getVersion()}\nElectron: ${process.versions.electron}\nChrome: ${process.versions.chrome}\nNode: ${process.versions.node}`,
               buttons: ['OK'],
             });
@@ -209,7 +209,7 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
-    title: 'DCEL HR',
+    title: 'DCEL Office Suite',
     icon: path.join(__dirname, '..', 'logo', 'logo-1.png'),
     // Hidden title bar but keep native Windows controls overlaid
     titleBarStyle: 'hidden',

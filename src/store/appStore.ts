@@ -8,6 +8,8 @@ export interface Site {
   client: string;
   vat: 'Yes' | 'No' | 'Add';
   status: 'Active' | 'Inactive';
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface TaxBracket {

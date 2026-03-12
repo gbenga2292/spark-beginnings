@@ -3,11 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
-import { Plus, Trash2, Save } from 'lucide-react';
+import { Plus, Trash2, Save, Download, Upload } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
-import { toast } from '@/src/components/ui/toast';
+import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
+import * as XLSX from 'xlsx';
 
 export function Variables() {
   const [newDate, setNewDate] = useState('');
@@ -146,6 +147,245 @@ export function Variables() {
   const currentTaskView = departmentTasksList.find(d => d.department === taskDeptFilter) ||
     { department: taskDeptFilter, onboardingTasks: [], offboardingTasks: [] };
 
+  const handleExportVariables = () => {
+    try {
+      const wb = XLSX.utils.book_new();
+
+      const posData = positions.map(p => ({ Position: p }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(posData), 'Positions');
+
+      const deptData = departments.map(d => ({ Department: d }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(deptData), 'Departments');
+
+      const clientData = clients.map(c => ({ Client: c }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(clientData), 'Clients');
+
+      const leaveData = leaveTypes.map(l => ({ LeaveType: l }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(leaveData), 'Leave_Types');
+
+      const phData = publicHolidays.map(h => ({ Date: h.date, Name: h.name }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(phData), 'Public_Holidays');
+
+      // Payroll Variables
+      const payrollData = [
+        { Key: 'Basic Salary (%)', Value: payrollVariables.basic },
+        { Key: 'Housing Allowance (%)', Value: payrollVariables.housing },
+        { Key: 'Transport Allowance (%)', Value: payrollVariables.transport },
+        { Key: 'Other Allowances (%)', Value: payrollVariables.otherAllowances },
+        { Key: 'Employee Pension (%)', Value: payrollVariables.employeePensionRate },
+        { Key: 'Employer Pension (%)', Value: payrollVariables.employerPensionRate },
+        { Key: 'NSITF (%)', Value: payrollVariables.nsitfRate },
+        { Key: 'Withholding Tax (%)', Value: payrollVariables.withholdingTaxRate },
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payrollData), 'Payroll_Variables');
+
+      // PAYE Tax Variables
+      const payeData = [
+        { Key: 'CRA Base (₦)', Value: payeTaxVariables.craBase },
+        { Key: 'Rent Relief Rate (%)', Value: (payeTaxVariables.rentReliefRate || 0) * 100 },
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payeData), 'PAYE_Variables');
+
+      const taxBracketsData = payeTaxVariables.taxBrackets.map(b => ({
+        Label: b.label,
+        'Rate (%)': b.rate * 100,
+        'UpTo (₦)': b.upTo === null ? 'INFINITY' : b.upTo
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taxBracketsData), 'PAYE_Tax_Brackets');
+
+      const extraConditionsData = payeTaxVariables.extraConditions.map(c => ({
+        Label: c.label,
+        'Amount (₦)': c.amount,
+        Enabled: c.enabled
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(extraConditionsData), 'PAYE_Extra_Conditions');
+
+      // Task Templates
+      const taskData: any[] = [];
+      departmentTasksList.forEach(dept => {
+        dept.onboardingTasks.forEach(t => taskData.push({
+          Department: dept.department,
+          Type: 'Onboarding',
+          Title: t.title,
+          Assignee: t.assignee
+        }));
+        dept.offboardingTasks.forEach(t => taskData.push({
+          Department: dept.department,
+          Type: 'Offboarding',
+          Title: t.title,
+          Assignee: t.assignee
+        }));
+      });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taskData), 'Task_Templates');
+
+      XLSX.writeFile(wb, 'System_Variables.xlsx');
+      toast.success('System variables exported successfully.');
+    } catch (error) {
+      toast.error('Failed to export variables.');
+    }
+  };
+
+  const handleImportVariables = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    showConfirm(
+      'This will add new entries to your variables (Positions, Departments, Clients, Leave Types, etc). Existing entries remain intact. Continue?',
+      { title: 'Import Variables' }
+    ).then((ok) => {
+      if (ok) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const data = evt.target?.result;
+            const wb = XLSX.read(data, { type: 'binary' });
+
+            if (wb.SheetNames.includes('Positions')) {
+              const posData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Positions']);
+              posData.forEach(row => {
+                if (row.Position && !positions.includes(row.Position)) addPosition(String(row.Position));
+              });
+            }
+
+            if (wb.SheetNames.includes('Departments')) {
+              const deptData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Departments']);
+              deptData.forEach(row => {
+                if (row.Department && !departments.includes(row.Department)) addDepartment(String(row.Department));
+              });
+            }
+
+            if (wb.SheetNames.includes('Clients')) {
+              const clientData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Clients']);
+              clientData.forEach(row => {
+                if (row.Client && !clients.includes(row.Client)) addClient(String(row.Client));
+              });
+            }
+
+            if (wb.SheetNames.includes('Leave_Types')) {
+              const leaveData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Leave_Types']);
+              leaveData.forEach(row => {
+                const lt = row.LeaveType || row.Leave_Type;
+                if (lt && !leaveTypes.includes(lt)) addLeaveType(String(lt));
+              });
+            }
+
+            if (wb.SheetNames.includes('Public_Holidays')) {
+              const phData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Public_Holidays']);
+              phData.forEach(row => {
+                if (row.Date && row.Name) {
+                  // Basic check to see if it already exists to avoid duplicates
+                  const exists = publicHolidays.some(ph => ph.date === row.Date && ph.name === row.Name);
+                  if (!exists) {
+                    addPublicHoliday({ id: Math.random().toString(36).slice(2), date: String(row.Date), name: String(row.Name) });
+                  }
+                }
+              });
+            }
+
+            if (wb.SheetNames.includes('Payroll_Variables')) {
+              const pvData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Payroll_Variables']);
+              const newPv = { ...payrollVariables };
+              pvData.forEach(row => {
+                const val = parseFloat(row.Value);
+                if (!isNaN(val)) {
+                  if (row.Key.includes('Basic')) newPv.basic = val;
+                  if (row.Key.includes('Housing')) newPv.housing = val;
+                  if (row.Key.includes('Transport')) newPv.transport = val;
+                  if (row.Key.includes('Other')) newPv.otherAllowances = val;
+                  if (row.Key.includes('Employee Pension')) newPv.employeePensionRate = val;
+                  if (row.Key.includes('Employer Pension')) newPv.employerPensionRate = val;
+                  if (row.Key.includes('NSITF')) newPv.nsitfRate = val;
+                  if (row.Key.includes('Withholding')) newPv.withholdingTaxRate = val;
+                }
+              });
+              updatePayrollVariables(newPv);
+            }
+
+            if (wb.SheetNames.includes('PAYE_Variables')) {
+              const payeData = XLSX.utils.sheet_to_json<any>(wb.Sheets['PAYE_Variables']);
+              const newPayeVar = { ...payeTaxVariables };
+              payeData.forEach(row => {
+                const val = parseFloat(row.Value);
+                if (!isNaN(val)) {
+                  if (row.Key.includes('CRA Base')) newPayeVar.craBase = val;
+                  if (row.Key.includes('Rent Relief Rate')) newPayeVar.rentReliefRate = val / 100;
+                }
+              });
+              
+              if (wb.SheetNames.includes('PAYE_Tax_Brackets')) {
+                const tbData = XLSX.utils.sheet_to_json<any>(wb.Sheets['PAYE_Tax_Brackets']);
+                if (tbData.length > 0) {
+                  newPayeVar.taxBrackets = tbData.map(row => ({
+                    id: Math.random().toString(36).slice(2),
+                    label: String(row.Label || ''),
+                    rate: parseFloat(row['Rate (%)'] || 0) / 100,
+                    upTo: row['UpTo (₦)'] === 'INFINITY' ? null : parseFloat(row['UpTo (₦)'] || 0)
+                  }));
+                }
+              }
+
+              if (wb.SheetNames.includes('PAYE_Extra_Conditions')) {
+                const ecData = XLSX.utils.sheet_to_json<any>(wb.Sheets['PAYE_Extra_Conditions']);
+                if (ecData.length > 0) {
+                  newPayeVar.extraConditions = ecData.map(row => ({
+                    id: Math.random().toString(36).slice(2),
+                    label: String(row.Label || ''),
+                    amount: parseFloat(row['Amount (₦)'] || 0),
+                    enabled: row.Enabled === true || row.Enabled === 'true' || row.Enabled === 'Yes',
+                  }));
+                }
+              }
+
+              updatePayeTaxVariables(newPayeVar);
+            }
+
+            if (wb.SheetNames.includes('Task_Templates')) {
+              const tasksData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Task_Templates']);
+              // Group by department
+              const deptsMap: Record<string, { onboardingTasks: any[], offboardingTasks: any[] }> = {};
+              tasksData.forEach(row => {
+                const d = row.Department;
+                if (!d) return;
+                if (!deptsMap[d]) deptsMap[d] = { onboardingTasks: [], offboardingTasks: [] };
+                
+                const task = { title: String(row.Title || ''), assignee: String(row.Assignee || '') };
+                if (String(row.Type || '').toLowerCase() === 'onboarding') {
+                  deptsMap[d].onboardingTasks.push(task);
+                } else if (String(row.Type || '').toLowerCase() === 'offboarding') {
+                  deptsMap[d].offboardingTasks.push(task);
+                }
+              });
+
+              Object.keys(deptsMap).forEach(deptName => {
+                // merge with existing
+                const existing = departmentTasksList.find(d => d.department === deptName);
+                if (existing) {
+                  updateDepartmentTasks({
+                    department: deptName,
+                    onboardingTasks: deptsMap[deptName].onboardingTasks,
+                    offboardingTasks: deptsMap[deptName].offboardingTasks
+                  });
+                } else {
+                  // Wait, no direct addDepartmentTasks? 
+                  // If it doesn't exist, updateDepartmentTasks will just replace or we can add it by using update which append missing?
+                  // `updateDepartmentTasks` actually filters and maps, wait let me check appStore implementation for updateDepartmentTasks.
+                  updateDepartmentTasks({ department: deptName, ...deptsMap[deptName] });
+                }
+              });
+            }
+
+            toast.success('Variables imported successfully.');
+          } catch (error) {
+            toast.error('Failed to parse the file.');
+          } finally {
+            if (e.target) e.target.value = '';
+          }
+        };
+        reader.readAsBinaryString(file);
+      }
+    });
+  };
+
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
@@ -155,11 +395,34 @@ export function Variables() {
           </h1>
           <p className="text-sm font-medium text-slate-500 mt-1">Configure global application variables, templates, and statutory parameters.</p>
         </div>
-        {priv.canEdit && (
-          <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md font-semibold gap-2 transition-all">
-            <Save className="h-4 w-4" /> Save Changes
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {priv.canImport && (
+            <div className="relative">
+              <input
+                type="file"
+                accept=".xlsx, .xls, .csv"
+                onChange={handleImportVariables}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                title="Import Variables"
+              />
+              <Button variant="outline" className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 gap-2">
+                <Upload className="h-4 w-4 text-slate-400" />
+                Import
+              </Button>
+            </div>
+          )}
+          {priv.canExport && (
+            <Button variant="outline" onClick={handleExportVariables} className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 gap-2">
+              <Download className="h-4 w-4 text-slate-400" />
+              Export
+            </Button>
+          )}
+          {priv.canEdit && (
+            <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md font-semibold gap-2 transition-all">
+              <Save className="h-4 w-4" /> Save Changes
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">

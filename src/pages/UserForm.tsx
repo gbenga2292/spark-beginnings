@@ -50,6 +50,7 @@ const PRIV_GROUPS: PG[] = [
         fields: [
           { key: 'canView', label: 'View' }, { key: 'canAddSite', label: 'Add Site' }, { key: 'canEditSite', label: 'Edit Site' }, { key: 'canDeleteSite', label: 'Delete Site', danger: true },
           { key: 'canAddClient', label: 'Add Client' }, { key: 'canEditClient', label: 'Edit Client' }, { key: 'canDeleteClient', label: 'Delete Client', danger: true }, { key: 'canViewClientSummary', label: 'Client Summary' },
+          { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }
         ] },
     ],
   },
@@ -57,9 +58,9 @@ const PRIV_GROUPS: PG[] = [
     name: 'Account', icon: Landmark, color: 'amber',
     pages: [
       { key: 'billing', label: 'Invoices & Billing', parentKey: 'billing', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canCreate', label: 'Create' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewAmounts', label: 'View Amounts', special: true }] },
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canCreate', label: 'Create' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
       { key: 'payments', label: 'Payments', parentKey: 'payments', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canViewVat', label: 'View VAT Tab' }, { key: 'canManageVat', label: 'Manage VAT' }] },
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canViewVat', label: 'View VAT Tab' }, { key: 'canManageVat', label: 'Manage VAT' }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
       { key: 'payroll', label: 'Payroll', parentKey: 'payroll', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canGenerate', label: 'Generate / Edit' }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canViewPayeSchedule', label: 'PAYE Schedule' }, { key: 'canViewPensionSchedule', label: 'Pension Schedule' }, { key: 'canViewNsitfSchedule', label: 'NSITF Schedule' }] },
       { key: 'financialReports', label: 'Financial Reports', parentKey: 'financialReports', masterField: 'canView',
@@ -67,10 +68,15 @@ const PRIV_GROUPS: PG[] = [
     ],
   },
   {
+    name: 'Variables', icon: Settings, color: 'emerald',
+    pages: [
+      { key: 'variables', label: 'Variables', parentKey: 'variables', masterField: 'canView',
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canEdit', label: 'Edit' }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
+    ],
+  },
+  {
     name: 'Settings', icon: Settings, color: 'slate',
     pages: [
-      { key: 'variables', label: 'Variables & Settings', parentKey: 'variables', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canEdit', label: 'Edit' }] },
       { key: 'users', label: 'User Management', parentKey: 'users', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View Users' }, { key: 'canManage', label: 'Add / Edit Users', danger: true }] },
     ],
@@ -82,6 +88,7 @@ const COLORS: Record<string, { bg: string; text: string; border: string; badge: 
   teal:   { bg: 'bg-teal-50',    text: 'text-teal-700',    border: 'border-teal-200',   badge: 'bg-teal-100 text-teal-700' },
   violet: { bg: 'bg-violet-50',  text: 'text-violet-700',  border: 'border-violet-200', badge: 'bg-violet-100 text-violet-700' },
   amber:  { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',  badge: 'bg-amber-100 text-amber-700' },
+  emerald:{ bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200',badge: 'bg-emerald-100 text-emerald-700' },
   slate:  { bg: 'bg-slate-100',  text: 'text-slate-700',   border: 'border-slate-300',  badge: 'bg-slate-200 text-slate-700' },
 };
 

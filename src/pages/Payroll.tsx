@@ -594,7 +594,7 @@ export function Payroll() {
                 <CreditCard className="h-4 w-4 text-slate-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-slate-900">₦{totals.totalGross.toLocaleString()}</div>
+                <div className="text-2xl font-bold text-slate-900">₦{priv?.canViewAmounts === false ? '***' : totals.totalGross.toLocaleString()}</div>
                 <p className="text-xs text-slate-500 mt-1">Salary + Overtime</p>
               </CardContent>
             </Card>
@@ -605,21 +605,21 @@ export function Payroll() {
               </CardHeader>
               <CardContent className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-red-600">₦{totals.totalDeductions.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-red-600">₦{priv?.canViewAmounts === false ? '***' : totals.totalDeductions.toLocaleString()}</div>
                   <p className="text-[10px] text-slate-500 mt-1">Sum of all deductions</p>
                 </div>
                 <div className="flex gap-2 ml-4">
                   <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 flex flex-col items-start px-2 py-1">
                     <span className="text-[9px] uppercase tracking-wider text-red-400">PAYE Tax</span>
-                    <span className="font-bold text-sm">₦{totals.totalPAYE.toLocaleString()}</span>
+                    <span className="font-bold text-sm">₦{priv?.canViewAmounts === false ? '***' : totals.totalPAYE.toLocaleString()}</span>
                   </Badge>
                   <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 flex flex-col items-start px-2 py-1">
                     <span className="text-[9px] uppercase tracking-wider text-red-400">Loans & Adv.</span>
-                    <span className="font-bold text-sm">₦{totals.totalLoans.toLocaleString()}</span>
+                    <span className="font-bold text-sm">₦{priv?.canViewAmounts === false ? '***' : totals.totalLoans.toLocaleString()}</span>
                   </Badge>
                   <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 flex flex-col items-start px-2 py-1">
                     <span className="text-[9px] uppercase tracking-wider text-red-400">Pension</span>
-                    <span className="font-bold text-sm">₦{totals.totalPension.toLocaleString()}</span>
+                    <span className="font-bold text-sm">₦{priv?.canViewAmounts === false ? '***' : totals.totalPension.toLocaleString()}</span>
                   </Badge>
                 </div>
               </CardContent>
@@ -630,7 +630,7 @@ export function Payroll() {
                 <CreditCard className="h-4 w-4 text-slate-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-emerald-600">₦{totals.totalNet.toLocaleString()}</div>
+                <div className="text-2xl font-bold text-emerald-600">₦{priv?.canViewAmounts === false ? '***' : totals.totalNet.toLocaleString()}</div>
                 <div className="flex items-center justify-between mt-1">
                   <p className="text-[10px] text-slate-500">Take Home Pay</p>
                   <p className="text-[10px] font-medium text-slate-700">{totals.employeeCount} active staff</p>
@@ -705,18 +705,18 @@ export function Payroll() {
                       <TableCell>{record.position}</TableCell>
                       <TableCell>{record.bankName}</TableCell>
                       <TableCell className="font-mono">{record.accountNo}</TableCell>
-                      <TableCell className="font-mono text-indigo-700 bg-indigo-50/30">₦{record.salary.toLocaleString()}</TableCell>
-                      <TableCell className="font-mono text-slate-600">{record.basicSalary.toLocaleString()}</TableCell>
-                      <TableCell className="font-mono text-slate-600">{record.housing.toLocaleString()}</TableCell>
-                      <TableCell className="font-mono text-slate-600">{record.transport.toLocaleString()}</TableCell>
-                      <TableCell className="font-mono text-slate-600">{record.otherAllowances.toLocaleString()}</TableCell>
-                      <TableCell className="font-mono font-medium bg-slate-50 border-x">{record.totalAllowances.toLocaleString()}</TableCell>
-                      <TableCell className="font-mono text-amber-600">{record.overtime.toLocaleString()}</TableCell>
-                      <TableCell className="font-mono font-bold text-slate-900 bg-emerald-50/50">₦{record.grossPay.toLocaleString()}</TableCell>
-                      <TableCell className="font-mono text-red-600">{record.paye.toLocaleString()}</TableCell>
-                      <TableCell className="font-mono text-red-600">{record.loanRepayment.toLocaleString()}</TableCell>
-                      <TableCell className="font-mono text-red-600">{record.pension.toLocaleString()}</TableCell>
-                      <TableCell className="font-mono font-bold text-emerald-700 bg-emerald-50 border-l">₦{record.takeHomePay.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-indigo-700 bg-indigo-50/30">₦{priv?.canViewAmounts === false ? '***' : record.salary.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.basicSalary.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.housing.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.transport.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.otherAllowances.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono font-medium bg-slate-50 border-x">{priv?.canViewAmounts === false ? '***' : record.totalAllowances.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-amber-600">{priv?.canViewAmounts === false ? '***' : record.overtime.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono font-bold text-slate-900 bg-emerald-50/50">₦{priv?.canViewAmounts === false ? '***' : record.grossPay.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-red-600">{priv?.canViewAmounts === false ? '***' : record.paye.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-red-600">{priv?.canViewAmounts === false ? '***' : record.loanRepayment.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-red-600">{priv?.canViewAmounts === false ? '***' : record.pension.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono font-bold text-emerald-700 bg-emerald-50 border-l">₦{priv?.canViewAmounts === false ? '***' : record.takeHomePay.toLocaleString()}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -741,7 +741,7 @@ export function Payroll() {
               <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
                 <CardTitle>PAYE Tax Schedule: {selectedMonthLabel}</CardTitle>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-500 font-medium">Total PAYE: <span className="text-red-600 font-bold">₦{totals.totalPAYE.toLocaleString()}</span></span>
+                  <span className="text-xs text-slate-500 font-medium">Total PAYE: <span className="text-red-600 font-bold">₦{priv?.canViewAmounts === false ? '***' : totals.totalPAYE.toLocaleString()}</span></span>
                   <Button variant="outline" size="sm" className="gap-2" onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintDialogOpen(true); setPrintType('PAYE'); }}>
                     <Printer className="h-4 w-4" /> Print Schedule
                   </Button>
@@ -810,7 +810,7 @@ export function Payroll() {
               <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
                 <CardTitle>Pension Schedule: {selectedMonthLabel}</CardTitle>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-500 font-medium">Total Pension: <span className="text-amber-600 font-bold">₦{totals.totalPension.toLocaleString()}</span></span>
+                  <span className="text-xs text-slate-500 font-medium">Total Pension: <span className="text-amber-600 font-bold">₦{priv?.canViewAmounts === false ? '***' : totals.totalPension.toLocaleString()}</span></span>
                   <Button variant="outline" size="sm" className="gap-2" onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintDialogOpen(true); setPrintType('PENSION'); }}>
                     <Printer className="h-4 w-4" /> Print Schedule
                   </Button>
@@ -1107,12 +1107,12 @@ export function Payroll() {
                             <tr className="text-left"><th className="py-2 text-slate-600">Description</th><th className="py-2 text-right text-slate-600">Amount (₦)</th></tr>
                           </thead>
                           <tbody>
-                            <tr><td className="py-2">Basic Salary</td><td className="py-2 text-right font-mono">{slip.record.basicSalary.toLocaleString()}</td></tr>
-                            {slip.record.housing > 0 && <tr><td className="py-2">Housing Allowance</td><td className="py-2 text-right font-mono">{slip.record.housing.toLocaleString()}</td></tr>}
-                            {slip.record.transport > 0 && <tr><td className="py-2">Transport Allowance</td><td className="py-2 text-right font-mono">{slip.record.transport.toLocaleString()}</td></tr>}
-                            {slip.record.otherAllowances > 0 && <tr><td className="py-2">Other Allowances</td><td className="py-2 text-right font-mono">{slip.record.otherAllowances.toLocaleString()}</td></tr>}
-                            {slip.record.overtime > 0 && <tr><td className="py-2">Overtime Pay</td><td className="py-2 text-right font-mono text-emerald-600">+{slip.record.overtime.toLocaleString()}</td></tr>}
-                            <tr className="border-t font-semibold"><td className="py-2">GROSS PAY</td><td className="py-2 text-right font-mono text-lg">{slip.record.grossPay.toLocaleString()}</td></tr>
+                            <tr><td className="py-2">Basic Salary</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.basicSalary.toLocaleString()}</td></tr>
+                            {slip.record.housing > 0 && <tr><td className="py-2">Housing Allowance</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.housing.toLocaleString()}</td></tr>}
+                            {slip.record.transport > 0 && <tr><td className="py-2">Transport Allowance</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.transport.toLocaleString()}</td></tr>}
+                            {slip.record.otherAllowances > 0 && <tr><td className="py-2">Other Allowances</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.otherAllowances.toLocaleString()}</td></tr>}
+                            {slip.record.overtime > 0 && <tr><td className="py-2">Overtime Pay</td><td className="py-2 text-right font-mono text-emerald-600">+{priv?.canViewAmounts === false ? '***' : slip.record.overtime.toLocaleString()}</td></tr>}
+                            <tr className="border-t font-semibold"><td className="py-2">GROSS PAY</td><td className="py-2 text-right font-mono text-lg">{priv?.canViewAmounts === false ? '***' : slip.record.grossPay.toLocaleString()}</td></tr>
                           </tbody>
                         </table>
                       </div>
@@ -1125,10 +1125,10 @@ export function Payroll() {
                             <tr className="text-left"><th className="py-2 text-slate-600">Description</th><th className="py-2 text-right text-slate-600">Amount (₦)</th></tr>
                           </thead>
                           <tbody>
-                            {slip.record.paye > 0 && <tr><td className="py-2">PAYE Tax</td><td className="py-2 text-right font-mono text-red-600">-{slip.record.paye.toLocaleString()}</td></tr>}
-                            {slip.record.loanRepayment > 0 && <tr><td className="py-2">Loan & Advance Repayment</td><td className="py-2 text-right font-mono text-red-600">-{slip.record.loanRepayment.toLocaleString()}</td></tr>}
-                            {slip.record.pension > 0 && <tr><td className="py-2">Pension Contribution</td><td className="py-2 text-right font-mono text-red-600">-{slip.record.pension.toLocaleString()}</td></tr>}
-                            <tr className="border-t font-semibold"><td className="py-2">TOTAL DEDUCTIONS</td><td className="py-2 text-right font-mono text-red-600 text-lg">-{(slip.record.paye + slip.record.loanRepayment + slip.record.pension).toLocaleString()}</td></tr>
+                            {slip.record.paye > 0 && <tr><td className="py-2">PAYE Tax</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.paye.toLocaleString()}</td></tr>}
+                            {slip.record.loanRepayment > 0 && <tr><td className="py-2">Loan & Advance Repayment</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.loanRepayment.toLocaleString()}</td></tr>}
+                            {slip.record.pension > 0 && <tr><td className="py-2">Pension Contribution</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.pension.toLocaleString()}</td></tr>}
+                            <tr className="border-t font-semibold"><td className="py-2">TOTAL DEDUCTIONS</td><td className="py-2 text-right font-mono text-red-600 text-lg">-{priv?.canViewAmounts === false ? '***' : (slip.record.paye + slip.record.loanRepayment + slip.record.pension).toLocaleString()}</td></tr>
                           </tbody>
                         </table>
                       </div>
@@ -1137,7 +1137,7 @@ export function Payroll() {
                       <div className="bg-emerald-50 p-6 rounded-lg border border-emerald-100">
                         <div className="flex justify-between items-center">
                           <span className="text-lg font-bold text-slate-900">TAKE HOME PAY</span>
-                          <span className="text-3xl font-bold text-emerald-700">₦{slip.record.takeHomePay.toLocaleString()}</span>
+                          <span className="text-3xl font-bold text-emerald-700">₦{priv?.canViewAmounts === false ? '***' : slip.record.takeHomePay.toLocaleString()}</span>
                         </div>
                       </div>
 

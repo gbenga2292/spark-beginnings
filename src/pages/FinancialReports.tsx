@@ -79,7 +79,9 @@ export function FinancialReports() {
     return days;
   }
 
-  const fm = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const hideAmounts = priv.canViewAmounts === false;
+  const fm = (n: number) => hideAmounts ? '***' : n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const fmRaw = (n: number) => hideAmounts ? '***' : '₦' + n.toLocaleString();
 
   // Payroll Exposure calculations
   const payrollStats = useMemo(() => {
@@ -312,11 +314,12 @@ export function FinancialReports() {
   }, [sites, invoices]);
 
   const formatCurrCompact = (val: number) => {
+    if (hideAmounts) return '***';
     if (val >= 1000000) return `₦${(val / 1000000).toFixed(2)}M`;
     if (val >= 1000) return `₦${(val / 1000).toFixed(1)}k`;
     return `₦${val.toLocaleString()}`;
   };
-  const formatCurr = (val: number) => `₦${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatCurr = (val: number) => hideAmounts ? '***' : `₦${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const showExportMessage = (message: string) => {
     setExportMessage(message);
@@ -1451,9 +1454,9 @@ export function FinancialReports() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
                     {[
                       { label: 'Active Loans', value: activeLoans.length, color: 'amber' },
-                      { label: 'Total Loan Balance', value: `₦${activeLoans.reduce((s, l) => s + l.remainingBalance, 0).toLocaleString()}`, color: 'amber' },
+                      { label: 'Total Loan Balance', value: fmRaw(activeLoans.reduce((s, l) => s + l.remainingBalance, 0)), color: 'amber' },
                       { label: 'Pending Advances', value: pendingAdvances.length, color: 'rose' },
-                      { label: 'Total Advance Amount', value: `₦${pendingAdvances.reduce((s, a) => s + a.amount, 0).toLocaleString()}`, color: 'rose' },
+                      { label: 'Total Advance Amount', value: fmRaw(pendingAdvances.reduce((s, a) => s + a.amount, 0)), color: 'rose' },
                     ].map(tile => (
                       <div key={tile.label} className={`rounded-xl border p-4 ${
                         tile.color === 'amber' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200'
@@ -1499,9 +1502,9 @@ export function FinancialReports() {
                               <TableRow key={loan.id} className={`hover:bg-amber-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
                                 <TableCell className="py-1.5 px-3 text-sm font-medium text-slate-800">{loan.employeeName}</TableCell>
                                 <TableCell className="py-1.5 px-3 text-sm text-slate-600">{loan.loanType}</TableCell>
-                                <TableCell className="py-1.5 px-3 text-sm text-right text-slate-700">₦{loan.principalAmount.toLocaleString()}</TableCell>
-                                <TableCell className="py-1.5 px-3 text-sm text-right text-slate-700">₦{loan.monthlyDeduction.toLocaleString()}</TableCell>
-                                <TableCell className="py-1.5 px-3 text-sm text-right font-semibold text-amber-700">₦{loan.remainingBalance.toLocaleString()}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right text-slate-700">{fmRaw(loan.principalAmount)}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right text-slate-700">{fmRaw(loan.monthlyDeduction)}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right font-semibold text-amber-700">{fmRaw(loan.remainingBalance)}</TableCell>
                                 <TableCell className="py-1.5 px-3 text-sm text-center text-slate-600">{loan.duration}m</TableCell>
                                 <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{loan.startDate}</TableCell>
                                 <TableCell className="py-1.5 px-3 text-center">
@@ -1540,7 +1543,7 @@ export function FinancialReports() {
                             ) : salaryAdvances.map((adv, idx) => (
                               <TableRow key={adv.id} className={`hover:bg-rose-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
                                 <TableCell className="py-1.5 px-3 text-sm font-medium text-slate-800">{adv.employeeName}</TableCell>
-                                <TableCell className="py-1.5 px-3 text-sm text-right font-semibold text-rose-700">₦{adv.amount.toLocaleString()}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right font-semibold text-rose-700">{fmRaw(adv.amount)}</TableCell>
                                 <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{adv.requestDate}</TableCell>
                                 <TableCell className="py-1.5 px-3 text-center">
                                   <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${

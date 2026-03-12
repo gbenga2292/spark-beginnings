@@ -393,23 +393,23 @@ export function Billing() {
                     <div className="text-slate-500 text-xs">{inv.site || inv.siteName} <span className="ml-1 px-1 rounded bg-slate-100 border text-[10px]">{inv.vatInc || 'No VAT'}</span></div>
                   </TableCell>
                   <TableCell className="px-4 py-3 text-right text-slate-600">
-                    <div><span className="text-slate-400">Mac:</span> {inv.noOfMachine || 0} x {(inv.dailyRentalCost || 0).toLocaleString()}</div>
-                    <div><span className="text-slate-400">Tech:</span> {inv.noOfTechnician || 0} x {(inv.techniciansDailyRate || 0).toLocaleString()}</div>
-                    <div><span className="text-slate-400">DsLtr:</span> {(inv.dieselCostPerLtr || 0).toLocaleString()} ({(inv.dailyUsage || 0)}L)</div>
+                    <div><span className="text-slate-400">Mac:</span> {inv.noOfMachine || 0} x {priv?.canViewAmounts === false ? '***' : (inv.dailyRentalCost || 0).toLocaleString()}</div>
+                    <div><span className="text-slate-400">Tech:</span> {inv.noOfTechnician || 0} x {priv?.canViewAmounts === false ? '***' : (inv.techniciansDailyRate || 0).toLocaleString()}</div>
+                    <div><span className="text-slate-400">DsLtr:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCostPerLtr || 0).toLocaleString()} ({(inv.dailyUsage || 0)}L)</div>
                   </TableCell>
                   <TableCell className="px-4 py-3 text-right text-slate-600">
                     <div className="font-medium text-slate-800">{inv.duration || 0} Days</div>
                     <div className="text-slate-500 text-xs">{inv.startDate || inv.date} - {inv.endDate || inv.dueDate}</div>
                   </TableCell>
                   <TableCell className="px-4 py-3 text-right text-slate-600">
-                    <div><span className="text-slate-400">Rent:</span> {(inv.rentalCost || 0).toLocaleString()}</div>
-                    <div><span className="text-slate-400">Fuel:</span> {(inv.dieselCost || 0).toLocaleString()}</div>
-                    <div><span className="text-slate-400">Other:</span> {((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)).toLocaleString()}</div>
+                    <div><span className="text-slate-400">Rent:</span> {priv?.canViewAmounts === false ? '***' : (inv.rentalCost || 0).toLocaleString()}</div>
+                    <div><span className="text-slate-400">Fuel:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCost || 0).toLocaleString()}</div>
+                    <div><span className="text-slate-400">Other:</span> {priv?.canViewAmounts === false ? '***' : ((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)).toLocaleString()}</div>
                   </TableCell>
                   <TableCell className="px-4 py-3 text-right">
-                    <div className="text-slate-500 text-xs">Gross: {(inv.totalCost || 0).toLocaleString()}</div>
-                    <div className="text-slate-500 text-xs">VAT: {(inv.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                    <div className="font-bold text-indigo-700 mt-1">{(inv.totalCharge || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div className="text-slate-500 text-xs">Gross: {priv?.canViewAmounts === false ? '***' : (inv.totalCost || 0).toLocaleString()}</div>
+                    <div className="text-slate-500 text-xs">VAT: {priv?.canViewAmounts === false ? '***' : (inv.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div className="font-bold text-indigo-700 mt-1">{priv?.canViewAmounts === false ? '***' : (inv.totalCharge || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                   </TableCell>
                   {(priv.canEdit || priv.canDelete) && (
                     <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
@@ -574,15 +574,15 @@ export function Billing() {
                   <div className="grid grid-cols-3 gap-4">
                     <div className="flex flex-col">
                       <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Gross Total</span>
-                      <span className="font-mono text-slate-200 font-medium text-sm">₦{livePreview.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-slate-200 font-medium text-sm">₦{priv?.canViewAmounts === false ? '***' : livePreview.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex flex-col border-l border-slate-700 pl-4">
                       <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Tax (VAT {livePreview.vatInc})</span>
-                      <span className="font-mono text-indigo-400 font-medium text-sm">₦{livePreview.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-indigo-400 font-medium text-sm">₦{priv?.canViewAmounts === false ? '***' : livePreview.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex flex-col border-l border-slate-700 pl-4">
                       <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Final Amount Due</span>
-                      <span className="font-mono text-emerald-400 font-bold text-lg leading-none">₦{livePreview.totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-emerald-400 font-bold text-lg leading-none">₦{priv?.canViewAmounts === false ? '***' : livePreview.totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   </div>
                 </div>

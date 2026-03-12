@@ -13,7 +13,7 @@ import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { useUserStore } from '@/src/store/userStore';
 
-const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive' };
+const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive', startDate: new Date().toISOString().split('T')[0], endDate: '' };
 
 function ClientSummary() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -187,6 +187,8 @@ export function Sites() {
   const canAddClient  = !currentUser || (sitePriv?.canView === true && sitePriv?.canAddClient === true);
   const canEditSite   = !currentUser || (sitePriv?.canView === true && sitePriv?.canEditSite === true);
   const canDeleteSite = !currentUser || (sitePriv?.canView === true && sitePriv?.canDeleteSite === true);
+  const canImport     = !currentUser || (sitePriv?.canView === true && sitePriv?.canImport === true);
+  const canExport     = !currentUser || (sitePriv?.canView === true && sitePriv?.canExport === true);
   const hasActions    = canEditSite || canDeleteSite;
 
   const sites = useAppStore((s) => s.sites);
@@ -215,12 +217,21 @@ export function Sites() {
       setAddError(`"${addForm.client} – ${addForm.name}" already exists. Client + Site combination must be unique.`);
       return;
     }
+    
+    // Auto status based on start/end date range logic
+    let calcStatus: 'Active' | 'Inactive' = 'Active';
+    const nowStr = new Date().toISOString().split('T')[0];
+    if (addForm.startDate && nowStr < addForm.startDate) calcStatus = 'Inactive';
+    if (addForm.endDate && nowStr > addForm.endDate) calcStatus = 'Inactive';
+
     addSite({
       id: `S-${Date.now().toString().slice(-4)}`,
       name: addForm.name.trim(),
       client: addForm.client.trim(),
       vat: addForm.vat,
-      status: addForm.status,
+      status: calcStatus,
+      startDate: addForm.startDate,
+      endDate: addForm.endDate,
     });
     if (!clients.includes(addForm.client.trim())) {
       addClient(addForm.client.trim());
@@ -247,7 +258,7 @@ export function Sites() {
 
   const handleEditStart = (site: Site) => {
     setEditingId(site.id);
-    setEditForm({ name: site.name, client: site.client, vat: site.vat, status: site.status });
+    setEditForm({ name: site.name, client: site.client, vat: site.vat, status: site.status, startDate: site.startDate || '', endDate: site.endDate || '' });
   };
 
   const handleSaveEdit = () => {
@@ -257,7 +268,15 @@ export function Sites() {
       toast.error(`"${editForm.client} – ${editForm.name}" already exists. Client + Site must be unique.`);
       return;
     }
-    updateSite(editingId, editForm);
+    // Auto status based on end date
+    const nowStr = new Date().toISOString().split('T')[0];
+    let submitStatus = editForm.status;
+    if (editForm.endDate && nowStr > editForm.endDate) {
+      submitStatus = 'Inactive';
+    } else if (editForm.startDate && nowStr < editForm.startDate) {
+      submitStatus = 'Inactive';
+    }
+    updateSite(editingId, { ...editForm, status: submitStatus });
     setEditingId(null);
   };
 
@@ -442,15 +461,19 @@ export function Sites() {
               <span className="text-xs text-slate-400 mr-auto">{filteredSites.length} of {sites.length} sites</span>
 
               <div className="flex items-center gap-2">
-                <label className="cursor-pointer">
-                  <Input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
-                  <Button variant="outline" size="sm" className="h-9 gap-2 pointer-events-none text-slate-600">
-                    <Upload className="h-4 w-4" /> Import
+                {canImport && (
+                  <label className="cursor-pointer">
+                    <Input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
+                    <Button variant="outline" size="sm" className="h-9 gap-2 pointer-events-none text-slate-600">
+                      <Upload className="h-4 w-4" /> Import
+                    </Button>
+                  </label>
+                )}
+                {canExport && (
+                  <Button onClick={handleExportExcel} size="sm" className="h-9 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+                    <Download className="h-4 w-4" /> Export Excel
                   </Button>
-                </label>
-                <Button onClick={handleExportExcel} size="sm" className="h-9 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
-                  <Download className="h-4 w-4" /> Export Excel
-                </Button>
+                )}
               </div>
             </div>
             <Table>
@@ -459,6 +482,8 @@ export function Sites() {
                   <TableHead>Site ID</TableHead>
                   <TableHead>Client</TableHead>
                   <TableHead>Site Name</TableHead>
+                  <TableHead>Start Date</TableHead>
+                  <TableHead>End Date</TableHead>
                   <TableHead className="text-center">VAT</TableHead>
                   <TableHead>Status</TableHead>
                   {hasActions && <TableHead className="text-right">Actions</TableHead>}
@@ -486,6 +511,20 @@ export function Sites() {
                         ? <Input value={editForm.name} className="h-8" onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
                         : site.name}
                     </TableCell>
+                    <TableCell>
+                      {editingId === site.id ? (
+                        <Input type="date" value={editForm.startDate} className="h-8 w-32" onChange={e => setEditForm({ ...editForm, startDate: e.target.value })} />
+                      ) : (
+                        site.startDate || <span className="text-slate-300">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {editingId === site.id ? (
+                        <Input type="date" value={editForm.endDate} className="h-8 w-32" onChange={e => setEditForm({ ...editForm, endDate: e.target.value })} />
+                      ) : (
+                        site.endDate || <span className="text-slate-300">-</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-center">
                       {editingId === site.id ? (
                         <select
@@ -509,6 +548,7 @@ export function Sites() {
                           value={editForm.status}
                           onChange={e => setEditForm({ ...editForm, status: e.target.value as 'Active' | 'Inactive' })}
                           className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm"
+                          disabled={false}
                         >
                           <option value="Active">Active</option>
                           <option value="Inactive">Inactive</option>
@@ -587,6 +627,14 @@ export function Sites() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Start Date</label>
+              <Input
+                type="date"
+                value={addForm.startDate}
+                onChange={e => setAddForm({ ...addForm, startDate: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
               <label className="text-sm font-medium text-slate-700">VAT</label>
               <select
                 value={addForm.vat}
@@ -596,17 +644,6 @@ export function Sites() {
                 <option value="No">No</option>
                 <option value="Yes">Yes</option>
                 <option value="Add">Add</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Status</label>
-              <select
-                value={addForm.status}
-                onChange={e => setAddForm({ ...addForm, status: e.target.value as 'Active' | 'Inactive' })}
-                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-              >
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
               </select>
             </div>
           </div>

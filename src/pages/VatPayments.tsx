@@ -194,7 +194,7 @@ export function VatPayments() {
                                             <TableCell className="px-4 py-3 font-semibold text-slate-800">{p.client}</TableCell>
                                             <TableCell className="px-4 py-3 text-slate-600">{p.month}</TableCell>
                                             <TableCell className="px-4 py-3 text-right font-mono font-bold text-emerald-600">
-                                                {(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                {priv?.canViewAmounts === false ? '***' : (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </TableCell>
                                             {priv.canManageVat && (
                                               <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
@@ -233,12 +233,12 @@ export function VatPayments() {
                             <div className="flex gap-4 font-mono text-sm">
                                 <div className="flex flex-col items-end">
                                     <span className="text-slate-400 text-xs font-sans tracking-tight">Total VAT</span>
-                                    <span className="text-slate-800 font-bold">₦{overallTotals.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <span className="text-slate-800 font-bold">₦{priv?.canViewAmounts === false ? '***' : overallTotals.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                                 <div className="h-8 w-px bg-slate-300 mx-2 hidden sm:block"></div>
                                 <div className="flex flex-col items-end">
                                     <span className="text-slate-400 text-xs font-sans tracking-tight">Total Balance</span>
-                                    <span className="text-rose-600 font-bold">₦{overallTotals.vatBalanceToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <span className="text-rose-600 font-bold">₦{priv?.canViewAmounts === false ? '***' : overallTotals.vatBalanceToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
                         </div>

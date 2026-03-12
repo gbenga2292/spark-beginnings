@@ -1,15 +1,68 @@
 import * as React from "react"
 import { cn } from "@/src/lib/utils"
 
+const TableContainer = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, children, ...props }, ref) => {
+  const innerRef = React.useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [startX, setStartX] = React.useState(0);
+  const [startY, setStartY] = React.useState(0);
+  const [scrollLeft, setScrollLeft] = React.useState(0);
+  const [scrollTop, setScrollTop] = React.useState(0);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    const container = innerRef.current;
+    if (!container) return;
+    setStartX(e.pageX - container.offsetLeft);
+    setStartY(e.pageY - container.offsetTop);
+    setScrollLeft(container.scrollLeft);
+    setScrollTop(container.scrollTop);
+  };
+  
+  const handleMouseLeave = () => setIsDragging(false);
+  const handleMouseUp = () => setIsDragging(false);
+  
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const container = innerRef.current;
+    if (!container) return;
+    
+    const x = e.pageX - container.offsetLeft;
+    const walkX = (x - startX) * 1;
+    container.scrollLeft = scrollLeft - walkX;
+    
+    const y = e.pageY - container.offsetTop;
+    const walkY = (y - startY) * 1;
+    container.scrollTop = scrollTop - walkY;
+  };
+
+  React.useImperativeHandle(ref, () => innerRef.current as HTMLDivElement);
+
+  return (
+    <div 
+      ref={innerRef}
+      className={cn("relative w-full overflow-auto max-h-[70vh]", isDragging ? "cursor-grabbing select-none" : "cursor-grab", className)}
+      onMouseDown={handleMouseDown}
+      onMouseLeave={handleMouseLeave}
+      onMouseUp={handleMouseUp}
+      onMouseMove={handleMouseMove}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+});
+
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto">
+  <TableContainer>
     <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
-  </div>
+  </TableContainer>
 ))
 Table.displayName = "Table"
 
 const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />
+  <thead ref={ref} className={cn("[&_tr]:border-b sticky top-0 bg-white z-10 shadow-[0_1px_3px_-2px_rgba(0,0,0,0.1)]", className)} {...props} />
 ))
 TableHeader.displayName = "TableHeader"
 
