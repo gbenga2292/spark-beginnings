@@ -309,12 +309,14 @@ export function Leaves() {
           >
             <CalendarClock className="h-4 w-4" /> Go to Summary
           </Button>
-          <Button
-            className="gap-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white shadow-md"
-            onClick={() => { resetForm(); setShowForm(true); }}
-          >
-            <Plus className="h-4 w-4" /> File Leave Entry
-          </Button>
+          {priv.canAdd && (
+            <Button
+              className="gap-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white shadow-md"
+              onClick={() => { resetForm(); setShowForm(true); }}
+            >
+              <Plus className="h-4 w-4" /> File Leave Entry
+            </Button>
+          )}
         </div>
       </div>
 

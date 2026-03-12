@@ -7,6 +7,7 @@ import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
+import { usePriv } from '@/src/hooks/usePriv';
 
 const MONTHS = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -20,6 +21,9 @@ export function VatPayments() {
     const addVatPayment = useAppStore((state) => state.addVatPayment);
     const updateVatPayment = useAppStore((state) => state.updateVatPayment);
     const deleteVatPayment = useAppStore((state) => state.deleteVatPayment);
+
+    // ─── Permissions ───────────────────────────────────────────
+    const priv = usePriv('payments');
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -147,12 +151,14 @@ export function VatPayments() {
             </div>
             <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
             <div className="flex justify-end">
-                <Button
-                    className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-10 px-5"
-                    onClick={() => { handleClear(); setIsModalOpen(true); }}
-                >
-                    <Plus className="w-5 h-5" /> Add VAT Payment
-                </Button>
+                {priv.canManageVat && (
+                  <Button
+                      className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-10 px-5"
+                      onClick={() => { handleClear(); setIsModalOpen(true); }}
+                  >
+                      <Plus className="w-5 h-5" /> Add VAT Payment
+                  </Button>
+                )}
             </div>
 
             <div className="flex flex-1 gap-6 items-start flex-col">
@@ -176,7 +182,9 @@ export function VatPayments() {
                                         <TableHead className="font-semibold px-4 py-3">Client</TableHead>
                                         <TableHead className="font-semibold px-4 py-3">Month</TableHead>
                                         <TableHead className="font-semibold px-4 py-3 text-right">Amount (₦)</TableHead>
-                                        <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">Actions</TableHead>
+                                        {priv.canManageVat && (
+                                          <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">Actions</TableHead>
+                                        )}
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -188,7 +196,8 @@ export function VatPayments() {
                                             <TableCell className="px-4 py-3 text-right font-mono font-bold text-emerald-600">
                                                 {(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </TableCell>
-                                            <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                                            {priv.canManageVat && (
+                                              <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
                                                 <div className="flex items-center justify-center gap-1">
                                                     <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(p); }} className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit">
                                                         <Edit className="w-4 h-4" />
@@ -197,7 +206,8 @@ export function VatPayments() {
                                                         <Trash2 className="w-4 h-4" />
                                                     </Button>
                                                 </div>
-                                            </TableCell>
+                                              </TableCell>
+                                            )}
                                         </TableRow>
                                     ))}
                                     {vatPayments.length === 0 && (

@@ -7,6 +7,7 @@ import { Plus, Trash2, Save } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import { toast } from '@/src/components/ui/toast';
+import { usePriv } from '@/src/hooks/usePriv';
 
 export function Variables() {
   const [newDate, setNewDate] = useState('');
@@ -41,6 +42,9 @@ export function Variables() {
   const leaveTypes = useAppStore((state) => state.leaveTypes);
   const addLeaveType = useAppStore((state) => state.addLeaveType);
   const removeLeaveType = useAppStore((state) => state.removeLeaveType);
+
+  // ─── Permissions ───────────────────────────────────────────
+  const priv = usePriv('variables');
 
   const [newExtraLabel, setNewExtraLabel] = useState('');
   const [newExtraAmount, setNewExtraAmount] = useState('');
@@ -151,9 +155,11 @@ export function Variables() {
           </h1>
           <p className="text-sm font-medium text-slate-500 mt-1">Configure global application variables, templates, and statutory parameters.</p>
         </div>
-        <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md font-semibold gap-2 transition-all">
-          <Save className="h-4 w-4" /> Save Changes
-        </Button>
+        {priv.canEdit && (
+          <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md font-semibold gap-2 transition-all">
+            <Save className="h-4 w-4" /> Save Changes
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
@@ -165,23 +171,25 @@ export function Variables() {
               <CardDescription>Dates defined here are used to calculate OT in the Daily Register.</CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
-              <div className="flex gap-2 mb-4">
-                <Input
-                  type="date"
-                  value={newDate}
-                  onChange={(e) => setNewDate(e.target.value)}
-                  className="w-40"
-                />
-                <Input
-                  placeholder="Holiday Name"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="flex-1"
-                />
-                <Button onClick={handleAddHoliday} variant="outline" className="gap-2">
-                  <Plus className="h-4 w-4" /> Add
-                </Button>
-              </div>
+              {priv.canEdit && (
+                <div className="flex gap-2 mb-4">
+                  <Input
+                    type="date"
+                    value={newDate}
+                    onChange={(e) => setNewDate(e.target.value)}
+                    className="w-40"
+                  />
+                  <Input
+                    placeholder="Holiday Name"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleAddHoliday} variant="outline" className="gap-2">
+                    <Plus className="h-4 w-4" /> Add
+                  </Button>
+                </div>
+              )}
 
               <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto">
                 <Table>
@@ -203,14 +211,16 @@ export function Variables() {
                           <TableCell className="font-medium">{holiday.date}</TableCell>
                           <TableCell>{holiday.name}</TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleRemoveHoliday(holiday.id)}
-                              className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            {priv.canEdit && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveHoliday(holiday.id)}
+                                className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))
@@ -228,19 +238,23 @@ export function Variables() {
               <CardDescription>Manage available job positions for employees.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-2 mb-4">
-                <Input placeholder="New Position" value={newPosition} onChange={(e) => setNewPosition(e.target.value)} className="flex-1" />
-                <Button onClick={handleAddPosition} variant="outline" className="gap-2">
-                  <Plus className="h-4 w-4" /> Add
-                </Button>
-              </div>
+              {priv.canEdit && (
+                <div className="flex gap-2 mb-4">
+                  <Input placeholder="New Position" value={newPosition} onChange={(e) => setNewPosition(e.target.value)} className="flex-1" />
+                  <Button onClick={handleAddPosition} variant="outline" className="gap-2">
+                    <Plus className="h-4 w-4" /> Add
+                  </Button>
+                </div>
+              )}
               <div className="flex flex-wrap gap-2">
                 {positions.map(pos => (
                   <div key={pos} className="bg-slate-100 border border-slate-200 rounded-full px-3 py-1 text-sm flex items-center gap-2">
                     {pos}
-                    <button onClick={() => removePosition(pos)} className="text-slate-400 hover:text-red-500">
-                      <Trash2 className="h-3 w-3" />
-                    </button>
+                    {priv.canEdit && (
+                      <button onClick={() => removePosition(pos)} className="text-slate-400 hover:text-red-500">
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -254,19 +268,23 @@ export function Variables() {
               <CardDescription>Manage available departments.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-2 mb-4">
-                <Input placeholder="New Department" value={newDepartment} onChange={(e) => setNewDepartment(e.target.value)} className="flex-1" />
-                <Button onClick={handleAddDepartment} variant="outline" className="gap-2">
-                  <Plus className="h-4 w-4" /> Add
-                </Button>
-              </div>
+              {priv.canEdit && (
+                <div className="flex gap-2 mb-4">
+                  <Input placeholder="New Department" value={newDepartment} onChange={(e) => setNewDepartment(e.target.value)} className="flex-1" />
+                  <Button onClick={handleAddDepartment} variant="outline" className="gap-2">
+                    <Plus className="h-4 w-4" /> Add
+                  </Button>
+                </div>
+              )}
               <div className="flex flex-wrap gap-2">
                 {departments.map(dep => (
                   <div key={dep} className="bg-slate-100 border border-slate-200 rounded-full px-3 py-1 text-sm flex items-center gap-2">
                     {dep}
-                    <button onClick={() => removeDepartment(dep)} className="text-slate-400 hover:text-red-500">
-                      <Trash2 className="h-3 w-3" />
-                    </button>
+                    {priv.canEdit && (
+                      <button onClick={() => removeDepartment(dep)} className="text-slate-400 hover:text-red-500">
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -280,19 +298,23 @@ export function Variables() {
               <CardDescription>Manage the types of leave available on employee leave forms.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-2 mb-4">
-                <Input placeholder="e.g. Compassionate Leave" value={newLeaveType} onChange={(e) => setNewLeaveType(e.target.value)} className="flex-1" />
-                <Button onClick={() => { if (newLeaveType && !leaveTypes.includes(newLeaveType)) { addLeaveType(newLeaveType); setNewLeaveType(''); } }} variant="outline" className="gap-2">
-                  <Plus className="h-4 w-4" /> Add
-                </Button>
-              </div>
+              {priv.canEdit && (
+                <div className="flex gap-2 mb-4">
+                  <Input placeholder="e.g. Compassionate Leave" value={newLeaveType} onChange={(e) => setNewLeaveType(e.target.value)} className="flex-1" />
+                  <Button onClick={() => { if (newLeaveType && !leaveTypes.includes(newLeaveType)) { addLeaveType(newLeaveType); setNewLeaveType(''); } }} variant="outline" className="gap-2">
+                    <Plus className="h-4 w-4" /> Add
+                  </Button>
+                </div>
+              )}
               <div className="flex flex-wrap gap-2">
                 {leaveTypes.map(lt => (
                   <div key={lt} className="bg-teal-50 border border-teal-200 rounded-full px-3 py-1 text-sm flex items-center gap-2 text-teal-800">
                     {lt}
-                    <button onClick={() => removeLeaveType(lt)} className="text-teal-400 hover:text-rose-500">
-                      <Trash2 className="h-3 w-3" />
-                    </button>
+                    {priv.canEdit && (
+                      <button onClick={() => removeLeaveType(lt)} className="text-teal-400 hover:text-rose-500">
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -316,13 +338,15 @@ export function Variables() {
                   <option value="offboarding">Offboarding</option>
                 </select>
               </div>
-              <div className="flex gap-2">
-                <Input placeholder="Task Title (e.g. Provide Laptop)" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} className="flex-1" />
-                <Input placeholder="Assignee (e.g. IT)" value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)} className="w-32" />
-                <Button variant="outline" onClick={handleAddTask} className="gap-2 shrink-0">
-                  <Plus className="h-4 w-4" /> Add
-                </Button>
-              </div>
+              {priv.canEdit && (
+                <div className="flex gap-2">
+                  <Input placeholder="Task Title (e.g. Provide Laptop)" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} className="flex-1" />
+                  <Input placeholder="Assignee (e.g. IT)" value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)} className="w-32" />
+                  <Button variant="outline" onClick={handleAddTask} className="gap-2 shrink-0">
+                    <Plus className="h-4 w-4" /> Add
+                  </Button>
+                </div>
+              )}
               <div className="border rounded-md overflow-hidden max-h-[300px] overflow-y-auto">
                 <Table>
                   <TableHeader className="bg-slate-50 sticky top-0">
@@ -342,9 +366,11 @@ export function Variables() {
                             <TableCell className="font-medium">{t.title}</TableCell>
                             <TableCell className="text-slate-500">{t.assignee}</TableCell>
                             <TableCell className="text-center">
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" onClick={() => handleRemoveTask(t.title, 'onboarding')}>
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                              {priv.canEdit && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" onClick={() => handleRemoveTask(t.title, 'onboarding')}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))
@@ -358,9 +384,11 @@ export function Variables() {
                             <TableCell className="font-medium">{t.title}</TableCell>
                             <TableCell className="text-slate-500">{t.assignee}</TableCell>
                             <TableCell className="text-center">
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" onClick={() => handleRemoveTask(t.title, 'offboarding')}>
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                              {priv.canEdit && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" onClick={() => handleRemoveTask(t.title, 'offboarding')}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))
@@ -600,10 +628,12 @@ export function Variables() {
                                 onChange={e => updateTaxBracket(b.id, { rate: Number(e.target.value) / 100 })} />
                             </TableCell>
                             <TableCell>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50"
-                                onClick={() => removeTaxBracket(b.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {priv.canEdit && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50"
+                                  onClick={() => removeTaxBracket(b.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -684,10 +714,12 @@ export function Variables() {
                                 className="h-4 w-4 accent-indigo-600" />
                             </TableCell>
                             <TableCell>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50"
-                                onClick={() => removePayeTaxExtraCondition(cond.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {priv.canEdit && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50"
+                                  onClick={() => removePayeTaxExtraCondition(cond.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}

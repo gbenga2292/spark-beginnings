@@ -1,0 +1,8 @@
+SalaryLoans: usePriv=false privUsed=false add=0 edit=0 del=0
+FinancialReports: usePriv=false privUsed=false add=0 edit=0 del=0
+Reports: usePriv=false privUsed=false add=0 edit=0 del=0
+VatPayments: usePriv=false privUsed=false add=6 edit=2 del=2
+Variables: usePriv=false privUsed=false add=8 edit=0 del=0
+ClientSummary: usePriv=false privUsed=false add=0 edit=0 del=0
+LeaveSummary: usePriv=false privUsed=false add=0 edit=0 del=0
+Dashboard: usePriv=false privUsed=false add=0 edit=0 del=0

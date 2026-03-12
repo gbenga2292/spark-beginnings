@@ -347,12 +347,14 @@ export function Billing() {
           </button>
         </div>
 
-        <Button
-          className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-10 px-5"
-          onClick={() => { handleClear(); setIsModalOpen(true); }}
-        >
-          <Plus className="w-5 h-5" /> Add Invoice
-        </Button>
+        {priv.canCreate && (
+          <Button
+            className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-10 px-5"
+            onClick={() => { handleClear(); setIsModalOpen(true); }}
+          >
+            <Plus className="w-5 h-5" /> Add Invoice
+          </Button>
+        )}
       </div>
 
       {/* Main Table View */}
@@ -377,7 +379,9 @@ export function Billing() {
                 <TableHead className="font-semibold px-4 py-3 text-right">Dates & Dur</TableHead>
                 <TableHead className="font-semibold px-4 py-3 text-right">Cost Bkdn</TableHead>
                 <TableHead className="font-semibold px-4 py-3 text-right">Totals (₦)</TableHead>
-                <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">Actions</TableHead>
+                {(priv.canEdit || priv.canDelete) && (
+                  <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">Actions</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -407,21 +411,27 @@ export function Billing() {
                     <div className="text-slate-500 text-xs">VAT: {(inv.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                     <div className="font-bold text-indigo-700 mt-1">{(inv.totalCharge || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                   </TableCell>
-                  <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                    <div className="flex items-center justify-center gap-1">
-                      {!isViewingActive && (
-                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleMakeActive(inv); }} className="h-8 w-8 text-emerald-600 hover:bg-emerald-50" title="Move to Active">
-                          <ArrowRightCircle className="w-4 h-4" />
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(inv); }} className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit row">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(inv.id); }} className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete row">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+                  {(priv.canEdit || priv.canDelete) && (
+                    <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                      <div className="flex items-center justify-center gap-1">
+                        {!isViewingActive && priv.canEdit && (
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleMakeActive(inv); }} className="h-8 w-8 text-emerald-600 hover:bg-emerald-50" title="Move to Active">
+                            <ArrowRightCircle className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {priv.canEdit && (
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(inv); }} className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit row">
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {priv.canDelete && (
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(inv.id); }} className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete row">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
               {currentList.length === 0 && (
