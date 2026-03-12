@@ -935,7 +935,7 @@ export function FinancialReports() {
                   <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', fontSize: '13px' }} />
                   <Bar dataKey="Cleared" stackId="a" fill="#cbd5e1" name="Received" />
                   <Bar dataKey="Outstanding" stackId="a" fill="#f59e0b" name="Outstanding" radius={[0, 4, 4, 0]}>
-                    <LabelList dataKey="Outstanding" position="right" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: number) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
+                    <LabelList dataKey="Outstanding" position="right" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
