@@ -669,10 +669,10 @@ export function FinancialReports() {
                   formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString()}`} />
                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
                 <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
-                  <LabelList dataKey="Payroll" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: number) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                  <LabelList dataKey="Payroll" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
                 </Line>
                 <Line yAxisId="right" type="monotone" name="Overtime Burn" dataKey="Overtime" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
-                  <LabelList dataKey="Overtime" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#f59e0b' }} formatter={(v: number) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                  <LabelList dataKey="Overtime" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#f59e0b' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
                 </Line>
               </LineChart>
             </ResponsiveContainer>
@@ -849,10 +849,10 @@ export function FinancialReports() {
                   <RechartsTooltip formatter={(value: number | undefined) => formatCurr(value ?? 0)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                   <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '13px' }} />
                   <Area type="monotone" dataKey="Billed" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorBilledR)">
-                    <LabelList dataKey="Billed" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#6366f1' }} formatter={(v: number) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
+                    <LabelList dataKey="Billed" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#6366f1' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
                   </Area>
                   <Area type="monotone" dataKey="Collected" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorCollectedR)">
-                    <LabelList dataKey="Collected" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: number) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
+                    <LabelList dataKey="Collected" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
                   </Area>
                 </AreaChart>
               </ResponsiveContainer>
@@ -935,7 +935,7 @@ export function FinancialReports() {
                   <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', fontSize: '13px' }} />
                   <Bar dataKey="Cleared" stackId="a" fill="#cbd5e1" name="Received" />
                   <Bar dataKey="Outstanding" stackId="a" fill="#f59e0b" name="Outstanding" radius={[0, 4, 4, 0]}>
-                    <LabelList dataKey="Outstanding" position="right" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: number) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
+                    <LabelList dataKey="Outstanding" position="right" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -965,10 +965,10 @@ export function FinancialReports() {
                 <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString()}`} />
                 <Legend verticalAlign="bottom" height={36} />
                 <Bar dataKey="paid" stackId="a" fill="#10b981" name="Paid Invoice">
-                  <LabelList dataKey="paid" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: number) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                  <LabelList dataKey="paid" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
                 </Bar>
                 <Bar dataKey="pending" stackId="a" fill="#f59e0b" name="Pending Invoice" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="pending" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: number) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                  <LabelList dataKey="pending" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

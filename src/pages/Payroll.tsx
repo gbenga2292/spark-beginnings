@@ -553,20 +553,6 @@ export function Payroll() {
             </div>
 
             <div className="flex gap-3">
-<<<<<<< HEAD
-              {(priv.canGenerate || priv.canViewPayeSchedule || priv.canViewPensionSchedule || priv.canViewNsitfSchedule) && (
-                <Button
-                  onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintSelectedDepts([]); setPrintDialogOpen(true); }}
-                  variant="outline"
-                  className="gap-2 border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
-                >
-                  <Printer className="h-4 w-4" /> Print / Export
-                </Button>
-              )}
-              {finRepPriv.canExport && (
-                <Button variant="outline" className="gap-2">
-                  <Download className="h-4 w-4" /> Export CSV
-=======
               {priv.canGenerate && (
                 <div className="flex gap-2 relative group">
                   <Button onClick={() => handleOpenPrintDialog('PAYSLIPS')} variant="outline" className="gap-2 shrink-0 border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700">
@@ -596,7 +582,6 @@ export function Payroll() {
                 <Button variant="outline" className="gap-2">
                   <Download className="h-4 w-4" />
                   Export CSV
->>>>>>> 7fc08406ec034025df6227fbe56fa076808fa66e
                 </Button>
               )}
             </div>

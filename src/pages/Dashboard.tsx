@@ -332,13 +332,13 @@ export function Dashboard() {
                                     <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                                     <Legend wrapperStyle={{ paddingTop: '10px' }} />
                                     <Bar dataKey="Present" fill="#10b981" radius={[4, 4, 0, 0]}>
-                                        <LabelList dataKey="Present" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: number) => v > 0 ? v : ''} />
+                                        <LabelList dataKey="Present" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? v : ''} />
                                     </Bar>
                                     <Bar dataKey="Absent" fill="#ef4444" radius={[4, 4, 0, 0]}>
-                                        <LabelList dataKey="Absent" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#ef4444' }} formatter={(v: number) => v > 0 ? v : ''} />
+                                        <LabelList dataKey="Absent" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#ef4444' }} formatter={(v: any) => v > 0 ? v : ''} />
                                     </Bar>
                                     <Bar dataKey="Overtime" fill="#8b5cf6" radius={[4, 4, 0, 0]}>
-                                        <LabelList dataKey="Overtime" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#8b5cf6' }} formatter={(v: number) => v > 0 ? v : ''} />
+                                        <LabelList dataKey="Overtime" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#8b5cf6' }} formatter={(v: any) => v > 0 ? v : ''} />
                                     </Bar>
                                 </BarChart>
                             </ResponsiveContainer>

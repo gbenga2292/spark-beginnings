@@ -601,7 +601,7 @@ export function Reports() {
                   <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
                   <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                   <Bar dataKey="count" fill="#4f46e5" radius={[4, 4, 0, 0]} name="Employees">
-                    <LabelList dataKey="count" position="top" style={{ fontSize: 11, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: number) => v > 0 ? v : ''} />
+                    <LabelList dataKey="count" position="top" style={{ fontSize: 11, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: any) => v > 0 ? v : ''} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -619,7 +619,7 @@ export function Reports() {
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={headcountStatusData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={5} dataKey="value" label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`} labelLine={true}>
+                  <Pie data={headcountStatusData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={5} dataKey="value" label={({ name, value, percent }: any) => `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`} labelLine={true}>
                     {headcountStatusData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
                   </Pie>
                   <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
