@@ -22,7 +22,7 @@ export function useDataLoader(isAuthenticated: boolean) {
           fetchPresets(),
         ]);
 
-        // Hydrate appStore
+        // Hydrate appStore (cast settings from JSONB to proper types)
         useAppStore.setState({
           sites: appData.sites,
           clients: appData.clients,
@@ -40,9 +40,9 @@ export function useDataLoader(isAuthenticated: boolean) {
           leaveTypes: appData.leaveTypes.length > 0 ? appData.leaveTypes : useAppStore.getState().leaveTypes,
           positions: appData.positions.length > 0 ? appData.positions : useAppStore.getState().positions,
           departments: appData.departments.length > 0 ? appData.departments : useAppStore.getState().departments,
-          ...(appData.payrollVariables ? { payrollVariables: appData.payrollVariables } : {}),
-          ...(appData.payeTaxVariables ? { payeTaxVariables: appData.payeTaxVariables } : {}),
-          ...(appData.monthValues && Object.keys(appData.monthValues).length > 0 ? { monthValues: appData.monthValues } : {}),
+          ...(appData.payrollVariables ? { payrollVariables: appData.payrollVariables as any } : {}),
+          ...(appData.payeTaxVariables ? { payeTaxVariables: appData.payeTaxVariables as any } : {}),
+          ...(appData.monthValues && Object.keys(appData.monthValues as any).length > 0 ? { monthValues: appData.monthValues as any } : {}),
         });
 
         // Hydrate userStore
