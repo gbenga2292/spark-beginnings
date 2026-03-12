@@ -1,27 +1,56 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Shield, Lock, Mail, User } from 'lucide-react';
 import { useUserStore, FULL_ACCESS } from '@/src/store/userStore';
+import { useAuth } from '@/src/hooks/useAuth';
+import { useAuthStore } from '@/src/store/auth';
+import { supabase } from '@/src/integrations/supabase/client';
+import { db } from '@/src/lib/supabaseService';
 
 export function SuperAdminSetup() {
   const { superAdminCreated, superAdminSignupEnabled, addUser, setSuperAdminCreated, setCurrentUser } = useUserStore();
+  const { signUp } = useAuth();
+  const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [isSetupDone, setIsSetupDone] = useState(false);
 
-  // If already created or disabled, redirect
-  if (superAdminCreated || !superAdminSignupEnabled) {
+  // Check if super admin already created via Supabase
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('app_settings').select('super_admin_created, super_admin_signup_enabled').limit(1).single();
+      if (data) {
+        if (data.super_admin_created || !data.super_admin_signup_enabled) {
+          setIsSetupDone(true);
+        }
+      }
+      setChecking(false);
+    })();
+  }, []);
+
+  if (checking) {
+    return (
+      <div className="flex min-h-full items-center justify-center bg-slate-50 px-4">
+        <div className="w-5 h-5 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (isSetupDone || superAdminCreated || !superAdminSignupEnabled) {
     return (
       <div className="flex min-h-full items-center justify-center bg-slate-50 px-4">
         <Card className="w-full max-w-md">
           <CardContent className="py-12 text-center">
             <Shield className="h-12 w-12 text-slate-300 mx-auto mb-4" />
             <p className="text-slate-500 text-sm">
-              {superAdminCreated ? 'Super Admin has already been created.' : 'Super Admin signup has been disabled.'}
+              Super Admin has already been created.
             </p>
             <Button variant="outline" className="mt-4" onClick={() => navigate('/login')}>Go to Login</Button>
           </CardContent>
@@ -30,26 +59,65 @@ export function SuperAdminSetup() {
     );
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!form.name || !form.email || !form.password) { setError('All fields are required.'); return; }
     if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return; }
     if (form.password !== form.confirm) { setError('Passwords do not match.'); return; }
 
-    const id = crypto.randomUUID();
-    addUser({
-      id,
-      name: form.name,
-      email: form.email,
-      password: form.password,
-      privileges: FULL_ACCESS,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-    });
-    setSuperAdminCreated();
-    setCurrentUser(id);
-    navigate('/');
+    setIsLoading(true);
+    try {
+      // Create Supabase auth user
+      const { data, error: signUpError } = await signUp(form.email, form.password, { name: form.name });
+      if (signUpError) {
+        setError(signUpError.message || 'Failed to create account.');
+        setIsLoading(false);
+        return;
+      }
+
+      const userId = data?.user?.id;
+      if (!userId) {
+        setError('Account created but failed to get user ID. Check your email for confirmation.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Update profile with full access privileges
+      await db.updateProfile(userId, {
+        name: form.name,
+        privileges: FULL_ACCESS as any,
+        is_active: true,
+      });
+
+      // Mark super admin as created
+      setSuperAdminCreated();
+
+      // Add to local store
+      addUser({
+        id: userId,
+        name: form.name,
+        email: form.email,
+        password: '', // Not stored
+        privileges: FULL_ACCESS,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      });
+
+      // Set auth state
+      login({
+        id: userId,
+        name: form.name,
+        email: form.email,
+        role: 'Super Admin',
+      });
+      setCurrentUser(userId);
+      setIsLoading(false);
+      navigate('/');
+    } catch (err: any) {
+      setError(err.message || 'An error occurred.');
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -101,8 +169,12 @@ export function SuperAdminSetup() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white">
-                Create Super Admin & Enter System
+              <Button type="submit" disabled={isLoading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white">
+                {isLoading ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  'Create Super Admin & Enter System'
+                )}
               </Button>
             </CardFooter>
           </form>

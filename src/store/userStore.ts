@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { db } from '@/src/lib/supabaseService';
 
 // ─── Dashboard ───────────────────────────────────────────────
 export interface DashboardPriv    { canView: boolean; }
@@ -39,24 +40,19 @@ export interface UsersPriv     { canView: boolean; canManage: boolean; }
 
 // ─── Master interface ─────────────────────────────────────────
 export interface UserPrivileges {
-  // Dashboard
   dashboard:         DashboardPriv;
   financeDashboard:  FinanceDashPriv;
-  // HR
   employees:         EmployeesPriv;
   onboarding:        OnboardingPriv;
   attendance:        AttendancePriv;
   leaves:            LeavesPriv;
   salaryLoans:       SalaryLoansPriv;
   reports:           ReportsPriv;
-  // Admin
   sites:             SitesPriv;
-  // Account
   billing:           BillingPriv;
   payments:          PaymentsPriv;
   payroll:           PayrollPriv;
   financialReports:  FinancialReportsPriv;
-  // Settings
   variables:         VariablesPriv;
   users:             UsersPriv;
 }
@@ -65,7 +61,7 @@ export interface AppUser {
   id: string;
   name: string;
   email: string;
-  password: string;
+  password: string; // Not used with Supabase auth, kept for interface compat
   avatar?: string;
   privileges: UserPrivileges;
   isActive: boolean;
@@ -120,8 +116,7 @@ export const NO_ACCESS: UserPrivileges = {
 const DEFAULT_PRESETS: PrivilegePreset[] = [
   { id: 'preset-full', name: 'Super Admin (Full Access)', privileges: FULL_ACCESS },
   {
-    id: 'preset-hr',
-    name: 'HR Manager',
+    id: 'preset-hr', name: 'HR Manager',
     privileges: {
       ...NO_ACCESS,
       dashboard:   { canView: true },
@@ -135,8 +130,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
     },
   },
   {
-    id: 'preset-finance',
-    name: 'Finance Officer',
+    id: 'preset-finance', name: 'Finance Officer',
     privileges: {
       ...NO_ACCESS,
       dashboard:        { canView: true },
@@ -150,8 +144,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
     },
   },
   {
-    id: 'preset-viewer',
-    name: 'View Only',
+    id: 'preset-viewer', name: 'View Only',
     privileges: {
       ...NO_ACCESS,
       dashboard:        { canView: true },
@@ -200,17 +193,33 @@ export const useUserStore = create<UserStore>()(
       superAdminSignupEnabled: true,
       currentUserId: null,
 
-      addUser:    (user)        => set((s) => ({ users: [...s.users, user] })),
-      updateUser: (id, data)    => set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, ...data } : u)) })),
-      deleteUser: (id)          => set((s) => ({ users: s.users.filter((u) => u.id !== id) })),
-      setCurrentUser: (id)      => set({ currentUserId: id }),
+      addUser: (user) => {
+        set((s) => ({ users: [...s.users, user] }));
+        // Profile is created via Supabase auth trigger; just update privileges
+        db.updateProfile(user.id, { name: user.name, privileges: user.privileges, is_active: user.isActive });
+      },
+      updateUser: (id, data) => {
+        set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, ...data } : u)) }));
+        const update: any = {};
+        if (data.name !== undefined) update.name = data.name;
+        if (data.email !== undefined) update.email = data.email;
+        if (data.avatar !== undefined) update.avatar = data.avatar;
+        if (data.privileges !== undefined) update.privileges = data.privileges;
+        if (data.isActive !== undefined) update.is_active = data.isActive;
+        if (Object.keys(update).length > 0) db.updateProfile(id, update);
+      },
+      deleteUser: (id) => {
+        set((s) => ({ users: s.users.filter((u) => u.id !== id) }));
+        // Note: To fully delete a Supabase auth user, use the edge function or admin dashboard
+      },
+      setCurrentUser: (id) => set({ currentUserId: id }),
 
-      addPreset:    (preset)      => set((s) => ({ presets: [...s.presets, preset] })),
-      updatePreset: (id, preset)  => set((s) => ({ presets: s.presets.map((p) => (p.id === id ? { ...p, ...preset } : p)) })),
-      deletePreset: (id)          => set((s) => ({ presets: s.presets.filter((p) => p.id !== id) })),
+      addPreset: (preset) => { set((s) => ({ presets: [...s.presets, preset] })); db.insertPreset(preset); },
+      updatePreset: (id, preset) => { set((s) => ({ presets: s.presets.map((p) => (p.id === id ? { ...p, ...preset } : p)) })); db.updatePreset(id, preset); },
+      deletePreset: (id) => { set((s) => ({ presets: s.presets.filter((p) => p.id !== id) })); db.deletePreset(id); },
 
-      setSuperAdminCreated:      () => set({ superAdminCreated: true }),
-      setSuperAdminSignupEnabled: (enabled) => set({ superAdminSignupEnabled: enabled }),
+      setSuperAdminCreated: () => { set({ superAdminCreated: true }); db.updateSettings({ superAdminCreated: true }); },
+      setSuperAdminSignupEnabled: (enabled) => { set({ superAdminSignupEnabled: enabled }); db.updateSettings({ superAdminSignupEnabled: enabled }); },
 
       getCurrentUser: () => {
         const state = get();
@@ -220,10 +229,8 @@ export const useUserStore = create<UserStore>()(
     {
       name: 'user-store',
       storage: createJSONStorage(() => localStorage),
-      // Merge stored data with new defaults so existing users get new keys
       merge: (persisted: any, current) => {
         const merged = { ...current, ...persisted };
-        // Ensure every existing user has all new privilege keys
         if (merged.users) {
           merged.users = merged.users.map((u: AppUser) => ({
             ...u,
@@ -236,7 +243,6 @@ export const useUserStore = create<UserStore>()(
   )
 );
 
-// Deep-merge helper so existing users get any new privilege keys defaulted to false
 function deepMergePrivileges(defaults: UserPrivileges, stored: Partial<UserPrivileges>): UserPrivileges {
   const result = { ...defaults };
   for (const key of Object.keys(defaults) as (keyof UserPrivileges)[]) {

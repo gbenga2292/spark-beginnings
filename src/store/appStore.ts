@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { db } from '@/src/lib/supabaseService';
 
 export interface Site {
   id: string;
@@ -11,8 +12,8 @@ export interface Site {
 
 export interface TaxBracket {
   id: string;
-  upTo: number | null; // null = top bracket (catches all remaining income)
-  rate: number;        // e.g. 0.15 for 15%
+  upTo: number | null;
+  rate: number;
   label: string;
 }
 
@@ -21,94 +22,6 @@ export interface DepartmentTasks {
   onboardingTasks: { title: string; assignee: string }[];
   offboardingTasks: { title: string; assignee: string }[];
 }
-
-interface AppState {
-  sites: Site[];
-  clients: string[];
-  employees: Employee[];
-  attendanceRecords: AttendanceRecord[];
-  positions: string[];
-  departments: string[];
-  invoices: Invoice[];
-  pendingInvoices: PendingInvoice[];
-  salaryAdvances: SalaryAdvance[];
-  loans: Loan[];
-  payments: Payment[];
-  vatPayments: VatPayment[];
-  addSite: (site: Site) => void;
-  setSites: (sites: Site[]) => void;
-  updateSite: (id: string, site: Partial<Site>) => void;
-  deleteSite: (id: string) => void;
-  addClient: (client: string) => void;
-  removeClient: (client: string) => void;
-  addEmployee: (employee: Employee) => void;
-  updateEmployee: (id: string, employee: Partial<Employee>) => void;
-  deleteEmployee: (id: string) => void;
-  addAttendanceRecords: (records: AttendanceRecord[]) => void;
-  removeAttendanceRecordsByDate: (date: string) => void;
-  addPosition: (position: string) => void;
-  removePosition: (position: string) => void;
-  addDepartment: (department: string) => void;
-  removeDepartment: (department: string) => void;
-  addInvoice: (invoice: Invoice) => void;
-  updateInvoice: (id: string, invoice: Partial<Invoice>) => void;
-  deleteInvoice: (id: string) => void;
-  addPendingInvoice: (inv: PendingInvoice) => void;
-  updatePendingInvoice: (id: string, inv: Partial<PendingInvoice>) => void;
-  deletePendingInvoice: (id: string) => void;
-  addSalaryAdvance: (advance: SalaryAdvance) => void;
-  updateSalaryAdvance: (id: string, advance: Partial<SalaryAdvance>) => void;
-  deleteSalaryAdvance: (id: string) => void;
-  addLoan: (loan: Loan) => void;
-  updateLoan: (id: string, loan: Partial<Loan>) => void;
-  deleteLoan: (id: string) => void;
-  addPayment: (payment: Payment) => void;
-  updatePayment: (id: string, payment: Partial<Payment>) => void;
-  deletePayment: (id: string) => void;
-  addVatPayment: (payment: VatPayment) => void;
-  updateVatPayment: (id: string, payment: Partial<VatPayment>) => void;
-  deleteVatPayment: (id: string) => void;
-  payrollVariables: {
-    basic: number;
-    housing: number;
-    transport: number;
-    otherAllowances: number;
-    employeePensionRate: number;
-    employerPensionRate: number;
-    withholdingTaxRate: number;
-    nsitfRate: number;
-    vatRate: number;
-  };
-  updatePayrollVariables: (variables: Partial<AppState['payrollVariables']>) => void;
-  payeTaxVariables: {
-    craBase: number;
-    rentReliefRate: number;
-    taxBrackets: TaxBracket[];
-    extraConditions: { id: string; label: string; amount: number; enabled: boolean }[];
-  };
-  updatePayeTaxVariables: (variables: Partial<Omit<AppState['payeTaxVariables'], 'taxBrackets' | 'extraConditions'>>) => void;
-  addTaxBracket: (bracket: TaxBracket) => void;
-  updateTaxBracket: (id: string, bracket: Partial<TaxBracket>) => void;
-  removeTaxBracket: (id: string) => void;
-  addPayeTaxExtraCondition: (cond: { id: string; label: string; amount: number; enabled: boolean }) => void;
-  updatePayeTaxExtraCondition: (id: string, cond: Partial<{ label: string; amount: number; enabled: boolean }>) => void;
-  removePayeTaxExtraCondition: (id: string) => void;
-  monthValues: Record<string, MonthValue>;
-  updateMonthValue: (month: string, values: Partial<MonthValue>) => void;
-  publicHolidays: { id: string; date: string; name: string }[];
-  addPublicHoliday: (holiday: { id: string; date: string; name: string }) => void;
-  removePublicHoliday: (id: string) => void;
-  departmentTasksList: DepartmentTasks[];
-  updateDepartmentTasks: (deptTasks: DepartmentTasks) => void;
-  leaves: LeaveRecord[];
-  addLeave: (leave: LeaveRecord) => void;
-  updateLeave: (id: string, leave: Partial<LeaveRecord>) => void;
-  deleteLeave: (id: string) => void;
-  leaveTypes: string[];
-  addLeaveType: (type: string) => void;
-  removeLeaveType: (type: string) => void;
-}
-
 
 export interface LeaveRecord {
   id: string;
@@ -122,7 +35,7 @@ export interface LeaveRecord {
   dateReturned: string;
   canBeContacted: 'Yes' | 'No';
   status: 'Active' | 'Cancelled';
-  uploadedFile?: string; // base64 or filename
+  uploadedFile?: string;
   uploadedFileName?: string;
 }
 
@@ -219,7 +132,6 @@ export interface Invoice {
   billingCycle: 'Weekly' | 'Bi-Weekly' | 'Monthly' | 'Custom';
   reminderDate: string;
   status: 'Paid' | 'Overdue' | 'Sent' | 'Draft';
-  // Additional metrics synced from PendingInvoices
   vatInc?: 'Yes' | 'No' | 'Add';
   noOfMachine?: number;
   dailyRentalCost?: number;
@@ -256,7 +168,7 @@ export interface Loan {
   loanType: string;
   principalAmount: number;
   monthlyDeduction: number;
-  duration: number; // months
+  duration: number;
   startDate: string;
   paymentStartDate: string;
   remainingBalance: number;
@@ -286,232 +198,124 @@ export interface VatPayment {
 
 export interface MonthValue {
   workDays: number;
-  overtimeRate: number; // 0.5 for 50%
+  overtimeRate: number;
 }
 
-
-
-const defaultSalary: MonthlySalary = {
-  jan: 600000, feb: 600000, mar: 600000, apr: 600000,
-  may: 600000, jun: 600000, jul: 600000, aug: 600000,
-  sep: 600000, oct: 600000, nov: 600000, dec: 600000
-};
+interface AppState {
+  sites: Site[];
+  clients: string[];
+  employees: Employee[];
+  attendanceRecords: AttendanceRecord[];
+  positions: string[];
+  departments: string[];
+  invoices: Invoice[];
+  pendingInvoices: PendingInvoice[];
+  salaryAdvances: SalaryAdvance[];
+  loans: Loan[];
+  payments: Payment[];
+  vatPayments: VatPayment[];
+  addSite: (site: Site) => void;
+  setSites: (sites: Site[]) => void;
+  updateSite: (id: string, site: Partial<Site>) => void;
+  deleteSite: (id: string) => void;
+  addClient: (client: string) => void;
+  removeClient: (client: string) => void;
+  addEmployee: (employee: Employee) => void;
+  updateEmployee: (id: string, employee: Partial<Employee>) => void;
+  deleteEmployee: (id: string) => void;
+  addAttendanceRecords: (records: AttendanceRecord[]) => void;
+  removeAttendanceRecordsByDate: (date: string) => void;
+  addPosition: (position: string) => void;
+  removePosition: (position: string) => void;
+  addDepartment: (department: string) => void;
+  removeDepartment: (department: string) => void;
+  addInvoice: (invoice: Invoice) => void;
+  updateInvoice: (id: string, invoice: Partial<Invoice>) => void;
+  deleteInvoice: (id: string) => void;
+  addPendingInvoice: (inv: PendingInvoice) => void;
+  updatePendingInvoice: (id: string, inv: Partial<PendingInvoice>) => void;
+  deletePendingInvoice: (id: string) => void;
+  addSalaryAdvance: (advance: SalaryAdvance) => void;
+  updateSalaryAdvance: (id: string, advance: Partial<SalaryAdvance>) => void;
+  deleteSalaryAdvance: (id: string) => void;
+  addLoan: (loan: Loan) => void;
+  updateLoan: (id: string, loan: Partial<Loan>) => void;
+  deleteLoan: (id: string) => void;
+  addPayment: (payment: Payment) => void;
+  updatePayment: (id: string, payment: Partial<Payment>) => void;
+  deletePayment: (id: string) => void;
+  addVatPayment: (payment: VatPayment) => void;
+  updateVatPayment: (id: string, payment: Partial<VatPayment>) => void;
+  deleteVatPayment: (id: string) => void;
+  payrollVariables: {
+    basic: number;
+    housing: number;
+    transport: number;
+    otherAllowances: number;
+    employeePensionRate: number;
+    employerPensionRate: number;
+    withholdingTaxRate: number;
+    nsitfRate: number;
+    vatRate: number;
+  };
+  updatePayrollVariables: (variables: Partial<AppState['payrollVariables']>) => void;
+  payeTaxVariables: {
+    craBase: number;
+    rentReliefRate: number;
+    taxBrackets: TaxBracket[];
+    extraConditions: { id: string; label: string; amount: number; enabled: boolean }[];
+  };
+  updatePayeTaxVariables: (variables: Partial<Omit<AppState['payeTaxVariables'], 'taxBrackets' | 'extraConditions'>>) => void;
+  addTaxBracket: (bracket: TaxBracket) => void;
+  updateTaxBracket: (id: string, bracket: Partial<TaxBracket>) => void;
+  removeTaxBracket: (id: string) => void;
+  addPayeTaxExtraCondition: (cond: { id: string; label: string; amount: number; enabled: boolean }) => void;
+  updatePayeTaxExtraCondition: (id: string, cond: Partial<{ label: string; amount: number; enabled: boolean }>) => void;
+  removePayeTaxExtraCondition: (id: string) => void;
+  monthValues: Record<string, MonthValue>;
+  updateMonthValue: (month: string, values: Partial<MonthValue>) => void;
+  publicHolidays: { id: string; date: string; name: string }[];
+  addPublicHoliday: (holiday: { id: string; date: string; name: string }) => void;
+  removePublicHoliday: (id: string) => void;
+  departmentTasksList: DepartmentTasks[];
+  updateDepartmentTasks: (deptTasks: DepartmentTasks) => void;
+  leaves: LeaveRecord[];
+  addLeave: (leave: LeaveRecord) => void;
+  updateLeave: (id: string, leave: Partial<LeaveRecord>) => void;
+  deleteLeave: (id: string) => void;
+  leaveTypes: string[];
+  addLeaveType: (type: string) => void;
+  removeLeaveType: (type: string) => void;
+}
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
+      // ── Default state (empty - data comes from Supabase) ──
       leaves: [],
-      addLeave: (leave) => set((state) => ({ leaves: [...state.leaves, leave] })),
-      updateLeave: (id, leave) => set((state) => ({ leaves: state.leaves.map(l => l.id === id ? { ...l, ...leave } : l) })),
-      deleteLeave: (id) => set((state) => ({ leaves: state.leaves.filter(l => l.id !== id) })),
-      sites: [
-        { id: 'S-001', name: 'Louiseville', client: 'Alpha Corp', vat: 'No', status: 'Active' },
-        { id: 'S-002', name: 'Bose Enenmon', client: 'Beta LLC', vat: 'Yes', status: 'Active' },
-        { id: 'S-003', name: 'CornerView Apartment', client: 'Gamma Inc', vat: 'No', status: 'Active' },
-        { id: 'S-004', name: 'Office', client: 'Internal', vat: 'No', status: 'Active' },
-      ],
-      clients: ['Alpha Corp', 'Beta LLC', 'Gamma Inc', 'Internal'],
-      positions: ['CEO', 'Head of Admin', 'Head of Operations', 'Projects Supervisor', 'Site Engineer', 'Technician', 'Security'],
-      departments: ['ADMIN', 'OPERATIONS', 'ENGINEERING', 'HR', 'FINANCE'],
-      departmentTasksList: [
-        {
-          department: 'ALL',
-          onboardingTasks: [
-            { title: 'Send Offer Letter', assignee: 'HR Team' },
-            { title: 'Background Check', assignee: 'External Agency' },
-            { title: 'IT Equipment Setup', assignee: 'IT Support' },
-            { title: 'Welcome Email & Accounts', assignee: 'IT Support' },
-            { title: 'First Day Orientation', assignee: 'HR Team' },
-            { title: 'Assign to Site', assignee: 'Operations' },
-            { title: 'Create Payroll Profile', assignee: 'Finance' },
-          ],
-          offboardingTasks: [
-            { title: 'Conduct Exit Interview', assignee: 'HR Team' },
-            { title: 'Revoke IT Access', assignee: 'IT Support' },
-            { title: 'Recover Company Assets', assignee: 'Operations' },
-            { title: 'Process Final Payroll', assignee: 'Finance' },
-          ]
-        }
-      ],
-      employees: [
-        {
-          id: 'EMP-001', surname: 'DAVIES', firstname: 'HUBERT', department: 'ADMIN', staffType: 'INTERNAL', position: 'CEO',
-          startDate: '2018-01-08', endDate: '', yearlyLeave: 20, bankName: 'STANBIC', accountNo: '9200384717',
-          payeTax: true, withholdingTax: false, taxId: 'TAX-001', pensionNumber: 'PEN-001', status: 'Active', monthlySalaries: defaultSalary
-        },
-        {
-          id: 'EMP-002', surname: 'OBOKIA', firstname: 'ALICIA', department: 'ADMIN', staffType: 'INTERNAL', position: 'Head of Admin',
-          startDate: '2018-01-08', endDate: '', yearlyLeave: 20, bankName: 'FIRST BANK', accountNo: '3059739035',
-          payeTax: true, withholdingTax: false, taxId: 'TAX-002', pensionNumber: 'PEN-002', status: 'Active',
-          monthlySalaries: { ...defaultSalary, jan: 400000, feb: 400000, mar: 400000, apr: 400000, may: 400000, jun: 400000, jul: 400000, aug: 400000, sep: 400000, oct: 400000, nov: 400000, dec: 400000 }
-        },
-        {
-          id: 'EMP-003', surname: 'IDIAFEHI', firstname: 'ELIJAH', department: 'OPERATIONS', staffType: 'INTERNAL', position: 'Head of Operations',
-          startDate: '2025-03-01', endDate: '', yearlyLeave: 20, bankName: 'STANBIC', accountNo: '0026639919',
-          payeTax: true, withholdingTax: false, taxId: 'TAX-003', pensionNumber: 'PEN-003', status: 'Active',
-          monthlySalaries: { ...defaultSalary, jan: 400000, feb: 400000, mar: 400000, apr: 400000, may: 400000, jun: 400000, jul: 400000, aug: 400000, sep: 400000, oct: 400000, nov: 400000, dec: 400000 }
-        },
-        {
-          id: 'EMP-004', surname: 'ALONGE', firstname: 'OLATUNDE GBENGA', department: 'ADMIN', staffType: 'INTERNAL', position: 'Projects Supervisor',
-          startDate: '2025-02-24', endDate: '', yearlyLeave: 20, bankName: 'ACCESS', accountNo: '1445714675',
-          payeTax: true, withholdingTax: false, taxId: 'TAX-004', pensionNumber: 'PEN-004', status: 'Active',
-          monthlySalaries: { ...defaultSalary, jan: 200000, feb: 200000, mar: 200000, apr: 200000, may: 200000, jun: 200000, jul: 200000, aug: 200000, sep: 200000, oct: 200000, nov: 200000, dec: 200000 }
-        },
-      ],
+      sites: [],
+      clients: [],
+      positions: [],
+      departments: [],
+      employees: [],
       attendanceRecords: [],
-      pendingInvoices: [
-        {
-          id: 'PI-001',
-          invoiceNo: '144',
-          client: 'HiTech',
-          site: 'Louiseville',
-          vatInc: 'Yes',
-          noOfMachine: 4,
-          dailyRentalCost: 120000,
-          dieselCostPerLtr: 1110,
-          dailyUsage: 18,
-          noOfTechnician: 2,
-          techniciansDailyRate: 12200,
-          mobDemob: 0,
-          installation: 0,
-          damages: 0,
-          startDate: '2023-11-01',
-          duration: 100,
-          endDate: '2024-02-08',
-          rentalCost: 48000000,
-          dieselCost: 7992000,
-          techniciansCost: 2440000,
-          totalCost: 58432000,
-          vat: 4076651.16,
-          totalCharge: 58432000,
-          totalExclusiveOfVat: 54355348.84
-        }
-      ],
-      invoices: [
-        { id: 'INV-2023-001', invoiceNumber: 'INV-001', client: 'Acme Corp', project: 'Website Redesign', siteId: 'S-001', siteName: 'Louiseville', amount: 12500000, date: '2023-10-01', dueDate: '2023-10-15', billingCycle: 'Monthly', reminderDate: '2023-10-12', status: 'Paid' },
-        { id: 'INV-2023-002', invoiceNumber: 'INV-002', client: 'Global Tech', project: 'Mobile App Dev', siteId: 'S-002', siteName: 'Bose Enenmon', amount: 24000000, date: '2023-10-05', dueDate: '2023-10-20', billingCycle: 'Monthly', reminderDate: '2023-10-17', status: 'Overdue' },
-        { id: 'INV-2023-003', invoiceNumber: 'INV-003', client: 'Stark Industries', project: 'Security Audit', siteId: 'S-003', siteName: 'CornerView Apartment', amount: 8500000, date: '2023-10-15', dueDate: '2023-10-30', billingCycle: 'Monthly', reminderDate: '2023-10-27', status: 'Sent' },
-        { id: 'INV-2023-004', invoiceNumber: 'INV-004', client: 'Wayne Enterprises', project: 'Cloud Migration', siteId: 'S-004', siteName: 'Office', amount: 32000000, date: '2023-10-20', dueDate: '2023-11-04', billingCycle: 'Monthly', reminderDate: '2023-11-01', status: 'Draft' },
-      ],
-      salaryAdvances: [
-        { id: 'SA-001', employeeId: 'EMP-002', employeeName: 'OBOKIA ALICIA', amount: 100000, requestDate: '2023-10-15', status: 'Pending' },
-        { id: 'SA-002', employeeId: 'EMP-004', employeeName: 'ALONGE OLATUNDE GBENGA', amount: 50000, requestDate: '2023-10-10', status: 'Approved' },
-      ],
-      loans: [
-        { id: 'LN-001', employeeId: 'EMP-003', employeeName: 'IDIAFEHI ELIJAH', loanType: 'Personal Loan', principalAmount: 500000, monthlyDeduction: 50000, duration: 10, startDate: '2023-01-01', paymentStartDate: '2023-02-01', remainingBalance: 450000, status: 'Active' },
-        { id: 'LN-002', employeeId: 'EMP-004', employeeName: 'ALONGE OLATUNDE GBENGA', loanType: 'Emergency Loan', principalAmount: 200000, monthlyDeduction: 40000, duration: 5, startDate: '2023-06-01', paymentStartDate: '2023-07-01', remainingBalance: 120000, status: 'Active' },
-      ],
-      payments: [
-        {
-          id: 'PAY-001',
-          client: 'HiTech',
-          site: 'Louiseville',
-          date: '2025-12-15',
-          amount: 1000000,
-          withholdingTax: 0,
-          discount: 0,
-          payVat: 'No',
-          vat: 0,
-          amountForVat: 1000000
-        }
-      ],
-      vatPayments: [
-        {
-          id: 'VAT-001',
-          client: 'Monterosa',
-          date: '2025-10-15',
-          month: 'October',
-          amount: 75000
-        }
-      ],
-      addSite: (site) => set((state) => ({ sites: [...state.sites, site] })),
-      setSites: (sites) => set({ sites }),
-      updateSite: (id, updatedSite) => set((state) => ({
-        sites: state.sites.map(site => site.id === id ? { ...site, ...updatedSite } : site)
-      })),
-      deleteSite: (id) => set((state) => ({
-        sites: state.sites.filter(site => site.id !== id)
-      })),
-      addClient: (client) => set((state) => ({ 
-        clients: state.clients.includes(client) 
-          ? state.clients 
-          : [...state.clients, client] 
-      })),
-      removeClient: (client) => set((state) => ({ 
-        clients: state.clients.filter(c => c !== client) 
-      })),
-      addEmployee: (employee) => set((state) => ({ employees: [...state.employees, employee] })),
-      updateEmployee: (id, updatedEmployee) => set((state) => ({
-        employees: state.employees.map(emp => emp.id === id ? { ...emp, ...updatedEmployee } : emp)
-      })),
-      deleteEmployee: (id) => set((state) => ({
-        employees: state.employees.filter(emp => emp.id !== id)
-      })),
-      addAttendanceRecords: (records) => set((state) => ({ attendanceRecords: [...state.attendanceRecords, ...records] })),
-      removeAttendanceRecordsByDate: (date) => set((state) => ({ attendanceRecords: state.attendanceRecords.filter(r => r.date !== date) })),
-      addPosition: (position) => set((state) => ({ positions: [...state.positions, position] })),
-      removePosition: (position) => set((state) => ({ positions: state.positions.filter(p => p !== position) })),
-      addDepartment: (department) => set((state) => ({ departments: [...state.departments, department] })),
-      removeDepartment: (department) => set((state) => ({ departments: state.departments.filter(d => d !== department) })),
-      addInvoice: (invoice) => set((state) => ({ invoices: [...state.invoices, invoice] })),
-      updateInvoice: (id, updatedInvoice) => set((state) => ({
-        invoices: state.invoices.map(inv => inv.id === id ? { ...inv, ...updatedInvoice } : inv)
-      })),
-      deleteInvoice: (id) => set((state) => ({
-        invoices: state.invoices.filter(inv => inv.id !== id)
-      })),
-      addPendingInvoice: (inv) => set((state) => ({ pendingInvoices: [...state.pendingInvoices, inv] })),
-      updatePendingInvoice: (id, updated) => set((state) => ({
-        pendingInvoices: state.pendingInvoices.map(inv => inv.id === id ? { ...inv, ...updated } : inv)
-      })),
-      deletePendingInvoice: (id) => set((state) => ({
-        pendingInvoices: state.pendingInvoices.filter(inv => inv.id !== id)
-      })),
-      addSalaryAdvance: (advance) => set((state) => ({ salaryAdvances: [...state.salaryAdvances, advance] })),
-      updateSalaryAdvance: (id, updatedAdvance) => set((state) => ({
-        salaryAdvances: state.salaryAdvances.map(adv => adv.id === id ? { ...adv, ...updatedAdvance } : adv)
-      })),
-      deleteSalaryAdvance: (id) => set((state) => ({
-        salaryAdvances: state.salaryAdvances.filter(adv => adv.id !== id)
-      })),
-      addLoan: (loan) => set((state) => ({ loans: [...state.loans, loan] })),
-      updateLoan: (id, updatedLoan) => set((state) => ({
-        loans: state.loans.map(ln => ln.id === id ? { ...ln, ...updatedLoan } : ln)
-      })),
-      deleteLoan: (id) => set((state) => ({
-        loans: state.loans.filter(ln => ln.id !== id)
-      })),
-      addPayment: (payment) => set((state) => ({ payments: [...state.payments, payment] })),
-      updatePayment: (id, updatedPayment) => set((state) => ({
-        payments: state.payments.map(p => p.id === id ? { ...p, ...updatedPayment } : p)
-      })),
-      deletePayment: (id) => set((state) => ({
-        payments: state.payments.filter(p => p.id !== id)
-      })),
-      addVatPayment: (payment) => set((state) => ({ vatPayments: [...state.vatPayments, payment] })),
-      updateVatPayment: (id, updatedPayment) => set((state) => ({
-        vatPayments: state.vatPayments.map(p => p.id === id ? { ...p, ...updatedPayment } : p)
-      })),
-      deleteVatPayment: (id) => set((state) => ({
-        vatPayments: state.vatPayments.filter(p => p.id !== id)
-      })),
+      pendingInvoices: [],
+      invoices: [],
+      salaryAdvances: [],
+      loans: [],
+      payments: [],
+      vatPayments: [],
+      publicHolidays: [],
+      departmentTasksList: [],
+      leaveTypes: [],
+
       payrollVariables: {
-        basic: 40,
-        housing: 30,
-        transport: 20,
-        otherAllowances: 10,
-        employeePensionRate: 8,
-        employerPensionRate: 10,
-        withholdingTaxRate: 0.05,
-        nsitfRate: 1,
-        vatRate: 7.5,
+        basic: 40, housing: 30, transport: 20, otherAllowances: 10,
+        employeePensionRate: 8, employerPensionRate: 10,
+        withholdingTaxRate: 0.05, nsitfRate: 1, vatRate: 7.5,
       },
-      updatePayrollVariables: (variables) => set((state) => ({
-        payrollVariables: { ...state.payrollVariables, ...variables }
-      })),
       payeTaxVariables: {
-        craBase: 800000,
-        rentReliefRate: 0.20,
+        craBase: 800000, rentReliefRate: 0.20,
         taxBrackets: [
           { id: 'tb-1', upTo: 2200000, rate: 0.15, label: 'First ₦2.2m' },
           { id: 'tb-2', upTo: 11200000, rate: 0.18, label: 'Next ₦9m' },
@@ -521,109 +325,173 @@ export const useAppStore = create<AppState>()(
         ],
         extraConditions: [],
       },
-      updatePayeTaxVariables: (variables) => set((state) => ({
-        payeTaxVariables: { ...state.payeTaxVariables, ...variables }
-      })),
-      addTaxBracket: (bracket) => set((state) => ({
-        payeTaxVariables: {
-          ...state.payeTaxVariables,
-          taxBrackets: [...state.payeTaxVariables.taxBrackets, bracket]
-        }
-      })),
-      updateTaxBracket: (id, update) => set((state) => ({
-        payeTaxVariables: {
-          ...state.payeTaxVariables,
-          taxBrackets: state.payeTaxVariables.taxBrackets.map(b => b.id === id ? { ...b, ...update } : b)
-        }
-      })),
-      removeTaxBracket: (id) => set((state) => ({
-        payeTaxVariables: {
-          ...state.payeTaxVariables,
-          taxBrackets: state.payeTaxVariables.taxBrackets.filter(b => b.id !== id)
-        }
-      })),
-      addPayeTaxExtraCondition: (cond) => set((state) => ({
-        payeTaxVariables: {
-          ...state.payeTaxVariables,
-          extraConditions: [...state.payeTaxVariables.extraConditions, cond]
-        }
-      })),
-      updatePayeTaxExtraCondition: (id, update) => set((state) => ({
-        payeTaxVariables: {
-          ...state.payeTaxVariables,
-          extraConditions: state.payeTaxVariables.extraConditions.map(c => c.id === id ? { ...c, ...update } : c)
-        }
-      })),
-      removePayeTaxExtraCondition: (id) => set((state) => ({
-        payeTaxVariables: {
-          ...state.payeTaxVariables,
-          extraConditions: state.payeTaxVariables.extraConditions.filter(c => c.id !== id)
-        }
-      })),
       monthValues: {
-        jan: { workDays: 22, overtimeRate: 0.5 },
-        feb: { workDays: 20, overtimeRate: 0.5 },
-        mar: { workDays: 21, overtimeRate: 0.5 },
-        apr: { workDays: 20, overtimeRate: 0.5 },
-        may: { workDays: 22, overtimeRate: 0.5 },
-        jun: { workDays: 21, overtimeRate: 0.5 },
-        jul: { workDays: 22, overtimeRate: 0.5 },
-        aug: { workDays: 21, overtimeRate: 0.5 },
-        sep: { workDays: 22, overtimeRate: 0.5 },
-        oct: { workDays: 21, overtimeRate: 0.5 },
-        nov: { workDays: 20, overtimeRate: 0.5 },
-        dec: { workDays: 22, overtimeRate: 0.5 },
+        jan: { workDays: 22, overtimeRate: 0.5 }, feb: { workDays: 20, overtimeRate: 0.5 },
+        mar: { workDays: 21, overtimeRate: 0.5 }, apr: { workDays: 20, overtimeRate: 0.5 },
+        may: { workDays: 22, overtimeRate: 0.5 }, jun: { workDays: 21, overtimeRate: 0.5 },
+        jul: { workDays: 22, overtimeRate: 0.5 }, aug: { workDays: 21, overtimeRate: 0.5 },
+        sep: { workDays: 22, overtimeRate: 0.5 }, oct: { workDays: 21, overtimeRate: 0.5 },
+        nov: { workDays: 20, overtimeRate: 0.5 }, dec: { workDays: 22, overtimeRate: 0.5 },
       },
-      updateMonthValue: (month, values) => set((state) => ({
-        monthValues: {
-          ...state.monthValues,
-          [month]: { ...state.monthValues[month], ...values }
-        }
-      })),
-      publicHolidays: [
-        { id: '1', date: '2026-01-01', name: 'New Year\'s Day' },
-        { id: '2', date: '2026-01-02', name: 'New Year Holiday' },
-        { id: '3', date: '2026-01-03', name: 'New Year Holiday' },
-        { id: '4', date: '2026-03-20', name: 'Eid-el-Fitr' },
-        { id: '5', date: '2026-03-21', name: 'Eid-el-Fitr' },
-        { id: '6', date: '2026-04-03', name: 'Good Friday' },
-        { id: '7', date: '2026-04-06', name: 'Easter Monday' },
-        { id: '8', date: '2026-05-01', name: 'Workers\' Day' },
-        { id: '9', date: '2026-05-27', name: 'Children\'s Day' },
-        { id: '10', date: '2026-05-28', name: 'Eid-el-Kabir' },
-        { id: '11', date: '2026-06-12', name: 'Democracy Day' },
-        { id: '12', date: '2026-08-26', name: 'Eid-el-Maulud' },
-        { id: '13', date: '2026-10-01', name: 'Independence Day' },
-        { id: '14', date: '2026-12-25', name: 'Christmas Day' },
-      ],
-      addPublicHoliday: (holiday) => set((state) => {
-        return {
-          publicHolidays: [...state.publicHolidays, holiday].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        };
-      }),
-      removePublicHoliday: (id: string) => set((state) => ({
-        publicHolidays: state.publicHolidays.filter(h => h.id !== id)
-      })),
-      updateDepartmentTasks: (deptTasks) => set((state) => {
-        const exists = state.departmentTasksList.find(d => d.department === deptTasks.department);
-        if (exists) {
-          return {
-            departmentTasksList: state.departmentTasksList.map(d =>
-              d.department === deptTasks.department ? deptTasks : d
-            )
-          };
-        } else {
-          return {
-            departmentTasksList: [...state.departmentTasksList, deptTasks]
-          };
-        }
-      }),
-      leaveTypes: ['Annual Leave', 'Sick Leave', 'Maternity Leave', 'Paternity Leave', 'Compassionate Leave', 'Study Leave', 'Unpaid Leave'],
-      addLeaveType: (type) => set((state) => ({ leaveTypes: state.leaveTypes.includes(type) ? state.leaveTypes : [...state.leaveTypes, type] })),
-      removeLeaveType: (type) => set((state) => ({ leaveTypes: state.leaveTypes.filter(t => t !== type) })),
+
+      // ── Actions with Supabase sync ──
+
+      // Leaves
+      addLeave: (leave) => { set((s) => ({ leaves: [...s.leaves, leave] })); db.insertLeave(leave); },
+      updateLeave: (id, leave) => { set((s) => ({ leaves: s.leaves.map(l => l.id === id ? { ...l, ...leave } : l) })); db.updateLeave(id, leave); },
+      deleteLeave: (id) => { set((s) => ({ leaves: s.leaves.filter(l => l.id !== id) })); db.deleteLeave(id); },
+
+      // Sites
+      addSite: (site) => { set((s) => ({ sites: [...s.sites, site] })); db.insertSite(site); },
+      setSites: (sites) => { set({ sites }); db.setSites(sites); },
+      updateSite: (id, updatedSite) => { set((s) => ({ sites: s.sites.map(site => site.id === id ? { ...site, ...updatedSite } : site) })); db.updateSite(id, updatedSite); },
+      deleteSite: (id) => { set((s) => ({ sites: s.sites.filter(site => site.id !== id) })); db.deleteSite(id); },
+
+      // Clients
+      addClient: (client) => { set((s) => ({ clients: s.clients.includes(client) ? s.clients : [...s.clients, client] })); db.insertClient(client); },
+      removeClient: (client) => { set((s) => ({ clients: s.clients.filter(c => c !== client) })); db.deleteClient(client); },
+
+      // Employees
+      addEmployee: (employee) => { set((s) => ({ employees: [...s.employees, employee] })); db.insertEmployee(employee); },
+      updateEmployee: (id, updatedEmployee) => { set((s) => ({ employees: s.employees.map(emp => emp.id === id ? { ...emp, ...updatedEmployee } : emp) })); db.updateEmployee(id, updatedEmployee); },
+      deleteEmployee: (id) => { set((s) => ({ employees: s.employees.filter(emp => emp.id !== id) })); db.deleteEmployee(id); },
+
+      // Attendance
+      addAttendanceRecords: (records) => { set((s) => ({ attendanceRecords: [...s.attendanceRecords, ...records] })); db.insertAttendanceRecords(records); },
+      removeAttendanceRecordsByDate: (date) => { set((s) => ({ attendanceRecords: s.attendanceRecords.filter(r => r.date !== date) })); db.deleteAttendanceByDate(date); },
+
+      // Positions & Departments
+      addPosition: (position) => { set((s) => ({ positions: [...s.positions, position] })); db.insertPosition(position); },
+      removePosition: (position) => { set((s) => ({ positions: s.positions.filter(p => p !== position) })); db.deletePosition(position); },
+      addDepartment: (department) => { set((s) => ({ departments: [...s.departments, department] })); db.insertDepartment(department); },
+      removeDepartment: (department) => { set((s) => ({ departments: s.departments.filter(d => d !== department) })); db.deleteDepartment(department); },
+
+      // Invoices
+      addInvoice: (invoice) => { set((s) => ({ invoices: [...s.invoices, invoice] })); db.insertInvoice(invoice); },
+      updateInvoice: (id, updatedInvoice) => { set((s) => ({ invoices: s.invoices.map(inv => inv.id === id ? { ...inv, ...updatedInvoice } : inv) })); db.updateInvoice(id, updatedInvoice); },
+      deleteInvoice: (id) => { set((s) => ({ invoices: s.invoices.filter(inv => inv.id !== id) })); db.deleteInvoice(id); },
+
+      // Pending Invoices
+      addPendingInvoice: (inv) => { set((s) => ({ pendingInvoices: [...s.pendingInvoices, inv] })); db.insertPendingInvoice(inv); },
+      updatePendingInvoice: (id, updated) => { set((s) => ({ pendingInvoices: s.pendingInvoices.map(inv => inv.id === id ? { ...inv, ...updated } : inv) })); db.updatePendingInvoice(id, updated); },
+      deletePendingInvoice: (id) => { set((s) => ({ pendingInvoices: s.pendingInvoices.filter(inv => inv.id !== id) })); db.deletePendingInvoice(id); },
+
+      // Salary Advances
+      addSalaryAdvance: (advance) => { set((s) => ({ salaryAdvances: [...s.salaryAdvances, advance] })); db.insertSalaryAdvance(advance); },
+      updateSalaryAdvance: (id, updatedAdvance) => { set((s) => ({ salaryAdvances: s.salaryAdvances.map(adv => adv.id === id ? { ...adv, ...updatedAdvance } : adv) })); db.updateSalaryAdvance(id, updatedAdvance); },
+      deleteSalaryAdvance: (id) => { set((s) => ({ salaryAdvances: s.salaryAdvances.filter(adv => adv.id !== id) })); db.deleteSalaryAdvance(id); },
+
+      // Loans
+      addLoan: (loan) => { set((s) => ({ loans: [...s.loans, loan] })); db.insertLoan(loan); },
+      updateLoan: (id, updatedLoan) => { set((s) => ({ loans: s.loans.map(ln => ln.id === id ? { ...ln, ...updatedLoan } : ln) })); db.updateLoan(id, updatedLoan); },
+      deleteLoan: (id) => { set((s) => ({ loans: s.loans.filter(ln => ln.id !== id) })); db.deleteLoan(id); },
+
+      // Payments
+      addPayment: (payment) => { set((s) => ({ payments: [...s.payments, payment] })); db.insertPayment(payment); },
+      updatePayment: (id, updatedPayment) => { set((s) => ({ payments: s.payments.map(p => p.id === id ? { ...p, ...updatedPayment } : p) })); db.updatePayment(id, updatedPayment); },
+      deletePayment: (id) => { set((s) => ({ payments: s.payments.filter(p => p.id !== id) })); db.deletePayment(id); },
+
+      // VAT Payments
+      addVatPayment: (payment) => { set((s) => ({ vatPayments: [...s.vatPayments, payment] })); db.insertVatPayment(payment); },
+      updateVatPayment: (id, updatedPayment) => { set((s) => ({ vatPayments: s.vatPayments.map(p => p.id === id ? { ...p, ...updatedPayment } : p) })); db.updateVatPayment(id, updatedPayment); },
+      deleteVatPayment: (id) => { set((s) => ({ vatPayments: s.vatPayments.filter(p => p.id !== id) })); db.deleteVatPayment(id); },
+
+      // Payroll Variables
+      updatePayrollVariables: (variables) => {
+        set((s) => {
+          const updated = { ...s.payrollVariables, ...variables };
+          db.updateSettings({ payrollVariables: updated });
+          return { payrollVariables: updated };
+        });
+      },
+
+      // PAYE Tax Variables
+      updatePayeTaxVariables: (variables) => {
+        set((s) => {
+          const updated = { ...s.payeTaxVariables, ...variables };
+          db.updateSettings({ payeTaxVariables: updated });
+          return { payeTaxVariables: updated };
+        });
+      },
+      addTaxBracket: (bracket) => {
+        set((s) => {
+          const updated = { ...s.payeTaxVariables, taxBrackets: [...s.payeTaxVariables.taxBrackets, bracket] };
+          db.updateSettings({ payeTaxVariables: updated });
+          return { payeTaxVariables: updated };
+        });
+      },
+      updateTaxBracket: (id, update) => {
+        set((s) => {
+          const updated = { ...s.payeTaxVariables, taxBrackets: s.payeTaxVariables.taxBrackets.map(b => b.id === id ? { ...b, ...update } : b) };
+          db.updateSettings({ payeTaxVariables: updated });
+          return { payeTaxVariables: updated };
+        });
+      },
+      removeTaxBracket: (id) => {
+        set((s) => {
+          const updated = { ...s.payeTaxVariables, taxBrackets: s.payeTaxVariables.taxBrackets.filter(b => b.id !== id) };
+          db.updateSettings({ payeTaxVariables: updated });
+          return { payeTaxVariables: updated };
+        });
+      },
+      addPayeTaxExtraCondition: (cond) => {
+        set((s) => {
+          const updated = { ...s.payeTaxVariables, extraConditions: [...s.payeTaxVariables.extraConditions, cond] };
+          db.updateSettings({ payeTaxVariables: updated });
+          return { payeTaxVariables: updated };
+        });
+      },
+      updatePayeTaxExtraCondition: (id, update) => {
+        set((s) => {
+          const updated = { ...s.payeTaxVariables, extraConditions: s.payeTaxVariables.extraConditions.map(c => c.id === id ? { ...c, ...update } : c) };
+          db.updateSettings({ payeTaxVariables: updated });
+          return { payeTaxVariables: updated };
+        });
+      },
+      removePayeTaxExtraCondition: (id) => {
+        set((s) => {
+          const updated = { ...s.payeTaxVariables, extraConditions: s.payeTaxVariables.extraConditions.filter(c => c.id !== id) };
+          db.updateSettings({ payeTaxVariables: updated });
+          return { payeTaxVariables: updated };
+        });
+      },
+
+      // Month Values
+      updateMonthValue: (month, values) => {
+        set((s) => {
+          const updated = { ...s.monthValues, [month]: { ...s.monthValues[month], ...values } };
+          db.updateSettings({ monthValues: updated });
+          return { monthValues: updated };
+        });
+      },
+
+      // Public Holidays
+      addPublicHoliday: (holiday) => {
+        set((s) => ({
+          publicHolidays: [...s.publicHolidays, holiday].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        }));
+        db.insertPublicHoliday(holiday);
+      },
+      removePublicHoliday: (id: string) => { set((s) => ({ publicHolidays: s.publicHolidays.filter(h => h.id !== id) })); db.deletePublicHoliday(id); },
+
+      // Department Tasks
+      updateDepartmentTasks: (deptTasks) => {
+        set((s) => {
+          const exists = s.departmentTasksList.find(d => d.department === deptTasks.department);
+          if (exists) {
+            return { departmentTasksList: s.departmentTasksList.map(d => d.department === deptTasks.department ? deptTasks : d) };
+          }
+          return { departmentTasksList: [...s.departmentTasksList, deptTasks] };
+        });
+        db.upsertDepartmentTasks(deptTasks);
+      },
+
+      // Leave Types
+      addLeaveType: (type) => { set((s) => ({ leaveTypes: s.leaveTypes.includes(type) ? s.leaveTypes : [...s.leaveTypes, type] })); db.insertLeaveType(type); },
+      removeLeaveType: (type) => { set((s) => ({ leaveTypes: s.leaveTypes.filter(t => t !== type) })); db.deleteLeaveType(type); },
     }),
     {
-      name: 'spark-beginnings-storage',
+      name: 'dcel-hr-storage',
       storage: createJSONStorage(() => localStorage),
     }
   )
