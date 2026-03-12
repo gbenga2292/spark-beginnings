@@ -16,7 +16,9 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "electron:dev": "electron .",
-    "electron:build": "npm run build:dev && electron-builder"
+    "electron:build": "npm run build:dev && electron-builder",
+    "electron:build:win": "npm run build:dev && electron-builder --win --x64",
+    "electron:build:dir": "npm run build:dev && electron-builder --win --x64 --dir"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -25,7 +27,6 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.4",
-    "better-sqlite3": "^12.4.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
@@ -68,7 +69,8 @@
     ],
     "win": {
       "target": [
-        "nsis"
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "dir", "arch": ["x64"] }
       ],
       "icon": "logo/logo-1.png"
     },

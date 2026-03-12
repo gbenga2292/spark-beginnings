@@ -993,12 +993,16 @@ export function FinancialReports() {
           <CardContent>
             <p className="text-sm text-slate-500 mb-4 h-10">Full invoice listing with client, site, amounts, and status.</p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="w-full gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportInvoiceReport}>
-                <FileSpreadsheet className="h-4 w-4" /> Excel
-              </Button>
-              <Button variant="outline" size="sm" className="w-full gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportInvoicePdf}>
-                <FileText className="h-4 w-4" /> PDF
-              </Button>
+              {priv.canExport && (
+                <Button variant="outline" size="sm" className="w-full gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportInvoiceReport}>
+                  <FileSpreadsheet className="h-4 w-4" /> Excel
+                </Button>
+              )}
+              {priv.canExport && (
+                <Button variant="outline" size="sm" className="w-full gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportInvoicePdf}>
+                  <FileText className="h-4 w-4" /> PDF
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1011,12 +1015,16 @@ export function FinancialReports() {
           <CardContent>
             <p className="text-sm text-slate-500 mb-4 h-10">Payment records with WHT, VAT, and discount breakdowns.</p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="w-full gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportPaymentReport}>
-                <FileSpreadsheet className="h-4 w-4" /> Excel
-              </Button>
-              <Button variant="outline" size="sm" className="w-full gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportPaymentPdf}>
-                <FileText className="h-4 w-4" /> PDF
-              </Button>
+              {priv.canExport && (
+                <Button variant="outline" size="sm" className="w-full gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportPaymentReport}>
+                  <FileSpreadsheet className="h-4 w-4" /> Excel
+                </Button>
+              )}
+              {priv.canExport && (
+                <Button variant="outline" size="sm" className="w-full gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportPaymentPdf}>
+                  <FileText className="h-4 w-4" /> PDF
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1029,9 +1037,11 @@ export function FinancialReports() {
           <CardContent>
             <p className="text-sm text-slate-500 mb-4 h-10">Track VAT collected vs remitted to FIRS for compliance.</p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="w-full gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportVatReport}>
-                <FileSpreadsheet className="h-4 w-4" /> Excel
-              </Button>
+              {priv.canExport && (
+                <Button variant="outline" size="sm" className="w-full gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportVatReport}>
+                  <FileSpreadsheet className="h-4 w-4" /> Excel
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1231,7 +1241,8 @@ export function FinancialReports() {
               const gPaye = payrollSummaryData.reduce((s, row) => s + row.paye, 0);
               const gTotalPayout = payrollSummaryData.reduce((s, row) => s + row.totalPayout, 0);
 
-              const fm = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              const fm = (n: number) => priv?.canViewAmounts === false ? '***' : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              const fmT = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
               const exportPayrollSummaryCsv = () => {
                 let csv = 'data:text/csv;charset=utf-8,';
@@ -1282,14 +1293,16 @@ export function FinancialReports() {
                         {years.map(y => <option key={y} value={y}>{y}</option>)}
                       </select>
                     </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportPayrollSummaryCsv}>
-                        <FileSpreadsheet className="h-4 w-4" /> CSV
-                      </Button>
-                      <Button size="sm" className="gap-2 bg-[#2c7793] hover:bg-[#1a556b] text-white" onClick={exportPayrollSummaryPdf}>
-                        <FileText className="h-4 w-4" /> PDF
-                      </Button>
-                    </div>
+                    {priv.canExport && (
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportPayrollSummaryCsv}>
+                          <FileSpreadsheet className="h-4 w-4" /> CSV
+                        </Button>
+                        <Button size="sm" className="gap-2 bg-[#2c7793] hover:bg-[#1a556b] text-white" onClick={exportPayrollSummaryPdf}>
+                          <FileText className="h-4 w-4" /> PDF
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   <div className="rounded-2xl border border-slate-200 shadow-lg overflow-hidden" style={{ background: 'linear-gradient(to bottom, #f8fafc, #ffffff)' }}>
                     {/* column legend bar */}
@@ -1407,7 +1420,7 @@ export function FinancialReports() {
                             <span className={`text-sm font-mono font-extrabold tracking-wide ${
                               isAccent ? 'text-amber-300' : isPaye ? 'text-rose-300' : 'text-white'
                             }`}>
-                              ₦{fm(val)}
+                              ₦{fmT(val)}
                             </span>
                           </div>
                         );
@@ -1468,14 +1481,16 @@ export function FinancialReports() {
                       </div>
                     ))}
                   </div>
-                  <div className="flex justify-end gap-2 mb-4">
-                    <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportLoansCsv}>
-                      <FileSpreadsheet className="h-4 w-4" /> CSV
-                    </Button>
-                    <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700 text-white" onClick={exportLoansPdf}>
-                      <FileText className="h-4 w-4" /> PDF
-                    </Button>
-                  </div>
+                  {priv.canExport && (
+                    <div className="flex justify-end gap-2 mb-4">
+                      <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportLoansCsv}>
+                        <FileSpreadsheet className="h-4 w-4" /> CSV
+                      </Button>
+                      <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700 text-white" onClick={exportLoansPdf}>
+                        <FileText className="h-4 w-4" /> PDF
+                      </Button>
+                    </div>
+                  )}
 
                   {/* Loans table */}
                   <div className="mb-6">

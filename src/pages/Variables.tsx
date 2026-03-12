@@ -554,6 +554,49 @@ export function Variables() {
             </CardContent>
           </Card>
 
+          {/* ——— CLIENTS ——— */}
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader>
+              <CardTitle>Clients</CardTitle>
+              <CardDescription>Manage clients. These are shared with the Sites &amp; Clients page.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {priv.canEdit && (
+                <div className="flex gap-2 mb-4">
+                  <Input
+                    placeholder="New Client Name"
+                    value={newClient}
+                    onChange={(e) => setNewClient(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { if (newClient && !clients.includes(newClient)) { addClient(newClient); setNewClient(''); } } }}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={() => { if (newClient && !clients.includes(newClient)) { addClient(newClient); setNewClient(''); } }}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" /> Add
+                  </Button>
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {clients.length === 0 && (
+                  <p className="text-sm text-slate-400 italic">No clients yet. Add one above or via Sites &amp; Clients.</p>
+                )}
+                {clients.map(c => (
+                  <div key={c} className="bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1 text-sm flex items-center gap-2 text-indigo-800">
+                    {c}
+                    {priv.canEdit && (
+                      <button onClick={() => removeClient(c)} className="text-indigo-300 hover:text-red-500">
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* ——— LEAVE TYPES ——— */}
           <Card className="shadow-sm border-slate-200">
             <CardHeader>

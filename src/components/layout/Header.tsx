@@ -6,6 +6,7 @@ import { useUserStore, UserPrivileges } from '@/src/store/userStore';
 import { useAppStore } from '@/src/store/appStore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
 import { Button } from '@/src/components/ui/button';
+import { useTheme } from '@/src/hooks/useTheme';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -17,7 +18,7 @@ interface SearchItem {
   description: string;
   href: string;
   icon: any;
-  privKey: keyof UserPrivileges;
+  privKey: keyof UserPrivileges | null; // null = super-admin only
   privField: string;
   keywords: string[];
 }
@@ -33,7 +34,7 @@ const ALL_SEARCH_ITEMS: SearchItem[] = [
   { label: 'Financial Hub', description: 'Invoices, payments & VAT', href: '/finance', icon: Landmark, privKey: 'financeDashboard', privField: 'canView', keywords: ['finance', 'invoice', 'billing', 'payment', 'vat', 'receipt', 'money', 'revenue', 'loan', 'advance'] },
   { label: 'Reports', description: 'Export & analysis', href: '/reports', icon: FileText, privKey: 'reports', privField: 'canView', keywords: ['report', 'export', 'analysis', 'data', 'download', 'pdf', 'excel'] },
   { label: 'Variables', description: 'Tax rates & config', href: '/variables', icon: Library, privKey: 'variables', privField: 'canView', keywords: ['variable', 'tax', 'rate', 'config', 'paye', 'pension', 'allowance', 'holiday'] },
-  { label: 'Settings', description: 'App preferences', href: '/settings', icon: Settings, privKey: 'variables', privField: 'canView', keywords: ['settings', 'preference', 'company', 'notification', 'integration', 'security'] },
+  { label: 'Settings', description: 'App preferences', href: '/settings', icon: Settings, privKey: null, privField: 'canView', keywords: ['settings', 'preference', 'company', 'notification', 'integration', 'security'] },
   { label: 'User Management', description: 'Users & privileges', href: '/users', icon: ShieldCheck, privKey: 'users', privField: 'canView', keywords: ['user', 'privilege', 'permission', 'role', 'access', 'admin'] },
 ];
 
@@ -80,6 +81,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { setCurrentUser } = useUserStore();
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const notifications = useNotifications();
+  const { isDark } = useTheme();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -122,6 +124,8 @@ export function Header({ onMenuClick }: HeaderProps) {
     return ALL_SEARCH_ITEMS.filter((item) => {
       // Check privilege
       if (currentUser) {
+        // null privKey = super-admin only — hide for sub-users
+        if (item.privKey === null) return false;
         const pagePriv = (currentUser.privileges[item.privKey] as unknown) as Record<string, boolean>;
         if (!pagePriv?.[item.privField]) return false;
       }
@@ -142,7 +146,9 @@ export function Header({ onMenuClick }: HeaderProps) {
     : 0;
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 md:px-6 gap-4">
+    <header className={`flex h-14 items-center justify-between border-b px-4 md:px-6 gap-4 transition-colors duration-200 ${
+      isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-slate-200'
+    }`}>
       {/* Left: Menu + Search */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {onMenuClick && (
@@ -158,7 +164,11 @@ export function Header({ onMenuClick }: HeaderProps) {
             <input
               type="text"
               placeholder="Search pages, features..."
-              className="w-full h-8 rounded-lg bg-slate-50 border border-slate-200 pl-8 pr-8 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-300 transition-all"
+              className={`w-full h-8 rounded-lg border pl-8 pr-8 text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all ${
+                isDark
+                  ? 'bg-slate-800 border-slate-600 text-slate-100 placeholder:text-slate-500'
+                  : 'bg-slate-50 border-slate-200 text-slate-700'
+              }`}
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
               onFocus={() => searchQuery && setSearchOpen(true)}
@@ -172,7 +182,9 @@ export function Header({ onMenuClick }: HeaderProps) {
 
           {/* Search Results Dropdown */}
           {searchOpen && searchQuery.trim() && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden max-h-80 overflow-y-auto">
+            <div className={`absolute top-full left-0 right-0 mt-1 border rounded-lg shadow-xl z-50 overflow-hidden max-h-80 overflow-y-auto ${
+              isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+            }`}>
               {filteredSearch.length === 0 ? (
                 <div className="px-4 py-6 text-center text-xs text-slate-400">
                   <Search className="h-5 w-5 mx-auto mb-2 opacity-30" />
@@ -183,7 +195,9 @@ export function Header({ onMenuClick }: HeaderProps) {
                   <button
                     key={item.href}
                     onClick={() => { navigate(item.href); setSearchOpen(false); setSearchQuery(''); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b last:border-0 ${
+                      isDark ? 'hover:bg-slate-700 border-slate-700/50 text-slate-200' : 'hover:bg-slate-50 border-slate-50 text-slate-800'
+                    }`}
                   >
                     <div className="h-8 w-8 rounded-md bg-indigo-50 flex items-center justify-center flex-shrink-0">
                       <item.icon className="h-4 w-4 text-indigo-600" />
@@ -207,19 +221,25 @@ export function Header({ onMenuClick }: HeaderProps) {
         <div ref={notifRef} className="relative">
           <button
             onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); }}
-            className="relative h-8 w-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+            className={`relative h-8 w-8 rounded-lg flex items-center justify-center transition-colors ${
+              isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'
+            }`}
           >
             <Bell className="h-4 w-4" />
             {notifications.length > 0 && (
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+              <span className={`absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 ring-2 ${isDark ? 'ring-slate-900' : 'ring-white'}`} />
             )}
           </button>
 
           {notifOpen && (
-            <div className="absolute right-0 top-full mt-1 w-80 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="text-xs font-bold text-slate-800">Notifications</h3>
-                <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full">
+            <div className={`absolute right-0 top-full mt-1 w-80 border rounded-lg shadow-xl z-50 overflow-hidden ${
+              isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+            }`}>
+              <div className={`px-4 py-3 border-b flex items-center justify-between ${
+                isDark ? 'border-slate-700' : 'border-slate-100'
+              }`}>
+                <h3 className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>Notifications</h3>
+                <span className="text-[10px] font-medium text-indigo-400 bg-indigo-900/40 px-1.5 py-0.5 rounded-full">
                   {notifications.length}
                 </span>
               </div>
@@ -231,12 +251,16 @@ export function Header({ onMenuClick }: HeaderProps) {
                   </div>
                 ) : (
                   notifications.map((n) => (
-                    <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0">
-                      <div className={`h-7 w-7 rounded-md bg-slate-50 flex items-center justify-center flex-shrink-0 mt-0.5 ${n.color}`}>
+                    <div key={n.id} className={`flex items-start gap-3 px-4 py-3 transition-colors border-b last:border-0 ${
+                      isDark ? 'hover:bg-slate-700/50 border-slate-700/50' : 'hover:bg-slate-50 border-slate-50'
+                    }`}>
+                      <div className={`h-7 w-7 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 ${n.color} ${
+                        isDark ? 'bg-slate-700' : 'bg-slate-50'
+                      }`}>
                         <n.icon className="h-3.5 w-3.5" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[11px] text-slate-700 leading-snug">{n.text}</p>
+                        <p className={`text-[11px] leading-snug ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{n.text}</p>
                         <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
                           <Clock className="h-2.5 w-2.5" /> {n.time}
                         </p>
@@ -249,16 +273,18 @@ export function Header({ onMenuClick }: HeaderProps) {
           )}
         </div>
 
-        <div className="h-6 w-px bg-slate-200" />
+        <div className={`h-6 w-px ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
 
         {/* Profile Dropdown */}
         <div ref={profileRef} className="relative">
           <button
             onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); }}
-            className="flex items-center gap-2.5 rounded-lg px-2 py-1 hover:bg-slate-50 transition-colors"
+            className={`flex items-center gap-2.5 rounded-lg px-2 py-1 transition-colors ${
+              isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-50'
+            }`}
           >
             <div className="hidden sm:flex flex-col items-end">
-              <span className="text-xs font-semibold text-slate-800 leading-tight">{user?.name}</span>
+              <span className={`text-xs font-semibold leading-tight ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{user?.name}</span>
               <span className="text-[10px] text-slate-400 leading-tight">{currentUser?.email}</span>
             </div>
             <Avatar className="h-8 w-8">
@@ -268,49 +294,62 @@ export function Header({ onMenuClick }: HeaderProps) {
           </button>
 
           {profileOpen && (
-            <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden">
+            <div className={`absolute right-0 top-full mt-1 w-64 border rounded-lg shadow-xl z-50 overflow-hidden ${
+              isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+            }`}>
               {/* Profile Header */}
-              <div className="px-4 py-4 bg-slate-50 border-b border-slate-100">
+              <div className={`px-4 py-4 border-b ${
+                isDark ? 'bg-slate-900/60 border-slate-700' : 'bg-slate-50 border-slate-100'
+              }`}>
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={user?.avatar} alt={user?.name} referrerPolicy="no-referrer" />
-                    <AvatarFallback className="bg-indigo-100 text-indigo-700 font-bold">{user?.name?.charAt(0)}</AvatarFallback>
+                    <AvatarFallback className="bg-indigo-700 text-white font-bold">{user?.name?.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-900 truncate">{user?.name}</p>
+                    <p className={`text-sm font-bold truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{user?.name}</p>
                     <p className="text-[11px] text-slate-500 truncate">{currentUser?.email}</p>
                   </div>
                 </div>
                 <div className="mt-3 flex gap-2">
-                  <span className="text-[10px] font-medium bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-medium bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full">
                     {privCount} permissions
                   </span>
-                  <span className="text-[10px] font-medium bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-medium bg-emerald-900/40 text-emerald-400 px-2 py-0.5 rounded-full">
                     Active
                   </span>
                 </div>
               </div>
 
-{/* Menu Items */}
+              {/* Menu Items */}
               <div className="py-1">
                 <button
                   onClick={() => { setProfileOpen(false); navigate('/profile'); }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs transition-colors ${
+                    isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
                 >
                   <User className="h-3.5 w-3.5 text-slate-400" />
                   My Profile
                 </button>
-                <button
-                  onClick={() => { setProfileOpen(false); navigate('/settings'); }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  <Settings className="h-3.5 w-3.5 text-slate-400" />
-                  Settings
-                </button>
+                {/* Settings — super-admin only */}
+                {!currentUser && (
+                  <button
+                    onClick={() => { setProfileOpen(false); navigate('/settings'); }}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs transition-colors ${
+                      isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Settings className="h-3.5 w-3.5 text-slate-400" />
+                    Settings
+                  </button>
+                )}
                 {currentUser?.privileges?.users?.canView && (
                   <button
                     onClick={() => { setProfileOpen(false); navigate('/users'); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs transition-colors ${
+                      isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-50'
+                    }`}
                   >
                     <User className="h-3.5 w-3.5 text-slate-400" />
                     User Management
@@ -318,10 +357,10 @@ export function Header({ onMenuClick }: HeaderProps) {
                 )}
               </div>
 
-              <div className="border-t border-slate-100 py-1">
+              <div className={`border-t py-1 ${isDark ? 'border-slate-700' : 'border-slate-100'}`}>
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-red-600 hover:bg-red-50 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-red-500 hover:bg-red-900/20 transition-colors"
                 >
                   <LogOut className="h-3.5 w-3.5" />
                   Sign Out

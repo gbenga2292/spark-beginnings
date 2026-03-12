@@ -499,7 +499,7 @@ export function Sites() {
                           <Input value={editForm.client} className="h-8" list="edit-clients"
                             onChange={e => setEditForm({ ...editForm, client: e.target.value })} />
                           <datalist id="edit-clients">
-                            {[...new Set(sites.map(s => s.client))].map(c => (
+                            {clients.map(c => (
                               <option key={c} value={c} />
                             ))}
                           </datalist>
@@ -610,7 +610,7 @@ export function Sites() {
               onChange={e => setAddForm({ ...addForm, client: e.target.value })}
             />
             <datalist id="dialog-clients">
-              {[...new Set(sites.map(s => s.client))].map(c => (
+              {clients.map(c => (
                 <option key={c} value={c} />
               ))}
             </datalist>

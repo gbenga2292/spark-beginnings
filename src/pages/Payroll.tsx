@@ -505,7 +505,10 @@ export function Payroll() {
 
   const selectedMonthLabel = months.find(m => m.key === selectedMonth)?.label || selectedMonth;
 
-  const fm = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const hideAmounts = priv?.canViewAmounts === false;
+  const fm = (n: number) => hideAmounts ? '***' : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // fmTotal always shows the real value (used for TOTALS rows)
+  const fmT = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div className="flex flex-col gap-8">
@@ -741,7 +744,7 @@ export function Payroll() {
               <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
                 <CardTitle>PAYE Tax Schedule: {selectedMonthLabel}</CardTitle>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-500 font-medium">Total PAYE: <span className="text-red-600 font-bold">₦{priv?.canViewAmounts === false ? '***' : totals.totalPAYE.toLocaleString()}</span></span>
+                  <span className="text-xs text-slate-500 font-medium">Total PAYE: <span className="text-red-600 font-bold">₦{fmT(totals.totalPAYE)}</span></span>
                   <Button variant="outline" size="sm" className="gap-2" onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintDialogOpen(true); setPrintType('PAYE'); }}>
                     <Printer className="h-4 w-4" /> Print Schedule
                   </Button>
@@ -780,12 +783,12 @@ export function Payroll() {
                     ))}
                     <TableRow className="border-t-2 bg-red-50 font-bold">
                       <TableCell colSpan={4} className="text-right font-bold">TOTALS</TableCell>
-                      <TableCell className="text-right font-mono">{fm(payrollData.reduce((s,r)=>s+r.basicSalary,0))}</TableCell>
-                      <TableCell className="text-right font-mono">{fm(payrollData.reduce((s,r)=>s+r.housing,0))}</TableCell>
-                      <TableCell className="text-right font-mono">{fm(payrollData.reduce((s,r)=>s+r.transport,0))}</TableCell>
-                      <TableCell className="text-right font-mono">{fm(payrollData.reduce((s,r)=>s+r.otherAllowances,0))}</TableCell>
-                      <TableCell className="text-right font-mono">{fm(payrollData.reduce((s,r)=>s+r.grossPay,0))}</TableCell>
-                      <TableCell className="text-right font-mono text-red-600">{fm(totals.totalPAYE)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmT(payrollData.reduce((s,r)=>s+r.basicSalary,0))}</TableCell>
+                      <TableCell className="text-right font-mono">{fmT(payrollData.reduce((s,r)=>s+r.housing,0))}</TableCell>
+                      <TableCell className="text-right font-mono">{fmT(payrollData.reduce((s,r)=>s+r.transport,0))}</TableCell>
+                      <TableCell className="text-right font-mono">{fmT(payrollData.reduce((s,r)=>s+r.otherAllowances,0))}</TableCell>
+                      <TableCell className="text-right font-mono">{fmT(payrollData.reduce((s,r)=>s+r.grossPay,0))}</TableCell>
+                      <TableCell className="text-right font-mono text-red-600">{fmT(totals.totalPAYE)}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -810,7 +813,7 @@ export function Payroll() {
               <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
                 <CardTitle>Pension Schedule: {selectedMonthLabel}</CardTitle>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-500 font-medium">Total Pension: <span className="text-amber-600 font-bold">₦{priv?.canViewAmounts === false ? '***' : totals.totalPension.toLocaleString()}</span></span>
+                  <span className="text-xs text-slate-500 font-medium">Total Pension: <span className="text-amber-600 font-bold">₦{fmT(totals.totalPension)}</span></span>
                   <Button variant="outline" size="sm" className="gap-2" onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintDialogOpen(true); setPrintType('PENSION'); }}>
                     <Printer className="h-4 w-4" /> Print Schedule
                   </Button>
@@ -848,10 +851,10 @@ export function Payroll() {
                     })}
                     <TableRow className="border-t-2 bg-amber-50 font-bold">
                       <TableCell colSpan={4} className="text-right font-bold">TOTALS</TableCell>
-                      <TableCell className="text-right font-mono">{fm(payrollData.filter(r=>r.pension>0).reduce((s,r)=>s+(r.basicSalary+r.housing+r.transport),0))}</TableCell>
-                      <TableCell className="text-right font-mono text-amber-600">{fm(totals.totalPension)}</TableCell>
-                      <TableCell className="text-right font-mono text-indigo-600">{fm(payrollData.reduce((s,r)=>s+r.employerPension,0))}</TableCell>
-                      <TableCell className="text-right font-mono text-emerald-700">{fm(payrollData.reduce((s,r)=>s+r.pension+r.employerPension,0))}</TableCell>
+                      <TableCell className="text-right font-mono">{fmT(payrollData.filter(r=>r.pension>0).reduce((s,r)=>s+(r.basicSalary+r.housing+r.transport),0))}</TableCell>
+                      <TableCell className="text-right font-mono text-amber-600">{fmT(totals.totalPension)}</TableCell>
+                      <TableCell className="text-right font-mono text-indigo-600">{fmT(payrollData.reduce((s,r)=>s+r.employerPension,0))}</TableCell>
+                      <TableCell className="text-right font-mono text-emerald-700">{fmT(payrollData.reduce((s,r)=>s+r.pension+r.employerPension,0))}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -876,7 +879,7 @@ export function Payroll() {
               <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
                 <CardTitle>NSITF Schedule: {selectedMonthLabel}</CardTitle>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-500 font-medium">Total NSITF: <span className="text-blue-600 font-bold">₦{fm(payrollData.reduce((s,r)=>s+r.nsitf,0))}</span></span>
+                  <span className="text-xs text-slate-500 font-medium">Total NSITF: <span className="text-blue-600 font-bold">₦{fmT(payrollData.reduce((s,r)=>s+r.nsitf,0))}</span></span>
                   <Button variant="outline" size="sm" className="gap-2" onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintDialogOpen(true); setPrintType('NSITF'); }}>
                     <Printer className="h-4 w-4" /> Print Schedule
                   </Button>
@@ -909,9 +912,9 @@ export function Payroll() {
                     ))}
                     <TableRow className="border-t-2 bg-blue-50 font-bold">
                       <TableCell colSpan={4} className="text-right font-bold">TOTALS</TableCell>
-                      <TableCell className="text-right font-mono">{fm(payrollData.filter(r=>r.nsitf>0).reduce((s,r)=>s+r.grossPay,0))}</TableCell>
+                      <TableCell className="text-right font-mono">{fmT(payrollData.filter(r=>r.nsitf>0).reduce((s,r)=>s+r.grossPay,0))}</TableCell>
                       <TableCell />
-                      <TableCell className="text-right font-mono text-blue-600">{fm(payrollData.reduce((s,r)=>s+r.nsitf,0))}</TableCell>
+                      <TableCell className="text-right font-mono text-blue-600">{fmT(payrollData.reduce((s,r)=>s+r.nsitf,0))}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>

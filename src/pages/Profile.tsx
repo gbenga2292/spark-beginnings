@@ -6,6 +6,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
+import { supabase } from '@/src/integrations/supabase/client';
 import { 
   User, 
   Mail, 
@@ -16,7 +17,8 @@ import {
   ArrowLeft,
   AlertCircle,
   CheckCircle2,
-  Building2
+  Building2,
+  Loader2
 } from 'lucide-react';
 
 export function Profile() {
@@ -28,6 +30,7 @@ export function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | undefined>(user?.avatar);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Form states
@@ -45,28 +48,42 @@ export function Profile() {
     fileInputRef.current?.click();
   };
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && currentUser) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setAvatarPreview(result);
-        
-        // Auto-save the avatar immediately
-        updateUser(currentUser.id, {
-          avatar: result,
-        });
-        
-        // Update auth store
-        login({
-          ...user!,
-          avatar: result,
-        });
-        
-        setSuccessMessage('Profile picture updated successfully');
-      };
-      reader.readAsDataURL(file);
+    if (!file || !currentUser) return;
+
+    setIsUploadingAvatar(true);
+    setErrorMessage('');
+
+    try {
+      // Show local preview immediately while uploading
+      const localUrl = URL.createObjectURL(file);
+      setAvatarPreview(localUrl);
+
+      // Upload to Supabase Storage: avatars/{userId}/{timestamp}.{ext}
+      const ext = file.name.split('.').pop() ?? 'jpg';
+      const path = `${currentUser.id}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { upsert: true, contentType: file.type });
+
+      if (uploadError) throw uploadError;
+
+      // Get the public URL
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+      const publicUrl = urlData.publicUrl;
+
+      // Save URL to profiles table + local store
+      updateUser(currentUser.id, { avatar: publicUrl });
+      login({ ...user!, avatar: publicUrl });
+      setAvatarPreview(publicUrl);
+
+      setSuccessMessage('Profile picture updated successfully');
+    } catch (err: any) {
+      setErrorMessage(`Failed to upload photo: ${err.message ?? 'Unknown error'}`);
+      setAvatarPreview(user?.avatar); // revert preview on failure
+    } finally {
+      setIsUploadingAvatar(false);
     }
   };
 
@@ -211,9 +228,13 @@ export function Profile() {
               </Avatar>
               <button
                 onClick={handleAvatarClick}
-                className="absolute bottom-0 right-0 h-10 w-10 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-indigo-700 transition-colors"
+                disabled={isUploadingAvatar}
+                className="absolute bottom-0 right-0 h-10 w-10 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-indigo-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                <Camera className="h-4 w-4" />
+                {isUploadingAvatar
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <Camera className="h-4 w-4" />
+                }
               </button>
               <input
                 ref={fileInputRef}

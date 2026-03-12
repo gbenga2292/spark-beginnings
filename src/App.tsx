@@ -1,9 +1,6 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+import { useEffect } from 'react';
 
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { useDataLoader } from './hooks/useDataLoader';
 import { Layout } from './components/layout/Layout';
@@ -31,6 +28,7 @@ import { ClientSummary } from './pages/ClientSummary';
 import { TitleBar } from './components/layout/TitleBar';
 import { ToastContainer, ConfirmDialog } from './components/ui/toast';
 import { GlobalDragScroll } from './components/ui/GlobalDragScroll';
+import { useTheme } from './hooks/useTheme';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -55,9 +53,20 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
 function AppContent() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Load data from Supabase when authenticated
   useDataLoader(!!user);
+
+  // Handle navigation triggered by Electron main-process menu items
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const path = (e as CustomEvent<string>).detail;
+      if (path) navigate(path);
+    };
+    window.addEventListener('electron-navigate', handler);
+    return () => window.removeEventListener('electron-navigate', handler);
+  }, [navigate]);
 
   return (
     <Routes>
@@ -92,11 +101,12 @@ function AppContent() {
 }
 
 export default function App() {
+  const { isDark } = useTheme();
   return (
     <AuthProvider>
-      <div className="flex flex-col h-[100dvh]">
+      <div className={`flex flex-col h-[100dvh] transition-colors duration-200 ${isDark ? 'dark bg-slate-950' : 'bg-slate-50'}`}>
         <TitleBar />
-        <div className="flex-1 min-h-0 bg-slate-50 relative">
+        <div className="flex-1 min-h-0 relative">
           <GlobalDragScroll />
           <ToastContainer />
           <ConfirmDialog />
