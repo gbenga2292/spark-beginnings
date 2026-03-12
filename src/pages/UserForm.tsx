@@ -30,11 +30,11 @@ const PRIV_GROUPS: PG[] = [
     name: 'HR', icon: UsersIcon, color: 'teal',
     pages: [
       { key: 'employees', label: 'Employees', parentKey: 'employees', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewSalary', label: 'View Salary', special: true }] },
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewSalary', label: 'View Salary', special: true }, { key: 'canExport', label: 'Export' }] },
       { key: 'onboarding', label: 'Onboarding', parentKey: 'onboarding', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
       { key: 'attendance', label: 'Daily Register', parentKey: 'attendance', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Submit' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Submit' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canImport', label: 'Import DB' }, { key: 'canExport', label: 'Export DB' }] },
       { key: 'leaves', label: 'Leaves', parentKey: 'leaves', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewSummary', label: 'View Summary Page' }] },
       { key: 'salaryLoans', label: 'Salary Advances & Loans', parentKey: 'salaryLoans', masterField: 'canView',
@@ -145,7 +145,7 @@ export function UserForm() {
     setPrivileges((prev) => {
       const next = { ...prev };
       group.pages.forEach((page) => {
-        const cur = (prev[page.parentKey] as unknown) as Record<string, boolean>;
+        const cur = ((prev[page.parentKey] as unknown) as Record<string, boolean>) || {};
         if (enable) {
           const up: Record<string, boolean> = { ...cur };
           if (page.masterField) up[page.masterField] = true;

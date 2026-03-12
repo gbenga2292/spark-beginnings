@@ -302,13 +302,15 @@ export function Leaves() {
           <p className="text-sm font-medium text-slate-500 mt-1">File, track, and manage employee leave requests.</p>
         </div>
         <div className="flex gap-3">
-          <Button
-            variant="outline"
-            className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-sm"
-            onClick={() => navigate('/leave-summary')}
-          >
-            <CalendarClock className="h-4 w-4" /> Go to Summary
-          </Button>
+          {priv.canViewSummary && (
+            <Button
+              variant="outline"
+              className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-sm"
+              onClick={() => navigate('/leave-summary')}
+            >
+              <CalendarClock className="h-4 w-4" /> Go to Summary
+            </Button>
+          )}
           {priv.canAdd && (
             <Button
               className="gap-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white shadow-md"

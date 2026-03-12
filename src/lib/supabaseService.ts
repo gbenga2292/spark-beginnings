@@ -17,7 +17,7 @@ function dbToSite(r: any): Site {
 
 function dbToEmployee(r: any): Employee {
   return {
-    id: r.id, surname: r.surname, firstname: r.firstname, department: r.department,
+    id: r.id, employeeCode: r.employee_code, surname: r.surname, firstname: r.firstname, department: r.department,
     staffType: r.staff_type, position: r.position, startDate: r.start_date,
     endDate: r.end_date, yearlyLeave: r.yearly_leave, bankName: r.bank_name,
     accountNo: r.account_no, payeTax: r.paye_tax, withholdingTax: r.withholding_tax,
@@ -129,7 +129,7 @@ function siteToDb(s: Site) {
 
 function employeeToDb(e: Employee) {
   return {
-    id: e.id, surname: e.surname, firstname: e.firstname, department: e.department,
+    id: e.id, employee_code: e.employeeCode, surname: e.surname, firstname: e.firstname, department: e.department,
     staff_type: e.staffType, position: e.position, start_date: e.startDate,
     end_date: e.endDate, yearly_leave: e.yearlyLeave, bank_name: e.bankName,
     account_no: e.accountNo, paye_tax: e.payeTax, withholding_tax: e.withholdingTax,
@@ -360,6 +360,7 @@ export const db = {
   },
   async updateEmployee(id: string, e: Partial<Employee>) {
     const update: any = {};
+    if (e.employeeCode !== undefined) update.employee_code = e.employeeCode;
     if (e.surname !== undefined) update.surname = e.surname;
     if (e.firstname !== undefined) update.firstname = e.firstname;
     if (e.department !== undefined) update.department = e.department;
@@ -616,9 +617,7 @@ export const db = {
 
   // Profiles / Users
   async updateProfile(id: string, data: Partial<{ name: string; email: string; avatar: string; privileges: any; is_active: boolean }>) {
-    const { error } = await supabase
-      .from('profiles')
-      .upsert({ id, ...data }, { onConflict: 'id' });
+    const { error } = await supabase.from('profiles').update(data).eq('id', id);
     if (error) console.error('updateProfile:', error);
   },
 

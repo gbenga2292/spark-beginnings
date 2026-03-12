@@ -11,6 +11,27 @@ import { toast, showConfirm } from '@/src/components/ui/toast';
 import * as XLSX from 'xlsx';
 import { usePriv } from '@/src/hooks/usePriv';
 
+const POSITION_HIERARCHY = [
+  'CEO',
+  'Head of Admin',
+  'Head of Operations',
+  'Projects Supervisor',
+  'Logistics and Warehouse Officer',
+  'Admin/Accounts Officer',
+  'HR Officer',
+  'Foreman',
+  'Engineer',
+  'Site Supervisor',
+  'Assistant Supervisor',
+  'Mechanic Technician/Site Worker',
+  'Site Worker',
+  'Driver',
+  'Adhoc Staff',
+  'Security',
+  'Consultant',
+  'Sponsored Student'
+];
+
 export function Attendance() {
   const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
   const sites = useAppStore((state) => state.sites);
@@ -71,6 +92,15 @@ export function Attendance() {
       emp.firstname.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDept = departmentFilter === 'All' || emp.department === departmentFilter;
     return matchesSearch && matchesDept;
+  }).sort((a, b) => {
+    const posA = a.position || '';
+    const posB = b.position || '';
+    const idxA = POSITION_HIERARCHY.indexOf(posA);
+    const idxB = POSITION_HIERARCHY.indexOf(posB);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return posA.localeCompare(posB);
   });
 
   const filteredDbRecords = attendanceRecords.filter(r => {
@@ -88,6 +118,19 @@ export function Attendance() {
       if (dbShiftFilter === 'Night' && r.night !== 'Yes') return false;
     }
     return true;
+  }).sort((a, b) => {
+    // Sort primarily by Date (descending) so newest records show first, then by position hierarchy
+    const dateCmp = new Date(b.date).getTime() - new Date(a.date).getTime();
+    if (dateCmp !== 0) return dateCmp;
+
+    const posA = a.position || '';
+    const posB = b.position || '';
+    const idxA = POSITION_HIERARCHY.indexOf(posA);
+    const idxB = POSITION_HIERARCHY.indexOf(posB);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return posA.localeCompare(posB);
   });
 
   // DB Export & Import
@@ -643,7 +686,7 @@ export function Attendance() {
             <div className="flex-1" />
 
             <div className="flex items-center gap-2">
-              {priv.canAdd && (
+              {priv.canImport && (
                 <label className="cursor-pointer">
                   <Input type="file" accept=".xlsx" className="hidden" onChange={handleImportExcel} />
                   <Button variant="outline" size="sm" className="h-8 text-xs gap-1 pointer-events-none">
@@ -651,7 +694,7 @@ export function Attendance() {
                   </Button>
                 </label>
               )}
-              {reportPriv.canExport && (
+              {priv.canExport && (
                 <Button onClick={handleExportExcel} size="sm" className="h-8 text-xs gap-1 bg-green-700 hover:bg-green-800 text-white shadow-sm">
                   <Download className="h-3 w-3" /> Export Excel
                 </Button>

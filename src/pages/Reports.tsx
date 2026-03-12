@@ -9,6 +9,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { usePriv } from '@/src/hooks/usePriv';
 
 const getBase64ImageFromUrl = async (imageUrl: string) => {
   const res = await fetch(imageUrl);
@@ -22,6 +23,7 @@ const getBase64ImageFromUrl = async (imageUrl: string) => {
 };
 
 export function Reports() {
+  const priv = usePriv('reports');
   const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
   const sites = useAppStore((state) => state.sites);
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
@@ -640,14 +642,18 @@ export function Reports() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-slate-500 mb-4 h-10">Employee demographics, growth, and retention rates.</p>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="w-full gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportHeadcountReport}>
-                <FileSpreadsheet className="h-4 w-4" /> Excel
-              </Button>
-              <Button variant="outline" size="sm" className="w-full gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportHeadcountPdf}>
-                <FileText className="h-4 w-4" /> PDF
-              </Button>
-            </div>
+            {priv.canExport ? (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="w-full gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportHeadcountReport}>
+                  <FileSpreadsheet className="h-4 w-4" /> Excel
+                </Button>
+                <Button variant="outline" size="sm" className="w-full gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportHeadcountPdf}>
+                  <FileText className="h-4 w-4" /> PDF
+                </Button>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic">Export not permitted</p>
+            )}
           </CardContent>
         </Card>
 
@@ -658,14 +664,18 @@ export function Reports() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-slate-500 mb-4 h-10">Track absenteeism, overtime hours, and leave balances.</p>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="w-full gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportAttendanceReport}>
-                <FileSpreadsheet className="h-4 w-4" /> Excel
-              </Button>
-              <Button variant="outline" size="sm" className="w-full gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportAttendancePdf}>
-                <FileText className="h-4 w-4" /> PDF
-              </Button>
-            </div>
+            {priv.canExport ? (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="w-full gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportAttendanceReport}>
+                  <FileSpreadsheet className="h-4 w-4" /> Excel
+                </Button>
+                <Button variant="outline" size="sm" className="w-full gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportAttendancePdf}>
+                  <FileText className="h-4 w-4" /> PDF
+                </Button>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic">Export not permitted</p>
+            )}
           </CardContent>
         </Card>
       </div>

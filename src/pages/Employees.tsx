@@ -11,6 +11,27 @@ import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useRedaction } from '@/src/hooks/useRedaction';
 
+const POSITION_HIERARCHY = [
+  'CEO',
+  'Head of Admin',
+  'Head of Operations',
+  'Projects Supervisor',
+  'Logistics and Warehouse Officer',
+  'Admin/Accounts Officer',
+  'HR Officer',
+  'Foreman',
+  'Engineer',
+  'Site Supervisor',
+  'Assistant Supervisor',
+  'Mechanic Technician/Site Worker',
+  'Site Worker',
+  'Driver',
+  'Adhoc Staff',
+  'Security',
+  'Consultant',
+  'Sponsored Student'
+];
+
 export function Employees() {
   const [activeTab, setActiveTab] = useState<'Active' | 'Delisted'>('Active');
   const [searchTerm, setSearchTerm] = useState('');
@@ -19,6 +40,7 @@ export function Employees() {
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
   const [viewingEmployee, setViewingEmployee] = useState<Employee | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
   const employees = useAppStore((state) => state.employees);
   const addEmployee = useAppStore((state) => state.addEmployee);
   const updateEmployee = useAppStore((state) => state.updateEmployee);
@@ -32,12 +54,30 @@ export function Employees() {
   const priv = usePriv('employees');
   const canSeeSalary = useRedaction('employees');
 
+  const [sortBy, setSortBy] = useState<'name' | 'position' | 'startDate' | 'dateAdded'>('position');
+
   const filteredEmployees = employees.filter(emp => {
-    const matchesSearch = emp.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.firstname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.department.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLow = searchTerm.toLowerCase();
+    const matchesSearch = emp.surname.toLowerCase().includes(searchLow) ||
+      emp.firstname.toLowerCase().includes(searchLow) ||
+      emp.department.toLowerCase().includes(searchLow) ||
+      (emp.employeeCode?.toLowerCase() || '').includes(searchLow);
     const matchesTab = activeTab === 'Delisted' ? emp.status === 'Terminated' : emp.status !== 'Terminated';
     return matchesSearch && matchesTab;
+  }).sort((a, b) => {
+    if (sortBy === 'name') return (a.surname + a.firstname).localeCompare(b.surname + b.firstname);
+    if (sortBy === 'position') {
+      const posA = a.position || '';
+      const posB = b.position || '';
+      const idxA = POSITION_HIERARCHY.indexOf(posA);
+      const idxB = POSITION_HIERARCHY.indexOf(posB);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return posA.localeCompare(posB);
+    }
+    if (sortBy === 'startDate') return new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime();
+    return 0; // maintain default dateAdded order which matches array order
   });
 
   const [formData, setFormData] = useState<Partial<Employee>>({
@@ -57,8 +97,12 @@ export function Employees() {
       return;
     }
 
+    const nextCodeNumber = Math.max(0, ...employees.map(e => parseInt(e.employeeCode?.replace(/\D/g, '') || '0')));
+    const employeeCode = formData.employeeCode || `EMP-${String(nextCodeNumber + 1).padStart(3, '0')}`;
+
     const newEmployee: Employee = {
-      id: `EMP-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
+      id: crypto.randomUUID(),
+      employeeCode,
       surname: formData.surname || '',
       firstname: formData.firstname || '',
       department: formData.department || '',
@@ -149,12 +193,12 @@ export function Employees() {
         toast.info('No employees to export');
         return;
       }
-      const headers = ['id', 'surname', 'firstname', 'department', 'staffType', 'position', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'taxId', 'pensionNumber', 'payeTax', 'withholdingTax', 'excludeFromOnboarding', 'rent', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-      const extractCSV = (str: any) => `"${String(str).replace(/"/g, '""')}"`;
+      const headers = ['id', 'employeeCode', 'surname', 'firstname', 'department', 'staffType', 'position', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'taxId', 'pensionNumber', 'payeTax', 'withholdingTax', 'excludeFromOnboarding', 'rent', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
 
       const rows = employees.map(emp => {
         const data = [
-          emp.id, emp.surname, emp.firstname, emp.department, emp.staffType,
+          emp.id, emp.employeeCode || '', emp.surname, emp.firstname, emp.department, emp.staffType,
           emp.position, emp.status, emp.yearlyLeave, emp.startDate || '',
           emp.endDate || '', emp.bankName || '', emp.accountNo || '', emp.taxId || '',
           emp.pensionNumber || '', emp.payeTax, emp.withholdingTax, emp.excludeFromOnboarding || false, emp.rent || 0,
@@ -180,9 +224,32 @@ export function Employees() {
     }
   };
 
-  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const parseCSVRow = (str: string) => {
+    const vals: string[] = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < str.length; i++) {
+      if (str[i] === '"') {
+        inQuotes = !inQuotes;
+      } else if (str[i] === ',' && !inQuotes) {
+        vals.push(cur.trim());
+        cur = '';
+      } else {
+        cur += str[i];
+      }
+    }
+    vals.push(cur.trim());
+    return vals;
+  };
+
+  const handleImportCSVSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (file) setImportFile(file);
+    e.target.value = '';
+  };
+
+  const processImport = (file: File, mode: 'update' | 'replace' | 'append') => {
+    setImportFile(null);
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -195,48 +262,72 @@ export function Employees() {
 
         let importedCount = 0;
         let updatedCount = 0;
+        let deletedCount = 0;
         const newDepartments = new Set<string>();
         const newPositions = new Set<string>();
+        const csvProcessedIds = new Set<string>();
+
+        // Check if the current CSV has employeeCode as header index 1
+        const headerRow = parseCSVRow(lines[0]);
+        const hasEmployeeCode = headerRow[1]?.toLowerCase() === 'employeecode';
 
         for (let i = 1; i < lines.length; i++) {
-          const row = lines[i];
-          const matches = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-          const vals = matches ? matches.map(m => m.replace(/^"|"$/g, '').trim()) : row.split(',').map(v => v.trim());
-
-          if (vals.length >= 17) {
-            // Extract department and position for auto-adding
-            const importedDept = vals[3]?.trim();
-            const importedPosition = vals[5]?.trim();
+          const vals = parseCSVRow(lines[i]);
+          
+          // Adjust index offsets dynamically depending on whether employeeCode existed in the file
+          const offset = hasEmployeeCode ? 1 : 0;
+          if (vals.length >= 17 + offset) {
+            const importedDept = vals[3 + offset]?.trim();
+            const importedPosition = vals[5 + offset]?.trim();
             
-            // Track new departments and positions to add
-            if (importedDept && !departments.includes(importedDept)) {
-              newDepartments.add(importedDept);
-            }
-            if (importedPosition && !positions.includes(importedPosition)) {
-              newPositions.add(importedPosition);
-            }
+            if (importedDept && !departments.includes(importedDept)) newDepartments.add(importedDept);
+            if (importedPosition && !positions.includes(importedPosition)) newPositions.add(importedPosition);
+
+            const providedId = vals[0]?.trim() || '';
+            const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(providedId);
+            const employeeCodeValue = hasEmployeeCode ? vals[1]?.trim() : '';
+            // Only preserve original ID if we aren't appending everything as new
+            const idToUse = (mode !== 'append' && isValidUUID) ? providedId : crypto.randomUUID();
+            
+            if (idToUse) csvProcessedIds.add(idToUse); // Track for 'replace' mode
 
             const parsedEmp: Employee = {
-              id: vals[0] || `EMP-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
-              surname: vals[1], firstname: vals[2], department: vals[3], staffType: vals[4] as any,
-              position: vals[5], status: vals[6] as any, yearlyLeave: parseInt(vals[7]) || 0,
-              startDate: vals[8] || '', endDate: vals[9] || '', bankName: vals[10] || '',
-              accountNo: vals[11] || '', taxId: vals[12] || '', pensionNumber: vals[13] || '',
-              payeTax: vals[14] === 'true' || vals[14] === 'Yes',
-              withholdingTax: vals[15] === 'true' || vals[15] === 'Yes',
-              excludeFromOnboarding: vals[16] === 'true' || vals[16] === 'Yes',
-              rent: parseFloat(vals[17]) || 0,
+              id: idToUse,
+              employeeCode: mode === 'append' ? '' : (employeeCodeValue || (isValidUUID ? '' : providedId)),
+              surname: vals[1 + offset], firstname: vals[2 + offset], department: vals[3 + offset], staffType: vals[4 + offset] as any,
+              position: vals[5 + offset], status: vals[6 + offset] as any, yearlyLeave: parseInt(vals[7 + offset]) || 0,
+              startDate: vals[8 + offset] || '', endDate: vals[9 + offset] || '', bankName: vals[10 + offset] || '',
+              accountNo: vals[11 + offset] || '', taxId: vals[12 + offset] || '', pensionNumber: vals[13 + offset] || '',
+              payeTax: ['true', 'yes', '1'].includes(vals[14 + offset]?.trim().toLowerCase() || ''),
+              withholdingTax: ['true', 'yes', '1'].includes(vals[15 + offset]?.trim().toLowerCase() || ''),
+              excludeFromOnboarding: ['true', 'yes', '1'].includes(vals[16 + offset]?.trim().toLowerCase() || ''),
+              rent: parseFloat(vals[17 + offset]) || 0,
               monthlySalaries: {
-                jan: parseFloat(vals[18]) || 0, feb: parseFloat(vals[19]) || 0, mar: parseFloat(vals[20]) || 0,
-                apr: parseFloat(vals[21]) || 0, may: parseFloat(vals[22]) || 0, jun: parseFloat(vals[23]) || 0,
-                jul: parseFloat(vals[24]) || 0, aug: parseFloat(vals[25]) || 0, sep: parseFloat(vals[26]) || 0,
-                oct: parseFloat(vals[27]) || 0, nov: parseFloat(vals[28]) || 0, dec: parseFloat(vals[29]) || 0
+                jan: parseFloat(vals[18 + offset]) || 0, feb: parseFloat(vals[19 + offset]) || 0, mar: parseFloat(vals[20 + offset]) || 0,
+                apr: parseFloat(vals[21 + offset]) || 0, may: parseFloat(vals[22 + offset]) || 0, jun: parseFloat(vals[23 + offset]) || 0,
+                jul: parseFloat(vals[24 + offset]) || 0, aug: parseFloat(vals[25 + offset]) || 0, sep: parseFloat(vals[26 + offset]) || 0,
+                oct: parseFloat(vals[27 + offset]) || 0, nov: parseFloat(vals[28 + offset]) || 0, dec: parseFloat(vals[29 + offset]) || 0
               }
             };
             const existing = employees.find(e => e.id === parsedEmp.id);
-            if (existing) { updateEmployee(existing.id, parsedEmp); updatedCount++; }
-            else { addEmployee(parsedEmp); importedCount++; }
+            if (existing && mode !== 'append') { 
+              updateEmployee(existing.id, parsedEmp); 
+              updatedCount++; 
+            } else { 
+              addEmployee(parsedEmp); 
+              importedCount++; 
+            }
           }
+        }
+
+        // If mode is replace, delete all employees NOT found in this CSV
+        if (mode === 'replace') {
+          employees.forEach(emp => {
+            if (!csvProcessedIds.has(emp.id)) {
+              deleteEmployee(emp.id);
+              deletedCount++;
+            }
+          });
         }
 
         // Auto-add new departments and positions to the store
@@ -251,8 +342,8 @@ export function Employees() {
           addedPosCount++;
         });
 
-        // Show appropriate toast message
         let message = `Import complete: ${importedCount} Added | ${updatedCount} Updated`;
+        if (deletedCount > 0) message += ` | ${deletedCount} Removed`;
         if (addedDeptCount > 0 || addedPosCount > 0) {
           message += `. ${addedDeptCount} new department(s) and ${addedPosCount} new position(s) added to Variables.`;
         }
@@ -262,7 +353,6 @@ export function Employees() {
       }
     };
     reader.readAsText(file);
-    e.target.value = '';
   };
 
   // Render Employee Form (Add or Edit)
@@ -301,6 +391,10 @@ export function Employees() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Firstname</label>
                   <Input value={formData.firstname || ''} onChange={e => setFormData({ ...formData, firstname: e.target.value })} placeholder="e.g. HUBERT" className="bg-slate-50 focus:bg-white" />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Employee Code</label>
+                  <Input value={formData.employeeCode || ''} onChange={e => setFormData({ ...formData, employeeCode: e.target.value })} placeholder="e.g. EMP-001 (Auto-generated if empty)" className="bg-slate-50 focus:bg-white font-mono" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Department</label>
@@ -508,7 +602,8 @@ export function Employees() {
               <div>
                 <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Personal Info</h4>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-slate-500">Employee ID:</span><span className="font-mono">{emp.id}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">System ID:</span><span className="font-mono text-[10px] break-all max-w-[120px] text-right">{emp.id}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Emp Code:</span><span className="font-mono">{emp.employeeCode || emp.id.substring(0,8)}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">Staff Type:</span><span>{emp.staffType}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">Start Date:</span><span>{emp.startDate || 'N/A'}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">End Date:</span><span>{emp.endDate || 'N/A'}</span></div>
@@ -580,13 +675,15 @@ export function Employees() {
           <p className="text-sm font-medium text-slate-500 mt-1">Manage personnel records, roles, and compensation details.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2 bg-white text-slate-700 hover:bg-slate-50 shadow-sm border-slate-200" onClick={handleExportCSV}>
-            <Download className="h-4 w-4 text-slate-500" /> Export CSV
-          </Button>
+          {priv.canExport && (
+            <Button variant="outline" className="gap-2 bg-white text-slate-700 hover:bg-slate-50 shadow-sm border-slate-200" onClick={handleExportCSV}>
+              <Download className="h-4 w-4 text-slate-500" /> Export CSV
+            </Button>
+          )}
           {priv.canAdd && (
             <label className="flex items-center gap-2 bg-white text-slate-700 hover:bg-slate-50 shadow-sm border border-slate-200 rounded-md h-9 px-4 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap">
               <Upload className="h-4 w-4 text-slate-500" /> Import Data
-              <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
+              <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
             </label>
           )}
           {priv.canAdd && (
@@ -615,18 +712,20 @@ export function Employees() {
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="relative w-full sm:w-72">
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input
-                placeholder="Search staff Name or ID..."
+                placeholder="Search Name or Code..."
                 className="pl-9 bg-white border-slate-200 h-9 text-sm focus-visible:ring-indigo-500/50 rounded-lg shadow-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <select className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" onChange={(e) => setSearchTerm(e.target.value)}>
-              <option value="">Filter by Dept...</option>
-              {departments.map(d => <option key={d} value={d}>{d}</option>)}
+            <select className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
+              <option value="dateAdded">Sort By: Default</option>
+              <option value="name">Sort By: Name</option>
+              <option value="position">Sort By: Position</option>
+              <option value="startDate">Sort By: Start Date</option>
             </select>
           </div>
         </div>
@@ -655,7 +754,7 @@ export function Employees() {
                     </Avatar>
                     <div className="flex flex-col">
                       <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{employee.surname} {employee.firstname}</span>
-                      <span className="text-xs text-slate-500 font-mono tracking-tight">{employee.id}</span>
+                      <span className="text-xs text-slate-500 font-mono tracking-tight">{employee.employeeCode || `EMP-${employee.id.substring(0, 4).toUpperCase()}`}</span>
                     </div>
                   </div>
                 </TableCell>
@@ -705,6 +804,36 @@ export function Employees() {
         </Table>
       </div>
       {renderViewModal()}
+
+      {/* Import Modal Options */}
+      {importFile && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
+          <div className="relative bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200">
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Import Policy</h3>
+            <p className="text-sm text-slate-500 leading-relaxed mb-6">
+              How would you like to process the employee records from this CSV file?
+            </p>
+            <div className="flex flex-col gap-3">
+              <Button onClick={() => processImport(importFile, 'update')} className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3 flex-col items-center justify-center">
+                <span className="font-semibold block text-base">Update & Add (Recommended)</span>
+                <span className="block text-xs opacity-80 mt-1 font-normal text-center">Modifies matching IDs. Adds missing ones. Leaves others alone.</span>
+              </Button>
+              <Button onClick={() => processImport(importFile, 'append')} variant="outline" className="border-slate-200 h-auto py-3 text-slate-700 hover:bg-slate-50 flex-col items-center justify-center">
+                <span className="font-semibold block text-base">Append Only</span>
+                <span className="block text-xs text-slate-500 mt-1 font-normal text-center">Adds every row as a brand new employee, completely ignoring current IDs.</span>
+              </Button>
+              <Button onClick={() => processImport(importFile, 'replace')} variant="outline" className="border-rose-200 h-auto py-3 text-rose-600 hover:bg-rose-50 flex-col items-center justify-center">
+                <span className="font-semibold block text-base">Replace Entire List</span>
+                <span className="block text-xs text-rose-500/80 mt-1 font-normal text-center">Deletes current staff that are NOT in this CSV. Updates matches. Adds new ones.</span>
+              </Button>
+              <Button onClick={() => setImportFile(null)} variant="ghost" className="text-slate-400 hover:text-slate-600 mt-2">
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

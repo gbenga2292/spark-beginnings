@@ -17,6 +17,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { usePayrollCalculator } from '@/src/hooks/usePayrollCalculator';
+import { usePriv } from '@/src/hooks/usePriv';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -32,6 +33,7 @@ const getBase64ImageFromUrl = async (imageUrl: string) => {
 };
 
 export function FinancialReports() {
+  const priv = usePriv('financialReports');
   const rawInvoices = useAppStore(state => state.invoices);
   const rawPayments = useAppStore(state => state.payments);
   const rawVatPayments = useAppStore(state => state.vatPayments);
@@ -752,9 +754,11 @@ export function FinancialReports() {
               <Receipt className="w-5 h-5 text-indigo-600" />
               <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">Financial Summary Ledger</CardTitle>
             </div>
-            <Button variant="outline" size="sm" className="gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportLedgerPdf}>
-              <FileText className="h-4 w-4" /> Export PDF
-            </Button>
+            {priv.canExport && (
+              <Button variant="outline" size="sm" className="gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportLedgerPdf}>
+                <FileText className="h-4 w-4" /> Export PDF
+              </Button>
+            )}
           </div>
           <div className="flex px-5 gap-6 border-b border-slate-200">
             <button className={`pb-3 text-sm font-semibold transition-all border-b-2 ${summaryTab === 'client' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('client')}>Client Summary</button>
@@ -1133,21 +1137,27 @@ export function FinancialReports() {
 
             {/* Export buttons */}
             <div className="pt-2 flex flex-wrap items-center justify-end gap-3">
-              <Button
-                variant="outline"
-                className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                onClick={generateCustomReport}
-                disabled={selectedFields.length === 0}
-              >
-                <FileSpreadsheet className="h-4 w-4" /> Export Excel
-              </Button>
-              <Button
-                className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
-                onClick={generateCustomReportPdf}
-                disabled={selectedFields.length === 0}
-              >
-                <FileText className="h-4 w-4" /> Export PDF Summary
-              </Button>
+              {priv.canExport ? (
+                <>
+                  <Button
+                    variant="outline"
+                    className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                    onClick={generateCustomReport}
+                    disabled={selectedFields.length === 0}
+                  >
+                    <FileSpreadsheet className="h-4 w-4" /> Export Excel
+                  </Button>
+                  <Button
+                    className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                    onClick={generateCustomReportPdf}
+                    disabled={selectedFields.length === 0}
+                  >
+                    <FileText className="h-4 w-4" /> Export PDF Summary
+                  </Button>
+                </>
+              ) : (
+                <p className="text-xs text-slate-400 italic">Export not permitted</p>
+              )}
             </div>
           </div>
         </CardContent>

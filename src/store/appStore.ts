@@ -47,6 +47,7 @@ export interface MonthlySalary {
 
 export interface Employee {
   id: string;
+  employeeCode?: string;
   surname: string;
   firstname: string;
   department: string;

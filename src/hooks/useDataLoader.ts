@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAppStore } from '@/src/store/appStore';
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets } from '@/src/lib/supabaseService';
+import { supabase } from '@/src/integrations/supabase/client';
 
 /** Fills in any missing privilege sections using NO_ACCESS defaults. */
 function backfillPrivileges(
@@ -65,13 +66,6 @@ export function useDataLoader(isAuthenticated: boolean) {
         });
 
         // ── Merge user data ──────────────────────────────────────────
-        // Strategy:
-        //  - Supabase is the source of truth for identity (name, email, etc.)
-        //  - For privileges: prefer Supabase IF it has actual grants.
-        //    If Supabase returns empty/null privileges (e.g. due to RLS blocking
-        //    the UPDATE, or auth-trigger created the profile without privileges),
-        //    fall back to the locally-stored privileges so admin changes survive reload.
-        //  - Locally-created users not yet in Supabase are preserved as-is.
         const localUsers = useUserStore.getState().users;
         const localMap = new Map(localUsers.map((u) => [u.id, u]));
         const remoteIds = new Set(users.map((u) => u.id));
@@ -80,12 +74,12 @@ export function useDataLoader(isAuthenticated: boolean) {
           const localUser = localMap.get(remoteUser.id);
           const remotePrivs = backfillPrivileges(NO_ACCESS, remoteUser.privileges ?? {});
 
-          // If Supabase has real grants, use them.
+          // Supabase has real grants → use them (source of truth)
           if (hasAnyGrant(remotePrivs)) {
             return { ...remoteUser, privileges: remotePrivs };
           }
 
-          // Supabase returned empty privileges — fall back to local if available.
+          // Supabase returned empty — fall back to local if available
           if (localUser && hasAnyGrant(localUser.privileges)) {
             return { ...remoteUser, privileges: localUser.privileges };
           }
@@ -93,14 +87,22 @@ export function useDataLoader(isAuthenticated: boolean) {
           return { ...remoteUser, privileges: remotePrivs };
         });
 
-        // Preserve any locally-created users not yet in Supabase
+        // Preserve locally-created users not yet in Supabase
         const localOnlyUsers = localUsers.filter((u) => !remoteIds.has(u.id));
+
+        // ── Set currentUserId to the logged-in Supabase user ────────
+        // This must happen AFTER users are loaded so getCurrentUser() works.
+        // We re-read the Supabase session here to get the current user's id.
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const currentSupabaseId = authUser?.id ?? useUserStore.getState().currentUserId;
 
         useUserStore.setState({
           users: [...mergedUsers, ...localOnlyUsers],
           presets: presets.length > 0 ? presets : useUserStore.getState().presets,
           superAdminCreated: appData.superAdminCreated,
           superAdminSignupEnabled: appData.superAdminSignupEnabled,
+          // Ensure currentUserId is set to the Supabase auth user id
+          ...(currentSupabaseId ? { currentUserId: currentSupabaseId } : {}),
         });
 
         console.log('[DataLoader] All data loaded from Supabase');
