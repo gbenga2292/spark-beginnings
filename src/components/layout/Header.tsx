@@ -307,7 +307,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                   <Settings className="h-3.5 w-3.5 text-slate-400" />
                   Settings
                 </button>
-                {currentUser?.privileges.users.canView && (
+                {currentUser?.privileges?.users?.canView && (
                   <button
                     onClick={() => { setProfileOpen(false); navigate('/users'); }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
