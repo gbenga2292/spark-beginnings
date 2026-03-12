@@ -968,7 +968,7 @@ export function FinancialReports() {
                   <LabelList dataKey="paid" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
                 </Bar>
                 <Bar dataKey="pending" stackId="a" fill="#f59e0b" name="Pending Invoice" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="pending" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: number) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                  <LabelList dataKey="pending" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

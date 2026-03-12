@@ -338,7 +338,7 @@ export function Dashboard() {
                                         <LabelList dataKey="Absent" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#ef4444' }} formatter={(v: any) => v > 0 ? v : ''} />
                                     </Bar>
                                     <Bar dataKey="Overtime" fill="#8b5cf6" radius={[4, 4, 0, 0]}>
-                                        <LabelList dataKey="Overtime" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#8b5cf6' }} formatter={(v: number) => v > 0 ? v : ''} />
+                                        <LabelList dataKey="Overtime" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#8b5cf6' }} formatter={(v: any) => v > 0 ? v : ''} />
                                     </Bar>
                                 </BarChart>
                             </ResponsiveContainer>

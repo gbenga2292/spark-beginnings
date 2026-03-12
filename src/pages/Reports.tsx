@@ -619,7 +619,7 @@ export function Reports() {
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={headcountStatusData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={5} dataKey="value" label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`} labelLine={true}>
+                  <Pie data={headcountStatusData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={5} dataKey="value" label={({ name, value, percent }: any) => `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`} labelLine={true}>
                     {headcountStatusData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
                   </Pie>
                   <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
