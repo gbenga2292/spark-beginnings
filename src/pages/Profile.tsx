@@ -26,6 +26,17 @@ import {
   Check
 } from 'lucide-react';
 
+
+const THEME_OPTIONS: { id: ColorTheme; label: string; swatches: string[] }[] = [
+  { id: 'default', label: 'Indigo',  swatches: ['#4f46e5', '#6366f1', '#818cf8'] },
+  { id: 'ocean',   label: 'Ocean',   swatches: ['#2563eb', '#3b82f6', '#60a5fa'] },
+  { id: 'forest',  label: 'Forest',  swatches: ['#059669', '#10b981', '#34d399'] },
+  { id: 'sunset',  label: 'Sunset',  swatches: ['#d97706', '#f59e0b', '#fbbf24'] },
+  { id: 'rose',    label: 'Rose',    swatches: ['#e11d48', '#f43f5e', '#fb7185'] },
+  { id: 'violet',  label: 'Violet',  swatches: ['#7c3aed', '#8b5cf6', '#a78bfa'] },
+  { id: 'slate',   label: 'Slate',   swatches: ['#475569', '#64748b', '#94a3b8'] },
+];
+
 export function Profile() {
   const navigate = useNavigate();
   const { user, login } = useAuthStore();
