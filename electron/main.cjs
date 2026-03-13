@@ -71,23 +71,24 @@ function can(page, field) {
 /* ─── Build context menus ──────────────────────────────────────── */
 function buildMenus() {
   /* ── FILE ──────────────────────────────────────────────────── */
-  const fileMenu = Menu.buildFromTemplate([
-    {
+  const fileActions = [
+    can('billing',   'canCreate') && {
       label: '⊕  New Invoice',
-      enabled: can('billing', 'canCreate'),
-      click: () => mainWindow?.webContents.executeJavaScript(`window.location.hash='/invoices'`),
+      click: () => mainWindow?.webContents.send('navigate', '/invoices'),
     },
-    {
+    can('employees', 'canAdd') && {
       label: '⊕  New Employee',
-      enabled: can('employees', 'canAdd'),
-      click: () => mainWindow?.webContents.executeJavaScript(`window.location.hash='/employees'`),
+      click: () => mainWindow?.webContents.send('navigate', '/employees'),
     },
-    {
+    can('leaves',    'canAdd') && {
       label: '⊕  New Leave Request',
-      enabled: can('leaves', 'canAdd'),
-      click: () => mainWindow?.webContents.executeJavaScript(`window.location.hash='/leaves'`),
+      click: () => mainWindow?.webContents.send('navigate', '/leaves'),
     },
-    { type: 'separator' },
+  ].filter(Boolean);
+
+  const fileTemplate = [
+    ...fileActions,
+    ...(fileActions.length > 0 ? [{ type: 'separator' }] : []),
     {
       label: 'Save Page as PDF',
       accelerator: 'CmdOrCtrl+S',
@@ -121,7 +122,9 @@ function buildMenus() {
     },
     { type: 'separator' },
     { label: 'Exit', accelerator: 'Alt+F4', role: 'quit' },
-  ]);
+  ];
+
+  const fileMenu = Menu.buildFromTemplate(fileTemplate);
 
   /* ── NAVIGATE (replaces Edit — app-specific page links) ─────── */
   const navItems = [];

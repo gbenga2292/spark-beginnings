@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/src/lib/utils';
 import { useUserStore, UserPrivileges } from '@/src/store/userStore';
 import { useTheme } from '@/src/hooks/useTheme';
+import logoSrc from '../../../logo/logo-2.png';
 import {
   LayoutDashboard,
   Users,
@@ -66,7 +67,6 @@ const navigation: NavCategory[] = [
     icon: Building2,
     items: [
       { name: 'Sites & Clients',  href: '/sites',          icon: MapPin,    privKey: 'sites', privField: 'canView' },
-      { name: 'Client Summary',   href: '/client-summary', icon: BarChart3, privKey: 'sites', privField: 'canViewClientSummary' },
     ],
   },
   {
@@ -94,7 +94,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const location = useLocation();
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const { isDark } = useTheme();
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(['Dashboard', 'HR', 'Admin', 'Account', 'Settings']);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
 
   const getVisibleItems = (items: NavItem[]) => {
     return items.filter((item) => {
@@ -130,7 +130,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       <div className="flex h-16 shrink-0 items-center px-6">
         <div className="flex items-center gap-2 font-bold text-xl text-indigo-600">
           <img
-            src="/logo/logo-2.png"
+            src={logoSrc}
             alt="HR System"
             className="h-10 w-auto transition-all duration-300"
             style={isDark ? { filter: 'brightness(0) invert(1)', opacity: 0.9 } : {}}

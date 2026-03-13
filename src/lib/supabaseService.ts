@@ -12,7 +12,7 @@ import type { AppUser, PrivilegePreset } from '@/src/store/userStore';
 // ─── Mappers: DB → App ──────────────────────────────────────
 
 function dbToSite(r: any): Site {
-  return { id: r.id, name: r.name, client: r.client, vat: r.vat, status: r.status };
+  return { id: r.id, name: r.name, client: r.client, vat: r.vat, status: r.status, startDate: r.start_date, endDate: r.end_date };
 }
 
 function dbToEmployee(r: any): Employee {
@@ -124,7 +124,7 @@ function dbToProfile(r: any): AppUser {
 // ─── Mappers: App → DB ──────────────────────────────────────
 
 function siteToDb(s: Site) {
-  return { id: s.id, name: s.name, client: s.client, vat: s.vat, status: s.status };
+  return { id: s.id, name: s.name, client: s.client, vat: s.vat, status: s.status, start_date: s.startDate, end_date: s.endDate };
 }
 
 function employeeToDb(e: Employee) {
@@ -308,6 +308,8 @@ export const db = {
     if (s.client !== undefined) update.client = s.client;
     if (s.vat !== undefined) update.vat = s.vat;
     if (s.status !== undefined) update.status = s.status;
+    if (s.startDate !== undefined) update.start_date = s.startDate;
+    if (s.endDate !== undefined) update.end_date = s.endDate;
     const { error } = await supabase.from('sites').update(update).eq('id', id);
     if (error) console.error('updateSite:', error);
   },

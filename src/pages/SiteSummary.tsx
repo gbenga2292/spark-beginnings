@@ -2,17 +2,36 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
-import { Download } from 'lucide-react';
+import { Download, Lock } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
+import { usePriv } from '@/src/hooks/usePriv';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 
-export function ClientSummary() {
+export function SiteSummary() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const monthValues = useAppStore(s => s.monthValues);
   const attendanceRecords = useAppStore(s => s.attendanceRecords);
   const employees = useAppStore(s => s.employees);
   const sites = useAppStore(s => s.sites);
+
+  const priv = usePriv('sites');
+
+  if (!priv.canViewClientSummary) {
+    return (
+      <div className="flex h-full items-center justify-center p-12 bg-slate-50/50 rounded-2xl border border-slate-100">
+        <div className="text-center space-y-4 max-w-md mx-auto">
+          <div className="mx-auto w-16 h-16 rounded-full bg-red-50 flex items-center justify-center border border-red-100">
+            <Lock className="h-8 w-8 text-red-500" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Access Denied</h2>
+            <p className="text-sm text-slate-500">You do not have permission to view the site summary. Please contact an administrator to request access.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const monthsMap = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'] as const;
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -84,25 +103,15 @@ export function ClientSummary() {
       "S/N": i + 1,
       "Client": r.client,
       "Site": r.name,
-      "Team Size": r.teamSize,
       "Total Cost (₦)": r.cost.toFixed(2)
     })));
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Client Summary");
-    XLSX.writeFile(wb, `Client_Summary_${monthNames[selectedMonth - 1]}_${format(new Date(), 'yyyy')}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Site Summary");
+    XLSX.writeFile(wb, `Site_Summary_${monthNames[selectedMonth - 1]}_${format(new Date(), 'yyyy')}.xlsx`);
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
-            Client Summary
-          </h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">View cost breakdown by client and site.</p>
-        </div>
-      </div>
-
+    <div className="flex flex-col gap-6 w-full pb-10">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col">
         <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -132,7 +141,6 @@ export function ClientSummary() {
                 <TableHead>S/N</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead>Site Name</TableHead>
-                <TableHead className="text-right">Staff Handled</TableHead>
                 <TableHead className="text-right">Total Cost (₦)</TableHead>
               </TableRow>
             </TableHeader>
@@ -142,13 +150,12 @@ export function ClientSummary() {
                   <TableCell>{idx + 1}</TableCell>
                   <TableCell className="font-medium text-indigo-900">{r.client}</TableCell>
                   <TableCell>{r.name}</TableCell>
-                  <TableCell className="text-right text-slate-500">{r.teamSize}</TableCell>
                   <TableCell className="text-right font-bold text-slate-700">₦{r.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                 </TableRow>
               ))}
               {results.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={4} className="text-center py-8 text-slate-500">
                     No costs recorded for this month.
                   </TableCell>
                 </TableRow>
@@ -158,7 +165,6 @@ export function ClientSummary() {
               <tfoot>
                 <tr className="bg-slate-50/80 font-bold border-t-2">
                   <td colSpan={3} className="px-4 py-3 text-right">GRAND TOTAL:</td>
-                  <td className="px-4 py-3 text-right text-slate-600">{results.reduce((s, r) => s + r.teamSize, 0)}</td>
                   <td className="px-4 py-3 text-right text-indigo-700 text-lg">₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
               </tfoot>

@@ -6,8 +6,10 @@ import { useUserStore } from '@/src/store/userStore';
 import { supabase } from '@/src/integrations/supabase/client';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
-import { Mail, Lock, AlertCircle, Building2, Shield, ArrowRight } from 'lucide-react';
+import { Mail, Lock, AlertCircle, ShieldCheck, Users, BarChart3, ArrowRight } from 'lucide-react';
 import logoSrc from '../../logo/logo-2.png';
+
+const CURRENT_YEAR = new Date().getFullYear();
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -32,7 +34,6 @@ export function Login() {
         return;
       }
 
-      // Get the authenticated user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setError('Authentication failed.');
@@ -40,7 +41,6 @@ export function Login() {
         return;
       }
 
-      // Fetch profile for privileges
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
@@ -54,7 +54,6 @@ export function Login() {
         return;
       }
 
-      // Set auth state
       login({
         id: user.id,
         name: profile?.name || user.email || '',
@@ -73,65 +72,86 @@ export function Login() {
 
   return (
     <div className="min-h-full flex">
-      {/* Left Side - Branding Panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-0 -left-40 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-slate-700/20 rounded-full blur-3xl"></div>
-        </div>
-        
-        <div className="absolute inset-0 opacity-5" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-        }}></div>
+      {/* ── Left Panel ─────────────────────────────────────────── */}
+      <div className="hidden lg:flex lg:w-[55%] bg-gradient-to-br from-[#0d1b3e] via-[#0f2260] to-[#0d1b3e] relative overflow-hidden flex-col justify-between">
 
-        <div className="relative z-10 flex flex-col justify-center px-16 xl:px-24">
-          <div className="flex items-center gap-4 mb-12">
-            <img src={logoSrc} alt="DCEL Office Suite" className="h-16 xl:h-20 w-auto drop-shadow-lg" />
+        {/* Decorative blobs */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute -top-32 -left-32 w-[500px] h-[500px] bg-indigo-600/15 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-3xl" />
+          <div className="absolute top-1/2 left-1/3 w-72 h-72 bg-purple-600/10 rounded-full blur-3xl" />
+        </div>
+
+        {/* Grid pattern overlay */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M0 0h1v40H0zm39 0h1v40h-1zM0 0v1h40V0zm0 39v1h40v-1z'/%3E%3C/g%3E%3C/svg%3E")`,
+          }}
+        />
+
+        {/* Content */}
+        <div className="relative z-10 flex flex-col justify-center flex-1 px-14 xl:px-20 py-12">
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-14">
+            <img src={logoSrc} alt="DCEL" className="h-14 xl:h-16 w-auto drop-shadow-xl" />
           </div>
-          <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-6">
-            Office management system
-          </h1>
-          <p className="text-slate-400 text-lg max-w-md mb-12">
-            Streamline your workforce management with our comprehensive HR platform. 
-            Built for construction industry excellence.
-          </p>
+
+          {/* Headline */}
+          <div className="mb-10">
+            <h1 className="text-4xl xl:text-[2.75rem] font-extrabold text-white leading-tight tracking-tight mb-4">
+              Office Management Tool<br />
+              <span className="text-indigo-300">For Dewatering Construction</span><br />
+              <span className="text-slate-300 text-3xl xl:text-4xl">Etc Limited</span>
+            </h1>
+            <p className="text-slate-400 text-base xl:text-lg max-w-sm leading-relaxed">
+              A complete HR &amp; finance platform purpose-built for DCEL's operations — from payroll to invoicing, all in one place.
+            </p>
+          </div>
+
+          {/* Feature list */}
           <div className="space-y-4">
-            <div className="flex items-center gap-3 text-slate-300">
-              <div className="w-8 h-8 bg-indigo-500/20 rounded-lg flex items-center justify-center">
-                <Shield className="w-4 h-4 text-indigo-400" />
+            {[
+              { icon: ShieldCheck, title: 'Enterprise-Grade Security', desc: 'Role-based access control for every team member' },
+              { icon: Users,       title: 'HR & Payroll Management',  desc: 'Employees, attendance, leaves and salary in one system' },
+              { icon: BarChart3,   title: 'Financial Reporting',      desc: 'Invoices, payments, VAT and account reports at a glance' },
+            ].map(({ icon: Icon, title, desc }) => (
+              <div key={title} className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-9 h-9 bg-indigo-500/20 border border-indigo-500/30 rounded-lg flex items-center justify-center mt-0.5">
+                  <Icon className="w-4 h-4 text-indigo-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">{title}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{desc}</p>
+                </div>
               </div>
-              <span>Enterprise-grade security</span>
-            </div>
-            <div className="flex items-center gap-3 text-slate-300">
-              <div className="w-8 h-8 bg-indigo-500/20 rounded-lg flex items-center justify-center">
-                <Building2 className="w-4 h-4 text-indigo-400" />
-              </div>
-              <span>Built for construction industry but DCEL Office System</span>
-            </div>
+            ))}
           </div>
         </div>
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500"></div>
+
+        {/* Bottom gradient line */}
+        <div className="relative z-10 h-1 bg-gradient-to-r from-indigo-500 via-purple-400 to-blue-500" />
       </div>
 
-      {/* Right Side - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12 sm:px-12 lg:px-16 bg-white">
-        <div className="w-full max-w-md">
-          <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <Building2 className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">Dewatering Construction Etc Limited</h2>
-              <p className="text-slate-500 text-xs">Construction HR</p>
-            </div>
+      {/* ── Right Panel (Form) ──────────────────────────────────── */}
+      <div className="w-full lg:w-[45%] flex items-center justify-center px-6 py-12 sm:px-12 bg-white">
+        <div className="w-full max-w-[400px]">
+
+          {/* Mobile logo */}
+          <div className="lg:hidden flex items-center justify-center gap-3 mb-10">
+            <img src={logoSrc} alt="DCEL" className="h-12 w-auto" />
           </div>
 
+          {/* Heading */}
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-slate-900">Welcome back</h2>
-            <p className="text-slate-500 mt-2">Enter your credentials to access the HR portal</p>
+            <p className="text-[11px] font-semibold text-indigo-600 uppercase tracking-widest mb-2">
+              Dewatering Construction Etc Limited
+            </p>
+            <h2 className="text-2xl font-bold text-slate-900">Welcome Back</h2>
+            <p className="text-slate-500 text-sm mt-1.5">Enter your credentials to access the portal</p>
           </div>
 
+          {/* Error */}
           {error && (
             <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-3 mb-6">
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
@@ -139,46 +159,67 @@ export function Login() {
             </div>
           )}
 
+          {/* Form */}
           <form onSubmit={handleLogin} className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700" htmlFor="email">Email Address</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wide" htmlFor="email">
+                Email Address
+              </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                <Input id="email" type="email" placeholder="admin@company.com"
-                  className="h-12 pl-10 bg-slate-50 border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20 rounded-lg"
-                  value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="admin@dcel.ng"
+                  className="h-11 pl-10 bg-slate-50 border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20 rounded-lg text-sm"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700" htmlFor="password">Password</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wide" htmlFor="password">
+                Password
+              </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                <Input id="password" type="password" placeholder="Enter your password"
-                  className="h-12 pl-10 bg-slate-50 border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20 rounded-lg"
-                  value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  className="h-11 pl-10 bg-slate-50 border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20 rounded-lg text-sm"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
+            <div className="flex items-center justify-between pt-1">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20" />
-                <span className="text-sm text-slate-600">Remember me</span>
+                <span className="text-sm text-slate-500">Remember me</span>
               </label>
             </div>
 
-            <Button type="submit" disabled={isLoading}
-              className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 disabled:opacity-70 flex items-center justify-center gap-2">
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+            >
               {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>Sign In <ArrowRight className="w-4 h-4" /></>
               )}
             </Button>
           </form>
 
-          <p className="mt-8 text-center text-sm text-slate-500">
-            © 2024 Dewatering Construction. All rights reserved.
+          {/* Footer */}
+          <p className="mt-10 text-center text-[11px] text-slate-400">
+            © {CURRENT_YEAR} Dewatering Construction Etc Limited. All rights reserved.
           </p>
         </div>
       </div>

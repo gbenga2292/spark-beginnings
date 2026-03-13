@@ -129,6 +129,7 @@ export function Payroll() {
 
     return employees
       .filter(e => e.status === 'Active')
+      .sort((a, b) => (a.position || '').localeCompare(b.position || ''))
       .map((emp) => {
         const standardSalary = emp.monthlySalaries[mKey] || 0;
 
@@ -1040,7 +1041,7 @@ export function Payroll() {
                     </button>
                   </h4>
                   <div className="space-y-2 mt-2 max-h-[300px] overflow-y-auto pr-2">
-                    {employees.filter(e => e.status === 'Active').map(emp => (
+                    {employees.filter(e => e.status === 'Active').sort((a, b) => (a.position || '').localeCompare(b.position || '')).map(emp => (
                       <label key={emp.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                         <input
                           type="checkbox"

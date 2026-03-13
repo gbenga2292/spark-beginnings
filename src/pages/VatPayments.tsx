@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useAppStore, VatPayment } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import { Trash2, Edit, CheckCircle, Plus, X } from 'lucide-react';
+import { Trash2, Edit, CheckCircle, Plus, X, Upload, Download } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
@@ -27,6 +27,7 @@ export function VatPayments() {
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [importFile, setImportFile] = useState<File | null>(null);
 
     const initialForm = {
         client: '',
@@ -98,6 +99,124 @@ export function VatPayments() {
         }
     };
 
+    const parseCSVRow = (str: string) => {
+        const vals: string[] = [];
+        let cur = '';
+        let inQuotes = false;
+        for (let i = 0; i < str.length; i++) {
+            if (str[i] === '"') {
+                inQuotes = !inQuotes;
+            } else if (str[i] === ',' && !inQuotes) {
+                vals.push(cur.trim());
+                cur = '';
+            } else {
+                cur += str[i];
+            }
+        }
+        vals.push(cur.trim());
+        return vals;
+    };
+
+    const handleImportCSVSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) setImportFile(file);
+        e.target.value = '';
+    };
+
+    const processImport = (file: File, mode: 'update' | 'replace' | 'append') => {
+        setImportFile(null);
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const text = event.target?.result as string;
+                const lines = text.split('\n').filter(l => l.trim().length > 0);
+                if (lines.length < 2) {
+                    toast.error('Invalid or empty CSV file'); return;
+                }
+
+                let importedCount = 0;
+                let updatedCount = 0;
+                let deletedCount = 0;
+                const csvProcessedIds = new Set<string>();
+
+                for (let i = 1; i < lines.length; i++) {
+                    const vals = parseCSVRow(lines[i]);
+                    
+                    if (vals.length >= 4) { // Minimum required columns
+                        const providedId = vals[0]?.trim() || '';
+                        const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(providedId);
+                        const idToUse = (mode !== 'append' && isValidUUID) ? providedId : crypto.randomUUID();
+                        
+                        if (idToUse) csvProcessedIds.add(idToUse);
+
+                        const parsedVatPayment: VatPayment = {
+                            id: idToUse,
+                            client: vals[1],
+                            date: vals[2],
+                            month: vals[3] || '',
+                            amount: parseFloat(vals[4]) || 0,
+                        };
+                        const existing = vatPayments.find(e => e.id === parsedVatPayment.id);
+                        if (existing && mode !== 'append') { 
+                            updateVatPayment(existing.id, parsedVatPayment); 
+                            updatedCount++; 
+                        } else { 
+                            addVatPayment(parsedVatPayment); 
+                            importedCount++; 
+                        }
+                    }
+                }
+
+                if (mode === 'replace') {
+                    vatPayments.forEach(pay => {
+                        if (!csvProcessedIds.has(pay.id)) {
+                            deleteVatPayment(pay.id);
+                            deletedCount++;
+                        }
+                    });
+                }
+
+                let message = `Import complete: ${importedCount} Added | ${updatedCount} Updated`;
+                if (deletedCount > 0) message += ` | ${deletedCount} Removed`;
+                toast.success(message);
+            } catch (err) {
+                toast.error('Failed to parse CSV file');
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    const handleExportCSV = () => {
+        try {
+            if (vatPayments.length === 0) {
+                toast.info('No VAT payments to export');
+                return;
+            }
+            const headers = ['id', 'client', 'date', 'month', 'amount'];
+            const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
+
+            const rows = vatPayments.map(pay => {
+                const data = [
+                    pay.id, pay.client, pay.date, pay.month || '', pay.amount
+                ];
+                return data.map(extractCSV).join(',');
+            });
+
+            const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `vat_payments_export_${new Date().toISOString().slice(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success(`Successfully exported ${vatPayments.length} VAT payments`);
+        } catch (e) {
+            toast.error('Export failed');
+        }
+    };
+
     const uniqueClients = useMemo(() => {
         const allClients = new Set([
             ...sites.map(s => s.client),
@@ -150,7 +269,18 @@ export function VatPayments() {
                 </div>
             </div>
             <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-3">
+                {priv.canImport && (
+                  <label className="flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 shadow-sm border border-indigo-200 rounded-md h-9 px-4 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap">
+                    <Upload className="h-4 w-4" /> Import CSV
+                    <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
+                  </label>
+                )}
+                {priv.canExport && (
+                    <Button variant="outline" className="gap-2 shrink-0 border-indigo-200 text-indigo-700 hover:bg-indigo-50" onClick={handleExportCSV}>
+                        <Download className="h-4 w-4" /> Export CSV
+                    </Button>
+                )}
                 {priv.canManageVat && (
                   <Button
                       className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-10 px-5"
@@ -343,6 +473,36 @@ export function VatPayments() {
                             </Button>
                             <Button onClick={handleSubmit} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-11 shadow-md">
                                 <CheckCircle className="w-4 h-4" /> {selectedId ? 'Update VAT' : 'Submit VAT'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Import Modal Options */}
+            {importFile && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
+                    <div className="relative bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200">
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">Import Policy</h3>
+                        <p className="text-sm text-slate-500 leading-relaxed mb-6">
+                            How would you like to process the VAT payment records from this CSV file?
+                        </p>
+                        <div className="flex flex-col gap-3">
+                            <Button onClick={() => processImport(importFile, 'update')} className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3 flex-col items-center justify-center">
+                                <span className="font-semibold block text-base">Update & Add (Recommended)</span>
+                                <span className="block text-xs opacity-80 mt-1 font-normal text-center">Modifies matching IDs. Adds missing ones. Leaves others alone.</span>
+                            </Button>
+                            <Button onClick={() => processImport(importFile, 'append')} variant="outline" className="border-slate-200 h-auto py-3 text-slate-700 hover:bg-slate-50 flex-col items-center justify-center">
+                                <span className="font-semibold block text-base">Append Only</span>
+                                <span className="block text-xs text-slate-500 mt-1 font-normal text-center">Adds every row as a brand new record, completely ignoring current IDs.</span>
+                            </Button>
+                            <Button onClick={() => processImport(importFile, 'replace')} variant="outline" className="border-rose-200 h-auto py-3 text-rose-600 hover:bg-rose-50 flex-col items-center justify-center">
+                                <span className="font-semibold block text-base">Replace Entire List</span>
+                                <span className="block text-xs text-rose-500/80 mt-1 font-normal text-center">Deletes current records that are NOT in this CSV. Updates matches. Adds new ones.</span>
+                            </Button>
+                            <Button onClick={() => setImportFile(null)} variant="ghost" className="text-slate-400 hover:text-slate-600 mt-2">
+                                Cancel
                             </Button>
                         </div>
                     </div>

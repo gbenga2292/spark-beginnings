@@ -18,6 +18,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { usePayrollCalculator } from '@/src/hooks/usePayrollCalculator';
 import { usePriv } from '@/src/hooks/usePriv';
+import { SiteSummary } from './SiteSummary';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -49,6 +50,9 @@ export function FinancialReports() {
   const [accountsTab, setAccountsTab] = useState<'payroll' | 'loans'>('payroll');
   const [payrollYear, setPayrollYear] = useState<number>(new Date().getFullYear());
   const [payrollMonth, setPayrollMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [mainTab, setMainTab] = useState<'financial' | 'site-summary'>('financial');
+  const sitesPriv = usePriv('sites');
+
   const currentYear = new Date().getFullYear();
   const years = [currentYear, currentYear - 1, currentYear - 2];
 
@@ -562,21 +566,44 @@ export function FinancialReports() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">
-            Financial Reports & Analytics
-          </h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">Revenue insights, collection analysis, and compliance reporting.</p>
+      <div className="flex flex-col gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">
+              Account Reports
+            </h1>
+            <p className="text-sm font-medium text-slate-500 mt-1">Revenue insights, collection analysis, and compliance reporting.</p>
+          </div>
+        </div>
+        
+        <div className="flex gap-6 mt-2">
+          <button 
+            className={`pb-3 text-sm font-semibold transition-all border-b-2 ${mainTab === 'financial' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} 
+            onClick={() => setMainTab('financial')}
+          >
+            Financial Analytics
+          </button>
+          {sitesPriv.canViewClientSummary && (
+            <button 
+              className={`pb-3 text-sm font-semibold transition-all border-b-2 ${mainTab === 'site-summary' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} 
+              onClick={() => setMainTab('site-summary')}
+            >
+              Site Summary
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <div className="flex items-center gap-2 text-slate-800">
-          <Filter className="w-5 h-5 text-indigo-600" />
-          <h2 className="text-sm font-bold uppercase tracking-wide">Filters</h2>
-        </div>
+      {mainTab === 'site-summary' ? (
+        <SiteSummary />
+      ) : (
+        <>
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <div className="flex items-center gap-2 text-slate-800">
+              <Filter className="w-5 h-5 text-indigo-600" />
+              <h2 className="text-sm font-bold uppercase tracking-wide">Filters</h2>
+            </div>
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-500 uppercase">Year</span>
@@ -1581,6 +1608,8 @@ export function FinancialReports() {
           )}
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   );
 }

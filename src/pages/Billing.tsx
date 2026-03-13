@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useAppStore, PendingInvoice, Invoice } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle } from 'lucide-react';
+import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -26,6 +26,7 @@ export function Billing() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isViewingActive, setIsViewingActive] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
 
   const initialForm = {
     destination: 'Pending' as 'Pending' | 'Active',
@@ -311,6 +312,207 @@ export function Billing() {
     }
   };
 
+  const parseCSVRow = (str: string) => {
+    const vals: string[] = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < str.length; i++) {
+      if (str[i] === '"') {
+        inQuotes = !inQuotes;
+      } else if (str[i] === ',' && !inQuotes) {
+        vals.push(cur.trim());
+        cur = '';
+      } else {
+        cur += str[i];
+      }
+    }
+    vals.push(cur.trim());
+    return vals;
+  };
+
+  const handleImportCSVSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setImportFile(file);
+    e.target.value = '';
+  };
+
+  const processImport = (file: File, mode: 'update' | 'replace' | 'append') => {
+    setImportFile(null);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split('\n').filter(l => l.trim().length > 0);
+        if (lines.length < 2) {
+          toast.error('Invalid or empty CSV file'); return;
+        }
+
+        let importedCount = 0;
+        let updatedCount = 0;
+        let deletedCount = 0;
+        const csvProcessedIds = new Set<string>();
+
+        for (let i = 1; i < lines.length; i++) {
+          const vals = parseCSVRow(lines[i]);
+          
+          if (vals.length >= 26) { // Minimum required columns
+            const providedId = vals[0]?.trim() || '';
+            const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(providedId);
+            const idToUse = (mode !== 'append' && isValidUUID) ? providedId : crypto.randomUUID();
+            
+            if (idToUse) csvProcessedIds.add(idToUse);
+
+            if (isViewingActive) {
+               const parsedInvoice: Invoice = {
+                 id: idToUse,
+                 invoiceNumber: vals[1],
+                 client: vals[2],
+                 project: vals[3] || 'Billed',
+                 siteId: vals[4] || '',
+                 siteName: vals[5] || '',
+                 amount: parseFloat(vals[6]) || 0,
+                 date: vals[7] || '',
+                 dueDate: vals[8] || '',
+                 billingCycle: (vals[9] as any) || 'Custom',
+                 reminderDate: vals[10] || '',
+                 status: (vals[11] as any) || 'Sent',
+                 vatInc: (vals[12] as any) || 'No',
+                 noOfMachine: parseFloat(vals[13]) || 0,
+                 dailyRentalCost: parseFloat(vals[14]) || 0,
+                 dieselCostPerLtr: parseFloat(vals[15]) || 0,
+                 dailyUsage: parseFloat(vals[16]) || 0,
+                 noOfTechnician: parseFloat(vals[17]) || 0,
+                 techniciansDailyRate: parseFloat(vals[18]) || 0,
+                 mobDemob: parseFloat(vals[19]) || 0,
+                 installation: parseFloat(vals[20]) || 0,
+                 damages: parseFloat(vals[21]) || 0,
+                 duration: parseFloat(vals[22]) || 0,
+                 rentalCost: parseFloat(vals[23]) || 0,
+                 dieselCost: parseFloat(vals[24]) || 0,
+                 techniciansCost: parseFloat(vals[25]) || 0,
+                 totalCost: parseFloat(vals[26]) || 0,
+                 vat: parseFloat(vals[27]) || 0,
+                 totalCharge: parseFloat(vals[28]) || 0,
+                 totalExclusiveOfVat: parseFloat(vals[29]) || 0,
+               };
+               const existing = invoices.find(e => e.id === parsedInvoice.id);
+               if (existing && mode !== 'append') { 
+                 updateInvoice(existing.id, parsedInvoice); 
+                 updatedCount++; 
+               } else { 
+                 addInvoice(parsedInvoice); 
+                 importedCount++; 
+               }
+            } else {
+               const parsedPendingInvoice: PendingInvoice = {
+                 id: idToUse,
+                 invoiceNo: vals[1],
+                 client: vals[2],
+                 site: vals[3] || '',
+                 vatInc: (vals[4] as any) || 'No',
+                 noOfMachine: parseFloat(vals[5]) || 0,
+                 dailyRentalCost: parseFloat(vals[6]) || 0,
+                 dieselCostPerLtr: parseFloat(vals[7]) || 0,
+                 dailyUsage: parseFloat(vals[8]) || 0,
+                 noOfTechnician: parseFloat(vals[9]) || 0,
+                 techniciansDailyRate: parseFloat(vals[10]) || 0,
+                 startDate: vals[11] || '',
+                 duration: parseFloat(vals[12]) || 0,
+                 endDate: vals[13] || '',
+                 mobDemob: parseFloat(vals[14]) || 0,
+                 installation: parseFloat(vals[15]) || 0,
+                 damages: parseFloat(vals[16]) || 0,
+                 rentalCost: parseFloat(vals[17]) || 0,
+                 dieselCost: parseFloat(vals[18]) || 0,
+                 techniciansCost: parseFloat(vals[19]) || 0,
+                 totalCost: parseFloat(vals[20]) || 0,
+                 vat: parseFloat(vals[21]) || 0,
+                 totalCharge: parseFloat(vals[22]) || 0,
+                 totalExclusiveOfVat: parseFloat(vals[23]) || 0,
+               };
+               const existing = pendingInvoices.find(e => e.id === parsedPendingInvoice.id);
+               if (existing && mode !== 'append') { 
+                 updatePendingInvoice(existing.id, parsedPendingInvoice); 
+                 updatedCount++; 
+               } else { 
+                 addPendingInvoice(parsedPendingInvoice); 
+                 importedCount++; 
+               }
+            }
+          }
+        }
+
+        if (mode === 'replace') {
+           if (isViewingActive) {
+              invoices.forEach(inv => {
+                if (!csvProcessedIds.has(inv.id)) {
+                  deleteInvoice(inv.id);
+                  deletedCount++;
+                }
+              });
+           } else {
+              pendingInvoices.forEach(inv => {
+                if (!csvProcessedIds.has(inv.id)) {
+                  deletePendingInvoice(inv.id);
+                  deletedCount++;
+                }
+              });
+           }
+        }
+
+        let message = `Import complete: ${importedCount} Added | ${updatedCount} Updated`;
+        if (deletedCount > 0) message += ` | ${deletedCount} Removed`;
+        toast.success(message);
+      } catch (err) {
+        toast.error('Failed to parse CSV file');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExportCSV = () => {
+    try {
+      if (currentList.length === 0) {
+        toast.info('No invoices to export');
+        return;
+      }
+      let headers: string[] = [];
+      let rows: string[] = [];
+      const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
+
+      if (isViewingActive) {
+         headers = ['id', 'invoiceNumber', 'client', 'project', 'siteId', 'siteName', 'amount', 'date', 'dueDate', 'billingCycle', 'reminderDate', 'status', 'vatInc', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'mobDemob', 'installation', 'damages', 'duration', 'rentalCost', 'dieselCost', 'techniciansCost', 'totalCost', 'vat', 'totalCharge', 'totalExclusiveOfVat'];
+         rows = (currentList as Invoice[]).map(inv => {
+            const data = [
+               inv.id, inv.invoiceNumber, inv.client, inv.project, inv.siteId, inv.siteName, inv.amount, inv.date, inv.dueDate, inv.billingCycle, inv.reminderDate, inv.status, inv.vatInc, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0, inv.duration || 0, inv.rentalCost || 0, inv.dieselCost || 0, inv.techniciansCost || 0, inv.totalCost || 0, inv.vat || 0, inv.totalCharge || 0, inv.totalExclusiveOfVat || 0
+            ];
+            return data.map(extractCSV).join(',');
+         });
+      } else {
+         headers = ['id', 'invoiceNo', 'client', 'site', 'vatInc', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'startDate', 'duration', 'endDate', 'mobDemob', 'installation', 'damages', 'rentalCost', 'dieselCost', 'techniciansCost', 'totalCost', 'vat', 'totalCharge', 'totalExclusiveOfVat'];
+         rows = (currentList as PendingInvoice[]).map(inv => {
+            const data = [
+               inv.id, inv.invoiceNo, inv.client, inv.site, inv.vatInc, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.startDate || '', inv.duration || 0, inv.endDate || '', inv.mobDemob || 0, inv.installation || 0, inv.damages || 0, inv.rentalCost || 0, inv.dieselCost || 0, inv.techniciansCost || 0, inv.totalCost || 0, inv.vat || 0, inv.totalCharge || 0, inv.totalExclusiveOfVat || 0
+            ];
+            return data.map(extractCSV).join(',');
+         });
+      }
+
+      const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `invoices_${isViewingActive ? 'active' : 'pending'}_export_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success(`Successfully exported ${currentList.length} invoices`);
+    } catch (e) {
+      toast.error('Export failed');
+    }
+  };
+
   const currentList = isViewingActive ? invoices : pendingInvoices;
 
   const uniqueClients = useMemo(() => Array.from(new Set(sites.map(s => s.client))), [sites]);
@@ -347,14 +549,27 @@ export function Billing() {
           </button>
         </div>
 
-        {priv.canCreate && (
-          <Button
-            className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-10 px-5"
-            onClick={() => { handleClear(); setIsModalOpen(true); }}
-          >
-            <Plus className="w-5 h-5" /> Add Invoice
-          </Button>
-        )}
+        <div className="flex items-center gap-3">
+          {priv.canImport && (
+            <label className="flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 shadow-sm border border-indigo-200 rounded-md h-9 px-4 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap">
+              <Upload className="h-4 w-4" /> Import CSV
+              <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
+            </label>
+          )}
+          {priv.canExport && (
+              <Button variant="outline" className="gap-2 shrink-0 border-indigo-200 text-indigo-700 hover:bg-indigo-50" onClick={handleExportCSV}>
+                  <Download className="h-4 w-4" /> Export CSV
+              </Button>
+          )}
+          {priv.canCreate && (
+            <Button
+              className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-10 px-5"
+              onClick={() => { handleClear(); setIsModalOpen(true); }}
+            >
+              <Plus className="w-5 h-5" /> Add Invoice
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Main Table View */}
@@ -596,6 +811,36 @@ export function Billing() {
               </Button>
               <Button onClick={handleSubmit} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-11 shadow-md">
                 <CheckCircle className="w-4 h-4" /> {selectedId ? 'Update Invoice' : 'Submit Invoice'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal Options */}
+      {importFile && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
+          <div className="relative bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200">
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Import Policy</h3>
+            <p className="text-sm text-slate-500 leading-relaxed mb-6">
+              How would you like to process the {isViewingActive ? 'Active' : 'Pending'} Invoice records from this CSV file?
+            </p>
+            <div className="flex flex-col gap-3">
+              <Button onClick={() => processImport(importFile, 'update')} className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3 flex-col items-center justify-center">
+                <span className="font-semibold block text-base">Update & Add (Recommended)</span>
+                <span className="block text-xs opacity-80 mt-1 font-normal text-center">Modifies matching IDs. Adds missing ones. Leaves others alone.</span>
+              </Button>
+              <Button onClick={() => processImport(importFile, 'append')} variant="outline" className="border-slate-200 h-auto py-3 text-slate-700 hover:bg-slate-50 flex-col items-center justify-center">
+                <span className="font-semibold block text-base">Append Only</span>
+                <span className="block text-xs text-slate-500 mt-1 font-normal text-center">Adds every row as a brand new record, completely ignoring current IDs.</span>
+              </Button>
+              <Button onClick={() => processImport(importFile, 'replace')} variant="outline" className="border-rose-200 h-auto py-3 text-rose-600 hover:bg-rose-50 flex-col items-center justify-center">
+                <span className="font-semibold block text-base">Replace Entire List</span>
+                <span className="block text-xs text-rose-500/80 mt-1 font-normal text-center">Deletes current records that are NOT in this CSV. Updates matches. Adds new ones.</span>
+              </Button>
+              <Button onClick={() => setImportFile(null)} variant="ghost" className="text-slate-400 hover:text-slate-600 mt-2">
+                Cancel
               </Button>
             </div>
           </div>

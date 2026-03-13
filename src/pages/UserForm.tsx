@@ -49,7 +49,7 @@ const PRIV_GROUPS: PG[] = [
       { key: 'sites', label: 'Sites & Clients', parentKey: 'sites', masterField: 'canView',
         fields: [
           { key: 'canView', label: 'View' }, { key: 'canAddSite', label: 'Add Site' }, { key: 'canEditSite', label: 'Edit Site' }, { key: 'canDeleteSite', label: 'Delete Site', danger: true },
-          { key: 'canAddClient', label: 'Add Client' }, { key: 'canEditClient', label: 'Edit Client' }, { key: 'canDeleteClient', label: 'Delete Client', danger: true }, { key: 'canViewClientSummary', label: 'Client Summary' },
+          { key: 'canAddClient', label: 'Add Client' }, { key: 'canEditClient', label: 'Edit Client' }, { key: 'canDeleteClient', label: 'Delete Client', danger: true },
           { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }
         ] },
     ],
@@ -57,6 +57,8 @@ const PRIV_GROUPS: PG[] = [
   {
     name: 'Account', icon: Landmark, color: 'amber',
     pages: [
+      { key: 'clientSummary', label: 'Client Summary', parentKey: 'sites', masterField: 'canViewClientSummary',
+        fields: [{ key: 'canViewClientSummary', label: 'View' }] },
       { key: 'billing', label: 'Invoices & Billing', parentKey: 'billing', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canCreate', label: 'Create' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
       { key: 'payments', label: 'Payments', parentKey: 'payments', masterField: 'canView',

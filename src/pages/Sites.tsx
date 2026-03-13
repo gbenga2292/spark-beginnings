@@ -495,15 +495,16 @@ export function Sites() {
                     <TableCell className="font-mono text-xs text-slate-500">{site.id}</TableCell>
                     <TableCell className="font-medium text-slate-900">
                       {editingId === site.id ? (
-                        <>
-                          <Input value={editForm.client} className="h-8" list="edit-clients"
-                            onChange={e => setEditForm({ ...editForm, client: e.target.value })} />
-                          <datalist id="edit-clients">
-                            {clients.map(c => (
-                              <option key={c} value={c} />
-                            ))}
-                          </datalist>
-                        </>
+                        <select
+                          value={editForm.client}
+                          onChange={e => setEditForm({ ...editForm, client: e.target.value })}
+                          className="flex h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-sm"
+                        >
+                          <option value="" disabled>Select Client</option>
+                          {clients.map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
                       ) : site.client}
                     </TableCell>
                     <TableCell>
@@ -603,18 +604,17 @@ export function Sites() {
         <div className="space-y-4">
           <div className="space-y-1">
             <label className="text-sm font-medium text-slate-700">Client <span className="text-red-500">*</span></label>
-            <Input
-              placeholder="Select or type client name"
-              list="dialog-clients"
+            <select
               value={addForm.client}
               onChange={e => setAddForm({ ...addForm, client: e.target.value })}
-            />
-            <datalist id="dialog-clients">
+              className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+            >
+              <option value="" disabled>Select a client...</option>
               {clients.map(c => (
-                <option key={c} value={c} />
+                <option key={c} value={c}>{c}</option>
               ))}
-            </datalist>
-            <p className="text-xs text-slate-400">A client can have multiple sites</p>
+            </select>
+            <p className="text-xs text-slate-400">Select an existing client</p>
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium text-slate-700">Site Name <span className="text-red-500">*</span></label>
