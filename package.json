@@ -18,6 +18,7 @@
     "electron:dev": "electron .",
     "electron:build": "npm run build:dev && electron-builder",
     "electron:build:win": "npm run build:dev && electron-builder --win --x64",
+    "electron:build:portable": "npm run build:dev && electron-builder --win portable --x64",
     "electron:build:dir": "npm run build:dev && electron-builder --win --x64 --dir"
   },
   "dependencies": {
@@ -70,6 +71,7 @@
     "win": {
       "target": [
         { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] },
         { "target": "dir", "arch": ["x64"] }
       ],
       "icon": "logo/logo-1.png"

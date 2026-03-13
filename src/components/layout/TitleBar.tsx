@@ -20,7 +20,6 @@ declare global {
 
 const MENU_ITEMS = [
   { id: 'file',     label: 'File' },
-  { id: 'navigate', label: 'Navigate' },
   { id: 'view',     label: 'View' },
   { id: 'help',     label: 'Help' },
 ];

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { useDataLoader } from './hooks/useDataLoader';
 import { Layout } from './components/layout/Layout';
@@ -110,9 +110,9 @@ export default function App() {
           <GlobalDragScroll />
           <ToastContainer />
           <ConfirmDialog />
-          <BrowserRouter>
+          <HashRouter>
             <AppContent />
-          </BrowserRouter>
+          </HashRouter>
         </div>
       </div>
     </AuthProvider>

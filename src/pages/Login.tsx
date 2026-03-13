@@ -7,6 +7,7 @@ import { supabase } from '@/src/integrations/supabase/client';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Mail, Lock, AlertCircle, Building2, Shield, ArrowRight } from 'lucide-react';
+import logoSrc from '../../logo/logo-2.png';
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -86,7 +87,7 @@ export function Login() {
 
         <div className="relative z-10 flex flex-col justify-center px-16 xl:px-24">
           <div className="flex items-center gap-4 mb-12">
-            <img src="/logo/logo-2.png" alt="DCEL Office Suite" className="h-16 xl:h-20 w-auto drop-shadow-lg" />
+            <img src={logoSrc} alt="DCEL Office Suite" className="h-16 xl:h-20 w-auto drop-shadow-lg" />
           </div>
           <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-6">
             Office management system
