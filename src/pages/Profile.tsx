@@ -448,6 +448,74 @@ export function Profile() {
               )}
             </CardContent>
           </Card>
+          {/* Appearance / Theme */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Palette className="h-5 w-5 text-indigo-600" />
+                Appearance
+              </CardTitle>
+              <CardDescription>Choose your preferred color theme and mode</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Light / Dark toggle */}
+              <div>
+                <label className="text-sm font-medium text-slate-700 mb-3 block">Mode</label>
+                <div className="flex gap-3">
+                  <button
+                    onClick={toggle}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                      !isDark
+                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                        : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Sun className="h-4 w-4" /> Light
+                  </button>
+                  <button
+                    onClick={toggle}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                      isDark
+                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                        : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Moon className="h-4 w-4" /> Dark
+                  </button>
+                </div>
+              </div>
+
+              {/* Color themes */}
+              <div>
+                <label className="text-sm font-medium text-slate-700 mb-3 block">Color Theme</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {THEME_OPTIONS.map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => setColorTheme(opt.id)}
+                      className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                        colorTheme === opt.id
+                          ? 'border-indigo-500 bg-indigo-50/60 shadow-sm'
+                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      {colorTheme === opt.id && (
+                        <div className="absolute top-2 right-2">
+                          <Check className="h-4 w-4 text-indigo-600" />
+                        </div>
+                      )}
+                      <div className="flex gap-1">
+                        {opt.swatches.map((c, i) => (
+                          <div key={i} className="w-5 h-5 rounded-full" style={{ backgroundColor: c }} />
+                        ))}
+                      </div>
+                      <span className="text-xs font-medium text-slate-700">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
