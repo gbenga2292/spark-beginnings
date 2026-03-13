@@ -7,6 +7,7 @@ import { Input } from '@/src/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
 import { supabase } from '@/src/integrations/supabase/client';
+import { useTheme, ALL_COLOR_THEMES, type ColorTheme } from '@/src/hooks/useTheme';
 import { 
   User, 
   Mail, 
@@ -18,7 +19,11 @@ import {
   AlertCircle,
   CheckCircle2,
   Building2,
-  Loader2
+  Loader2,
+  Palette,
+  Sun,
+  Moon,
+  Check
 } from 'lucide-react';
 
 export function Profile() {
