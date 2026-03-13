@@ -7,6 +7,7 @@ import { Input } from '@/src/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
 import { supabase } from '@/src/integrations/supabase/client';
+import { useTheme, ALL_COLOR_THEMES, type ColorTheme } from '@/src/hooks/useTheme';
 import { 
   User, 
   Mail, 
@@ -18,13 +19,29 @@ import {
   AlertCircle,
   CheckCircle2,
   Building2,
-  Loader2
+  Loader2,
+  Palette,
+  Sun,
+  Moon,
+  Check
 } from 'lucide-react';
+
+
+const THEME_OPTIONS: { id: ColorTheme; label: string; swatches: string[] }[] = [
+  { id: 'default', label: 'Indigo',  swatches: ['#4f46e5', '#6366f1', '#818cf8'] },
+  { id: 'ocean',   label: 'Ocean',   swatches: ['#2563eb', '#3b82f6', '#60a5fa'] },
+  { id: 'forest',  label: 'Forest',  swatches: ['#059669', '#10b981', '#34d399'] },
+  { id: 'sunset',  label: 'Sunset',  swatches: ['#d97706', '#f59e0b', '#fbbf24'] },
+  { id: 'rose',    label: 'Rose',    swatches: ['#e11d48', '#f43f5e', '#fb7185'] },
+  { id: 'violet',  label: 'Violet',  swatches: ['#7c3aed', '#8b5cf6', '#a78bfa'] },
+  { id: 'slate',   label: 'Slate',   swatches: ['#475569', '#64748b', '#94a3b8'] },
+];
 
 export function Profile() {
   const navigate = useNavigate();
   const { user, login } = useAuthStore();
   const { updateUser, getCurrentUser } = useUserStore();
+  const { isDark, toggle, colorTheme, setColorTheme } = useTheme();
   const currentUser = getCurrentUser();
   
   const [isEditing, setIsEditing] = useState(false);
@@ -440,6 +457,74 @@ export function Profile() {
                   </Button>
                 </div>
               )}
+            </CardContent>
+          </Card>
+          {/* Appearance / Theme */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Palette className="h-5 w-5 text-indigo-600" />
+                Appearance
+              </CardTitle>
+              <CardDescription>Choose your preferred color theme and mode</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Light / Dark toggle */}
+              <div>
+                <label className="text-sm font-medium text-slate-700 mb-3 block">Mode</label>
+                <div className="flex gap-3">
+                  <button
+                    onClick={toggle}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                      !isDark
+                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                        : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Sun className="h-4 w-4" /> Light
+                  </button>
+                  <button
+                    onClick={toggle}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                      isDark
+                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                        : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Moon className="h-4 w-4" /> Dark
+                  </button>
+                </div>
+              </div>
+
+              {/* Color themes */}
+              <div>
+                <label className="text-sm font-medium text-slate-700 mb-3 block">Color Theme</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {THEME_OPTIONS.map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => setColorTheme(opt.id)}
+                      className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                        colorTheme === opt.id
+                          ? 'border-indigo-500 bg-indigo-50/60 shadow-sm'
+                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      {colorTheme === opt.id && (
+                        <div className="absolute top-2 right-2">
+                          <Check className="h-4 w-4 text-indigo-600" />
+                        </div>
+                      )}
+                      <div className="flex gap-1">
+                        {opt.swatches.map((c, i) => (
+                          <div key={i} className="w-5 h-5 rounded-full" style={{ backgroundColor: c }} />
+                        ))}
+                      </div>
+                      <span className="text-xs font-medium text-slate-700">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
