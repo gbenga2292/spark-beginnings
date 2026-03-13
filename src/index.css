@@ -11,117 +11,99 @@
 
 /* ══════════════════════════════════════════════════════════════════════
    COLOR THEME SYSTEM
-   Each theme remaps the indigo-* palette used throughout the app.
-   Applied via a class on <html>: .theme-ocean, .theme-forest, etc.
+   Tailwind v4 resolves bg-indigo-600 → var(--color-indigo-600) etc.
+   We simply redefine those CSS variables per theme class on <html>.
    ══════════════════════════════════════════════════════════════════════ */
 
 /* ── Ocean (Blue) ─────────────────────────────────────────────────── */
-.theme-ocean .bg-indigo-600  { background-color: rgb(37 99 235)  !important; }
-.theme-ocean .bg-indigo-700  { background-color: rgb(29 78 216)  !important; }
-.theme-ocean .bg-indigo-500  { background-color: rgb(59 130 246) !important; }
-.theme-ocean .bg-indigo-100  { background-color: rgb(219 234 254) !important; }
-.theme-ocean .bg-indigo-50   { background-color: rgb(239 246 255) !important; }
-.theme-ocean .bg-indigo-50\/40 { background-color: rgb(239 246 255 / 0.4) !important; }
-.theme-ocean .text-indigo-600 { color: rgb(37 99 235)  !important; }
-.theme-ocean .text-indigo-700 { color: rgb(29 78 216)  !important; }
-.theme-ocean .text-indigo-500 { color: rgb(59 130 246) !important; }
-.theme-ocean .text-indigo-100 { color: rgb(219 234 254) !important; }
-.theme-ocean .text-indigo-900 { color: rgb(30 58 138)  !important; }
-.theme-ocean .border-indigo-100 { border-color: rgb(219 234 254) !important; }
-.theme-ocean .border-indigo-200 { border-color: rgb(191 219 254) !important; }
-.theme-ocean .hover\:bg-indigo-700:hover { background-color: rgb(29 78 216) !important; }
-.theme-ocean .from-indigo-600 { --tw-gradient-from: rgb(37 99 235); }
-.theme-ocean .to-indigo-700   { --tw-gradient-to: rgb(29 78 216); }
+.theme-ocean {
+  --color-indigo-50:  #eff6ff;
+  --color-indigo-100: #dbeafe;
+  --color-indigo-200: #bfdbfe;
+  --color-indigo-300: #93c5fd;
+  --color-indigo-400: #60a5fa;
+  --color-indigo-500: #3b82f6;
+  --color-indigo-600: #2563eb;
+  --color-indigo-700: #1d4ed8;
+  --color-indigo-800: #1e40af;
+  --color-indigo-900: #1e3a8a;
+  --color-indigo-950: #172554;
+}
 
 /* ── Forest (Emerald) ─────────────────────────────────────────────── */
-.theme-forest .bg-indigo-600  { background-color: rgb(5 150 105)  !important; }
-.theme-forest .bg-indigo-700  { background-color: rgb(4 120 87)   !important; }
-.theme-forest .bg-indigo-500  { background-color: rgb(16 185 129) !important; }
-.theme-forest .bg-indigo-100  { background-color: rgb(209 250 229) !important; }
-.theme-forest .bg-indigo-50   { background-color: rgb(236 253 245) !important; }
-.theme-forest .bg-indigo-50\/40 { background-color: rgb(236 253 245 / 0.4) !important; }
-.theme-forest .text-indigo-600 { color: rgb(5 150 105)  !important; }
-.theme-forest .text-indigo-700 { color: rgb(4 120 87)   !important; }
-.theme-forest .text-indigo-500 { color: rgb(16 185 129) !important; }
-.theme-forest .text-indigo-100 { color: rgb(209 250 229) !important; }
-.theme-forest .text-indigo-900 { color: rgb(6 78 59)    !important; }
-.theme-forest .border-indigo-100 { border-color: rgb(209 250 229) !important; }
-.theme-forest .border-indigo-200 { border-color: rgb(167 243 208) !important; }
-.theme-forest .hover\:bg-indigo-700:hover { background-color: rgb(4 120 87) !important; }
-.theme-forest .from-indigo-600 { --tw-gradient-from: rgb(5 150 105); }
-.theme-forest .to-indigo-700   { --tw-gradient-to: rgb(4 120 87); }
+.theme-forest {
+  --color-indigo-50:  #ecfdf5;
+  --color-indigo-100: #d1fae5;
+  --color-indigo-200: #a7f3d0;
+  --color-indigo-300: #6ee7b7;
+  --color-indigo-400: #34d399;
+  --color-indigo-500: #10b981;
+  --color-indigo-600: #059669;
+  --color-indigo-700: #047857;
+  --color-indigo-800: #065f46;
+  --color-indigo-900: #064e3b;
+  --color-indigo-950: #022c22;
+}
 
-/* ── Sunset (Amber/Orange) ────────────────────────────────────────── */
-.theme-sunset .bg-indigo-600  { background-color: rgb(217 119 6)  !important; }
-.theme-sunset .bg-indigo-700  { background-color: rgb(180 83 9)   !important; }
-.theme-sunset .bg-indigo-500  { background-color: rgb(245 158 11) !important; }
-.theme-sunset .bg-indigo-100  { background-color: rgb(254 243 199) !important; }
-.theme-sunset .bg-indigo-50   { background-color: rgb(255 251 235) !important; }
-.theme-sunset .bg-indigo-50\/40 { background-color: rgb(255 251 235 / 0.4) !important; }
-.theme-sunset .text-indigo-600 { color: rgb(217 119 6)  !important; }
-.theme-sunset .text-indigo-700 { color: rgb(180 83 9)   !important; }
-.theme-sunset .text-indigo-500 { color: rgb(245 158 11) !important; }
-.theme-sunset .text-indigo-100 { color: rgb(254 243 199) !important; }
-.theme-sunset .text-indigo-900 { color: rgb(120 53 15)  !important; }
-.theme-sunset .border-indigo-100 { border-color: rgb(254 243 199) !important; }
-.theme-sunset .border-indigo-200 { border-color: rgb(253 230 138) !important; }
-.theme-sunset .hover\:bg-indigo-700:hover { background-color: rgb(180 83 9) !important; }
-.theme-sunset .from-indigo-600 { --tw-gradient-from: rgb(217 119 6); }
-.theme-sunset .to-indigo-700   { --tw-gradient-to: rgb(180 83 9); }
+/* ── Sunset (Amber) ───────────────────────────────────────────────── */
+.theme-sunset {
+  --color-indigo-50:  #fffbeb;
+  --color-indigo-100: #fef3c7;
+  --color-indigo-200: #fde68a;
+  --color-indigo-300: #fcd34d;
+  --color-indigo-400: #fbbf24;
+  --color-indigo-500: #f59e0b;
+  --color-indigo-600: #d97706;
+  --color-indigo-700: #b45309;
+  --color-indigo-800: #92400e;
+  --color-indigo-900: #78350f;
+  --color-indigo-950: #451a03;
+}
 
 /* ── Rose (Pink) ──────────────────────────────────────────────────── */
-.theme-rose .bg-indigo-600  { background-color: rgb(225 29 72)  !important; }
-.theme-rose .bg-indigo-700  { background-color: rgb(190 18 60)  !important; }
-.theme-rose .bg-indigo-500  { background-color: rgb(244 63 94)  !important; }
-.theme-rose .bg-indigo-100  { background-color: rgb(255 228 230) !important; }
-.theme-rose .bg-indigo-50   { background-color: rgb(255 241 242) !important; }
-.theme-rose .bg-indigo-50\/40 { background-color: rgb(255 241 242 / 0.4) !important; }
-.theme-rose .text-indigo-600 { color: rgb(225 29 72)  !important; }
-.theme-rose .text-indigo-700 { color: rgb(190 18 60)  !important; }
-.theme-rose .text-indigo-500 { color: rgb(244 63 94)  !important; }
-.theme-rose .text-indigo-100 { color: rgb(255 228 230) !important; }
-.theme-rose .text-indigo-900 { color: rgb(136 19 55)  !important; }
-.theme-rose .border-indigo-100 { border-color: rgb(255 228 230) !important; }
-.theme-rose .border-indigo-200 { border-color: rgb(254 205 211) !important; }
-.theme-rose .hover\:bg-indigo-700:hover { background-color: rgb(190 18 60) !important; }
-.theme-rose .from-indigo-600 { --tw-gradient-from: rgb(225 29 72); }
-.theme-rose .to-indigo-700   { --tw-gradient-to: rgb(190 18 60); }
+.theme-rose {
+  --color-indigo-50:  #fff1f2;
+  --color-indigo-100: #ffe4e6;
+  --color-indigo-200: #fecdd3;
+  --color-indigo-300: #fda4af;
+  --color-indigo-400: #fb7185;
+  --color-indigo-500: #f43f5e;
+  --color-indigo-600: #e11d48;
+  --color-indigo-700: #be123c;
+  --color-indigo-800: #9f1239;
+  --color-indigo-900: #881337;
+  --color-indigo-950: #4c0519;
+}
 
 /* ── Violet (Purple) ──────────────────────────────────────────────── */
-.theme-violet .bg-indigo-600  { background-color: rgb(124 58 237) !important; }
-.theme-violet .bg-indigo-700  { background-color: rgb(109 40 217) !important; }
-.theme-violet .bg-indigo-500  { background-color: rgb(139 92 246) !important; }
-.theme-violet .bg-indigo-100  { background-color: rgb(237 233 254) !important; }
-.theme-violet .bg-indigo-50   { background-color: rgb(245 243 255) !important; }
-.theme-violet .bg-indigo-50\/40 { background-color: rgb(245 243 255 / 0.4) !important; }
-.theme-violet .text-indigo-600 { color: rgb(124 58 237) !important; }
-.theme-violet .text-indigo-700 { color: rgb(109 40 217) !important; }
-.theme-violet .text-indigo-500 { color: rgb(139 92 246) !important; }
-.theme-violet .text-indigo-100 { color: rgb(237 233 254) !important; }
-.theme-violet .text-indigo-900 { color: rgb(76 29 149)  !important; }
-.theme-violet .border-indigo-100 { border-color: rgb(237 233 254) !important; }
-.theme-violet .border-indigo-200 { border-color: rgb(221 214 254) !important; }
-.theme-violet .hover\:bg-indigo-700:hover { background-color: rgb(109 40 217) !important; }
-.theme-violet .from-indigo-600 { --tw-gradient-from: rgb(124 58 237); }
-.theme-violet .to-indigo-700   { --tw-gradient-to: rgb(109 40 217); }
+.theme-violet {
+  --color-indigo-50:  #f5f3ff;
+  --color-indigo-100: #ede9fe;
+  --color-indigo-200: #ddd6fe;
+  --color-indigo-300: #c4b5fd;
+  --color-indigo-400: #a78bfa;
+  --color-indigo-500: #8b5cf6;
+  --color-indigo-600: #7c3aed;
+  --color-indigo-700: #6d28d9;
+  --color-indigo-800: #5b21b6;
+  --color-indigo-900: #4c1d95;
+  --color-indigo-950: #2e1065;
+}
 
 /* ── Slate (Neutral) ──────────────────────────────────────────────── */
-.theme-slate .bg-indigo-600  { background-color: rgb(71 85 105)  !important; }
-.theme-slate .bg-indigo-700  { background-color: rgb(51 65 85)   !important; }
-.theme-slate .bg-indigo-500  { background-color: rgb(100 116 139) !important; }
-.theme-slate .bg-indigo-100  { background-color: rgb(226 232 240) !important; }
-.theme-slate .bg-indigo-50   { background-color: rgb(248 250 252) !important; }
-.theme-slate .bg-indigo-50\/40 { background-color: rgb(248 250 252 / 0.4) !important; }
-.theme-slate .text-indigo-600 { color: rgb(71 85 105)  !important; }
-.theme-slate .text-indigo-700 { color: rgb(51 65 85)   !important; }
-.theme-slate .text-indigo-500 { color: rgb(100 116 139) !important; }
-.theme-slate .text-indigo-100 { color: rgb(226 232 240) !important; }
-.theme-slate .text-indigo-900 { color: rgb(15 23 42)   !important; }
-.theme-slate .border-indigo-100 { border-color: rgb(226 232 240) !important; }
-.theme-slate .border-indigo-200 { border-color: rgb(203 213 225) !important; }
-.theme-slate .hover\:bg-indigo-700:hover { background-color: rgb(51 65 85) !important; }
-.theme-slate .from-indigo-600 { --tw-gradient-from: rgb(71 85 105); }
-.theme-slate .to-indigo-700   { --tw-gradient-to: rgb(51 65 85); }
+.theme-slate {
+  --color-indigo-50:  #f8fafc;
+  --color-indigo-100: #f1f5f9;
+  --color-indigo-200: #e2e8f0;
+  --color-indigo-300: #cbd5e1;
+  --color-indigo-400: #94a3b8;
+  --color-indigo-500: #64748b;
+  --color-indigo-600: #475569;
+  --color-indigo-700: #334155;
+  --color-indigo-800: #1e293b;
+  --color-indigo-900: #0f172a;
+  --color-indigo-950: #020617;
+}
 
 /* ══════════════════════════════════════════════════════════════════════
    DARK MODE OVERRIDES
