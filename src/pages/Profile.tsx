@@ -30,6 +30,7 @@ export function Profile() {
   const navigate = useNavigate();
   const { user, login } = useAuthStore();
   const { updateUser, getCurrentUser } = useUserStore();
+  const { isDark, toggle, colorTheme, setColorTheme } = useTheme();
   const currentUser = getCurrentUser();
   
   const [isEditing, setIsEditing] = useState(false);
