@@ -194,6 +194,7 @@ export type Database = {
           bank_name: string
           created_at: string
           department: string
+          employee_code: string | null
           end_date: string
           exclude_from_onboarding: boolean
           firstname: string
@@ -217,6 +218,7 @@ export type Database = {
           bank_name?: string
           created_at?: string
           department: string
+          employee_code?: string | null
           end_date?: string
           exclude_from_onboarding?: boolean
           firstname: string
@@ -240,6 +242,7 @@ export type Database = {
           bank_name?: string
           created_at?: string
           department?: string
+          employee_code?: string | null
           end_date?: string
           exclude_from_onboarding?: boolean
           firstname?: string
