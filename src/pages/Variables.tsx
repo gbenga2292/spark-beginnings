@@ -67,6 +67,7 @@ export function Variables() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskAssignee, setNewTaskAssignee] = useState('');
   const [taskDirection, setTaskDirection] = useState<'onboarding' | 'offboarding'>('onboarding');
+  const [monthConfigDept, setMonthConfigDept] = useState('');
 
   // Payroll year is always the current year
   const payrollYear = new Date().getFullYear();
@@ -599,17 +600,52 @@ export function Variables() {
                   </Button>
                 </div>
               )}
-              <div className="flex flex-wrap gap-2">
-                {departments.map(dep => (
-                  <div key={dep} className="bg-slate-100 border border-slate-200 rounded-full px-3 py-1 text-sm flex items-center gap-2">
-                    {dep}
-                    {priv.canEdit && (
-                      <button onClick={() => removeDepartment(dep)} className="text-slate-400 hover:text-red-500">
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                ))}
+              <div className="border rounded-md overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-slate-50">
+                    <TableRow>
+                      <TableHead>Department</TableHead>
+                      <TableHead className="w-40 text-center">Work Days/Week</TableHead>
+                      <TableHead className="w-[100px] text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {departments.map(dep => {
+                      const defaultDays = ['OPERATIONS', 'ENGINEERING'].includes(dep.toUpperCase()) ? 6 : 5;
+                      const days = localPayrollVars.departmentWorkDays?.[dep] ?? defaultDays;
+                      return (
+                        <TableRow key={dep}>
+                          <TableCell className="font-medium text-slate-800">{dep}</TableCell>
+                          <TableCell className="text-center">
+                            <Input
+                              type="number"
+                              min={1}
+                              max={7}
+                              value={days}
+                              onChange={(e) => {
+                                const nw = { ...(localPayrollVars.departmentWorkDays || {}), [dep]: Math.max(1, Math.min(7, Number(e.target.value))) };
+                                updateLocalPayrollVariables({ departmentWorkDays: nw });
+                              }}
+                              className="h-8 w-20 mx-auto text-center"
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {priv.canEdit && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeDepartment(dep)}
+                                className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
@@ -867,10 +903,30 @@ export function Variables() {
             <CardHeader>
               <CardTitle>Monthly Config (Workdays &amp; OT Rate)</CardTitle>
               <CardDescription>
-                Work days are <strong>auto-computed</strong> from the current year ({payrollYear}) and Public Holidays above (Mon–Sat, excluding Sundays &amp; holidays). Only the OT Rate and TT Allowance % are editable.
+                Work days are <strong>auto-computed</strong> per department and year ({payrollYear}), excluding Sundays, holidays, and off-days based on each department's configured days/week.
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Department picker */}
+              <div className="flex items-center gap-2 mb-4">
+                <label className="text-xs font-semibold text-slate-600 uppercase">Department:</label>
+                <select
+                  value={monthConfigDept}
+                  onChange={e => setMonthConfigDept(e.target.value)}
+                  className="h-8 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer focus:ring-2 focus:ring-indigo-400 outline-none"
+                >
+                  <option value="">— All (6 days/wk default) —</option>
+                  {departments.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+                {monthConfigDept && (() => {
+                  const configuredDays = localPayrollVars.departmentWorkDays?.[monthConfigDept];
+                  const defaultDays = ['OPERATIONS', 'ENGINEERING'].includes(monthConfigDept.toUpperCase()) ? 6 : 5;
+                  const effective = configuredDays ?? defaultDays;
+                  return <span className="text-xs text-indigo-600 font-medium bg-indigo-50 rounded-full px-2 py-0.5">{effective} days/week</span>;
+                })()}
+              </div>
               <div className="border rounded-md overflow-hidden">
                 <Table>
                   <TableHeader className="bg-slate-50">
@@ -880,17 +936,24 @@ export function Variables() {
                       <TableHead>End of Mth</TableHead>
                       <TableHead className="text-center">Work Days</TableHead>
                       <TableHead>OT Rate</TableHead>
-                      <TableHead>TT Allow %</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {monthsList.map(({ key, label }, idx) => {
+                    {monthsList.map(({ key, label }) => {
                       const monthNum = MONTH_INDEX[key];
                       const startDate = new Date(payrollYear, monthNum - 1, 1);
                       const endDate = new Date(payrollYear, monthNum, 0);
-                      const computedWorkDays = computeWorkDays(payrollYear, monthNum, holidayDateStrings);
+
+                      // Compute workdays for selected department
+                      const selectedDefaultDays = monthConfigDept
+                        ? (['OPERATIONS', 'ENGINEERING'].includes(monthConfigDept.toUpperCase()) ? 6 : 5)
+                        : 6;
+                      const deptWorkDaysPerWeek = monthConfigDept
+                        ? (localPayrollVars.departmentWorkDays?.[monthConfigDept] ?? selectedDefaultDays)
+                        : 6;
+                      const computedWorkDays = computeWorkDays(payrollYear, monthNum, holidayDateStrings, deptWorkDaysPerWeek);
+
                       const data = localMonthVals[key] || { workDays: 0, overtimeRate: 0.5 };
-                      const ttAllowance = localPayrollVars.otherAllowances;
                       const formatDate = (d: Date) =>
                         `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
                       return (
@@ -911,11 +974,6 @@ export function Variables() {
                               value={data.overtimeRate}
                               onChange={e => updateLocalMonthValue(key, { workDays: computedWorkDays, overtimeRate: Number(e.target.value) })}
                             />
-                          </TableCell>
-                          <TableCell>
-                            <span className="inline-flex items-center justify-center h-8 w-16 rounded bg-slate-50 text-slate-600 font-semibold text-sm">
-                              {ttAllowance}%
-                            </span>
                           </TableCell>
                         </TableRow>
                       );

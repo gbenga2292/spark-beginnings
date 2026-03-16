@@ -37,9 +37,10 @@ export function usePayrollCalculator() {
 
     // Auto-compute workdays for this month from public holidays
     const holidayDates = publicHolidays.map(h => h.date);
-    const officialWorkdays = computeWorkDays(currentYear, selectedMonthIndex, holidayDates);
+    // Keep a generic 6-day default for month config fallback
+    const fallbackWorkdays = computeWorkDays(currentYear, selectedMonthIndex, holidayDates, 6);
 
-    const monthConfig = monthValues[mKey as keyof typeof monthValues] || { workDays: officialWorkdays, overtimeRate: 0.5 };
+    const monthConfig = monthValues[mKey as keyof typeof monthValues] || { workDays: fallbackWorkdays, overtimeRate: 0.5 };
     const otRate = monthConfig.overtimeRate;
 
     let snCounter = 1;
@@ -48,6 +49,11 @@ export function usePayrollCalculator() {
       .filter(e => e.status === 'Active')
       .map((emp) => {
         const standardSalary = emp.monthlySalaries[mKey] || 0;
+
+        // Per-department workdays per week (defaults: Ops/Engineering = 6, others = 5)
+        const defaultDays = OPERATIONS_DEPARTMENTS.includes(emp.department.toUpperCase()) ? 6 : 5;
+        const empWorkDaysPerWeek = payrollVariables.departmentWorkDays?.[emp.department] ?? defaultDays;
+        const empOfficialWorkdays = computeWorkDays(currentYear, selectedMonthIndex, holidayDates, empWorkDaysPerWeek);
 
         // ── Attendance tallies ────────────────────────────────────────────
         let daysWorked = 0;
@@ -65,14 +71,14 @@ export function usePayrollCalculator() {
           }
         }
 
-        if (daysWorked > officialWorkdays) daysWorked = officialWorkdays;
+        if (daysWorked > empOfficialWorkdays) daysWorked = empOfficialWorkdays;
 
         // ── Salary calculation (two-mode) ─────────────────────────────────
         let salary = 0;
         let overtime = 0;
 
-        if (standardSalary > 0 && officialWorkdays > 0) {
-          const dailyRate = standardSalary / officialWorkdays;
+        if (standardSalary > 0 && empOfficialWorkdays > 0) {
+          const dailyRate = standardSalary / empOfficialWorkdays;
           const isOperations = OPERATIONS_DEPARTMENTS.includes(emp.department.toUpperCase());
 
           if (isOperations) {

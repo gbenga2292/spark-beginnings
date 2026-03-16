@@ -1,0 +1,6 @@
+ALTER TABLE public.sites 
+ADD COLUMN IF NOT EXISTS start_date TEXT NOT NULL DEFAULT '',
+ADD COLUMN IF NOT EXISTS end_date TEXT NOT NULL DEFAULT '';
+
+ALTER TABLE public.attendance_records
+ADD COLUMN IF NOT EXISTS overtime_details TEXT NOT NULL DEFAULT '';

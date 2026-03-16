@@ -34,7 +34,7 @@ function dbToAttendance(r: any): AttendanceRecord {
     nightClient: r.night_client, nightSite: r.night_site, day: r.day,
     night: r.night, absentStatus: r.absent_status, nightWk: r.night_wk,
     ot: r.ot, otSite: r.ot_site, dayWk: r.day_wk, dow: r.dow,
-    ndw: r.ndw, mth: r.mth, isPresent: r.is_present, day2: r.day2,
+    ndw: r.ndw, mth: r.mth, isPresent: r.is_present, day2: r.day2, overtimeDetails: r.overtime_details,
   };
 }
 
@@ -146,7 +146,7 @@ function attendanceToDb(r: AttendanceRecord) {
     night_client: r.nightClient, night_site: r.nightSite, day: r.day,
     night: r.night, absent_status: r.absentStatus, night_wk: r.nightWk,
     ot: r.ot, ot_site: r.otSite, day_wk: r.dayWk, dow: r.dow,
-    ndw: r.ndw, mth: r.mth, is_present: r.isPresent, day2: r.day2,
+    ndw: r.ndw, mth: r.mth, is_present: r.isPresent, day2: r.day2, overtime_details: r.overtimeDetails,
   };
 }
 
@@ -399,6 +399,11 @@ export const db = {
   async deleteAttendanceByDate(date: string) {
     const { error } = await supabase.from('attendance_records').delete().eq('date', date);
     if (error) console.error('deleteAttendanceByDate:', error);
+  },
+  async deleteAttendanceByIds(ids: string[]) {
+    if (ids.length === 0) return;
+    const { error } = await supabase.from('attendance_records').delete().in('id', ids);
+    if (error) console.error('deleteAttendanceByIds:', error);
   },
 
   // Invoices

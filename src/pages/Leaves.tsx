@@ -363,7 +363,13 @@ export function Leaves() {
                   value={leaveType} onChange={e => setLeaveType(e.target.value)}
                 >
                   <option value="" disabled>— Select Leave Type —</option>
-                  {leaveTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                  {(() => {
+                    const DEFAULT_LEAVE_TYPES = ['Annual', 'Emergency', 'Maternity/Paternity', 'Study', 'Others'];
+                    const extras = leaveTypes.filter(t => !DEFAULT_LEAVE_TYPES.includes(t));
+                    return [...DEFAULT_LEAVE_TYPES, ...extras].map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ));
+                  })()}
                 </select>
               </div>
 

@@ -13,7 +13,8 @@
 export function computeWorkDays(
     year: number,
     month: number,
-    publicHolidayDates: string[]
+    publicHolidayDates: string[],
+    workDaysPerWeek: number = 6
 ): number {
     // Build a Set of holiday date strings for O(1) lookup
     const holidaySet = new Set(publicHolidayDates);
@@ -24,7 +25,11 @@ export function computeWorkDays(
     let count = 0;
     for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
         const dow = d.getDay(); // 0 = Sun, 1 = Mon … 6 = Sat
-        if (dow === 0) continue; // Sunday — not a workday (mode 11)
+        if (dow === 0) continue; // Sunday — always off
+        // Saturday logic
+        if (workDaysPerWeek < 6 && dow === 6) continue;
+        if (workDaysPerWeek < 7 && dow === 0) continue;
+        if (dow > workDaysPerWeek) continue; // fallback for lower bound e.g. 4 days
 
         // Use LOCAL year/month/day — NOT toISOString() which shifts to UTC
         const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

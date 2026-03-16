@@ -132,9 +132,9 @@ export function Payroll() {
 
       // Auto-compute workdays for this month from public holidays
       const holidayDates = publicHolidays.map(h => h.date);
-      const officialWorkdays = computeWorkDays(currentYear, selectedMonthIndex, holidayDates);
+      const fallbackWorkdays = computeWorkDays(currentYear, selectedMonthIndex, holidayDates, 6);
 
-      const monthConfig = monthValues[mKey as keyof typeof monthValues] || { workDays: officialWorkdays, overtimeRate: 0.5 };
+      const monthConfig = monthValues[mKey as keyof typeof monthValues] || { workDays: fallbackWorkdays, overtimeRate: 0.5 };
       const otRate = monthConfig.overtimeRate;
 
       let snCounter = 1;
@@ -154,6 +154,10 @@ export function Payroll() {
         .map((emp) => {
           const standardSalary = emp.monthlySalaries[mKey] || 0;
 
+          const defaultDays = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase()) ? 6 : 5;
+          const empWorkDaysPerWeek = payrollVariables.departmentWorkDays?.[emp.department] ?? defaultDays;
+          const empOfficialWorkdays = computeWorkDays(currentYear, selectedMonthIndex, holidayDates, empWorkDaysPerWeek);
+
           // â”€â”€ Attendance tallies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           let daysWorked = 0; // days where day === 'Yes'
           let daysAbsent = 0; // days where attendance record exists AND day === 'No'
@@ -161,24 +165,29 @@ export function Payroll() {
 
           for (const r of attendanceRecords) {
             if (r.staffId === emp.id && r.mth === selectedMonthIndex) {
+              if (r.ot > 0) totalOTInstances += 1;
+
               if (r.day?.toLowerCase() === 'yes') {
                 daysWorked += 1;
-                if (r.ot > 0) totalOTInstances += 1;
               } else if (r.day?.toLowerCase() === 'no') {
-                daysAbsent += 1; // explicit absence recorded
+                const st = r.absentStatus?.toUpperCase() || '';
+                const isRealAbsence = ["ABSENT", "NO WORK", "ABSENT WITHOUT PERMIT", "SUSPENSION", "OFF DUTY"].includes(st);
+                if (isRealAbsence) {
+                  daysAbsent += 1;
+                }
               }
             }
           }
 
           // Cap daysWorked at the official workdays ceiling
-          if (daysWorked > officialWorkdays) daysWorked = officialWorkdays;
+          if (daysWorked > empOfficialWorkdays) daysWorked = empOfficialWorkdays;
 
           // â”€â”€ Salary calculation (two-mode) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           let salary = 0;
           let overtime = 0;
 
-          if (standardSalary > 0 && officialWorkdays > 0) {
-            const dailyRate = standardSalary / officialWorkdays;
+          if (standardSalary > 0 && empOfficialWorkdays > 0) {
+            const dailyRate = standardSalary / empOfficialWorkdays;
 
             const isOperations = OPERATIONS_DEPARTMENTS.includes(emp.department.toUpperCase());
 

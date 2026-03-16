@@ -103,6 +103,7 @@ export interface AttendanceRecord {
   mth: number;
   isPresent: 'Yes' | 'No';
   day2: number;
+  overtimeDetails: string;
 }
 
 export interface PendingInvoice {
@@ -238,6 +239,7 @@ interface AppState {
   deleteEmployee: (id: string) => void;
   addAttendanceRecords: (records: AttendanceRecord[]) => void;
   removeAttendanceRecordsByDate: (date: string) => void;
+  deleteAttendanceRecords: (ids: string[]) => void;
   addPosition: (position: string) => void;
   removePosition: (position: string) => void;
   addDepartment: (department: string) => void;
@@ -270,6 +272,7 @@ interface AppState {
     withholdingTaxRate: number;
     nsitfRate: number;
     vatRate: number;
+    departmentWorkDays?: Record<string, number>;
   };
   updatePayrollVariables: (variables: Partial<AppState['payrollVariables']>) => void;
   payeTaxVariables: {
@@ -373,6 +376,7 @@ export const useAppStore = create<AppState>()(
       // Attendance
       addAttendanceRecords: (records) => { set((s) => ({ attendanceRecords: [...s.attendanceRecords, ...records] })); db.insertAttendanceRecords(records); },
       removeAttendanceRecordsByDate: (date) => { set((s) => ({ attendanceRecords: s.attendanceRecords.filter(r => r.date !== date) })); db.deleteAttendanceByDate(date); },
+      deleteAttendanceRecords: (ids) => { set((s) => ({ attendanceRecords: s.attendanceRecords.filter(r => !ids.includes(r.id)) })); db.deleteAttendanceByIds(ids); },
 
       // Positions & Departments
       addPosition: (position) => { set((s) => ({ positions: [...s.positions, position] })); db.insertPosition(position); },

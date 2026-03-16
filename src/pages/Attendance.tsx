@@ -36,8 +36,10 @@ export function Attendance() {
   const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
   const sites = useAppStore((state) => state.sites);
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
+  const payrollVariables = useAppStore((state) => state.payrollVariables);
   const addAttendanceRecords = useAppStore((state) => state.addAttendanceRecords);
   const removeAttendanceRecordsByDate = useAppStore((state) => state.removeAttendanceRecordsByDate);
+  const deleteAttendanceRecords = useAppStore((state) => state.deleteAttendanceRecords);
 
   const [registerDate, setRegisterDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [lastEntryDate, setLastEntryDate] = useState(format(new Date(Date.now() - 86400000), 'yyyy-MM-dd'));
@@ -56,13 +58,15 @@ export function Attendance() {
   const [dbSiteFilter, setDbSiteFilter] = useState('All');
   const [dbShiftFilter, setDbShiftFilter] = useState('All');
 
+  const [dbSelectedIds, setDbSelectedIds] = useState<Set<string>>(new Set());
+
   const isOperationsDepartment = departmentFilter === 'OPERATIONS';
   const isAllDepartments = departmentFilter === 'All';
   
   const departments = useAppStore((state) => state.departments);
 
   // State for the current form
-  const [attendanceData, setAttendanceData] = useState<Record<string, { day: string, night: string }>>({});
+  const [attendanceData, setAttendanceData] = useState<Record<string, { day: string, night: string, overtime: boolean, overtimeDetails: string }>>({});
 
   const statuses = [
     "Absent",
@@ -74,11 +78,13 @@ export function Attendance() {
   useEffect(() => {
     const existingRecords = attendanceRecords.filter(r => r.date === registerDate);
     if (existingRecords.length > 0) {
-      const loadedData: Record<string, { day: string, night: string }> = {};
+      const loadedData: Record<string, { day: string, night: string, overtime: boolean, overtimeDetails: string }> = {};
       existingRecords.forEach(r => {
         loadedData[r.staffId] = {
           day: r.daySite || r.absentStatus || '',
-          night: r.nightSite || (r.absentStatus && !r.daySite ? r.absentStatus : '')
+          night: r.nightSite || (r.absentStatus && !r.daySite ? r.absentStatus : ''),
+          overtime: r.overtimeDetails ? true : false,
+          overtimeDetails: r.overtimeDetails || ''
         };
       });
       setAttendanceData(loadedData);
@@ -133,7 +139,16 @@ export function Attendance() {
     return posA.localeCompare(posB);
   });
 
-  // DB Export & Import
+  // DB Actions
+  const handleBulkDelete = async () => {
+    if (dbSelectedIds.size === 0) return;
+    const ok = await showConfirm(`Are you sure you want to delete ${dbSelectedIds.size} attendance record(s)?`, { variant: 'danger' });
+    if (!ok) return;
+    deleteAttendanceRecords(Array.from(dbSelectedIds));
+    setDbSelectedIds(new Set());
+    toast.success('Selected records deleted.');
+  };
+
   const handleExportExcel = () => {
     if (filteredDbRecords.length === 0) {
       toast.error('No records to export');
@@ -172,12 +187,28 @@ export function Attendance() {
     reader.readAsBinaryString(file);
   };
 
-  const handleSelectChange = (empId: string, shift: 'day' | 'night', value: string) => {
+  const handleSelectChange = (empId: string, shift: 'day' | 'night' | 'overtimeDetails', value: string | boolean) => {
     setAttendanceData(prev => ({
       ...prev,
       [empId]: {
         ...prev[empId],
         [shift]: value
+      }
+    }));
+  };
+
+  const handleOvertimeToggle = (empId: string, checked: boolean) => {
+    const emp = employees.find(e => e.id === empId);
+    const isOps = emp ? ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase()) : false;
+    setAttendanceData(prev => ({
+      ...prev,
+      [empId]: {
+        ...prev[empId],
+        overtime: checked,
+        overtimeDetails: checked ? prev[empId]?.overtimeDetails || '' : '',
+        // For non-Operations: auto-set day to 'Office' (DCEL) when overtime is ticked
+        ...((!isOps && checked) ? { day: 'Office' } : {}),
+        ...((!isOps && !checked && prev[empId]?.day === 'Office') ? { day: '' } : {}),
       }
     }));
   };
@@ -257,6 +288,7 @@ export function Attendance() {
       day: 'Yes' | 'No';
       night: 'Yes' | 'No';
       absentStatus: string;
+      overtimeDetails: string;
     };
 
     const rawRecords: RawRecord[] = [];
@@ -269,9 +301,12 @@ export function Attendance() {
       if (formDaySite && !isAbsentStatus(formDaySite)) staffHasWorkEntry = true;
       if (formNightSite && !isAbsentStatus(formNightSite)) staffHasWorkEntry = true;
 
-      // Default: on weekdays that aren't holidays, everyone is at Office for day shift
-      const fillData = !(isSunday || dateIsHoliday);
-      if (!fillData && !staffHasWorkEntry && !formDaySite && !formNightSite) return;
+      // Default: on weekdays that aren't holidays, Operations staff are at Office for day shift
+      // Other departments only get an entry if manually specified (status, day, night, or overtime).
+      const isOperations = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase());
+      const fillData = isOperations ? !(isSunday || dateIsHoliday) : false;
+      const hasOvertime = attendanceData[emp.id]?.overtime;
+      if (!fillData && !staffHasWorkEntry && !formDaySite && !formNightSite && !hasOvertime) return;
 
       let daySite = fillData ? "Office" : "";
       let nightSite = "";
@@ -292,7 +327,8 @@ export function Attendance() {
       const finalDaySite = isAbsentStatus(daySite) ? '' : daySite;
       const finalNightSite = isAbsentStatus(nightSite) ? '' : nightSite;
 
-      const dayClient = sites.find(s => s.name === finalDaySite)?.client || '';
+      const dayClient = sites.find(s => s.name === finalDaySite)?.client
+        || (hasOvertime && !isOperations ? 'DCEL' : '');
       const nightClient = sites.find(s => s.name === finalNightSite)?.client || '';
 
       rawRecords.push({
@@ -306,6 +342,7 @@ export function Attendance() {
         day: dayShift,
         night: nightShift,
         absentStatus: absentReason,
+        overtimeDetails: (attendanceData[emp.id]?.overtime && !isOperationsDepartment) ? attendanceData[emp.id].overtimeDetails : '',
       });
     });
 
@@ -354,12 +391,15 @@ export function Attendance() {
       // 1. Sunday + worked → OT
       // 2. Public holiday + worked → OT
       // 3. Day=Yes AND Night=Yes AND NDW=Yes → OT
+      // 4. Non-operations manual overtime ticked
       const worked = raw.day === 'Yes' || raw.night === 'Yes';
       let ot = 0;
+      const isManualOvertime = !!raw.overtimeDetails;
       if (
         (dow === 7 && worked) ||
         (dateIsHoliday && worked) ||
-        (raw.day === 'Yes' && raw.night === 'Yes' && ndw === 'Yes')
+        (raw.day === 'Yes' && raw.night === 'Yes' && ndw === 'Yes') ||
+        isManualOvertime
       ) {
         ot = overtimeRates[mth] || 0;
       }
@@ -389,7 +429,7 @@ export function Attendance() {
       const day2 = (raw.day === 'Yes' ? 1 : 0) + (raw.night === 'Yes' ? 1 : 0);
 
       return {
-        id: Math.random().toString(36).slice(2),
+        id: crypto.randomUUID(),
         date: registerDate,
         staffId: raw.empId,
         staffName: raw.staffName,
@@ -410,13 +450,16 @@ export function Attendance() {
         mth,
         isPresent,
         day2,
+        overtimeDetails: raw.overtimeDetails,
       };
     });
 
     addAttendanceRecords(records);
     setLastEntryDate(registerDate);
-    // Increment date locally so user can immediately record the next day
-    setRegisterDate(prev => getNextDayStr(prev));
+    // Increment date to next day only if it won't be a future date
+    const nextDay = getNextDayStr(registerDate);
+    const today = format(new Date(), 'yyyy-MM-dd');
+    setRegisterDate(nextDay <= today ? nextDay : today);
     setAttendanceData({});
     toast.success(`Successfully saved ${records.length} records to the database!`);
   };
@@ -464,7 +507,15 @@ export function Attendance() {
               <Input
                 type="date"
                 value={registerDate}
-                onChange={(e) => setRegisterDate(e.target.value)}
+                max={format(new Date(), 'yyyy-MM-dd')}
+                onChange={(e) => {
+                  const chosen = e.target.value;
+                  if (chosen > format(new Date(), 'yyyy-MM-dd')) {
+                    toast.error('You cannot record attendance for a future date.');
+                    return;
+                  }
+                  setRegisterDate(chosen);
+                }}
                 className="h-7 text-xs border-0 bg-transparent p-0 w-28 font-mono focus-visible:ring-0"
               />
             </div>
@@ -531,9 +582,13 @@ export function Attendance() {
                   <tr>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 w-[30%]">Staff Name</th>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">Day Site / Status</th>
-                    {isOperationsDepartment && (
+                    {isOperationsDepartment ? (
                       <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">
                         Night Site / Status
+                      </th>
+                    ) : (
+                      <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">
+                        Overtime
                       </th>
                     )}
                   </tr>
@@ -584,7 +639,7 @@ export function Attendance() {
                               <option value="">—</option>
                               <optgroup label="Sites">
                                 {sites.filter(s => s.status === 'Active').map(site => (
-                                  <option key={`d-${site.id}`} value={site.name}>{site.name}</option>
+                                  <option key={`d-${site.id}`} value={site.name}>{site.name} ({site.client})</option>
                                 ))}
                               </optgroup>
                               <optgroup label="Status">
@@ -594,7 +649,7 @@ export function Attendance() {
                               </optgroup>
                             </select>
                           </td>
-                          {isOperationsDepartment && (
+                          {isOperationsDepartment ? (
                             <td className="py-1 px-2 border-l border-slate-100">
                               <select
                                 className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${nightVal && !isAbsentStatus(nightVal)
@@ -609,7 +664,7 @@ export function Attendance() {
                                 <option value="">—</option>
                                 <optgroup label="Sites">
                                   {sites.filter(s => s.status === 'Active').map(site => (
-                                    <option key={`n-${site.id}`} value={site.name}>{site.name}</option>
+                                    <option key={`n-${site.id}`} value={site.name}>{site.name} ({site.client})</option>
                                   ))}
                                 </optgroup>
                                 <optgroup label="Status">
@@ -618,6 +673,41 @@ export function Attendance() {
                                   ))}
                                 </optgroup>
                               </select>
+                            </td>
+                          ) : (
+                            <td className="py-1 px-2 border-l border-slate-100">
+                              <div className="flex items-center gap-2">
+                                {(() => {
+                                  const dow = getDOW(registerDate);
+                                  const defaultDays = ['OPERATIONS', 'ENGINEERING'].includes(employee.department.toUpperCase()) ? 6 : 5;
+                                  const wd = payrollVariables.departmentWorkDays?.[employee.department] ?? defaultDays;
+                                  const isWorkday = (dow <= wd) && !isHoliday(registerDate);
+                                  
+                                  return (
+                                    <>
+                                      <label className={`flex items-center gap-1 ${isWorkday ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} title={isWorkday ? "Overtime disabled on regular workdays" : ""}>
+                                        <input 
+                                          type="checkbox" 
+                                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                          checked={!isWorkday && (attendanceData[employee.id]?.overtime || false)}
+                                          onChange={(e) => handleOvertimeToggle(employee.id, e.target.checked)}
+                                          disabled={isWorkday}
+                                        />
+                                        <span className="text-xs text-slate-600 font-medium">Overtime</span>
+                                      </label>
+                                      {attendanceData[employee.id]?.overtime && !isWorkday && (
+                                        <Input
+                                          type="text"
+                                          placeholder="Remarks..."
+                                          className="h-7 text-xs flex-1"
+                                          value={attendanceData[employee.id]?.overtimeDetails || ''}
+                                          onChange={(e) => handleSelectChange(employee.id, 'overtimeDetails', e.target.value)}
+                                        />
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </div>
                             </td>
                           )}
                         </tr>
@@ -694,6 +784,11 @@ export function Attendance() {
                   </Button>
                 </label>
               )}
+              {priv.canDelete && dbSelectedIds.size > 0 && (
+                <Button onClick={handleBulkDelete} size="sm" variant="destructive" className="h-8 text-xs gap-1 shadow-sm">
+                  <Trash2 className="h-3 w-3" /> Delete ({dbSelectedIds.size})
+                </Button>
+              )}
               {priv.canExport && (
                 <Button onClick={handleExportExcel} size="sm" className="h-8 text-xs gap-1 bg-green-700 hover:bg-green-800 text-white shadow-sm">
                   <Download className="h-3 w-3" /> Export Excel
@@ -707,6 +802,17 @@ export function Attendance() {
               <table className="w-full text-[11px] whitespace-nowrap">
                 <thead className="bg-slate-100 sticky top-0 shadow-sm z-10">
                   <tr>
+                    <th className="py-2 px-2 border-b border-slate-200">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-slate-300 w-3 h-3 text-slate-800"
+                        checked={filteredDbRecords.length > 0 && dbSelectedIds.size === filteredDbRecords.length}
+                        onChange={(e) => {
+                          if (e.target.checked) setDbSelectedIds(new Set(filteredDbRecords.map(r => r.id)));
+                          else setDbSelectedIds(new Set());
+                        }}
+                      />
+                    </th>
                     {['Date', 'Staff', 'Position', 'Day Client', 'Day Site', 'Night Client', 'Night Site', 'Day', 'Night', 'Absent', 'Night_wk', 'OT', 'OT Site', 'Day_Wk', 'DOW', 'NDW', 'Mth', 'Present', 'day2'].map(h => (
                       <th key={h} className="text-left font-semibold text-slate-600 py-2 px-2 border-b border-slate-200">{h}</th>
                     ))}
@@ -722,6 +828,19 @@ export function Attendance() {
                   ) : (
                     filteredDbRecords.map((r) => (
                       <tr key={r.id} className="hover:bg-slate-50">
+                        <td className="py-1.5 px-2">
+                          <input 
+                            type="checkbox" 
+                            className="rounded border-slate-300 w-3 h-3 text-slate-800"
+                            checked={dbSelectedIds.has(r.id)}
+                            onChange={(e) => {
+                              const s = new Set(dbSelectedIds);
+                              if (e.target.checked) s.add(r.id);
+                              else s.delete(r.id);
+                              setDbSelectedIds(s);
+                            }}
+                          />
+                        </td>
                         <td className="py-1.5 px-2 font-mono">{r.date}</td>
                         <td className="py-1.5 px-2 font-medium text-slate-800">{r.staffName}</td>
                         <td className="py-1.5 px-2 text-slate-500">{r.position}</td>
