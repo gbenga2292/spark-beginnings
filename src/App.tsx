@@ -15,6 +15,9 @@ import { Billing } from './pages/Billing';
 import { Payments } from './pages/Payments';
 import { VatPayments } from './pages/VatPayments';
 import { Onboarding } from './pages/Onboarding';
+import { NewHire } from './pages/NewHire';
+import { GenerateContract } from './pages/GenerateContract';
+import { StartOffboarding } from './pages/StartOffboarding';
 import { Reports } from './pages/Reports';
 import { FinancialReports } from './pages/FinancialReports';
 import { Settings } from './pages/Settings';
@@ -81,6 +84,9 @@ function AppContent() {
         <Route path="payments" element={<Payments />} />
         <Route path="vat" element={<VatPayments />} />
         <Route path="onboarding" element={<Onboarding />} />
+        <Route path="onboarding/new" element={<NewHire />} />
+        <Route path="onboarding/contract" element={<GenerateContract />} />
+        <Route path="onboarding/offboard" element={<StartOffboarding />} />
         <Route path="reports" element={<Reports />} />
         <Route path="financial-reports" element={<FinancialReports />} />
         <Route path="settings" element={<Settings />} />

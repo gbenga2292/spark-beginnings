@@ -612,9 +612,16 @@ export const db = {
     if (data.superAdminCreated !== undefined) update.super_admin_created = data.superAdminCreated;
     if (data.superAdminSignupEnabled !== undefined) update.super_admin_signup_enabled = data.superAdminSignupEnabled;
     update.updated_at = new Date().toISOString();
-    // Update the first (only) settings row
-    const { error } = await supabase.from('app_settings').update(update).not('id', 'is', null);
-    if (error) console.error('updateSettings:', error);
+    // Check if a row exists first
+    const { data: existingData } = await supabase.from('app_settings').select('id').limit(1).maybeSingle();
+    
+    if (existingData) {
+      const { error } = await supabase.from('app_settings').update(update).eq('id', existingData.id);
+      if (error) console.error('updateSettings (update):', error);
+    } else {
+      const { error } = await supabase.from('app_settings').insert([update]);
+      if (error) console.error('updateSettings (insert):', error);
+    }
   },
 
   // Profiles / Users

@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -23,21 +24,30 @@ export function Variables() {
   const removeDepartment = useAppStore((state) => state.removeDepartment);
   const addClient = useAppStore((state) => state.addClient);
   const removeClient = useAppStore((state) => state.removeClient);
-  const payrollVariables = useAppStore((state) => state.payrollVariables);
-  const updatePayrollVariables = useAppStore((state) => state.updatePayrollVariables);
-  const monthValues = useAppStore((state) => state.monthValues);
-  const updateMonthValue = useAppStore((state) => state.updateMonthValue);
+  const storePayrollVariables = useAppStore((state) => state.payrollVariables);
+  const storeMonthValues = useAppStore((state) => state.monthValues);
   const publicHolidays = useAppStore((state) => state.publicHolidays);
   const addPublicHoliday = useAppStore((state) => state.addPublicHoliday);
   const removePublicHoliday = useAppStore((state) => state.removePublicHoliday);
-  const payeTaxVariables = useAppStore((state) => state.payeTaxVariables);
-  const updatePayeTaxVariables = useAppStore((state) => state.updatePayeTaxVariables);
-  const addPayeTaxExtraCondition = useAppStore((state) => state.addPayeTaxExtraCondition);
-  const updatePayeTaxExtraCondition = useAppStore((state) => state.updatePayeTaxExtraCondition);
-  const removePayeTaxExtraCondition = useAppStore((state) => state.removePayeTaxExtraCondition);
-  const addTaxBracket = useAppStore((state) => state.addTaxBracket);
-  const updateTaxBracket = useAppStore((state) => state.updateTaxBracket);
-  const removeTaxBracket = useAppStore((state) => state.removeTaxBracket);
+  const storePayeTaxVariables = useAppStore((state) => state.payeTaxVariables);
+  const saveAllSettingsStore = useAppStore((state) => state.saveAllSettings);
+
+  const [localPayrollVars, setLocalPayrollVars] = useState(storePayrollVariables);
+  const [localPayeVars, setLocalPayeVars] = useState(storePayeTaxVariables);
+  const [localMonthVals, setLocalMonthVals] = useState(storeMonthValues);
+  const [isDirty, setIsDirty] = useState(false);
+
+  useEffect(() => {
+    if (!isDirty) {
+      setLocalPayrollVars(storePayrollVariables);
+      setLocalPayeVars(storePayeTaxVariables);
+      setLocalMonthVals(storeMonthValues);
+    }
+  }, [storePayrollVariables, storePayeTaxVariables, storeMonthValues, isDirty]);
+
+  // Navigation blocker removed because it requires react-router v6 createBrowserRouter data routers
+  // Relying only on window.addEventListener('beforeunload') below
+
   const departmentTasksList = useAppStore((state) => state.departmentTasksList);
   const updateDepartmentTasks = useAppStore((state) => state.updateDepartmentTasks);
   const leaveTypes = useAppStore((state) => state.leaveTypes);
@@ -112,10 +122,60 @@ export function Variables() {
     }
   };
 
+  const updateLocalPayrollVariables = (vars: Partial<typeof localPayrollVars>) => {
+    setLocalPayrollVars(p => ({ ...p, ...vars }));
+    setIsDirty(true);
+  };
+  const updateLocalPayeVars = (vars: Partial<typeof localPayeVars>) => {
+    setLocalPayeVars(p => ({ ...p, ...vars }));
+    setIsDirty(true);
+  };
+  const updateLocalMonthValue = (month: string, vals: any) => {
+    setLocalMonthVals(p => ({ ...p, [month]: { ...p[month], ...vals } }));
+    setIsDirty(true);
+  };
+  const addLocalTaxBracket = (b: any) => {
+    setLocalPayeVars(p => ({ ...p, taxBrackets: [...p.taxBrackets, b] }));
+    setIsDirty(true);
+  };
+  const updateLocalTaxBracket = (id: string, update: any) => {
+    setLocalPayeVars(p => ({ ...p, taxBrackets: p.taxBrackets.map(b => b.id === id ? { ...b, ...update } : b) }));
+    setIsDirty(true);
+  };
+  const removeLocalTaxBracket = (id: string) => {
+    setLocalPayeVars(p => ({ ...p, taxBrackets: p.taxBrackets.filter(b => b.id !== id) }));
+    setIsDirty(true);
+  };
+  const addLocalExtraCond = (cond: any) => {
+    setLocalPayeVars(p => ({ ...p, extraConditions: [...p.extraConditions, cond] }));
+    setIsDirty(true);
+  };
+  const updateLocalExtraCond = (id: string, update: any) => {
+    setLocalPayeVars(p => ({ ...p, extraConditions: p.extraConditions.map(c => c.id === id ? { ...c, ...update } : c) }));
+    setIsDirty(true);
+  };
+  const removeLocalExtraCond = (id: string) => {
+    setLocalPayeVars(p => ({ ...p, extraConditions: p.extraConditions.filter(c => c.id !== id) }));
+    setIsDirty(true);
+  };
+
   const handleSave = () => {
-    // In a real app, this would save to the backend/store
+    saveAllSettingsStore(localPayrollVars, localPayeVars, localMonthVals);
+    setIsDirty(false);
     toast.success('Variables saved successfully!');
   };
+
+  // Browser reload protection
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
 
   const handleAddTask = () => {
     if (!newTaskTitle || !newTaskAssignee) return;
@@ -168,32 +228,32 @@ export function Variables() {
 
       // Payroll Variables
       const payrollData = [
-        { Key: 'Basic Salary (%)', Value: payrollVariables.basic },
-        { Key: 'Housing Allowance (%)', Value: payrollVariables.housing },
-        { Key: 'Transport Allowance (%)', Value: payrollVariables.transport },
-        { Key: 'Other Allowances (%)', Value: payrollVariables.otherAllowances },
-        { Key: 'Employee Pension (%)', Value: payrollVariables.employeePensionRate },
-        { Key: 'Employer Pension (%)', Value: payrollVariables.employerPensionRate },
-        { Key: 'NSITF (%)', Value: payrollVariables.nsitfRate },
-        { Key: 'Withholding Tax (%)', Value: payrollVariables.withholdingTaxRate },
+        { Key: 'Basic Salary (%)', Value: localPayrollVars.basic },
+        { Key: 'Housing Allowance (%)', Value: localPayrollVars.housing },
+        { Key: 'Transport Allowance (%)', Value: localPayrollVars.transport },
+        { Key: 'Other Allowances (%)', Value: localPayrollVars.otherAllowances },
+        { Key: 'Employee Pension (%)', Value: localPayrollVars.employeePensionRate },
+        { Key: 'Employer Pension (%)', Value: localPayrollVars.employerPensionRate },
+        { Key: 'NSITF (%)', Value: localPayrollVars.nsitfRate },
+        { Key: 'Withholding Tax (%)', Value: localPayrollVars.withholdingTaxRate },
       ];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payrollData), 'Payroll_Variables');
 
       // PAYE Tax Variables
       const payeData = [
-        { Key: 'CRA Base (₦)', Value: payeTaxVariables.craBase },
-        { Key: 'Rent Relief Rate (%)', Value: (payeTaxVariables.rentReliefRate || 0) * 100 },
+        { Key: 'CRA Base (₦)', Value: localPayeVars.craBase },
+        { Key: 'Rent Relief Rate (%)', Value: (localPayeVars.rentReliefRate || 0) * 100 },
       ];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payeData), 'PAYE_Variables');
 
-      const taxBracketsData = payeTaxVariables.taxBrackets.map(b => ({
+      const taxBracketsData = localPayeVars.taxBrackets.map(b => ({
         Label: b.label,
         'Rate (%)': b.rate * 100,
         'UpTo (₦)': b.upTo === null ? 'INFINITY' : b.upTo
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taxBracketsData), 'PAYE_Tax_Brackets');
 
-      const extraConditionsData = payeTaxVariables.extraConditions.map(c => ({
+      const extraConditionsData = localPayeVars.extraConditions.map(c => ({
         Label: c.label,
         'Amount (₦)': c.amount,
         Enabled: c.enabled
@@ -284,7 +344,7 @@ export function Variables() {
 
             if (wb.SheetNames.includes('Payroll_Variables')) {
               const pvData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Payroll_Variables']);
-              const newPv = { ...payrollVariables };
+              const newPv = { ...localPayrollVars };
               pvData.forEach(row => {
                 const val = parseFloat(row.Value);
                 if (!isNaN(val)) {
@@ -298,12 +358,12 @@ export function Variables() {
                   if (row.Key.includes('Withholding')) newPv.withholdingTaxRate = val;
                 }
               });
-              updatePayrollVariables(newPv);
+              updateLocalPayrollVariables(newPv);
             }
 
             if (wb.SheetNames.includes('PAYE_Variables')) {
               const payeData = XLSX.utils.sheet_to_json<any>(wb.Sheets['PAYE_Variables']);
-              const newPayeVar = { ...payeTaxVariables };
+              const newPayeVar = { ...localPayeVars };
               payeData.forEach(row => {
                 const val = parseFloat(row.Value);
                 if (!isNaN(val)) {
@@ -336,7 +396,7 @@ export function Variables() {
                 }
               }
 
-              updatePayeTaxVariables(newPayeVar);
+              updateLocalPayeVars(newPayeVar);
             }
 
             if (wb.SheetNames.includes('Task_Templates')) {
@@ -720,32 +780,32 @@ export function Variables() {
                   <label className="text-xs font-semibold text-slate-700 uppercase">Basic Salary</label>
                   <Input
                     type="number"
-                    value={payrollVariables.basic}
-                    onChange={e => updatePayrollVariables({ basic: Number(e.target.value) })}
+                    value={localPayrollVars.basic}
+                    onChange={e => updateLocalPayrollVariables({ basic: Number(e.target.value) })}
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-slate-700 uppercase">Housing</label>
                   <Input
                     type="number"
-                    value={payrollVariables.housing}
-                    onChange={e => updatePayrollVariables({ housing: Number(e.target.value) })}
+                    value={localPayrollVars.housing}
+                    onChange={e => updateLocalPayrollVariables({ housing: Number(e.target.value) })}
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-slate-700 uppercase">Transport</label>
                   <Input
                     type="number"
-                    value={payrollVariables.transport}
-                    onChange={e => updatePayrollVariables({ transport: Number(e.target.value) })}
+                    value={localPayrollVars.transport}
+                    onChange={e => updateLocalPayrollVariables({ transport: Number(e.target.value) })}
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-slate-700 uppercase">Other Allowances</label>
                   <Input
                     type="number"
-                    value={payrollVariables.otherAllowances}
-                    onChange={e => updatePayrollVariables({ otherAllowances: Number(e.target.value) })}
+                    value={localPayrollVars.otherAllowances}
+                    onChange={e => updateLocalPayrollVariables({ otherAllowances: Number(e.target.value) })}
                   />
                 </div>
 
@@ -754,8 +814,8 @@ export function Variables() {
                   <Input
                     type="number"
                     step="0.01"
-                    value={payrollVariables.employeePensionRate}
-                    onChange={e => updatePayrollVariables({ employeePensionRate: Number(e.target.value) })}
+                    value={localPayrollVars.employeePensionRate}
+                    onChange={e => updateLocalPayrollVariables({ employeePensionRate: Number(e.target.value) })}
                   />
                   <p className="text-xs text-slate-400">Deducted from employee salary (default 8%)</p>
                 </div>
@@ -764,8 +824,8 @@ export function Variables() {
                   <Input
                     type="number"
                     step="0.01"
-                    value={payrollVariables.employerPensionRate}
-                    onChange={e => updatePayrollVariables({ employerPensionRate: Number(e.target.value) })}
+                    value={localPayrollVars.employerPensionRate}
+                    onChange={e => updateLocalPayrollVariables({ employerPensionRate: Number(e.target.value) })}
                   />
                   <p className="text-xs text-slate-400">Company's contribution to pension (default 10%)</p>
                 </div>
@@ -774,8 +834,8 @@ export function Variables() {
                   <Input
                     type="number"
                     step="0.01"
-                    value={(payrollVariables.withholdingTaxRate * 100).toFixed(1)}
-                    onChange={e => updatePayrollVariables({ withholdingTaxRate: Number(e.target.value) / 100 })}
+                    value={(localPayrollVars.withholdingTaxRate * 100).toFixed(1)}
+                    onChange={e => updateLocalPayrollVariables({ withholdingTaxRate: Number(e.target.value) / 100 })}
                   />
                   <p className="text-xs text-slate-400">Applied when employee has Withholding Tax</p>
                 </div>
@@ -784,8 +844,8 @@ export function Variables() {
                   <Input
                     type="number"
                     step="0.01"
-                    value={payrollVariables.nsitfRate}
-                    onChange={e => updatePayrollVariables({ nsitfRate: Number(e.target.value) })}
+                    value={localPayrollVars.nsitfRate}
+                    onChange={e => updateLocalPayrollVariables({ nsitfRate: Number(e.target.value) })}
                   />
                   <p className="text-xs text-slate-400">Company's NSITF contribution (1% by default)</p>
                 </div>
@@ -794,8 +854,8 @@ export function Variables() {
                   <Input
                     type="number"
                     step="0.1"
-                    value={payrollVariables.vatRate}
-                    onChange={e => updatePayrollVariables({ vatRate: Number(e.target.value) })}
+                    value={localPayrollVars.vatRate}
+                    onChange={e => updateLocalPayrollVariables({ vatRate: Number(e.target.value) })}
                   />
                   <p className="text-xs text-slate-400">Value Added Tax (7.5% by default)</p>
                 </div>
@@ -829,8 +889,8 @@ export function Variables() {
                       const startDate = new Date(payrollYear, monthNum - 1, 1);
                       const endDate = new Date(payrollYear, monthNum, 0);
                       const computedWorkDays = computeWorkDays(payrollYear, monthNum, holidayDateStrings);
-                      const data = monthValues[key] || { workDays: 0, overtimeRate: 0.5 };
-                      const ttAllowance = payrollVariables.otherAllowances;
+                      const data = localMonthVals[key] || { workDays: 0, overtimeRate: 0.5 };
+                      const ttAllowance = localPayrollVars.otherAllowances;
                       const formatDate = (d: Date) =>
                         `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
                       return (
@@ -849,7 +909,7 @@ export function Variables() {
                               step="0.1"
                               className="w-24 h-8"
                               value={data.overtimeRate}
-                              onChange={e => updateMonthValue(key, { workDays: computedWorkDays, overtimeRate: Number(e.target.value) })}
+                              onChange={e => updateLocalMonthValue(key, { workDays: computedWorkDays, overtimeRate: Number(e.target.value) })}
                             />
                           </TableCell>
                           <TableCell>
@@ -883,14 +943,14 @@ export function Variables() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-700">CRA Base (₦)</label>
-                    <Input type="number" value={payeTaxVariables.craBase}
-                      onChange={e => updatePayeTaxVariables({ craBase: Number(e.target.value) })} />
+                    <Input type="number" value={localPayeVars.craBase}
+                      onChange={e => updateLocalPayeVars({ craBase: Number(e.target.value) })} />
                     <p className="text-xs text-slate-400">Fixed statutory amount (default ₦800,000)</p>
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-700">Rent Relief Rate (%)</label>
-                    <Input type="number" step="0.1" value={(payeTaxVariables.rentReliefRate * 100).toFixed(1)}
-                      onChange={e => updatePayeTaxVariables({ rentReliefRate: Number(e.target.value) / 100 })} />
+                    <Input type="number" step="0.1" value={(localPayeVars.rentReliefRate * 100).toFixed(1)}
+                      onChange={e => updateLocalPayeVars({ rentReliefRate: Number(e.target.value) / 100 })} />
                     <p className="text-xs text-slate-400">Applied to input Rent to compute Relief (default 20%)</p>
                   </div>
                 </div>
@@ -910,7 +970,7 @@ export function Variables() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {[...payeTaxVariables.taxBrackets]
+                      {[...localPayeVars.taxBrackets]
                         .sort((a, b) => {
                           if (a.upTo === null) return 1;
                           if (b.upTo === null) return -1;
@@ -920,23 +980,23 @@ export function Variables() {
                           <TableRow key={b.id}>
                             <TableCell>
                               <Input className="h-8 w-36" value={b.label}
-                                onChange={e => updateTaxBracket(b.id, { label: e.target.value })} />
+                                onChange={e => updateLocalTaxBracket(b.id, { label: e.target.value })} />
                             </TableCell>
                             <TableCell>
                               <Input type="number" className="h-8 w-36"
                                 placeholder="(top bracket)"
                                 value={b.upTo !== null ? b.upTo : ''}
-                                onChange={e => updateTaxBracket(b.id, { upTo: e.target.value === '' ? null : Number(e.target.value) })} />
+                                onChange={e => updateLocalTaxBracket(b.id, { upTo: e.target.value === '' ? null : Number(e.target.value) })} />
                             </TableCell>
                             <TableCell>
                               <Input type="number" step="0.1" className="h-8 w-24"
                                 value={(b.rate * 100).toFixed(1)}
-                                onChange={e => updateTaxBracket(b.id, { rate: Number(e.target.value) / 100 })} />
+                                onChange={e => updateLocalTaxBracket(b.id, { rate: Number(e.target.value) / 100 })} />
                             </TableCell>
                             <TableCell>
                               {priv.canEdit && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50"
-                                  onClick={() => removeTaxBracket(b.id)}>
+                                  onClick={() => removeLocalTaxBracket(b.id)}>
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               )}
@@ -965,7 +1025,7 @@ export function Variables() {
                   </div>
                   <Button variant="outline" className="gap-1 shrink-0" onClick={() => {
                     if (!newBracketLabel || !newBracketRate) return;
-                    addTaxBracket({
+                    addLocalTaxBracket({
                       id: Math.random().toString(36).slice(2),
                       label: newBracketLabel,
                       upTo: newBracketUpTo !== '' ? Number(newBracketUpTo) : null,
@@ -989,11 +1049,11 @@ export function Variables() {
                     onChange={e => setNewExtraAmount(e.target.value)} className="w-36" />
                   <Button variant="outline" className="gap-1" onClick={() => {
                     if (!newExtraLabel || !newExtraAmount) return;
-                    addPayeTaxExtraCondition({ id: Math.random().toString(36).slice(2), label: newExtraLabel, amount: Number(newExtraAmount), enabled: true });
+                    addLocalExtraCond({ id: Math.random().toString(36).slice(2), label: newExtraLabel, amount: Number(newExtraAmount), enabled: true });
                     setNewExtraLabel(''); setNewExtraAmount('');
                   }}><Plus className="h-4 w-4" /> Add</Button>
                 </div>
-                {payeTaxVariables.extraConditions.length === 0 ? (
+                {localPayeVars.extraConditions.length === 0 ? (
                   <p className="text-center text-slate-400 text-sm py-4 border rounded-md">No extra conditions. Add one above.</p>
                 ) : (
                   <div className="border rounded-md overflow-hidden">
@@ -1007,22 +1067,22 @@ export function Variables() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {payeTaxVariables.extraConditions.map(cond => (
+                        {localPayeVars.extraConditions.map(cond => (
                           <TableRow key={cond.id}>
                             <TableCell className="font-medium">{cond.label}</TableCell>
                             <TableCell>
                               <Input type="number" className="w-32 h-8" value={cond.amount}
-                                onChange={e => updatePayeTaxExtraCondition(cond.id, { amount: Number(e.target.value) })} />
+                                onChange={e => updateLocalExtraCond(cond.id, { amount: Number(e.target.value) })} />
                             </TableCell>
                             <TableCell className="text-center">
                               <input type="checkbox" checked={cond.enabled}
-                                onChange={e => updatePayeTaxExtraCondition(cond.id, { enabled: e.target.checked })}
+                                onChange={e => updateLocalExtraCond(cond.id, { enabled: e.target.checked })}
                                 className="h-4 w-4 accent-indigo-600" />
                             </TableCell>
                             <TableCell>
                               {priv.canEdit && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50"
-                                  onClick={() => removePayeTaxExtraCondition(cond.id)}>
+                                  onClick={() => removeLocalExtraCond(cond.id)}>
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               )}

@@ -47,6 +47,14 @@ export interface MonthlySalary {
   sep: number; oct: number; nov: number; dec: number;
 }
 
+export interface OnboardingTask {
+  id: string;
+  title: string;
+  assignee: string;
+  status: 'Completed' | 'In Progress' | 'Pending';
+  date: string;
+}
+
 export interface Employee {
   id: string;
   employeeCode?: string;
@@ -64,11 +72,13 @@ export interface Employee {
   withholdingTax: boolean;
   taxId: string;
   pensionNumber: string;
-  status: 'Active' | 'On Leave' | 'Terminated';
+  status: 'Active' | 'On Leave' | 'Terminated' | 'Onboarding';
   monthlySalaries: MonthlySalary;
   avatar?: string;
   excludeFromOnboarding?: boolean;
   rent?: number;
+  onboardingTasks?: OnboardingTask[];
+  offboardingTasks?: OnboardingTask[];
 }
 
 export interface AttendanceRecord {
@@ -277,6 +287,7 @@ interface AppState {
   removePayeTaxExtraCondition: (id: string) => void;
   monthValues: Record<string, MonthValue>;
   updateMonthValue: (month: string, values: Partial<MonthValue>) => void;
+  saveAllSettings: (payroll: AppState['payrollVariables'], paye: AppState['payeTaxVariables'], months: AppState['monthValues']) => void;
   publicHolidays: { id: string; date: string; name: string }[];
   addPublicHoliday: (holiday: { id: string; date: string; name: string }) => void;
   removePublicHoliday: (id: string) => void;
@@ -465,6 +476,19 @@ export const useAppStore = create<AppState>()(
           const updated = { ...s.monthValues, [month]: { ...s.monthValues[month], ...values } };
           db.updateSettings({ monthValues: updated });
           return { monthValues: updated };
+        });
+      },
+
+      saveAllSettings: (payroll, paye, months) => {
+        set(() => ({
+          payrollVariables: payroll,
+          payeTaxVariables: paye,
+          monthValues: months
+        }));
+        db.updateSettings({
+          payrollVariables: payroll,
+          payeTaxVariables: paye,
+          monthValues: months
         });
       },
 

@@ -1,0 +1,156 @@
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
+import { Button } from '@/src/components/ui/button';
+import { Input } from '@/src/components/ui/input';
+import { UserPlus, ArrowRight, Check, ArrowLeft } from 'lucide-react';
+import { useAppStore, Employee, MonthlySalary, OnboardingTask } from '@/src/store/appStore';
+import { toast } from '@/src/components/ui/toast';
+import { useNavigate } from 'react-router-dom';
+
+export function NewHire() {
+  const departments = useAppStore((state) => state.departments);
+  const positions = useAppStore((state) => state.positions);
+  const departmentTasksList = useAppStore((state) => state.departmentTasksList);
+  const addEmployee = useAppStore((state) => state.addEmployee);
+  const navigate = useNavigate();
+
+  const [newHireData, setNewHireData] = useState<Partial<Employee>>({
+    firstname: '',
+    surname: '',
+    department: '',
+    position: '',
+    staffType: 'INTERNAL',
+    startDate: '',
+    monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 }
+  });
+
+  const handleStartNewHire = () => {
+    if (!newHireData.firstname || !newHireData.surname || !newHireData.startDate || !newHireData.department || !newHireData.position) {
+      toast.error('Please fill in all basic employee details and start date.');
+      return;
+    }
+
+    // Determine tasks based on department
+    const baseTasks = departmentTasksList.find(d => d.department === 'ALL')?.onboardingTasks || [];
+    const deptTasks = newHireData.department ?
+      (departmentTasksList.find(d => d.department === newHireData.department)?.onboardingTasks || []) : [];
+
+    // De-duplicate tasks by title
+    const combinedTasks = [...baseTasks];
+    deptTasks.forEach(dt => {
+      if (!combinedTasks.find(bt => bt.title === dt.title)) combinedTasks.push(dt);
+    });
+
+    if (combinedTasks.length === 0) {
+      toast.warning('No onboarding tasks configured for this department or the ALL default. Proceeding without tasks.');
+    }
+
+    const start = new Date(newHireData.startDate as string);
+    const newTasks: OnboardingTask[] = combinedTasks.map((task, index) => {
+      const taskDate = new Date(start);
+      taskDate.setDate(start.getDate() + index);
+      return {
+        id: `task-${Date.now()}-${index}`,
+        title: task.title,
+        assignee: task.assignee,
+        status: index === 0 ? 'In Progress' : 'Pending',
+        date: taskDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      };
+    });
+
+    const finalEmployee: Employee = {
+      id: `EMP-${Date.now().toString().slice(-6)}`,
+      surname: (newHireData.surname as string).toUpperCase(),
+      firstname: (newHireData.firstname as string).toUpperCase(),
+      department: newHireData.department as string,
+      staffType: newHireData.staffType as 'INTERNAL' | 'EXTERNAL',
+      position: newHireData.position as string,
+      startDate: newHireData.startDate as string,
+      endDate: '',
+      yearlyLeave: 20,
+      bankName: '', accountNo: '', taxId: '', pensionNumber: '',
+      payeTax: true, withholdingTax: false,
+      status: 'Onboarding', // Persist as Onboarding
+      monthlySalaries: newHireData.monthlySalaries as MonthlySalary,
+      onboardingTasks: newTasks,
+    };
+
+    addEmployee(finalEmployee);
+    toast.success('Onboarding process started! The employee has been saved as pending.');
+    navigate('/onboarding');
+  };
+
+  return (
+    <div className="flex flex-col gap-6 max-w-4xl mx-auto pb-10 w-full animate-in fade-in duration-300 pt-6">
+      <div className="flex items-center gap-4 mb-2">
+        <Button variant="ghost" onClick={() => navigate('/onboarding')} className="gap-2 text-slate-500 hover:text-slate-800 shrink-0">
+          <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+        </Button>
+      </div>
+
+      <Card className="border-none shadow-xl ring-1 ring-black/5 bg-white relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-blue-400"></div>
+        <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-5 pt-6 px-6 flex flex-row justify-between items-center">
+          <div>
+            <CardTitle className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+              <UserPlus className="h-6 w-6 text-indigo-500" /> Start New Hire
+            </CardTitle>
+            <CardDescription className="mt-1 pb-0">Configure basic details to generate the onboarding roadmap and save as a pending employee.</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 md:p-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-6">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">First Name <span className="text-rose-500">*</span></label>
+              <Input className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-colors" placeholder="e.g. John" value={newHireData.firstname} onChange={(e) => setNewHireData({ ...newHireData, firstname: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Surname <span className="text-rose-500">*</span></label>
+              <Input className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-colors" placeholder="e.g. Doe" value={newHireData.surname} onChange={(e) => setNewHireData({ ...newHireData, surname: e.target.value })} />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Department <span className="text-rose-500">*</span></label>
+              <select className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-indigo-500/20"
+                value={newHireData.department} onChange={(e) => setNewHireData({ ...newHireData, department: e.target.value })}>
+                <option value="" disabled>Select Department</option>
+                {departments.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <p className="text-[11px] text-slate-400 mt-1">Dictates which specific task template is activated.</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Position <span className="text-rose-500">*</span></label>
+              <select className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-indigo-500/20"
+                value={newHireData.position} onChange={(e) => setNewHireData({ ...newHireData, position: e.target.value })}>
+                <option value="" disabled>Select Position</option>
+                {positions.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Official Start Date <span className="text-rose-500">*</span></label>
+              <Input type="date" className="h-11 md:max-w-[50%] bg-slate-50 border-slate-200 focus:bg-white transition-colors" value={newHireData.startDate} onChange={(e) => setNewHireData({ ...newHireData, startDate: e.target.value })} />
+            </div>
+          </div>
+
+          <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 flex gap-4 mt-6 items-center">
+            <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600 h-10 w-10 flex items-center justify-center shrink-0">
+              <Check className="h-5 w-5" />
+            </div>
+            <p className="text-sm text-indigo-900 leading-relaxed">
+              This profile will be saved to the database immediately with a <strong>Pending Onboarding</strong> status. The employee will not appear on active payroll or attendance until formally checked off.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-3 mt-8">
+            <Button variant="ghost" className="text-slate-500 hover:text-slate-700 font-medium" onClick={() => navigate('/onboarding')}>Cancel</Button>
+            <Button onClick={handleStartNewHire} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-2 h-10 px-6 shadow-md shadow-indigo-200">
+              <ArrowRight className="h-4 w-4" /> Save Pending Hire
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
