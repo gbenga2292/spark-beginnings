@@ -225,7 +225,7 @@ export function Sites() {
     if (addForm.endDate && nowStr > addForm.endDate) calcStatus = 'Inactive';
 
     addSite({
-      id: `S-${Date.now().toString().slice(-4)}`,
+      id: crypto.randomUUID(),
       name: addForm.name.trim(),
       client: addForm.client.trim(),
       vat: addForm.vat,
@@ -604,17 +604,18 @@ export function Sites() {
         <div className="space-y-4">
           <div className="space-y-1">
             <label className="text-sm font-medium text-slate-700">Client <span className="text-red-500">*</span></label>
-            <select
+            <Input
+              list="addClientList"
+              placeholder="Select or type to create new client"
               value={addForm.client}
               onChange={e => setAddForm({ ...addForm, client: e.target.value })}
-              className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-            >
-              <option value="" disabled>Select a client...</option>
+            />
+            <datalist id="addClientList">
               {clients.map(c => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c} />
               ))}
-            </select>
-            <p className="text-xs text-slate-400">Select an existing client</p>
+            </datalist>
+            <p className="text-xs text-slate-400">Select an existing client or type to quickly create a new one</p>
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium text-slate-700">Site Name <span className="text-red-500">*</span></label>
