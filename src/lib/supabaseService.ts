@@ -24,6 +24,8 @@ function dbToEmployee(r: any): Employee {
     taxId: r.tax_id, pensionNumber: r.pension_number, status: r.status,
     monthlySalaries: r.monthly_salaries, avatar: r.avatar,
     excludeFromOnboarding: r.exclude_from_onboarding, rent: Number(r.rent) || 0,
+    onboardingTasks: r.onboarding_tasks || [],
+    offboardingTasks: r.offboarding_tasks || [],
   };
 }
 
@@ -137,6 +139,8 @@ function employeeToDb(e: Employee) {
     tax_id: e.taxId, pension_number: e.pensionNumber, status: e.status,
     monthly_salaries: e.monthlySalaries, avatar: e.avatar,
     exclude_from_onboarding: e.excludeFromOnboarding ?? false, rent: e.rent ?? 0,
+    onboarding_tasks: e.onboardingTasks || [],
+    offboarding_tasks: e.offboardingTasks || [],
   };
 }
 
@@ -384,6 +388,8 @@ export const db = {
     if (e.avatar !== undefined) update.avatar = e.avatar;
     if (e.excludeFromOnboarding !== undefined) update.exclude_from_onboarding = e.excludeFromOnboarding;
     if (e.rent !== undefined) update.rent = e.rent;
+    if (e.onboardingTasks !== undefined) update.onboarding_tasks = e.onboardingTasks;
+    if (e.offboardingTasks !== undefined) update.offboarding_tasks = e.offboardingTasks;
     const { error } = await supabase.from('employees').update(update).eq('id', id);
     if (error) console.error('updateEmployee:', error);
   },

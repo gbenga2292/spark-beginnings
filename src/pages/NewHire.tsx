@@ -59,7 +59,8 @@ export function NewHire() {
     });
 
     const finalEmployee: Employee = {
-      id: `EMP-${Date.now().toString().slice(-6)}`,
+      id: crypto.randomUUID(),
+      employeeCode: `EMP-${Date.now().toString().slice(-6)}`,
       surname: (newHireData.surname as string).toUpperCase(),
       firstname: (newHireData.firstname as string).toUpperCase(),
       department: newHireData.department as string,
