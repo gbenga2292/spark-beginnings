@@ -39,6 +39,8 @@ export interface LeaveRecord {
   status: 'Active' | 'Cancelled';
   uploadedFile?: string;
   uploadedFileName?: string;
+  supervisor?: string;
+  management?: string;
 }
 
 export interface MonthlySalary {

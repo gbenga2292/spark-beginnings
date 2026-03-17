@@ -109,6 +109,7 @@ function dbToLeave(r: any): LeaveRecord {
     expectedEndDate: r.expected_end_date, reason: r.reason,
     dateReturned: r.date_returned, canBeContacted: r.can_be_contacted,
     status: r.status, uploadedFile: r.uploaded_file, uploadedFileName: r.uploaded_file_name,
+    supervisor: r.supervisor, management: r.management,
   };
 }
 
@@ -220,6 +221,7 @@ function leaveToDb(l: LeaveRecord) {
     expected_end_date: l.expectedEndDate, reason: l.reason,
     date_returned: l.dateReturned, can_be_contacted: l.canBeContacted,
     status: l.status, uploaded_file: l.uploadedFile, uploaded_file_name: l.uploadedFileName,
+    supervisor: l.supervisor, management: l.management,
   };
 }
 

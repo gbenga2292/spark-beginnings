@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '@/src/store/appStore';
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
-import { fetchAllAppData, fetchAllUsers, fetchPresets } from '@/src/lib/supabaseService';
+import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
 
 /** Fills in any missing privilege sections using NO_ACCESS defaults. */
@@ -41,6 +41,21 @@ export function useDataLoader(isAuthenticated: boolean) {
           fetchAllUsers(),
           fetchPresets(),
         ]);
+
+        // Auto-initialize standard client & site
+        if (!appData.clients.includes('DCEL')) {
+          appData.clients.push('DCEL');
+          db.insertClient('DCEL');
+        }
+        if (!appData.sites.some(s => s.name.toLowerCase() === 'office' && s.client.toLowerCase() === 'dcel')) {
+          const mID = appData.sites.reduce((m, s) => {
+            const match = s.id.match(/^S-(\d+)$/i);
+            return match ? Math.max(m, parseInt(match[1], 10)) : m;
+          }, 0);
+          const officeSite = { id: `S-${String(mID + 1).padStart(3, '0')}`, name: 'Office', client: 'DCEL', status: 'Active' as const, vat: 'No' as const };
+          appData.sites.push(officeSite);
+          db.insertSite(officeSite);
+        }
 
         // Hydrate appStore
         useAppStore.setState({

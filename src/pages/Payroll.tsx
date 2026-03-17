@@ -18,6 +18,7 @@ interface PayrollRecord {
   firstname: string;
   position: string;
   department: string;
+  staffType: 'INTERNAL' | 'EXTERNAL';
   bankName: string;
   accountNo: string;
   salary: number;
@@ -40,15 +41,29 @@ interface PayrollRecord {
 
 
 const POSITION_HIERARCHY = [
-  'MD',
   'CEO',
-  'Operations Manager',
-  'HR',
-  'Accountant',
-  'Supervisor',
-  'Admin',
+  'Head of Admin',
+  'Head of Operations',
+  'Projects Supervisor',
+  'Logistics and Warehouse Officer',
+  'Admin/Accounts Officer',
+  'HR Officer',
+  'Foreman',
+  'Engineer',
+  'Site Supervisor',
+  'Assistant Supervisor',
+  'Mechanic Technician/Site Worker',
+  'Site Worker',
+  'Driver',
   'Adhoc Staff',
+  'Security',
+  'Consultant',
+  'Sponsored Student',
 ];
+
+const isPayeEligible = (r: PayrollRecord) => r.paye > 0 && r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc');
+const isPensionEligible = (r: PayrollRecord) => r.pension > 0 && r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc');
+const isNsitfEligible = (r: PayrollRecord) => r.nsitf > 0 && !r.department.trim().toLowerCase().includes('adhoc');
 
 const currentYear = new Date().getFullYear();
 
@@ -220,8 +235,8 @@ export function Payroll() {
           // GROSS PAY: SALARY + OVERTIME
           const grossPay = salary + overtime;
 
-          // PENSION deduction (on pensionSum, not totalAllowances)
-          const pension = emp.payeTax ? pensionSum * (payrollVariables.employeePensionRate / 100) : 0;
+          // PENSION deduction (on pensionSum, not totalAllowances) — INTERNAL staff only
+          const pension = (emp.payeTax && emp.staffType === 'INTERNAL') ? pensionSum * (payrollVariables.employeePensionRate / 100) : 0;
 
           // â”€â”€ PAYE calculation matching Excel formula exactly: â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           // =IF(payeTax="Yes", NIGERIATAX(salary, SUM(Basic:Transport), overtime, rentRelief),
@@ -292,7 +307,7 @@ export function Payroll() {
           // TAKE HOME PAY: GROSS PAY - (PAYE + LOAN REPAYMENT + PENSION)
           const takeHomePay = grossPay - (paye + loanRepayment + pension);
 
-          const employerPension = emp.payeTax ? pensionSum * (payrollVariables.employerPensionRate / 100) : 0;
+          const employerPension = (emp.payeTax && emp.staffType === 'INTERNAL') ? pensionSum * (payrollVariables.employerPensionRate / 100) : 0;
           const nsitf = emp.payeTax ? grossPay * (payrollVariables.nsitfRate / 100) : 0;
 
           return {
@@ -302,6 +317,7 @@ export function Payroll() {
             firstname: emp.firstname,
             position: emp.position,
             department: emp.department,
+            staffType: emp.staffType,
             bankName: emp.bankName,
             accountNo: emp.accountNo,
             salary,
@@ -402,7 +418,7 @@ export function Payroll() {
       }
 
       // Build self-contained HTML for every payslip so all appear in one print job
-      const currency = (n: number) => 'â‚¦' + n.toLocaleString();
+      const currency = (n: number) => '₦' + n.toLocaleString();
       const slipsHtml = payslipsToPrint.map((slip, i) => `
       <div class="payslip${i === payslipsToPrint.length - 1 ? ' last' : ''}">
         <div class="header">
@@ -422,7 +438,7 @@ export function Payroll() {
         </div>
         
         <table class="breakdown-table">
-          <thead><tr><th>Earnings</th><th class="text-right">Amount (â‚¦)</th></tr></thead>
+          <thead><tr><th>Earnings</th><th class="text-right">Amount (₦)</th></tr></thead>
           <tbody>
             <tr><td>Basic Salary</td><td class="text-right">${currency(slip.record.basicSalary)}</td></tr>
             ${slip.record.housing > 0 ? `<tr><td>Housing Allowance</td><td class="text-right">${currency(slip.record.housing)}</td></tr>` : ''}
@@ -434,7 +450,7 @@ export function Payroll() {
         </table>
 
         <table class="breakdown-table">
-          <thead><tr><th>Deductions</th><th class="text-right">Amount (â‚¦)</th></tr></thead>
+          <thead><tr><th>Deductions</th><th class="text-right">Amount (₦)</th></tr></thead>
           <tbody>
             ${slip.record.paye > 0 ? `<tr><td>PAYE Tax</td><td class="text-right">-${currency(slip.record.paye)}</td></tr>` : ''}
             ${slip.record.loanRepayment > 0 ? `<tr><td>Loan & Advance</td><td class="text-right">-${currency(slip.record.loanRepayment)}</td></tr>` : ''}
@@ -496,29 +512,34 @@ export function Payroll() {
       let csvStr = '';
       const fmCSV = (n: number) => n.toFixed(2);
 
+      // Helpers for CSV eligibility
+      const csvPayeOk  = (r: typeof payslipsToPrint[0]['record']) => r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc');
+      const csvPenOk   = (r: typeof payslipsToPrint[0]['record']) => r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc');
+      const csvNsitfOk = (r: typeof payslipsToPrint[0]['record']) => r.nsitf > 0 && !r.department.trim().toLowerCase().includes('adhoc');
+
       if (printType === 'PAYE') {
-        csvStr = 'S/N,Employee Name,Month,Basic Salary (â‚¦),Housing (â‚¦),Transport (â‚¦),Other Allowances (â‚¦),Gross Pay (â‚¦),PAYE Deducted (â‚¦)\n';
+        csvStr = 'S/N,Employee Name,Month,Basic Salary (₦),Housing (₦),Transport (₦),Other Allowances (₦),Gross Pay (₦),PAYE Deducted (₦)\n';
         let sn = 1;
         payslipsToPrint.forEach(slip => {
-          if (slip.record.paye > 0) {
+          if (csvPayeOk(slip.record)) {
             csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.monthLabel}","${fmCSV(slip.record.basicSalary)}","${fmCSV(slip.record.housing)}","${fmCSV(slip.record.transport)}","${fmCSV(slip.record.otherAllowances)}","${fmCSV(slip.record.grossPay)}","${fmCSV(slip.record.paye)}"\n`;
           }
         });
       } else if (printType === 'PENSION') {
-        csvStr = 'S/N,Employee Name,Month,Pensionable Sum (â‚¦),Employee Contrib. (â‚¦),Employer Contrib. (â‚¦),Total Contrib. (â‚¦)\n';
+        csvStr = 'S/N,Employee Name,Month,Pensionable Sum (₦),Employee Contrib. (₦),Employer Contrib. (₦),Total Contrib. (₦)\n';
         let sn = 1;
         payslipsToPrint.forEach(slip => {
-          if (slip.record.pension > 0) {
+          if (csvPenOk(slip.record)) {
             const penSum = slip.record.basicSalary + slip.record.housing + slip.record.transport;
             const totalPen = slip.record.pension + slip.record.employerPension;
             csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.monthLabel}","${fmCSV(penSum)}","${fmCSV(slip.record.pension)}","${fmCSV(slip.record.employerPension)}","${fmCSV(totalPen)}"\n`;
           }
         });
       } else if (printType === 'NSITF') {
-        csvStr = 'S/N,Employee Name,Month,Gross Pay (â‚¦),NSITF Rate (%),NSITF Amount (â‚¦)\n';
+        csvStr = 'S/N,Employee Name,Month,Gross Pay (₦),NSITF Rate (%),NSITF Amount (₦)\n';
         let sn = 1;
         payslipsToPrint.forEach(slip => {
-          if (slip.record.nsitf > 0 && slip.record.department.trim().toLowerCase() !== 'adhoc staff') {
+          if (csvNsitfOk(slip.record)) {
             csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.monthLabel}","${fmCSV(slip.record.grossPay)}","${payrollVariables.nsitfRate}","${fmCSV(slip.record.nsitf)}"\n`;
           }
         });
@@ -591,7 +612,7 @@ export function Payroll() {
                   <div className="flex gap-2 relative group">
                     <Button onClick={() => handleOpenPrintDialog('PAYSLIPS')} variant="outline" className="gap-2 shrink-0 border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700">
                       <Printer className="h-4 w-4" />
-                      Print Payslips
+                      Print Schedule
                     </Button>
                     <div className="absolute top-full left-0 mt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 flex flex-col gap-1 w-full pt-1">
                       {priv.canViewPayeSchedule && (
@@ -628,7 +649,7 @@ export function Payroll() {
                   <CreditCard className="h-4 w-4 text-slate-400" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-slate-900">â‚¦{priv?.canViewAmounts === false ? '***' : totals.totalGross.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-slate-900">₦{priv?.canViewAmounts === false ? '***' : totals.totalGross.toLocaleString()}</div>
                   <p className="text-xs text-slate-500 mt-1">Salary + Overtime</p>
                 </CardContent>
               </Card>
@@ -639,21 +660,21 @@ export function Payroll() {
                 </CardHeader>
                 <CardContent className="flex items-center justify-between">
                   <div>
-                    <div className="text-2xl font-bold text-red-600">â‚¦{priv?.canViewAmounts === false ? '***' : totals.totalDeductions.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-red-600">₦{priv?.canViewAmounts === false ? '***' : totals.totalDeductions.toLocaleString()}</div>
                     <p className="text-[10px] text-slate-500 mt-1">Sum of all deductions</p>
                   </div>
                   <div className="flex gap-2 ml-4">
                     <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 flex flex-col items-start px-2 py-1">
                       <span className="text-[9px] uppercase tracking-wider text-red-400">PAYE Tax</span>
-                      <span className="font-bold text-sm">â‚¦{priv?.canViewAmounts === false ? '***' : totals.totalPAYE.toLocaleString()}</span>
+                      <span className="font-bold text-sm">₦{priv?.canViewAmounts === false ? '***' : totals.totalPAYE.toLocaleString()}</span>
                     </Badge>
                     <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 flex flex-col items-start px-2 py-1">
                       <span className="text-[9px] uppercase tracking-wider text-red-400">Loans & Adv.</span>
-                      <span className="font-bold text-sm">â‚¦{priv?.canViewAmounts === false ? '***' : totals.totalLoans.toLocaleString()}</span>
+                      <span className="font-bold text-sm">₦{priv?.canViewAmounts === false ? '***' : totals.totalLoans.toLocaleString()}</span>
                     </Badge>
                     <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 flex flex-col items-start px-2 py-1">
                       <span className="text-[9px] uppercase tracking-wider text-red-400">Pension</span>
-                      <span className="font-bold text-sm">â‚¦{priv?.canViewAmounts === false ? '***' : totals.totalPension.toLocaleString()}</span>
+                      <span className="font-bold text-sm">₦{priv?.canViewAmounts === false ? '***' : totals.totalPension.toLocaleString()}</span>
                     </Badge>
                   </div>
                 </CardContent>
@@ -664,7 +685,7 @@ export function Payroll() {
                   <CreditCard className="h-4 w-4 text-slate-400" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-emerald-600">â‚¦{priv?.canViewAmounts === false ? '***' : totals.totalNet.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-emerald-600">₦{priv?.canViewAmounts === false ? '***' : totals.totalNet.toLocaleString()}</div>
                   <div className="flex items-center justify-between mt-1">
                     <p className="text-[10px] text-slate-500">Take Home Pay</p>
                     <p className="text-[10px] font-medium text-slate-700">{totals.employeeCount} active staff</p>
@@ -710,10 +731,10 @@ export function Payroll() {
                 <Table className="whitespace-nowrap w-full text-xs">
                   <TableHeader>
                     <TableRow className="bg-slate-50">
-                      <TableHead className="font-bold text-slate-900">S/N</TableHead>
-                      <TableHead className="font-bold text-slate-900">SURNAMES</TableHead>
-                      <TableHead className="font-bold text-slate-900">FIRNAME</TableHead>
-                      <TableHead className="font-bold text-slate-900">JOB TITTLE</TableHead>
+                      <TableHead className="font-bold text-slate-900 sticky left-0 z-20 bg-slate-50" style={{minWidth:'48px',boxShadow:'none'}}>S/N</TableHead>
+                      <TableHead className="font-bold text-slate-900 sticky z-20 bg-slate-50" style={{left:'48px',minWidth:'110px'}}>SURNAMES</TableHead>
+                      <TableHead className="font-bold text-slate-900 sticky z-20 bg-slate-50" style={{left:'158px',minWidth:'110px'}}>FIRNAME</TableHead>
+                      <TableHead className="font-bold text-slate-900 sticky z-20 bg-slate-50 border-r border-slate-300" style={{left:'268px',minWidth:'180px'}}>JOB TITTLE</TableHead>
                       <TableHead className="font-bold text-slate-900">BANK</TableHead>
                       <TableHead className="font-bold text-slate-900">ACCOUNT NO.</TableHead>
                       <TableHead className="font-bold text-slate-900 bg-indigo-50/50">SALARY</TableHead>
@@ -733,24 +754,24 @@ export function Payroll() {
                   <TableBody>
                     {payrollData.filter(r => !filterDept || r.department === filterDept).map((record) => (
                       <TableRow key={record.id} className="hover:bg-slate-50/50 transition-colors">
-                        <TableCell>{record.sn}</TableCell>
-                        <TableCell className="font-medium">{record.surname}</TableCell>
-                        <TableCell>{record.firstname}</TableCell>
-                        <TableCell>{record.position}</TableCell>
+                        <TableCell className="sticky left-0 z-10 bg-white border-r border-transparent" style={{minWidth:'48px'}}>{record.sn}</TableCell>
+                        <TableCell className="font-medium sticky z-10 bg-white" style={{left:'48px',minWidth:'110px'}}>{record.surname}</TableCell>
+                        <TableCell className="sticky z-10 bg-white" style={{left:'158px',minWidth:'110px'}}>{record.firstname}</TableCell>
+                        <TableCell className="sticky z-10 bg-white border-r border-slate-300" style={{left:'268px',minWidth:'180px'}}>{record.position}</TableCell>
                         <TableCell>{record.bankName}</TableCell>
                         <TableCell className="font-mono">{record.accountNo}</TableCell>
-                        <TableCell className="font-mono text-indigo-700 bg-indigo-50/30">â‚¦{priv?.canViewAmounts === false ? '***' : record.salary.toLocaleString()}</TableCell>
+                        <TableCell className="font-mono text-indigo-700 bg-indigo-50/30">₦{priv?.canViewAmounts === false ? '***' : record.salary.toLocaleString()}</TableCell>
                         <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.basicSalary.toLocaleString()}</TableCell>
                         <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.housing.toLocaleString()}</TableCell>
                         <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.transport.toLocaleString()}</TableCell>
                         <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.otherAllowances.toLocaleString()}</TableCell>
                         <TableCell className="font-mono font-medium bg-slate-50 border-x">{priv?.canViewAmounts === false ? '***' : record.totalAllowances.toLocaleString()}</TableCell>
                         <TableCell className="font-mono text-amber-600">{priv?.canViewAmounts === false ? '***' : record.overtime.toLocaleString()}</TableCell>
-                        <TableCell className="font-mono font-bold text-slate-900 bg-emerald-50/50">â‚¦{priv?.canViewAmounts === false ? '***' : record.grossPay.toLocaleString()}</TableCell>
+                        <TableCell className="font-mono font-bold text-slate-900 bg-emerald-50/50">₦{priv?.canViewAmounts === false ? '***' : record.grossPay.toLocaleString()}</TableCell>
                         <TableCell className="font-mono text-red-600">{priv?.canViewAmounts === false ? '***' : record.paye.toLocaleString()}</TableCell>
                         <TableCell className="font-mono text-red-600">{priv?.canViewAmounts === false ? '***' : record.loanRepayment.toLocaleString()}</TableCell>
                         <TableCell className="font-mono text-red-600">{priv?.canViewAmounts === false ? '***' : record.pension.toLocaleString()}</TableCell>
-                        <TableCell className="font-mono font-bold text-emerald-700 bg-emerald-50 border-l">â‚¦{priv?.canViewAmounts === false ? '***' : record.takeHomePay.toLocaleString()}</TableCell>
+                        <TableCell className="font-mono font-bold text-emerald-700 bg-emerald-50 border-l">₦{priv?.canViewAmounts === false ? '***' : record.takeHomePay.toLocaleString()}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -775,7 +796,7 @@ export function Payroll() {
                 <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
                   <CardTitle>PAYE Tax Schedule: {selectedMonthLabel}</CardTitle>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-slate-500 font-medium">Total PAYE: <span className="text-red-600 font-bold">â‚¦{fmT(totals.totalPAYE)}</span></span>
+                    <span className="text-xs text-slate-500 font-medium">Total PAYE: <span className="text-red-600 font-bold">₦{fmT(totals.totalPAYE)}</span></span>
                     <Button variant="outline" size="sm" className="gap-2" onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintDialogOpen(true); setPrintType('PAYE'); }}>
                       <Printer className="h-4 w-4" /> Print Schedule
                     </Button>
@@ -789,16 +810,16 @@ export function Payroll() {
                         <TableHead className="font-bold">Surname</TableHead>
                         <TableHead className="font-bold">Firstname</TableHead>
                         <TableHead className="font-bold">Department</TableHead>
-                        <TableHead className="font-bold text-right">Basic (â‚¦)</TableHead>
-                        <TableHead className="font-bold text-right">Housing (â‚¦)</TableHead>
-                        <TableHead className="font-bold text-right">Transport (â‚¦)</TableHead>
-                        <TableHead className="font-bold text-right">Other (â‚¦)</TableHead>
-                        <TableHead className="font-bold text-right bg-slate-100">Gross Pay (â‚¦)</TableHead>
-                        <TableHead className="font-bold text-right text-red-600">PAYE (â‚¦)</TableHead>
+                        <TableHead className="font-bold text-right">Basic (₦)</TableHead>
+                        <TableHead className="font-bold text-right">Housing (₦)</TableHead>
+                        <TableHead className="font-bold text-right">Transport (₦)</TableHead>
+                        <TableHead className="font-bold text-right">Other (₦)</TableHead>
+                        <TableHead className="font-bold text-right bg-slate-100">Gross Pay (₦)</TableHead>
+                        <TableHead className="font-bold text-right text-red-600">PAYE (₦)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {payrollData.filter(r => r.paye > 0).map((r, i) => (
+                      {payrollData.filter(r => r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc')).map((r, i) => (
                         <TableRow key={r.id} className="hover:bg-red-50/30">
                           <TableCell>{i + 1}</TableCell>
                           <TableCell className="font-medium">{r.surname}</TableCell>
@@ -812,15 +833,16 @@ export function Payroll() {
                           <TableCell className="text-right font-mono font-bold text-red-600">{fm(r.paye)}</TableCell>
                         </TableRow>
                       ))}
+                      {(() => { const pd = payrollData.filter(r => r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc')); return (
                       <TableRow className="border-t-2 bg-red-50 font-bold">
                         <TableCell colSpan={4} className="text-right font-bold">TOTALS</TableCell>
-                        <TableCell className="text-right font-mono">{fmT(payrollData.reduce((s, r) => s + r.basicSalary, 0))}</TableCell>
-                        <TableCell className="text-right font-mono">{fmT(payrollData.reduce((s, r) => s + r.housing, 0))}</TableCell>
-                        <TableCell className="text-right font-mono">{fmT(payrollData.reduce((s, r) => s + r.transport, 0))}</TableCell>
-                        <TableCell className="text-right font-mono">{fmT(payrollData.reduce((s, r) => s + r.otherAllowances, 0))}</TableCell>
-                        <TableCell className="text-right font-mono">{fmT(payrollData.reduce((s, r) => s + r.grossPay, 0))}</TableCell>
-                        <TableCell className="text-right font-mono text-red-600">{fmT(totals.totalPAYE)}</TableCell>
-                      </TableRow>
+                        <TableCell className="text-right font-mono">{fmT(pd.reduce((s, r) => s + r.basicSalary, 0))}</TableCell>
+                        <TableCell className="text-right font-mono">{fmT(pd.reduce((s, r) => s + r.housing, 0))}</TableCell>
+                        <TableCell className="text-right font-mono">{fmT(pd.reduce((s, r) => s + r.transport, 0))}</TableCell>
+                        <TableCell className="text-right font-mono">{fmT(pd.reduce((s, r) => s + r.otherAllowances, 0))}</TableCell>
+                        <TableCell className="text-right font-mono">{fmT(pd.reduce((s, r) => s + r.grossPay, 0))}</TableCell>
+                        <TableCell className="text-right font-mono text-red-600">{fmT(pd.reduce((s, r) => s + r.paye, 0))}</TableCell>
+                      </TableRow>); })()}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -844,7 +866,7 @@ export function Payroll() {
                 <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
                   <CardTitle>Pension Schedule: {selectedMonthLabel}</CardTitle>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-slate-500 font-medium">Total Pension: <span className="text-amber-600 font-bold">â‚¦{fmT(totals.totalPension)}</span></span>
+                    <span className="text-xs text-slate-500 font-medium">Total Pension: <span className="text-amber-600 font-bold">₦{fmT(totals.totalPension)}</span></span>
                     <Button variant="outline" size="sm" className="gap-2" onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintDialogOpen(true); setPrintType('PENSION'); }}>
                       <Printer className="h-4 w-4" /> Print Schedule
                     </Button>
@@ -858,14 +880,14 @@ export function Payroll() {
                         <TableHead className="font-bold">Surname</TableHead>
                         <TableHead className="font-bold">Firstname</TableHead>
                         <TableHead className="font-bold">Department</TableHead>
-                        <TableHead className="font-bold text-right">Pensionable Sum (â‚¦)</TableHead>
-                        <TableHead className="font-bold text-right text-amber-700">Employee (â‚¦)</TableHead>
-                        <TableHead className="font-bold text-right text-indigo-700">Employer (â‚¦)</TableHead>
-                        <TableHead className="font-bold text-right text-emerald-700 bg-emerald-50">Total (â‚¦)</TableHead>
+                        <TableHead className="font-bold text-right">Pensionable Sum (₦)</TableHead>
+                        <TableHead className="font-bold text-right text-amber-700">Employee (₦)</TableHead>
+                        <TableHead className="font-bold text-right text-indigo-700">Employer (₦)</TableHead>
+                        <TableHead className="font-bold text-right text-emerald-700 bg-emerald-50">Total (₦)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {payrollData.filter(r => r.pension > 0).map((r, i) => {
+                      {payrollData.filter(r => r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc')).map((r, i) => {
                         const penSum = r.basicSalary + r.housing + r.transport;
                         return (
                           <TableRow key={r.id} className="hover:bg-amber-50/30">
@@ -880,13 +902,14 @@ export function Payroll() {
                           </TableRow>
                         );
                       })}
+                      {(() => { const pp = payrollData.filter(r => r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc')); return (
                       <TableRow className="border-t-2 bg-amber-50 font-bold">
                         <TableCell colSpan={4} className="text-right font-bold">TOTALS</TableCell>
-                        <TableCell className="text-right font-mono">{fmT(payrollData.filter(r => r.pension > 0).reduce((s, r) => s + (r.basicSalary + r.housing + r.transport), 0))}</TableCell>
-                        <TableCell className="text-right font-mono text-amber-600">{fmT(totals.totalPension)}</TableCell>
-                        <TableCell className="text-right font-mono text-indigo-600">{fmT(payrollData.reduce((s, r) => s + r.employerPension, 0))}</TableCell>
-                        <TableCell className="text-right font-mono text-emerald-700">{fmT(payrollData.reduce((s, r) => s + r.pension + r.employerPension, 0))}</TableCell>
-                      </TableRow>
+                        <TableCell className="text-right font-mono">{fmT(pp.reduce((s, r) => s + (r.basicSalary + r.housing + r.transport), 0))}</TableCell>
+                        <TableCell className="text-right font-mono text-amber-600">{fmT(pp.reduce((s, r) => s + r.pension, 0))}</TableCell>
+                        <TableCell className="text-right font-mono text-indigo-600">{fmT(pp.reduce((s, r) => s + r.employerPension, 0))}</TableCell>
+                        <TableCell className="text-right font-mono text-emerald-700">{fmT(pp.reduce((s, r) => s + r.pension + r.employerPension, 0))}</TableCell>
+                      </TableRow>); })()}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -910,7 +933,7 @@ export function Payroll() {
                 <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
                   <CardTitle>NSITF Schedule: {selectedMonthLabel}</CardTitle>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-slate-500 font-medium">Total NSITF: <span className="text-blue-600 font-bold">â‚¦{fmT(payrollData.reduce((s, r) => s + r.nsitf, 0))}</span></span>
+                    <span className="text-xs text-slate-500 font-medium">Total NSITF: <span className="text-blue-600 font-bold">₦{fmT(payrollData.reduce((s, r) => s + r.nsitf, 0))}</span></span>
                     <Button variant="outline" size="sm" className="gap-2" onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintDialogOpen(true); setPrintType('NSITF'); }}>
                       <Printer className="h-4 w-4" /> Print Schedule
                     </Button>
@@ -924,13 +947,13 @@ export function Payroll() {
                         <TableHead className="font-bold">Surname</TableHead>
                         <TableHead className="font-bold">Firstname</TableHead>
                         <TableHead className="font-bold">Department</TableHead>
-                        <TableHead className="font-bold text-right">Gross Pay (â‚¦)</TableHead>
+                        <TableHead className="font-bold text-right">Gross Pay (₦)</TableHead>
                         <TableHead className="font-bold text-center">Rate (%)</TableHead>
-                        <TableHead className="font-bold text-right text-blue-700 bg-blue-50">NSITF (â‚¦)</TableHead>
+                        <TableHead className="font-bold text-right text-blue-700 bg-blue-50">NSITF (₦)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {payrollData.filter(r => r.nsitf > 0).map((r, i) => (
+                      {payrollData.filter(r => isNsitfEligible(r)).map((r, i) => (
                         <TableRow key={r.id} className="hover:bg-blue-50/30">
                           <TableCell>{i + 1}</TableCell>
                           <TableCell className="font-medium">{r.surname}</TableCell>
@@ -1138,7 +1161,7 @@ export function Payroll() {
                           <h3 className="text-sm font-semibold text-slate-500 uppercase mb-2 border-b pb-1">Earnings</h3>
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="text-left"><th className="py-2 text-slate-600">Description</th><th className="py-2 text-right text-slate-600">Amount (â‚¦)</th></tr>
+                              <tr className="text-left"><th className="py-2 text-slate-600">Description</th><th className="py-2 text-right text-slate-600">Amount (₦)</th></tr>
                             </thead>
                             <tbody>
                               <tr><td className="py-2">Basic Salary</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.basicSalary.toLocaleString()}</td></tr>
@@ -1156,7 +1179,7 @@ export function Payroll() {
                           <h3 className="text-sm font-semibold text-slate-500 uppercase mb-2 border-b pb-1">Deductions</h3>
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="text-left"><th className="py-2 text-slate-600">Description</th><th className="py-2 text-right text-slate-600">Amount (â‚¦)</th></tr>
+                              <tr className="text-left"><th className="py-2 text-slate-600">Description</th><th className="py-2 text-right text-slate-600">Amount (₦)</th></tr>
                             </thead>
                             <tbody>
                               {slip.record.paye > 0 && <tr><td className="py-2">PAYE Tax</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.paye.toLocaleString()}</td></tr>}
@@ -1171,7 +1194,7 @@ export function Payroll() {
                         <div className="bg-emerald-50 p-6 rounded-lg border border-emerald-100">
                           <div className="flex justify-between items-center">
                             <span className="text-lg font-bold text-slate-900">TAKE HOME PAY</span>
-                            <span className="text-3xl font-bold text-emerald-700">â‚¦{priv?.canViewAmounts === false ? '***' : slip.record.takeHomePay.toLocaleString()}</span>
+                            <span className="text-3xl font-bold text-emerald-700">₦{priv?.canViewAmounts === false ? '***' : slip.record.takeHomePay.toLocaleString()}</span>
                           </div>
                         </div>
 
@@ -1197,7 +1220,7 @@ export function Payroll() {
                             </p>
                           </div>
                           <div className="text-right" style={{ textAlign: 'right' }}>
-                            <p className="font-semibold text-sm text-slate-600" style={{ fontWeight: 600, fontSize: '14px', color: '#475569', margin: '0' }}>Total Valid Records: {payslipsToPrint.filter(s => printType === 'PAYE' ? s.record.paye > 0 : printType === 'PENSION' ? s.record.pension > 0 : (s.record.nsitf > 0 && s.record.department.trim().toLowerCase() !== 'adhoc staff')).length}</p>
+                            <p className="font-semibold text-sm text-slate-600" style={{ fontWeight: 600, fontSize: '14px', color: '#475569', margin: '0' }}>Total Valid Records: {payslipsToPrint.filter(s => printType === 'PAYE' ? (s.record.staffType === 'INTERNAL' && !s.record.department.trim().toLowerCase().includes('adhoc')) : printType === 'PENSION' ? (s.record.staffType === 'INTERNAL' && !s.record.department.trim().toLowerCase().includes('adhoc')) : (s.record.nsitf > 0 && !s.record.department.trim().toLowerCase().includes('adhoc'))).length}</p>
                           </div>
                         </div>
                       </div>
@@ -1210,32 +1233,36 @@ export function Payroll() {
                             <th className="py-3 px-2 text-slate-600">Month</th>
                             {printType === 'PAYE' ? (
                               <>
-                                <th className="py-3 px-2 text-right text-slate-600">Basic (â‚¦)</th>
-                                <th className="py-3 px-2 text-right text-slate-600">Housing (â‚¦)</th>
-                                <th className="py-3 px-2 text-right text-slate-600">Transport (â‚¦)</th>
-                                <th className="py-3 px-2 text-right text-slate-600">Other (â‚¦)</th>
-                                <th className="py-3 px-2 text-right text-slate-600">Gross Pay (â‚¦)</th>
-                                <th className="py-3 px-2 text-right text-slate-600">PAYE Deducted (â‚¦)</th>
+                                <th className="py-3 px-2 text-right text-slate-600">Basic (₦)</th>
+                                <th className="py-3 px-2 text-right text-slate-600">Housing (₦)</th>
+                                <th className="py-3 px-2 text-right text-slate-600">Transport (₦)</th>
+                                <th className="py-3 px-2 text-right text-slate-600">Other (₦)</th>
+                                <th className="py-3 px-2 text-right text-slate-600">Gross Pay (₦)</th>
+                                <th className="py-3 px-2 text-right text-slate-600">PAYE Deducted (₦)</th>
                               </>
                             ) : printType === 'PENSION' ? (
                               <>
-                                <th className="py-3 px-2 text-right text-slate-600">Pensionable Sum (â‚¦)</th>
-                                <th className="py-3 px-2 text-right text-slate-600">Employee (â‚¦)</th>
-                                <th className="py-3 px-2 text-right text-slate-600">Employer (â‚¦)</th>
-                                <th className="py-3 px-2 text-right font-bold text-slate-800">Total (â‚¦)</th>
+                                <th className="py-3 px-2 text-right text-slate-600">Pensionable Sum (₦)</th>
+                                <th className="py-3 px-2 text-right text-slate-600">Employee (₦)</th>
+                                <th className="py-3 px-2 text-right text-slate-600">Employer (₦)</th>
+                                <th className="py-3 px-2 text-right font-bold text-slate-800">Total (₦)</th>
                               </>
                             ) : (
                               <>
-                                <th className="py-3 px-2 text-right text-slate-600">Gross Pay (â‚¦)</th>
+                                <th className="py-3 px-2 text-right text-slate-600">Gross Pay (₦)</th>
                                 <th className="py-3 px-2 text-right text-slate-600">NSITF Ratio (%)</th>
-                                <th className="py-3 px-2 text-right font-bold text-slate-800">Amount (â‚¦)</th>
+                                <th className="py-3 px-2 text-right font-bold text-slate-800">Amount (₦)</th>
                               </>
                             )}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {payslipsToPrint
-                            .filter(slip => printType === 'PAYE' ? slip.record.paye > 0 : printType === 'PENSION' ? slip.record.pension > 0 : (slip.record.nsitf > 0 && slip.record.department.trim().toLowerCase() !== 'adhoc staff'))
+                            .filter(slip => printType === 'PAYE'
+                              ? (slip.record.staffType === 'INTERNAL' && !slip.record.department.trim().toLowerCase().includes('adhoc'))
+                              : printType === 'PENSION'
+                                ? (slip.record.staffType === 'INTERNAL' && !slip.record.department.trim().toLowerCase().includes('adhoc'))
+                                : (slip.record.nsitf > 0 && !slip.record.department.trim().toLowerCase().includes('adhoc')))
                             .map((slip, idx) => {
                               const pSum = slip.record.basicSalary + slip.record.housing + slip.record.transport;
                               return (

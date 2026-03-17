@@ -15,6 +15,14 @@ import { useUserStore } from '@/src/store/userStore';
 
 const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive', startDate: new Date().toISOString().split('T')[0], endDate: '' };
 
+const getNextSiteId = (existingSites: Site[]) => {
+  const max = existingSites.reduce((m, s) => {
+    const match = s.id.match(/^S-(\d+)$/i);
+    return match ? Math.max(m, parseInt(match[1], 10)) : m;
+  }, 0);
+  return `S-${String(max + 1).padStart(3, '0')}`;
+};
+
 function ClientSummary() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const monthValues = useAppStore(s => s.monthValues);
@@ -225,7 +233,7 @@ export function Sites() {
     if (addForm.endDate && nowStr > addForm.endDate) calcStatus = 'Inactive';
 
     addSite({
-      id: crypto.randomUUID(),
+      id: getNextSiteId(sites),
       name: addForm.name.trim(),
       client: addForm.client.trim(),
       vat: addForm.vat,
@@ -349,10 +357,8 @@ export function Sites() {
             }
 
             let newId = importedSite.id ? importedSite.id.toString().trim() : '';
-            if (!newId || importedIds.has(newId)) {
-              do {
-                newId = `S-${Date.now().toString().slice(-4)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-              } while (importedIds.has(newId) || sites.some(s => s.id === newId));
+            if (!newId || importedIds.has(newId) || sites.some(s => s.id === newId)) {
+              newId = getNextSiteId([...sites, ...validNewSites]);
             }
 
             importedPairs.add(pairKey);

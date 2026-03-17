@@ -43,6 +43,12 @@ export function Leaves() {
     [employees]
   );
 
+  // Internal staff only (no Adhoc) – used for Staff, Supervisor, Management dropdowns and Leave Summary
+  const internalEmployees = useMemo(
+    () => activeEmployees.filter(e => e.position !== 'Adhoc Staff'),
+    [activeEmployees]
+  );
+
   /* ── filter state ── */
   const [searchQuery, setSearchQuery] = useState('');
   const [filterView, setFilterView] = useState<'All' | 'Active' | 'Completed' | 'Cancelled'>('All');
@@ -57,6 +63,8 @@ export function Leaves() {
   const [reason, setReason] = useState('');
   const [dateReturned, setDateReturned] = useState('');
   const [canBeContacted, setCanBeContacted] = useState<'Yes' | 'No'>('No');
+  const [supervisor, setSupervisor] = useState('');
+  const [management, setManagement] = useState('');
   const [uploadedFile, setUploadedFile] = useState<string | undefined>(undefined);
   const [uploadedFileName, setUploadedFileName] = useState<string | undefined>(undefined);
 
@@ -91,9 +99,9 @@ export function Leaves() {
     return [...result].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   }, [leaves, filterView, searchQuery]);
 
-  /* leave summary per employee */
+  /* leave summary per employee — internal staff only */
   const leaveSummary = useMemo(() => {
-    return activeEmployees.map(emp => {
+    return internalEmployees.map(emp => {
       const empLeaves = leaves.filter(l => l.employeeId === emp.id && l.status !== 'Cancelled');
       const totalTaken = empLeaves.reduce((s, l) => s + l.duration, 0);
       const entitlement = emp.yearlyLeave || 20;
@@ -101,12 +109,13 @@ export function Leaves() {
       const isCurrentlyOnLeave = empLeaves.some(l => isOnLeave(l, new Date()));
       return { emp, totalTaken, remaining, entitlement, isCurrentlyOnLeave };
     });
-  }, [activeEmployees, leaves]);
+  }, [internalEmployees, leaves]);
 
   /* ── form helpers ── */
   const resetForm = () => {
     setFormId(null); setStaffId(''); setLeaveType(''); setStartDate('');
     setDuration(''); setReason(''); setDateReturned(''); setCanBeContacted('No');
+    setSupervisor(''); setManagement('');
     setUploadedFile(undefined); setUploadedFileName(undefined);
   };
 
@@ -119,6 +128,8 @@ export function Leaves() {
     setReason(leave.reason);
     setDateReturned(leave.dateReturned || '');
     setCanBeContacted(leave.canBeContacted);
+    setSupervisor(leave.supervisor || '');
+    setManagement(leave.management || '');
     setUploadedFile(leave.uploadedFile);
     setUploadedFileName(leave.uploadedFileName);
     setShowForm(true);
@@ -151,7 +162,7 @@ export function Leaves() {
       updateLeave(formId, {
         leaveType, startDate, duration: parseInt(duration),
         expectedEndDate: endDate, reason, dateReturned, canBeContacted,
-        uploadedFile, uploadedFileName,
+        uploadedFile, uploadedFileName, supervisor, management,
       });
       toast.success('Leave entry updated!');
       setTimeout(() => syncEmployeeStatus(staffId), 100);
@@ -163,7 +174,7 @@ export function Leaves() {
         leaveType, startDate, duration: parseInt(duration),
         expectedEndDate: endDate, reason, dateReturned,
         canBeContacted, status: 'Active',
-        uploadedFile, uploadedFileName,
+        uploadedFile, uploadedFileName, supervisor, management,
       };
       addLeave(newLeave);
       toast.success('Leave filed successfully!');
@@ -197,6 +208,7 @@ export function Leaves() {
       dateReturned: dateReturned || '',
       canBeContacted: canBeContacted || 'Yes',
       status: 'Active',
+      supervisor, management,
     };
     
     setPreviewLeave(tempLeave);
@@ -248,33 +260,33 @@ export function Leaves() {
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: Arial, sans-serif; font-size: 11px; color: #111; background: white; }
-        .page { width: 100%; padding: 24px 32px; }
-        .logo-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-        .logo-header img { height: 48px; }
-        .form-title { text-align: center; font-size: 14px; font-weight: bold; text-transform: uppercase; margin: 10px 0 18px 0; letter-spacing: 0.5px; }
-        .two-col { display: flex; gap: 40px; }
-        .col { flex: 1; }
-        .section-heading { font-size: 10px; font-weight: bold; text-transform: uppercase; margin-bottom: 6px; margin-top: 16px; }
-        .field-row { margin-bottom: 10px; }
-        .field-label { font-size: 10px; color: #333; margin-bottom: 2px; }
-        .field-line { border-bottom: 1px solid #111; min-width: 160px; display: inline-block; width: 100%; height: 14px; }
-        .field-inline { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px; }
-        .field-inline .field-label { white-space: nowrap; flex-shrink: 0; }
-        .field-inline .field-line { flex: 1; }
-        .checkbox-row { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
-        .checkbox-row span { display: flex; align-items: center; gap: 3px; margin-right: 6px; }
-        .reason-box { border: 1px solid #111; min-height: 40px; width: 100%; margin-top: 2px; display: block; }
-        .sig-section { margin-top: 14px; }
-        .sig-row { display: flex; gap: 16px; margin-bottom: 10px; align-items: flex-end; }
+        .a4-page { width: 210mm; min-height: 297mm; padding: 20mm 18mm; page-break-after: always; }
+        .a4-page:last-child { page-break-after: auto; }
+        .logo-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .logo-header img { height: 52px; }
+        .form-title { text-align: center; font-size: 14px; font-weight: bold; text-transform: uppercase; margin: 12px 0 20px; letter-spacing: 0.6px; border-bottom: 2px solid #111; padding-bottom: 6px; }
+        .section-heading { font-size: 10px; font-weight: bold; text-transform: uppercase; margin: 16px 0 8px; padding: 3px 6px; background: #f0f0f0; border-left: 3px solid #333; }
+        .field-row { margin-bottom: 11px; display: flex; align-items: flex-end; gap: 8px; }
+        .field-label { font-size: 10px; white-space: nowrap; flex-shrink: 0; }
+        .field-line { border-bottom: 1px solid #111; flex: 1; height: 15px; display: inline-block; font-size: 10px; }
+        .reason-box { border: 1px solid #111; min-height: 48px; width: 100%; margin-top: 4px; padding: 3px; font-size: 10px; }
+        .checkbox-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; font-size: 10px; }
+        .checkbox-row span { display: flex; align-items: center; gap: 3px; margin-right: 8px; }
+        .two-col-sig { display: flex; gap: 24px; }
+        .two-col-sig .col { flex: 1; }
+        .sig-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: flex-end; }
         .sig-row .label { font-size: 10px; flex-shrink: 0; white-space: nowrap; }
         .sig-row .sig-line { flex: 1; border-bottom: 1px solid #111; height: 14px; }
-        .approval-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 8px; }
-        .approval-row .label { font-size: 10px; flex-shrink: 0; }
+        .approval-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 6px; font-size: 10px; }
         .approval-row .line { border-bottom: 1px solid #111; height: 14px; flex: 1; }
-        .divider { border-top: 1px solid #555; margin: 14px 0; }
-        .hr-section-title { font-size: 10px; font-weight: bold; margin-bottom: 8px; }
-        .ack-text { font-size: 10px; line-height: 1.6; margin-bottom: 8px; }
-        @media print { body { -webkit-print-color-adjust: exact; } }
+        .divider { border-top: 1px solid #555; margin: 16px 0; }
+        .hr-title { font-size: 10px; font-weight: bold; margin-bottom: 8px; }
+        .ack-text { font-size: 10px; line-height: 1.7; margin-bottom: 8px; }
+        @media print {
+          body { -webkit-print-color-adjust: exact; }
+          .a4-page { page-break-after: always; }
+          .a4-page:last-child { page-break-after: auto; }
+        }
       </style></head><body>
       ${content.innerHTML}
       </body></html>
@@ -349,7 +361,7 @@ export function Leaves() {
                   value={staffId} onChange={e => setStaffId(e.target.value)} disabled={!!formId}
                 >
                   <option value="" disabled>— Select Staff Member —</option>
-                  {activeEmployees.map(emp => (
+                  {internalEmployees.map(emp => (
                     <option key={emp.id} value={emp.id}>{emp.surname} {emp.firstname} ({emp.department})</option>
                   ))}
                 </select>
@@ -371,6 +383,42 @@ export function Leaves() {
                     ));
                   })()}
                 </select>
+              </div>
+
+              {/* Supervisor / Line Manager */}
+              <div className="sm:col-span-2 space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Supervisor / Line Manager</label>
+                {formId && supervisor ? (
+                  <div className="flex h-11 w-full items-center rounded-md border border-slate-200 bg-slate-100 px-3 text-sm text-slate-700 cursor-not-allowed">{supervisor}</div>
+                ) : (
+                  <select
+                    className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
+                    value={supervisor} onChange={e => setSupervisor(e.target.value)} disabled={!!formId}
+                  >
+                    <option value="">— Select Supervisor —</option>
+                    {internalEmployees.filter(e => e.id !== staffId).map(emp => (
+                      <option key={emp.id} value={`${emp.surname} ${emp.firstname}`}>{emp.surname} {emp.firstname} ({emp.position})</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Management Staff */}
+              <div className="sm:col-span-2 space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Management Staff</label>
+                {formId && management ? (
+                  <div className="flex h-11 w-full items-center rounded-md border border-slate-200 bg-slate-100 px-3 text-sm text-slate-700 cursor-not-allowed">{management}</div>
+                ) : (
+                  <select
+                    className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
+                    value={management} onChange={e => setManagement(e.target.value)} disabled={!!formId}
+                  >
+                    <option value="">— Select Management Staff —</option>
+                    {internalEmployees.filter(e => e.id !== staffId).map(emp => (
+                      <option key={emp.id} value={`${emp.surname} ${emp.firstname}`}>{emp.surname} {emp.firstname} ({emp.position})</option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Dates */}
@@ -600,160 +648,160 @@ export function Leaves() {
                 </div>
               </div>
 
-              {/* Scrollable preview area */}
-              <div className="overflow-y-auto flex-1 bg-gray-200 p-4">
-                <div ref={printRef} className="bg-white mx-auto shadow-sm" style={{ maxWidth: 900, padding: '28px 36px', fontSize: 11, fontFamily: 'Arial, sans-serif', color: '#111' }}>
+              {/* Scrollable preview area — two A4 sheets */}
+              <div className="overflow-y-auto flex-1 bg-gray-300 p-6 flex flex-col gap-6">
+                <div ref={printRef}>
 
-                  {/* Two-column form layout */}
-                  <div style={{ display: 'flex', gap: 40 }}>
+                  {/* ══════════ PAGE 1 ══════════ */}
+                  <div className="a4-page bg-white shadow-lg mx-auto" style={{ width: 794, minHeight: 1123, padding: '40px 48px', fontFamily: 'Arial, sans-serif', fontSize: 11, color: '#111' }}>
 
-                    {/* ── LEFT COLUMN ── */}
-                    <div style={{ flex: 1 }}>
-                      {/* Logo + Title */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                        <img src="/logo/logo-2.png" alt="logo" style={{ height: 48 }} />
+                    {/* Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <img src="/logo/logo-2.png" alt="logo" style={{ height: 52 }} />
+                      <img src="/logo/logo-2.png" alt="logo" style={{ height: 52, opacity: 0 }} />
+                    </div>
+                    <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 'bold', textTransform: 'uppercase', margin: '10px 0 20px', letterSpacing: '0.6px', borderBottom: '2px solid #111', paddingBottom: 6 }}>STAFF ANNUAL LEAVE APPLICATION FORM</div>
+
+                    {/* 1. Employee Details */}
+                    <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', marginBottom: 8, padding: '3px 6px', background: '#f0f0f0', borderLeft: '3px solid #333' }}>1. Employee Details</div>
+                    {[['Employee Full Name', lv.employeeName], ['Supervisor / Line Manager', lv.supervisor || ''], ['Management Staff', lv.management || '']].map(([label, val]) => (
+                      <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 11 }}>
+                        <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}:</span>
+                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 15, fontSize: 10, paddingBottom: 1 }}>{val}</span>
                       </div>
-                      <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 'bold', textTransform: 'uppercase', margin: '10px 0 18px', letterSpacing: '0.5px' }}>
-                        STAFF ANNUAL LEAVE APPLICATION FORM
+                    ))}
+
+                    {/* Phone & Email */}
+                    {[['Phone Number', ''], ['Email Address', '']].map(([label]) => (
+                      <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 11 }}>
+                        <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}:</span>
+                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 15 }}></span>
                       </div>
+                    ))}
 
-                      {/* 1. Employee Details */}
-                      <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', marginBottom: 8 }}>1. Employee Details</div>
-                      {[['Employee Full Name', lv.employeeName], ['Supervisor / Line Manager', ''], ['Management Staff', '']].map(([label, val]) => (
-                        <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 10 }}>
-                          <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}:</span>
-                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, display: 'inline-block', minHeight: 14, paddingBottom: 1, fontSize: 10 }}>{val}</span>
-                        </div>
-                      ))}
-
-                      {/* 2. Leave Details */}
-                      <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '14px 0 8px' }}>2. Leave Details</div>
-                      <div style={{ fontSize: 10, marginBottom: 6 }}>Type of Leave:</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-                        {leaveTypeOptions.map(opt => {
-                          const matched = (lv.leaveType || '').toLowerCase().includes(opt.toLowerCase());
-                          return (
-                            <span key={opt} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10 }}>
-                              <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: matched ? '#111' : 'white', color: 'white', fontSize: 8 }}>{matched ? '✓' : ''}</span>
-                              {opt}
-                            </span>
-                          );
-                        })}
-                      </div>
-
-                      <div style={{ fontSize: 10, marginBottom: 4 }}>Reason For Leave:</div>
-                      <div contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ border: '1px solid #111', minHeight: 44, padding: 4, fontSize: 10, marginBottom: 10 }}>{lv.reason}</div>
-
-                      {[['Leave Start Date', lv.startDate ? format(parseISO(lv.startDate), 'dd/MM/yyyy') : ''], ['Leave End Date', lv.expectedEndDate ? format(parseISO(lv.expectedEndDate), 'dd/MM/yyyy') : ''], ['Date Returning to Work', lv.dateReturned ? format(parseISO(lv.dateReturned), 'dd/MM/yyyy') : '']].map(([label, val]) => (
-                        <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 9 }}>
-                          <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}:</span>
-                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, display: 'inline-block', minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{val}</span>
-                        </div>
-                      ))}
-
-                      {/* 3. Handover Details */}
-                      <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '14px 0 8px' }}>3. Handover Details</div>
-                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 10 }}>
-                        <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>Person Responsible During Absence:</span>
-                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                      </div>
-                      <div style={{ fontSize: 10, marginBottom: 4 }}>Key Duties Handed Over:</div>
-                      <div contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', marginBottom: 8, minHeight: 14 }}></div>
-                      <div contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', marginBottom: 8, minHeight: 14 }}></div>
-                      <div contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', marginBottom: 16, minHeight: 14 }}></div>
-
-                      {/* 5. Contact During Leave */}
-                      <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '4px 0 8px' }}>5. Contact During Leave</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 10 }}>
-                        <span>Can be Contacted:</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: lv.canBeContacted === 'Yes' ? '#111' : 'white', color: 'white', fontSize: 8 }}>{lv.canBeContacted === 'Yes' ? '✓' : ''}</span> Yes
-                        </span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: lv.canBeContacted === 'No' ? '#111' : 'white', color: 'white', fontSize: 8 }}>{lv.canBeContacted === 'No' ? '✓' : ''}</span> No
-                        </span>
-                      </div>
+                    {/* 2. Leave Details */}
+                    <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '16px 0 8px', padding: '3px 6px', background: '#f0f0f0', borderLeft: '3px solid #333' }}>2. Leave Details</div>
+                    <div style={{ fontSize: 10, marginBottom: 6 }}>Type of Leave:</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                      {leaveTypeOptions.map(opt => {
+                        const matched = (lv.leaveType || '').toLowerCase().includes(opt.toLowerCase());
+                        return (
+                          <span key={opt} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10 }}>
+                            <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: matched ? '#111' : 'white', color: 'white', fontSize: 8 }}>{matched ? '✓' : ''}</span>
+                            {opt}
+                          </span>
+                        );
+                      })}
                     </div>
 
-                    {/* ── RIGHT COLUMN ── */}
-                    <div style={{ flex: 1 }}>
-                      {/* Logo repeat */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22 }}>
-                        <img src="/logo/logo-2.png" alt="logo" style={{ height: 48, marginLeft: 'auto' }} />
-                      </div>
+                    <div style={{ fontSize: 10, marginBottom: 4 }}>Reason For Leave:</div>
+                    <div contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ border: '1px solid #111', minHeight: 56, padding: 4, fontSize: 10, marginBottom: 12 }}>{lv.reason}</div>
 
-                      {/* Phone / Email */}
-                      {[['Phone Number', emp?.accountNo ? '' : ''], ['Email Address', '']].map(([label]) => (
-                        <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 10 }}>
-                          <span style={{ fontSize: 10, flexShrink: 0 }}>{label}:</span>
-                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                        </div>
+                    {[['Leave Start Date', lv.startDate ? format(parseISO(lv.startDate), 'dd/MM/yyyy') : ''], ['Leave End Date', lv.expectedEndDate ? format(parseISO(lv.expectedEndDate), 'dd/MM/yyyy') : ''], ['Date Returning to Work', lv.dateReturned ? format(parseISO(lv.dateReturned), 'dd/MM/yyyy') : '']].map(([label, val]) => (
+                      <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 11 }}>
+                        <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}:</span>
+                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 15, fontSize: 10, paddingBottom: 1 }}>{val}</span>
+                      </div>
+                    ))}
+
+                    {/* 3. Handover Details */}
+                    <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '16px 0 8px', padding: '3px 6px', background: '#f0f0f0', borderLeft: '3px solid #333' }}>3. Handover Details</div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 11 }}>
+                      <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>Person Responsible During Absence:</span>
+                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 15 }}></span>
+                    </div>
+                    <div style={{ fontSize: 10, marginBottom: 4 }}>Key Duties Handed Over:</div>
+                    {[1, 2, 3].map(i => (
+                      <div key={i} contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', marginBottom: 10, minHeight: 15 }}></div>
+                    ))}
+
+                    {/* 5. Contact During Leave */}
+                    <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '16px 0 8px', padding: '3px 6px', background: '#f0f0f0', borderLeft: '3px solid #333' }}>5. Contact During Leave</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 10 }}>
+                      <span>Can be Contacted:</span>
+                      {(['Yes', 'No'] as const).map(opt => (
+                        <span key={opt} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: lv.canBeContacted === opt ? '#111' : 'white', color: 'white', fontSize: 8 }}>{lv.canBeContacted === opt ? '✓' : ''}</span>
+                          {opt}
+                        </span>
                       ))}
-
-                      {/* 6. Signatures */}
-                      <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '14px 0 8px' }}>6. Signatures</div>
-
-                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 10 }}>
-                        <span style={{ fontSize: 10, flexShrink: 0 }}>Employee Signature:</span>
-                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }}></span>
-                        <span style={{ fontSize: 10, flexShrink: 0 }}>Date</span>
-                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                      </div>
-
-                      {["Supervisor's", "Management's"].map(who => (
-                        <div key={who} style={{ marginBottom: 10 }}>
-                          <div style={{ display: 'flex', gap: 8, fontSize: 10, marginBottom: 6 }}>
-                            <span style={{ flexShrink: 0 }}>{who} Approval:</span>
-                            <span>Approved</span>
-                            <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                            <span style={{ flexShrink: 0 }}>Not Approved</span>
-                            <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10 }}>
-                            <span style={{ flexShrink: 0 }}>{who.replace("'s", '')} Signature:</span>
-                            <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }}></span>
-                            <span style={{ flexShrink: 0 }}>Date</span>
-                            <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* HR Section */}
-                      <div style={{ borderTop: '1px solid #555', margin: '14px 0 10px' }} />
-                      <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 8 }}>To be Completed by Human Resources</div>
-                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 9, fontSize: 10 }}>
-                        <span style={{ flexShrink: 0 }}>Leave approved from:</span>
-                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                        <span style={{ flexShrink: 0 }}>to</span>
-                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                      </div>
-                      {[['Human Resource & Admin Manager', ''], ['Date', '']].map(([label]) => (
-                        <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 9, fontSize: 10 }}>
-                          <span style={{ flexShrink: 0 }}>{label}:</span>
-                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                        </div>
-                      ))}
-
-                      {/* Leave Acknowledgement */}
-                      <div style={{ borderTop: '1px solid #555', margin: '14px 0 10px' }} />
-                      <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 8 }}>Leave Acknowledgement:</div>
-                      <div style={{ fontSize: 10, lineHeight: 1.7, marginBottom: 8 }}>
-                        I <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', display: 'inline-block', minWidth: 120, marginBottom: -2 }}>&nbsp;</span> hereby notify the Human Resources and Administrative department that I have resumed duty as of:
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10, marginBottom: 10 }}>
-                        <span style={{ flexShrink: 0 }}>Employee's Signature:</span>
-                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }}></span>
-                        <span style={{ flexShrink: 0 }}>Date:</span>
-                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10 }}>
-                        <span style={{ flexShrink: 0 }}>Head of Dept/Line Manager Signature:</span>
-                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }}></span>
-                        <span style={{ flexShrink: 0 }}>Date:</span>
-                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 transition-colors cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                      </div>
                     </div>
                   </div>
+
+                  {/* ══════════ PAGE 2 ══════════ */}
+                  <div className="a4-page bg-white shadow-lg mx-auto" style={{ width: 794, minHeight: 1123, padding: '40px 48px', fontFamily: 'Arial, sans-serif', fontSize: 11, color: '#111' }}>
+
+                    {/* Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <img src="/logo/logo-2.png" alt="logo" style={{ height: 52 }} />
+                      <div style={{ fontSize: 10, color: '#555', textAlign: 'right' }}>Staff Annual Leave Application Form — Page 2</div>
+                    </div>
+                    <div style={{ borderBottom: '2px solid #111', marginBottom: 24 }} />
+
+                    {/* 6. Signatures */}
+                    <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', marginBottom: 8, padding: '3px 6px', background: '#f0f0f0', borderLeft: '3px solid #333' }}>6. Signatures</div>
+
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 14 }}>
+                      <span style={{ fontSize: 10, flexShrink: 0 }}>Employee Signature:</span>
+                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 15 }}></span>
+                      <span style={{ fontSize: 10, flexShrink: 0 }}>Date:</span>
+                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 15 }}></span>
+                    </div>
+
+                    {(["Supervisor's", "Management's"] as const).map(who => (
+                      <div key={who} style={{ marginBottom: 16, padding: '10px 12px', border: '1px solid #ddd', borderRadius: 4 }}>
+                        <div style={{ display: 'flex', gap: 8, fontSize: 10, marginBottom: 8 }}>
+                          <span style={{ flexShrink: 0 }}>{who} Approval:</span>
+                          <span>Approved</span>
+                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
+                          <span style={{ flexShrink: 0 }}>Not Approved</span>
+                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10 }}>
+                          <span style={{ flexShrink: 0 }}>{who.replace("'s", '')} Signature:</span>
+                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 15 }}></span>
+                          <span style={{ fontSize: 10, flexShrink: 0 }}>Date:</span>
+                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 15 }}></span>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* HR Section */}
+                    <div style={{ borderTop: '1px solid #555', margin: '24px 0 12px' }} />
+                    <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 10 }}>To be Completed by Human Resources</div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 11, fontSize: 10 }}>
+                      <span style={{ flexShrink: 0 }}>Leave approved from:</span>
+                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 15 }}></span>
+                      <span style={{ flexShrink: 0 }}>to</span>
+                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 15 }}></span>
+                    </div>
+                    {[['Human Resource & Admin Manager', ''], ['Date', '']].map(([label]) => (
+                      <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 11, fontSize: 10 }}>
+                        <span style={{ flexShrink: 0 }}>{label}:</span>
+                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 15 }}></span>
+                      </div>
+                    ))}
+
+                    {/* Leave Acknowledgement */}
+                    <div style={{ borderTop: '1px solid #555', margin: '24px 0 12px' }} />
+                    <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 10 }}>Leave Acknowledgement:</div>
+                    <div style={{ fontSize: 10, lineHeight: 1.7, marginBottom: 10 }}>
+                      I <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', display: 'inline-block', minWidth: 120, marginBottom: -2 }}>&nbsp;</span> hereby notify the Human Resources and Administrative department that I have resumed duty as of:
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10, marginBottom: 14 }}>
+                      <span style={{ flexShrink: 0 }}>Employee's Signature:</span>
+                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 15 }}></span>
+                      <span style={{ flexShrink: 0 }}>Date:</span>
+                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 15 }}></span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10 }}>
+                      <span style={{ flexShrink: 0 }}>Head of Dept/Line Manager Signature:</span>
+                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 15 }}></span>
+                      <span style={{ flexShrink: 0 }}>Date:</span>
+                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 15 }}></span>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             </div>
