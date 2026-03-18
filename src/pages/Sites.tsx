@@ -6,22 +6,16 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload } from 'lucide-react';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText } from 'lucide-react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
+import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { useUserStore } from '@/src/store/userStore';
 
 const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive', startDate: new Date().toISOString().split('T')[0], endDate: '' };
-
-const getNextSiteId = (existingSites: Site[]) => {
-  const max = existingSites.reduce((m, s) => {
-    const match = s.id.match(/^S-(\d+)$/i);
-    return match ? Math.max(m, parseInt(match[1], 10)) : m;
-  }, 0);
-  return `S-${String(max + 1).padStart(3, '0')}`;
-};
 
 function ClientSummary() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -179,6 +173,7 @@ export function Sites() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState('active');
   const [isAddingSite, setIsAddingSite] = useState(searchParams.get('action') === 'add');
   const [isAddingClient, setIsAddingClient] = useState(searchParams.get('action') === 'addClient');
   const [newClientName, setNewClientName] = useState('');
@@ -186,6 +181,69 @@ export function Sites() {
   const [addForm, setAddForm] = useState({ ...EMPTY_FORM });
   const [editForm, setEditForm] = useState({ ...EMPTY_FORM });
   const [addError, setAddError] = useState('');
+  const [narrativeSite, setNarrativeSite] = useState<{ site: any; q: SiteQuestionnaire | null } | null>(null);
+
+  const buildNarrative = (site: any, q: SiteQuestionnaire | null): string => {
+    const lines: string[] = [];
+    const name = site.name || 'this site';
+    const client = site.client || 'the client';
+
+    // Opening
+    lines.push(`${name} is a dewatering project undertaken by DCEL on behalf of ${client}.`);
+
+    if (q) {
+      // Phase 1 — Project Scope
+      const p1 = q.phase1;
+      if (p1.whatIsBeingBuilt) lines.push(`The project involves ${p1.whatIsBeingBuilt.toLowerCase()}.`);
+      if (p1.excavationDepthMeters) lines.push(`Excavation is planned to a depth of ${p1.excavationDepthMeters} metres.`);
+      if (p1.footprintSize) lines.push(`The site footprint covers approximately ${p1.footprintSize} square metres.`);
+      if (p1.timelineStartDate) lines.push(`Works are scheduled to commence on ${p1.timelineStartDate}.`);
+      const dataAvail = [p1.geotechnicalReportAvailable && 'geotechnical report', p1.hydrogeologicalDataAvailable && 'hydrogeological data'].filter(Boolean);
+      if (dataAvail.length) lines.push(`Background data available at inquiry: ${dataAvail.join(' and ')}.`);
+
+      // Phase 2 — Site Assessment
+      const p2 = q.phase2;
+      const visited = p2.siteVisited || p2.walkthroughCompleted;
+      if (visited) lines.push(`A site visit and walkthrough were conducted to assess site conditions.`);
+      if (p2.knownObstacles) lines.push(`Known site obstacles include: ${p2.knownObstacles}.`);
+      if (p2.dischargeLocation) lines.push(`Dewatering discharge will be directed to ${p2.dischargeLocation}.`);
+      if (p2.dieselSupplyStrategy) lines.push(`Diesel supply is to be provided by ${p2.dieselSupplyStrategy}.`);
+
+      // Phase 3 — Engineering
+      const p3 = q.phase3;
+      const methods = (p3.dewateringMethods || []);
+      if (methods.length) lines.push(`The approved dewatering method(s) for this site: ${methods.join(', ')}.`);
+      if (p3.totalWellpointsRequired) lines.push(`The system requires ${p3.totalWellpointsRequired} wellpoints across ${p3.totalHeadersRequired || '—'} header pipes.`);
+      if (p3.totalPumpsRequired) lines.push(`A total of ${p3.totalPumpsRequired} pump(s) will be deployed.`);
+      if (p3.expectedDailyDieselUsage) lines.push(`Daily diesel consumption is estimated at ${p3.expectedDailyDieselUsage}.`);
+
+      // Phase 4 — Commercial
+      const p4 = q.phase4;
+      if (p4.scopeOfWorkSummary) lines.push(`Scope of work: ${p4.scopeOfWorkSummary}`);
+      if (p4.scopeExclusionsSummary) lines.push(`Exclusions from scope: ${p4.scopeExclusionsSummary}`);
+      if (p4.clientTaxStatus) lines.push(`Client tax classification is ${p4.clientTaxStatus}.`);
+      if (p4.proposalAccepted) lines.push(`The client has formally accepted the proposal.`);
+
+      // Phase 5 — Handover
+      const p5 = q.phase5;
+      const milestones: string[] = [];
+      if (p5.safetyPlanIntegrated) milestones.push('site safety plan integrated');
+      if (p5.stage1AdvanceReceived) milestones.push('50% advance payment received');
+      if (p5.stage2InstallationComplete) milestones.push('installation complete and system started');
+      if (p5.stage2FirstInvoiceIssued) milestones.push('first hire invoice issued');
+      if (p5.stage3TimelyBilling) milestones.push('regular hire invoicing ongoing');
+      if (p5.stage4DemobilizationComplete) milestones.push('demobilisation complete');
+      if (p5.stage4FinalInvoiceIssued) milestones.push('final invoice and WHT credit issued');
+      if (milestones.length) lines.push(`Project milestones achieved: ${milestones.join(', ')}.`);
+      if (p5.actualEndDate) lines.push(`The project concluded on ${p5.actualEndDate}.`);
+    } else {
+      lines.push(`No detailed onboarding record has been linked to this site yet.`);
+    }
+
+    lines.push(`Current site status: ${site.status}. VAT: ${site.vat}.`);
+    if (site.startDate) lines.push(`Start date: ${site.startDate}${site.endDate ? `. End date: ${site.endDate}` : ''}.`);
+    return lines.join(' ');
+  };
 
   // ── Permission checks ──────────────────────────────────────────
   const currentUser = useUserStore((s) => s.getCurrentUser());
@@ -200,6 +258,7 @@ export function Sites() {
   const hasActions    = canEditSite || canDeleteSite;
 
   const sites = useAppStore((s) => s.sites);
+  const pendingSites = useAppStore((s) => s.pendingSites);
   const clients = useAppStore((s) => s.clients);
   const addSite = useAppStore((s) => s.addSite);
   const addClient = useAppStore((s) => s.addClient);
@@ -210,6 +269,12 @@ export function Sites() {
   const filteredSites = sites.filter(site =>
     site.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     site.client.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredPendingSites = pendingSites.filter(site =>
+    site.status === 'Pending' &&
+    (site.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    site.clientName.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const isDuplicate = (name: string, client: string, excludeId?: string) =>
@@ -233,7 +298,7 @@ export function Sites() {
     if (addForm.endDate && nowStr > addForm.endDate) calcStatus = 'Inactive';
 
     addSite({
-      id: getNextSiteId(sites),
+      id: crypto.randomUUID(),
       name: addForm.name.trim(),
       client: addForm.client.trim(),
       vat: addForm.vat,
@@ -358,7 +423,7 @@ export function Sites() {
 
             let newId = importedSite.id ? importedSite.id.toString().trim() : '';
             if (!newId || importedIds.has(newId) || sites.some(s => s.id === newId)) {
-              newId = getNextSiteId([...sites, ...validNewSites]);
+              newId = crypto.randomUUID();
             }
 
             importedPairs.add(pairKey);
@@ -405,8 +470,8 @@ export function Sites() {
           <div className="flex items-center gap-4">
             <div className="flex gap-2">
               {canAddSite && (
-                <Button onClick={() => setIsAddingSite(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
-                  <Plus className="h-4 w-4" /> Add New Site
+                <Button onClick={() => navigate('/sites/onboarding/new')} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+                  <Plus className="h-4 w-4" /> Site Onboarding
                 </Button>
               )}
               {canAddClient && (
@@ -419,7 +484,27 @@ export function Sites() {
         )}
       </div>
 
-      <div className="flex flex-col flex-1 min-h-0 gap-8">
+      <div className="flex items-center gap-2">
+        <TabsList className="bg-slate-100 h-8">
+          <TabsTrigger
+            active={activeTab === 'active'}
+            onClick={() => setActiveTab('active')}
+            className="gap-1.5 text-xs h-7 px-3"
+          >
+            Active Sites
+          </TabsTrigger>
+          <TabsTrigger
+            active={activeTab === 'pending'}
+            onClick={() => setActiveTab('pending')}
+            className="gap-1.5 text-xs h-7 px-3"
+          >
+            Pending Sites
+          </TabsTrigger>
+        </TabsList>
+      </div>
+
+      <Tabs className="flex flex-col flex-1 min-h-0 gap-8">
+        <TabsContent active={activeTab === 'active'} className="flex-1 flex flex-col min-h-0 gap-6">
           <div className="grid gap-6 md:grid-cols-3">
             <Card className="border-indigo-100 bg-indigo-50/50">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -551,21 +636,13 @@ export function Sites() {
                     </TableCell>
                     <TableCell>
                       {editingId === site.id ? (
-                        <select
-                          value={editForm.status}
-                          onChange={e => setEditForm({ ...editForm, status: e.target.value as 'Active' | 'Inactive' })}
-                          className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm"
-                          disabled={false}
-                        >
-                          <option value="Active">Active</option>
-                          <option value="Inactive">Inactive</option>
-                        </select>
+                        <Badge variant={editForm.status === 'Active' ? 'success' : 'secondary'}>{editForm.status}</Badge>
                       ) : (
                         <Badge variant={site.status === 'Active' ? 'success' : 'secondary'}>{site.status}</Badge>
                       )}
                     </TableCell>
                     {hasActions && (
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap">
                         {editingId === site.id ? (
                           <div className="flex justify-end gap-2">
                             <Button variant="ghost" size="sm" className="text-emerald-600" onClick={handleSaveEdit}>
@@ -577,6 +654,33 @@ export function Sites() {
                           </div>
                         ) : (
                           <div className="flex justify-end gap-2">
+                            {(() => {
+                              const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
+                              return (
+                                <>
+                                  <Button
+                                    variant="ghost" size="sm" className="text-slate-600"
+                                    onClick={() => setNarrativeSite({ site, q: linkedQ || null })}
+                                    title="Site Info Summary"
+                                  >
+                                    <FileText className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost" size="sm" className="text-slate-600"
+                                    onClick={() => {
+                                      if (linkedQ) {
+                                        navigate(`/sites/onboarding/${linkedQ.id}`);
+                                      } else {
+                                        navigate('/sites/onboarding/new', { state: { linkedSite: site } });
+                                      }
+                                    }}
+                                    title="View Site Onboarding"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              );
+                            })()}
                             {canEditSite && (
                               <Button variant="ghost" size="sm" className="text-indigo-600" onClick={() => handleEditStart(site)}>
                                 <Pencil className="h-4 w-4" />
@@ -603,7 +707,69 @@ export function Sites() {
               </TableBody>
             </Table>
           </div>
-        </div>
+        </TabsContent>
+
+        <TabsContent active={activeTab === 'pending'} className="flex-1 flex flex-col min-h-0 gap-6">
+          <div className="rounded-xl border border-slate-200 bg-white shadow-sm flex-1 min-h-0 flex flex-col">
+            <div className="p-4 border-b border-slate-200 flex items-center gap-3">
+              <div className="relative flex-1 max-w-xs">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
+                  <Input
+                    placeholder="Search pending sites or clients..."
+                    className="pl-9 text-sm h-9"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                  />
+                </div>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Proposed Site</TableHead>
+                  <TableHead className="text-center">Phase 1</TableHead>
+                  <TableHead className="text-center">Phase 2</TableHead>
+                  <TableHead className="text-center">Phase 3</TableHead>
+                  <TableHead className="text-center">Phase 4</TableHead>
+                  <TableHead className="text-center">Phase 5</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredPendingSites.map(site => (
+                  <TableRow key={site.id}>
+                    <TableCell className="font-medium text-slate-900">{site.clientName}</TableCell>
+                    <TableCell>{site.siteName}</TableCell>
+                    <TableCell className="text-center">{site.phase1.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-green-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-300" />}</TableCell>
+                    <TableCell className="text-center">{site.phase2.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-green-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-300" />}</TableCell>
+                    <TableCell className="text-center">{site.phase3.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-green-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-300" />}</TableCell>
+                    <TableCell className="text-center">{site.phase4.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-green-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-300" />}</TableCell>
+                    <TableCell className="text-center">{site.phase5.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-green-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-300" />}</TableCell>
+                    <TableCell>
+                      <Badge variant={site.status === 'Pending' ? 'secondary' : 'success'}>
+                        {site.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" size="sm" onClick={() => navigate(`/sites/onboarding/${site.id}`)}>
+                        <Eye className="h-4 w-4 mr-2" /> View Form
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredPendingSites.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-slate-500">
+                      No pending sites found. Click "Site Onboarding" to create one.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Floating Dialogs */}
       <Dialog open={isAddingSite} onClose={() => { setIsAddingSite(false); setAddError(''); navigate('/sites', { replace: true }); }} title="Add New Site">
@@ -683,6 +849,32 @@ export function Sites() {
           </Button>
         </DialogFooter>
       </Dialog>
+
+      {/* ── Site Narrative Info Modal ── */}
+      {narrativeSite && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 py-5 flex items-start justify-between">
+              <div>
+                <h2 className="text-white font-bold text-lg">{narrativeSite.site.name}</h2>
+                <p className="text-indigo-200 text-sm mt-0.5">{narrativeSite.site.client} · {narrativeSite.site.status}</p>
+              </div>
+              <button onClick={() => setNarrativeSite(null)} className="text-indigo-200 hover:text-white mt-1">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Project Summary</h3>
+              <p className="text-slate-700 text-sm leading-relaxed">
+                {buildNarrative(narrativeSite.site, narrativeSite.q)}
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex justify-end">
+              <Button variant="outline" onClick={() => setNarrativeSite(null)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

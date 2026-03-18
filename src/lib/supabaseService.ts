@@ -11,11 +11,11 @@ import type { AppUser, PrivilegePreset } from '@/src/store/userStore';
 
 // ─── Mappers: DB → App ──────────────────────────────────────
 
-function dbToSite(r: any): Site {
+export function dbToSite(r: any): Site {
   return { id: r.id, name: r.name, client: r.client, vat: r.vat, status: r.status, startDate: r.start_date, endDate: r.end_date };
 }
 
-function dbToEmployee(r: any): Employee {
+export function dbToEmployee(r: any): Employee {
   return {
     id: r.id, employeeCode: r.employee_code, surname: r.surname, firstname: r.firstname, department: r.department,
     staffType: r.staff_type, position: r.position, startDate: r.start_date,
@@ -29,7 +29,7 @@ function dbToEmployee(r: any): Employee {
   };
 }
 
-function dbToAttendance(r: any): AttendanceRecord {
+export function dbToAttendance(r: any): AttendanceRecord {
   return {
     id: r.id, date: r.date, staffId: r.staff_id, staffName: r.staff_name,
     position: r.position, dayClient: r.day_client, daySite: r.day_site,
@@ -40,7 +40,7 @@ function dbToAttendance(r: any): AttendanceRecord {
   };
 }
 
-function dbToInvoice(r: any): Invoice {
+export function dbToInvoice(r: any): Invoice {
   return {
     id: r.id, invoiceNumber: r.invoice_number, client: r.client,
     project: r.project, siteId: r.site_id, siteName: r.site_name,
@@ -58,7 +58,7 @@ function dbToInvoice(r: any): Invoice {
   };
 }
 
-function dbToPendingInvoice(r: any): PendingInvoice {
+export function dbToPendingInvoice(r: any): PendingInvoice {
   return {
     id: r.id, invoiceNo: r.invoice_no, client: r.client, site: r.site,
     vatInc: r.vat_inc, noOfMachine: r.no_of_machine,
@@ -74,14 +74,14 @@ function dbToPendingInvoice(r: any): PendingInvoice {
   };
 }
 
-function dbToSalaryAdvance(r: any): SalaryAdvance {
+export function dbToSalaryAdvance(r: any): SalaryAdvance {
   return {
     id: r.id, employeeId: r.employee_id, employeeName: r.employee_name,
     amount: Number(r.amount), requestDate: r.request_date, status: r.status,
   };
 }
 
-function dbToLoan(r: any): Loan {
+export function dbToLoan(r: any): Loan {
   return {
     id: r.id, employeeId: r.employee_id, employeeName: r.employee_name,
     loanType: r.loan_type, principalAmount: Number(r.principal_amount),
@@ -91,7 +91,7 @@ function dbToLoan(r: any): Loan {
   };
 }
 
-function dbToPayment(r: any): Payment {
+export function dbToPayment(r: any): Payment {
   return {
     id: r.id, client: r.client, site: r.site, date: r.date,
     amount: Number(r.amount), withholdingTax: Number(r.withholding_tax),
@@ -100,11 +100,11 @@ function dbToPayment(r: any): Payment {
   };
 }
 
-function dbToVatPayment(r: any): VatPayment {
+export function dbToVatPayment(r: any): VatPayment {
   return { id: r.id, client: r.client, date: r.date, month: r.month, amount: Number(r.amount) };
 }
 
-function dbToLeave(r: any): LeaveRecord {
+export function dbToLeave(r: any): LeaveRecord {
   return {
     id: r.id, employeeId: r.employee_id, employeeName: r.employee_name,
     leaveType: r.leave_type, startDate: r.start_date, duration: r.duration,
@@ -115,7 +115,7 @@ function dbToLeave(r: any): LeaveRecord {
   };
 }
 
-function dbToProfile(r: any): AppUser {
+export function dbToProfile(r: any): AppUser {
   return {
     id: r.id, name: r.name, email: r.email, avatar: r.avatar,
     password: '', // Not stored in DB
@@ -305,8 +305,16 @@ export async function fetchPresets() {
 export const db = {
   // Sites
   async insertSite(s: Site) {
-    const { error } = await supabase.from('sites').insert(siteToDb(s));
-    if (error) console.error('insertSite:', error);
+    // Use upsert so that re-activating an existing site key doesn't 400
+    const { data, error } = await supabase
+      .from('sites')
+      .upsert(siteToDb(s), { onConflict: 'id' })
+      .select('id')
+      .single();
+    if (error) {
+      console.error('insertSite:', error);
+    }
+    return data;
   },
   async updateSite(id: string, s: Partial<Site>) {
     const update: any = {};

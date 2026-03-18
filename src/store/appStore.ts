@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { db } from '@/src/lib/supabaseService';
+import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 
 export interface Site {
   id: string;
@@ -219,6 +220,7 @@ export interface MonthValue {
 
 interface AppState {
   sites: Site[];
+  pendingSites: SiteQuestionnaire[];
   clients: string[];
   employees: Employee[];
   attendanceRecords: AttendanceRecord[];
@@ -234,6 +236,12 @@ interface AppState {
   setSites: (sites: Site[]) => void;
   updateSite: (id: string, site: Partial<Site>) => void;
   deleteSite: (id: string) => void;
+  
+  addPendingSite: (site: SiteQuestionnaire) => void;
+  setPendingSites: (sites: SiteQuestionnaire[]) => void;
+  updatePendingSite: (id: string, site: Partial<SiteQuestionnaire>) => void;
+  deletePendingSite: (id: string) => void;
+
   addClient: (client: string) => void;
   removeClient: (client: string) => void;
   addEmployee: (employee: Employee) => void;
@@ -313,6 +321,7 @@ export const useAppStore = create<AppState>()(
       // ── Default state (empty - data comes from Supabase) ──
       leaves: [],
       sites: [],
+      pendingSites: [],
       clients: [],
       positions: [],
       departments: [],
@@ -365,6 +374,12 @@ export const useAppStore = create<AppState>()(
       setSites: (sites) => { set({ sites }); db.setSites(sites); },
       updateSite: (id, updatedSite) => { set((s) => ({ sites: s.sites.map(site => site.id === id ? { ...site, ...updatedSite } : site) })); db.updateSite(id, updatedSite); },
       deleteSite: (id) => { set((s) => ({ sites: s.sites.filter(site => site.id !== id) })); db.deleteSite(id); },
+
+      // Pending Sites
+      addPendingSite: (site) => { set((s) => ({ pendingSites: [...s.pendingSites, site] })); },
+      setPendingSites: (pendingSites) => { set({ pendingSites }); },
+      updatePendingSite: (id, updatedSite) => { set((s) => ({ pendingSites: s.pendingSites.map(site => site.id === id ? { ...site, ...updatedSite } : site) })); },
+      deletePendingSite: (id) => { set((s) => ({ pendingSites: s.pendingSites.filter(site => site.id !== id) })); },
 
       // Clients
       addClient: (client) => { set((s) => ({ clients: s.clients.includes(client) ? s.clients : [...s.clients, client] })); db.insertClient(client); },

@@ -3,6 +3,7 @@ import { useAppStore } from '@/src/store/appStore';
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile } from '@/src/lib/supabaseService';
 
 /** Fills in any missing privilege sections using NO_ACCESS defaults. */
 function backfillPrivileges(
@@ -48,14 +49,13 @@ export function useDataLoader(isAuthenticated: boolean) {
           db.insertClient('DCEL');
         }
         if (!appData.sites.some(s => s.name.toLowerCase() === 'office' && s.client.toLowerCase() === 'dcel')) {
-          const mID = appData.sites.reduce((m, s) => {
-            const match = s.id.match(/^S-(\d+)$/i);
-            return match ? Math.max(m, parseInt(match[1], 10)) : m;
-          }, 0);
-          const officeSite = { id: `S-${String(mID + 1).padStart(3, '0')}`, name: 'Office', client: 'DCEL', status: 'Active' as const, vat: 'No' as const };
+          const officeSite = { id: crypto.randomUUID(), name: 'Office', client: 'DCEL', status: 'Active' as const, vat: 'No' as const };
           appData.sites.push(officeSite);
           db.insertSite(officeSite);
         }
+
+        // Preserve pendingSites from localStorage — they have no Supabase table yet
+        const localPendingSites = useAppStore.getState().pendingSites;
 
         // Hydrate appStore
         useAppStore.setState({
@@ -75,6 +75,8 @@ export function useDataLoader(isAuthenticated: boolean) {
           leaveTypes: appData.leaveTypes.length > 0 ? appData.leaveTypes : useAppStore.getState().leaveTypes,
           positions: appData.positions.length > 0 ? appData.positions : useAppStore.getState().positions,
           departments: appData.departments.length > 0 ? appData.departments : useAppStore.getState().departments,
+          // Always preserve pendingSites from localStorage — not synced to Supabase
+          pendingSites: localPendingSites,
           ...(appData.payrollVariables ? { payrollVariables: appData.payrollVariables as any } : {}),
           ...(appData.payeTaxVariables ? { payeTaxVariables: appData.payeTaxVariables as any } : {}),
           ...(appData.monthValues && Object.keys(appData.monthValues as any).length > 0 ? { monthValues: appData.monthValues as any } : {}),
@@ -132,5 +134,157 @@ export function useDataLoader(isAuthenticated: boolean) {
     if (!isAuthenticated) {
       loaded.current = false;
     }
+  }, [isAuthenticated]);
+}
+
+/**
+ * Creates Realtime subscriptions to core tables so that changes
+ * made by other users immediately reflect in the Zustand store.
+ */
+export function useRealtimeData(isAuthenticated: boolean) {
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    // We create a global channel to listen to all public schema changes
+    // Alternatively, you can create one channel per table
+    const channel = supabase
+      .channel('app-realtime-global')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public' },
+        (payload) => {
+          const table = payload.table;
+          const eventType = payload.eventType;
+          const newRow = payload.new as Record<string, any>;
+          const oldRow = payload.old as Record<string, any>;
+
+          // Helper to get current state safely
+          const appState = useAppStore.getState();
+
+          switch (table) {
+            case 'employees': {
+              const current = appState.employees;
+              if (eventType === 'INSERT') {
+                useAppStore.setState({ employees: [...current, dbToEmployee(newRow)] });
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToEmployee(newRow);
+                useAppStore.setState({ employees: current.map(e => e.id === updated.id ? updated : e) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ employees: current.filter(e => e.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'attendance_records': {
+              const current = appState.attendanceRecords;
+              if (eventType === 'INSERT') {
+                useAppStore.setState({ attendanceRecords: [...current, dbToAttendance(newRow)] });
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToAttendance(newRow);
+                useAppStore.setState({ attendanceRecords: current.map(a => a.id === updated.id ? updated : a) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ attendanceRecords: current.filter(a => a.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'invoices': {
+              const current = appState.invoices;
+              if (eventType === 'INSERT') {
+                useAppStore.setState({ invoices: [...current, dbToInvoice(newRow)] });
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToInvoice(newRow);
+                useAppStore.setState({ invoices: current.map(i => i.id === updated.id ? updated : i) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ invoices: current.filter(i => i.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'pending_invoices': {
+              const current = appState.pendingInvoices;
+              if (eventType === 'INSERT') {
+                useAppStore.setState({ pendingInvoices: [...current, dbToPendingInvoice(newRow)] });
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToPendingInvoice(newRow);
+                useAppStore.setState({ pendingInvoices: current.map(i => i.id === updated.id ? updated : i) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ pendingInvoices: current.filter(i => i.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'salary_advances': {
+              const current = appState.salaryAdvances;
+              if (eventType === 'INSERT') {
+                useAppStore.setState({ salaryAdvances: [...current, dbToSalaryAdvance(newRow)] });
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToSalaryAdvance(newRow);
+                useAppStore.setState({ salaryAdvances: current.map(a => a.id === updated.id ? updated : a) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ salaryAdvances: current.filter(a => a.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'loans': {
+              const current = appState.loans;
+              if (eventType === 'INSERT') {
+                useAppStore.setState({ loans: [...current, dbToLoan(newRow)] });
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToLoan(newRow);
+                useAppStore.setState({ loans: current.map(l => l.id === updated.id ? updated : l) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ loans: current.filter(l => l.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'leaves': {
+              const current = appState.leaves;
+              if (eventType === 'INSERT') {
+                useAppStore.setState({ leaves: [...current, dbToLeave(newRow)] });
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToLeave(newRow);
+                useAppStore.setState({ leaves: current.map(l => l.id === updated.id ? updated : l) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ leaves: current.filter(l => l.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'sites': {
+              const current = appState.sites;
+              if (eventType === 'INSERT') {
+                useAppStore.setState({ sites: [...current, dbToSite(newRow)] });
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToSite(newRow);
+                useAppStore.setState({ sites: current.map(s => s.id === updated.id ? updated : s) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ sites: current.filter(s => s.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'profiles': {
+              const userStoreState = useUserStore.getState();
+              const currentUsers = userStoreState.users;
+              if (eventType === 'INSERT') {
+                useUserStore.setState({ users: [...currentUsers, dbToProfile(newRow)] });
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToProfile(newRow);
+                useUserStore.setState({ users: currentUsers.map(u => u.id === updated.id ? updated : u) });
+              } else if (eventType === 'DELETE') {
+                useUserStore.setState({ users: currentUsers.filter(u => u.id !== oldRow.id) });
+              }
+              break;
+            }
+            // You can add payments, vat_payments and others if needed
+          }
+        }
+      )
+      .subscribe((status, err) => {
+        if (err) {
+          console.error("Error setting up realtime:", err);
+        } else {
+          console.log("Realtime subscription status:", status);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [isAuthenticated]);
 }

@@ -2,13 +2,14 @@ import { useEffect } from 'react';
 
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
-import { useDataLoader } from './hooks/useDataLoader';
+import { useDataLoader, useRealtimeData } from './hooks/useDataLoader';
 import { Layout } from './components/layout/Layout';
 import { Login } from './pages/Login';
 import { SuperAdminSetup } from './pages/SuperAdminSetup';
 import { Dashboard } from './pages/Dashboard';
 import { Employees } from './pages/Employees';
 import { Sites } from './pages/Sites';
+import { SiteOnboarding } from './pages/SiteOnboarding';
 import { Attendance } from './pages/Attendance';
 import { Payroll } from './pages/Payroll';
 import { Billing } from './pages/Billing';
@@ -59,6 +60,9 @@ function AppContent() {
 
   // Load data from Supabase when authenticated
   useDataLoader(!!user);
+  
+  // Listen to realtime database changes so connected clients update instantly
+  useRealtimeData(!!user);
 
   // Handle navigation triggered by Electron main-process menu items
   useEffect(() => {
@@ -79,6 +83,7 @@ function AppContent() {
         <Route path="attendance" element={<Attendance />} />
         <Route path="employees" element={<Employees />} />
         <Route path="sites" element={<Sites />} />
+        <Route path="sites/onboarding/:id" element={<SiteOnboarding />} />
         <Route path="payroll" element={<Payroll />} />
         <Route path="invoices" element={<Billing />} />
         <Route path="payments" element={<Payments />} />
