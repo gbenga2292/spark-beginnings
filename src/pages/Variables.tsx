@@ -39,7 +39,7 @@ export function Variables() {
   const [localHrVars, setLocalHrVars] = useState(storeHrVariables);
   const [isDirty, setIsDirty] = useState(false);
 
-  // ── Ledger variables ───────────────────────────────────────
+  // â”€â”€ Ledger variables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const ledgerCategories = useAppStore((state) => state.ledgerCategories);
   const ledgerBanks = useAppStore((state) => state.ledgerBanks);
   const ledgerVendors = useAppStore((state) => state.ledgerVendors);
@@ -76,7 +76,7 @@ export function Variables() {
   const addLeaveType = useAppStore((state) => state.addLeaveType);
   const removeLeaveType = useAppStore((state) => state.removeLeaveType);
 
-  // ─── Permissions ───────────────────────────────────────────
+  // â”€â”€â”€ Permissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const priv = usePriv('variables');
 
   const [newExtraLabel, setNewExtraLabel] = useState('');
@@ -307,7 +307,7 @@ export function Variables() {
 
       // PAYE Tax Variables
       const payeData = [
-        { Key: 'CRA Base (₦)', Value: localPayeVars.craBase },
+        { Key: 'CRA Base (â‚¦)', Value: localPayeVars.craBase },
         { Key: 'Rent Relief Rate (%)', Value: (localPayeVars.rentReliefRate || 0) * 100 },
       ];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payeData), 'PAYE_Variables');
@@ -315,13 +315,13 @@ export function Variables() {
       const taxBracketsData = localPayeVars.taxBrackets.map(b => ({
         Label: b.label,
         'Rate (%)': b.rate * 100,
-        'UpTo (₦)': b.upTo === null ? 'INFINITY' : b.upTo
+        'UpTo (â‚¦)': b.upTo === null ? 'INFINITY' : b.upTo
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taxBracketsData), 'PAYE_Tax_Brackets');
 
       const extraConditionsData = localPayeVars.extraConditions.map(c => ({
         Label: c.label,
-        'Amount (₦)': c.amount,
+        'Amount (â‚¦)': c.amount,
         Enabled: c.enabled
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(extraConditionsData), 'PAYE_Extra_Conditions');
@@ -445,7 +445,7 @@ export function Variables() {
                     id: Math.random().toString(36).slice(2),
                     label: String(row.Label || ''),
                     rate: parseFloat(row['Rate (%)'] || 0) / 100,
-                    upTo: row['UpTo (₦)'] === 'INFINITY' ? null : parseFloat(row['UpTo (₦)'] || 0)
+                    upTo: row['UpTo (â‚¦)'] === 'INFINITY' ? null : parseFloat(row['UpTo (â‚¦)'] || 0)
                   }));
                 }
               }
@@ -456,7 +456,7 @@ export function Variables() {
                   newPayeVar.extraConditions = ecData.map(row => ({
                     id: Math.random().toString(36).slice(2),
                     label: String(row.Label || ''),
-                    amount: parseFloat(row['Amount (₦)'] || 0),
+                    amount: parseFloat(row['Amount (â‚¦)'] || 0),
                     enabled: row.Enabled === true || row.Enabled === 'true' || row.Enabled === 'Yes',
                   }));
                 }
@@ -578,7 +578,7 @@ export function Variables() {
       </div>
 
       {varSection === 'ledger' ? (
-        /* ── LEDGER VARIABLES SECTION ─────────────────────────── */
+        /* â”€â”€ LEDGER VARIABLES SECTION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Card className="shadow-sm border-slate-200">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
@@ -666,7 +666,7 @@ export function Variables() {
                     {ledgerVendors.map(v => (
                       <TableRow key={v.id}>
                         <TableCell className="font-medium text-slate-700">{v.name}</TableCell>
-                        <TableCell className="text-sm text-slate-500">{v.tinNumber || '—'}</TableCell>
+                        <TableCell className="text-sm text-slate-500">{v.tinNumber || 'â€”'}</TableCell>
                         <TableCell className="w-[50px]">
                           {priv.canEdit && (
                             <Button variant="ghost" size="icon" onClick={async () => { const conf = await showConfirm(`Delete vendor "${v.name}"?`, { variant: 'danger' }); if (conf) removeLedgerVendor(v.id); }}>
@@ -850,7 +850,7 @@ export function Variables() {
             </CardContent>
           </Card>
 
-          {/* ——— CLIENTS ——— */}
+          {/* â€”â€”â€” CLIENTS â€”â€”â€” */}
           <Card className="shadow-sm border-slate-200">
             <CardHeader>
               <CardTitle>Clients</CardTitle>
@@ -893,7 +893,7 @@ export function Variables() {
             </CardContent>
           </Card>
 
-          {/* ——— LEAVE TYPES ——— */}
+          {/* â€”â€”â€” LEAVE TYPES â€”â€”â€” */}
           <Card className="shadow-sm border-slate-200">
             <CardHeader>
               <CardTitle>Leave Types</CardTitle>
@@ -928,7 +928,7 @@ export function Variables() {
             <CardHeader className="bg-indigo-50/30 rounded-t-lg border-b border-indigo-100">
               <CardTitle className="text-indigo-900">Onboarding Task Templates</CardTitle>
               <CardDescription>
-                <strong>System Default Tasks</strong> (Steps 1–8) are built-in for all departments and cannot be removed.
+                <strong>System Default Tasks</strong> (Steps 1â€“8) are built-in for all departments and cannot be removed.
                 Add <strong>custom extra tasks</strong> below and choose where they slot in.
               </CardDescription>
             </CardHeader>
@@ -941,7 +941,7 @@ export function Variables() {
                 </select>
               </div>
 
-              {/* System default tasks — read-only */}
+              {/* System default tasks â€” read-only */}
               <div className="rounded-xl border border-indigo-100 bg-indigo-50/30 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-100/60 border-b border-indigo-100">
                   <span className="text-xs font-bold uppercase tracking-wider text-indigo-700">System Default Tasks (All Departments)</span>
@@ -952,7 +952,7 @@ export function Variables() {
                     { step: '1', label: 'Send Necessary Information (Forms)', sub: ['Sent', 'Acknowledgement received'] },
                     { step: '2', label: 'Return of Forms', sub: ['2.1 Guarantor Forms', '2.2 Personal Employee Form', '2.3 Passport Copy'] },
                     { step: '3', label: 'Verification of Documents', sub: ['3.1 Guarantor Info (name, phone, verified each)', '3.2 Documents (passport photos, address, edu)', '3.2 Account details (bank + account no + verified)', '3.2 Pension Number (input + verified)', '3.2 PAYE Number (input + verified)'] },
-                    { step: '4', label: 'Resumption — Verified Start Date', sub: ['Official start date confirmed'] },
+                    { step: '4', label: 'Resumption â€” Verified Start Date', sub: ['Official start date confirmed'] },
                     { step: '5', label: 'Employment Letters (Print, Sign & Return)', sub: [] },
                     { step: '6', label: 'Orientation (HR, Department, Site, HSE)', sub: ['Post-activation'] },
                     { step: '8', label: 'Provision of PPE, Handbook & Requirements', sub: ['Post-activation'] },
@@ -971,7 +971,7 @@ export function Variables() {
               {/* Custom onboarding tasks */}
               <div className="rounded-xl border border-amber-200 bg-amber-50/20 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-2.5 bg-amber-100/60 border-b border-amber-200">
-                  <span className="text-xs font-bold uppercase tracking-wider text-amber-700">Custom Onboarding Tasks{taskDeptFilter !== 'ALL' ? ` — ${taskDeptFilter}` : ''}</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-700">Custom Onboarding Tasks{taskDeptFilter !== 'ALL' ? ` â€” ${taskDeptFilter}` : ''}</span>
                   <span className="text-[10px] text-amber-600 bg-amber-100 rounded px-2 py-0.5 font-semibold">{currentTaskView.onboardingTasks.length} task{currentTaskView.onboardingTasks.length !== 1 ? 's' : ''}</span>
                 </div>
                 <div className="p-3 space-y-3">
@@ -1034,7 +1034,7 @@ export function Variables() {
               {/* Offboarding tasks */}
               <div className="rounded-xl border border-rose-200 bg-rose-50/20 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-2.5 bg-rose-100/60 border-b border-rose-200">
-                  <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Offboarding Tasks{taskDeptFilter !== 'ALL' ? ` — ${taskDeptFilter}` : ''}</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Offboarding Tasks{taskDeptFilter !== 'ALL' ? ` â€” ${taskDeptFilter}` : ''}</span>
                   <span className="text-[10px] text-rose-600 bg-rose-100 rounded px-2 py-0.5 font-semibold">{currentTaskView.offboardingTasks.length} task{currentTaskView.offboardingTasks.length !== 1 ? 's' : ''}</span>
                 </div>
                 <div className="p-3 space-y-2">
@@ -1193,7 +1193,7 @@ export function Variables() {
                   onChange={e => setMonthConfigDept(e.target.value)}
                   className="h-8 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer focus:ring-2 focus:ring-indigo-400 outline-none"
                 >
-                  <option value="">— All (6 days/wk default) —</option>
+                  <option value="">â€” All (6 days/wk default) â€”</option>
                   {departments.map(d => (
                     <option key={d} value={d}>{d}</option>
                   ))}
@@ -1262,7 +1262,7 @@ export function Variables() {
             </CardContent>
           </Card>
 
-          {/* ── PAYE Tax Variables ─────────────────────────────────── */}
+          {/* â”€â”€ PAYE Tax Variables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <Card className="border-amber-200">
             <CardHeader className="bg-amber-50/50 rounded-t-lg border-b border-amber-100">
               <CardTitle className="text-amber-900">PAYE Tax Variables (NIGERIATAX)</CardTitle>
@@ -1278,10 +1278,10 @@ export function Variables() {
                 <p className="text-xs font-bold text-slate-500 uppercase mb-3">Consolidated Relief Allowance (CRA)</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">CRA Base (₦)</label>
+                    <label className="text-xs font-semibold text-slate-700">CRA Base (â‚¦)</label>
                     <Input type="number" value={localPayeVars.craBase}
                       onChange={e => updateLocalPayeVars({ craBase: Number(e.target.value) })} />
-                    <p className="text-xs text-slate-400">Fixed statutory amount (default ₦800,000)</p>
+                    <p className="text-xs text-slate-400">Fixed statutory amount (default â‚¦800,000)</p>
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-700">Rent Relief Rate (%)</label>
@@ -1292,7 +1292,7 @@ export function Variables() {
                 </div>
               </div>
 
-              {/* Tax Brackets — fully dynamic, add/remove/edit */}
+              {/* Tax Brackets â€” fully dynamic, add/remove/edit */}
               <div>
                 <p className="text-xs font-bold text-slate-500 uppercase mb-3">Tax Brackets (Annual Taxable Income)</p>
                 <div className="border rounded-md overflow-hidden mb-3">
@@ -1300,7 +1300,7 @@ export function Variables() {
                     <TableHeader className="bg-slate-50">
                       <TableRow>
                         <TableHead>Label</TableHead>
-                        <TableHead>Up To (₦) <span className="text-slate-400 font-normal text-xs italic">— blank = top bracket</span></TableHead>
+                        <TableHead>Up To (â‚¦) <span className="text-slate-400 font-normal text-xs italic">â€” blank = top bracket</span></TableHead>
                         <TableHead>Rate (%)</TableHead>
                         <TableHead className="w-10"></TableHead>
                       </TableRow>
@@ -1346,11 +1346,11 @@ export function Variables() {
                 <div className="flex gap-2 items-end">
                   <div className="flex-1 space-y-1">
                     <label className="text-xs font-semibold text-slate-600">Label</label>
-                    <Input placeholder="e.g. Next ₦9m" value={newBracketLabel}
+                    <Input placeholder="e.g. Next â‚¦9m" value={newBracketLabel}
                       onChange={e => setNewBracketLabel(e.target.value)} />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-600">Up To (₦) <span className="text-slate-400 font-normal italic">blank=top</span></label>
+                    <label className="text-xs font-semibold text-slate-600">Up To (â‚¦) <span className="text-slate-400 font-normal italic">blank=top</span></label>
                     <Input type="number" placeholder="11200000" className="w-36" value={newBracketUpTo}
                       onChange={e => setNewBracketUpTo(e.target.value)} />
                   </div>
@@ -1381,7 +1381,7 @@ export function Variables() {
                 <div className="flex gap-2 mb-3">
                   <Input placeholder="Label (e.g. Life Insurance Relief)" value={newExtraLabel}
                     onChange={e => setNewExtraLabel(e.target.value)} className="flex-1" />
-                  <Input type="number" placeholder="₦ Amount" value={newExtraAmount}
+                  <Input type="number" placeholder="â‚¦ Amount" value={newExtraAmount}
                     onChange={e => setNewExtraAmount(e.target.value)} className="w-36" />
                   <Button variant="outline" className="gap-1" onClick={() => {
                     if (!newExtraLabel || !newExtraAmount) return;
@@ -1397,7 +1397,7 @@ export function Variables() {
                       <TableHeader className="bg-slate-50">
                         <TableRow>
                           <TableHead>Label</TableHead>
-                          <TableHead>Amount (₦)</TableHead>
+                          <TableHead>Amount (â‚¦)</TableHead>
                           <TableHead className="text-center">Enabled</TableHead>
                           <TableHead className="w-12"></TableHead>
                         </TableRow>
@@ -1518,4 +1518,5 @@ export function Variables() {
     </div>
   );
 }
+
 

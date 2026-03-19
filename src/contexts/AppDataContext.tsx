@@ -4,6 +4,19 @@ import { useAuth } from '@/src/hooks/useAuth';
 
 export const TaskContext = createContext<any>(null);
 
+export function deriveMainTaskStatus(mainTaskId: string, subtasks: any[]): 'not_started'|'in_progress'|'completed' {
+    const subs = subtasks.filter(s => s.main_task_id === mainTaskId || s.mainTaskId === mainTaskId);
+    if (!subs.length) return 'not_started';
+    if (subs.every(s => s.status === 'completed')) return 'completed';
+    if (subs.some(s => s.status === 'in_progress' || s.status === 'completed')) return 'in_progress';
+    return 'not_started';
+}
+
+export function getMainTaskProgress(mainTaskId: string, subtasks: any[]) {
+    const subs = subtasks.filter(s => s.main_task_id === mainTaskId || s.mainTaskId === mainTaskId);
+    return { total: subs.length, completed: subs.filter(s => s.status === 'completed').length };
+}
+
 export function TaskProvider({ children }: { children: React.ReactNode }) {
     const { user } = useAuth();
     const [mainTasks, setMainTasks] = useState<any[]>([]);
@@ -39,6 +52,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         users,
         comments,
         projects,
+        reminders: [],
+        workspaces: [{ id: 'dcel-team', name: 'DCEL Team Workspace' }], // Temporary mock
+        addReminder: async () => {},
+        updateReminder: async () => {},
+        deleteReminder: async () => {},
+        toggleReminderActive: async () => {},
+        createProject: async () => {},
         createMainTask: async (task: any, subs: any[]) => {
             const { data } = await supabase.from('main_tasks').insert({ ...task, created_by: user?.id }).select().single();
             if (data && subs.length) {

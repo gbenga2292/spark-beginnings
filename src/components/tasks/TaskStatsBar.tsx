@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { CheckCircle2, Clock, AlertTriangle, ListTodo } from "lucide-react";
 import { isPast, isToday, isTomorrow } from "date-fns";
-import type { SubTask, MainTask } from "@/types/tasks";
+import type { SubTask, MainTask } from "@/src/types/tasks";
 
 interface TaskStatsBarProps {
   mainTasks: MainTask[];

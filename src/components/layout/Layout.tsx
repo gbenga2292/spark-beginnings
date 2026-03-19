@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useTheme } from '@/src/hooks/useTheme';
+import { DesktopFloatingCalendar } from '@/src/components/tasks/DesktopFloatingCalendar';
 
 export function Layout() {
   const { user, loading } = useAuth();
@@ -27,6 +28,7 @@ export function Layout() {
         <main className={`flex-1 overflow-y-auto p-4 md:p-8 w-full ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
           <Outlet />
         </main>
+        <DesktopFloatingCalendar />
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
-import { useAppData, deriveMainTaskStatus, getMainTaskProgress } from '@/contexts/AppDataContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { useWorkspace } from '@/hooks/use-workspace';
+import { useAppData, deriveMainTaskStatus, getMainTaskProgress } from '@/src/contexts/AppDataContext';
+import { useAuth } from '@/src/hooks/useAuth';
+import { useWorkspace } from '@/src/hooks/use-workspace';
 import { CheckCircle2, Loader2, Circle, Calendar, Users, BarChart3, Clock, TrendingUp } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 
@@ -17,16 +17,16 @@ const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { st
 const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
 
 export default function Reports() {
-    const { currentUser } = useAuth();
+    const { user: currentUser } = useAuth();
     return currentUser?.role === 'admin' ? <AdminReports /> : <UserReports />;
 }
 
-/* ═══════════════════════════════════════════════════════════
-   ADMIN VIEW — full company-wide dashboard
-═══════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   ADMIN VIEW â€” full company-wide dashboard
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function AdminReports() {
     const { subtasks } = useAppData();
-    const { currentUser } = useAuth();
+    const { user: currentUser } = useAuth();
     const { wsTasks: teamTasks, wsMembers: teamUsers, workspace } = useWorkspace();
 
     // Active workspace scoped data
@@ -189,11 +189,11 @@ function AdminReports() {
     );
 }
 
-/* ═══════════════════════════════════════════════════════════
-   USER VIEW — personal stats only, no other user's data
-═══════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   USER VIEW â€” personal stats only, no other user's data
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function UserReports() {
-    const { currentUser } = useAuth();
+    const { user: currentUser } = useAuth();
     const { subtasks } = useAppData();
     const { wsTasks: teamTasks } = useWorkspace();
 
@@ -308,7 +308,7 @@ function UserReports() {
 
             {total === 0 && (
                 <motion.div variants={item} className="text-center py-20 bg-card border border-border rounded-2xl">
-                    <p className="text-4xl mb-3">📋</p>
+                    <p className="text-4xl mb-3">ðŸ“‹</p>
                     <p className="text-base font-medium text-foreground">No tasks assigned yet</p>
                     <p className="text-sm text-muted-foreground mt-1">Your progress will appear here once tasks are assigned to you.</p>
                 </motion.div>
@@ -316,3 +316,4 @@ function UserReports() {
         </motion.div>
     );
 }
+

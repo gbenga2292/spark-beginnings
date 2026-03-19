@@ -9,9 +9,9 @@ import {
 } from 'lucide-react';
 import { useUserStore, AppUser, UserPrivileges, FULL_ACCESS, NO_ACCESS, PrivilegePreset } from '@/src/store/userStore';
 
-/* ═══════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    Privilege tree definition (mirrors sidebar structure)
-   ═══════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 interface PF { key: string; label: string; danger?: boolean; special?: boolean; }
 interface PP { key: string; label: string; parentKey: keyof UserPrivileges; fields: PF[]; masterField?: string; }
 interface PG { name: string; icon: any; color: string; pages: PP[]; }
@@ -104,9 +104,9 @@ function getPrivObj(privs: UserPrivileges, key: keyof UserPrivileges): Record<st
   return ((privs[key] ?? NO_ACCESS[key]) as unknown) as Record<string, boolean>;
 }
 
-/* ═══════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    Inline Toggle
-   ═══════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function Sw({ on, set, disabled, size = 'md' }: { on: boolean; set: (v: boolean) => void; disabled?: boolean; size?: 'sm' | 'md' }) {
   const h = size === 'sm' ? 'h-4 w-7' : 'h-5 w-9';
   const dot = size === 'sm' ? 'h-3 w-3' : 'h-4 w-4';
@@ -119,9 +119,9 @@ function Sw({ on, set, disabled, size = 'md' }: { on: boolean; set: (v: boolean)
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    Main Page Component
-   ═══════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 export function UserForm() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -218,13 +218,13 @@ export function UserForm() {
 
   return (
     <div className="max-w-4xl mx-auto pb-8">
-      {/* ── Header ─────────────────────────────────────────── */}
+      {/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="flex items-center gap-4 mb-6">
         <button onClick={() => navigate('/users')} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex-1">
-          <h1 className="text-xl font-bold text-slate-900">{isEdit ? `Edit User — ${editingUser?.name}` : 'Create New User'}</h1>
+          <h1 className="text-xl font-bold text-slate-900">{isEdit ? `Edit User â€” ${editingUser?.name}` : 'Create New User'}</h1>
           <p className="text-sm text-slate-500 mt-0.5">{isEdit ? 'Modify user details and permissions' : 'Fill in details and assign permissions'}</p>
         </div>
         <Button variant="outline" onClick={() => navigate('/users')} className="h-9 text-sm">Cancel</Button>
@@ -233,7 +233,7 @@ export function UserForm() {
         </Button>
       </div>
 
-      {/* ── User Details Card ──────────────────────────────── */}
+      {/* â”€â”€ User Details Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-6">
         <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">User Details</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -248,7 +248,7 @@ export function UserForm() {
           <div className="space-y-1.5 sm:col-span-2">
             <label className="text-xs font-semibold text-slate-600">{isEdit ? 'New Password (leave blank to keep)' : 'Password *'}</label>
             <div className="relative max-w-sm">
-              <Input type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="h-9 text-sm pr-9" />
+              <Input type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" className="h-9 text-sm pr-9" />
               <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600">
                 {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -257,7 +257,7 @@ export function UserForm() {
         </div>
       </div>
 
-      {/* ── Presets Strip ──────────────────────────────────── */}
+      {/* â”€â”€ Presets Strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
@@ -286,7 +286,7 @@ export function UserForm() {
         </div>
         {showPresetSave && (
           <div className="flex gap-2 mt-3 max-w-sm">
-            <Input value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Preset name…" className="h-8 text-xs flex-1" />
+            <Input value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Preset nameâ€¦" className="h-8 text-xs flex-1" />
             <Button onClick={handleSavePreset} className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 gap-1">
               <Save className="h-3 w-3" /> Save
             </Button>
@@ -294,7 +294,7 @@ export function UserForm() {
         )}
       </div>
 
-      {/* ── Permission Groups ─────────────────────────────── */}
+      {/* â”€â”€ Permission Groups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="space-y-3">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
@@ -403,7 +403,7 @@ export function UserForm() {
         })}
       </div>
 
-      {/* ── Sticky bottom bar ─────────────────────────────── */}
+      {/* â”€â”€ Sticky bottom bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="sticky bottom-0 mt-6 -mx-2 px-2 py-4 bg-gradient-to-t from-slate-100 via-slate-100/95 to-transparent flex items-center justify-between rounded-b-xl">
         <span className="text-xs text-slate-500">
           <strong className="text-slate-700">{totalG}/{totalT}</strong> permissions
@@ -418,3 +418,4 @@ export function UserForm() {
     </div>
   );
 }
+

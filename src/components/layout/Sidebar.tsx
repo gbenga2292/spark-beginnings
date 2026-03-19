@@ -27,7 +27,11 @@ import {
   PanelLeftOpen,
   X,
   ListTodo,
-  BellRing
+  BellRing,
+  Sparkles,
+  ClipboardCheck,
+  BarChart2,
+  Bell
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -49,6 +53,7 @@ interface NavCategory {
   name: string;
   icon: any;
   items: NavItem[];
+  isSpecial?: boolean;
 }
 
 const navigation: NavCategory[] = [
@@ -76,10 +81,11 @@ const navigation: NavCategory[] = [
   {
     name: 'Tasks',
     icon: ListTodo,
+    isSpecial: true,
     items: [
-      { name: 'My Tasks', href: '/tasks', icon: ListTodo, privKey: 'custom', privField: '', visible: () => true },
-      { name: 'Dashboard', href: '/tasks/dashboard', icon: LayoutDashboard, privKey: 'custom', privField: '', visible: () => true },
-      { name: 'Reminders', href: '/tasks/reminders', icon: BellRing, privKey: 'custom', privField: '', visible: () => true },
+      { name: 'My Tasks', href: '/tasks', icon: ClipboardCheck, privKey: 'custom', privField: '', visible: () => true },
+      { name: 'Dashboard', href: '/tasks/dashboard', icon: BarChart2, privKey: 'custom', privField: '', visible: () => true },
+      { name: 'Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'custom', privField: '', visible: () => true },
     ],
   },
   {
@@ -203,14 +209,104 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
               const visibleItems = getVisibleItems(category.items);
               if (visibleItems.length === 0) return null;
 
-              // When collapsed, we can consider items expanded if they contain an active active
               const isAnyItemActive = visibleItems.some(
                 (item) => location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href))
               );
 
-              // Auto-expand category if collapsed and an item inside is active (so icons are visible)
               const isExpanded = isCollapsed ? isAnyItemActive : expandedCategories.includes(category.name);
 
+              /* ── Special "Tasks" category rendering ── */
+              if (category.isSpecial && !isCollapsed) {
+                return (
+                  <div key={category.name} className="mb-4">
+                    <button
+                      onClick={() => toggleCategory(category.name)}
+                      className={cn(
+                        'group/task relative flex w-full items-center justify-between rounded-xl py-2.5 px-3 text-sm font-semibold transition-all duration-200',
+                        isAnyItemActive
+                          ? isDark
+                            ? 'bg-gradient-to-r from-indigo-950/60 via-indigo-900/40 to-slate-900/80 text-indigo-300 shadow-sm shadow-indigo-950/20 ring-1 ring-indigo-700/30'
+                            : 'bg-gradient-to-r from-indigo-50 via-indigo-50/80 to-white text-indigo-700 shadow-sm shadow-indigo-100/50 ring-1 ring-indigo-200/60'
+                          : isDark
+                            ? 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                            : 'text-slate-700 hover:bg-slate-100'
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className={cn(
+                          'flex h-7 w-7 items-center justify-center rounded-lg transition-all duration-200',
+                          isAnyItemActive
+                            ? isDark
+                              ? 'bg-indigo-500/20 text-indigo-400'
+                              : 'bg-indigo-100 text-indigo-600'
+                            : isDark
+                              ? 'bg-slate-800 text-slate-400 group-hover/task:bg-slate-700 group-hover/task:text-slate-300'
+                              : 'bg-slate-100 text-slate-500 group-hover/task:bg-slate-200 group-hover/task:text-slate-600'
+                        )}>
+                          <Sparkles className="h-3.5 w-3.5" />
+                        </div>
+                        <span>{category.name}</span>
+                      </div>
+                      <ChevronDown
+                        className={cn('h-4 w-4 transition-transform duration-200 opacity-50', isExpanded ? 'rotate-180' : '')}
+                      />
+                    </button>
+
+                    {isExpanded && (
+                      <div className={cn(
+                        'mt-1.5 space-y-0.5 rounded-xl py-1.5 px-1.5 transition-all',
+                        isDark
+                          ? 'bg-slate-800/40'
+                          : 'bg-slate-50/80'
+                      )}>
+                        {visibleItems.map((item) => {
+                          const isActive =
+                            location.pathname === item.href ||
+                            (item.href !== '/' && location.pathname.startsWith(item.href));
+                          return (
+                            <Link
+                              key={item.name}
+                              to={item.href}
+                              className={cn(
+                                'group flex items-center gap-2.5 rounded-lg py-2 px-2.5 text-[13px] font-medium transition-all duration-150',
+                                isActive
+                                  ? isDark
+                                    ? 'bg-indigo-500/15 text-indigo-300 shadow-sm shadow-indigo-900/10'
+                                    : 'bg-white text-indigo-700 shadow-sm shadow-indigo-100/60 ring-1 ring-indigo-100'
+                                  : isDark
+                                    ? 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
+                                    : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
+                              )}
+                            >
+                              <div className={cn(
+                                'flex h-6 w-6 items-center justify-center rounded-md transition-colors',
+                                isActive
+                                  ? isDark
+                                    ? 'bg-indigo-500/20 text-indigo-400'
+                                    : 'bg-indigo-100 text-indigo-600'
+                                  : isDark
+                                    ? 'bg-slate-700/60 text-slate-500 group-hover:text-slate-300'
+                                    : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200/80 group-hover:text-slate-500'
+                              )}>
+                                <item.icon className="h-3.5 w-3.5" aria-hidden="true" />
+                              </div>
+                              <span className="truncate">{item.name}</span>
+                              {isActive && (
+                                <div className={cn(
+                                  'ml-auto h-1.5 w-1.5 rounded-full flex-shrink-0',
+                                  isDark ? 'bg-indigo-400' : 'bg-indigo-600'
+                                )} />
+                              )}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              /* ── Default category rendering ── */
               return (
                 <div key={category.name} className="mb-4">
                   {/* Category Header */}

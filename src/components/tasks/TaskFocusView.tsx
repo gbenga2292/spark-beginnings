@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { AlertTriangle, Clock, Zap, CheckCircle2 } from "lucide-react";
 import { isPast, isToday, isTomorrow } from "date-fns";
-import type { SubTask, MainTask, AppUser } from "@/types/tasks";
+import type { SubTask, MainTask, AppUser } from "@/src/types/tasks";
 import { SubtaskCard } from "./TaskCard";
 
 interface TaskFocusViewProps {

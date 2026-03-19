@@ -2,11 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "@/contexts/AuthContext";
-import { useAppData, deriveMainTaskStatus, getMainTaskProgress } from "@/contexts/AppDataContext";
-import { useWorkspace } from "@/hooks/use-workspace";
-import type { SubTask, SubTaskStatus, MainTask, AppUser } from "@/types/tasks";
-import type { TaskPriority } from "@/types/tasks";
+import { useAuth } from '@/src/hooks/useAuth';
+import { useAppData, deriveMainTaskStatus, getMainTaskProgress } from '@/src/contexts/AppDataContext';
+import { useWorkspace } from '@/src/hooks/use-workspace';
+import type { SubTask, SubTaskStatus, MainTask, AppUser } from "@/src/types/tasks";
+import type { TaskPriority } from "@/src/types/tasks";
 import {
   Plus, Search, Circle, Loader2,
   CheckCircle2, Calendar, X, Users, Clock, ChevronDown,
@@ -15,18 +15,18 @@ import {
 } from "lucide-react";
 import { differenceInHours, addDays } from "date-fns";
 import { format, isToday, isTomorrow, isPast } from "date-fns";
-import { TaskDetailSheet } from "@/components/tasks/TaskDetailSheet";
-import { ViewToggle, type TaskViewMode } from "@/components/tasks/ViewToggle";
-import { SubtaskKanbanView, MainTaskKanbanView } from "@/components/tasks/TaskKanbanView";
-import { TaskFocusView } from "@/components/tasks/TaskFocusView";
-import CreateProjectDialog from "@/components/projects/CreateProjectDialog";
-import type { Project } from "@/types/project";
+import { TaskDetailSheet } from "@/src/components/tasks/TaskDetailSheet";
+import { ViewToggle, type TaskViewMode } from "@/src/components/tasks/ViewToggle";
+import { SubtaskKanbanView, MainTaskKanbanView } from "@/src/components/tasks/TaskKanbanView";
+import { TaskFocusView } from "@/src/components/tasks/TaskFocusView";
+
+import type { Project } from "@/src/types/tasks/project";
 
 /* ─── Shared config ────────────────────────────────────────────────────────── */
 const statusConfig: Record<SubTaskStatus, { label: string; pillClass: string; dot: string; icon: React.ElementType }> = {
   not_started: { label: "Not Started", pillClass: "chip-pending", dot: "bg-gray-400", icon: Circle },
   in_progress: { label: "In Progress", pillClass: "chip-in-progress", dot: "bg-blue-600", icon: Loader2 },
-  pending_approval: { label: "Pending Approval", pillClass: "chip-pending", dot: "bg-amber-400", icon: Circle },
+  pending_approval: { label: "Pending Approval", pillClass: "chip-pending-approval", dot: "bg-amber-400", icon: Circle },
   completed: { label: "Completed", pillClass: "chip-completed", dot: "bg-green-600", icon: CheckCircle2 },
 };
 
@@ -251,7 +251,7 @@ type PriorityFilter = TaskPriority | 'all';
 
 /* ─── Main export ──────────────────────────────────────────────────────────── */
 export default function Tasks() {
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const { isPersonal } = useWorkspace();
   if (isPersonal) return <PersonalTasksView />;
   return <AdminTasksView />;
@@ -263,7 +263,7 @@ export default function Tasks() {
 function PersonalTasksView() {
   const { mainTasks, subtasks, createMainTask, addSubtask, deleteSubtask,
     updateSubtask, updateSubtaskStatus, deleteMainTask, updateMainTask, comments } = useAppData();
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const { wsTasks, workspace } = useWorkspace();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -576,7 +576,7 @@ function AdminTasksView() {
   const { mainTasks, subtasks, users, comments, createMainTask, addSubtask, assignSubtask,
     updateSubtask, deleteSubtask, updateSubtaskStatus, deleteMainTask, updateMainTask,
     postComment, getMainTaskComments, projects, createProject } = useAppData();
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -664,27 +664,30 @@ function AdminTasksView() {
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-0">
 
-      {/* Toolbar row 1 */}
-      <motion.div variants={item} className="flex items-center gap-2 mb-3 flex-wrap">
+      {/* ── Toolbar — Primary Row ── */}
+      <motion.div variants={item} className="flex items-center gap-3 mb-3 flex-wrap">
         {/* View toggle */}
         <ViewToggle value={viewMode} onChange={setViewMode} />
 
+        {/* Thin divider */}
+        <div className="w-px h-6 bg-border hidden sm:block" />
+
         {/* Scope toggle */}
-        <div className="flex items-center bg-muted rounded-full p-0.5">
+        <div className="flex items-center bg-muted/60 rounded-xl p-0.5 gap-0.5 border border-border/40">
           <button onClick={() => setScope('mine')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${scope === 'mine' ? 'bg-card shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
-            Mine {mySubs.length > 0 && <span className="ml-1 text-[10px] bg-primary/10 text-primary px-1 rounded-full">{mySubs.length}</span>}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${scope === 'mine' ? 'bg-card shadow-sm text-primary ring-1 ring-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'}`}>
+            Mine {mySubs.length > 0 && <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-bold ${scope === 'mine' ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'}`}>{mySubs.length}</span>}
           </button>
           <button onClick={() => setScope('all')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${scope === 'all' ? 'bg-card shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${scope === 'all' ? 'bg-card shadow-sm text-primary ring-1 ring-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'}`}>
             All
           </button>
           <button onClick={() => setScope('pending_review')}
-            className={`relative px-3 py-1.5 rounded-full text-xs font-medium transition-all ${scope === 'pending_review'
+            className={`relative px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${scope === 'pending_review'
               ? 'bg-amber-500 text-white shadow-sm'
               : pendingApprovalSubs.length > 0
                 ? 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                : 'text-muted-foreground hover:text-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'
               }`}>
             Review
             {pendingApprovalSubs.length > 0 && (
@@ -695,15 +698,17 @@ function AdminTasksView() {
             )}
           </button>
           <button onClick={() => setScope('projects')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${scope === 'projects' ? 'bg-card shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${scope === 'projects' ? 'bg-card shadow-sm text-primary ring-1 ring-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'}`}>
             <span className="flex items-center gap-1"><FolderOpen className="w-3 h-3" /> Projects</span>
           </button>
         </div>
 
+        <div className="flex-1" />
+
         {/* Sort */}
         <div className="relative">
           <button onClick={() => setShowSortMenu(p => !p)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-muted text-xs font-medium text-muted-foreground hover:text-foreground transition-colors border border-transparent hover:border-border">
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-muted/60 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors border border-border/40 hover:border-border">
             <ArrowUpDown className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{SORT_OPTIONS.find(o => o.value === sortBy)?.label}</span>
           </button>
@@ -725,33 +730,36 @@ function AdminTasksView() {
           )}
         </div>
 
-        {/* Priority filter — list view only */}
-        {scope === 'all' && (viewMode === 'list' || viewMode === 'compact') && (
-          <div className="flex items-center gap-1 overflow-x-auto">
+        {scope === 'projects' ? (
+          <button onClick={() => setShowCreateProject(true)}
+            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm hover:shadow-md">
+            <FolderOpen className="w-4 h-4" /><span className="hidden sm:inline">New Project</span>
+          </button>
+        ) : (
+          <button onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm hover:shadow-md">
+            <Plus className="w-4 h-4" /><span className="hidden sm:inline">New Task</span>
+          </button>
+        )}
+      </motion.div>
+
+      {/* ── Priority Filter Row (conditional) ── */}
+      {scope === 'all' && (viewMode === 'list' || viewMode === 'compact') && (
+        <motion.div variants={item} className="mb-3">
+          <div className="flex items-center gap-1.5 overflow-x-auto">
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mr-1 hidden sm:inline">Priority</span>
             {(['all', ...PRIORITY_ORDER] as PriorityFilter[]).map(p => (
               <button key={p} onClick={() => setPriorityFilter(p)}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all whitespace-nowrap ${priorityFilter === p
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all whitespace-nowrap ${priorityFilter === p
                   ? p === 'all' ? 'bg-foreground text-background border-foreground' : PRIORITY_CONFIG[p as TaskPriority].className
-                  : 'border-border bg-muted text-muted-foreground hover:text-foreground'
+                  : 'border-border bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
                   }`}>
                 {p === 'all' ? 'All' : PRIORITY_CONFIG[p as TaskPriority].label}
               </button>
             ))}
           </div>
-        )}
-        <div className="flex-1" />
-        {scope === 'projects' ? (
-          <button onClick={() => setShowCreateProject(true)}
-            className="flex items-center gap-2 px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm">
-            <FolderOpen className="w-4 h-4" /><span className="hidden sm:inline">New Project</span>
-          </button>
-        ) : (
-          <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm">
-            <Plus className="w-4 h-4" /><span className="hidden sm:inline">New Task</span>
-          </button>
-        )}
-      </motion.div>
+        </motion.div>
+      )}
 
       {/* Search */}
       <motion.div variants={item} className="mb-4">
@@ -935,29 +943,7 @@ function AdminTasksView() {
         </motion.div>
       )}
 
-      {/* Create project dialog */}
-      <CreateProjectDialog
-        open={showCreateProject}
-        onClose={() => setShowCreateProject(false)}
-        onCreate={({ templateId, projectName, serviceType, startDate, durationDays, template }) => {
-          if (!currentUser || !teamWs) return;
-          // Create a MainTask for this project
-          const mt = createMainTask(
-            { teamId: teamWs.id, workspaceId: teamWs.id, title: projectName, description: `${serviceType} project`, createdBy: currentUser.id },
-            template.subtasks.map(s => ({
-              mainTaskId: '', title: s.title, description: s.description,
-              assignedTo: s.defaultAssignee || null, status: 'not_started' as const,
-              priority: s.priority, deadline: format(addDays(new Date(startDate), s.relativeDayOffset), 'yyyy-MM-dd'),
-            }))
-          );
-          const newProj: Omit<Project,'id'|'createdAt'|'updatedAt'> = {
-            workspaceId: teamWs.id, templateId, name: projectName, serviceType,
-            startDate, durationDays, status: 'active', createdBy: currentUser.id,
-            mainTaskId: mt.id,
-          };
-          createProject(newProj);
-        }}
-      />
+
 
 
       {viewMode === 'list' && scope === 'mine' && (
@@ -1347,7 +1333,7 @@ function AdminTasksView() {
    USER VIEW
 ═══════════════════════════════════════════════════════════════════════════════ */
 function UserTasksView() {
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const { subtasks, mainTasks, users, createMainTask, updateSubtaskStatus } = useAppData();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -1578,7 +1564,7 @@ function AddSubtaskInline({ mainTaskId, users, onAdd, isPersonal }: {
   const [desc, setDesc] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [deadline, setDeadline] = useState("");
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
 
   const handleAdd = () => {
@@ -1962,7 +1948,7 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
   mainTaskId: string;
   users: AppUser[];
   currentUserId: string;
-  getComments: (id: string) => import('@/types/tasks').TaskComment[];
+  getComments: (id: string) => import('@/src/types/tasks').TaskComment[];
   onPost: (text: string) => void;
   onClose: () => void;
 }) {
@@ -2256,7 +2242,7 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
   const statusOptions: { value: SubTaskStatus; label: string; cls: string }[] = [
     { value: 'not_started', label: 'Not Started', cls: 'chip-pending' },
     { value: 'in_progress', label: 'In Progress', cls: 'chip-in-progress' },
-    { value: 'pending_approval', label: 'Pending Approval', cls: 'chip-pending' },
+    { value: 'pending_approval', label: 'Pending Approval', cls: 'chip-pending-approval' },
     { value: 'completed', label: 'Completed', cls: 'chip-completed' },
   ];
 

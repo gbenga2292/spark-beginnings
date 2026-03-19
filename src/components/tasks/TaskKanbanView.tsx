@@ -1,8 +1,8 @@
 import { AnimatePresence } from "framer-motion";
 import { Circle, Loader2, Hourglass, CheckCircle2 } from "lucide-react";
-import type { SubTask, SubTaskStatus, MainTask, AppUser } from "@/types/tasks";
+import type { SubTask, SubTaskStatus, MainTask, AppUser } from "@/src/types/tasks";
 import { SubtaskCard, MainTaskCard } from "./TaskCard";
-import { deriveMainTaskStatus } from "@/contexts/AppDataContext";
+import { deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
 
 /* ─── Kanban column config ─────────────────────────────────────────────────── */
 const COLUMNS: { status: SubTaskStatus; label: string; icon: React.ElementType; color: string; bg: string }[] = [

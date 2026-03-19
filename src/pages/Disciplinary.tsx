@@ -568,7 +568,7 @@ export function Disciplinary() {
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
                   <h4 className="font-bold text-slate-800 text-lg">{viewingRecord.employeeName}</h4>
-                  <p className="text-sm text-slate-500">{viewingRecord.date} • {viewingRecord.type}</p>
+                  <p className="text-sm text-slate-500">{viewingRecord.date} â€¢ {viewingRecord.type}</p>
                 </div>
                 <Badge variant={viewingRecord.severity.includes('Warning') ? 'warning' : 'destructive'}>{viewingRecord.severity}</Badge>
               </div>
@@ -635,3 +635,4 @@ export function Disciplinary() {
     </div>
   );
 }
+

@@ -328,7 +328,7 @@ export function Evaluations() {
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
                   <h4 className="font-bold text-slate-800 text-lg">{viewingRecord.employeeName}</h4>
-                  <p className="text-sm text-slate-500">{viewingRecord.date} • {viewingRecord.type}</p>
+                  <p className="text-sm text-slate-500">{viewingRecord.date} â€¢ {viewingRecord.type}</p>
                 </div>
                 <span className={`text-2xl font-black ${viewingRecord.overallScore >= 70 ? 'text-emerald-500' : viewingRecord.overallScore >= 40 ? 'text-amber-500' : 'text-rose-500'}`}>
                   {viewingRecord.overallScore}%
@@ -353,3 +353,4 @@ export function Evaluations() {
     </div>
   );
 }
+

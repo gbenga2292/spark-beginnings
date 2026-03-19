@@ -11,7 +11,7 @@ import { usePriv } from '@/src/hooks/usePriv';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { addDays, parseISO, format, isWithinInterval } from 'date-fns';
 
-/* ─────────────────────────────────── helpers ─── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ helpers â”€â”€â”€ */
 function calcExpectedEnd(startDate: string, duration: number): string {
   if (!startDate || !duration || duration < 1) return '';
   return format(addDays(parseISO(startDate), duration), 'yyyy-MM-dd');
@@ -27,7 +27,7 @@ function isOnLeave(leave: LeaveRecord, date: Date): boolean {
   } catch { return false; }
 }
 
-/* ─────────────────────────────────── component ─ */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ component â”€ */
 export function Leaves() {
   const navigate = useNavigate();
   const {
@@ -35,7 +35,7 @@ export function Leaves() {
     leaveTypes, updateEmployee,
   } = useAppStore();
 
-  // ─── Permissions ───────────────────────────────────────────
+  // â”€â”€â”€ Permissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const priv = usePriv('leaves');
 
   const activeEmployees = useMemo(
@@ -43,17 +43,17 @@ export function Leaves() {
     [employees]
   );
 
-  // Internal staff only (no Adhoc) – used for Staff, Supervisor, Management dropdowns and Leave Summary
+  // Internal staff only (no Adhoc) â€“ used for Staff, Supervisor, Management dropdowns and Leave Summary
   const internalEmployees = useMemo(
     () => activeEmployees.filter(e => e.position !== 'Adhoc Staff'),
     [activeEmployees]
   );
 
-  /* ── filter state ── */
+  /* â”€â”€ filter state â”€â”€ */
   const [searchQuery, setSearchQuery] = useState('');
   const [filterView, setFilterView] = useState<'All' | 'Active' | 'Completed' | 'Cancelled'>('All');
 
-  /* ── form state ── */
+  /* â”€â”€ form state â”€â”€ */
   const [showForm, setShowForm] = useState(false);
   const [formId, setFormId] = useState<string | null>(null);
   const [staffId, setStaffId] = useState('');
@@ -68,12 +68,12 @@ export function Leaves() {
   const [uploadedFile, setUploadedFile] = useState<string | undefined>(undefined);
   const [uploadedFileName, setUploadedFileName] = useState<string | undefined>(undefined);
 
-  /* ── print / preview state ── */
+  /* â”€â”€ print / preview state â”€â”€ */
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [previewLeave, setPreviewLeave] = useState<LeaveRecord | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
-  /* ── file upload preview ── */
+  /* â”€â”€ file upload preview â”€â”€ */
   const [filePreviewLeave, setFilePreviewLeave] = useState<LeaveRecord | null>(null);
 
   const expectedEndDate = useMemo(
@@ -81,7 +81,7 @@ export function Leaves() {
     [startDate, duration]
   );
 
-  /* ── derived data ── */
+  /* â”€â”€ derived data â”€â”€ */
   const filteredLeaves = useMemo(() => {
     let result = leaves;
     if (filterView === 'Active') result = result.filter(l => !l.dateReturned && l.status !== 'Cancelled');
@@ -99,7 +99,7 @@ export function Leaves() {
     return [...result].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   }, [leaves, filterView, searchQuery]);
 
-  /* leave summary per employee — internal staff only */
+  /* leave summary per employee â€” internal staff only */
   const leaveSummary = useMemo(() => {
     return internalEmployees.map(emp => {
       const empLeaves = leaves.filter(l => l.employeeId === emp.id && l.status !== 'Cancelled');
@@ -111,7 +111,7 @@ export function Leaves() {
     });
   }, [internalEmployees, leaves]);
 
-  /* ── form helpers ── */
+  /* â”€â”€ form helpers â”€â”€ */
   const resetForm = () => {
     setFormId(null); setStaffId(''); setLeaveType(''); setStartDate('');
     setDuration(''); setReason(''); setDateReturned(''); setCanBeContacted('No');
@@ -231,7 +231,7 @@ export function Leaves() {
     toast.success('Leave cancelled.');
   };
 
-  /* ── file upload ── */
+  /* â”€â”€ file upload â”€â”€ */
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, leaveId?: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -249,7 +249,7 @@ export function Leaves() {
     reader.readAsDataURL(file);
   };
 
-  /* ── print ── */
+  /* â”€â”€ print â”€â”€ */
   const handlePrint = () => {
     const content = printRef.current;
     if (!content) return;
@@ -301,11 +301,11 @@ export function Leaves() {
     setShowPrintPreview(true);
   };
 
-  /* ─────────────────────────────── render ──── */
+  /* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ render â”€â”€â”€â”€ */
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
 
-      {/* ── Header ── */}
+      {/* â”€â”€ Header â”€â”€ */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-teal-400">
@@ -334,7 +334,7 @@ export function Leaves() {
         </div>
       </div>
 
-      {/* ── Leave Form Overlay ── */}
+      {/* â”€â”€ Leave Form Overlay â”€â”€ */}
       {showForm && (
         <Card className="border-none shadow-2xl ring-1 ring-black/5 bg-white relative overflow-hidden animate-in slide-in-from-top-4 fade-in duration-300 z-10 w-full max-w-2xl mx-auto">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 to-emerald-400" />
@@ -360,7 +360,7 @@ export function Leaves() {
                   className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
                   value={staffId} onChange={e => setStaffId(e.target.value)} disabled={!!formId}
                 >
-                  <option value="" disabled>— Select Staff Member —</option>
+                  <option value="" disabled>â€” Select Staff Member â€”</option>
                   {internalEmployees.map(emp => (
                     <option key={emp.id} value={emp.id}>{emp.surname} {emp.firstname} ({emp.department})</option>
                   ))}
@@ -374,7 +374,7 @@ export function Leaves() {
                   className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
                   value={leaveType} onChange={e => setLeaveType(e.target.value)}
                 >
-                  <option value="" disabled>— Select Leave Type —</option>
+                  <option value="" disabled>â€” Select Leave Type â€”</option>
                   {(() => {
                     const DEFAULT_LEAVE_TYPES = ['Annual', 'Emergency', 'Maternity/Paternity', 'Study', 'Others'];
                     const extras = leaveTypes.filter(t => !DEFAULT_LEAVE_TYPES.includes(t));
@@ -395,7 +395,7 @@ export function Leaves() {
                     className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
                     value={supervisor} onChange={e => setSupervisor(e.target.value)} disabled={!!formId}
                   >
-                    <option value="">— Select Supervisor —</option>
+                    <option value="">â€” Select Supervisor â€”</option>
                     {internalEmployees.filter(e => e.id !== staffId).map(emp => (
                       <option key={emp.id} value={`${emp.surname} ${emp.firstname}`}>{emp.surname} {emp.firstname} ({emp.position})</option>
                     ))}
@@ -413,7 +413,7 @@ export function Leaves() {
                     className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
                     value={management} onChange={e => setManagement(e.target.value)} disabled={!!formId}
                   >
-                    <option value="">— Select Management Staff —</option>
+                    <option value="">â€” Select Management Staff â€”</option>
                     {internalEmployees.filter(e => e.id !== staffId).map(emp => (
                       <option key={emp.id} value={`${emp.surname} ${emp.firstname}`}>{emp.surname} {emp.firstname} ({emp.position})</option>
                     ))}
@@ -491,7 +491,7 @@ export function Leaves() {
         </Card>
       )}
 
-      {/* ─── Leave Records Table ─── */}
+      {/* â”€â”€â”€ Leave Records Table â”€â”€â”€ */}
       <Card className="border-none shadow-sm overflow-hidden bg-white flex-1 flex flex-col min-h-[500px]">
         <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
           <div className="flex items-center gap-2 ml-1">
@@ -553,18 +553,18 @@ export function Leaves() {
                     <td className="px-5 py-4 font-bold text-slate-800 uppercase text-xs">{leave.employeeName}</td>
                     <td className="px-5 py-4">
                       <span className="inline-block px-2 py-1 text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200 rounded-full whitespace-nowrap">
-                        {leave.leaveType || '—'}
+                        {leave.leaveType || 'â€”'}
                       </span>
                     </td>
                     <td className="px-5 py-4 font-medium text-slate-600 whitespace-nowrap">
-                      {leave.startDate ? format(parseISO(leave.startDate), 'dd-MMM-yy') : '—'}
+                      {leave.startDate ? format(parseISO(leave.startDate), 'dd-MMM-yy') : 'â€”'}
                     </td>
                     <td className="px-5 py-4 font-bold text-slate-700">{leave.duration}</td>
                     <td className="px-5 py-4 font-medium text-slate-600 whitespace-nowrap">
-                      {leave.expectedEndDate ? format(parseISO(leave.expectedEndDate), 'dd-MMM-yy') : '—'}
+                      {leave.expectedEndDate ? format(parseISO(leave.expectedEndDate), 'dd-MMM-yy') : 'â€”'}
                     </td>
                     <td className="px-5 py-4 font-medium text-slate-600 whitespace-nowrap">
-                      {leave.dateReturned ? format(parseISO(leave.dateReturned), 'dd-MMM-yy') : '—'}
+                      {leave.dateReturned ? format(parseISO(leave.dateReturned), 'dd-MMM-yy') : 'â€”'}
                     </td>
                     <td className="px-5 py-4 max-w-xs text-slate-700 text-xs">{leave.reason}</td>
                     <td className="px-5 py-4 text-center">
@@ -626,7 +626,7 @@ export function Leaves() {
 
 
 
-      {/* ─── Print Preview Modal ─── */}
+      {/* â”€â”€â”€ Print Preview Modal â”€â”€â”€ */}
       {showPrintPreview && previewLeave && (() => {
         const lv = previewLeave;
         const emp = employees.find(e => e.id === lv.employeeId);
@@ -636,7 +636,7 @@ export function Leaves() {
             <div className="bg-white max-w-4xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  <Printer className="h-5 w-5 text-teal-600" /> Staff Annual Leave Application Form — Preview
+                  <Printer className="h-5 w-5 text-teal-600" /> Staff Annual Leave Application Form â€” Preview
                 </h2>
                 <div className="flex gap-2">
                   <Button onClick={handlePrint} className="bg-teal-600 hover:bg-teal-700 text-white gap-2 h-9 text-sm">
@@ -648,11 +648,11 @@ export function Leaves() {
                 </div>
               </div>
 
-              {/* Scrollable preview area — two A4 sheets */}
+              {/* Scrollable preview area â€” two A4 sheets */}
               <div className="overflow-y-auto flex-1 bg-gray-300 p-6 flex flex-col gap-6">
                 <div ref={printRef}>
 
-                  {/* ══════════ PAGE 1 ══════════ */}
+                  {/* â•â•â•â•â•â•â•â•â•â• PAGE 1 â•â•â•â•â•â•â•â•â•â• */}
                   <div className="a4-page bg-white shadow-lg mx-auto" style={{ width: 794, minHeight: 1123, padding: '40px 48px', fontFamily: 'Arial, sans-serif', fontSize: 11, color: '#111' }}>
 
                     {/* Header */}
@@ -687,7 +687,7 @@ export function Leaves() {
                         const matched = (lv.leaveType || '').toLowerCase().includes(opt.toLowerCase());
                         return (
                           <span key={opt} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10 }}>
-                            <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: matched ? '#111' : 'white', color: 'white', fontSize: 8 }}>{matched ? '✓' : ''}</span>
+                            <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: matched ? '#111' : 'white', color: 'white', fontSize: 8 }}>{matched ? 'âœ“' : ''}</span>
                             {opt}
                           </span>
                         );
@@ -721,20 +721,20 @@ export function Leaves() {
                       <span>Can be Contacted:</span>
                       {(['Yes', 'No'] as const).map(opt => (
                         <span key={opt} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: lv.canBeContacted === opt ? '#111' : 'white', color: 'white', fontSize: 8 }}>{lv.canBeContacted === opt ? '✓' : ''}</span>
+                          <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: lv.canBeContacted === opt ? '#111' : 'white', color: 'white', fontSize: 8 }}>{lv.canBeContacted === opt ? 'âœ“' : ''}</span>
                           {opt}
                         </span>
                       ))}
                     </div>
                   </div>
 
-                  {/* ══════════ PAGE 2 ══════════ */}
+                  {/* â•â•â•â•â•â•â•â•â•â• PAGE 2 â•â•â•â•â•â•â•â•â•â• */}
                   <div className="a4-page bg-white shadow-lg mx-auto" style={{ width: 794, minHeight: 1123, padding: '40px 48px', fontFamily: 'Arial, sans-serif', fontSize: 11, color: '#111' }}>
 
                     {/* Header */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <img src="/logo/logo-2.png" alt="logo" style={{ height: 52 }} />
-                      <div style={{ fontSize: 10, color: '#555', textAlign: 'right' }}>Staff Annual Leave Application Form — Page 2</div>
+                      <div style={{ fontSize: 10, color: '#555', textAlign: 'right' }}>Staff Annual Leave Application Form â€” Page 2</div>
                     </div>
                     <div style={{ borderBottom: '2px solid #111', marginBottom: 24 }} />
 
@@ -809,7 +809,7 @@ export function Leaves() {
         );
       })()}
 
-      {/* ─── Uploaded File Preview Modal ─── */}
+      {/* â”€â”€â”€ Uploaded File Preview Modal â”€â”€â”€ */}
       {filePreviewLeave && filePreviewLeave.uploadedFile && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setFilePreviewLeave(null)}>
           <div className="bg-white max-w-3xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
@@ -834,3 +834,4 @@ export function Leaves() {
     </div>
   );
 }
+

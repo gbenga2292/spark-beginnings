@@ -1,0 +1,139 @@
+﻿
+> react-example@0.0.1 lint
+> tsc --noEmit
+
+src/components/task_ui/accordion.tsx(2,37): error TS2307: Cannot find module '@radix-ui/react-accordion' or its corresponding type declarations.
+src/components/task_ui/alert-dialog.tsx(2,39): error TS2307: Cannot find module '@radix-ui/react-alert-dialog' or its corresponding type declarations.
+src/components/task_ui/alert.tsx(2,40): error TS2307: Cannot find module 'class-variance-authority' or its corresponding type declarations.
+src/components/task_ui/aspect-ratio.tsx(1,39): error TS2307: Cannot find module '@radix-ui/react-aspect-ratio' or its corresponding type declarations.
+src/components/task_ui/avatar.tsx(2,34): error TS2307: Cannot find module '@radix-ui/react-avatar' or its corresponding type declarations.
+src/components/task_ui/badge.tsx(2,40): error TS2307: Cannot find module 'class-variance-authority' or its corresponding type declarations.
+src/components/task_ui/badge.tsx(25,29): error TS2339: Property 'variant' does not exist on type 'BadgeProps'.
+src/components/task_ui/breadcrumb.tsx(2,22): error TS2307: Cannot find module '@radix-ui/react-slot' or its corresponding type declarations.
+src/components/task_ui/button.tsx(2,22): error TS2307: Cannot find module '@radix-ui/react-slot' or its corresponding type declarations.
+src/components/task_ui/button.tsx(3,40): error TS2307: Cannot find module 'class-variance-authority' or its corresponding type declarations.
+src/components/task_ui/button.tsx(40,17): error TS2339: Property 'variant' does not exist on type 'ButtonProps'.
+src/components/task_ui/button.tsx(40,26): error TS2339: Property 'size' does not exist on type 'ButtonProps'.
+src/components/task_ui/calendar.tsx(3,27): error TS2307: Cannot find module 'react-day-picker' or its corresponding type declarations.
+src/components/task_ui/carousel.tsx(2,61): error TS2307: Cannot find module 'embla-carousel-react' or its corresponding type declarations.
+src/components/task_ui/carousel.tsx(169,17): error TS2339: Property 'variant' does not exist on type 'Omit<ButtonProps & RefAttributes<HTMLButtonElement>, "ref">'.
+src/components/task_ui/carousel.tsx(169,38): error TS2339: Property 'size' does not exist on type 'Omit<ButtonProps & RefAttributes<HTMLButtonElement>, "ref">'.
+src/components/task_ui/carousel.tsx(175,9): error TS2322: Type '{ children: Element[]; color?: string; content?: string; value?: string | number | readonly string[]; hidden?: boolean; style?: CSSProperties; title?: string; form?: string; slot?: string; ... 283 more ...; className: string; }' is not assignable to type 'IntrinsicAttributes & ButtonProps & RefAttributes<HTMLButtonElement>'.
+  Property 'variant' does not exist on type 'IntrinsicAttributes & ButtonProps & RefAttributes<HTMLButtonElement>'.
+src/components/task_ui/carousel.tsx(197,17): error TS2339: Property 'variant' does not exist on type 'Omit<ButtonProps & RefAttributes<HTMLButtonElement>, "ref">'.
+src/components/task_ui/carousel.tsx(197,38): error TS2339: Property 'size' does not exist on type 'Omit<ButtonProps & RefAttributes<HTMLButtonElement>, "ref">'.
+src/components/task_ui/carousel.tsx(203,9): error TS2322: Type '{ children: Element[]; color?: string; content?: string; value?: string | number | readonly string[]; hidden?: boolean; style?: CSSProperties; title?: string; form?: string; slot?: string; ... 283 more ...; className: string; }' is not assignable to type 'IntrinsicAttributes & ButtonProps & RefAttributes<HTMLButtonElement>'.
+  Property 'variant' does not exist on type 'IntrinsicAttributes & ButtonProps & RefAttributes<HTMLButtonElement>'.
+src/components/task_ui/chart.tsx(106,7): error TS2339: Property 'payload' does not exist on type 'Omit<Omit<Props<ValueType, NameType>, PropertiesReadFromContext> & { active?: boolean; allowEscapeViewBox?: AllowInDimension; ... 24 more ...; wrapperStyle?: CSSProperties; } & ClassAttributes<...> & HTMLAttributes<...> & { ...; }, "ref">'.
+src/components/task_ui/chart.tsx(111,7): error TS2339: Property 'label' does not exist on type 'Omit<Omit<Props<ValueType, NameType>, PropertiesReadFromContext> & { active?: boolean; allowEscapeViewBox?: AllowInDimension; ... 24 more ...; wrapperStyle?: CSSProperties; } & ClassAttributes<...> & HTMLAttributes<...> & { ...; }, "ref">'.
+src/components/task_ui/chart.tsx(233,41): error TS2344: Type '"payload" | "verticalAlign"' does not satisfy the constraint '"string" | "filter" | "fill" | "values" | "mode" | "transform" | "color" | "direction" | "display" | "overflow" | "opacity" | "content" | "d" | "x" | "y" | "clipPath" | "mask" | ... 432 more ... | "onBBoxUpdate"'.
+  Type '"payload"' is not assignable to type '"string" | "filter" | "fill" | "values" | "mode" | "transform" | "color" | "direction" | "display" | "overflow" | "opacity" | "content" | "d" | "x" | "y" | "clipPath" | "mask" | ... 432 more ... | "onBBoxUpdate"'.
+src/components/task_ui/chart.tsx(240,17): error TS2339: Property 'length' does not exist on type 'unknown'.
+src/components/task_ui/chart.tsx(249,16): error TS2339: Property 'map' does not exist on type 'unknown'.
+src/components/task_ui/checkbox.tsx(2,36): error TS2307: Cannot find module '@radix-ui/react-checkbox' or its corresponding type declarations.
+src/components/task_ui/collapsible.tsx(1,39): error TS2307: Cannot find module '@radix-ui/react-collapsible' or its corresponding type declarations.
+src/components/task_ui/command.tsx(2,34): error TS2307: Cannot find module '@radix-ui/react-dialog' or its corresponding type declarations.
+src/components/task_ui/command.tsx(3,45): error TS2307: Cannot find module 'cmdk' or its corresponding type declarations.
+src/components/task_ui/command.tsx(26,26): error TS2339: Property 'children' does not exist on type 'CommandDialogProps'.
+src/components/task_ui/context-menu.tsx(2,39): error TS2307: Cannot find module '@radix-ui/react-context-menu' or its corresponding type declarations.
+src/components/task_ui/dialog.tsx(2,34): error TS2307: Cannot find module '@radix-ui/react-dialog' or its corresponding type declarations.
+src/components/task_ui/drawer.tsx(2,43): error TS2307: Cannot find module 'vaul' or its corresponding type declarations.
+src/components/task_ui/dropdown-menu.tsx(2,40): error TS2307: Cannot find module '@radix-ui/react-dropdown-menu' or its corresponding type declarations.
+src/components/task_ui/form.tsx(2,33): error TS2307: Cannot find module '@radix-ui/react-label' or its corresponding type declarations.
+src/components/task_ui/form.tsx(3,22): error TS2307: Cannot find module '@radix-ui/react-slot' or its corresponding type declarations.
+src/components/task_ui/form.tsx(4,99): error TS2307: Cannot find module 'react-hook-form' or its corresponding type declarations.
+src/components/task_ui/hover-card.tsx(2,37): error TS2307: Cannot find module '@radix-ui/react-hover-card' or its corresponding type declarations.
+src/components/task_ui/input-otp.tsx(2,43): error TS2307: Cannot find module 'input-otp' or its corresponding type declarations.
+src/components/task_ui/input-otp.tsx(29,60): error TS2339: Property 'slots' does not exist on type 'unknown'.
+src/components/task_ui/label.tsx(2,33): error TS2307: Cannot find module '@radix-ui/react-label' or its corresponding type declarations.
+src/components/task_ui/label.tsx(3,40): error TS2307: Cannot find module 'class-variance-authority' or its corresponding type declarations.
+src/components/task_ui/menubar.tsx(2,35): error TS2307: Cannot find module '@radix-ui/react-menubar' or its corresponding type declarations.
+src/components/task_ui/navigation-menu.tsx(2,42): error TS2307: Cannot find module '@radix-ui/react-navigation-menu' or its corresponding type declarations.
+src/components/task_ui/navigation-menu.tsx(3,21): error TS2307: Cannot find module 'class-variance-authority' or its corresponding type declarations.
+src/components/task_ui/pagination.tsx(31,23): error TS2344: Type '"size"' does not satisfy the constraint 'keyof ButtonProps'.
+src/components/task_ui/popover.tsx(2,35): error TS2307: Cannot find module '@radix-ui/react-popover' or its corresponding type declarations.
+src/components/task_ui/progress.tsx(2,36): error TS2307: Cannot find module '@radix-ui/react-progress' or its corresponding type declarations.
+src/components/task_ui/radio-group.tsx(2,38): error TS2307: Cannot find module '@radix-ui/react-radio-group' or its corresponding type declarations.
+src/components/task_ui/resizable.tsx(2,37): error TS2307: Cannot find module 'react-resizable-panels' or its corresponding type declarations.
+src/components/task_ui/scroll-area.tsx(2,38): error TS2307: Cannot find module '@radix-ui/react-scroll-area' or its corresponding type declarations.
+src/components/task_ui/select.tsx(2,34): error TS2307: Cannot find module '@radix-ui/react-select' or its corresponding type declarations.
+src/components/task_ui/separator.tsx(2,37): error TS2307: Cannot find module '@radix-ui/react-separator' or its corresponding type declarations.
+src/components/task_ui/sheet.tsx(1,33): error TS2307: Cannot find module '@radix-ui/react-dialog' or its corresponding type declarations.
+src/components/task_ui/sheet.tsx(2,40): error TS2307: Cannot find module 'class-variance-authority' or its corresponding type declarations.
+src/components/task_ui/sheet.tsx(55,6): error TS2339: Property 'side' does not exist on type 'SheetContentProps'.
+src/components/task_ui/sheet.tsx(55,22): error TS2339: Property 'className' does not exist on type 'SheetContentProps'.
+src/components/task_ui/sheet.tsx(55,33): error TS2339: Property 'children' does not exist on type 'SheetContentProps'.
+src/components/task_ui/sidebar.tsx(2,22): error TS2307: Cannot find module '@radix-ui/react-slot' or its corresponding type declarations.
+src/components/task_ui/sidebar.tsx(3,35): error TS2307: Cannot find module 'class-variance-authority' or its corresponding type declarations.
+src/components/task_ui/sidebar.tsx(6,29): error TS2307: Cannot find module '@/src/hooks/use-mobile' or its corresponding type declarations.
+src/components/task_ui/sidebar.tsx(156,10): error TS2322: Type '{ children: Element; "data-sidebar": string; "data-mobile": string; className: string; style: CSSProperties; side: "right" | "left"; }' is not assignable to type 'IntrinsicAttributes & SheetContentProps & RefAttributes<any>'.
+  Property 'children' does not exist on type 'IntrinsicAttributes & SheetContentProps & RefAttributes<any>'.
+src/components/task_ui/sidebar.tsx(227,9): error TS2322: Type '{ children: Element[]; color?: string; content?: string; value?: string | number | readonly string[]; hidden?: boolean; style?: CSSProperties; title?: string; form?: string; slot?: string; ... 284 more ...; onClick: (event: MouseEvent<...>) => void; }' is not assignable to type 'IntrinsicAttributes & ButtonProps & RefAttributes<HTMLButtonElement>'.
+  Property 'variant' does not exist on type 'IntrinsicAttributes & ButtonProps & RefAttributes<HTMLButtonElement>'.
+src/components/task_ui/slider.tsx(2,34): error TS2307: Cannot find module '@radix-ui/react-slider' or its corresponding type declarations.
+src/components/task_ui/sonner.tsx(1,26): error TS2307: Cannot find module 'next-themes' or its corresponding type declarations.
+src/components/task_ui/sonner.tsx(2,42): error TS2307: Cannot find module 'sonner' or its corresponding type declarations.
+src/components/task_ui/switch.tsx(2,35): error TS2307: Cannot find module '@radix-ui/react-switch' or its corresponding type declarations.
+src/components/task_ui/tabs.tsx(2,32): error TS2307: Cannot find module '@radix-ui/react-tabs' or its corresponding type declarations.
+src/components/task_ui/toast.tsx(2,34): error TS2307: Cannot find module '@radix-ui/react-toast' or its corresponding type declarations.
+src/components/task_ui/toast.tsx(3,40): error TS2307: Cannot find module 'class-variance-authority' or its corresponding type declarations.
+src/components/task_ui/toaster.tsx(1,26): error TS2307: Cannot find module '@/src/hooks/use-toast' or its corresponding type declarations.
+src/components/task_ui/toggle-group.tsx(2,39): error TS2307: Cannot find module '@radix-ui/react-toggle-group' or its corresponding type declarations.
+src/components/task_ui/toggle-group.tsx(3,35): error TS2307: Cannot find module 'class-variance-authority' or its corresponding type declarations.
+src/components/task_ui/toggle.tsx(2,34): error TS2307: Cannot find module '@radix-ui/react-toggle' or its corresponding type declarations.
+src/components/task_ui/toggle.tsx(3,40): error TS2307: Cannot find module 'class-variance-authority' or its corresponding type declarations.
+src/components/task_ui/tooltip.tsx(2,35): error TS2307: Cannot find module '@radix-ui/react-tooltip' or its corresponding type declarations.
+src/components/task_ui/use-toast.ts(1,33): error TS2307: Cannot find module '@/src/hooks/use-toast' or its corresponding type declarations.
+src/components/tasks/CreateTaskDialog.tsx(2,48): error TS2307: Cannot find module '@/src/types/task' or its corresponding type declarations.
+src/components/tasks/CreateTaskDialog.tsx(3,29): error TS2307: Cannot find module '@/src/lib/mock-data' or its corresponding type declarations.
+src/components/tasks/TaskDetailSheet.tsx(66,11): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/components/tasks/TaskDetailSheet.tsx(245,8): error TS2322: Type '{ children: Element[]; className: string; }' is not assignable to type 'IntrinsicAttributes & SheetContentProps & RefAttributes<any>'.
+  Property 'children' does not exist on type 'IntrinsicAttributes & SheetContentProps & RefAttributes<any>'.
+src/pages/TaskCalendar.tsx(47,11): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/TaskDashboard.tsx(81,11): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/TaskDashboard.tsx(96,11): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/TaskDashboard.tsx(290,11): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/TaskDashboard.tsx(368,11): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/TaskDashboard.tsx(535,11): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/TaskDashboard.tsx(758,11): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/TaskReminders.tsx(30,11): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/TaskReports.tsx(20,13): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/TaskReports.tsx(29,13): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/TaskReports.tsx(196,13): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/Tasks.tsx(22,33): error TS2307: Cannot find module '@/src/components/projects/CreateProjectDialog' or its corresponding type declarations.
+src/pages/Tasks.tsx(254,11): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/Tasks.tsx(266,11): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/Tasks.tsx(495,58): error TS2339: Property 'id' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(498,75): error TS2339: Property 'id' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(506,48): error TS2339: Property 'description' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(506,122): error TS2339: Property 'description' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(509,44): error TS2339: Property 'priority' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(509,85): error TS2339: Property 'priority' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(517,95): error TS2339: Property 'id' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(518,78): error TS2339: Property 'id' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(579,11): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/Tasks.tsx(789,13): error TS2322: Type '{ title: string; deadline?: string; status: string; }[]' is not assignable to type 'SubTask[]'.
+  Type '{ title: string; deadline?: string; status: string; }' is missing the following properties from type 'SubTask': id, mainTaskId, workspaceId, description, and 3 more.
+src/pages/Tasks.tsx(996,63): error TS2339: Property 'mainTaskId' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(999,42): error TS2339: Property 'id' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(1002,59): error TS2339: Property 'id' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(1003,179): error TS2339: Property 'priority' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(1003,224): error TS2339: Property 'priority' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(1011,28): error TS2339: Property 'priority' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(1011,69): error TS2339: Property 'priority' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(1350,11): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/Tasks.tsx(1466,13): error TS2322: Type '{ title: string; deadline?: string; status: string; }[]' is not assignable to type 'SubTask[]'.
+  Type '{ title: string; deadline?: string; status: string; }' is missing the following properties from type 'SubTask': id, mainTaskId, workspaceId, description, and 3 more.
+src/pages/Tasks.tsx(1520,63): error TS2339: Property 'mainTaskId' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(1523,42): error TS2339: Property 'id' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(1526,59): error TS2339: Property 'id' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(1527,179): error TS2339: Property 'priority' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(1527,224): error TS2339: Property 'priority' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(1535,28): error TS2339: Property 'priority' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(1535,69): error TS2339: Property 'priority' does not exist on type '{ title: string; deadline?: string; status: string; }'.
+src/pages/Tasks.tsx(1581,11): error TS2339: Property 'currentUser' does not exist on type 'AuthContextType'.
+src/pages/Tasks.tsx(1587,11): error TS2345: Argument of type '{ mainTaskId: string; title: string; description: string; assignedTo: any; status: "not_started"; deadline: string; priority: TaskPriority; }' is not assignable to parameter of type 'Omit<SubTask, "id" | "createdAt" | "updatedAt">'.
+  Property 'workspaceId' is missing in type '{ mainTaskId: string; title: string; description: string; assignedTo: any; status: "not_started"; deadline: string; priority: TaskPriority; }' but required in type 'Omit<SubTask, "id" | "createdAt" | "updatedAt">'.
+src/pages/Tasks.tsx(1672,7): error TS2345: Argument of type '{ title: string; description: string; assignedTo: string; status: SubTaskStatus; deadline: string; priority: TaskPriority; }[]' is not assignable to parameter of type 'Omit<SubTask, "id" | "createdAt" | "updatedAt" | "mainTaskId">[]'.
+  Property 'workspaceId' is missing in type '{ title: string; description: string; assignedTo: string; status: SubTaskStatus; deadline: string; priority: TaskPriority; }' but required in type 'Omit<SubTask, "id" | "createdAt" | "updatedAt" | "mainTaskId">'.
+src/types/tasks/project.ts(1,35): error TS2307: Cannot find module '@/types' or its corresponding type declarations.

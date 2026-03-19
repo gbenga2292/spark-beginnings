@@ -51,13 +51,13 @@ export function Settings() {
   const [isChecking, setIsChecking] = useState(false);
   const isElectron = window.electronAPI?.isElectron;
 
-  /* ── Company info state ─────────────────────────────────────── */
+  /* â”€â”€ Company info state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const [isEditing, setIsEditing] = useState(false);
   const [saved, setSaved] = useState<CompanyInfo>(DEFAULT_COMPANY);
   const [draft, setDraft] = useState<CompanyInfo>(DEFAULT_COMPANY);
   const [justSaved, setJustSaved] = useState(false);
 
-  /* ── Backup state ───────────────────────────────────────────── */
+  /* â”€â”€ Backup state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const [backupSettings, setBackupSettings] = useState<BackupSettings>(() => {
     try {
       const stored = localStorage.getItem(BACKUP_SETTINGS_KEY);
@@ -78,13 +78,13 @@ export function Settings() {
     }
   }, [isElectron]);
 
-  /* ── Save backup settings to localStorage ─────────────────── */
+  /* â”€â”€ Save backup settings to localStorage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const saveBackupSettings = (settings: BackupSettings) => {
     setBackupSettings(settings);
     localStorage.setItem(BACKUP_SETTINGS_KEY, JSON.stringify(settings));
   };
 
-  /* ── Create backup JSON ───────────────────────────────────── */
+  /* â”€â”€ Create backup JSON â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const createBackupData = useCallback(() => {
     return {
       version: '1.0',
@@ -114,7 +114,7 @@ export function Settings() {
     };
   }, [state, appVersion]);
 
-  /* ── Manual backup to file ───────────────────────────────── */
+  /* â”€â”€ Manual backup to file â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const handleManualBackup = async () => {
     setIsBackingUp(true);
     try {
@@ -141,7 +141,7 @@ export function Settings() {
     }
   };
 
-  /* ── Restore from file ───────────────────────────────────── */
+  /* â”€â”€ Restore from file â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const handleRestoreFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -194,7 +194,7 @@ export function Settings() {
     reader.readAsText(file);
   };
 
-  /* ── Auto-backup scheduler ───────────────────────────────── */
+  /* â”€â”€ Auto-backup scheduler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   useEffect(() => {
     if (autoBackupTimerRef.current) clearInterval(autoBackupTimerRef.current);
     if (!backupSettings.autoBackupEnabled) return;
@@ -278,7 +278,7 @@ export function Settings() {
           </TabsTrigger>
         </TabsList>
 
-        {/* ─────────── GENERAL TAB ─────────────────────────────────── */}
+        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ GENERAL TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent active={activeTab === 'general'}>
           <Card className="border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 px-6 py-5">
@@ -380,7 +380,7 @@ export function Settings() {
           </Card>
         </TabsContent>
 
-        {/* ─────────── BACKUP & RESTORE TAB ─────────────────────────── */}
+        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ BACKUP & RESTORE TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent active={activeTab === 'backup'}>
           <div className="flex flex-col gap-6">
 
@@ -406,7 +406,7 @@ export function Settings() {
                       <h3 className="font-bold text-slate-800">Create Backup</h3>
                     </div>
                     <p className="text-sm text-slate-600 leading-relaxed">
-                      Downloads a <strong>.json</strong> file containing all your app data — employees, attendance, payroll, invoices, sites, and settings. Save this file to your PC for safekeeping.
+                      Downloads a <strong>.json</strong> file containing all your app data â€” employees, attendance, payroll, invoices, sites, and settings. Save this file to your PC for safekeeping.
                     </p>
                     <div className="flex items-center gap-2 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg px-3 py-2">
                       <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
@@ -418,7 +418,7 @@ export function Settings() {
                       className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-11 rounded-xl shadow-sm"
                     >
                       {isBackingUp
-                        ? <><RefreshCw className="h-4 w-4 animate-spin" /> Creating backup…</>
+                        ? <><RefreshCw className="h-4 w-4 animate-spin" /> Creating backupâ€¦</>
                         : <><Download className="h-4 w-4" /> Download Backup File</>
                       }
                     </Button>
@@ -452,7 +452,7 @@ export function Settings() {
                       className="border-amber-300 text-amber-700 hover:bg-amber-50 gap-2 h-11 rounded-xl"
                     >
                       {isRestoring
-                        ? <><RefreshCw className="h-4 w-4 animate-spin" /> Restoring…</>
+                        ? <><RefreshCw className="h-4 w-4 animate-spin" /> Restoringâ€¦</>
                         : <><Upload className="h-4 w-4" /> Select Backup File</>
                       }
                     </Button>
@@ -525,7 +525,7 @@ export function Settings() {
                     <div className="h-10 flex items-center gap-2">
                       {backupSettings.autoBackupEnabled ? (
                         <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 gap-1.5">
-                          <ShieldCheck className="h-3.5 w-3.5" /> Active — Auto-save on
+                          <ShieldCheck className="h-3.5 w-3.5" /> Active â€” Auto-save on
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="text-slate-500 gap-1.5">
@@ -547,7 +547,7 @@ export function Settings() {
           </div>
         </TabsContent>
 
-        {/* ─────────── NOTIFICATIONS TAB ───────────────────────────── */}
+        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ NOTIFICATIONS TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent active={activeTab === 'notifications'}>
           <Card>
             <CardHeader>
@@ -576,7 +576,7 @@ export function Settings() {
           </Card>
         </TabsContent>
 
-        {/* ─────────── INTEGRATIONS TAB ────────────────────────────── */}
+        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ INTEGRATIONS TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent active={activeTab === 'integrations'}>
           <Card>
             <CardHeader>
@@ -609,7 +609,7 @@ export function Settings() {
           </Card>
         </TabsContent>
 
-        {/* ─────────── UPDATES TAB ─────────────────────────────────── */}
+        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ UPDATES TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent active={activeTab === 'updates'}>
           <Card>
             <CardHeader>
@@ -651,7 +651,7 @@ export function Settings() {
           </Card>
         </TabsContent>
 
-        {/* ─────────── VARIABLES TAB ───────────────────────────────── */}
+        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ VARIABLES TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent active={activeTab === 'variables'}>
           <Variables />
         </TabsContent>
@@ -659,3 +659,4 @@ export function Settings() {
     </div>
   );
 }
+

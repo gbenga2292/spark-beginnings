@@ -110,11 +110,11 @@ export function Ledger() {
     setItems(loadedItems);
   };
 
-  // Navigate forward through vouchers: 01 → 02 → 03 ...
+  // Navigate forward through vouchers: 01 â†’ 02 â†’ 03 ...
   const handleNextVoucher = () => {
     if (distinctVouchers.length === 0) return;
     if (!activeVoucherNo) {
-      // No voucher loaded — start from the first one
+      // No voucher loaded â€” start from the first one
       loadVoucher(distinctVouchers[0]);
       return;
     }
@@ -122,14 +122,14 @@ export function Ledger() {
     if (idx >= 0 && idx < distinctVouchers.length - 1) {
       loadVoucher(distinctVouchers[idx + 1]);
     }
-    // Already at the last voucher — stay put
+    // Already at the last voucher â€” stay put
   };
 
-  // Navigate backward through vouchers: 03 → 02 → 01 ...
+  // Navigate backward through vouchers: 03 â†’ 02 â†’ 01 ...
   const handlePrevVoucher = () => {
     if (distinctVouchers.length === 0) return;
     if (!activeVoucherNo) {
-      // No voucher loaded — start from the last one
+      // No voucher loaded â€” start from the last one
       loadVoucher(distinctVouchers[distinctVouchers.length - 1]);
       return;
     }
@@ -137,7 +137,7 @@ export function Ledger() {
     if (idx > 0) {
       loadVoucher(distinctVouchers[idx - 1]);
     }
-    // Already at the first voucher — stay put
+    // Already at the first voucher â€” stay put
   };
 
   const handleClear = () => {
@@ -153,7 +153,7 @@ export function Ledger() {
       toast.success(`Reloaded voucher ${vno}.`);
     } else {
       handleClear();
-      toast.info('No saved voucher to reload — form cleared.');
+      toast.info('No saved voucher to reload â€” form cleared.');
     }
   };
 
@@ -463,7 +463,7 @@ export function Ledger() {
                           onChange={e => setItemField(idx, 'description', e.target.value)}
                           placeholder="Description..."
                         />
-                        {/* Book icon — click to open callout dialog */}
+                        {/* Book icon â€” click to open callout dialog */}
                         <button
                           type="button"
                           onClick={() => setDescDialog({ idx, value: item.description })}
@@ -482,7 +482,7 @@ export function Ledger() {
                     </td>
                     <td className={tdClass}>
                       <div className="flex items-center px-2 relative group-focus-within:text-indigo-600">
-                        <span className="text-slate-400 absolute left-2 text-xs">₦</span>
+                        <span className="text-slate-400 absolute left-2 text-xs">â‚¦</span>
                         <input type="number" min="0" step="0.01" className={`w-full h-8 pl-4 pr-1 text-sm bg-transparent outline-none font-medium`} value={item.amount} onChange={e => setItemField(idx, 'amount', e.target.value)} />
                       </div>
                     </td>
@@ -524,7 +524,7 @@ export function Ledger() {
                     Total
                   </td>
                   <td className="py-3 px-3 font-bold text-indigo-700 border border-slate-200 bg-indigo-50/50">
-                    ₦{formTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    â‚¦{formTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
                   <td colSpan={3} className="bg-white border border-slate-200 text-slate-300 px-4 text-xs italic">
                     All amounts aggregated per voucher automatically.
@@ -536,7 +536,7 @@ export function Ledger() {
         </div>
       </TabsContent>
 
-      {/* ── Description Callout Dialog ─────────────────────────────────────── */}
+      {/* â”€â”€ Description Callout Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {descDialog !== null && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
@@ -551,7 +551,7 @@ export function Ledger() {
               <div className="flex items-center gap-2">
                 <BookOpen className="h-4 w-4 text-indigo-200" />
                 <span className="text-white font-semibold text-sm uppercase tracking-wider">
-                  Row {descDialog.idx + 1} — Description
+                  Row {descDialog.idx + 1} â€” Description
                 </span>
               </div>
               <button
@@ -653,11 +653,11 @@ export function Ledger() {
                         {v.voucherNo}
                       </TableCell>
                       <TableCell className="text-slate-600 text-sm whitespace-nowrap">
-                        {v.date ? new Date(v.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                        {v.date ? new Date(v.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'â€”'}
                       </TableCell>
                       <TableCell className="text-slate-600">{v.bank}</TableCell>
                       <TableCell className="font-bold text-slate-900 text-right tabular-nums">
-                        ₦{v.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        â‚¦{v.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell className="text-center">
                         <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
@@ -710,7 +710,7 @@ export function Ledger() {
                 <div className="text-right">
                   <p className="text-indigo-200 text-xs">Total Amount</p>
                   <p className="text-white font-bold text-lg">
-                    ₦{dialogTransactions.reduce((s, e) => s + e.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    â‚¦{dialogTransactions.reduce((s, e) => s + e.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </p>
                 </div>
                 <button
@@ -754,25 +754,25 @@ export function Ledger() {
                     <tr key={t.id} className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
                       <td className="py-2.5 px-4 text-slate-400 text-xs font-semibold">{idx + 1}</td>
                       <td className="py-2.5 px-3 text-slate-600 text-xs font-mono whitespace-nowrap">
-                        {t.date ? new Date(t.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}
+                        {t.date ? new Date(t.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) : 'â€”'}
                       </td>
-                      <td className="py-2.5 px-3 text-slate-700 font-medium">{t.description || <span className="text-slate-300 italic">—</span>}</td>
+                      <td className="py-2.5 px-3 text-slate-700 font-medium">{t.description || <span className="text-slate-300 italic">â€”</span>}</td>
                       <td className="py-2.5 px-3">
                         <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">{t.category}</span>
                       </td>
-                      <td className="py-2.5 px-3 text-slate-500 text-xs">{t.client || '—'}</td>
-                      <td className="py-2.5 px-3 text-slate-500 text-xs">{t.site || '—'}</td>
+                      <td className="py-2.5 px-3 text-slate-500 text-xs">{t.client || 'â€”'}</td>
+                      <td className="py-2.5 px-3 text-slate-500 text-xs">{t.site || 'â€”'}</td>
                       <td className="py-2.5 px-3 text-right font-bold text-slate-900 tabular-nums">
-                        ₦{t.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        â‚¦{t.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="py-2.5 px-3 text-slate-400 text-xs">{t.vendor || '—'}</td>
+                      <td className="py-2.5 px-3 text-slate-400 text-xs">{t.vendor || 'â€”'}</td>
                     </tr>
                   ))}
                   {/* Grand total row */}
                   <tr className="bg-indigo-50 border-t-2 border-indigo-200">
                     <td colSpan={6} className="py-3 px-4 text-right font-bold text-slate-700">Total</td>
                     <td className="py-3 px-3 text-right font-extrabold text-indigo-700 tabular-nums">
-                      ₦{dialogTransactions.reduce((s, e) => s + e.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      â‚¦{dialogTransactions.reduce((s, e) => s + e.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
                     <td />
                   </tr>
@@ -786,7 +786,7 @@ export function Ledger() {
         </div>
       )}
 
-      {/* Summary tab removed — see Financial Reports > Ledger Summary */}
+      {/* Summary tab removed â€” see Financial Reports > Ledger Summary */}
       <TabsContent active={tab === 'summary'} className="m-0 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
@@ -796,7 +796,7 @@ export function Ledger() {
                 <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Total Amount</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {catSummary.map(s => (
-                    <TableRow key={s.name}><TableCell className="font-medium">{s.name}</TableCell><TableCell className="text-right font-semibold text-indigo-700">₦{s.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell></TableRow>
+                    <TableRow key={s.name}><TableCell className="font-medium">{s.name}</TableCell><TableCell className="text-right font-semibold text-indigo-700">â‚¦{s.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell></TableRow>
                   ))}
                 </TableBody>
               </Table>
@@ -809,7 +809,7 @@ export function Ledger() {
                 <TableHeader><TableRow><TableHead>Bank</TableHead><TableHead className="text-right">Total Amount</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {bankSummary.map(s => (
-                    <TableRow key={s.name}><TableCell className="font-medium">{s.name}</TableCell><TableCell className="text-right font-semibold text-indigo-700">₦{s.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell></TableRow>
+                    <TableRow key={s.name}><TableCell className="font-medium">{s.name}</TableCell><TableCell className="text-right font-semibold text-indigo-700">â‚¦{s.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell></TableRow>
                   ))}
                 </TableBody>
               </Table>
@@ -822,7 +822,7 @@ export function Ledger() {
                 <TableHeader><TableRow><TableHead>Client</TableHead><TableHead className="text-right">Total Amount</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {clientSummary.map(s => (
-                    <TableRow key={s.name}><TableCell className="font-medium">{s.name}</TableCell><TableCell className="text-right font-semibold text-indigo-700">₦{s.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell></TableRow>
+                    <TableRow key={s.name}><TableCell className="font-medium">{s.name}</TableCell><TableCell className="text-right font-semibold text-indigo-700">â‚¦{s.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell></TableRow>
                   ))}
                 </TableBody>
               </Table>
@@ -835,7 +835,7 @@ export function Ledger() {
                 <TableHeader><TableRow><TableHead>Site</TableHead><TableHead className="text-right">Total Amount</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {siteSummary.map(s => (
-                    <TableRow key={s.name}><TableCell className="font-medium">{s.name}</TableCell><TableCell className="text-right font-semibold text-indigo-700">₦{s.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell></TableRow>
+                    <TableRow key={s.name}><TableCell className="font-medium">{s.name}</TableCell><TableCell className="text-right font-semibold text-indigo-700">â‚¦{s.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell></TableRow>
                   ))}
                 </TableBody>
               </Table>
@@ -849,3 +849,4 @@ export function Ledger() {
     </div>
   );
 }
+

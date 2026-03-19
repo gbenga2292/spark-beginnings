@@ -88,7 +88,7 @@ export function FinancialReports() {
 
   const hideAmounts = priv.canViewAmounts === false;
   const fm = (n: number) => hideAmounts ? '***' : n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-  const fmRaw = (n: number) => hideAmounts ? '***' : '₦' + n.toLocaleString();
+  const fmRaw = (n: number) => hideAmounts ? '***' : 'â‚¦' + n.toLocaleString();
 
   // Payroll Exposure calculations
   const payrollStats = useMemo(() => {
@@ -322,11 +322,11 @@ export function FinancialReports() {
 
   const formatCurrCompact = (val: number) => {
     if (hideAmounts) return '***';
-    if (val >= 1000000) return `₦${(val / 1000000).toFixed(2)}M`;
-    if (val >= 1000) return `₦${(val / 1000).toFixed(1)}k`;
-    return `₦${val.toLocaleString()}`;
+    if (val >= 1000000) return `â‚¦${(val / 1000000).toFixed(2)}M`;
+    if (val >= 1000) return `â‚¦${(val / 1000).toFixed(1)}k`;
+    return `â‚¦${val.toLocaleString()}`;
   };
-  const formatCurr = (val: number) => hideAmounts ? '***' : `₦${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatCurr = (val: number) => hideAmounts ? '***' : `â‚¦${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const showExportMessage = (message: string) => {
     setExportMessage(message);
@@ -366,7 +366,7 @@ export function FinancialReports() {
   };
 
   const exportInvoicePdf = () => {
-    const head = [["Invoice ID", "Client", "Site", "Date", "Amount (₦)", "Status"]];
+    const head = [["Invoice ID", "Client", "Site", "Date", "Amount (â‚¦)", "Status"]];
     const body = invoices.map(inv => [inv.id, inv.client, inv.siteName, inv.date, (inv.amount || 0).toLocaleString(), inv.status]);
     generatePdf("Invoice Report", head, body, "invoice_report.pdf");
   };
@@ -383,7 +383,7 @@ export function FinancialReports() {
   };
 
   const exportPaymentPdf = () => {
-    const head = [["Payment ID", "Client", "Site", "Date", "Amount (₦)", "WHT (₦)", "VAT (₦)"]];
+    const head = [["Payment ID", "Client", "Site", "Date", "Amount (â‚¦)", "WHT (â‚¦)", "VAT (â‚¦)"]];
     const body = payments.map(p => [p.id, p.client, p.site, p.date, (p.amount || 0).toLocaleString(), (p.withholdingTax || 0).toLocaleString(), (p.vat || 0).toLocaleString()]);
     generatePdf("Payment Report", head, body, "payment_report.pdf");
   };
@@ -400,7 +400,7 @@ export function FinancialReports() {
   };
 
   const exportLedgerPdf = () => {
-    const head = [["Client", summaryTab === 'site' ? "Site" : "", "Inv. Qty", "Total Invoiced (₦)", "Total Payments (₦)", "WHT (₦)", "Balance Due (₦)", "Status"].filter(Boolean)];
+    const head = [["Client", summaryTab === 'site' ? "Site" : "", "Inv. Qty", "Total Invoiced (â‚¦)", "Total Payments (â‚¦)", "WHT (â‚¦)", "Balance Due (â‚¦)", "Status"].filter(Boolean)];
     const body = summaryData.map(r => [
       r.client, ...(summaryTab === 'site' ? [r.site] : []),
       r.noOfInvoices, (r.totalInvoices || 0).toLocaleString(), (r.totalPayment || 0).toLocaleString(),
@@ -530,32 +530,32 @@ export function FinancialReports() {
     const body: string[][] = [];
     if (selectedFields.includes('Invoice Summary') || selectedFields.includes('Revenue & Billing')) {
       body.push(['Total Invoices', invoices.length.toString()]);
-      body.push(['Total Billed', `₦${globalStats.totalBilled.toLocaleString()}`]);
+      body.push(['Total Billed', `â‚¦${globalStats.totalBilled.toLocaleString()}`]);
     }
     if (selectedFields.includes('Payment Summary') || selectedFields.includes('Collections & Payments')) {
-      body.push(['Total Payments (Cash)', `₦${globalStats.totalCollectedCash.toLocaleString()}`]);
-      body.push(['Total WHT', `₦${globalStats.totalWHT.toLocaleString()}`]);
-      body.push(['Total Discounts', `₦${globalStats.totalDiscount.toLocaleString()}`]);
+      body.push(['Total Payments (Cash)', `â‚¦${globalStats.totalCollectedCash.toLocaleString()}`]);
+      body.push(['Total WHT', `â‚¦${globalStats.totalWHT.toLocaleString()}`]);
+      body.push(['Total Discounts', `â‚¦${globalStats.totalDiscount.toLocaleString()}`]);
     }
     if (selectedFields.includes('Outstanding Balances') || selectedFields.includes('Client Balances')) {
-      body.push(['Outstanding Receivables', `₦${globalStats.totalOutstanding.toLocaleString()}`]);
+      body.push(['Outstanding Receivables', `â‚¦${globalStats.totalOutstanding.toLocaleString()}`]);
     }
     if (selectedFields.includes('Collection Efficiency')) {
       body.push(['Collection Efficiency Rate', `${collectionRate}%`]);
     }
     if (selectedFields.includes('VAT Remittance') || selectedFields.includes('VAT Collected vs Remitted')) {
-      body.push(['VAT Collected', `₦${globalStats.totalVATCollected.toLocaleString()}`]);
-      body.push(['VAT Remitted', `₦${globalStats.totalVATRemitted.toLocaleString()}`]);
-      body.push(['VAT Deficit', `₦${globalStats.vatDeficit.toLocaleString()}`]);
+      body.push(['VAT Collected', `â‚¦${globalStats.totalVATCollected.toLocaleString()}`]);
+      body.push(['VAT Remitted', `â‚¦${globalStats.totalVATRemitted.toLocaleString()}`]);
+      body.push(['VAT Deficit', `â‚¦${globalStats.vatDeficit.toLocaleString()}`]);
     }
     if (selectedFields.includes('Site Revenue')) {
-      siteFinancialData.forEach(s => body.push([`Site: ${s.name}`, `₦${(s.paid + s.pending).toLocaleString()} total (₦${s.paid.toLocaleString()} paid)`]));
+      siteFinancialData.forEach(s => body.push([`Site: ${s.name}`, `â‚¦${(s.paid + s.pending).toLocaleString()} total (â‚¦${s.paid.toLocaleString()} paid)`]));
     }
     if (selectedFields.includes('Top Debtors')) {
-      clientDebtData.slice(0, 5).forEach(d => body.push([`Debtor: ${d.name}`, `₦${d.Outstanding.toLocaleString()} outstanding`]));
+      clientDebtData.slice(0, 5).forEach(d => body.push([`Debtor: ${d.name}`, `â‚¦${d.Outstanding.toLocaleString()} outstanding`]));
     }
     if (body.length === 0) {
-      body.push(['Selected fields', 'No numeric summary available — use Excel export for full detail.']);
+      body.push(['Selected fields', 'No numeric summary available â€” use Excel export for full detail.']);
     }
     generatePdf(`Financial Report Summary (${filterYear === 'All' ? 'All Time' : filterYear})`, head, body, 'custom_financial_report.pdf');
   };
@@ -606,9 +606,9 @@ export function FinancialReports() {
       {mainTab === 'site-summary' ? (
         <SiteSummary />
       ) : mainTab === 'ledger-summary' ? (
-        /* ─────────────────────────────────────────────────────────────
-           LEDGER SUMMARY TAB — monthly breakdown of ledger expenses
-           ───────────────────────────────────────────────────────────── */
+        /* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+           LEDGER SUMMARY TAB â€” monthly breakdown of ledger expenses
+           â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         (() => {
           const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
           const MONTH_KEYS  = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
@@ -622,14 +622,14 @@ export function FinancialReports() {
             return true;
           });
 
-          // Build month → group → total map
+          // Build month â†’ group â†’ total map
           const buildMonthlyBreakdown = (groupKey: (e: typeof filteredLedger[0]) => string) => {
             const groups = new Map<string, Map<number, number>>();
             filteredLedger.forEach(e => {
               const d = new Date(e.date);
               if (isNaN(d.getTime())) return;
               const mth = d.getMonth(); // 0-11
-              const grp = groupKey(e) || '—';
+              const grp = groupKey(e) || 'â€”';
               if (!groups.has(grp)) groups.set(grp, new Map());
               const mthMap = groups.get(grp)!;
               mthMap.set(mth, (mthMap.get(mth) || 0) + (e.amount || 0));
@@ -671,14 +671,14 @@ export function FinancialReports() {
                   ))}
                 </div>
                 <div className="ml-auto text-sm text-slate-500">
-                  <span className="font-bold text-slate-900">₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> total
+                  <span className="font-bold text-slate-900">â‚¦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> total
                 </div>
               </div>
 
               {/* Monthly breakdown table */}
               <Card className="shadow-sm border-slate-200 overflow-hidden">
                 <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-3 px-4">
-                  <CardTitle className="text-slate-800 text-base capitalize">By {ledgerSummaryView} — Monthly Breakdown ({ledgerSummaryYear})</CardTitle>
+                  <CardTitle className="text-slate-800 text-base capitalize">By {ledgerSummaryView} â€” Monthly Breakdown ({ledgerSummaryYear})</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
@@ -700,19 +700,19 @@ export function FinancialReports() {
                           const rowTotal = totalsPerGroup[gi];
                           return (
                             <tr key={grp} className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${gi % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
-                              <td className="py-2 px-4 font-medium text-slate-700 whitespace-nowrap">{grp || '—'}</td>
+                              <td className="py-2 px-4 font-medium text-slate-700 whitespace-nowrap">{grp || 'â€”'}</td>
                               {MONTH_NAMES.map((_, mi) => {
                                 const val = mthMap.get(mi) || 0;
                                 return (
                                   <td key={mi} className={`py-2 px-2 text-right tabular-nums text-xs ${
                                     val > 0 ? 'text-slate-800 font-medium' : 'text-slate-300'
                                   }`}>
-                                    {val > 0 ? val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—'}
+                                    {val > 0 ? val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : 'â€”'}
                                   </td>
                                 );
                               })}
                               <td className="py-2 px-4 text-right font-bold text-indigo-700 whitespace-nowrap tabular-nums">
-                                ₦{rowTotal.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                                â‚¦{rowTotal.toLocaleString(undefined, { minimumFractionDigits: 0 })}
                               </td>
                             </tr>
                           );
@@ -727,12 +727,12 @@ export function FinancialReports() {
                                 .reduce((sum, e) => sum + (e.amount || 0), 0);
                               return (
                                 <td key={mi} className="py-2.5 px-2 text-right text-indigo-800 tabular-nums text-xs">
-                                  {colTotal > 0 ? colTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—'}
+                                  {colTotal > 0 ? colTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : 'â€”'}
                                 </td>
                               );
                             })}
                             <td className="py-2.5 px-4 text-right text-indigo-900 whitespace-nowrap tabular-nums">
-                              ₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                              â‚¦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0 })}
                             </td>
                           </tr>
                         )}
@@ -758,12 +758,12 @@ export function FinancialReports() {
                           const pct = grandTotal > 0 ? (item.total / grandTotal) * 100 : 0;
                           return (
                             <div key={item.name} className="flex items-center gap-3">
-                              <div className="w-32 md:w-48 text-xs font-medium text-slate-600 truncate shrink-0">{item.name || '—'}</div>
+                              <div className="w-32 md:w-48 text-xs font-medium text-slate-600 truncate shrink-0">{item.name || 'â€”'}</div>
                               <div className="flex-1 bg-slate-100 rounded-full h-2.5 overflow-hidden">
                                 <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
                               </div>
                               <div className="text-right text-xs font-semibold text-slate-700 w-28 shrink-0 tabular-nums">
-                                ₦{item.total.toLocaleString(undefined, { minimumFractionDigits: 0 })} <span className="text-slate-400">({pct.toFixed(1)}%)</span>
+                                â‚¦{item.total.toLocaleString(undefined, { minimumFractionDigits: 0 })} <span className="text-slate-400">({pct.toFixed(1)}%)</span>
                               </div>
                             </div>
                           );
@@ -830,7 +830,7 @@ export function FinancialReports() {
             </CardTitle>
           </CardHeader>
           <CardContent className="relative z-10">
-            <div className="text-4xl font-black mb-1">₦{fm(payrollStats.totalGrossExposure)}</div>
+            <div className="text-4xl font-black mb-1">â‚¦{fm(payrollStats.totalGrossExposure)}</div>
             <p className="text-xs text-indigo-300 flex items-center mt-1 font-medium">Gross liability based on attendance.</p>
           </CardContent>
         </Card>
@@ -841,7 +841,7 @@ export function FinancialReports() {
             <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Est. Statutory Liab.</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(payrollStats.totalStatutory)}</div>
+            <div className="text-3xl font-bold text-slate-900 mb-1">â‚¦{fm(payrollStats.totalStatutory)}</div>
             <p className="text-xs text-slate-500 flex items-center mt-1">Projected PAYE, Pension & NSITF.</p>
           </CardContent>
         </Card>
@@ -852,7 +852,7 @@ export function FinancialReports() {
             <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Active Outstanding Adv.</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(payrollStats.outstandingLoans)}</div>
+            <div className="text-3xl font-bold text-slate-900 mb-1">â‚¦{fm(payrollStats.outstandingLoans)}</div>
             <p className="text-xs text-slate-500 flex items-center mt-1"><TrendingUp className="h-3 w-3 mr-1 text-slate-400" /> Capital returning to company.</p>
           </CardContent>
         </Card>
@@ -873,17 +873,17 @@ export function FinancialReports() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis yAxisId="left" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false}
-                  tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
+                  tickFormatter={(value) => value >= 1000000 ? `â‚¦${(value / 1000000).toFixed(1)}M` : `â‚¦${(value / 1000).toFixed(0)}k`} />
                 <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false}
-                  tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
+                  tickFormatter={(value) => value >= 1000000 ? `â‚¦${(value / 1000000).toFixed(1)}M` : `â‚¦${(value / 1000).toFixed(0)}k`} />
                 <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString()}`} />
+                  formatter={(value: number | undefined) => `â‚¦${(value ?? 0).toLocaleString()}`} />
                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
                 <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
-                  <LabelList dataKey="Payroll" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                  <LabelList dataKey="Payroll" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: any) => v >= 1000000 ? `â‚¦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `â‚¦${(v/1000).toFixed(0)}k` : ''} />
                 </Line>
                 <Line yAxisId="right" type="monotone" name="Overtime Burn" dataKey="Overtime" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
-                  <LabelList dataKey="Overtime" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#f59e0b' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                  <LabelList dataKey="Overtime" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#f59e0b' }} formatter={(v: any) => v >= 1000000 ? `â‚¦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `â‚¦${(v/1000).toFixed(0)}k` : ''} />
                 </Line>
               </LineChart>
             </ResponsiveContainer>
@@ -1058,14 +1058,14 @@ export function FinancialReports() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `₦${val / 1000000}M`} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `â‚¦${val / 1000000}M`} />
                   <RechartsTooltip formatter={(value: number | undefined) => formatCurr(value ?? 0)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                   <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '13px' }} />
                   <Area type="monotone" dataKey="Billed" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorBilledR)">
-                    <LabelList dataKey="Billed" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#6366f1' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
+                    <LabelList dataKey="Billed" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#6366f1' }} formatter={(v: any) => v > 0 ? `â‚¦${(v/1000000).toFixed(1)}M` : ''} />
                   </Area>
                   <Area type="monotone" dataKey="Collected" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorCollectedR)">
-                    <LabelList dataKey="Collected" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
+                    <LabelList dataKey="Collected" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? `â‚¦${(v/1000000).toFixed(1)}M` : ''} />
                   </Area>
                 </AreaChart>
               </ResponsiveContainer>
@@ -1142,13 +1142,13 @@ export function FinancialReports() {
               <ResponsiveContainer width="100%" height={250} className="min-w-[600px]">
                 <BarChart data={clientDebtData} layout="vertical" margin={{ top: 10, right: 30, left: debtorView === 'site' ? 80 : 20, bottom: 5 }} barSize={20}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `₦${(val / 1000000)}M`} />
+                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `â‚¦${(val / 1000000)}M`} />
                   <YAxis type="category" dataKey="name" width={debtorView === 'site' ? 180 : 100} axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: '#334155' }} />
                   <RechartsTooltip cursor={{ fill: '#f1f5f9' }} formatter={(value: number | undefined) => formatCurr(value ?? 0)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                   <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', fontSize: '13px' }} />
                   <Bar dataKey="Cleared" stackId="a" fill="#cbd5e1" name="Received" />
                   <Bar dataKey="Outstanding" stackId="a" fill="#f59e0b" name="Outstanding" radius={[0, 4, 4, 0]}>
-                    <LabelList dataKey="Outstanding" position="right" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
+                    <LabelList dataKey="Outstanding" position="right" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: any) => v > 0 ? `â‚¦${(v/1000000).toFixed(1)}M` : ''} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -1174,14 +1174,14 @@ export function FinancialReports() {
               <BarChart data={siteFinancialData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
-                <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString()}`} />
+                <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => value >= 1000000 ? `â‚¦${(value / 1000000).toFixed(1)}M` : `â‚¦${(value / 1000).toFixed(0)}k`} />
+                <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number | undefined) => `â‚¦${(value ?? 0).toLocaleString()}`} />
                 <Legend verticalAlign="bottom" height={36} />
                 <Bar dataKey="paid" stackId="a" fill="#10b981" name="Paid Invoice">
-                  <LabelList dataKey="paid" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                  <LabelList dataKey="paid" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v >= 1000000 ? `â‚¦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `â‚¦${(v/1000).toFixed(0)}k` : ''} />
                 </Bar>
                 <Bar dataKey="pending" stackId="a" fill="#f59e0b" name="Pending Invoice" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="pending" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                  <LabelList dataKey="pending" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: any) => v >= 1000000 ? `â‚¦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `â‚¦${(v/1000).toFixed(0)}k` : ''} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -1259,7 +1259,7 @@ export function FinancialReports() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <CardTitle className="text-slate-900">Custom Financial Report Builder</CardTitle>
-              <p className="text-sm text-slate-500 mt-1">Pick the data modules you need — export as a multi-sheet Excel or a PDF summary.</p>
+              <p className="text-sm text-slate-500 mt-1">Pick the data modules you need â€” export as a multi-sheet Excel or a PDF summary.</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -1382,7 +1382,7 @@ export function FinancialReports() {
         </CardContent>
       </Card>
 
-      {/* ───────────────── ACCOUNTS REPORTS ───────────────── */}
+      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ ACCOUNTS REPORTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Card className="bg-white border-slate-200 mb-6">
         <CardHeader className="border-b border-slate-100 pb-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
@@ -1409,7 +1409,7 @@ export function FinancialReports() {
         </CardHeader>
         <CardContent className="pt-6">
           {accountsTab === 'payroll' ? (
-            /* ── PAYROLL SUMMARY ── */
+            /* â”€â”€ PAYROLL SUMMARY â”€â”€ */
             (() => {
               const payrollSummaryData = MONTHS.map(month => {
                 const results = calculatePayrollForMonth(month.key);
@@ -1558,41 +1558,41 @@ export function FinancialReports() {
 
                             {/* Salary */}
                             <div className="py-3 px-4 text-right">
-                              <span className="text-sm font-mono text-slate-700">₦{fm(row.salary)}</span>
+                              <span className="text-sm font-mono text-slate-700">â‚¦{fm(row.salary)}</span>
                             </div>
 
                             {/* Overtime */}
                             <div className="py-3 px-4 text-right">
                               {row.overtime > 0 ? (
                                 <span className="inline-flex items-center gap-1 text-sm font-mono text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5">
-                                  ₦{fm(row.overtime)}
+                                  â‚¦{fm(row.overtime)}
                                 </span>
                               ) : (
-                                <span className="text-sm font-mono text-slate-400">—</span>
+                                <span className="text-sm font-mono text-slate-400">â€”</span>
                               )}
                             </div>
 
-                            {/* Gross Pay – accent col */}
+                            {/* Gross Pay â€“ accent col */}
                             <div className="py-3 px-4 text-right bg-teal-50/50 border-l border-r border-teal-100 group-hover:bg-teal-100/40">
-                              <span className="text-sm font-mono font-bold text-teal-800">₦{fm(row.grossPay)}</span>
+                              <span className="text-sm font-mono font-bold text-teal-800">â‚¦{fm(row.grossPay)}</span>
                             </div>
 
                             {/* Other Pay */}
                             <div className="py-3 px-4 text-right">
-                              <span className="text-sm font-mono text-slate-600">₦{fm(row.otherPay)}</span>
+                              <span className="text-sm font-mono text-slate-600">â‚¦{fm(row.otherPay)}</span>
                             </div>
 
                             {/* PAYE */}
                             <div className="py-3 px-4 text-right">
                               <span className="inline-flex items-center gap-1 text-xs font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-0.5">
-                                ₦{fm(row.paye)}
+                                â‚¦{fm(row.paye)}
                               </span>
                             </div>
 
-                            {/* Total Payout – accent col */}
+                            {/* Total Payout â€“ accent col */}
                             <div className="py-3 px-4 bg-slate-800/[0.03] border-l border-slate-200 group-hover:bg-slate-800/[0.06]">
                               <div className="flex flex-col items-end gap-1">
-                                <span className="text-sm font-mono font-extrabold text-slate-900">₦{fm(row.totalPayout)}</span>
+                                <span className="text-sm font-mono font-extrabold text-slate-900">â‚¦{fm(row.totalPayout)}</span>
                                 <div className="w-full max-w-[80px] h-1.5 bg-slate-200 rounded-full overflow-hidden">
                                   <div
                                     className="h-full rounded-full bg-gradient-to-r from-[#1f6075] to-[#2aa0c8]"
@@ -1626,7 +1626,7 @@ export function FinancialReports() {
                             <span className={`text-sm font-mono font-extrabold tracking-wide ${
                               isAccent ? 'text-amber-300' : isPaye ? 'text-rose-300' : 'text-white'
                             }`}>
-                              ₦{fmT(val)}
+                              â‚¦{fmT(val)}
                             </span>
                           </div>
                         );
@@ -1637,7 +1637,7 @@ export function FinancialReports() {
               );
             })()
           ) : (
-            /* ── LOANS & ADVANCES ── */
+            /* â”€â”€ LOANS & ADVANCES â”€â”€ */
             (() => {
               const activeLoans = loans.filter(l => l.status === 'Active' || l.status === 'Approved');
               const pendingAdvances = salaryAdvances.filter(a => a.status !== 'Deducted');
@@ -1792,3 +1792,4 @@ export function FinancialReports() {
     </div>
   );
 }
+

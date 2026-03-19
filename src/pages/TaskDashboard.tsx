@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useAuth } from "@/contexts/AuthContext";
-import { useAppData, deriveMainTaskStatus, getMainTaskProgress } from "@/contexts/AppDataContext";
-import { useWorkspace } from "@/hooks/use-workspace";
+import { useAuth } from "@/src/hooks/useAuth";
+import { useAppData, deriveMainTaskStatus, getMainTaskProgress } from "@/src/contexts/AppDataContext";
+import { useWorkspace } from "@/src/hooks/use-workspace";
 import {
   CheckCircle2, AlertTriangle, TrendingUp, ArrowRight,
   Circle, Loader2, Calendar, Clock, Users, BarChart2, ChevronRight,
@@ -11,8 +11,8 @@ import {
   "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, isToday, isTomorrow, isPast, differenceInHours } from "date-fns";
-import { TaskDetailSheet } from "@/components/tasks/TaskDetailSheet";
-import type { TaskPriority } from "@/types/tasks";
+import { TaskDetailSheet } from "@/src/components/tasks/TaskDetailSheet";
+import type { TaskPriority } from "@/src/types/tasks";
 
 const container = {
   hidden: { opacity: 0 },
@@ -26,7 +26,7 @@ const item = {
 const statusConfig = {
   not_started: { label: "Not Started", pillClass: "chip-pending", icon: Circle },
   in_progress: { label: "In Progress", pillClass: "chip-in-progress", icon: Loader2 },
-  pending_approval: { label: "Pending Approval", pillClass: "chip-pending", icon: Circle },
+  pending_approval: { label: "Pending Approval", pillClass: "chip-pending-approval", icon: Circle },
   completed: { label: "Completed", pillClass: "chip-completed", icon: CheckCircle2 }
 };
 
@@ -76,24 +76,24 @@ function urgencyScore(sub: { deadline?: string; status: string; }) {
   return score;
 }
 
-/* ─── Router ─────────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Router â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 export default function Dashboard() {
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const { isPersonal } = useWorkspace();
 
-  // Personal workspace → always show personal dashboard (solo)
+  // Personal workspace â†’ always show personal dashboard (solo)
   if (isPersonal) return <PersonalSpaceDashboard />;
-  // Team workspace — role-based
+  // Team workspace â€” role-based
   if (currentUser?.role === "admin") return <AdminDashboard />;
   return <UserDashboard />;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    PERSONAL SPACE DASHBOARD
    Clean, private, solo-focused. No team, no assignments, no approvals.
-═══════════════════════════════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function PersonalSpaceDashboard() {
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const { subtasks, workspaces } = useAppData();
   const { wsTasks, workspace } = useWorkspace();
   const navigate = useNavigate();
@@ -114,7 +114,7 @@ function PersonalSpaceDashboard() {
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
-      {/* Header — violet personal identity */}
+      {/* Header â€” violet personal identity */}
       <motion.div variants={item} className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -126,13 +126,13 @@ function PersonalSpaceDashboard() {
             </span>
           </div>
           <h2 className="text-2xl font-heading font-normal text-foreground">
-            {getGreeting()}, {currentUser?.name.split(' ')[0]} 👋
+            {getGreeting()}, {((currentUser as any)?.user_metadata?.name || currentUser?.email || 'User').split(' ')[0].split('@')[0]} 👋
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             {inProgress > 0 ?
               <><span className="font-medium text-foreground">{inProgress}</span> tasks in progress</> :
-              'Your private workspace — no teammates, just you.'}
-            {notStarted > 0 && <span className="text-amber-500 font-medium"> · {notStarted} not started</span>}
+              'Your private workspace â€” no teammates, just you.'}
+            {notStarted > 0 && <span className="text-amber-500 font-medium"> Â· {notStarted} not started</span>}
           </p>
         </div>
         <button onClick={() => navigate('/tasks')}
@@ -141,7 +141,7 @@ function PersonalSpaceDashboard() {
         </button>
       </motion.div>
 
-      {/* Stats — personal palette (violet/purple) */}
+      {/* Stats â€” personal palette (violet/purple) */}
       <motion.div variants={item} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <PersonalStatCard label="My Tasks" value={wsTasks.length} icon={ListTodo} color="violet" sub="Total task groups" />
         <PersonalStatCard label="In Progress" value={inProgress} icon={Loader2} color="violet" sub="Active now" />
@@ -189,7 +189,7 @@ function PersonalSpaceDashboard() {
           <div className="divide-y divide-border/50">
             {urgent.length === 0 ?
               <div className="px-5 py-10 text-center">
-                <p className="text-2xl mb-2">🎉</p>
+                <p className="text-2xl mb-2">ðŸŽ‰</p>
                 <p className="text-sm text-muted-foreground">All clear! No pending tasks.</p>
               </div> :
               urgent.map((sub, i) => {
@@ -259,35 +259,36 @@ function PersonalSpaceDashboard() {
 
 }
 
-/* ─── Personal Stat Card ─────────────────────────────────────────────────── */
+/* â”€â”€â”€ Personal Stat Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function PersonalStatCard({ label, value, icon: Icon, color, sub
-
-
 }: { label: string; value: number; icon: React.ElementType; color: 'violet' | 'green' | 'amber' | 'red'; sub?: string; }) {
-  const colorMap = {
-    violet: { icon: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/30', border: 'border-violet-200 dark:border-violet-800' },
-    green: { icon: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/30', border: 'border-green-200 dark:border-green-800' },
-    amber: { icon: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/30', border: 'border-amber-200 dark:border-amber-800' },
-    red: { icon: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/30', border: 'border-red-200 dark:border-red-800' }
+  const accentMap = {
+    violet: { icon: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/30', accent: '#7c3aed', accentEnd: '#a78bfa' },
+    green:  { icon: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30', accent: '#16a34a', accentEnd: '#4ade80' },
+    amber:  { icon: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30', accent: '#d97706', accentEnd: '#fbbf24' },
+    red:    { icon: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30', accent: '#dc2626', accentEnd: '#f87171' }
   };
-  const c = colorMap[color];
+  const c = accentMap[color];
   return (
-    <div className={`p-4 rounded-xl bg-card border ${c.border} hover:shadow-sm transition-shadow`}>
+    <div
+      className="task-stat-card p-4"
+      style={{ '--stat-accent': c.accent, '--stat-accent-end': c.accentEnd } as React.CSSProperties}
+    >
       <div className="flex items-start justify-between mb-3">
-        <div className={`w-8 h-8 rounded-lg ${c.bg} flex items-center justify-center`}>
-          <Icon className={`w-4 h-4 ${c.icon}`} />
+        <div className={`w-9 h-9 rounded-xl ${c.bg} flex items-center justify-center`}>
+          <Icon className={`w-4.5 h-4.5 ${c.icon}`} />
         </div>
       </div>
-      <p className={`text-2xl font-semibold tabular-nums ${c.icon}`}>{value}</p>
-      <p className="text-xs font-medium text-foreground/80 mt-0.5">{label}</p>
+      <p className={`text-2xl font-bold tabular-nums ${c.icon}`}>{value}</p>
+      <p className="text-xs font-semibold text-foreground/80 mt-0.5">{label}</p>
       {sub && <p className="text-[11px] text-muted-foreground mt-1">{sub}</p>}
-    </div>);
-
+    </div>
+  );
 }
 
-/* ─── Personal Productivity Score ────────────────────────────────────────── */
+/* â”€â”€â”€ Personal Productivity Score â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function PersonalProductivityScore() {
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const { subtasks, reminders } = useAppData();
   const { wsTasks } = useWorkspace();
   const wsTaskIds = new Set(wsTasks.map((mt) => mt.id));
@@ -306,10 +307,10 @@ function PersonalProductivityScore() {
   const score = Math.round(completionRate * 40 + onTimeRate * 30 + engagementRate * 20 + reminderScore * 10);
 
   const getScoreColor = (s: number) => {
-    if (s >= 80) return { ring: 'text-green-500', bg: 'bg-green-500', label: 'Excellent', emoji: '🔥' };
-    if (s >= 60) return { ring: 'text-violet-500', bg: 'bg-violet-500', label: 'Good', emoji: '👍' };
-    if (s >= 40) return { ring: 'text-amber-500', bg: 'bg-amber-500', label: 'Fair', emoji: '📈' };
-    return { ring: 'text-destructive', bg: 'bg-destructive', label: 'Needs Work', emoji: '💪' };
+    if (s >= 80) return { ring: 'text-green-500', bg: 'bg-green-500', label: 'Excellent', emoji: 'ðŸ”¥' };
+    if (s >= 60) return { ring: 'text-violet-500', bg: 'bg-violet-500', label: 'Good', emoji: 'ðŸ‘' };
+    if (s >= 40) return { ring: 'text-amber-500', bg: 'bg-amber-500', label: 'Fair', emoji: 'ðŸ“ˆ' };
+    return { ring: 'text-destructive', bg: 'bg-destructive', label: 'Needs Work', emoji: 'ðŸ’ª' };
   };
   const sc = getScoreColor(score);
 
@@ -361,11 +362,11 @@ function PersonalProductivityScore() {
 
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════════
-   TEAM WORKSPACE — ADMIN DASHBOARD
-═══════════════════════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   TEAM WORKSPACE â€” ADMIN DASHBOARD
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function AdminDashboard() {
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const { subtasks, users } = useAppData();
   const { wsTasks, wsMembers } = useWorkspace();
   const navigate = useNavigate();
@@ -401,11 +402,11 @@ function AdminDashboard() {
 
           </div>
           <h2 className="text-2xl font-heading font-normal text-foreground">
-            {getGreeting()} 👋
+            {getGreeting()} ðŸ‘‹
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             Your team has <span className="font-medium text-foreground">{inProgress}</span> modules in progress
-            {notStarted > 0 && <span className="text-warning font-medium"> · {notStarted} not started</span>}
+            {notStarted > 0 && <span className="text-warning font-medium"> Â· {notStarted} not started</span>}
           </p>
         </div>
         <button onClick={() => navigate("/tasks")}
@@ -460,7 +461,7 @@ function AdminDashboard() {
           <div className="divide-y divide-border/50">
             {urgentTasks.length === 0 ?
               <div className="px-5 py-10 text-center">
-                <p className="text-2xl mb-2">🎉</p>
+                <p className="text-2xl mb-2">ðŸŽ‰</p>
                 <p className="text-sm text-muted-foreground">All clear! No pending tasks.</p>
               </div> :
               urgentTasks.map((sub, i) => {
@@ -481,7 +482,7 @@ function AdminDashboard() {
                       </div>
                       <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1"><Users className="w-3 h-3" />{assignee?.name ?? "Unassigned"}</span>
-                        <span>·</span>
+                        <span>Â·</span>
                         <span>{mt?.title ?? ""}</span>
                       </div>
                     </div>
@@ -528,11 +529,11 @@ function AdminDashboard() {
 
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════════
-   TEAM WORKSPACE — USER DASHBOARD
-═══════════════════════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   TEAM WORKSPACE â€” USER DASHBOARD
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function UserDashboard() {
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const { subtasks, users } = useAppData();
   const { wsTasks, wsMembers } = useWorkspace();
   const navigate = useNavigate();
@@ -567,16 +568,16 @@ function UserDashboard() {
               <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
             </div>
             <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/30 px-2.5 py-1 rounded-full border border-indigo-200 dark:border-indigo-800">
-              Team Workspace · {wsMembers.length} member{wsMembers.length !== 1 ? 's' : ''}
+              Team Workspace Â· {wsMembers.length} member{wsMembers.length !== 1 ? 's' : ''}
             </span>
           </div>
           <h2 className="text-2xl font-heading font-normal text-foreground">
-            {getGreeting()}, {currentUser?.name.split(' ')[0]} 👋
+            {getGreeting()}, {((currentUser as any)?.user_metadata?.name || currentUser?.email || 'User').split(' ')[0].split('@')[0]} 👋
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             You have <span className="font-medium text-foreground">{myProgress}</span> tasks in progress
-            {myPending > 0 && <span className="text-warning font-medium"> · {myPending} not started</span>}
-            {myPendingApproval > 0 && <span className="text-warning font-medium"> · {myPendingApproval} awaiting approval</span>}
+            {myPending > 0 && <span className="text-warning font-medium"> Â· {myPending} not started</span>}
+            {myPendingApproval > 0 && <span className="text-warning font-medium"> Â· {myPendingApproval} awaiting approval</span>}
           </p>
         </div>
         <button onClick={() => navigate('/tasks')}
@@ -633,7 +634,7 @@ function UserDashboard() {
           <div className="divide-y divide-border/50">
             {myUrgent.length === 0 ?
               <div className="px-5 py-10 text-center">
-                <p className="text-2xl mb-2">📋</p>
+                <p className="text-2xl mb-2">ðŸ“‹</p>
                 <p className="text-sm text-muted-foreground">No pending tasks. You're all caught up!</p>
               </div> :
               myUrgent.map((sub, i) => {
@@ -657,7 +658,7 @@ function UserDashboard() {
                       </div>
                       <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
                         <span>{mt?.title ?? ''}</span>
-                        {sub.deadline && <><span>·</span><span className={`flex items-center gap-0.5 ${isOverdue ? 'text-destructive' : ''}`}>
+                        {sub.deadline && <><span>Â·</span><span className={`flex items-center gap-0.5 ${isOverdue ? 'text-destructive' : ''}`}>
                           <Clock className="w-3 h-3" />{formatDueDate(sub.deadline)}
                         </span></>}
                       </div>
@@ -713,7 +714,7 @@ function UserDashboard() {
             </div>
           }
 
-          {/* Team Activity — only in team workspace */}
+          {/* Team Activity â€” only in team workspace */}
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="flex items-center gap-2 px-5 py-3.5 border-b border-border">
               <Clock className="w-4 h-4 text-muted-foreground" />
@@ -736,7 +737,7 @@ function UserDashboard() {
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium text-foreground truncate">
                           {isMe ? <span className="text-primary">You</span> : assignee?.name.split(' ')[0] ?? 'Unassigned'}
-                          {' '}<span className="text-muted-foreground font-normal">· {sub.title}</span>
+                          {' '}<span className="text-muted-foreground font-normal">Â· {sub.title}</span>
                         </p>
                         <p className="text-[11px] text-muted-foreground truncate">{mt?.title}</p>
                       </div>
@@ -753,9 +754,9 @@ function UserDashboard() {
 
 }
 
-/* ─── Team Productivity Score ────────────────────────────────────────────── */
+/* â”€â”€â”€ Team Productivity Score â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function ProductivityScore() {
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const { subtasks, reminders } = useAppData();
   const { wsTasks } = useWorkspace();
 
@@ -779,10 +780,10 @@ function ProductivityScore() {
   const score = Math.round(completionRate * 40 + onTimeRate * 30 + engagementRate * 20 + reminderScore * 10);
 
   const getScoreColor = (s: number) => {
-    if (s >= 80) return { ring: 'text-green-500', bg: 'bg-green-500', label: 'Excellent', emoji: '🔥' };
-    if (s >= 60) return { ring: 'text-primary', bg: 'bg-primary', label: 'Good', emoji: '👍' };
-    if (s >= 40) return { ring: 'text-warning', bg: 'bg-warning', label: 'Fair', emoji: '📈' };
-    return { ring: 'text-destructive', bg: 'bg-destructive', label: 'Needs Work', emoji: '💪' };
+    if (s >= 80) return { ring: 'text-green-500', bg: 'bg-green-500', label: 'Excellent', emoji: 'ðŸ”¥' };
+    if (s >= 60) return { ring: 'text-primary', bg: 'bg-primary', label: 'Good', emoji: 'ðŸ‘' };
+    if (s >= 40) return { ring: 'text-warning', bg: 'bg-warning', label: 'Fair', emoji: 'ðŸ“ˆ' };
+    return { ring: 'text-destructive', bg: 'bg-destructive', label: 'Needs Work', emoji: 'ðŸ’ª' };
   };
   const sc = getScoreColor(score);
 
@@ -834,28 +835,31 @@ function ProductivityScore() {
 
 }
 
-/* ─── Shared StatCard ──────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Shared StatCard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function StatCard({ label, value, icon: Icon, color, sub
-
 }: { label: string; value: number; icon: React.ElementType; color: "blue" | "green" | "red" | "yellow" | "gray"; sub?: string; }) {
-  const colorMap = {
-    blue: { icon: "text-primary", bg: "bg-primary/10", border: "border-primary/20" },
-    green: { icon: "text-green-500", bg: "bg-green-500/10", border: "border-green-500/20" },
-    red: { icon: "text-destructive", bg: "bg-destructive/10", border: "border-destructive/20" },
-    yellow: { icon: "text-warning", bg: "bg-warning/10", border: "border-warning/20" },
-    gray: { icon: "text-muted-foreground", bg: "bg-muted", border: "border-border" }
+  const accentMap = {
+    blue:   { icon: "text-primary", bg: "bg-primary/10", accent: '#4f46e5', accentEnd: '#818cf8' },
+    green:  { icon: "text-green-500", bg: "bg-green-500/10", accent: '#16a34a', accentEnd: '#4ade80' },
+    red:    { icon: "text-destructive", bg: "bg-destructive/10", accent: '#dc2626', accentEnd: '#f87171' },
+    yellow: { icon: "text-warning", bg: "bg-warning/10", accent: '#d97706', accentEnd: '#fbbf24' },
+    gray:   { icon: "text-muted-foreground", bg: "bg-muted", accent: '#64748b', accentEnd: '#94a3b8' }
   };
-  const c = colorMap[color];
+  const c = accentMap[color];
   return (
-    <div className={`p-4 rounded-xl bg-card border ${c.border} hover:shadow-sm transition-shadow`}>
+    <div
+      className="task-stat-card p-4"
+      style={{ '--stat-accent': c.accent, '--stat-accent-end': c.accentEnd } as React.CSSProperties}
+    >
       <div className="flex items-start justify-between mb-3">
-        <div className={`w-8 h-8 rounded-lg ${c.bg} flex items-center justify-center`}>
-          <Icon className={`w-4 h-4 ${c.icon}`} />
+        <div className={`w-9 h-9 rounded-xl ${c.bg} flex items-center justify-center`}>
+          <Icon className={`w-4.5 h-4.5 ${c.icon}`} />
         </div>
       </div>
-      <p className={`text-2xl font-semibold ${c.icon} tabular-nums`}>{value}</p>
-      <p className="text-xs font-medium text-foreground/80 mt-0.5">{label}</p>
+      <p className={`text-2xl font-bold ${c.icon} tabular-nums`}>{value}</p>
+      <p className="text-xs font-semibold text-foreground/80 mt-0.5">{label}</p>
       {sub && <p className="text-[11px] text-muted-foreground mt-1">{sub}</p>}
-    </div>);
-
+    </div>
+  );
 }
+

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/task_ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/src/components/task_ui/sheet";
 import {
   Circle, Loader2, CheckCircle2, Calendar, User, MessageSquare,
   Send, X, Hash, Plus, GitBranch, AlertTriangle, Paperclip,
@@ -7,14 +7,14 @@ import {
   FolderOpen, Link, ChevronDown,
 } from "lucide-react";
 import { format, isPast } from "date-fns";
-import { useAuth } from "@/contexts/AuthContext";
-import { useAppData } from "@/contexts/AppDataContext";
-import type { SubTask, SubTaskStatus, TaskComment, AppUser, CommentAttachment, WorkflowEvent } from "@/types/tasks";
+import { useAuth } from '@/src/hooks/useAuth';
+import { useAppData } from '@/src/contexts/AppDataContext';
+import type { SubTask, SubTaskStatus, TaskComment, AppUser, CommentAttachment, WorkflowEvent } from "@/src/types/tasks";
 
 const statusConfig: Record<SubTaskStatus, { label: string; pillClass: string; icon: React.ElementType }> = {
   not_started: { label: "Not Started", pillClass: "chip-pending", icon: Circle },
   in_progress: { label: "In Progress", pillClass: "chip-in-progress", icon: Loader2 },
-  pending_approval: { label: "Pending Approval", pillClass: "chip-pending", icon: Hourglass },
+  pending_approval: { label: "Pending Approval", pillClass: "chip-pending-approval", icon: Hourglass },
   completed: { label: "Completed", pillClass: "chip-completed", icon: CheckCircle2 },
 };
 
@@ -63,7 +63,7 @@ interface TaskDetailSheetProps {
 type TabType = "updates" | "workflow";
 
 export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const {
     subtasks, mainTasks, users,
     updateSubtaskStatus, approveSubtask, rejectSubtask,

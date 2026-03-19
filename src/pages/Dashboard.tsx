@@ -61,7 +61,7 @@ export function Dashboard() {
     const [filterYear, setFilterYear] = useState<number>(currentDate.getFullYear());
     const [filterMonth, setFilterMonth] = useState<number | null>(currentDate.getMonth() + 1);
 
-    // ── TOP KPI CARDS ──
+    // â”€â”€ TOP KPI CARDS â”€â”€
     const kpiStats = useMemo(() => {
         const activeStaff = employees.filter(e => e.status === 'Active');
         const onLeave = employees.filter(e => e.status === 'On Leave');
@@ -123,7 +123,7 @@ export function Dashboard() {
         };
     }, [employees, attendanceRecords, holidays, filterMonth, filterYear, invoices, leaves, salaryAdvances, loans, sites]);
 
-    // ── DEPARTMENT BREAKDOWN ──
+    // â”€â”€ DEPARTMENT BREAKDOWN â”€â”€
     const deptData = useMemo(() => {
         const deptMap: Record<string, number> = {};
         employees.filter(e => e.status === 'Active').forEach(emp => {
@@ -133,7 +133,7 @@ export function Dashboard() {
         return Object.entries(deptMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
     }, [employees]);
 
-    // ── MONTHLY ATTENDANCE & OT TREND ──
+    // â”€â”€ MONTHLY ATTENDANCE & OT TREND â”€â”€
     const attendanceTrend = useMemo(() => {
         return MONTHS.map(m => {
             const activeStaff = employees.filter(e => e.status === 'Active');
@@ -153,7 +153,7 @@ export function Dashboard() {
         });
     }, [employees, attendanceRecords, holidays, filterYear]);
 
-    // ── HEADCOUNT GROWTH ──
+    // â”€â”€ HEADCOUNT GROWTH â”€â”€
     const headcountChartData = useMemo(() => {
         return MONTHS.map((m) => {
             const endOfMonthTimestamp = new Date(filterYear, m.value, 0).getTime();
@@ -169,7 +169,7 @@ export function Dashboard() {
         });
     }, [employees, filterYear]);
 
-    // ── SITE STAFFING ──
+    // â”€â”€ SITE STAFFING â”€â”€
     const siteStaffing = useMemo(() => {
         const siteMap: Record<string, number> = {};
         employees.filter(e => e.status === 'Active').forEach(emp => {
@@ -179,7 +179,7 @@ export function Dashboard() {
         return Object.entries(siteMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8);
     }, [employees]);
 
-    // ── LEAVE TYPE BREAKDOWN ──
+    // â”€â”€ LEAVE TYPE BREAKDOWN â”€â”€
     const leaveBreakdown = useMemo(() => {
         const typeMap: Record<string, number> = {};
         leaves.forEach(l => {
@@ -194,7 +194,7 @@ export function Dashboard() {
         return Object.entries(typeMap).map(([name, value]) => ({ name, value }));
     }, [leaves, filterYear, filterMonth]);
 
-    // ── ALERTS ──
+    // â”€â”€ ALERTS â”€â”€
     const alerts = useMemo(() => {
         const ALERTS: { type: 'warning' | 'info' | 'urgent', msg: string }[] = [];
 
@@ -216,7 +216,7 @@ export function Dashboard() {
         }
 
         if (kpiStats.attendanceRate < 70 && kpiStats.totalPossibleDays > 0) {
-            ALERTS.push({ type: 'urgent', msg: `Low attendance rate: ${kpiStats.attendanceRate}% — review staffing.` });
+            ALERTS.push({ type: 'urgent', msg: `Low attendance rate: ${kpiStats.attendanceRate}% â€” review staffing.` });
         }
 
         if (ALERTS.length === 0) {
@@ -527,3 +527,4 @@ export function Dashboard() {
         </div>
     );
 }
+

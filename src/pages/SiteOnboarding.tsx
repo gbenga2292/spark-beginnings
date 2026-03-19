@@ -8,14 +8,14 @@ import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import { toast } from '@/src/components/ui/toast';
 import { Save, ArrowLeft, CheckCircle2, Building2, MapPin, Calendar, User } from 'lucide-react';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function InfoField({ label, value }: { label: string; value?: string | null }) {
   return (
     <div className="space-y-0.5">
       <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">{label}</p>
       <p className="text-sm font-medium text-slate-800">
-        {value || <span className="text-slate-300 font-normal italic">—</span>}
+        {value || <span className="text-slate-300 font-normal italic">â€”</span>}
       </p>
     </div>
   );
@@ -32,7 +32,7 @@ function CheckRow({ label, checked }: { label: string; checked: boolean }) {
   );
 }
 
-// Checkbox that is always editable — but shows as read-only row when headerLocked
+// Checkbox that is always editable â€” but shows as read-only row when headerLocked
 function PhaseCheck({
   label, checked, onChange
 }: { label: string; checked: boolean; onChange: (v: boolean) => void; }) {
@@ -65,7 +65,7 @@ function PhaseTextField({
   );
 }
 
-// ─── Default blank form ───────────────────────────────────────────────────────
+// â”€â”€â”€ Default blank form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const blankForm = (): SiteQuestionnaire => ({
   id: '',
@@ -108,7 +108,7 @@ const phaseLabels = [
   'Kick-off & Handover'
 ];
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function SiteOnboarding() {
   const { id } = useParams();
@@ -180,7 +180,7 @@ export function SiteOnboarding() {
     }
   }, [id, pendingSites, navigate, location.state]);
 
-  // ─── Updaters ──────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Updaters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const upd = (patch: Partial<SiteQuestionnaire>) => setForm(p => ({ ...p, ...patch }));
   const updPhase = <K extends 'phase1'|'phase2'|'phase3'|'phase4'|'phase5'>(
     key: K, patch: Partial<SiteQuestionnaire[K]>
@@ -191,7 +191,7 @@ export function SiteOnboarding() {
     if (phase < 5) setActivePhase((phase + 1) as any);
   };
 
-  // ─── Save ──────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleSave = () => {
     if (!form.clientName.trim() || !form.siteName.trim()) {
       toast.error('Client Name and Site Name are required.');
@@ -216,7 +216,7 @@ export function SiteOnboarding() {
     }
   };
 
-  // ─── Activation ──────────────────────────────────────────────────────────
+  // â”€â”€â”€ Activation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const canActivate =
     form.status === 'Pending' &&
     form.phase1.completed &&
@@ -242,7 +242,7 @@ export function SiteOnboarding() {
     updatePendingSite(form.id, activated);
     setForm(activated);
     setInitialForm(activated);
-    toast.success(`🎉 ${form.siteName} is now an Active Site!`);
+    toast.success(`ðŸŽ‰ ${form.siteName} is now an Active Site!`);
     navigate('/sites');
   };
 
@@ -261,7 +261,7 @@ export function SiteOnboarding() {
 
   const completedCount = [1,2,3,4,5].filter(p => (form as any)[`phase${p}`].completed).length;
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <div className="flex flex-col gap-5 h-full max-w-5xl mx-auto w-full">
 
@@ -273,7 +273,7 @@ export function SiteOnboarding() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              {isNew ? 'Site Onboarding' : `Site Onboarding — ${form.siteName || 'New Site'}`}
+              {isNew ? 'Site Onboarding' : `Site Onboarding â€” ${form.siteName || 'New Site'}`}
             </h1>
             {!isNew && (
               <Badge variant={form.status === 'Active' ? 'success' : 'secondary'}>{form.status}</Badge>
@@ -281,7 +281,7 @@ export function SiteOnboarding() {
           </div>
           <p className="text-sm text-slate-500 mt-0.5">
             {form.status === 'Active'
-              ? 'This site is active. Client & site name are locked — all phases remain editable.'
+              ? 'This site is active. Client & site name are locked â€” all phases remain editable.'
               : 'Fill all phases. Activation unlocks at Phase 4 when quotation is accepted and payment confirmed.'}
           </p>
         </div>
@@ -300,7 +300,7 @@ export function SiteOnboarding() {
         )}
       </div>
 
-      {/* Site info summary card — only after created */}
+      {/* Site info summary card â€” only after created */}
       {!isNew && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
@@ -387,7 +387,7 @@ export function SiteOnboarding() {
         </div>
       )}
 
-      {/* Phase tabs + content — shown after record is created */}
+      {/* Phase tabs + content â€” shown after record is created */}
       {!isNew && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 min-h-0 overflow-hidden flex flex-col">
 
@@ -423,13 +423,13 @@ export function SiteOnboarding() {
           {/* Content */}
           <div className="p-6 overflow-y-auto flex-1">
 
-            {/* ── Phase 1 ── */}
+            {/* â”€â”€ Phase 1 â”€â”€ */}
             {activePhase === 1 && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-base font-semibold text-slate-800">Phase 1: Initial Inquiry</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">Head of Operations — collect first project details</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Head of Operations â€” collect first project details</p>
                   </div>
                   {form.phase1.completed && <Badge variant="success">Complete</Badge>}
                 </div>
@@ -477,18 +477,18 @@ export function SiteOnboarding() {
                   variant={form.phase1.completed ? 'outline' : 'default'}
                   className={form.phase1.completed ? 'text-emerald-700 border-emerald-300 hover:bg-emerald-50' : ''}
                 >
-                  {form.phase1.completed ? '✓ Phase 1 Complete' : 'Mark Phase 1 Complete'}
+                  {form.phase1.completed ? 'âœ“ Phase 1 Complete' : 'Mark Phase 1 Complete'}
                 </Button>
               </div>
             )}
 
-            {/* ── Phase 2 ── */}
+            {/* â”€â”€ Phase 2 â”€â”€ */}
             {activePhase === 2 && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-base font-semibold text-slate-800">Phase 2: Site Visit & Assessment</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">Head of Operations — on-site walkthrough</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Head of Operations â€” on-site walkthrough</p>
                   </div>
                   {form.phase2.completed && <Badge variant="success">Complete</Badge>}
                 </div>
@@ -531,18 +531,18 @@ export function SiteOnboarding() {
                   variant={form.phase2.completed ? 'outline' : 'default'}
                   className={form.phase2.completed ? 'text-emerald-700 border-emerald-300 hover:bg-emerald-50' : ''}
                 >
-                  {form.phase2.completed ? '✓ Phase 2 Complete' : 'Mark Phase 2 Complete'}
+                  {form.phase2.completed ? 'âœ“ Phase 2 Complete' : 'Mark Phase 2 Complete'}
                 </Button>
               </div>
             )}
 
-            {/* ── Phase 3 ── */}
+            {/* â”€â”€ Phase 3 â”€â”€ */}
             {activePhase === 3 && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-base font-semibold text-slate-800">Phase 3: System Design & Setup</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">Head of Operations — engineering calculations</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Head of Operations â€” engineering calculations</p>
                   </div>
                   {form.phase3.completed && <Badge variant="success">Complete</Badge>}
                 </div>
@@ -607,18 +607,18 @@ export function SiteOnboarding() {
                   variant={form.phase3.completed ? 'outline' : 'default'}
                   className={form.phase3.completed ? 'text-emerald-700 border-emerald-300 hover:bg-emerald-50' : ''}
                 >
-                  {form.phase3.completed ? '✓ Phase 3 Complete' : 'Mark Phase 3 Complete'}
+                  {form.phase3.completed ? 'âœ“ Phase 3 Complete' : 'Mark Phase 3 Complete'}
                 </Button>
               </div>
             )}
 
-            {/* ── Phase 4 ── */}
+            {/* â”€â”€ Phase 4 â”€â”€ */}
             {activePhase === 4 && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-base font-semibold text-slate-800">Phase 4: Commercial Proposal</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">Accounts Department — quotation, payment & contracts</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Accounts Department â€” quotation, payment & contracts</p>
                   </div>
                   {form.phase4.completed && <Badge variant="success">Complete</Badge>}
                 </div>
@@ -674,10 +674,10 @@ export function SiteOnboarding() {
                   variant={form.phase4.completed ? 'outline' : 'default'}
                   className={form.phase4.completed ? 'text-emerald-700 border-emerald-300 hover:bg-emerald-50' : ''}
                 >
-                  {form.phase4.completed ? '✓ Phase 4 Complete' : 'Mark Phase 4 Complete'}
+                  {form.phase4.completed ? 'âœ“ Phase 4 Complete' : 'Mark Phase 4 Complete'}
                 </Button>
 
-                {/* Activation CTA — only when conditions met and still pending */}
+                {/* Activation CTA â€” only when conditions met and still pending */}
                 {canActivate && (
                   <div className="p-5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl">
                     <div className="flex items-start gap-3">
@@ -685,7 +685,7 @@ export function SiteOnboarding() {
                       <div>
                         <h3 className="font-semibold text-emerald-800">Ready for Activation!</h3>
                         <p className="text-sm text-emerald-700 mt-1">
-                          Phases 1–3 complete, quotation accepted, AND 50% mobilization payment confirmed (Stage 1 in Phase 5).
+                          Phases 1â€“3 complete, quotation accepted, AND 50% mobilization payment confirmed (Stage 1 in Phase 5).
                           Move this site to the <strong>Active Sites</strong> list now.
                         </p>
                         <Button
@@ -711,13 +711,13 @@ export function SiteOnboarding() {
               </div>
             )}
 
-            {/* ── Phase 5 ── */}
+            {/* â”€â”€ Phase 5 â”€â”€ */}
             {activePhase === 5 && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-base font-semibold text-slate-800">Phase 5: Kick-off & Site Handover</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">Ops + Accounts — mobilisation and ongoing billing</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Ops + Accounts â€” mobilisation and ongoing billing</p>
                   </div>
                   {form.phase5.completed && <Badge variant="success">Complete</Badge>}
                 </div>
@@ -751,7 +751,7 @@ export function SiteOnboarding() {
                   variant={form.phase5.completed ? 'outline' : 'default'}
                   className={form.phase5.completed ? 'text-emerald-700 border-emerald-300 hover:bg-emerald-50' : ''}
                 >
-                  {form.phase5.completed ? '✓ Phase 5 Complete' : 'Mark Phase 5 Complete'}
+                  {form.phase5.completed ? 'âœ“ Phase 5 Complete' : 'Mark Phase 5 Complete'}
                 </Button>
               </div>
             )}
@@ -781,3 +781,4 @@ export function SiteOnboarding() {
     </div>
   );
 }
+

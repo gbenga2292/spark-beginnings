@@ -17,23 +17,23 @@ const VIEWS: { mode: TaskViewMode; icon: React.ElementType; label: string }[] = 
 
 export function ViewToggle({ value, onChange }: ViewToggleProps) {
   return (
-    <div className="flex items-center bg-muted rounded-xl p-0.5 gap-0.5">
+    <div className="flex items-center bg-muted/60 rounded-xl p-0.5 gap-0.5 border border-border/40">
       {VIEWS.map(v => {
         const isActive = value === v.mode;
         return (
           <button
             key={v.mode}
             onClick={() => onChange(v.mode)}
-            className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
               isActive
                 ? "text-primary"
-                : "text-muted-foreground hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
             }`}
           >
             {isActive && (
               <motion.div
                 layoutId="view-toggle-bg"
-                className="absolute inset-0 bg-card rounded-lg shadow-sm"
+                className="absolute inset-0 bg-card rounded-lg shadow-sm ring-1 ring-primary/10"
                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
               />
             )}

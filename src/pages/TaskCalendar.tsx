@@ -6,8 +6,8 @@ import {
 import {
   Bell, ChevronLeft, ChevronRight, ArrowLeft, CheckSquare,
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useAppData } from '@/contexts/AppDataContext';
+import { useAuth } from '@/src/hooks/useAuth';
+import { useAppData } from '@/src/contexts/AppDataContext';
 import { useNavigate } from 'react-router-dom';
 
 const WEEKDAYS_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -44,7 +44,7 @@ interface CalendarEvent {
 }
 
 export default function CalendarPage() {
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const { reminders, mainTasks, subtasks } = useAppData();
   const navigate = useNavigate();
 
@@ -153,7 +153,7 @@ export default function CalendarPage() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* ─── Top Bar ─── */}
+      {/* â”€â”€â”€ Top Bar â”€â”€â”€ */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-3 sm:px-5 py-3 border-b border-white/10 flex-shrink-0 gap-2 sm:gap-0">
         <div className="flex items-center gap-2">
           {viewMode === 'day' && (
@@ -190,7 +190,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* ─── Legend ─── */}
+      {/* â”€â”€â”€ Legend â”€â”€â”€ */}
       <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-5 py-2 border-b border-white/10 flex-shrink-0 flex-wrap">
         {Object.entries(EVENT_TYPE_STYLES).map(([key, style]) => (
           <div key={key} className="flex items-center gap-1.5">
@@ -200,7 +200,7 @@ export default function CalendarPage() {
         ))}
       </div>
 
-      {/* ─── Month View ─── */}
+      {/* â”€â”€â”€ Month View â”€â”€â”€ */}
       {viewMode === 'month' && (
         <div className="flex-1 flex flex-col min-h-0">
           <div className="grid grid-cols-7 border-b border-white/10 flex-shrink-0">
@@ -243,7 +243,7 @@ export default function CalendarPage() {
                         className={`${EVENT_TYPE_STYLES[evt.colorKey].bg} text-white text-[8px] sm:text-[10px] leading-tight font-medium px-1 sm:px-1.5 py-0.5 rounded truncate`}
                       >
                         <span className="hidden sm:inline">{format(evt.time, 'h:mm ')} </span>
-                        {evt.type === 'reminder' ? '🔔 ' : ''}
+                        {evt.type === 'reminder' ? 'ðŸ”” ' : ''}
                         {evt.title}
                       </div>
                     ))}
@@ -260,7 +260,7 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* ─── Day View ─── */}
+      {/* â”€â”€â”€ Day View â”€â”€â”€ */}
       {viewMode === 'day' && (
         <div className="flex-1 flex min-h-0">
           {/* Mini calendar sidebar */}
@@ -341,11 +341,11 @@ export default function CalendarPage() {
                           className={`${EVENT_TYPE_STYLES[evt.colorKey].bg} text-white rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 mb-1 cursor-pointer hover:brightness-110 transition-all`}
                         >
                           <p className="text-xs sm:text-sm font-medium truncate">
-                            {evt.type === 'reminder' ? '🔔 ' : ''}{evt.title}
+                            {evt.type === 'reminder' ? 'ðŸ”” ' : ''}{evt.title}
                           </p>
                           <p className="text-[10px] sm:text-[11px] opacity-80">
                             {format(evt.time, 'h:mm a')}
-                            {evt.body && ` · ${evt.body}`}
+                            {evt.body && ` Â· ${evt.body}`}
                           </p>
                         </div>
                       ))}
@@ -360,3 +360,4 @@ export default function CalendarPage() {
     </div>
   );
 }
+

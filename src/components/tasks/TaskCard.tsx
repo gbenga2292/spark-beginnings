@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
 import { Clock, Flag, CheckCircle2, Circle, Loader2, User, Hourglass } from "lucide-react";
 import { isPast, isToday, isTomorrow, format } from "date-fns";
-import type { SubTask, SubTaskStatus, MainTask, AppUser, TaskPriority } from "@/types/tasks";
-import { getMainTaskProgress, deriveMainTaskStatus } from "@/contexts/AppDataContext";
+import type { SubTask, SubTaskStatus, MainTask, AppUser, TaskPriority } from "@/src/types/tasks";
+import { getMainTaskProgress, deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
 
 /* ─── Priority config ──────────────────────────────────────────────────────── */
 const PRIORITY_CONFIG: Record<TaskPriority, { label: string; dot: string; border: string }> = {
@@ -15,7 +15,7 @@ const PRIORITY_CONFIG: Record<TaskPriority, { label: string; dot: string; border
 const statusConfig: Record<SubTaskStatus, { label: string; pillClass: string; dot: string; icon: React.ElementType }> = {
   not_started: { label: "Not Started", pillClass: "chip-pending", dot: "bg-gray-400", icon: Circle },
   in_progress: { label: "In Progress", pillClass: "chip-in-progress", dot: "bg-blue-600", icon: Loader2 },
-  pending_approval: { label: "Pending", pillClass: "chip-pending", dot: "bg-amber-400", icon: Hourglass },
+  pending_approval: { label: "Pending", pillClass: "chip-pending-approval", dot: "bg-amber-400", icon: Hourglass },
   completed: { label: "Done", pillClass: "chip-completed", dot: "bg-green-600", icon: CheckCircle2 },
 };
 

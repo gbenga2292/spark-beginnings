@@ -103,7 +103,7 @@ export function SiteSummary() {
       "S/N": i + 1,
       "Client": r.client,
       "Site": r.name,
-      "Total Cost (₦)": r.cost.toFixed(2)
+      "Total Cost (â‚¦)": r.cost.toFixed(2)
     })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Site Summary");
@@ -141,7 +141,7 @@ export function SiteSummary() {
                 <TableHead>S/N</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead>Site Name</TableHead>
-                <TableHead className="text-right">Total Cost (₦)</TableHead>
+                <TableHead className="text-right">Total Cost (â‚¦)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -150,7 +150,7 @@ export function SiteSummary() {
                   <TableCell>{idx + 1}</TableCell>
                   <TableCell className="font-medium text-indigo-900">{r.client}</TableCell>
                   <TableCell>{r.name}</TableCell>
-                  <TableCell className="text-right font-bold text-slate-700">₦{r.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                  <TableCell className="text-right font-bold text-slate-700">â‚¦{r.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                 </TableRow>
               ))}
               {results.length === 0 && (
@@ -165,7 +165,7 @@ export function SiteSummary() {
               <tfoot>
                 <tr className="bg-slate-50/80 font-bold border-t-2">
                   <td colSpan={3} className="px-4 py-3 text-right">GRAND TOTAL:</td>
-                  <td className="px-4 py-3 text-right text-indigo-700 text-lg">₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-3 text-right text-indigo-700 text-lg">â‚¦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
               </tfoot>
             )}
@@ -175,4 +175,5 @@ export function SiteSummary() {
     </div>
   );
 }
+
 

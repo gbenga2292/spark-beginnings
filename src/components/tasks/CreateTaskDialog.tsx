@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Task, TaskPriority, TaskStatus } from "@/types/task";
-import { departments } from "@/lib/mock-data";
+import { Task, TaskPriority, TaskStatus } from "@/src/types/task";
+import { departments } from "@/src/lib/mock-data";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/task_ui/dialog";
+} from "@/src/components/task_ui/dialog";
 import { X } from "lucide-react";
 
 interface CreateTaskDialogProps {

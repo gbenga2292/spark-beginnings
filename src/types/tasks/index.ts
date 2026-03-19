@@ -67,16 +67,16 @@ export type SubTaskStatus = 'not_started' | 'in_progress' | 'pending_approval' |
 export type MainTaskStatus = 'not_started' | 'in_progress' | 'completed';
 
 export interface SubTask {
-    id: string;
-    mainTaskId: string;
-    workspaceId: string;          // added for Firestore workspace-scoped queries
+    id?: string;
+    mainTaskId?: string;
+    workspaceId?: string;          // added for Firestore workspace-scoped queries
     title: string;
-    description: string;
-    assignedTo: string | null;
+    description?: string;
+    assignedTo?: string | null;
     status: SubTaskStatus;
     priority?: TaskPriority;
-    createdAt: string;
-    updatedAt: string;
+    createdAt?: string;
+    updatedAt?: string;
     deadline?: string;
     pendingApprovalSince?: string;
     approvedBy?: string;
