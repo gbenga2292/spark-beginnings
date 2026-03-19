@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+<<<<<<< HEAD
 @utility no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -7,6 +8,8 @@
     display: none;
   }
 }
+=======
+>>>>>>> fb98aec701065e1aac6f2eeafeeb43403c83b8af
 /* ── Visible scrollbars — slim & tasteful ───────────────────────────── */
 * {
   scrollbar-width: thin;                     /* Firefox */
