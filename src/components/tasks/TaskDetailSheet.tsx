@@ -95,7 +95,7 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
   const creator = mainTask ? users.find((u) => u.id === mainTask.createdBy) ?? null : null;
   const comments = subtaskId ? getSubtaskComments(subtaskId) : [];
   const workflowEvents = mainTask ? getMainTaskWorkflow(mainTask.id) : [];
-  const activeUsers = users.filter((u) => !u.isDeleted && !u.isSuspended && u.teamId === currentUser?.teamId);
+  const activeUsers = users.filter((u) => !u.isDeleted && !u.isSuspended && (u.teamId === (currentUser as any)?.teamId || u.workspaceIds?.some(id => currentUser?.workspaceIds?.includes(id))));
 
   const mentionResults: AppUser[] = mentionQuery !== null
     ? activeUsers.filter((u) =>

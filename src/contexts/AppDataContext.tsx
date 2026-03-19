@@ -60,25 +60,62 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         toggleReminderActive: async () => {},
         createProject: async () => {},
         createMainTask: async (task: any, subs: any[]) => {
-            const { data } = await supabase.from('main_tasks').insert({ ...task, created_by: user?.id }).select().single();
+            const payload = {
+                title: task.title,
+                description: task.description || null,
+                created_by: task.createdBy || user?.id,
+                team_id: task.teamId,
+                workspace_id: task.workspaceId,
+                assigned_to: task.assignedTo,
+                deadline: task.deadline,
+                priority: task.priority
+            };
+            const { data } = await supabase.from('main_tasks').insert(payload).select().single();
             if (data && subs.length) {
-                const subTasksPayload = subs.map(s => ({ ...s, main_task_id: data.id }));
+                const subTasksPayload = subs.map(s => ({ 
+                    title: s.title,
+                    description: s.description || null,
+                    assigned_to: s.assignedTo,
+                    status: s.status,
+                    deadline: s.deadline,
+                    priority: s.priority,
+                    main_task_id: data.id 
+                }));
                 await supabase.from('subtasks').insert(subTasksPayload);
             }
             return data;
         },
         updateMainTask: async (id: string, p: any) => {
-            await supabase.from('main_tasks').update(p).eq('id', id);
+            const payload: any = { ...p };
+            if (p.assignedTo !== undefined) payload.assigned_to = p.assignedTo;
+            if (p.teamId !== undefined) payload.team_id = p.teamId;
+            if (p.workspaceId !== undefined) payload.workspace_id = p.workspaceId;
+            if (p.createdBy !== undefined) payload.created_by = p.createdBy;
+            delete payload.assignedTo; delete payload.teamId; delete payload.workspaceId; delete payload.createdBy;
+            await supabase.from('main_tasks').update(payload).eq('id', id);
             // optimistic sync skipped
         },
         deleteMainTask: async (id: string) => {
             await supabase.from('main_tasks').update({ is_deleted: true }).eq('id', id);
         },
         addSubtask: async (sub: any) => {
-             await supabase.from('subtasks').insert(sub);
+             const payload = {
+                 title: sub.title,
+                 description: sub.description || null,
+                 assigned_to: sub.assignedTo,
+                 status: sub.status,
+                 deadline: sub.deadline,
+                 priority: sub.priority,
+                 main_task_id: sub.mainTaskId
+             };
+             await supabase.from('subtasks').insert(payload);
         },
         updateSubtask: async (id: string, p: any) => {
-            await supabase.from('subtasks').update(p).eq('id', id);
+            const payload: any = { ...p };
+            if (p.assignedTo !== undefined) payload.assigned_to = p.assignedTo;
+            if (p.mainTaskId !== undefined) payload.main_task_id = p.mainTaskId;
+            delete payload.assignedTo; delete payload.mainTaskId;
+            await supabase.from('subtasks').update(payload).eq('id', id);
         },
         deleteSubtask: async (id: string) => {
             await supabase.from('subtasks').delete().eq('id', id);
@@ -89,10 +126,18 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         updateSubtaskStatus: async (id: string, status: string) => {
             await supabase.from('subtasks').update({ status }).eq('id', id);
         },
+        approveSubtask: async (id: string, note?: string) => {
+            await supabase.from('subtasks').update({ status: 'completed', approved_at: new Date().toISOString(), approval_note: note }).eq('id', id);
+        },
+        rejectSubtask: async (id: string, note?: string) => {
+            await supabase.from('subtasks').update({ status: 'in_progress', rejected_at: new Date().toISOString(), approval_note: note }).eq('id', id);
+        },
         postComment: async (subId: string, mainId: string, authorId: string, text: string) => {
             await supabase.from('task_updates').insert({ task_id: mainId, text, author_id: authorId });
         },
-        getMainTaskComments: (id: string) => comments.filter(c => c.task_id === id)
+        getMainTaskComments: (id: string) => comments.filter(c => c.task_id === id || c.main_task_id === id),
+        getSubtaskComments: (subtaskId: string) => comments.filter(c => c.subtask_id === subtaskId || c.subtaskId === subtaskId),
+        getMainTaskWorkflow: (_mainTaskId: string) => [],
     };
 
     return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;

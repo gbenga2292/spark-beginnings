@@ -38,10 +38,13 @@ const mainStatusConfig = {
 
 function formatDueDate(d?: string) {
   if (!d) return "";
-  const date = new Date(d);
-  if (isToday(date)) return "Today";
-  if (isTomorrow(date)) return "Tomorrow";
-  return format(date, "MMM d");
+  try {
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return "";
+    if (isToday(date)) return "Today";
+    if (isTomorrow(date)) return "Tomorrow";
+    return format(date, "MMM d");
+  } catch { return ""; }
 }
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.04 } } };
@@ -436,7 +439,7 @@ function PersonalTasksView() {
               <div className="space-y-3">
                 {filtered.map(mt => {
                   const isExpanded = expanded.has(mt.id);
-                  const subs = applySortToSubs(wsSubs.filter(s => s.mainTaskId === mt.id), sortBy);
+                  const subs = applySortToSubs(wsSubs.filter(s => s.mainTaskId === mt.id), sortBy) as SubTask[];
                   const progress = getMainTaskProgress(mt.id, wsSubs);
                   const status = deriveMainTaskStatus(mt.id, wsSubs);
                   const sc = mainStatusConfig[status];
@@ -492,10 +495,10 @@ function PersonalTasksView() {
                                   const sc2 = statusConfig[sub.status];
                                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
                                   return (
-                                    <motion.div key={sub.id}
+                                    <motion.div key={sub.id ?? i}
                                       initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                                       transition={{ delay: i * 0.03, duration: 0.25 }}
-                                      onClick={() => setOpenSubtaskId(sub.id)}
+                                      onClick={() => setOpenSubtaskId(sub.id ?? null)}
                                       className="flex items-center gap-3 px-5 py-3 hover:bg-violet-50/60 dark:hover:bg-violet-950/30 transition-colors cursor-pointer group">
                                       <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc2.dot}`} />
                                       <div className="min-w-0 flex-1">
@@ -503,10 +506,10 @@ function PersonalTasksView() {
                                           {sub.title}
                                         </p>
                                         <div className="flex items-center gap-2 mt-0.5">
-                                          {sub.description && <p className="text-xs text-muted-foreground truncate">{sub.description}</p>}
+                                          {(sub as SubTask).description && <p className="text-xs text-muted-foreground truncate">{(sub as SubTask).description}</p>}
                                         </div>
                                       </div>
-                                      {sub.priority && <PriorityBadge priority={sub.priority} size="xs" />}
+                                      {(sub as SubTask).priority && <PriorityBadge priority={(sub as SubTask).priority} size="xs" />}
                                       {sub.deadline && (
                                         <span className={`text-[11px] flex items-center gap-1 flex-shrink-0 hidden md:flex ${isOverdue ? "text-red-500" : "text-muted-foreground"}`}>
                                           <Clock className="w-3 h-3" />{formatDueDate(sub.deadline)}
@@ -515,7 +518,7 @@ function PersonalTasksView() {
                                       <div onClick={e => e.stopPropagation()} className="flex items-center gap-1 flex-shrink-0">
                                         <DeleteSubtaskButton
                                           hasActivity={comments.some(c => c.subtaskId === sub.id) || sub.status !== 'not_started'}
-                                          onConfirm={() => deleteSubtask(sub.id)}
+                                          onConfirm={() => deleteSubtask(sub.id ?? '')}
                                         />
                                       </div>
                                       <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full ${sc2.pillClass} flex-shrink-0`}>
@@ -621,10 +624,11 @@ function AdminTasksView() {
   const mySubs = teamSubtasks.filter(s => s.assignedTo === currentUser?.id);
   const pendingApprovalSubs = teamSubtasks.filter(s => s.status === 'pending_approval');
 
-  const filtered = teamTasks.filter(mt =>
-    mt.title.toLowerCase().includes(search.toLowerCase()) ||
-    mt.description.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = teamTasks.filter(mt => {
+    const tMatch = mt.title?.toLowerCase().includes(search.toLowerCase());
+    const dMatch = mt.description?.toLowerCase().includes(search.toLowerCase());
+    return tMatch || dMatch;
+  });
 
   const toggle = (id: string) =>
     setExpanded(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
@@ -659,7 +663,7 @@ function AdminTasksView() {
     if (mySearch && !s.title.toLowerCase().includes(mySearch.toLowerCase())) return false;
     if (myStatusFilter !== "all" && s.status !== myStatusFilter) return false;
     return true;
-  }), sortBy);
+  }), sortBy) as SubTask[];
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-0">
@@ -794,7 +798,7 @@ function AdminTasksView() {
       {viewMode === 'board' && scope === 'mine' && (
         <motion.div variants={item}>
           <SubtaskKanbanView
-            subtasks={filteredMySubs}
+            subtasks={filteredMySubs as SubTask[]}
             mainTasks={mainTasks}
             users={activeUsers}
             onClickSubtask={id => setOpenSubtaskId(id)}
@@ -842,10 +846,10 @@ function AdminTasksView() {
                   const creator = mt ? users.find(u => u.id === mt.createdBy) : null;
                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== 'completed';
                   return (
-                    <motion.div key={sub.id}
+                    <motion.div key={sub.id ?? i}
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.015 }}
-                      onClick={() => setOpenSubtaskId(sub.id)}
+                      onClick={() => setOpenSubtaskId(sub.id ?? null)}
                       className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-4 py-2.5 hover:bg-muted/40 cursor-pointer transition-colors items-center">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${sc.dot}`} />
@@ -917,7 +921,7 @@ function AdminTasksView() {
                             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase">{proj.serviceType}</span>
                           </div>
                           <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{format(new Date(proj.startDate), 'MMM d')} → {format(endDate, 'MMM d')}</span>
+                            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{(() => { try { return format(new Date(proj.startDate), 'MMM d'); } catch { return ''; } })()} → {(() => { try { return format(endDate, 'MMM d'); } catch { return ''; } })()}</span>
                             <span>{proj.durationDays}d</span>
                             <span>{completed}/{total} done</span>
                           </div>
@@ -982,11 +986,11 @@ function AdminTasksView() {
                   const mt = mainTasks.find(m => m.id === sub.mainTaskId);
                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
                   return (
-                    <motion.div key={sub.id}
+                    <motion.div key={sub.id ?? i}
                       initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.02, duration: 0.25 }}
-                      onClick={() => setOpenSubtaskId(sub.id)}
-                      className={`flex items-center gap-3 px-4 py-3.5 bg-card border rounded-xl hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer group ${sub.priority ? `border-l-4 ${PRIORITY_CONFIG[sub.priority].border}` : ''}`}>
+                      onClick={() => setOpenSubtaskId(sub.id ?? null)}
+                      className={`flex items-center gap-3 px-4 py-3.5 bg-card border rounded-xl hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer group ${(sub as SubTask).priority ? `border-l-4 ${PRIORITY_CONFIG[(sub as SubTask).priority!].border}` : ''}`}>
                       <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc.dot}`} />
                       <div className="min-w-0 flex-1">
                         <p className={`text-sm font-medium group-hover:text-primary transition-colors truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
@@ -994,7 +998,7 @@ function AdminTasksView() {
                         </p>
                         {mt && <p className="text-xs text-muted-foreground truncate mt-0.5">{mt.title}</p>}
                       </div>
-                      {sub.priority && <PriorityBadge priority={sub.priority} size="xs" />}
+                      {(sub as SubTask).priority && <PriorityBadge priority={(sub as SubTask).priority} size="xs" />}
                       {sub.deadline && (
                         <span className={`text-[11px] flex items-center gap-1 flex-shrink-0 hidden md:flex ${isOverdue ? "text-red-500" : "text-muted-foreground"}`}>
                           <Clock className="w-3 h-3" />{formatDueDate(sub.deadline)}
@@ -1028,10 +1032,10 @@ function AdminTasksView() {
                 const parentTask = mainTasks.find(mt => mt.id === sub.mainTaskId);
                 const isOverdue = sub.deadline && isPast(new Date(sub.deadline));
                 return (
-                  <motion.div key={sub.id}
+                  <motion.div key={sub.id ?? i}
                     initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.03, duration: 0.25 }}
-                    onClick={() => setOpenSubtaskId(sub.id)}
+                    onClick={() => setOpenSubtaskId(sub.id ?? null)}
                     className="flex items-center gap-3 px-4 py-3.5 bg-card border border-amber-200 dark:border-amber-800/30 rounded-xl hover:shadow-sm transition-all cursor-pointer group border-l-4 border-l-amber-400">
                     <div className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
                     <div className="min-w-0 flex-1">
@@ -1054,7 +1058,7 @@ function AdminTasksView() {
                       </div>
                     )}
                     <button
-                      onClick={e => { e.stopPropagation(); setOpenSubtaskId(sub.id); }}
+                      onClick={e => { e.stopPropagation(); setOpenSubtaskId(sub.id ?? null); }}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-[11px] font-semibold transition-colors shadow-sm whitespace-nowrap flex-shrink-0">
                       Review →
                     </button>
@@ -1375,7 +1379,7 @@ function UserTasksView() {
     if (search && !s.title.toLowerCase().includes(search.toLowerCase())) return false;
     if (statusFilter !== "all" && s.status !== statusFilter) return false;
     return true;
-  }), sortBy);
+  }), sortBy) as SubTask[];
 
   const STATUS_TABS: { label: string; value: SubTaskStatus | "all" }[] = [
     { label: "All", value: "all" },
@@ -1449,7 +1453,7 @@ function UserTasksView() {
       {viewMode === 'board' && (
         <motion.div variants={item}>
           <SubtaskKanbanView
-            subtasks={filtered}
+            subtasks={filtered as SubTask[]}
             mainTasks={mainTasks}
             users={activeUsers}
             onClickSubtask={id => setOpenSubtaskId(id)}
@@ -1506,11 +1510,11 @@ function UserTasksView() {
                   const mt = mainTasks.find(m => m.id === sub.mainTaskId);
                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
                   return (
-                    <motion.div key={sub.id}
+                    <motion.div key={sub.id ?? i}
                       initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.02, duration: 0.25 }}
-                      onClick={() => setOpenSubtaskId(sub.id)}
-                      className={`flex items-center gap-3 px-4 py-3.5 bg-card border rounded-xl hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer group ${sub.priority ? `border-l-4 ${PRIORITY_CONFIG[sub.priority].border}` : ''}`}>
+                      onClick={() => setOpenSubtaskId(sub.id ?? null)}
+                      className={`flex items-center gap-3 px-4 py-3.5 bg-card border rounded-xl hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer group ${(sub as SubTask).priority ? `border-l-4 ${PRIORITY_CONFIG[(sub as SubTask).priority!].border}` : ''}`}>
                       <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc.dot}`} />
                       <div className="min-w-0 flex-1">
                         <p className={`text-sm font-medium group-hover:text-primary transition-colors truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
@@ -1518,7 +1522,7 @@ function UserTasksView() {
                         </p>
                         {mt && <p className="text-xs text-muted-foreground truncate mt-0.5">{mt.title}</p>}
                       </div>
-                      {sub.priority && <PriorityBadge priority={sub.priority} size="xs" />}
+                      {(sub as SubTask).priority && <PriorityBadge priority={(sub as SubTask).priority} size="xs" />}
                       {sub.deadline && (
                         <span className={`text-[11px] flex items-center gap-1 flex-shrink-0 hidden md:flex ${isOverdue ? "text-red-500" : "text-muted-foreground"}`}>
                           <Clock className="w-3 h-3" />{formatDueDate(sub.deadline)}
@@ -1675,60 +1679,68 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
         transition={{ duration: 0.18 }}
         className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-[90vh]"
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="text-base font-semibold text-foreground">New Task</h2>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted transition-colors">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Plus className="w-4.5 h-4.5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-foreground">New Task</h2>
+              <p className="text-[11px] text-muted-foreground">Create a new task and assign subtasks</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">
               Task Title <span className="text-red-400">*</span>
             </label>
             <input required autoFocus value={title} onChange={e => setTitle(e.target.value)}
               placeholder="e.g. Review Q2 Report"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
+              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm" />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Description</label>
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Description</label>
             <textarea rows={2} value={description} onChange={e => setDesc(e.target.value)}
               placeholder="Optional notes…"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all" />
+              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all shadow-sm" />
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Assigned To</label>
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Assigned To</label>
               <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm cursor-pointer">
                 <option value="">Unassigned</option>
                 {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Due Date</label>
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Due Date</label>
               <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Time <span className="normal-case font-normal text-muted-foreground/60">(opt.)</span></label>
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Time <span className="normal-case font-normal text-muted-foreground/60">(opt.)</span></label>
               <input type="time" value={deadlineTime} onChange={e => setDeadlineTime(e.target.value)}
                 disabled={!deadline}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed" />
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm" />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Priority</label>
-            <div className="flex items-center gap-2 flex-wrap">
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-2">Priority</label>
+            <div className="flex items-center gap-2 flex-wrap bg-muted/30 p-1.5 rounded-xl border border-border/50">
               <button type="button" onClick={() => setPriority(undefined)}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${!priority ? 'bg-foreground text-background border-foreground' : 'border-border bg-muted text-muted-foreground hover:text-foreground'}`}>None</button>
+                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm ${!priority ? 'bg-background text-foreground border border-border ring-1 ring-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-black/5'}`}>None</button>
               {PRIORITY_ORDER.map(p => (
                 <button key={p} type="button" onClick={() => setPriority(p)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${priority === p ? PRIORITY_CONFIG[p].className : 'border-border bg-muted text-muted-foreground hover:text-foreground'}`}>
+                  className={`flex-1 flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm border ${priority === p ? `${PRIORITY_CONFIG[p].className} ring-1 ring-primary/20` : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-black/5'}`}>
                   <span className={`w-2 h-2 rounded-full ${PRIORITY_CONFIG[p].dot}`} />
                   {PRIORITY_CONFIG[p].label}
                 </button>
@@ -1754,28 +1766,28 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
                     {subtasks.map((sub, i) => (
                       <div key={i} className="space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground w-4 flex-shrink-0">{i + 1}.</span>
-                          <input value={sub.title} onChange={e => updateRow(i, "title", e.target.value)}
+                          <span className="text-xs font-semibold text-muted-foreground w-4 flex-shrink-0 text-right">{i + 1}.</span>
+                          <input required value={sub.title} onChange={e => updateRow(i, "title", e.target.value)}
                             placeholder="Subtask title"
-                            className="flex-1 px-2.5 py-2 rounded-lg border border-border text-sm bg-muted focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                            className="flex-1 px-3 py-2 rounded-xl border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm" />
                           <button type="button" onClick={() => removeRow(i)}
-                            className="text-muted-foreground hover:text-red-400 transition-colors flex-shrink-0">
+                            className="text-muted-foreground hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors flex-shrink-0">
                             <X className="w-4 h-4" />
                           </button>
                         </div>
                         <div className="flex items-center gap-2 ml-6 flex-wrap">
                           <select value={sub.assignedTo} onChange={e => updateRow(i, "assignedTo", e.target.value)}
-                            className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-muted focus:outline-none focus:ring-1 focus:ring-primary/20 max-w-[120px]">
+                            className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/20 max-w-[120px] shadow-sm cursor-pointer">
                             <option value="">Assign…</option>
                             {users.map(u => <option key={u.id} value={u.id}>{u.name.split(" ")[0]}</option>)}
                           </select>
                           <input type="date" value={sub.deadline} onChange={e => updateRow(i, "deadline", e.target.value)}
-                            className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-muted focus:outline-none focus:ring-1 focus:ring-primary/20 w-[120px]" />
+                            className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/20 w-[120px] shadow-sm" />
                           <input type="time" value={sub.deadlineTime ?? ''} onChange={e => updateRow(i, "deadlineTime", e.target.value)}
                             disabled={!sub.deadline} title="Deadline time (optional)"
-                            className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-muted focus:outline-none focus:ring-1 focus:ring-primary/20 w-[100px] disabled:opacity-40 disabled:cursor-not-allowed" />
+                            className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/20 w-[100px] disabled:opacity-40 disabled:cursor-not-allowed shadow-sm" />
                           <select value={sub.priority ?? ''} onChange={e => updateRow(i, "priority", e.target.value || undefined as any)}
-                            className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-muted focus:outline-none focus:ring-1 focus:ring-primary/20 max-w-[100px]">
+                            className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/20 max-w-[100px] shadow-sm cursor-pointer">
                             <option value="">Priority…</option>
                             {PRIORITY_ORDER.map(p => <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>)}
                           </select>
@@ -1870,46 +1882,51 @@ function EditTaskDialog({ task, users, onClose, onSave }: {
       <motion.div initial={{ opacity: 0, scale: 0.96, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.18 }}
         className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">Edit Task</h2>
-            <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[280px]">{task.title}</p>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Pencil className="w-4.5 h-4.5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Edit Task</h2>
+              <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[280px]">{task.title}</p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted transition-colors">
+          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
 
         <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Task Title <span className="text-red-400">*</span></label>
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Task Title <span className="text-red-400">*</span></label>
             <input required autoFocus value={title} onChange={e => setTitle(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
+              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Description</label>
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Description</label>
             <textarea rows={2} value={description} onChange={e => setDesc(e.target.value)}
               placeholder="Optional notes…"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all" />
+              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all shadow-sm" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Assigned To</label>
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Assigned To</label>
               <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm cursor-pointer">
                 <option value="">Unassigned</option>
                 {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Deadline</label>
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Deadline</label>
               <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Priority</label>
-            <div className="grid grid-cols-5 gap-2">
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-2">Priority</label>
+            <div className="grid grid-cols-5 gap-2 bg-muted/30 p-1.5 rounded-xl border border-border/50">
               <button type="button" onClick={() => setPriority(undefined)}
                 className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border text-[11px] font-semibold transition-all ${!priority
                   ? 'bg-foreground text-background border-foreground shadow-sm scale-105'
@@ -2251,51 +2268,56 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
       <motion.div initial={{ opacity: 0, scale: 0.96, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.18 }}
         className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">Edit Subtask</h2>
-            <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[280px]">{subtask.title}</p>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Pencil className="w-4.5 h-4.5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Edit Subtask</h2>
+              <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[280px]">{subtask.title}</p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted transition-colors">
+          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
 
         <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Title <span className="text-red-400">*</span></label>
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Title <span className="text-red-400">*</span></label>
             <input required autoFocus value={title} onChange={e => setTitle(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
+              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Description</label>
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Description</label>
             <textarea rows={2} value={description} onChange={e => setDesc(e.target.value)}
               placeholder="Optional notes…"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all" />
+              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all shadow-sm" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Assigned To</label>
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Assigned To</label>
               <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm cursor-pointer">
                 <option value="">Unassigned</option>
                 {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Deadline</label>
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Deadline</label>
               <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Priority</label>
-            <div className="flex items-center gap-2 flex-wrap">
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-2">Priority</label>
+            <div className="flex items-center gap-2 flex-wrap bg-muted/30 p-1.5 rounded-xl border border-border/50">
               <button type="button" onClick={() => setPriority(undefined)}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${!priority ? 'bg-foreground text-background border-foreground' : 'border-border bg-muted text-muted-foreground hover:text-foreground'}`}>None</button>
+                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm ${!priority ? 'bg-background text-foreground border border-border ring-1 ring-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-black/5'}`}>None</button>
               {PRIORITY_ORDER.map(p => (
                 <button key={p} type="button" onClick={() => setPriority(p)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${priority === p ? PRIORITY_CONFIG[p].className : 'border-border bg-muted text-muted-foreground hover:text-foreground'}`}>
+                  className={`flex-1 flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm border ${priority === p ? `${PRIORITY_CONFIG[p].className} ring-1 ring-primary/20` : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-black/5'}`}>
                   <span className={`w-2 h-2 rounded-full ${PRIORITY_CONFIG[p].dot}`} />
                   {PRIORITY_CONFIG[p].label}
                 </button>
@@ -2303,13 +2325,13 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Status</label>
-            <div className="grid grid-cols-2 gap-2">
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-2">Status</label>
+            <div className="grid grid-cols-2 gap-2 bg-muted/30 p-1.5 rounded-xl border border-border/50">
               {statusOptions.map(opt => (
                 <button key={opt.value} type="button" onClick={() => setStatus(opt.value)}
-                  className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all ${status === opt.value
-                    ? 'bg-primary text-primary-foreground border-primary shadow-sm scale-[1.02]'
-                    : 'border-border bg-muted text-muted-foreground hover:text-foreground'
+                  className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all shadow-sm ${status === opt.value
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-black/5 bg-background'
                     }`}>
                   {opt.label}
                 </button>
