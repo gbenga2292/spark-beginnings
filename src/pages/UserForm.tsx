@@ -31,6 +31,10 @@ const PRIV_GROUPS: PG[] = [
     pages: [
       { key: 'employees', label: 'Employees', parentKey: 'employees', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewSalary', label: 'View Salary', special: true }, { key: 'canExport', label: 'Export' }] },
+      { key: 'disciplinary', label: 'Disciplinary', parentKey: 'disciplinary', masterField: 'canView',
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
+      { key: 'evaluations', label: 'Evaluations', parentKey: 'evaluations', masterField: 'canView',
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
       { key: 'onboarding', label: 'Onboarding', parentKey: 'onboarding', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
       { key: 'attendance', label: 'Daily Register', parentKey: 'attendance', masterField: 'canView',
@@ -67,6 +71,8 @@ const PRIV_GROUPS: PG[] = [
         fields: [{ key: 'canView', label: 'View' }, { key: 'canGenerate', label: 'Generate / Edit' }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canViewPayeSchedule', label: 'PAYE Schedule' }, { key: 'canViewPensionSchedule', label: 'Pension Schedule' }, { key: 'canViewNsitfSchedule', label: 'NSITF Schedule' }] },
       { key: 'financialReports', label: 'Financial Reports', parentKey: 'financialReports', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canExport', label: 'Export' }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canViewPayrollSummary', label: 'Payroll Summary Tab' }, { key: 'canViewLoansAndAdvances', label: 'Loans & Advances Tab' }] },
+      { key: 'ledger', label: 'Financial Ledger', parentKey: 'ledger', masterField: 'canView',
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Record Entries' }, { key: 'canEdit', label: 'Edit Variables' }, { key: 'canDelete', label: 'Delete Entries', danger: true }, { key: 'canExport', label: 'Export' }] },
     ],
   },
   {

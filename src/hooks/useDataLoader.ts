@@ -3,7 +3,7 @@ import { useAppStore } from '@/src/store/appStore';
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation } from '@/src/lib/supabaseService';
 
 /** Fills in any missing privilege sections using NO_ACCESS defaults. */
 function backfillPrivileges(
@@ -73,6 +73,8 @@ export function useDataLoader(isAuthenticated: boolean) {
           departmentTasksList: appData.departmentTasksList.length > 0 ? appData.departmentTasksList : useAppStore.getState().departmentTasksList,
           leaves: appData.leaves,
           leaveTypes: appData.leaveTypes.length > 0 ? appData.leaveTypes : useAppStore.getState().leaveTypes,
+          disciplinaryRecords: appData.disciplinaryRecords,
+          evaluations: appData.evaluations,
           positions: appData.positions.length > 0 ? appData.positions : useAppStore.getState().positions,
           departments: appData.departments.length > 0 ? appData.departments : useAppStore.getState().departments,
           // Always preserve pendingSites from localStorage — not synced to Supabase
@@ -243,6 +245,30 @@ export function useRealtimeData(isAuthenticated: boolean) {
                 useAppStore.setState({ leaves: current.map(l => l.id === updated.id ? updated : l) });
               } else if (eventType === 'DELETE') {
                 useAppStore.setState({ leaves: current.filter(l => l.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'disciplinary_records': {
+              const current = appState.disciplinaryRecords;
+              if (eventType === 'INSERT') {
+                useAppStore.setState({ disciplinaryRecords: [...current, dbToDisciplinary(newRow)] });
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToDisciplinary(newRow);
+                useAppStore.setState({ disciplinaryRecords: current.map(r => r.id === updated.id ? updated : r) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ disciplinaryRecords: current.filter(r => r.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'evaluations': {
+              const current = appState.evaluations;
+              if (eventType === 'INSERT') {
+                useAppStore.setState({ evaluations: [...current, dbToEvaluation(newRow)] });
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToEvaluation(newRow);
+                useAppStore.setState({ evaluations: current.map(e => e.id === updated.id ? updated : e) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ evaluations: current.filter(e => e.id !== oldRow.id) });
               }
               break;
             }

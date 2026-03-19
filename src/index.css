@@ -1,12 +1,28 @@
 @import "tailwindcss";
 
-/* ── Invisible scrollbars (functional but hidden) ──────────────────── */
+/* ── Visible scrollbars — slim & tasteful ───────────────────────────── */
 * {
-  scrollbar-width: none;        /* Firefox */
-  -ms-overflow-style: none;     /* IE / Edge */
+  scrollbar-width: thin;                     /* Firefox */
+  scrollbar-color: #cbd5e1 transparent;      /* Firefox: thumb track */
 }
 *::-webkit-scrollbar {
-  display: none;                /* Chrome / Safari / Electron */
+  width: 7px;
+  height: 7px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* ══════════════════════════════════════════════════════════════════════

@@ -3,6 +3,15 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { db } from '@/src/lib/supabaseService';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 
+export interface LedgerCategory { id: string; name: string; }
+export interface LedgerVendor { id: string; name: string; tinNumber?: string; }
+export interface LedgerBank { id: string; name: string; }
+export interface LedgerEntry {
+  id: string; voucherNo: string; date: string; description: string;
+  category: string; amount: number; client: string; site: string;
+  vendor: string; bank: string; enteredBy: string;
+}
+
 export interface Site {
   id: string;
   name: string;
@@ -58,6 +67,45 @@ export interface OnboardingTask {
   date: string;
 }
 
+export interface GuarantorInfo {
+  name: string;
+  phone: string;
+  verified: boolean;
+}
+
+export interface OnboardingChecklist {
+  // Task 1
+  emailFormsSent: boolean;
+  emailFormsAcknowledged: boolean;
+  // Task 2: Return of forms
+  formsReturned: boolean;
+  guarantorFormsReturned: boolean;      // 2.1
+  personalEmployeeFormReturned: boolean; // 2.2
+  passportReturned: boolean;             // 2.3
+  // Task 3: Document verification
+  guarantors: GuarantorInfo[];           // 3.1 - each has name, phone, verified
+  passportPhotos: boolean;
+  addressVerification: boolean;
+  verifiedAddress?: string;          // 3.2 - typed address after verification
+  educationalCredentials: boolean;
+  // Task 3.2: Account details
+  bankName: string;
+  accountNo: string;
+  accountDetailsVerified: boolean;
+  // Task 3.2: Pension & PAYE
+  pensionVerified: boolean;
+  pensionNumberInput: string;
+  payeVerified: boolean;
+  payeNumberInput: string;
+  // Task 4: Resumption
+  verifiedStartDate: string;
+  // Task 5: Employment letters
+  employmentLettersIssued: boolean;
+  // Post-activation tasks (6 & 8)
+  orientationDone: boolean;
+  ppeHandbookIssued: boolean;
+}
+
 export interface Employee {
   id: string;
   employeeCode?: string;
@@ -75,6 +123,7 @@ export interface Employee {
   withholdingTax: boolean;
   taxId: string;
   pensionNumber: string;
+  payeNumber?: string;
   status: 'Active' | 'On Leave' | 'Terminated' | 'Onboarding';
   monthlySalaries: MonthlySalary;
   avatar?: string;
@@ -82,6 +131,56 @@ export interface Employee {
   rent?: number;
   onboardingTasks?: OnboardingTask[];
   offboardingTasks?: OnboardingTask[];
+  // New onboarding intake fields
+  probationPeriod?: number;
+  noOfGuarantors?: number;
+  tentativeStartDate?: string;
+  verifiedStartDate?: string;
+  onboardingChecklist?: OnboardingChecklist;
+  onboardingSuspended?: boolean;   // suspend/resume onboarding without deleting
+}
+
+export interface DisciplinaryRecord {
+  id: string;
+  employeeId: string;
+  date: string;
+  type: string;
+  severity: string;
+  description: string;
+  actionTaken: string;
+  status: 'Active' | 'Appealed' | 'Expired' | 'Closed'; // added Closed to align with workflows
+  acknowledged: boolean;
+  employeeComment?: string;
+  attachments?: string[];
+  createdBy: string;
+  visibleToEmployee: boolean;
+
+  // Multi-Step Workflow Fields
+  reportedBy?: string;
+  queryIssued?: boolean;
+  queryDeadline?: string;
+  queryReplied?: boolean;
+  queryReplyText?: string;
+  workflowState?: 'Reported' | 'Query Issued' | 'Under Review' | 'Committee' | 'Closed';
+  initialResult?: 'Warning' | 'Committee' | 'No Consequence' | 'Pending';
+  committeeMeetingDate?: string;
+  finalResult?: 'Warning' | 'Suspension' | 'Termination' | 'No Consequence' | 'Pending';
+  suspensionStartDate?: string;
+  suspensionEndDate?: string;
+}
+
+export interface EvaluationRecord {
+  id: string;
+  employeeId: string;
+  date: string;
+  type: string;
+  scores: Record<string, number>;
+  overallScore: number;
+  managerNotes: string;
+  status: 'Draft' | 'Review' | 'Acknowledged';
+  acknowledged: boolean;
+  employeeComment?: string;
+  createdBy: string;
 }
 
 export interface AttendanceRecord {
@@ -224,6 +323,8 @@ interface AppState {
   clients: string[];
   employees: Employee[];
   attendanceRecords: AttendanceRecord[];
+  disciplinaryRecords: DisciplinaryRecord[];
+  evaluations: EvaluationRecord[];
   positions: string[];
   departments: string[];
   invoices: Invoice[];
@@ -232,6 +333,10 @@ interface AppState {
   loans: Loan[];
   payments: Payment[];
   vatPayments: VatPayment[];
+  ledgerCategories: LedgerCategory[];
+  ledgerVendors: LedgerVendor[];
+  ledgerBanks: LedgerBank[];
+  ledgerEntries: LedgerEntry[];
   addSite: (site: Site) => void;
   setSites: (sites: Site[]) => void;
   updateSite: (id: string, site: Partial<Site>) => void;
@@ -250,6 +355,15 @@ interface AppState {
   addAttendanceRecords: (records: AttendanceRecord[]) => void;
   removeAttendanceRecordsByDate: (date: string) => void;
   deleteAttendanceRecords: (ids: string[]) => void;
+  
+  addDisciplinaryRecord: (record: DisciplinaryRecord) => void;
+  updateDisciplinaryRecord: (id: string, record: Partial<DisciplinaryRecord>) => void;
+  deleteDisciplinaryRecord: (id: string) => void;
+
+  addEvaluation: (evalRecord: EvaluationRecord) => void;
+  updateEvaluation: (id: string, evalRecord: Partial<EvaluationRecord>) => void;
+  deleteEvaluation: (id: string) => void;
+
   addPosition: (position: string) => void;
   removePosition: (position: string) => void;
   addDepartment: (department: string) => void;
@@ -272,6 +386,23 @@ interface AppState {
   addVatPayment: (payment: VatPayment) => void;
   updateVatPayment: (id: string, payment: Partial<VatPayment>) => void;
   deleteVatPayment: (id: string) => void;
+  
+  addLedgerCategory: (category: LedgerCategory) => void;
+  updateLedgerCategory: (id: string, category: Partial<LedgerCategory>) => void;
+  removeLedgerCategory: (id: string) => void;
+  
+  addLedgerVendor: (vendor: LedgerVendor) => void;
+  updateLedgerVendor: (id: string, vendor: Partial<LedgerVendor>) => void;
+  removeLedgerVendor: (id: string) => void;
+  
+  addLedgerBank: (bank: LedgerBank) => void;
+  updateLedgerBank: (id: string, bank: Partial<LedgerBank>) => void;
+  removeLedgerBank: (id: string) => void;
+  
+  addLedgerEntry: (entry: LedgerEntry) => void;
+  updateLedgerEntry: (id: string, entry: Partial<LedgerEntry>) => void;
+  deleteLedgerEntry: (id: string) => void;
+
   payrollVariables: {
     basic: number;
     housing: number;
@@ -300,7 +431,16 @@ interface AppState {
   removePayeTaxExtraCondition: (id: string) => void;
   monthValues: Record<string, MonthValue>;
   updateMonthValue: (month: string, values: Partial<MonthValue>) => void;
-  saveAllSettings: (payroll: AppState['payrollVariables'], paye: AppState['payeTaxVariables'], months: AppState['monthValues']) => void;
+  hrVariables: {
+    flaggedAbsenceThreshold: number;
+    disciplinaryExpirationMonths: number;
+    actionLevels: string[];
+    defaultProbationDays: number;
+    investigationPeriodDays: number;
+    appealPeriodDays: number;
+  };
+  updateHrVariables: (variables: Partial<AppState['hrVariables']>) => void;
+  saveAllSettings: (payroll: AppState['payrollVariables'], paye: AppState['payeTaxVariables'], months: AppState['monthValues'], hr: AppState['hrVariables']) => void;
   publicHolidays: { id: string; date: string; name: string }[];
   addPublicHoliday: (holiday: { id: string; date: string; name: string }) => void;
   removePublicHoliday: (id: string) => void;
@@ -336,6 +476,12 @@ export const useAppStore = create<AppState>()(
       publicHolidays: [],
       departmentTasksList: [],
       leaveTypes: [],
+      disciplinaryRecords: [],
+      evaluations: [],
+      ledgerCategories: [],
+      ledgerVendors: [],
+      ledgerBanks: [],
+      ledgerEntries: [],
 
       payrollVariables: {
         basic: 40, housing: 30, transport: 20, otherAllowances: 10,
@@ -360,6 +506,14 @@ export const useAppStore = create<AppState>()(
         jul: { workDays: 22, overtimeRate: 0.5 }, aug: { workDays: 21, overtimeRate: 0.5 },
         sep: { workDays: 22, overtimeRate: 0.5 }, oct: { workDays: 21, overtimeRate: 0.5 },
         nov: { workDays: 20, overtimeRate: 0.5 }, dec: { workDays: 22, overtimeRate: 0.5 },
+      },
+      hrVariables: {
+        flaggedAbsenceThreshold: 3,
+        disciplinaryExpirationMonths: 6,
+        actionLevels: ['Verbal Warning', 'Written Warning', 'Final Written Warning', 'Suspension'],
+        defaultProbationDays: 90,
+        investigationPeriodDays: 5,
+        appealPeriodDays: 7,
       },
 
       // ── Actions with Supabase sync ──
@@ -431,6 +585,26 @@ export const useAppStore = create<AppState>()(
       updateVatPayment: (id, updatedPayment) => { set((s) => ({ vatPayments: s.vatPayments.map(p => p.id === id ? { ...p, ...updatedPayment } : p) })); db.updateVatPayment(id, updatedPayment); },
       deleteVatPayment: (id) => { set((s) => ({ vatPayments: s.vatPayments.filter(p => p.id !== id) })); db.deleteVatPayment(id); },
 
+      // Ledger Categories
+      addLedgerCategory: (cat) => { set(s => ({ ledgerCategories: [...s.ledgerCategories, cat] })); db.insertLedgerCategory(cat); },
+      updateLedgerCategory: (id, cat) => { set(s => ({ ledgerCategories: s.ledgerCategories.map(c => c.id === id ? { ...c, ...cat } : c) })); db.updateLedgerCategory(id, cat); },
+      removeLedgerCategory: (id) => { set(s => ({ ledgerCategories: s.ledgerCategories.filter(c => c.id !== id) })); db.deleteLedgerCategory(id); },
+
+      // Ledger Vendors
+      addLedgerVendor: (v) => { set(s => ({ ledgerVendors: [...s.ledgerVendors, v] })); db.insertLedgerVendor(v); },
+      updateLedgerVendor: (id, v) => { set(s => ({ ledgerVendors: s.ledgerVendors.map(c => c.id === id ? { ...c, ...v } : c) })); db.updateLedgerVendor(id, v); },
+      removeLedgerVendor: (id) => { set(s => ({ ledgerVendors: s.ledgerVendors.filter(c => c.id !== id) })); db.deleteLedgerVendor(id); },
+
+      // Ledger Banks
+      addLedgerBank: (b) => { set(s => ({ ledgerBanks: [...s.ledgerBanks, b] })); db.insertLedgerBank(b); },
+      updateLedgerBank: (id, b) => { set(s => ({ ledgerBanks: s.ledgerBanks.map(c => c.id === id ? { ...c, ...b } : c) })); db.updateLedgerBank(id, b); },
+      removeLedgerBank: (id) => { set(s => ({ ledgerBanks: s.ledgerBanks.filter(c => c.id !== id) })); db.deleteLedgerBank(id); },
+
+      // Ledger Entries
+      addLedgerEntry: (e) => { set(s => ({ ledgerEntries: [...s.ledgerEntries, e] })); db.insertLedgerEntry(e); },
+      updateLedgerEntry: (id, e) => { set(s => ({ ledgerEntries: s.ledgerEntries.map(c => c.id === id ? { ...c, ...e } : c) })); db.updateLedgerEntry(id, e); },
+      deleteLedgerEntry: (id) => { set(s => ({ ledgerEntries: s.ledgerEntries.filter(c => c.id !== id) })); db.deleteLedgerEntry(id); },
+
       // Payroll Variables
       updatePayrollVariables: (variables) => {
         set((s) => {
@@ -500,16 +674,27 @@ export const useAppStore = create<AppState>()(
         });
       },
 
-      saveAllSettings: (payroll, paye, months) => {
+      // HR Variables
+      updateHrVariables: (variables) => {
+        set((s) => {
+          const updated = { ...s.hrVariables, ...variables };
+          db.updateSettings({ hrVariables: updated });
+          return { hrVariables: updated };
+        });
+      },
+
+      saveAllSettings: (payroll, paye, months, hr) => {
         set(() => ({
           payrollVariables: payroll,
           payeTaxVariables: paye,
-          monthValues: months
+          monthValues: months,
+          hrVariables: hr
         }));
         db.updateSettings({
           payrollVariables: payroll,
           payeTaxVariables: paye,
-          monthValues: months
+          monthValues: months,
+          hrVariables: hr
         });
       },
 
@@ -521,6 +706,16 @@ export const useAppStore = create<AppState>()(
         db.insertPublicHoliday(holiday);
       },
       removePublicHoliday: (id: string) => { set((s) => ({ publicHolidays: s.publicHolidays.filter(h => h.id !== id) })); db.deletePublicHoliday(id); },
+
+      // Disciplinary
+      addDisciplinaryRecord: (record) => { set((s) => ({ disciplinaryRecords: [...s.disciplinaryRecords, record] })); db.insertDisciplinaryRecord(record); },
+      updateDisciplinaryRecord: (id, record) => { set((s) => ({ disciplinaryRecords: s.disciplinaryRecords.map(r => r.id === id ? { ...r, ...record } : r) })); db.updateDisciplinaryRecord(id, record); },
+      deleteDisciplinaryRecord: (id) => { set((s) => ({ disciplinaryRecords: s.disciplinaryRecords.filter(r => r.id !== id) })); db.deleteDisciplinaryRecord(id); },
+
+      // Evaluations
+      addEvaluation: (record) => { set((s) => ({ evaluations: [...s.evaluations, record] })); db.insertEvaluation(record); },
+      updateEvaluation: (id, record) => { set((s) => ({ evaluations: s.evaluations.map(r => r.id === id ? { ...r, ...record } : r) })); db.updateEvaluation(id, record); },
+      deleteEvaluation: (id) => { set((s) => ({ evaluations: s.evaluations.filter(r => r.id !== id) })); db.deleteEvaluation(id); },
 
       // Department Tasks
       updateDepartmentTasks: (deptTasks) => {

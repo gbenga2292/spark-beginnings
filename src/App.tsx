@@ -28,6 +28,9 @@ import { LeaveSummary } from './pages/LeaveSummary';
 import { Users } from './pages/Users';
 import { UserForm } from './pages/UserForm';
 import { SalaryLoans } from './pages/SalaryLoans';
+import { Disciplinary } from './pages/Disciplinary';
+import { Evaluations } from './pages/Evaluations';
+import { Ledger } from './pages/Ledger';
 import { TitleBar } from './components/layout/TitleBar';
 import { ToastContainer, ConfirmDialog } from './components/ui/toast';
 import { GlobalDragScroll } from './components/ui/GlobalDragScroll';
@@ -103,6 +106,9 @@ function AppContent() {
         <Route path="users/new" element={<UserForm />} />
         <Route path="users/:id/edit" element={<UserForm />} />
         <Route path="salary-loans" element={<SalaryLoans />} />
+        <Route path="disciplinary" element={<Disciplinary />} />
+        <Route path="evaluations" element={<Evaluations />} />
+        <Route path="ledger" element={<Ledger />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

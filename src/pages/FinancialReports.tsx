@@ -47,11 +47,14 @@ export function FinancialReports() {
   const holidays = useAppStore(state => state.publicHolidays);
   const monthValues = useAppStore(state => state.monthValues);
   const payrollVariables = useAppStore(state => state.payrollVariables);
+  const ledgerEntries = useAppStore(state => state.ledgerEntries);
   const [accountsTab, setAccountsTab] = useState<'payroll' | 'loans'>('payroll');
   const [payrollYear, setPayrollYear] = useState<number>(new Date().getFullYear());
   const [payrollMonth, setPayrollMonth] = useState<number | null>(new Date().getMonth() + 1);
-  const [mainTab, setMainTab] = useState<'financial' | 'site-summary'>('financial');
+  const [mainTab, setMainTab] = useState<'financial' | 'site-summary' | 'ledger-summary'>('financial');
   const sitesPriv = usePriv('sites');
+  const [ledgerSummaryYear, setLedgerSummaryYear] = useState<string>(String(new Date().getFullYear()));
+  const [ledgerSummaryView, setLedgerSummaryView] = useState<'category' | 'bank' | 'client' | 'site'>('category');
 
   const currentYear = new Date().getFullYear();
   const years = [currentYear, currentYear - 1, currentYear - 2];
@@ -576,26 +579,202 @@ export function FinancialReports() {
           </div>
         </div>
         
-        <div className="flex gap-6 mt-2">
+        <div className="flex gap-6 mt-2 overflow-x-auto">
           <button 
-            className={`pb-3 text-sm font-semibold transition-all border-b-2 ${mainTab === 'financial' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} 
+            className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${mainTab === 'financial' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} 
             onClick={() => setMainTab('financial')}
           >
             Financial Analytics
           </button>
           {sitesPriv.canViewClientSummary && (
             <button 
-              className={`pb-3 text-sm font-semibold transition-all border-b-2 ${mainTab === 'site-summary' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} 
+              className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${mainTab === 'site-summary' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} 
               onClick={() => setMainTab('site-summary')}
             >
               Site Summary
             </button>
           )}
+          <button 
+            className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${mainTab === 'ledger-summary' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} 
+            onClick={() => setMainTab('ledger-summary')}
+          >
+            Ledger Summary
+          </button>
         </div>
       </div>
 
       {mainTab === 'site-summary' ? (
         <SiteSummary />
+      ) : mainTab === 'ledger-summary' ? (
+        /* ─────────────────────────────────────────────────────────────
+           LEDGER SUMMARY TAB — monthly breakdown of ledger expenses
+           ───────────────────────────────────────────────────────────── */
+        (() => {
+          const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          const MONTH_KEYS  = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+
+          // Available years from ledger entries
+          const ledgerYears = Array.from(new Set(ledgerEntries.map(e => e.date?.substring(0, 4)).filter(Boolean))).sort().reverse();
+
+          const filteredLedger = ledgerEntries.filter(e => {
+            if (!e.date) return false;
+            if (ledgerSummaryYear !== 'All' && !e.date.startsWith(ledgerSummaryYear)) return false;
+            return true;
+          });
+
+          // Build month → group → total map
+          const buildMonthlyBreakdown = (groupKey: (e: typeof filteredLedger[0]) => string) => {
+            const groups = new Map<string, Map<number, number>>();
+            filteredLedger.forEach(e => {
+              const d = new Date(e.date);
+              if (isNaN(d.getTime())) return;
+              const mth = d.getMonth(); // 0-11
+              const grp = groupKey(e) || '—';
+              if (!groups.has(grp)) groups.set(grp, new Map());
+              const mthMap = groups.get(grp)!;
+              mthMap.set(mth, (mthMap.get(mth) || 0) + (e.amount || 0));
+            });
+            return groups;
+          };
+
+          const dataMap = {
+            category: buildMonthlyBreakdown(e => e.category),
+            bank:     buildMonthlyBreakdown(e => e.bank),
+            client:   buildMonthlyBreakdown(e => e.client),
+            site:     buildMonthlyBreakdown(e => e.site),
+          }[ledgerSummaryView];
+
+          const groups = Array.from(dataMap.keys()).sort();
+          const totalsPerGroup = groups.map(g => Array.from(dataMap.get(g)!.values()).reduce((a, b) => a + b, 0));
+          const grandTotal = totalsPerGroup.reduce((a, b) => a + b, 0);
+
+          return (
+            <div className="space-y-6">
+              {/* Controls */}
+              <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase">Year</span>
+                  <select value={ledgerSummaryYear} onChange={e => setLedgerSummaryYear(e.target.value)}
+                    className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
+                    <option value="All">All Years</option>
+                    {ledgerYears.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                  {(['category', 'bank', 'client', 'site'] as const).map(v => (
+                    <button key={v} onClick={() => setLedgerSummaryView(v)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold capitalize transition-all ${
+                        ledgerSummaryView === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                      }`}>
+                      {v}
+                    </button>
+                  ))}
+                </div>
+                <div className="ml-auto text-sm text-slate-500">
+                  <span className="font-bold text-slate-900">₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> total
+                </div>
+              </div>
+
+              {/* Monthly breakdown table */}
+              <Card className="shadow-sm border-slate-200 overflow-hidden">
+                <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-3 px-4">
+                  <CardTitle className="text-slate-800 text-base capitalize">By {ledgerSummaryView} — Monthly Breakdown ({ledgerSummaryYear})</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-indigo-700 text-white">
+                        <tr>
+                          <th className="py-2.5 px-4 text-left font-semibold capitalize">{ledgerSummaryView}</th>
+                          {MONTH_NAMES.map(m => (
+                            <th key={m} className="py-2.5 px-2 text-right font-semibold whitespace-nowrap">{m}</th>
+                          ))}
+                          <th className="py-2.5 px-4 text-right font-semibold">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groups.length === 0 ? (
+                          <tr><td colSpan={14} className="text-center py-12 text-slate-400 italic">No ledger entries for the selected period.</td></tr>
+                        ) : groups.map((grp, gi) => {
+                          const mthMap = dataMap.get(grp)!;
+                          const rowTotal = totalsPerGroup[gi];
+                          return (
+                            <tr key={grp} className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${gi % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                              <td className="py-2 px-4 font-medium text-slate-700 whitespace-nowrap">{grp || '—'}</td>
+                              {MONTH_NAMES.map((_, mi) => {
+                                const val = mthMap.get(mi) || 0;
+                                return (
+                                  <td key={mi} className={`py-2 px-2 text-right tabular-nums text-xs ${
+                                    val > 0 ? 'text-slate-800 font-medium' : 'text-slate-300'
+                                  }`}>
+                                    {val > 0 ? val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—'}
+                                  </td>
+                                );
+                              })}
+                              <td className="py-2 px-4 text-right font-bold text-indigo-700 whitespace-nowrap tabular-nums">
+                                ₦{rowTotal.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {/* Grand total row */}
+                        {groups.length > 0 && (
+                          <tr className="bg-indigo-50 border-t-2 border-indigo-200 font-bold">
+                            <td className="py-2.5 px-4 text-slate-800">TOTAL</td>
+                            {MONTH_NAMES.map((_, mi) => {
+                              const colTotal = filteredLedger
+                                .filter(e => { const d = new Date(e.date); return !isNaN(d.getTime()) && d.getMonth() === mi; })
+                                .reduce((sum, e) => sum + (e.amount || 0), 0);
+                              return (
+                                <td key={mi} className="py-2.5 px-2 text-right text-indigo-800 tabular-nums text-xs">
+                                  {colTotal > 0 ? colTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—'}
+                                </td>
+                              );
+                            })}
+                            <td className="py-2.5 px-4 text-right text-indigo-900 whitespace-nowrap tabular-nums">
+                              ₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Per-group bar chart */}
+              {groups.length > 0 && (
+                <Card className="shadow-sm border-slate-200">
+                  <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-3 px-4">
+                    <CardTitle className="text-slate-800 text-base">Top {Math.min(groups.length, 10)} by Total Spend</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <div className="space-y-2">
+                      {groups
+                        .map((g, i) => ({ name: g, total: totalsPerGroup[i] }))
+                        .sort((a, b) => b.total - a.total)
+                        .slice(0, 10)
+                        .map(item => {
+                          const pct = grandTotal > 0 ? (item.total / grandTotal) * 100 : 0;
+                          return (
+                            <div key={item.name} className="flex items-center gap-3">
+                              <div className="w-32 md:w-48 text-xs font-medium text-slate-600 truncate shrink-0">{item.name || '—'}</div>
+                              <div className="flex-1 bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                                <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                              </div>
+                              <div className="text-right text-xs font-semibold text-slate-700 w-28 shrink-0 tabular-nums">
+                                ₦{item.total.toLocaleString(undefined, { minimumFractionDigits: 0 })} <span className="text-slate-400">({pct.toFixed(1)}%)</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          );
+        })()
       ) : (
         <>
           {/* Filters */}

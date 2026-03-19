@@ -20,6 +20,9 @@ import {
   DollarSign,
   BarChart3,
   ChevronDown,
+  AlertTriangle,
+  ClipboardList,
+  BookOpen,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -54,11 +57,13 @@ const navigation: NavCategory[] = [
     name: 'HR',
     icon: Users,
     items: [
+      { name: 'Daily Register',         href: '/attendance',   icon: CalendarClock, privKey: 'attendance',  privField: 'canView' },
       { name: 'Employees',              href: '/employees',    icon: Users,         privKey: 'employees',   privField: 'canView' },
       { name: 'Onboarding',             href: '/onboarding',   icon: UserPlus,      privKey: 'onboarding',  privField: 'canView' },
-      { name: 'Daily Register',         href: '/attendance',   icon: CalendarClock, privKey: 'attendance',  privField: 'canView' },
       { name: 'Leaves',                 href: '/leaves',       icon: CalendarClock, privKey: 'leaves',      privField: 'canView' },
       { name: 'Salary & Loan Advance',  href: '/salary-loans', icon: DollarSign,    privKey: 'salaryLoans', privField: 'canView' },
+      { name: 'Evaluations',            href: '/evaluations',  icon: ClipboardList, privKey: 'evaluations',  privField: 'canView' },
+      { name: 'Disciplinary',           href: '/disciplinary', icon: AlertTriangle, privKey: 'disciplinary', privField: 'canView' },
       { name: 'Employee Reports',       href: '/reports',      icon: FileText,      privKey: 'reports',     privField: 'canView' },
     ],
   },
@@ -77,6 +82,7 @@ const navigation: NavCategory[] = [
       { name: 'Payment',          href: '/payments',          icon: DollarSign, privKey: 'payments',         privField: 'canView' },
       { name: 'VAT',              href: '/vat',               icon: Landmark,   privKey: 'payments',         privField: 'canViewVat' },
       { name: 'Payroll',          href: '/payroll',           icon: Wallet,     privKey: 'payroll',          privField: 'canView' },
+      { name: 'Financial Ledger', href: '/ledger',            icon: BookOpen,   privKey: 'ledger',           privField: 'canView' },
       { name: 'Account Reports',  href: '/financial-reports', icon: BarChart3,  privKey: 'financialReports', privField: 'canView' },
     ],
   },
@@ -94,7 +100,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const location = useLocation();
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const { isDark } = useTheme();
-  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(['HR', 'Settings', 'Account']);
 
   const getVisibleItems = (items: NavItem[]) => {
     return items.filter((item) => {
