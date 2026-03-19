@@ -58,6 +58,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+import Tasks from './pages/Tasks';
+import TaskDashboard from './pages/TaskDashboard';
+import TaskReminders from './pages/TaskReminders';
+import { TaskProvider } from './contexts/AppDataContext';
+
 function AppContent() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -111,6 +116,12 @@ function AppContent() {
         <Route path="disciplinary" element={<Disciplinary />} />
         <Route path="evaluations" element={<Evaluations />} />
         <Route path="ledger" element={<Ledger />} />
+        
+        {/* Task Manager Module */}
+        <Route path="tasks" element={<Tasks />} />
+        <Route path="tasks/dashboard" element={<TaskDashboard />} />
+        <Route path="tasks/reminders" element={<TaskReminders />} />
+        
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
@@ -121,17 +132,19 @@ export default function App() {
   const { isDark } = useTheme();
   return (
     <AuthProvider>
-      <div className={`flex flex-col h-[100dvh] transition-colors duration-200 ${isDark ? 'dark bg-slate-950' : 'bg-slate-50'}`}>
-        <TitleBar />
-        <div className="flex-1 min-h-0 relative">
-          <GlobalDragScroll />
-          <ToastContainer />
-          <ConfirmDialog />
-          <HashRouter>
-            <AppContent />
-          </HashRouter>
+      <TaskProvider>
+        <div className={`flex flex-col h-[100dvh] transition-colors duration-200 ${isDark ? 'dark bg-slate-950' : 'bg-slate-50'}`}>
+          <TitleBar />
+          <div className="flex-1 min-h-0 relative">
+            <GlobalDragScroll />
+            <ToastContainer />
+            <ConfirmDialog />
+            <HashRouter>
+              <AppContent />
+            </HashRouter>
+          </div>
         </div>
-      </div>
+      </TaskProvider>
     </AuthProvider>
   );
 }
