@@ -581,9 +581,12 @@ export function Sites() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSites.map(site => (
+                {filteredSites.map(site => {
+                  const siteIndex = sites.findIndex(s => s.id === site.id);
+                  const siteCode = `S-${String(siteIndex + 1).padStart(3, '0')}`;
+                  return (
                   <TableRow key={site.id}>
-                    <TableCell className="font-mono text-xs text-slate-500">{site.id}</TableCell>
+                    <TableCell className="font-mono text-xs font-semibold text-slate-500">{siteCode}</TableCell>
                     <TableCell className="font-medium text-slate-900">
                       {editingId === site.id ? (
                         <select
@@ -696,7 +699,7 @@ export function Sites() {
                       </TableCell>
                     )}
                   </TableRow>
-                ))}
+                )})}
                 {filteredSites.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={hasActions ? 6 : 5} className="text-center py-8 text-slate-500">

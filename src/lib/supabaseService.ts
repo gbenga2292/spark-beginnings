@@ -6,6 +6,8 @@ import { supabase } from '@/src/integrations/supabase/client';
 import type {
   Site, Employee, AttendanceRecord, Invoice, PendingInvoice,
   SalaryAdvance, Loan, Payment, VatPayment, LeaveRecord, DepartmentTasks,
+  DisciplinaryRecord, EvaluationRecord,
+  LedgerCategory, LedgerVendor, LedgerBank, LedgerEntry
 } from '@/src/store/appStore';
 import type { AppUser, PrivilegePreset } from '@/src/store/userStore';
 
@@ -21,11 +23,17 @@ export function dbToEmployee(r: any): Employee {
     staffType: r.staff_type, position: r.position, startDate: r.start_date,
     endDate: r.end_date, yearlyLeave: r.yearly_leave, bankName: r.bank_name,
     accountNo: r.account_no, payeTax: r.paye_tax, withholdingTax: r.withholding_tax,
-    taxId: r.tax_id, pensionNumber: r.pension_number, status: r.status,
+    taxId: r.tax_id, pensionNumber: r.pension_number, payeNumber: r.paye_number || '',
+    status: r.status,
     monthlySalaries: r.monthly_salaries, avatar: r.avatar,
     excludeFromOnboarding: r.exclude_from_onboarding, rent: Number(r.rent) || 0,
     onboardingTasks: r.onboarding_tasks || [],
     offboardingTasks: r.offboarding_tasks || [],
+    probationPeriod: r.probation_period ?? undefined,
+    noOfGuarantors: r.no_of_guarantors ?? 1,
+    tentativeStartDate: r.tentative_start_date || undefined,
+    verifiedStartDate: r.verified_start_date || undefined,
+    onboardingChecklist: r.onboarding_checklist || undefined,
   };
 }
 
@@ -115,6 +123,55 @@ export function dbToLeave(r: any): LeaveRecord {
   };
 }
 
+export function dbToDisciplinary(r: any): DisciplinaryRecord {
+  return {
+    id: r.id, employeeId: r.employee_id, date: r.date, type: r.type,
+    severity: r.severity, description: r.description, actionTaken: r.action_taken,
+    status: r.status, acknowledged: r.acknowledged, employeeComment: r.employee_comment,
+    attachments: r.attachments || [], createdBy: r.created_by, visibleToEmployee: r.visible_to_employee,
+    reportedBy: r.reported_by,
+    queryIssued: r.query_issued,
+    queryDeadline: r.query_deadline,
+    queryReplied: r.query_replied,
+    queryReplyText: r.query_reply_text,
+    workflowState: r.workflow_state,
+    initialResult: r.initial_result,
+    committeeMeetingDate: r.committee_meeting_date,
+    finalResult: r.final_result,
+    suspensionStartDate: r.suspension_start_date,
+    suspensionEndDate: r.suspension_end_date,
+  };
+}
+
+export function dbToEvaluation(r: any): EvaluationRecord {
+  return {
+    id: r.id, employeeId: r.employee_id, date: r.date, type: r.type,
+    scores: r.scores || {}, overallScore: Number(r.overall_score), managerNotes: r.manager_notes,
+    status: r.status, acknowledged: r.acknowledged, employeeComment: r.employee_comment,
+    createdBy: r.created_by,
+  };
+}
+
+export function dbToLedgerCategory(r: any): LedgerCategory {
+  return { id: r.id, name: r.name };
+}
+
+export function dbToLedgerVendor(r: any): LedgerVendor {
+  return { id: r.id, name: r.name, tinNumber: r.tin_number };
+}
+
+export function dbToLedgerBank(r: any): LedgerBank {
+  return { id: r.id, name: r.name };
+}
+
+export function dbToLedgerEntry(r: any): LedgerEntry {
+  return {
+    id: r.id, voucherNo: r.voucher_no, date: r.date, description: r.description,
+    category: r.category, amount: Number(r.amount), client: r.client, site: r.site,
+    vendor: r.vendor, bank: r.bank, enteredBy: r.entered_by
+  };
+}
+
 export function dbToProfile(r: any): AppUser {
   return {
     id: r.id, name: r.name, email: r.email, avatar: r.avatar,
@@ -136,11 +193,17 @@ function employeeToDb(e: Employee) {
     staff_type: e.staffType, position: e.position, start_date: e.startDate,
     end_date: e.endDate, yearly_leave: e.yearlyLeave, bank_name: e.bankName,
     account_no: e.accountNo, paye_tax: e.payeTax, withholding_tax: e.withholdingTax,
-    tax_id: e.taxId, pension_number: e.pensionNumber, status: e.status,
+    tax_id: e.taxId, pension_number: e.pensionNumber, paye_number: e.payeNumber || '',
+    status: e.status,
     monthly_salaries: e.monthlySalaries, avatar: e.avatar,
     exclude_from_onboarding: e.excludeFromOnboarding ?? false, rent: e.rent ?? 0,
     onboarding_tasks: e.onboardingTasks || [],
     offboarding_tasks: e.offboardingTasks || [],
+    probation_period: e.probationPeriod ?? null,
+    no_of_guarantors: e.noOfGuarantors ?? 1,
+    tentative_start_date: e.tentativeStartDate ?? null,
+    verified_start_date: e.verifiedStartDate ?? null,
+    onboarding_checklist: e.onboardingChecklist ?? null,
   };
 }
 
@@ -229,6 +292,45 @@ function leaveToDb(l: LeaveRecord) {
   };
 }
 
+function disciplinaryToDb(d: DisciplinaryRecord) {
+  return {
+    id: d.id, employee_id: d.employeeId, date: d.date, type: d.type,
+    severity: d.severity, description: d.description, action_taken: d.actionTaken,
+    status: d.status, acknowledged: d.acknowledged, employee_comment: d.employeeComment,
+    attachments: d.attachments, created_by: d.createdBy, visible_to_employee: d.visibleToEmployee,
+    reported_by: d.reportedBy,
+    query_issued: d.queryIssued,
+    query_deadline: d.queryDeadline,
+    query_replied: d.queryReplied,
+    query_reply_text: d.queryReplyText,
+    workflow_state: d.workflowState,
+    initial_result: d.initialResult,
+    committee_meeting_date: d.committeeMeetingDate,
+    final_result: d.finalResult,
+    suspension_start_date: d.suspensionStartDate,
+    suspension_end_date: d.suspensionEndDate,
+  };
+}
+
+function evaluationToDb(e: EvaluationRecord) {
+  return {
+    id: e.id, employee_id: e.employeeId, date: e.date, type: e.type,
+    scores: e.scores, overall_score: e.overallScore, manager_notes: e.managerNotes,
+    status: e.status, acknowledged: e.acknowledged, employee_comment: e.employeeComment,
+    created_by: e.createdBy,
+  };
+}
+
+function ledgerEntryToDb(e: LedgerEntry) {
+  // Ensure date is always a valid date string; fallback to today
+  const safeDate = e.date && e.date.trim() !== '' ? e.date : new Date().toISOString().split('T')[0];
+  return {
+    id: e.id, voucher_no: e.voucherNo, date: safeDate, description: e.description,
+    category: e.category, amount: e.amount, client: e.client || null, site: e.site || null,
+    vendor: e.vendor || null, bank: e.bank, entered_by: e.enteredBy
+  };
+}
+
 // ─── FETCH ALL ───────────────────────────────────────────────
 
 export async function fetchAllAppData() {
@@ -238,6 +340,8 @@ export async function fetchAllAppData() {
     paymentsRes, vatPayRes, holidaysRes, deptTasksRes,
     leavesRes, leaveTypesRes, settingsRes,
     positionsRes, departmentsRes,
+    disciplinaryRes, evaluationsRes,
+    lCatRes, lVenRes, lBankRes, lEntRes,
   ] = await Promise.all([
     supabase.from('sites').select('*').order('created_at'),
     supabase.from('clients').select('*').order('name'),
@@ -256,6 +360,12 @@ export async function fetchAllAppData() {
     supabase.from('app_settings').select('*').limit(1).maybeSingle(),
     supabase.from('positions').select('*').order('name'),
     supabase.from('departments').select('*').order('name'),
+    supabase.from('disciplinary_records').select('*').order('date', { ascending: false }),
+    supabase.from('evaluations').select('*').order('date', { ascending: false }),
+    supabase.from('ledger_categories').select('*').order('name'),
+    supabase.from('ledger_vendors').select('*').order('name'),
+    supabase.from('ledger_banks').select('*').order('name'),
+    supabase.from('ledger_entries').select('*').order('date', { ascending: false }),
   ]);
 
   const settings = settingsRes.data;
@@ -279,11 +389,18 @@ export async function fetchAllAppData() {
     })) as DepartmentTasks[],
     leaves: (leavesRes.data || []).map(dbToLeave),
     leaveTypes: (leaveTypesRes.data || []).map((t: any) => t.name),
+    disciplinaryRecords: (disciplinaryRes.data || []).map(dbToDisciplinary),
+    evaluations: (evaluationsRes.data || []).map(dbToEvaluation),
+    ledgerCategories: (lCatRes.data || []).map(dbToLedgerCategory),
+    ledgerVendors: (lVenRes.data || []).map(dbToLedgerVendor),
+    ledgerBanks: (lBankRes.data || []).map(dbToLedgerBank),
+    ledgerEntries: (lEntRes.data || []).map(dbToLedgerEntry),
     positions: (positionsRes.data || []).map((p: any) => p.name),
     departments: (departmentsRes.data || []).map((d: any) => d.name),
     payrollVariables: settings?.payroll_variables || undefined,
     payeTaxVariables: settings?.paye_tax_variables || undefined,
     monthValues: settings?.month_values || undefined,
+    hrVariables: settings?.hr_variables || undefined,
     superAdminCreated: settings?.super_admin_created ?? false,
     superAdminSignupEnabled: settings?.super_admin_signup_enabled ?? true,
     settingsId: settings?.id,
@@ -398,6 +515,12 @@ export const db = {
     if (e.rent !== undefined) update.rent = e.rent;
     if (e.onboardingTasks !== undefined) update.onboarding_tasks = e.onboardingTasks;
     if (e.offboardingTasks !== undefined) update.offboarding_tasks = e.offboardingTasks;
+    if (e.probationPeriod !== undefined) update.probation_period = e.probationPeriod;
+    if (e.noOfGuarantors !== undefined) update.no_of_guarantors = e.noOfGuarantors;
+    if (e.tentativeStartDate !== undefined) update.tentative_start_date = e.tentativeStartDate;
+    if (e.verifiedStartDate !== undefined) update.verified_start_date = e.verifiedStartDate;
+    if (e.onboardingChecklist !== undefined) update.onboarding_checklist = e.onboardingChecklist;
+    if (e.payeNumber !== undefined) update.paye_number = e.payeNumber;
     const { error } = await supabase.from('employees').update(update).eq('id', id);
     if (error) console.error('updateEmployee:', error);
   },
@@ -571,6 +694,71 @@ export const db = {
     if (error) console.error('deletePublicHoliday:', error);
   },
 
+  // Disciplinary
+  async insertDisciplinaryRecord(d: DisciplinaryRecord) {
+    const { error } = await supabase.from('disciplinary_records').insert(disciplinaryToDb(d));
+    if (error) console.error('insertDisciplinaryRecord:', error);
+  },
+  async updateDisciplinaryRecord(id: string, d: Partial<DisciplinaryRecord>) {
+    const update: any = {};
+    if (d.employeeId !== undefined) update.employee_id = d.employeeId;
+    if (d.date !== undefined) update.date = d.date;
+    if (d.type !== undefined) update.type = d.type;
+    if (d.severity !== undefined) update.severity = d.severity;
+    if (d.description !== undefined) update.description = d.description;
+    if (d.actionTaken !== undefined) update.action_taken = d.actionTaken;
+    if (d.status !== undefined) update.status = d.status;
+    if (d.acknowledged !== undefined) update.acknowledged = d.acknowledged;
+    if (d.employeeComment !== undefined) update.employee_comment = d.employeeComment;
+    if (d.attachments !== undefined) update.attachments = d.attachments;
+    if (d.createdBy !== undefined) update.created_by = d.createdBy;
+    if (d.visibleToEmployee !== undefined) update.visible_to_employee = d.visibleToEmployee;
+    
+    if (d.reportedBy !== undefined) update.reported_by = d.reportedBy;
+    if (d.queryIssued !== undefined) update.query_issued = d.queryIssued;
+    if (d.queryDeadline !== undefined) update.query_deadline = d.queryDeadline;
+    if (d.queryReplied !== undefined) update.query_replied = d.queryReplied;
+    if (d.queryReplyText !== undefined) update.query_reply_text = d.queryReplyText;
+    if (d.workflowState !== undefined) update.workflow_state = d.workflowState;
+    if (d.initialResult !== undefined) update.initial_result = d.initialResult;
+    if (d.committeeMeetingDate !== undefined) update.committee_meeting_date = d.committeeMeetingDate;
+    if (d.finalResult !== undefined) update.final_result = d.finalResult;
+    if (d.suspensionStartDate !== undefined) update.suspension_start_date = d.suspensionStartDate;
+    if (d.suspensionEndDate !== undefined) update.suspension_end_date = d.suspensionEndDate;
+
+    const { error } = await supabase.from('disciplinary_records').update(update).eq('id', id);
+    if (error) console.error('updateDisciplinaryRecord:', error);
+  },
+  async deleteDisciplinaryRecord(id: string) {
+    const { error } = await supabase.from('disciplinary_records').delete().eq('id', id);
+    if (error) console.error('deleteDisciplinaryRecord:', error);
+  },
+
+  // Evaluations
+  async insertEvaluation(e: EvaluationRecord) {
+    const { error } = await supabase.from('evaluations').insert(evaluationToDb(e));
+    if (error) console.error('insertEvaluation:', error);
+  },
+  async updateEvaluation(id: string, e: Partial<EvaluationRecord>) {
+    const update: any = {};
+    if (e.employeeId !== undefined) update.employee_id = e.employeeId;
+    if (e.date !== undefined) update.date = e.date;
+    if (e.type !== undefined) update.type = e.type;
+    if (e.scores !== undefined) update.scores = e.scores;
+    if (e.overallScore !== undefined) update.overall_score = e.overallScore;
+    if (e.managerNotes !== undefined) update.manager_notes = e.managerNotes;
+    if (e.status !== undefined) update.status = e.status;
+    if (e.acknowledged !== undefined) update.acknowledged = e.acknowledged;
+    if (e.employeeComment !== undefined) update.employee_comment = e.employeeComment;
+    if (e.createdBy !== undefined) update.created_by = e.createdBy;
+    const { error } = await supabase.from('evaluations').update(update).eq('id', id);
+    if (error) console.error('updateEvaluation:', error);
+  },
+  async deleteEvaluation(id: string) {
+    const { error } = await supabase.from('evaluations').delete().eq('id', id);
+    if (error) console.error('deleteEvaluation:', error);
+  },
+
   // Department Tasks
   async upsertDepartmentTasks(dt: DepartmentTasks) {
     const { error } = await supabase.from('department_tasks').upsert({
@@ -623,6 +811,7 @@ export const db = {
     payrollVariables?: any;
     payeTaxVariables?: any;
     monthValues?: any;
+    hrVariables?: any;
     superAdminCreated?: boolean;
     superAdminSignupEnabled?: boolean;
   }) {
@@ -630,6 +819,7 @@ export const db = {
     if (data.payrollVariables !== undefined) update.payroll_variables = data.payrollVariables;
     if (data.payeTaxVariables !== undefined) update.paye_tax_variables = data.payeTaxVariables;
     if (data.monthValues !== undefined) update.month_values = data.monthValues;
+    if (data.hrVariables !== undefined) update.hr_variables = data.hrVariables;
     if (data.superAdminCreated !== undefined) update.super_admin_created = data.superAdminCreated;
     if (data.superAdminSignupEnabled !== undefined) update.super_admin_signup_enabled = data.superAdminSignupEnabled;
     update.updated_at = new Date().toISOString();
@@ -666,5 +856,82 @@ export const db = {
   async deletePreset(id: string) {
     const { error } = await supabase.from('privilege_presets').delete().eq('id', id);
     if (error) console.error('deletePreset:', error);
+  },
+
+  // Ledger
+  async insertLedgerCategory(cat: LedgerCategory) {
+    const { error } = await supabase.from('ledger_categories').insert({ id: cat.id, name: cat.name });
+    if (error) console.error('insertLedgerCategory:', error);
+  },
+  async updateLedgerCategory(id: string, cat: Partial<LedgerCategory>) {
+    const { error } = await supabase.from('ledger_categories').update(cat).eq('id', id);
+    if (error) console.error('updateLedgerCategory:', error);
+  },
+  async deleteLedgerCategory(id: string) {
+    const { error } = await supabase.from('ledger_categories').delete().eq('id', id);
+    if (error) console.error('deleteLedgerCategory:', error);
+  },
+
+  async insertLedgerVendor(v: LedgerVendor) {
+    const { error } = await supabase.from('ledger_vendors').insert({ id: v.id, name: v.name, tin_number: v.tinNumber });
+    if (error) console.error('insertLedgerVendor:', error);
+  },
+  async updateLedgerVendor(id: string, v: Partial<LedgerVendor>) {
+    const update: any = {};
+    if (v.name !== undefined) update.name = v.name;
+    if (v.tinNumber !== undefined) update.tin_number = v.tinNumber;
+    const { error } = await supabase.from('ledger_vendors').update(update).eq('id', id);
+    if (error) console.error('updateLedgerVendor:', error);
+  },
+  async deleteLedgerVendor(id: string) {
+    const { error } = await supabase.from('ledger_vendors').delete().eq('id', id);
+    if (error) console.error('deleteLedgerVendor:', error);
+  },
+
+  async insertLedgerBank(b: LedgerBank) {
+    const { error } = await supabase.from('ledger_banks').insert({ id: b.id, name: b.name });
+    if (error) console.error('insertLedgerBank:', error);
+  },
+  async updateLedgerBank(id: string, b: Partial<LedgerBank>) {
+    const { error } = await supabase.from('ledger_banks').update(b).eq('id', id);
+    if (error) console.error('updateLedgerBank:', error);
+  },
+  async deleteLedgerBank(id: string) {
+    const { error } = await supabase.from('ledger_banks').delete().eq('id', id);
+    if (error) console.error('deleteLedgerBank:', error);
+  },
+
+  async insertLedgerEntry(e: LedgerEntry) {
+    const payload = ledgerEntryToDb(e);
+    // Use upsert to handle re-submits of the same voucher gracefully
+    const { error } = await supabase
+      .from('ledger_entries')
+      .upsert(payload, { onConflict: 'id' });
+    if (error) {
+      console.error('insertLedgerEntry:', error.message, error.details, error.hint, payload);
+    }
+  },
+  async updateLedgerEntry(id: string, e: Partial<LedgerEntry>) {
+    const update: any = {};
+    if (e.voucherNo !== undefined) update.voucher_no = e.voucherNo;
+    if (e.date !== undefined) update.date = (e.date && e.date.trim() !== '') ? e.date : new Date().toISOString().split('T')[0];
+    if (e.description !== undefined) update.description = e.description;
+    if (e.category !== undefined) update.category = e.category;
+    if (e.amount !== undefined) update.amount = e.amount;
+    if (e.client !== undefined) update.client = e.client || null;
+    if (e.site !== undefined) update.site = e.site || null;
+    if (e.vendor !== undefined) update.vendor = e.vendor || null;
+    if (e.bank !== undefined) update.bank = e.bank;
+    if (e.enteredBy !== undefined) update.entered_by = e.enteredBy;
+    const { error } = await supabase.from('ledger_entries').update(update).eq('id', id);
+    if (error) {
+      console.error('updateLedgerEntry:', error.message, error.details, error.hint);
+    }
+  },
+  async deleteLedgerEntry(id: string) {
+    const { error } = await supabase.from('ledger_entries').delete().eq('id', id);
+    if (error) {
+      console.error('deleteLedgerEntry:', error.message, error.details, error.hint);
+    }
   },
 };

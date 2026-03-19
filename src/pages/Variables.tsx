@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
-import { Plus, Trash2, Save, Download, Upload } from 'lucide-react';
+import { Plus, Trash2, Save, Download, Upload, BookOpen, Settings2 } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -30,20 +30,42 @@ export function Variables() {
   const addPublicHoliday = useAppStore((state) => state.addPublicHoliday);
   const removePublicHoliday = useAppStore((state) => state.removePublicHoliday);
   const storePayeTaxVariables = useAppStore((state) => state.payeTaxVariables);
+  const storeHrVariables = useAppStore((state) => state.hrVariables);
   const saveAllSettingsStore = useAppStore((state) => state.saveAllSettings);
 
   const [localPayrollVars, setLocalPayrollVars] = useState(storePayrollVariables);
   const [localPayeVars, setLocalPayeVars] = useState(storePayeTaxVariables);
   const [localMonthVals, setLocalMonthVals] = useState(storeMonthValues);
+  const [localHrVars, setLocalHrVars] = useState(storeHrVariables);
   const [isDirty, setIsDirty] = useState(false);
+
+  // ── Ledger variables ───────────────────────────────────────
+  const ledgerCategories = useAppStore((state) => state.ledgerCategories);
+  const ledgerBanks = useAppStore((state) => state.ledgerBanks);
+  const ledgerVendors = useAppStore((state) => state.ledgerVendors);
+  const addLedgerCategory = useAppStore((state) => state.addLedgerCategory);
+  const removeLedgerCategory = useAppStore((state) => state.removeLedgerCategory);
+  const addLedgerBank = useAppStore((state) => state.addLedgerBank);
+  const removeLedgerBank = useAppStore((state) => state.removeLedgerBank);
+  const addLedgerVendor = useAppStore((state) => state.addLedgerVendor);
+  const removeLedgerVendor = useAppStore((state) => state.removeLedgerVendor);
+
+  const [newCat, setNewCat] = useState('');
+  const [newBank, setNewBank] = useState('');
+  const [newVendorName, setNewVendorName] = useState('');
+  const [newVendorTin, setNewVendorTin] = useState('');
+
+  // Top-level section switch: 'system' | 'ledger'
+  const [varSection, setVarSection] = useState<'system' | 'ledger'>('system');
 
   useEffect(() => {
     if (!isDirty) {
       setLocalPayrollVars(storePayrollVariables);
       setLocalPayeVars(storePayeTaxVariables);
       setLocalMonthVals(storeMonthValues);
+      setLocalHrVars(storeHrVariables);
     }
-  }, [storePayrollVariables, storePayeTaxVariables, storeMonthValues, isDirty]);
+  }, [storePayrollVariables, storePayeTaxVariables, storeMonthValues, storeHrVariables, isDirty]);
 
   // Navigation blocker removed because it requires react-router v6 createBrowserRouter data routers
   // Relying only on window.addEventListener('beforeunload') below
@@ -66,6 +88,9 @@ export function Variables() {
   const [taskDeptFilter, setTaskDeptFilter] = useState('ALL');
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskAssignee, setNewTaskAssignee] = useState('');
+  const [newTaskPosition, setNewTaskPosition] = useState('end');
+  const [newOffTaskTitle, setNewOffTaskTitle] = useState('');
+  const [newOffTaskAssignee, setNewOffTaskAssignee] = useState('');
   const [taskDirection, setTaskDirection] = useState<'onboarding' | 'offboarding'>('onboarding');
   const [monthConfigDept, setMonthConfigDept] = useState('');
 
@@ -135,6 +160,10 @@ export function Variables() {
     setLocalMonthVals(p => ({ ...p, [month]: { ...p[month], ...vals } }));
     setIsDirty(true);
   };
+  const updateLocalHrVariables = (vars: Partial<typeof localHrVars>) => {
+    setLocalHrVars(p => ({ ...p, ...vars }));
+    setIsDirty(true);
+  };
   const addLocalTaxBracket = (b: any) => {
     setLocalPayeVars(p => ({ ...p, taxBrackets: [...p.taxBrackets, b] }));
     setIsDirty(true);
@@ -161,7 +190,7 @@ export function Variables() {
   };
 
   const handleSave = () => {
-    saveAllSettingsStore(localPayrollVars, localPayeVars, localMonthVals);
+    saveAllSettingsStore(localPayrollVars, localPayeVars, localMonthVals, localHrVars);
     setIsDirty(false);
     toast.success('Variables saved successfully!');
   };
@@ -183,14 +212,50 @@ export function Variables() {
     const currentTasks = departmentTasksList.find(d => d.department === taskDeptFilter) ||
       { department: taskDeptFilter, onboardingTasks: [], offboardingTasks: [] };
 
-    if (taskDirection === 'onboarding') {
-      currentTasks.onboardingTasks.push({ title: newTaskTitle, assignee: newTaskAssignee });
+    const newTask = { title: newTaskTitle, assignee: newTaskAssignee, insertAfter: newTaskPosition };
+    const tasks = [...currentTasks.onboardingTasks];
+
+    if (newTaskPosition === 'start') {
+      tasks.unshift(newTask);
+    } else if (newTaskPosition === 'end' || !newTaskPosition.startsWith('custom-after-')) {
+      tasks.push(newTask);
     } else {
-      currentTasks.offboardingTasks.push({ title: newTaskTitle, assignee: newTaskAssignee });
+      const afterIdx = parseInt(newTaskPosition.replace('custom-after-', ''), 10);
+      tasks.splice(afterIdx + 1, 0, newTask);
     }
-    updateDepartmentTasks(currentTasks);
+
+    updateDepartmentTasks({ ...currentTasks, onboardingTasks: tasks });
     setNewTaskTitle('');
     setNewTaskAssignee('');
+    setNewTaskPosition('end');
+  };
+
+  const handleAddOffboardingTask = () => {
+    if (!newOffTaskTitle || !newOffTaskAssignee) return;
+    const currentTasks = departmentTasksList.find(d => d.department === taskDeptFilter) ||
+      { department: taskDeptFilter, onboardingTasks: [], offboardingTasks: [] };
+    currentTasks.offboardingTasks.push({ title: newOffTaskTitle, assignee: newOffTaskAssignee });
+    updateDepartmentTasks(currentTasks);
+    setNewOffTaskTitle('');
+    setNewOffTaskAssignee('');
+  };
+
+  const handleMoveTask = (idx: number, dir: 'up' | 'down') => {
+    const currentTasks = departmentTasksList.find(d => d.department === taskDeptFilter);
+    if (!currentTasks) return;
+    const tasks = [...currentTasks.onboardingTasks];
+    if (dir === 'up' && idx > 0) [tasks[idx - 1], tasks[idx]] = [tasks[idx], tasks[idx - 1]];
+    if (dir === 'down' && idx < tasks.length - 1) [tasks[idx], tasks[idx + 1]] = [tasks[idx + 1], tasks[idx]];
+    updateDepartmentTasks({ ...currentTasks, onboardingTasks: tasks });
+  };
+
+  const handleMoveOffTask = (idx: number, dir: 'up' | 'down') => {
+    const currentTasks = departmentTasksList.find(d => d.department === taskDeptFilter);
+    if (!currentTasks) return;
+    const tasks = [...currentTasks.offboardingTasks];
+    if (dir === 'up' && idx > 0) [tasks[idx - 1], tasks[idx]] = [tasks[idx], tasks[idx - 1]];
+    if (dir === 'down' && idx < tasks.length - 1) [tasks[idx], tasks[idx + 1]] = [tasks[idx + 1], tasks[idx]];
+    updateDepartmentTasks({ ...currentTasks, offboardingTasks: tasks });
   };
 
   const handleRemoveTask = (title: string, direction: 'onboarding' | 'offboarding') => {
@@ -486,6 +551,141 @@ export function Variables() {
         </div>
       </div>
 
+      {/* Section selector */}
+      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 self-start">
+        <button
+          onClick={() => setVarSection('system')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            varSection === 'system'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <Settings2 className="h-4 w-4" />
+          System Variables
+        </button>
+        <button
+          onClick={() => setVarSection('ledger')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            varSection === 'ledger'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <BookOpen className="h-4 w-4" />
+          Ledger Variables
+        </button>
+      </div>
+
+      {varSection === 'ledger' ? (
+        /* ── LEDGER VARIABLES SECTION ─────────────────────────── */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
+              <CardTitle className="text-slate-800">Categories</CardTitle>
+              <CardDescription>Expense categories used for ledger entries.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-6">
+              <div className="flex gap-2">
+                <Input value={newCat} onChange={e => setNewCat(e.target.value)} placeholder="New Category" />
+                <Button disabled={!priv.canEdit} onClick={() => { if(newCat) { addLedgerCategory({id: crypto.randomUUID(), name: newCat}); setNewCat(''); } }}>Add</Button>
+              </div>
+              <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
+                <Table>
+                  <TableBody>
+                    {ledgerCategories.map(c => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium text-slate-700">{c.name}</TableCell>
+                        <TableCell className="w-[50px]">
+                          {priv.canEdit && (
+                            <Button variant="ghost" size="icon" onClick={async () => { const conf = await showConfirm(`Delete category "${c.name}"?`, { variant: 'danger' }); if (conf) removeLedgerCategory(c.id); }}>
+                              <Trash2 className="h-4 w-4 text-rose-500" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {ledgerCategories.length === 0 && (
+                      <TableRow><TableCell className="text-slate-400 text-center text-sm py-6 italic">No categories yet.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
+              <CardTitle className="text-slate-800">Banks / Accounts</CardTitle>
+              <CardDescription>Pay-from accounts and bank names.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-6">
+              <div className="flex gap-2">
+                <Input value={newBank} onChange={e => setNewBank(e.target.value)} placeholder="New Bank Name" />
+                <Button disabled={!priv.canEdit} onClick={() => { if(newBank) { addLedgerBank({id: crypto.randomUUID(), name: newBank}); setNewBank(''); } }}>Add</Button>
+              </div>
+              <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
+                <Table>
+                  <TableBody>
+                    {ledgerBanks.map(b => (
+                      <TableRow key={b.id}>
+                        <TableCell className="font-medium text-slate-700">{b.name}</TableCell>
+                        <TableCell className="w-[50px]">
+                          {priv.canEdit && (
+                            <Button variant="ghost" size="icon" onClick={async () => { const conf = await showConfirm(`Delete bank "${b.name}"?`, { variant: 'danger' }); if (conf) removeLedgerBank(b.id); }}>
+                              <Trash2 className="h-4 w-4 text-rose-500" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {ledgerBanks.length === 0 && (
+                      <TableRow><TableCell className="text-slate-400 text-center text-sm py-6 italic">No banks yet.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border-slate-200 md:col-span-2 lg:col-span-1">
+            <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
+              <CardTitle className="text-slate-800">Vendors</CardTitle>
+              <CardDescription>Store vendors with optional TIN numbers.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-6">
+              <div className="flex gap-2">
+                <Input value={newVendorName} onChange={e => setNewVendorName(e.target.value)} placeholder="Vendor Name" className="flex-1" />
+                <Input value={newVendorTin} onChange={e => setNewVendorTin(e.target.value)} placeholder="TIN" className="w-[100px]" />
+                <Button disabled={!priv.canEdit} onClick={() => { if(newVendorName) { addLedgerVendor({id: crypto.randomUUID(), name: newVendorName, tinNumber: newVendorTin}); setNewVendorName(''); setNewVendorTin(''); } }}>Add</Button>
+              </div>
+              <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
+                <Table>
+                  <TableHeader className="bg-slate-50"><TableRow><TableHead>Vendor</TableHead><TableHead>TIN</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {ledgerVendors.map(v => (
+                      <TableRow key={v.id}>
+                        <TableCell className="font-medium text-slate-700">{v.name}</TableCell>
+                        <TableCell className="text-sm text-slate-500">{v.tinNumber || '—'}</TableCell>
+                        <TableCell className="w-[50px]">
+                          {priv.canEdit && (
+                            <Button variant="ghost" size="icon" onClick={async () => { const conf = await showConfirm(`Delete vendor "${v.name}"?`, { variant: 'danger' }); if (conf) removeLedgerVendor(v.id); }}>
+                              <Trash2 className="h-4 w-4 text-rose-500" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {ledgerVendors.length === 0 && (
+                      <TableRow><TableCell colSpan={3} className="text-slate-400 text-center text-sm py-6 italic">No vendors yet.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
         {/* --- LEFT COLUMN --- */}
         <div className="flex flex-col gap-6">
@@ -723,85 +923,163 @@ export function Variables() {
             </CardContent>
           </Card>
 
-          {/* ——— MOVED TASK TEMPLATES ——— */}
+          {/* Task Templates */}
           <Card className="shadow-sm border-slate-200 border-t-4 border-t-indigo-500">
             <CardHeader className="bg-indigo-50/30 rounded-t-lg border-b border-indigo-100">
-              <CardTitle className="text-indigo-900">Task Templates</CardTitle>
-              <CardDescription>Configure default onboarding/offboarding tasks by department.</CardDescription>
+              <CardTitle className="text-indigo-900">Onboarding Task Templates</CardTitle>
+              <CardDescription>
+                <strong>System Default Tasks</strong> (Steps 1–8) are built-in for all departments and cannot be removed.
+                Add <strong>custom extra tasks</strong> below and choose where they slot in.
+              </CardDescription>
             </CardHeader>
             <CardContent className="pt-4 space-y-4">
-              <div className="flex gap-2 mb-4">
+              {/* Department filter */}
+              <div className="flex gap-2">
                 <select className="flex-1 h-10 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer" value={taskDeptFilter} onChange={(e) => setTaskDeptFilter(e.target.value)}>
-                  <option value="ALL">ALL DEPARTMENTS (Always added)</option>
+                  <option value="ALL">ALL DEPARTMENTS (always applied)</option>
                   {departments.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
-                <select className="w-40 h-10 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer" value={taskDirection} onChange={(e) => setTaskDirection(e.target.value as 'onboarding' | 'offboarding')}>
-                  <option value="onboarding">Onboarding</option>
-                  <option value="offboarding">Offboarding</option>
-                </select>
               </div>
-              {priv.canEdit && (
-                <div className="flex gap-2">
-                  <Input placeholder="Task Title (e.g. Provide Laptop)" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} className="flex-1" />
-                  <Input placeholder="Assignee (e.g. IT)" value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)} className="w-32" />
-                  <Button variant="outline" onClick={handleAddTask} className="gap-2 shrink-0">
-                    <Plus className="h-4 w-4" /> Add
-                  </Button>
+
+              {/* System default tasks — read-only */}
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/30 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-100/60 border-b border-indigo-100">
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-700">System Default Tasks (All Departments)</span>
+                  <span className="text-[10px] text-indigo-500 bg-indigo-100 rounded px-2 py-0.5 font-semibold">READ-ONLY</span>
                 </div>
-              )}
-              <div className="border rounded-md overflow-hidden max-h-[300px] overflow-y-auto">
-                <Table>
-                  <TableHeader className="bg-slate-50 sticky top-0">
-                    <TableRow>
-                      <TableHead>Task Title</TableHead>
-                      <TableHead className="w-40">Assignee</TableHead>
-                      <TableHead className="w-12 text-center"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {taskDirection === 'onboarding' ? (
-                      currentTaskView.onboardingTasks.length === 0 ? (
-                        <TableRow><TableCell colSpan={3} className="text-center text-slate-500 py-4">No specific onboarding tasks.</TableCell></TableRow>
-                      ) : (
-                        currentTaskView.onboardingTasks.map((t, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell className="font-medium">{t.title}</TableCell>
-                            <TableCell className="text-slate-500">{t.assignee}</TableCell>
-                            <TableCell className="text-center">
-                              {priv.canEdit && (
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" onClick={() => handleRemoveTask(t.title, 'onboarding')}>
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )
-                    ) : (
-                      currentTaskView.offboardingTasks.length === 0 ? (
-                        <TableRow><TableCell colSpan={3} className="text-center text-slate-500 py-4">No specific offboarding tasks.</TableCell></TableRow>
-                      ) : (
-                        currentTaskView.offboardingTasks.map((t, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell className="font-medium">{t.title}</TableCell>
-                            <TableCell className="text-slate-500">{t.assignee}</TableCell>
-                            <TableCell className="text-center">
-                              {priv.canEdit && (
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" onClick={() => handleRemoveTask(t.title, 'offboarding')}>
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )
-                    )}
-                  </TableBody>
-                </Table>
+                <div className="p-3 space-y-1.5 max-h-[300px] overflow-y-auto">
+                  {[
+                    { step: '1', label: 'Send Necessary Information (Forms)', sub: ['Sent', 'Acknowledgement received'] },
+                    { step: '2', label: 'Return of Forms', sub: ['2.1 Guarantor Forms', '2.2 Personal Employee Form', '2.3 Passport Copy'] },
+                    { step: '3', label: 'Verification of Documents', sub: ['3.1 Guarantor Info (name, phone, verified each)', '3.2 Documents (passport photos, address, edu)', '3.2 Account details (bank + account no + verified)', '3.2 Pension Number (input + verified)', '3.2 PAYE Number (input + verified)'] },
+                    { step: '4', label: 'Resumption — Verified Start Date', sub: ['Official start date confirmed'] },
+                    { step: '5', label: 'Employment Letters (Print, Sign & Return)', sub: [] },
+                    { step: '6', label: 'Orientation (HR, Department, Site, HSE)', sub: ['Post-activation'] },
+                    { step: '8', label: 'Provision of PPE, Handbook & Requirements', sub: ['Post-activation'] },
+                  ].map(item => (
+                    <div key={item.step} className="flex gap-2 p-2 rounded-lg bg-white/70 border border-indigo-100/50">
+                      <span className="h-6 w-6 rounded-full bg-indigo-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">{item.step}</span>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700">{item.label}</p>
+                        {item.sub.length > 0 && <ul className="mt-0.5 space-y-0.5">{item.sub.map((s, i) => <li key={i} className="text-[11px] text-slate-500 flex gap-1"><span className="shrink-0">&#8594;</span>{s}</li>)}</ul>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom onboarding tasks */}
+              <div className="rounded-xl border border-amber-200 bg-amber-50/20 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-amber-100/60 border-b border-amber-200">
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-700">Custom Onboarding Tasks{taskDeptFilter !== 'ALL' ? ` — ${taskDeptFilter}` : ''}</span>
+                  <span className="text-[10px] text-amber-600 bg-amber-100 rounded px-2 py-0.5 font-semibold">{currentTaskView.onboardingTasks.length} task{currentTaskView.onboardingTasks.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="p-3 space-y-3">
+                  {priv.canEdit && (
+                    <div className="space-y-2 p-3 bg-white rounded-lg border border-amber-100">
+                      <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">Add Custom Task</p>
+                      <Input placeholder="Task title (e.g. Provide Laptop)" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} className="text-sm h-9" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <select className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)}>
+                          <option value="">-- Select Assignee Dept --</option>
+                          <option value="HR">HR</option>
+                          <option value="IT">IT</option>
+                          <option value="Finance">Finance</option>
+                          <option value="Management">Management</option>
+                          {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                        <select className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" value={newTaskPosition} onChange={e => setNewTaskPosition(e.target.value)}>
+                          <option value="start">Insert before Step 1</option>
+                          <option value="after-1">After Step 1 (Send Forms)</option>
+                          <option value="after-2">After Step 2 (Return of Forms)</option>
+                          <option value="after-3">After Step 3 (Verification)</option>
+                          <option value="after-4">After Step 4 (Start Date)</option>
+                          <option value="after-5">After Step 5 (Letters)</option>
+                          <option value="after-6">After Step 6 (Orientation)</option>
+                          <option value="end">At End (after all steps)</option>
+                          {currentTaskView.onboardingTasks.map((t, i) => (
+                            <option key={i} value={`custom-after-${i}`}>After custom: "{t.title.slice(0, 22)}{t.title.length > 22 ? '...' : ''}"</option>
+                          ))}
+                        </select>
+                      </div>
+                      <Button variant="outline" onClick={handleAddTask} className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50 w-full h-9" disabled={!newTaskTitle || !newTaskAssignee}>
+                        <Plus className="h-4 w-4" /> Add Custom Onboarding Task
+                      </Button>
+                    </div>
+                  )}
+                  {currentTaskView.onboardingTasks.length === 0
+                    ? <p className="text-xs text-slate-400 text-center py-4 italic">No custom tasks yet.</p>
+                    : <div className="space-y-1.5">{currentTaskView.onboardingTasks.map((t, idx) => (
+                        <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-amber-100 group hover:border-amber-300 transition-colors">
+                          <div className="flex flex-col gap-0.5">
+                            <button className="h-5 w-5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center disabled:opacity-30 text-[10px]" onClick={() => handleMoveTask(idx, 'up')} disabled={idx === 0}>&#9650;</button>
+                            <button className="h-5 w-5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center disabled:opacity-30 text-[10px]" onClick={() => handleMoveTask(idx, 'down')} disabled={idx === currentTaskView.onboardingTasks.length - 1}>&#9660;</button>
+                          </div>
+                          <span className="h-6 w-6 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold flex items-center justify-center shrink-0">+</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-700 truncate">{t.title}</p>
+                            <p className="text-[11px] text-slate-400">Assignee: {t.assignee}</p>
+                          </div>
+                          {priv.canEdit && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-red-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleRemoveTask(t.title, 'onboarding')}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}</div>
+                  }
+                </div>
+              </div>
+
+              {/* Offboarding tasks */}
+              <div className="rounded-xl border border-rose-200 bg-rose-50/20 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-rose-100/60 border-b border-rose-200">
+                  <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Offboarding Tasks{taskDeptFilter !== 'ALL' ? ` — ${taskDeptFilter}` : ''}</span>
+                  <span className="text-[10px] text-rose-600 bg-rose-100 rounded px-2 py-0.5 font-semibold">{currentTaskView.offboardingTasks.length} task{currentTaskView.offboardingTasks.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="p-3 space-y-2">
+                  {priv.canEdit && (
+                    <div className="flex gap-2 p-2 bg-white rounded-lg border border-rose-100">
+                      <Input placeholder="Task title" value={newOffTaskTitle} onChange={e => setNewOffTaskTitle(e.target.value)} className="flex-1 text-sm h-9" />
+                      <select className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm w-44 shrink-0" value={newOffTaskAssignee} onChange={e => setNewOffTaskAssignee(e.target.value)}>
+                        <option value="">-- Assignee Dept --</option>
+                        <option value="HR">HR</option>
+                        <option value="IT">IT</option>
+                        <option value="Finance">Finance</option>
+                        <option value="Management">Management</option>
+                        {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                      <Button variant="outline" onClick={handleAddOffboardingTask} className="gap-1 border-rose-300 text-rose-700 hover:bg-rose-50 shrink-0 h-9" disabled={!newOffTaskTitle || !newOffTaskAssignee}>
+                        <Plus className="h-3.5 w-3.5" /> Add
+                      </Button>
+                    </div>
+                  )}
+                  {currentTaskView.offboardingTasks.length === 0
+                    ? <p className="text-xs text-slate-400 text-center py-4 italic">No offboarding tasks configured.</p>
+                    : currentTaskView.offboardingTasks.map((t, idx) => (
+                        <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-rose-100 group hover:border-rose-300 transition-colors">
+                          <div className="flex flex-col gap-0.5">
+                            <button className="h-5 w-5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center disabled:opacity-30 text-[10px]" onClick={() => handleMoveOffTask(idx, 'up')} disabled={idx === 0}>&#9650;</button>
+                            <button className="h-5 w-5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center disabled:opacity-30 text-[10px]" onClick={() => handleMoveOffTask(idx, 'down')} disabled={idx === currentTaskView.offboardingTasks.length - 1}>&#9660;</button>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-700 truncate">{t.title}</p>
+                            <p className="text-[11px] text-slate-400">Assignee: {t.assignee}</p>
+                          </div>
+                          {priv.canEdit && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-red-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleRemoveTask(t.title, 'offboarding')}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      ))
+                  }
+                </div>
               </div>
             </CardContent>
           </Card>
         </div> {/* END LEFT COLUMN */}
+
 
         {/* --- RIGHT COLUMN --- */}
         <div className="flex flex-col gap-6">
@@ -1155,8 +1433,88 @@ export function Variables() {
 
             </CardContent>
           </Card>
+          
+          {/* --- HR Module & Disciplinary Settings --- */}
+          <Card className="border-indigo-200">
+            <CardHeader className="bg-indigo-50/50 rounded-t-lg border-b border-indigo-100">
+              <CardTitle className="text-indigo-900">HR, Disciplinary &amp; Lifecycle Settings (Due Process)</CardTitle>
+              <CardDescription>
+                Configure thresholds, time-frames, and policies applied automatically by the system. Includes specific "Due Process" variables such as the investigation timeframe and appeal allowance periods.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-6">
+              
+              <div className="space-y-4">
+                <p className="text-xs font-bold text-slate-500 uppercase">Attendance &amp; Disciplinary Auto-Triggers</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700">Flagged Absence Threshold</label>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" value={localHrVars.flaggedAbsenceThreshold}
+                        onChange={e => updateLocalHrVariables({ flaggedAbsenceThreshold: parseInt(e.target.value) || 0 })} />
+                      <span className="text-sm text-slate-500 whitespace-nowrap">flagged days</span>
+                    </div>
+                    <p className="text-xs text-slate-400">Absences generating auto-warning (e.g. 3)</p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700">Disciplinary Expiration/Rolling Period</label>
+                    <div className="flex items-center gap-2">
+                       <Input type="number" value={localHrVars.disciplinaryExpirationMonths}
+                        onChange={e => updateLocalHrVariables({ disciplinaryExpirationMonths: parseInt(e.target.value) || 0 })} />
+                       <span className="text-sm text-slate-500 whitespace-nowrap">months</span>
+                    </div>
+                    <p className="text-xs text-slate-400">Duration a record stays active</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-xs font-bold text-slate-500 uppercase">Evaluations &amp; Lifecycle Checks</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700">Default Probation Period</label>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" value={localHrVars.defaultProbationDays}
+                        onChange={e => updateLocalHrVariables({ defaultProbationDays: parseInt(e.target.value) || 0 })} />
+                      <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
+                    </div>
+                    <p className="text-xs text-slate-400">Triggers probation review process</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-4 border-t pt-4 border-slate-100">
+                <p className="text-xs font-bold text-indigo-500 uppercase">Due Process Settings</p>
+                <p className="text-xs text-slate-500 leading-relaxed max-w-lg mb-2">
+                  Legally compliant HR actions require allowing the employee time to investigate notes or make appeals before termination or suspension takes final effect.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700">Investigation Response Period</label>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" value={localHrVars.investigationPeriodDays}
+                        onChange={e => updateLocalHrVariables({ investigationPeriodDays: parseInt(e.target.value) || 0 })} />
+                      <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">Time to reply to a disciplinary query</p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700">Appeal Window</label>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" value={localHrVars.appealPeriodDays}
+                        onChange={e => updateLocalHrVariables({ appealPeriodDays: parseInt(e.target.value) || 0 })} />
+                      <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">Time allowed to appeal an action</p>
+                  </div>
+                </div>
+              </div>
+
+            </CardContent>
+          </Card>
         </div>
       </div>
+      )}
     </div>
   );
 }

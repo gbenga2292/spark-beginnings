@@ -12,6 +12,7 @@ import { Sites } from './pages/Sites';
 import { SiteOnboarding } from './pages/SiteOnboarding';
 import { Attendance } from './pages/Attendance';
 import { Payroll } from './pages/Payroll';
+import { ClientAccounts } from './pages/ClientAccounts';
 import { Billing } from './pages/Billing';
 import { Payments } from './pages/Payments';
 import { VatPayments } from './pages/VatPayments';
@@ -28,6 +29,9 @@ import { LeaveSummary } from './pages/LeaveSummary';
 import { Users } from './pages/Users';
 import { UserForm } from './pages/UserForm';
 import { SalaryLoans } from './pages/SalaryLoans';
+import { Disciplinary } from './pages/Disciplinary';
+import { Evaluations } from './pages/Evaluations';
+import { Ledger } from './pages/Ledger';
 import { TitleBar } from './components/layout/TitleBar';
 import { ToastContainer, ConfirmDialog } from './components/ui/toast';
 import { GlobalDragScroll } from './components/ui/GlobalDragScroll';
@@ -85,9 +89,10 @@ function AppContent() {
         <Route path="sites" element={<Sites />} />
         <Route path="sites/onboarding/:id" element={<SiteOnboarding />} />
         <Route path="payroll" element={<Payroll />} />
-        <Route path="invoices" element={<Billing />} />
-        <Route path="payments" element={<Payments />} />
-        <Route path="vat" element={<VatPayments />} />
+        <Route path="client-accounts" element={<ClientAccounts />} />
+        <Route path="invoices" element={<Navigate to="/client-accounts" replace />} />
+        <Route path="payments" element={<Navigate to="/client-accounts" replace />} />
+        <Route path="vat" element={<Navigate to="/client-accounts" replace />} />
         <Route path="onboarding" element={<Onboarding />} />
         <Route path="onboarding/new" element={<NewHire />} />
         <Route path="onboarding/contract" element={<GenerateContract />} />
@@ -103,6 +108,9 @@ function AppContent() {
         <Route path="users/new" element={<UserForm />} />
         <Route path="users/:id/edit" element={<UserForm />} />
         <Route path="salary-loans" element={<SalaryLoans />} />
+        <Route path="disciplinary" element={<Disciplinary />} />
+        <Route path="evaluations" element={<Evaluations />} />
+        <Route path="ledger" element={<Ledger />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useRedaction } from '@/src/hooks/useRedaction';
+import { Dialog } from '@/src/components/ui/dialog';
 
 const POSITION_HIERARCHY = [
   'CEO',
@@ -34,11 +35,13 @@ const POSITION_HIERARCHY = [
 
 export function Employees() {
   const [activeTab, setActiveTab] = useState<'Active' | 'Delisted'>('Active');
+  const [detailTab, setDetailTab] = useState<'Overview' | 'Attendance' | 'Leaves' | 'Disciplinary' | 'Evaluations'>('Overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
   const [viewingEmployee, setViewingEmployee] = useState<Employee | null>(null);
+  const [viewingNarrative, setViewingNarrative] = useState<{type: 'Disciplinary' | 'Evaluation', data: any} | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const employees = useAppStore((state) => state.employees);
@@ -49,6 +52,8 @@ export function Employees() {
   const departments = useAppStore((state) => state.departments);
   const addPosition = useAppStore((state) => state.addPosition);
   const addDepartment = useAppStore((state) => state.addDepartment);
+  const disciplinaryRecords = useAppStore((state) => state.disciplinaryRecords);
+  const evaluations = useAppStore((state) => state.evaluations);
 
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('employees');
@@ -174,6 +179,7 @@ export function Employees() {
 
   const closeViewModal = () => {
     setViewingEmployee(null);
+    setDetailTab('Overview');
   };
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -598,58 +604,236 @@ export function Employees() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Personal Info</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-slate-500">System ID:</span><span className="font-mono text-[10px] break-all max-w-[120px] text-right">{emp.id}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Emp Code:</span><span className="font-mono">{emp.employeeCode || emp.id.substring(0,8)}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Staff Type:</span><span>{emp.staffType}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Start Date:</span><span>{emp.startDate || 'N/A'}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">End Date:</span><span>{emp.endDate || 'N/A'}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Yearly Leave:</span><span>{emp.yearlyLeave} days</span></div>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Bank & Tax</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-slate-500">Bank:</span><span>{emp.bankName || 'N/A'}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Account:</span><span className="font-mono">{emp.accountNo || 'N/A'}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Tax ID:</span><span className="font-mono">{emp.taxId || 'N/A'}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Pension:</span><span className="font-mono">{emp.pensionNumber || 'N/A'}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">PAYE Tax:</span><span>{emp.payeTax ? 'Yes' : 'No'}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">WHT Tax:</span><span>{emp.withholdingTax ? 'Yes' : 'No'}</span></div>
-                </div>
-              </div>
+            <div className="flex bg-slate-100 rounded-lg p-1 mb-6">
+              {['Overview', 'Attendance', 'Leaves', 'Disciplinary', 'Evaluations'].map(tab => (
+                <button
+                  key={tab}
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${detailTab === tab ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  onClick={() => setDetailTab(tab as any)}
+                >
+                  {tab}
+                </button>
+              ))}
             </div>
 
-            <div className="mt-6">
-              <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Salary Information</h4>
-              {canSeeSalary ? (
-                <div className="bg-slate-50 rounded-lg p-4">
-                  <div className="grid grid-cols-4 gap-2 text-sm mb-3">
-                    {Object.entries(emp.monthlySalaries).map(([month, amount]) => (
-                      <div key={month} className="flex justify-between">
-                        <span className="text-slate-500 uppercase text-xs">{month}:</span>
-                        <span className="font-mono">₦{amount.toLocaleString()}</span>
+            {detailTab === 'Overview' && (
+              <>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Personal Info</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between"><span className="text-slate-500">Emp Code:</span><span className="font-mono">{emp.employeeCode || emp.id.substring(0,8)}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Staff Type:</span><span>{emp.staffType}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Start Date:</span><span>{emp.startDate || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">End Date:</span><span>{emp.endDate || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Yearly Leave:</span><span>{emp.yearlyLeave} days</span></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Bank & Tax</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between"><span className="text-slate-500">Bank:</span><span>{emp.bankName || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Account:</span><span className="font-mono">{emp.accountNo || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Tax ID:</span><span className="font-mono">{emp.taxId || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Pension:</span><span className="font-mono">{emp.pensionNumber || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">PAYE Tax:</span><span>{emp.payeTax ? 'Yes' : 'No'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">WHT Tax:</span><span>{emp.withholdingTax ? 'Yes' : 'No'}</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                {canSeeSalary && (
+                  <div className="mt-6">
+                    <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Salary Information</h4>
+                    <div className="bg-slate-50 rounded-lg p-4">
+                      <div className="grid grid-cols-4 gap-2 text-sm mb-3">
+                        {Object.entries(emp.monthlySalaries).map(([month, amount]) => (
+                          <div key={month} className="flex justify-between">
+                            <span className="text-slate-500 uppercase text-xs">{month}:</span>
+                            <span className="font-mono">₦{amount.toLocaleString()}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                      <div className="border-t border-slate-200 pt-3 flex justify-between items-center">
+                        <span className="font-semibold">Annual Total:</span>
+                        <span className="text-xl font-bold text-indigo-600">₦{totalSalary.toLocaleString()}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="border-t border-slate-200 pt-3 flex justify-between items-center">
-                    <span className="font-semibold">Annual Total:</span>
-                    <span className="text-xl font-bold text-indigo-600">₦{totalSalary.toLocaleString()}</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-slate-50 rounded-lg p-4 flex items-center justify-center gap-2 text-slate-400 text-sm">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                  Salary data is restricted for your role.
-                </div>
-              )}
-            </div>
+                )}
+              </>
+            )}
+
+            {detailTab === 'Attendance' && (
+              <div className="text-center py-10 bg-slate-50 rounded-lg border border-slate-100">
+                <p className="text-slate-500 font-medium">Attendance records will appear here.</p>
+                <p className="text-xs text-slate-400 mt-1">Integrated with daily time tracking and absence triggers.</p>
+              </div>
+            )}
+
+            {detailTab === 'Leaves' && (
+              <div className="text-center py-10 bg-slate-50 rounded-lg border border-slate-100">
+                <p className="text-slate-500 font-medium">Leave history & balances will appear here.</p>
+                <p className="text-xs text-slate-400 mt-1">Track sick, vacation, and compassionate leaves.</p>
+              </div>
+            )}
+
+            {detailTab === 'Disciplinary' && (() => {
+               const empDiscip = disciplinaryRecords.filter(r => r.employeeId === emp.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+               return (
+                 <div className="space-y-4">
+                   <div className="flex justify-between items-center bg-rose-50 p-4 rounded-lg border border-rose-100">
+                     <div>
+                       <h4 className="text-rose-800 font-bold text-sm">Disciplinary Record</h4>
+                       <p className="text-xs text-rose-600">Track infractions, warnings, and suspensions.</p>
+                     </div>
+                   </div>
+                   {empDiscip.length === 0 ? (
+                     <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                        <p className="text-slate-500 font-medium">No active disciplinary events.</p>
+                        <p className="text-xs text-slate-400 mt-1">Good standing.</p>
+                     </div>
+                   ) : (
+                     <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                       <Table>
+                         <TableHeader>
+                           <TableRow className="bg-slate-50/50">
+                             <TableHead className="w-24">Date</TableHead>
+                             <TableHead>Type</TableHead>
+                             <TableHead>Severity</TableHead>
+                             <TableHead className="text-right">Actions</TableHead>
+                           </TableRow>
+                         </TableHeader>
+                         <TableBody>
+                           {empDiscip.map(d => (
+                             <TableRow key={d.id} className="hover:bg-slate-50/80">
+                               <TableCell className="font-mono text-[11px] text-slate-500">{d.date}</TableCell>
+                               <TableCell className="font-semibold text-slate-800 text-xs">{d.type}</TableCell>
+                               <TableCell>
+                                 <Badge variant={d.severity.includes('Warning') ? 'warning' : 'destructive'} className="text-[10px]">{d.severity}</Badge>
+                               </TableCell>
+                               <TableCell className="text-right">
+                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => setViewingNarrative({ type: 'Disciplinary', data: d })}>
+                                   <Eye className="h-4 w-4" />
+                                 </Button>
+                               </TableCell>
+                             </TableRow>
+                           ))}
+                         </TableBody>
+                       </Table>
+                     </div>
+                   )}
+                 </div>
+               );
+            })()}
+
+            {detailTab === 'Evaluations' && (() => {
+               const empEvals = evaluations.filter(e => e.employeeId === emp.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+               return (
+                 <div className="space-y-4">
+                   <div className="flex justify-between items-center bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                     <div>
+                       <h4 className="text-indigo-800 font-bold text-sm">Performance Evaluations</h4>
+                       <p className="text-xs text-indigo-600">Track probation & recurring reviews.</p>
+                     </div>
+                   </div>
+                   {empEvals.length === 0 ? (
+                     <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                        <p className="text-slate-500 font-medium">No evaluation records found.</p>
+                        <p className="text-xs text-slate-400 mt-1">Schedule a review to get started.</p>
+                     </div>
+                   ) : (
+                     <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                       <Table>
+                         <TableHeader>
+                           <TableRow className="bg-slate-50/50">
+                             <TableHead className="w-24">Date</TableHead>
+                             <TableHead>Type</TableHead>
+                             <TableHead>Score</TableHead>
+                             <TableHead className="text-right">Actions</TableHead>
+                           </TableRow>
+                         </TableHeader>
+                         <TableBody>
+                           {empEvals.map(e => (
+                             <TableRow key={e.id} className="hover:bg-slate-50/80">
+                               <TableCell className="font-mono text-[11px] text-slate-500">{e.date}</TableCell>
+                               <TableCell className="font-semibold text-slate-800 text-xs">{e.type}</TableCell>
+                               <TableCell>
+                                 <span className={`text-xs font-bold ${e.overallScore >= 70 ? 'text-emerald-600' : e.overallScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}>
+                                   {e.overallScore}%
+                                 </span>
+                               </TableCell>
+                               <TableCell className="text-right">
+                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => setViewingNarrative({ type: 'Evaluation', data: e })}>
+                                   <Eye className="h-4 w-4" />
+                                 </Button>
+                               </TableCell>
+                             </TableRow>
+                           ))}
+                         </TableBody>
+                       </Table>
+                     </div>
+                   )}
+                 </div>
+               );
+            })()}
           </div>
         </div>
+
+        <Dialog open={!!viewingNarrative} onClose={() => setViewingNarrative(null)} title={viewingNarrative?.type === 'Disciplinary' ? 'Disciplinary Narrative' : 'Evaluation Details'}>
+          {viewingNarrative && (
+            <div className="space-y-4">
+              {viewingNarrative.type === 'Disciplinary' ? (
+                <>
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div>
+                      <h4 className="font-bold text-slate-800 text-lg">{emp.surname} {emp.firstname}</h4>
+                      <p className="text-sm text-slate-500">{viewingNarrative.data.date} • {viewingNarrative.data.type}</p>
+                    </div>
+                    <Badge variant={viewingNarrative.data.severity.includes('Warning') ? 'warning' : 'destructive'}>{viewingNarrative.data.severity}</Badge>
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Narrative of Event</h5>
+                    <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-700 whitespace-pre-wrap border border-slate-100">
+                      {viewingNarrative.data.description || 'No description provided.'}
+                    </div>
+                  </div>
+                  {viewingNarrative.data.actionTaken && (
+                    <div>
+                      <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Action Taken / Resolution</h5>
+                      <div className="bg-rose-50 border border-rose-100 p-4 rounded-lg text-sm text-rose-900 whitespace-pre-wrap">
+                        {viewingNarrative.data.actionTaken}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div>
+                      <h4 className="font-bold text-slate-800 text-lg">{emp.surname} {emp.firstname}</h4>
+                      <p className="text-sm text-slate-500">{viewingNarrative.data.date} • {viewingNarrative.data.type}</p>
+                    </div>
+                    <span className={`text-xl font-bold ${viewingNarrative.data.overallScore >= 70 ? 'text-emerald-600' : viewingNarrative.data.overallScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}>
+                      {viewingNarrative.data.overallScore}%
+                    </span>
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Manager Notes</h5>
+                    <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-700 whitespace-pre-wrap border border-slate-100">
+                      {viewingNarrative.data.managerNotes || 'No notes provided.'}
+                    </div>
+                  </div>
+                </>
+              )}
+              <div className="pt-2 text-xs text-slate-400 border-t border-slate-100 flex items-center justify-between">
+                <span>Logged by: {viewingNarrative.data.createdBy || 'System'}</span>
+                <Badge variant={viewingNarrative.data.status === 'Active' || viewingNarrative.data.status === 'Acknowledged' ? 'default' : 'outline'}>{viewingNarrative.data.status}</Badge>
+              </div>
+            </div>
+          )}
+        </Dialog>
       </div>
     );
   };

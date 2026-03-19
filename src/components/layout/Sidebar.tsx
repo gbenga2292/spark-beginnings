@@ -20,6 +20,12 @@ import {
   DollarSign,
   BarChart3,
   ChevronDown,
+  AlertTriangle,
+  ClipboardList,
+  BookOpen,
+  PanelLeftClose,
+  PanelLeftOpen,
+  X
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -32,8 +38,9 @@ interface NavItem {
   name: string;
   href: string;
   icon: any;
-  privKey: keyof UserPrivileges;
+  privKey: keyof UserPrivileges | 'custom';
   privField: string;
+  visible?: (user: any) => boolean;
 }
 
 interface NavCategory {
@@ -54,38 +61,39 @@ const navigation: NavCategory[] = [
     name: 'HR',
     icon: Users,
     items: [
-      { name: 'Employees',              href: '/employees',    icon: Users,         privKey: 'employees',   privField: 'canView' },
-      { name: 'Onboarding',             href: '/onboarding',   icon: UserPlus,      privKey: 'onboarding',  privField: 'canView' },
-      { name: 'Daily Register',         href: '/attendance',   icon: CalendarClock, privKey: 'attendance',  privField: 'canView' },
-      { name: 'Leaves',                 href: '/leaves',       icon: CalendarClock, privKey: 'leaves',      privField: 'canView' },
-      { name: 'Salary & Loan Advance',  href: '/salary-loans', icon: DollarSign,    privKey: 'salaryLoans', privField: 'canView' },
-      { name: 'Employee Reports',       href: '/reports',      icon: FileText,      privKey: 'reports',     privField: 'canView' },
+      { name: 'Daily Register', href: '/attendance', icon: CalendarClock, privKey: 'attendance', privField: 'canView' },
+      { name: 'Employees', href: '/employees', icon: Users, privKey: 'employees', privField: 'canView' },
+      { name: 'Onboarding', href: '/onboarding', icon: UserPlus, privKey: 'onboarding', privField: 'canView' },
+      { name: 'Leaves', href: '/leaves', icon: CalendarClock, privKey: 'leaves', privField: 'canView' },
+      { name: 'Salary & Loan Advance', href: '/salary-loans', icon: DollarSign, privKey: 'salaryLoans', privField: 'canView' },
+      { name: 'Evaluations', href: '/evaluations', icon: ClipboardList, privKey: 'evaluations', privField: 'canView' },
+      { name: 'Disciplinary', href: '/disciplinary', icon: AlertTriangle, privKey: 'disciplinary', privField: 'canView' },
+      { name: 'HR Reports', href: '/reports', icon: FileText, privKey: 'reports', privField: 'canView' },
     ],
   },
   {
     name: 'Admin',
     icon: Building2,
     items: [
-      { name: 'Sites & Clients',  href: '/sites',          icon: MapPin,    privKey: 'sites', privField: 'canView' },
+      { name: 'Sites & Clients', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView' },
     ],
   },
   {
     name: 'Account',
     icon: Landmark,
     items: [
-      { name: 'Invoice',          href: '/invoices',          icon: Receipt,    privKey: 'billing',          privField: 'canView' },
-      { name: 'Payment',          href: '/payments',          icon: DollarSign, privKey: 'payments',         privField: 'canView' },
-      { name: 'VAT',              href: '/vat',               icon: Landmark,   privKey: 'payments',         privField: 'canViewVat' },
-      { name: 'Payroll',          href: '/payroll',           icon: Wallet,     privKey: 'payroll',          privField: 'canView' },
-      { name: 'Account Reports',  href: '/financial-reports', icon: BarChart3,  privKey: 'financialReports', privField: 'canView' },
+      { name: 'Client Accounts', href: '/client-accounts', icon: Receipt, privKey: 'custom', privField: '', visible: (user: any) => user?.privileges?.billing?.canView || user?.privileges?.payments?.canView || user?.privileges?.payments?.canViewVat },
+      { name: 'Payroll', href: '/payroll', icon: Wallet, privKey: 'payroll', privField: 'canView' },
+      { name: 'Ledger', href: '/ledger', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
+      { name: 'Account Reports', href: '/financial-reports', icon: BarChart3, privKey: 'financialReports', privField: 'canView' },
     ],
   },
   {
     name: 'Settings',
     icon: Settings,
     items: [
-      { name: 'Settings', href: '/settings', icon: Settings,    privKey: 'variables', privField: 'canView' },
-      { name: 'Users',    href: '/users',    icon: ShieldCheck, privKey: 'users',     privField: 'canView' },
+      { name: 'Settings', href: '/settings', icon: Settings, privKey: 'variables', privField: 'canView' },
+      { name: 'Users', href: '/users', icon: ShieldCheck, privKey: 'users', privField: 'canView' },
     ],
   },
 ];
@@ -94,11 +102,14 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const location = useLocation();
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const { isDark } = useTheme();
-  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(['HR', 'Settings', 'Account']);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const getVisibleItems = (items: NavItem[]) => {
     return items.filter((item) => {
       if (!currentUser) return true;
+      if (item.visible) return item.visible(currentUser);
+      if (item.privKey === 'custom') return false;
       const pagePriv = (currentUser.privileges[item.privKey] as unknown) as Record<string, boolean>;
       if (item.privField !== 'canView' && pagePriv?.['canView'] !== true) return false;
       return pagePriv?.[item.privField] === true;
@@ -114,94 +125,149 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   };
 
   // ── Theme-dependent tokens ────────────────────────────────
-  const sidebarBg    = isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-slate-50 border-slate-200';
-  const catBtnBase   = isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-slate-700 hover:bg-slate-100';
+  const sidebarBg = isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-slate-50 border-slate-200';
+  const catBtnBase = isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-slate-700 hover:bg-slate-100';
   const catBtnActive = isDark ? 'bg-indigo-900/50 text-indigo-300' : 'bg-indigo-50 text-indigo-700';
-  const itemBase     = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900';
-  const itemActive   = isDark
+  const itemBase = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900';
+  const itemActive = isDark
     ? 'bg-slate-800 text-indigo-400 border-l-2 border-indigo-500'
     : 'bg-white text-indigo-600 shadow-sm border-l-2 border-indigo-600';
-  const iconBase     = isDark ? 'text-slate-500 group-hover:text-slate-300' : 'text-slate-400 group-hover:text-slate-500';
-  const iconActive   = isDark ? 'text-indigo-400' : 'text-indigo-600';
+  const iconBase = isDark ? 'text-slate-500 group-hover:text-slate-300' : 'text-slate-400 group-hover:text-slate-500';
+  const iconActive = isDark ? 'text-indigo-400' : 'text-indigo-600';
 
   return (
-    <div className={`flex h-full w-64 flex-col border-r transition-colors duration-200 ${sidebarBg}`}>
-      {/* Logo */}
-      <div className="flex h-16 shrink-0 items-center px-6">
-        <div className="flex items-center gap-2 font-bold text-xl text-indigo-600">
-          <img
-            src={logoSrc}
-            alt="HR System"
-            className="h-10 w-auto transition-all duration-300"
-            style={isDark ? { filter: 'brightness(0) invert(1)', opacity: 0.9 } : {}}
-          />
+    <>
+      {/* Mobile Backdrop */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setIsOpen?.(false)}
+        />
+      )}
+
+      {/* Sidebar Container */}
+      <div
+        className={cn(
+          "fixed lg:relative flex h-full flex-col border-r transition-all duration-300 z-50",
+          sidebarBg,
+          isCollapsed ? "w-20" : "w-64",
+          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        )}
+      >
+        {/* Logo Area */}
+        <div className={cn("flex h-16 shrink-0 items-center border-b border-transparent transition-all", isCollapsed ? "px-0 justify-center" : "px-6 justify-between")}>
+          <div className={cn("flex items-center gap-2 font-bold text-xl text-indigo-600 overflow-hidden transition-all duration-300", isCollapsed ? "w-0 opacity-0 hidden" : "w-auto opacity-100")}>
+            <img
+              src={logoSrc}
+              alt="HR System"
+              className="h-10 w-auto min-w-max"
+              style={isDark ? { filter: 'brightness(0) invert(1)', opacity: 0.9 } : {}}
+            />
+          </div>
+
+          <div className="flex items-center">
+            {/* Desktop Collapse Toggle */}
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className={cn("hidden lg:flex p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors", isDark && "hover:bg-slate-800 hover:text-slate-300")}
+              title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+              {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+            </button>
+
+            {/* Mobile Close Button */}
+            <button
+              onClick={() => setIsOpen?.(false)}
+              className="lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-md"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden no-scrollbar">
+          <nav className={cn("flex-1 space-y-2 py-4", isCollapsed ? "px-2" : "px-3")}>
+            {navigation.map((category) => {
+              const visibleItems = getVisibleItems(category.items);
+              if (visibleItems.length === 0) return null;
+
+              // When collapsed, we can consider items expanded if they contain an active active
+              const isAnyItemActive = visibleItems.some(
+                (item) => location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href))
+              );
+
+              // Auto-expand category if collapsed and an item inside is active (so icons are visible)
+              const isExpanded = isCollapsed ? isAnyItemActive : expandedCategories.includes(category.name);
+
+              return (
+                <div key={category.name} className="mb-4">
+                  {/* Category Header */}
+                  <button
+                    onClick={() => {
+                      if (isCollapsed) {
+                        setIsCollapsed(false);
+                      } else {
+                        toggleCategory(category.name);
+                      }
+                    }}
+                    title={isCollapsed ? category.name : undefined}
+                    className={cn(
+                      'flex w-full items-center justify-between rounded-md py-2 text-sm font-semibold transition-colors',
+                      isCollapsed ? 'px-0 justify-center' : 'px-3',
+                      isAnyItemActive ? catBtnActive : catBtnBase
+                    )}
+                  >
+                    <div className={cn("flex items-center", isCollapsed && "justify-center w-full")}>
+                      <category.icon className={cn("h-5 w-5", !isCollapsed && "mr-3")} />
+                      {!isCollapsed && category.name}
+                    </div>
+                    {!isCollapsed && (
+                      <ChevronDown
+                        className={cn('h-4 w-4 transition-transform opacity-60', isExpanded ? 'rotate-180' : '')}
+                      />
+                    )}
+                  </button>
+
+                  {/* Submenu Items */}
+                  {isExpanded && (
+                    <div className={cn("mt-1 space-y-1", isCollapsed ? "pl-0" : "pl-4")}>
+                      {visibleItems.map((item) => {
+                        const isActive =
+                          location.pathname === item.href ||
+                          (item.href !== '/' && location.pathname.startsWith(item.href));
+                        return (
+                          <Link
+                            key={item.name}
+                            to={item.href}
+                            title={isCollapsed ? item.name : undefined}
+                            className={cn(
+                              'group flex items-center rounded-md py-2.5 text-sm font-medium transition-colors',
+                              isCollapsed ? 'px-0 justify-center' : 'px-3',
+                              isActive ? itemActive : itemBase
+                            )}
+                          >
+                            <item.icon
+                              className={cn(
+                                'h-[18px] w-[18px] flex-shrink-0 transition-colors',
+                                !isCollapsed && 'mr-3',
+                                isActive ? iconActive : iconBase
+                              )}
+                              aria-hidden="true"
+                            />
+                            {!isCollapsed && <span className="truncate">{item.name}</span>}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
         </div>
       </div>
-
-      <div className="flex flex-1 flex-col overflow-y-auto">
-        <nav className="flex-1 space-y-1 px-3 py-4">
-          {navigation.map((category) => {
-            const visibleItems = getVisibleItems(category.items);
-            if (visibleItems.length === 0) return null;
-
-            const isExpanded = expandedCategories.includes(category.name);
-            const isAnyItemActive = visibleItems.some(
-              (item) => location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href))
-            );
-
-            return (
-              <div key={category.name} className="mb-4">
-                {/* Category Header */}
-                <button
-                  onClick={() => toggleCategory(category.name)}
-                  className={cn(
-                    'flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-semibold transition-colors',
-                    isAnyItemActive ? catBtnActive : catBtnBase
-                  )}
-                >
-                  <div className="flex items-center">
-                    <category.icon className="mr-3 h-5 w-5" />
-                    {category.name}
-                  </div>
-                  <ChevronDown
-                    className={cn('h-4 w-4 transition-transform opacity-60', isExpanded ? 'rotate-180' : '')}
-                  />
-                </button>
-
-                {/* Submenu Items */}
-                {isExpanded && (
-                  <div className="mt-1 space-y-0.5 pl-4">
-                    {visibleItems.map((item) => {
-                      const isActive =
-                        location.pathname === item.href ||
-                        (item.href !== '/' && location.pathname.startsWith(item.href));
-                      return (
-                        <Link
-                          key={item.name}
-                          to={item.href}
-                          className={cn(
-                            'group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                            isActive ? itemActive : itemBase
-                          )}
-                        >
-                          <item.icon
-                            className={cn(
-                              'mr-3 h-4 w-4 flex-shrink-0 transition-colors',
-                              isActive ? iconActive : iconBase
-                            )}
-                            aria-hidden="true"
-                          />
-                          {item.name}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </nav>
-      </div>
-    </div>
+    </>
   );
 }
+

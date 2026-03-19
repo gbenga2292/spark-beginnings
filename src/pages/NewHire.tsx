@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
-import { UserPlus, ArrowRight, Check, ArrowLeft } from 'lucide-react';
+import { UserPlus, ArrowRight, Check, ArrowLeft, Info } from 'lucide-react';
 import { useAppStore, Employee, MonthlySalary, OnboardingTask } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
 import { useNavigate } from 'react-router-dom';
@@ -21,14 +21,19 @@ export function NewHire() {
     position: '',
     staffType: 'INTERNAL',
     startDate: '',
+    tentativeStartDate: '',
+    probationPeriod: undefined,
+    noOfGuarantors: 1,
     monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 }
   });
 
   const handleStartNewHire = () => {
-    if (!newHireData.firstname || !newHireData.surname || !newHireData.startDate || !newHireData.department || !newHireData.position) {
-      toast.error('Please fill in all basic employee details and start date.');
+    if (!newHireData.firstname || !newHireData.surname || !newHireData.tentativeStartDate || !newHireData.department || !newHireData.position) {
+      toast.error('Please fill in all basic employee details and tentative start date.');
       return;
     }
+
+    const noOfGuarantors = newHireData.noOfGuarantors ?? 1;
 
     // Determine tasks based on department
     const baseTasks = departmentTasksList.find(d => d.department === 'ALL')?.onboardingTasks || [];
@@ -45,7 +50,7 @@ export function NewHire() {
       toast.warning('No onboarding tasks configured for this department or the ALL default. Proceeding without tasks.');
     }
 
-    const start = new Date(newHireData.startDate as string);
+    const start = new Date(newHireData.tentativeStartDate as string);
     const newTasks: OnboardingTask[] = combinedTasks.map((task, index) => {
       const taskDate = new Date(start);
       taskDate.setDate(start.getDate() + index);
@@ -58,6 +63,9 @@ export function NewHire() {
       };
     });
 
+    // Initialize guarantor slots
+    const guarantorSlots = Array.from({ length: noOfGuarantors }, () => ({ name: '', phone: '', verified: false }));
+
     const finalEmployee: Employee = {
       id: crypto.randomUUID(),
       employeeCode: `EMP-${Date.now().toString().slice(-6)}`,
@@ -66,14 +74,41 @@ export function NewHire() {
       department: newHireData.department as string,
       staffType: newHireData.staffType as 'INTERNAL' | 'EXTERNAL',
       position: newHireData.position as string,
-      startDate: newHireData.startDate as string,
+      startDate: newHireData.tentativeStartDate as string, // used as the main date until verified
+      tentativeStartDate: newHireData.tentativeStartDate as string,
+      verifiedStartDate: '',
       endDate: '',
       yearlyLeave: 20,
-      bankName: '', accountNo: '', taxId: '', pensionNumber: '',
+      bankName: '', accountNo: '', taxId: '', pensionNumber: '', payeNumber: '',
       payeTax: true, withholdingTax: false,
-      status: 'Onboarding', // Persist as Onboarding
+      status: 'Onboarding',
       monthlySalaries: newHireData.monthlySalaries as MonthlySalary,
       onboardingTasks: newTasks,
+      probationPeriod: newHireData.probationPeriod,
+      noOfGuarantors,
+      onboardingChecklist: {
+        emailFormsSent: false,
+        emailFormsAcknowledged: false,
+        formsReturned: false,
+        guarantorFormsReturned: false,
+        personalEmployeeFormReturned: false,
+        passportReturned: false,
+        guarantors: guarantorSlots,
+        passportPhotos: false,
+        addressVerification: false,
+        educationalCredentials: false,
+        bankName: '',
+        accountNo: '',
+        accountDetailsVerified: false,
+        pensionVerified: false,
+        pensionNumberInput: '',
+        payeVerified: false,
+        payeNumberInput: '',
+        verifiedStartDate: '',
+        employmentLettersIssued: false,
+        orientationDone: false,
+        ppeHandbookIssued: false,
+      },
     };
 
     addEmployee(finalEmployee);
@@ -129,9 +164,57 @@ export function NewHire() {
               </select>
             </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Official Start Date <span className="text-rose-500">*</span></label>
-              <Input type="date" className="h-11 md:max-w-[50%] bg-slate-50 border-slate-200 focus:bg-white transition-colors" value={newHireData.startDate} onChange={(e) => setNewHireData({ ...newHireData, startDate: e.target.value })} />
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Staff Type</label>
+              <select className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-indigo-500/20"
+                value={newHireData.staffType} onChange={(e) => setNewHireData({ ...newHireData, staffType: e.target.value as 'INTERNAL' | 'EXTERNAL' })}>
+                <option value="INTERNAL">Internal</option>
+                <option value="EXTERNAL">External</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                Tentative Start Date <span className="text-rose-500">*</span>
+              </label>
+              <Input
+                type="date"
+                className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-colors"
+                value={newHireData.tentativeStartDate}
+                onChange={(e) => setNewHireData({ ...newHireData, tentativeStartDate: e.target.value })}
+              />
+              <p className="text-[11px] text-amber-600 flex items-center gap-1 mt-1">
+                <Info className="h-3 w-3" /> This is a tentative date. The verified start date will be confirmed during onboarding.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Probation Period (Days)</label>
+              <Input
+                type="number"
+                min={0}
+                className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-colors"
+                placeholder="e.g. 90"
+                value={newHireData.probationPeriod ?? ''}
+                onChange={(e) => setNewHireData({ ...newHireData, probationPeriod: e.target.value ? Number(e.target.value) : undefined })}
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Leave blank if not applicable.</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                No. of Guarantors Required <span className="text-rose-500">*</span>
+              </label>
+              <Input
+                type="number"
+                min={1}
+                max={5}
+                className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-colors"
+                placeholder="e.g. 2"
+                value={newHireData.noOfGuarantors ?? 1}
+                onChange={(e) => setNewHireData({ ...newHireData, noOfGuarantors: Math.max(1, Number(e.target.value)) })}
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Number of guarantor forms the employee must submit.</p>
             </div>
           </div>
 
@@ -140,7 +223,7 @@ export function NewHire() {
               <Check className="h-5 w-5" />
             </div>
             <p className="text-sm text-indigo-900 leading-relaxed">
-              This profile will be saved to the database immediately with a <strong>Pending Onboarding</strong> status. The employee will not appear on active payroll or attendance until formally checked off.
+              This profile will be saved to the database immediately with a <strong>Pending Onboarding</strong> status. The employee will not appear on active payroll or attendance until all required onboarding tasks are completed and they are formally activated.
             </p>
           </div>
 

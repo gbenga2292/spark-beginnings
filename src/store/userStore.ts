@@ -8,6 +8,8 @@ export interface FinanceDashPriv  { canView: boolean; canViewAmounts: boolean; }
 
 // ─── HR ──────────────────────────────────────────────────────
 export interface EmployeesPriv   { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canViewSalary: boolean; canExport: boolean; }
+export interface DisciplinaryPriv{ canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; }
+export interface EvaluationsPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; }
 export interface OnboardingPriv  { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; }
 export interface AttendancePriv  { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canImport: boolean; canExport: boolean; }
 export interface LeavesPriv      { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canViewSummary: boolean; }
@@ -34,6 +36,7 @@ export interface FinancialReportsPriv {
   canView: boolean; canExport: boolean; canViewAmounts: boolean;
   canViewPayrollSummary: boolean; canViewLoansAndAdvances: boolean;
 }
+export interface LedgerPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean; }
 
 // ─── Settings ────────────────────────────────────────────────
 export interface VariablesPriv { canView: boolean; canEdit: boolean; canImport: boolean; canExport: boolean; }
@@ -44,6 +47,8 @@ export interface UserPrivileges {
   dashboard:         DashboardPriv;
   financeDashboard:  FinanceDashPriv;
   employees:         EmployeesPriv;
+  disciplinary:      DisciplinaryPriv;
+  evaluations:       EvaluationsPriv;
   onboarding:        OnboardingPriv;
   attendance:        AttendancePriv;
   leaves:            LeavesPriv;
@@ -54,6 +59,7 @@ export interface UserPrivileges {
   payments:          PaymentsPriv;
   payroll:           PayrollPriv;
   financialReports:  FinancialReportsPriv;
+  ledger:            LedgerPriv;
   variables:         VariablesPriv;
   users:             UsersPriv;
 }
@@ -80,6 +86,8 @@ export const FULL_ACCESS: UserPrivileges = {
   dashboard:        { canView: true },
   financeDashboard: { canView: true, canViewAmounts: true },
   employees:        { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewSalary: true, canExport: true },
+  disciplinary:     { canView: true, canAdd: true, canEdit: true, canDelete: true },
+  evaluations:      { canView: true, canAdd: true, canEdit: true, canDelete: true },
   onboarding:       { canView: true, canAdd: true, canEdit: true, canDelete: true },
   attendance:       { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
   leaves:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewSummary: true },
@@ -90,6 +98,7 @@ export const FULL_ACCESS: UserPrivileges = {
   payments:         { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewAmounts: true, canViewVat: true, canManageVat: true, canImport: true, canExport: true },
   payroll:          { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true },
   financialReports: { canView: true, canExport: true, canViewAmounts: true, canViewPayrollSummary: true, canViewLoansAndAdvances: true },
+  ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
   variables:        { canView: true, canEdit: true, canImport: true, canExport: true },
   users:            { canView: true, canManage: true },
 };
@@ -99,6 +108,8 @@ export const NO_ACCESS: UserPrivileges = {
   dashboard:        { canView: false },
   financeDashboard: { canView: false, canViewAmounts: false },
   employees:        { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewSalary: false, canExport: false },
+  disciplinary:     { canView: false, canAdd: false, canEdit: false, canDelete: false },
+  evaluations:      { canView: false, canAdd: false, canEdit: false, canDelete: false },
   onboarding:       { canView: false, canAdd: false, canEdit: false, canDelete: false },
   attendance:       { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
   leaves:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewSummary: false },
@@ -109,6 +120,7 @@ export const NO_ACCESS: UserPrivileges = {
   payments:         { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewAmounts: false, canViewVat: false, canManageVat: false, canImport: false, canExport: false },
   payroll:          { canView: false, canGenerate: false, canViewAmounts: false, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false },
   financialReports: { canView: false, canExport: false, canViewAmounts: false, canViewPayrollSummary: false, canViewLoansAndAdvances: false },
+  ledger:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
   variables:        { canView: false, canEdit: false, canImport: false, canExport: false },
   users:            { canView: false, canManage: false },
 };
@@ -122,6 +134,8 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       ...NO_ACCESS,
       dashboard:   { canView: true },
       employees:   { canView: true, canAdd: true, canEdit: true, canDelete: false, canViewSalary: true, canExport: true },
+      disciplinary:{ canView: true, canAdd: true, canEdit: true, canDelete: false },
+      evaluations: { canView: true, canAdd: true, canEdit: true, canDelete: false },
       onboarding:  { canView: true, canAdd: true, canEdit: true, canDelete: false },
       attendance:  { canView: true, canAdd: true, canEdit: true, canDelete: false, canImport: true, canExport: true },
       leaves:      { canView: true, canAdd: true, canEdit: true, canDelete: false, canViewSummary: true },
@@ -141,6 +155,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       payments:         { canView: true, canAdd: true, canEdit: true, canDelete: false, canViewAmounts: true, canViewVat: true, canManageVat: false, canImport: true, canExport: true },
       payroll:          { canView: true, canGenerate: false, canViewAmounts: true, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false },
       financialReports: { canView: true, canExport: true, canViewAmounts: true, canViewPayrollSummary: true, canViewLoansAndAdvances: true },
+      ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: false, canExport: true },
       reports:          { canView: true, canExport: true },
     },
   },
@@ -161,6 +176,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       payments:         { canView: true, canAdd: false, canEdit: false, canDelete: false, canViewAmounts: false, canViewVat: true, canManageVat: false, canImport: false, canExport: false },
       payroll:          { canView: true, canGenerate: false, canViewAmounts: false, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false },
       financialReports: { canView: true, canExport: false, canViewAmounts: false, canViewPayrollSummary: false, canViewLoansAndAdvances: false },
+      ledger:           { canView: true, canAdd: false, canEdit: false, canDelete: false, canExport: false },
     },
   },
 ];
