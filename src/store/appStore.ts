@@ -137,6 +137,7 @@ export interface Employee {
   tentativeStartDate?: string;
   verifiedStartDate?: string;
   onboardingChecklist?: OnboardingChecklist;
+  onboardingMainTaskId?: string;
   onboardingSuspended?: boolean;   // suspend/resume onboarding without deleting
 }
 

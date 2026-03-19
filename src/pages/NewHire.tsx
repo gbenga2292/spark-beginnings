@@ -6,6 +6,8 @@ import { UserPlus, ArrowRight, Check, ArrowLeft, Info } from 'lucide-react';
 import { useAppStore, Employee, MonthlySalary, OnboardingTask } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
 import { useNavigate } from 'react-router-dom';
+import { useAppData } from '@/src/contexts/AppDataContext';
+import { useAuth } from '@/src/hooks/useAuth';
 
 export function NewHire() {
   const departments = useAppStore((state) => state.departments);
@@ -13,6 +15,8 @@ export function NewHire() {
   const departmentTasksList = useAppStore((state) => state.departmentTasksList);
   const addEmployee = useAppStore((state) => state.addEmployee);
   const navigate = useNavigate();
+  const { createMainTask } = useAppData();
+  const { user } = useAuth();
 
   const [newHireData, setNewHireData] = useState<Partial<Employee>>({
     firstname: '',
@@ -27,7 +31,7 @@ export function NewHire() {
     monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 }
   });
 
-  const handleStartNewHire = () => {
+  const handleStartNewHire = async () => {
     if (!newHireData.firstname || !newHireData.surname || !newHireData.tentativeStartDate || !newHireData.department || !newHireData.position) {
       toast.error('Please fill in all basic employee details and tentative start date.');
       return;
@@ -63,6 +67,39 @@ export function NewHire() {
       };
     });
 
+    // Create MainTask in Task ecosystem
+    let onboardingMainTaskId = undefined;
+    if (createMainTask && user) {
+      try {
+        const subTasksForCreation = combinedTasks.map((task, index) => {
+          const taskDate = new Date(start);
+          taskDate.setDate(start.getDate() + index);
+          return {
+            title: task.title,
+            description: `Onboarding task for ${newHireData.firstname} ${newHireData.surname}`,
+            status: index === 0 ? 'in_progress' : 'not_started',
+            deadline: taskDate.toISOString(),
+            priority: 'medium',
+            assignedTo: user.id, // assign to the creator (HR) for now
+          };
+        });
+
+        const mTask = await createMainTask(
+          {
+            title: `Onboarding: ${newHireData.firstname} ${newHireData.surname}`,
+            description: `Auto-generated onboarding workflow for ${newHireData.department} - ${newHireData.position}`,
+            assignedTo: user.id,
+            priority: 'high',
+            deadline: start.toISOString(),
+          },
+          subTasksForCreation
+        );
+        onboardingMainTaskId = mTask?.id;
+      } catch (err) {
+        console.error("Failed to create onboarding main task", err);
+      }
+    }
+
     // Initialize guarantor slots
     const guarantorSlots = Array.from({ length: noOfGuarantors }, () => ({ name: '', phone: '', verified: false }));
 
@@ -84,6 +121,7 @@ export function NewHire() {
       status: 'Onboarding',
       monthlySalaries: newHireData.monthlySalaries as MonthlySalary,
       onboardingTasks: newTasks,
+      onboardingMainTaskId,
       probationPeriod: newHireData.probationPeriod,
       noOfGuarantors,
       onboardingChecklist: {

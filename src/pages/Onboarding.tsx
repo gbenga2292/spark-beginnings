@@ -13,6 +13,8 @@ import { useAppStore, Employee, OnboardingTask, OnboardingChecklist, GuarantorIn
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useNavigate } from 'react-router-dom';
+import { useAppData } from '@/src/contexts/AppDataContext';
+import { useAuth } from '@/src/hooks/useAuth';
 
 // â”€â”€â”€ Default blank checklist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function makeDefaultChecklist(noOfGuarantors: number): OnboardingChecklist {
@@ -195,6 +197,8 @@ export function Onboarding() {
   const positions = useAppStore(s => s.positions);
   const priv = usePriv('onboarding');
   const navigate = useNavigate();
+  const { createMainTask, subtasks, updateSubtaskStatus } = useAppData();
+  const { user } = useAuth();
 
   const [leftTab, setLeftTab] = useState<'Active' | 'Pending' | 'Terminated'>('Active');
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
@@ -333,9 +337,32 @@ export function Onboarding() {
       { confirmLabel: 'Activate Employee' }
     );
     if (!ok) return;
+
+    const startDate = cl.verifiedStartDate || selectedEmployee.startDate;
+    
+    // Auto-spawn probation evaluation task if applicable
+    if (selectedEmployee.probationPeriod && selectedEmployee.probationPeriod > 0 && createMainTask && user) {
+      const evaluationDate = new Date(startDate);
+      evaluationDate.setDate(evaluationDate.getDate() + selectedEmployee.probationPeriod);
+      try {
+        await createMainTask(
+          {
+            title: `Probation Evaluation: ${selectedEmployee.firstname} ${selectedEmployee.surname}`,
+            description: `Auto-generated reminder to conduct a ${selectedEmployee.probationPeriod}-day probation evaluation for ${selectedEmployee.firstname} ${selectedEmployee.surname}.`,
+            assignedTo: user.id,
+            priority: 'medium',
+            deadline: evaluationDate.toISOString()
+          },
+          []
+        );
+      } catch (e) {
+        console.error("Failed to create probation evaluation task", e);
+      }
+    }
+
     updateEmployee(selectedEmployee.id, {
       status: 'Active',
-      startDate: cl.verifiedStartDate || selectedEmployee.startDate,
+      startDate: startDate,
       verifiedStartDate: cl.verifiedStartDate,
       bankName: cl.bankName || selectedEmployee.bankName,
       accountNo: cl.accountNo || selectedEmployee.accountNo,
@@ -510,13 +537,32 @@ export function Onboarding() {
                         </div>
                       )}
                     </div>
-                    <div className="mt-2">
+                    <div className="mt-2 text-center space-y-1.5">
                       {suspended
-                        ? <div className="w-full flex justify-center h-7 items-center text-xs font-semibold text-slate-400 border border-slate-200 rounded-full bg-slate-50">&#9646;&#9646; Onboarding Suspended</div>
+                        ? <div className="w-full flex justify-center h-7 items-center text-xs font-semibold text-slate-400 border border-slate-200 rounded-full bg-slate-50">&#9646;&#9646; Suspended</div>
                         : <Badge variant="outline" className={`w-full flex justify-center h-7 text-xs font-semibold ${ready ? 'text-emerald-700 border-emerald-200 bg-emerald-50' : 'text-amber-600 border-amber-200 bg-amber-50'}`}>
                             {ready ? <><Unlock className="h-3 w-3 mr-1.5" />Ready to Activate</> : <><Clock className="h-3 w-3 mr-1.5" />Tasks Pending</>}
                           </Badge>
                       }
+                      {/* Subtask progress quick view */}
+                      {!suspended && emp.onboardingMainTaskId && (
+                        <div className="text-[10px] font-medium text-slate-500 flex justify-between items-center px-1">
+                          {(() => {
+                            const empSubs = subtasks.filter(s => s.main_task_id === emp.onboardingMainTaskId || s.mainTaskId === emp.onboardingMainTaskId);
+                            if (!empSubs.length) return null;
+                            const completed = empSubs.filter(s => s.status === 'completed').length;
+                            const pct = Math.round((completed / empSubs.length) * 100);
+                            return (
+                              <>
+                                <span>Tasks: {completed}/{empSubs.length}</span>
+                                <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                  <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${pct}%` }}></div>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -581,6 +627,40 @@ export function Onboarding() {
             {/* â•â• ONBOARDING CHECKLIST â•â• */}
             {isOnboarding && selectedEmployee && (
               <div className="space-y-3">
+
+                {/* â”€ Dynamic Auto-Tasks â”€ */}
+                {selectedEmployee.onboardingMainTaskId && (
+                  <Section icon={Activity} label="Auto-Generated Workflow Tasks" color="bg-blue-50 text-blue-700" defaultOpen={true}>
+                    <div className="space-y-2">
+                      {subtasks
+                        .filter(s => s.main_task_id === selectedEmployee.onboardingMainTaskId || s.mainTaskId === selectedEmployee.onboardingMainTaskId)
+                        .map(task => (
+                        <div key={task.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-lg bg-slate-50 hover:bg-slate-100/50 transition-colors">
+                            <div className="flex flex-col gap-1">
+                              <span className={`text-sm font-semibold ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{task.title}</span>
+                              <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                                <Clock className="h-3 w-3" /> Due: {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'N/A'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Badge variant="outline" className={`text-[10px] font-bold ${task.status === 'completed' ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : task.priority === 'high' ? 'border-rose-200 text-rose-600 bg-rose-50' : 'border-amber-200 text-amber-600 bg-amber-50'}`}>
+                                {task.status === 'completed' ? 'Completed' : task.priority === 'high' ? 'High Priority' : 'Pending'}
+                              </Badge>
+                              {task.status !== 'completed' ? (
+                                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 h-7 text-xs px-3" onClick={() => updateSubtaskStatus && updateSubtaskStatus(task.id, 'completed')}>
+                                  Mark Done
+                                </Button>
+                              ) : (
+                                <Button size="sm" variant="outline" className="h-7 text-[10px] px-2 border-slate-200 text-slate-500" onClick={() => updateSubtaskStatus && updateSubtaskStatus(task.id, 'in_progress')}>
+                                  Undo
+                                </Button>
+                              )}
+                            </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Section>
+                )}
 
                 {/* â”€ Task 1 â”€ */}
                 <Section icon={Mail} label="1. Send Necessary Information (Forms)" color="bg-indigo-50 text-indigo-700"
