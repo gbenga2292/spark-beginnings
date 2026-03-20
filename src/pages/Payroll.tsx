@@ -134,6 +134,8 @@ export function Payroll() {
     { id: 'month',            label: 'Month',             summable: false, types: ['all'] },
     { id: 'bank_name',        label: 'Bank Name',         summable: false, types: ['all'] },
     { id: 'account_number',   label: 'Account No',        summable: false, types: ['all'] },
+    { id: 'paye_id',          label: 'PAYE ID',           summable: false, types: ['PAYE'] },
+    { id: 'pension_pin',      label: 'Pension Number',    summable: false, types: ['PENSION'] },
     { id: 'basic',            label: 'Basic Salary',      summable: true,  types: ['PAYE'] },
     { id: 'housing',          label: 'Housing',           summable: true,  types: ['PAYE'] },
     { id: 'transport',        label: 'Transport',         summable: true,  types: ['PAYE'] },
@@ -151,8 +153,8 @@ export function Payroll() {
 
   const DEFAULT_COLUMNS: Record<string, string[]> = {
     PAYSLIPS: [],
-    PAYE:    ['sn', 'employee_name', 'month', 'bank_name', 'account_number', 'basic', 'housing', 'transport', 'other', 'gross', 'paye'],
-    PENSION: ['sn', 'employee_name', 'month', 'bank_name', 'account_number', 'pensionable', 'employee_pension', 'employer_pension', 'total_pension'],
+    PAYE:    ['sn', 'employee_name', 'paye_id', 'month', 'bank_name', 'account_number', 'basic', 'housing', 'transport', 'other', 'gross', 'paye'],
+    PENSION: ['sn', 'employee_name', 'pension_pin', 'month', 'bank_name', 'account_number', 'pensionable', 'employee_pension', 'employer_pension', 'total_pension'],
     NSITF:   ['sn', 'employee_name', 'month', 'bank_name', 'account_number', 'gross', 'nsitf_rate', 'nsitf_amount'],
   };
 
@@ -1175,7 +1177,7 @@ export function Payroll() {
                         </h4>
                         <div className="flex flex-col gap-1 mt-1">
                           {relevantCols.map((col, idx) => (
-                            <div key={col.id} className="flex items-center gap-1">
+                            <div key={col.id} className="flex items-center gap-2 py-0.5">
                               <input
                                 type="checkbox"
                                 id={`col-${col.id}`}
@@ -1183,49 +1185,20 @@ export function Payroll() {
                                 checked={printSelectedColumns.includes(col.id)}
                                 onChange={(e) => {
                                   if (e.target.checked) {
-                                    // Insert at correct position to maintain order
-                                    const allIds = relevantCols.map(c => c.id);
-                                    const newCols = allIds.filter(id => printSelectedColumns.includes(id) || id === col.id);
-                                    setPrintSelectedColumns(newCols);
+                                    setPrintSelectedColumns([...printSelectedColumns, col.id]);
                                   } else {
                                     setPrintSelectedColumns(printSelectedColumns.filter(id => id !== col.id));
                                   }
                                 }}
                               />
-                              <label htmlFor={`col-${col.id}`} className="text-sm text-slate-700 cursor-pointer flex-1">{col.label}</label>
-                              <div className="flex gap-0.5 shrink-0">
-                                <button
-                                  className="text-slate-400 hover:text-slate-700 disabled:opacity-30 px-0.5"
-                                  disabled={idx === 0 || !printSelectedColumns.includes(col.id)}
-                                  onClick={() => {
-                                    const allIds = relevantCols.map(c => c.id);
-                                    const selOrdered = allIds.filter(id => printSelectedColumns.includes(id));
-                                    const pos = selOrdered.indexOf(col.id);
-                                    if (pos <= 0) return;
-                                    const next = [...selOrdered];
-                                    [next[pos - 1], next[pos]] = [next[pos], next[pos - 1]];
-                                    // Rebuild full ordered list preserving non-selected slots
-                                    const result = allIds.filter(id => next.includes(id));
-                                    setPrintSelectedColumns(result);
-                                  }}
-                                  title="Move up"
-                                >▲</button>
-                                <button
-                                  className="text-slate-400 hover:text-slate-700 disabled:opacity-30 px-0.5"
-                                  disabled={idx === relevantCols.length - 1 || !printSelectedColumns.includes(col.id)}
-                                  onClick={() => {
-                                    const allIds = relevantCols.map(c => c.id);
-                                    const selOrdered = allIds.filter(id => printSelectedColumns.includes(id));
-                                    const pos = selOrdered.indexOf(col.id);
-                                    if (pos < 0 || pos >= selOrdered.length - 1) return;
-                                    const next = [...selOrdered];
-                                    [next[pos], next[pos + 1]] = [next[pos + 1], next[pos]];
-                                    const result = allIds.filter(id => next.includes(id));
-                                    setPrintSelectedColumns(result);
-                                  }}
-                                  title="Move down"
-                                >▼</button>
-                              </div>
+                              <label htmlFor={`col-${col.id}`} className="text-sm text-slate-700 cursor-pointer flex-1 flex items-center justify-between">
+                                {col.label}
+                                {printSelectedColumns.includes(col.id) && (
+                                  <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded-sm">
+                                    #{printSelectedColumns.indexOf(col.id) + 1}
+                                  </span>
+                                )}
+                              </label>
                             </div>
                           ))}
                         </div>
@@ -1349,6 +1322,8 @@ export function Payroll() {
                         case 'sn':             return <span style={{ color: '#94a3b8', fontSize: '12px' }}>{idx + 1}</span>;
                         case 'employee_name':  return <span style={{ fontWeight: 600, color: '#0f172a' }}>{slip.record.surname} {slip.record.firstname}</span>;
                         case 'month':          return <span style={{ color: '#6366f1', fontSize: '12px', fontWeight: 500 }}>{slip.monthLabel}</span>;
+                        case 'paye_id':        { const emp = employees.find(e => e.id === slip.record.id); return <span style={{ fontSize: '12px', color: '#475569' }}>{emp?.payeNumber || emp?.taxId || 'N/A'}</span>; }
+                        case 'pension_pin':    { const emp = employees.find(e => e.id === slip.record.id); return <span style={{ fontSize: '12px', color: '#475569' }}>{emp?.pensionNumber || 'N/A'}</span>; }
                         case 'bank_name':      return <span style={{ fontSize: '12px' }}>{slip.record.bankName}</span>;
                         case 'account_number': return <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#475569' }}>{slip.record.accountNo}</span>;
                         case 'basic':          return <span style={{ fontFamily: 'monospace' }}>{fm(slip.record.basicSalary)}</span>;
@@ -1392,7 +1367,7 @@ export function Payroll() {
                     for (const c of orderedCols) { if (!c.summable) labelSpan++; else break; }
                     if (labelSpan === 0) labelSpan = 1;
 
-                    const colIsNumeric = (id: string) => !['sn','employee_name','month','bank_name','account_number'].includes(id);
+                    const colIsNumeric = (id: string) => !['sn','employee_name','month','bank_name','account_number','paye_id','pension_pin'].includes(id);
 
                     return (
                       <div className="bg-white mx-auto shadow-lg max-w-5xl rounded-sm print-break" id="print-area-content"
