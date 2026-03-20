@@ -35,6 +35,11 @@ export interface DepartmentTasks {
   offboardingTasks: { title: string; assignee: string }[];
 }
 
+export interface ServiceTemplate {
+  serviceName: string;
+  subtasks: { title: string; assignee: string; description?: string }[];
+}
+
 export interface LeaveRecord {
   id: string;
   employeeId: string;
@@ -447,6 +452,9 @@ interface AppState {
   removePublicHoliday: (id: string) => void;
   departmentTasksList: DepartmentTasks[];
   updateDepartmentTasks: (deptTasks: DepartmentTasks) => void;
+  getServiceTemplates: () => ServiceTemplate[];
+  updateServiceTemplate: (template: ServiceTemplate) => void;
+  removeServiceTemplate: (serviceName: string) => void;
   leaves: LeaveRecord[];
   addLeave: (leave: LeaveRecord) => void;
   updateLeave: (id: string, leave: Partial<LeaveRecord>) => void;
@@ -728,6 +736,32 @@ export const useAppStore = create<AppState>()(
           return { departmentTasksList: [...s.departmentTasksList, deptTasks] };
         });
         db.upsertDepartmentTasks(deptTasks);
+      },
+
+      // Service Templates (piggybacking on department_tasks DB)
+      getServiceTemplates: () => {
+        return get().departmentTasksList
+          .filter(d => d.department.startsWith('__SERVICE__'))
+          .map(d => ({
+            serviceName: d.department.replace('__SERVICE__', ''),
+            subtasks: d.onboardingTasks
+          }));
+      },
+      updateServiceTemplate: (template) => {
+        get().updateDepartmentTasks({
+          department: `__SERVICE__${template.serviceName}`,
+          onboardingTasks: template.subtasks,
+          offboardingTasks: []
+        });
+      },
+      removeServiceTemplate: (serviceName) => {
+        // Technically this leaves an empty record or we can just empty it to hide it. 
+        // We'll empty it to effectively "remove" it.
+        get().updateDepartmentTasks({
+          department: `__SERVICE__${serviceName}`,
+          onboardingTasks: [],
+          offboardingTasks: []
+        });
       },
 
       // Leave Types

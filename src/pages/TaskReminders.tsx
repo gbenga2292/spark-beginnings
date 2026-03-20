@@ -4,11 +4,13 @@ import { format, parseISO, isPast, isToday } from 'date-fns';
 import {
   Bell, Plus, Trash2, Edit3, Clock, Mail, Users, X, Check,
   AlertCircle, RefreshCw, ToggleLeft, ToggleRight,
-  Calendar, Zap, CheckCircle2, Link2, ChevronDown,
+  Calendar, Zap, CheckCircle2, Link2, ChevronDown, Eye,
 } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useWorkspace } from '@/src/hooks/use-workspace';
+import { useSearchParams } from 'react-router-dom';
+import { useEffect } from 'react';
 import type { Reminder, ReminderFrequency } from '@/src/types/tasks';
 
 const FREQ_LABELS: Record<ReminderFrequency, string> = {
@@ -39,6 +41,14 @@ const emptyForm = (): ReminderFormData => ({
   recipientIds: [], sendEmail: false, mainTaskId: '',
 });
 
+const safeFormatDate = (d: string) => {
+  try {
+    return format(new Date(d), "EEE, MMM d, yyyy 'at' h:mm a");
+  } catch {
+    return "Invalid date";
+  }
+};
+
 export default function Reminders() {
   const { user: currentUser } = useAuth();
   const { reminders, addReminder, updateReminder, deleteReminder, toggleReminderActive, users } = useAppData();
@@ -46,11 +56,13 @@ export default function Reminders() {
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewingReminder, setViewingReminder] = useState<Reminder | null>(null);
   const [form, setForm] = useState<ReminderFormData>(emptyForm());
   const [formError, setFormError] = useState('');
   const [showRecipientPicker, setShowRecipientPicker] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [tab, setTab] = useState<'all' | 'mine' | 'shared'>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const myReminders = reminders.filter(r => r.createdBy === currentUser?.id).filter(r => {
     if (r.mainTaskId) return mainTasks.some(m => m.id === r.mainTaskId);
@@ -82,6 +94,34 @@ export default function Reminders() {
     });
     setEditingId(rem.id); setFormError(''); setShowForm(true);
   };
+
+  useEffect(() => {
+    const viewId = searchParams.get('view');
+    if (viewId && reminders.length > 0) {
+      const rem = reminders.find(r => r.id === viewId);
+      if (rem) {
+        setViewingReminder(rem);
+        setTimeout(() => {
+          document.getElementById(`reminder-row-${rem.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      }
+      searchParams.delete('view');
+      setSearchParams(searchParams, { replace: true });
+    }
+    const editId = searchParams.get('edit');
+    if (editId && reminders.length > 0) {
+      const rem = reminders.find(r => r.id === editId);
+      if (rem) {
+        openEditForm(rem);
+        setTimeout(() => {
+          document.getElementById(`reminder-row-${rem.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      }
+      // Remove query param to prevent re-opening on manual refresh
+      searchParams.delete('edit');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, reminders]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault(); setFormError('');
@@ -217,7 +257,7 @@ export default function Reminders() {
               const isOwner = rem.createdBy === currentUser?.id;
 
               return (
-                <motion.div key={rem.id} variants={item}
+                <motion.div key={rem.id} id={`reminder-row-${rem.id}`} variants={item}
                   className={`rounded-2xl border overflow-hidden transition-all ${!rem.isActive
                     ? 'bg-muted/20 border-border opacity-60'
                     : isPastDue
@@ -245,6 +285,11 @@ export default function Reminders() {
                           </div>
                           {/* Actions */}
                           <div className="flex items-center gap-0.5 flex-shrink-0">
+                            <button onClick={() => setViewingReminder(rem)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+                              title="View details">
+                              <Eye className="w-4 h-4" />
+                            </button>
                             {isOwner && (
                               <>
                                 <button onClick={() => toggleReminderActive(rem.id)}
@@ -322,6 +367,118 @@ export default function Reminders() {
         )}
       </div>
 
+      {/* ── View Dialog ── */}
+      <AnimatePresence>
+        {viewingReminder && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={e => { if (e.target === e.currentTarget) setViewingReminder(null); }}>
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+              
+              <div className="flex items-center gap-3 px-6 py-4 border-b border-border flex-shrink-0 bg-primary/5">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Bell className="w-4.5 h-4.5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-semibold text-foreground truncate">{viewingReminder.title}</h3>
+                  <p className="text-[11px] text-muted-foreground">Reminder Details</p>
+                </div>
+                <button onClick={() => setViewingReminder(null)} className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-5">
+                {viewingReminder.body && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Message</p>
+                    <p className="text-sm text-foreground bg-muted/40 p-3 rounded-xl border border-border leading-relaxed">{viewingReminder.body}</p>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Start At</p>
+                    <p className="text-sm font-medium text-foreground">{safeFormatDate(viewingReminder.remindAt)}</p>
+                  </div>
+                  {viewingReminder.endAt && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">End At</p>
+                      <p className="text-sm font-medium text-foreground">{safeFormatDate(viewingReminder.endAt)}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Frequency</p>
+                    <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${FREQ_COLORS[viewingReminder.frequency]}`}>
+                      <RefreshCw className="w-3 h-3" />{FREQ_LABELS[viewingReminder.frequency]}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Status</p>
+                    <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${viewingReminder.isActive ? 'bg-green-50 text-green-700 border-green-200' : 'bg-muted text-muted-foreground border-border'}`}>
+                      {viewingReminder.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Recipients</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {viewingReminder.recipientIds.map(id => {
+                      const u = users.find(u => u.id === id);
+                      if (!u) return null;
+                      return (
+                        <span key={id} className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-full text-xs font-medium text-foreground border border-border">
+                          <div className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] font-bold shadow-sm ${u.avatarColor}`}>
+                            {u.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                          </div>
+                          {u.name}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {viewingReminder.mainTaskId && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1"><Link2 className="w-3 h-3" /> Linked Task</p>
+                    {(() => {
+                      const linked = mainTasks.find(t => t.id === viewingReminder.mainTaskId);
+                      if (!linked) return <p className="text-sm text-foreground">Task not found</p>;
+                      return (
+                         <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl text-sm font-medium text-primary">
+                           {linked.title}
+                         </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 px-6 py-4 bg-muted/30 border-t border-border mt-auto">
+                <button type="button" onClick={() => setViewingReminder(null)}
+                  className="px-4 py-2 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors">
+                  Close
+                </button>
+                {viewingReminder.createdBy === currentUser?.id && (
+                  <button type="button" 
+                    onClick={() => {
+                      setViewingReminder(null);
+                      openEditForm(viewingReminder);
+                    }}
+                    className="px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm flex items-center gap-2">
+                    <Edit3 className="w-4 h-4" /> Edit Reminder
+                  </button>
+                )}
+              </div>
+              
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── Create/Edit Modal ── */}
       <AnimatePresence>
         {showForm && (
@@ -330,7 +487,7 @@ export default function Reminders() {
             onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-              className="w-full max-w-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              className="w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
               {/* Modal header */}
               <div className="flex items-center gap-3 px-6 py-4 border-b border-border flex-shrink-0 bg-gradient-to-r from-primary/5 to-transparent">
@@ -353,7 +510,7 @@ export default function Reminders() {
                   <label className="block text-xs font-semibold text-foreground mb-1.5 uppercase tracking-wide">Title *</label>
                   <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
                     placeholder="e.g. Submit weekly report"
-                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all shadow-sm" />
+                    className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all shadow-sm" />
                 </div>
 
                 {/* Message */}
@@ -361,7 +518,7 @@ export default function Reminders() {
                   <label className="block text-xs font-semibold text-foreground mb-1.5 uppercase tracking-wide">Message</label>
                   <textarea value={form.body} onChange={e => setForm(p => ({ ...p, body: e.target.value }))}
                     placeholder="Optional details or instructions..." rows={2}
-                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all resize-none shadow-sm" />
+                    className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all resize-none shadow-sm" />
                 </div>
 
                 {/* Date/time row */}
@@ -369,12 +526,12 @@ export default function Reminders() {
                   <div>
                     <label className="block text-xs font-semibold text-foreground mb-1.5 uppercase tracking-wide flex items-center gap-1"><Calendar className="w-3 h-3" /> Start At *</label>
                     <input type="datetime-local" value={form.remindAt} onChange={e => setForm(p => ({ ...p, remindAt: e.target.value }))}
-                      className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all shadow-sm" />
+                      className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all shadow-sm" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-foreground mb-1.5 uppercase tracking-wide">End At</label>
                     <input type="datetime-local" value={form.endAt} onChange={e => setForm(p => ({ ...p, endAt: e.target.value }))} min={form.remindAt}
-                      className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all shadow-sm" />
+                      className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all shadow-sm" />
                   </div>
                 </div>
 
@@ -442,7 +599,7 @@ export default function Reminders() {
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1.5 uppercase tracking-wide flex items-center gap-1"><Link2 className="w-3 h-3" /> Link to Task</label>
                   <select value={form.mainTaskId} onChange={e => setForm(p => ({ ...p, mainTaskId: e.target.value }))}
-                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 cursor-pointer shadow-sm">
+                    className="w-full px-4 py-2.5 rounded-xl border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer shadow-sm">
                     <option value="">— None —</option>
                     {mainTasks.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
                   </select>

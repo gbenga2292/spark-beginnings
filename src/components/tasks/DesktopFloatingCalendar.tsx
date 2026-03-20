@@ -54,7 +54,7 @@ export function DesktopFloatingCalendar() {
 
               {/* Body */}
               <div className="flex-1 overflow-hidden bg-[#0f111a] text-white">
-                <CalendarPage />
+                <CalendarPage onNavigate={() => setOpen(false)} />
               </div>
             </motion.div>
           </motion.div>

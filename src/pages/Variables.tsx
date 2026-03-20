@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
-import { Plus, Trash2, Save, Download, Upload, BookOpen, Settings2 } from 'lucide-react';
+import { Plus, Trash2, Save, Download, Upload, BookOpen, Settings2, Briefcase } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -55,8 +55,23 @@ export function Variables() {
   const [newVendorName, setNewVendorName] = useState('');
   const [newVendorTin, setNewVendorTin] = useState('');
 
-  // Top-level section switch: 'system' | 'ledger'
-  const [varSection, setVarSection] = useState<'system' | 'ledger'>('system');
+  // Top-level section switch: 'system' | 'ledger' | 'services'
+  const [varSection, setVarSection] = useState<'system' | 'ledger' | 'services'>('system');
+
+  const departmentTasksList = useAppStore((state) => state.departmentTasksList);
+  const updateDepartmentTasks = useAppStore((state) => state.updateDepartmentTasks);
+
+  // Service Templates State
+  const getServiceTemplates = useAppStore((state) => state.getServiceTemplates);
+  const updateServiceTemplate = useAppStore((state) => state.updateServiceTemplate);
+  const removeServiceTemplateStore = useAppStore((state) => state.removeServiceTemplate);
+
+  const serviceTemplates = useMemo(() => getServiceTemplates(), [departmentTasksList]);
+  
+  const [selectedService, setSelectedService] = useState('');
+  const [newServiceName, setNewServiceName] = useState('');
+  const [newServiceTaskTitle, setNewServiceTaskTitle] = useState('');
+  const [newServiceTaskAssignee, setNewServiceTaskAssignee] = useState('');
 
   useEffect(() => {
     if (!isDirty) {
@@ -70,8 +85,6 @@ export function Variables() {
   // Navigation blocker removed because it requires react-router v6 createBrowserRouter data routers
   // Relying only on window.addEventListener('beforeunload') below
 
-  const departmentTasksList = useAppStore((state) => state.departmentTasksList);
-  const updateDepartmentTasks = useAppStore((state) => state.updateDepartmentTasks);
   const leaveTypes = useAppStore((state) => state.leaveTypes);
   const addLeaveType = useAppStore((state) => state.addLeaveType);
   const removeLeaveType = useAppStore((state) => state.removeLeaveType);
@@ -575,9 +588,182 @@ export function Variables() {
           <BookOpen className="h-4 w-4" />
           Ledger Variables
         </button>
+        <button
+          onClick={() => setVarSection('services')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            varSection === 'services'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <Briefcase className="h-4 w-4" />
+          Project Services
+        </button>
       </div>
 
-      {varSection === 'ledger' ? (
+      {varSection === 'services' ? (
+        <div className="flex flex-col gap-6">
+          <Card className="shadow-sm border-slate-200 border-t-4 border-t-cyan-500">
+            <CardHeader className="bg-cyan-50/30 rounded-t-lg border-b border-cyan-100">
+              <CardTitle className="text-cyan-900">Configure Project Services</CardTitle>
+              <CardDescription>
+                Define available services (e.g., Dewatering, Waterproofing) and their preset subtasks. These templates populate automatically during Site Onboarding when creating a new project.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-6">
+              
+              {/* Add New Service */}
+              {priv.canEdit && (
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="New Service Name (e.g. Dewatering)" 
+                    value={newServiceName} 
+                    onChange={e => setNewServiceName(e.target.value)} 
+                    className="flex-1 max-w-sm"
+                  />
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      if (!newServiceName) return;
+                      const exists = serviceTemplates.find(s => s.serviceName.toLowerCase() === newServiceName.toLowerCase());
+                      if (!exists) {
+                        updateServiceTemplate({ serviceName: newServiceName, subtasks: [] });
+                        setNewServiceName('');
+                        setSelectedService(newServiceName);
+                      } else {
+                        toast.error('Service already exists');
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" /> Add Service
+                  </Button>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                {serviceTemplates.length === 0 && <p className="text-sm text-slate-400 italic">No services configured.</p>}
+                {serviceTemplates.map(s => (
+                  <button
+                    key={s.serviceName}
+                    onClick={() => setSelectedService(s.serviceName === selectedService ? '' : s.serviceName)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors
+                      ${selectedService === s.serviceName 
+                        ? 'bg-cyan-600 text-white border-cyan-700 shadow-sm' 
+                        : 'bg-white text-slate-700 hover:bg-slate-50'}`}
+                  >
+                    {s.serviceName}
+                    {priv.canEdit && selectedService === s.serviceName && (
+                      <span
+                        className="p-0.5 rounded-full hover:bg-red-500/20 text-white/70 hover:text-white transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          showConfirm(
+                            `Are you sure you want to completely remove the ${s.serviceName} service and its tasks?`,
+                            { title: 'Remove Service' }
+                          ).then(confirmed => {
+                            if (confirmed) {
+                              removeServiceTemplateStore(s.serviceName);
+                              if (selectedService === s.serviceName) setSelectedService('');
+                            }
+                          });
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Service Subtasks */}
+              {selectedService && (
+                <div className="rounded-xl border border-cyan-200 bg-cyan-50/20 overflow-hidden mt-6">
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-cyan-100/60 border-b border-cyan-200">
+                    <span className="text-xs font-bold uppercase tracking-wider text-cyan-800">
+                      Preset Tasks for {selectedService}
+                    </span>
+                    <span className="text-[10px] text-cyan-700 bg-cyan-100/80 rounded px-2 py-0.5 font-semibold">
+                      {serviceTemplates.find(s => s.serviceName === selectedService)?.subtasks.length || 0} tasks
+                    </span>
+                  </div>
+                  <div className="p-4 space-y-4">
+                    {priv.canEdit && (
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-2 p-3 bg-white rounded-lg border border-cyan-100 shadow-sm">
+                        <Input 
+                          placeholder="Task Title (e.g. Site Visitation)" 
+                          value={newServiceTaskTitle} 
+                          onChange={(e) => setNewServiceTaskTitle(e.target.value)} 
+                          className="md:col-span-6 h-9" 
+                        />
+                        <select 
+                          className="md:col-span-4 h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" 
+                          value={newServiceTaskAssignee} 
+                          onChange={(e) => setNewServiceTaskAssignee(e.target.value)}
+                        >
+                          <option value="">-- Default Assignee Team --</option>
+                          <option value="HR">HR</option>
+                          <option value="Engineering">Engineering</option>
+                          <option value="Operations">Operations</option>
+                          <option value="Site Manager">Site Manager</option>
+                          {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => {
+                            if (!newServiceTaskTitle) return;
+                            const srv = serviceTemplates.find(s => s.serviceName === selectedService);
+                            if (srv) {
+                              updateServiceTemplate({ ...srv, subtasks: [...srv.subtasks, { title: newServiceTaskTitle, assignee: newServiceTaskAssignee }] });
+                              setNewServiceTaskTitle('');
+                            }
+                          }} 
+                          className="md:col-span-2 gap-1 border-cyan-300 text-cyan-700 hover:bg-cyan-50 h-9" 
+                          disabled={!newServiceTaskTitle}
+                        >
+                          <Plus className="h-4 w-4" /> Add Task
+                        </Button>
+                      </div>
+                    )}
+
+                    <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                      {(serviceTemplates.find(s => s.serviceName === selectedService)?.subtasks || []).map((t, idx) => (
+                        <div key={idx} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200 shadow-sm group hover:border-cyan-300 transition-colors">
+                          <span className="h-6 w-6 rounded-full bg-cyan-100/50 text-cyan-700 text-[11px] font-bold flex items-center justify-center shrink-0 border border-cyan-200">
+                            {idx + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-800">{t.title}</p>
+                            {t.assignee && <p className="text-[11px] text-slate-500 mt-0.5">Assigned to: {t.assignee}</p>}
+                          </div>
+                          {priv.canEdit && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 shrink-0 text-slate-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity" 
+                              onClick={() => {
+                                const srv = serviceTemplates.find(s => s.serviceName === selectedService);
+                                if (srv) updateServiceTemplate({ ...srv, subtasks: srv.subtasks.filter((_, i) => i !== idx) });
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      {(serviceTemplates.find(s => s.serviceName === selectedService)?.subtasks || []).length === 0 && (
+                        <p className="text-sm text-slate-400 text-center py-6 italic border-2 border-dashed border-slate-200 rounded-lg">
+                          No tasks defined for this service yet. Add one above.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      ) : varSection === 'ledger' ? (
         /* ── LEDGER VARIABLES SECTION ─────────────────────────── */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Card className="shadow-sm border-slate-200">

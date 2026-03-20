@@ -9,6 +9,8 @@ import {
 import { useAuth } from '@/src/hooks/useAuth';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useNavigate } from 'react-router-dom';
+import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
+import { Button } from '@/src/components/ui/button';
 
 const WEEKDAYS_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -43,7 +45,7 @@ interface CalendarEvent {
   colorKey: 'reminder' | 'task' | 'main';
 }
 
-export default function CalendarPage() {
+export default function CalendarPage({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { user: currentUser } = useAuth();
   const { reminders, mainTasks, subtasks } = useAppData();
   const navigate = useNavigate();
@@ -51,6 +53,7 @@ export default function CalendarPage() {
   const [calMonth, setCalMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [previewEvent, setPreviewEvent] = useState<CalendarEvent | null>(null);
 
   const allEvents = useMemo(() => {
     const events: CalendarEvent[] = [];
@@ -230,7 +233,18 @@ export default function CalendarPage() {
                     {events.slice(0, maxVisible).map(evt => (
                       <div
                         key={evt.id}
-                        className={`${EVENT_TYPE_STYLES[evt.colorKey].bg} text-white text-[8px] sm:text-[10px] leading-tight font-medium px-1 sm:px-1.5 py-0.5 rounded truncate`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (evt.type === 'reminder') {
+                            navigate(`/tasks/reminders?view=${evt.id}`);
+                          } else if (evt.colorKey === 'main') {
+                            navigate(`/tasks?openTask=${evt.id}`);
+                          } else {
+                            navigate(`/tasks?open=${evt.id}`);
+                          }
+                          onNavigate?.();
+                        }}
+                        className={`${EVENT_TYPE_STYLES[evt.colorKey].bg} text-white text-[8px] sm:text-[10px] leading-tight font-medium px-1 sm:px-1.5 py-0.5 rounded truncate hover:brightness-110 transition-all`}
                       >
                         <span className="hidden sm:inline">{format(evt.time, 'h:mm ')} </span>
                         {evt.type === 'reminder' ? 'ðŸ”” ' : ''}
@@ -325,8 +339,14 @@ export default function CalendarPage() {
                         <div
                           key={evt.id}
                           onClick={() => {
-                            if (evt.type === 'reminder') navigate('/reminders');
-                            else navigate('/tasks');
+                            if (evt.type === 'reminder') {
+                              navigate(`/tasks/reminders?view=${evt.id}`);
+                            } else if (evt.colorKey === 'main') {
+                              navigate(`/tasks?openTask=${evt.id}`);
+                            } else {
+                              navigate(`/tasks?open=${evt.id}`);
+                            }
+                            onNavigate?.();
                           }}
                           className={`${EVENT_TYPE_STYLES[evt.colorKey].bg} text-white rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 mb-1 cursor-pointer hover:brightness-110 transition-all`}
                         >
@@ -347,6 +367,39 @@ export default function CalendarPage() {
           </div>
         </div>
       )}
+
+      {/* ─── Event Preview Dialog ─── */}
+      <Dialog 
+        open={!!previewEvent} 
+        onClose={() => setPreviewEvent(null)}
+        title={previewEvent?.title || "Event Details"}
+      >
+        <div className="py-2">
+           <div className="mb-4 text-sm text-slate-500 font-medium">
+             {previewEvent && format(previewEvent.time, "EEEE, MMMM d, yyyy 'at' h:mm a")}
+           </div>
+           <p className="text-sm text-slate-700 dark:text-slate-300">
+             {previewEvent?.body || (previewEvent?.type === 'task' ? 'This is a scheduled task that requires your attention.' : 'No description provided.')}
+           </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setPreviewEvent(null)}>Close</Button>
+          <Button onClick={() => {
+            if (!previewEvent) return;
+            if (previewEvent.type === 'reminder') {
+               navigate(`/tasks/reminders?view=${previewEvent.id}`);
+            } else if (previewEvent.colorKey === 'main') {
+               navigate(`/tasks?openTask=${previewEvent.id}`);
+            } else {
+               navigate(`/tasks?open=${previewEvent.id}`);
+            }
+            setPreviewEvent(null);
+            onNavigate?.();
+          }} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm border-0 font-medium ml-2">
+            Go to {previewEvent?.type === 'reminder' ? 'Reminder' : 'Task'}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }

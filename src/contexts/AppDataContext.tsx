@@ -480,6 +480,24 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                  };
                  setProjects(prev => [...prev, adaptedProject]);
             }
+            
+            // Insert passed subtasks if any
+            if (projectData.subtasks && projectData.subtasks.length > 0) {
+                const subsToInsert = projectData.subtasks.map((st: any) => ({
+                    main_task_id: mainTask.id,
+                    title: st.title,
+                    description: '',
+                    status: 'not_started',
+                    category: 'General',
+                    assigned_department: st.assignee || 'Engineering',
+                    created_by: projectData.createdBy,
+                }));
+                const { data: insertedSubs } = await supabase.from('subtasks').insert(subsToInsert).select();
+                if (insertedSubs && insertedSubs.length > 0) {
+                    setSubtasks(prev => [...prev, ...insertedSubs]);
+                }
+            }
+            
             setMainTasks(prev => [...prev, mainTask]);
             toast.success('Project created successfully');
         },

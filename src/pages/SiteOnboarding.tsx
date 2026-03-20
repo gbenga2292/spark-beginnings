@@ -7,6 +7,9 @@ import { useAppStore } from '@/src/store/appStore';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import { toast } from '@/src/components/ui/toast';
 import { Save, ArrowLeft, CheckCircle2, Building2, MapPin, Calendar, User } from 'lucide-react';
+import { CreateProjectDialog } from '@/src/components/tasks/CreateProjectDialog';
+import { useAppData } from '@/src/contexts/AppDataContext';
+import { useAuth } from '@/src/hooks/useAuth';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -127,6 +130,12 @@ export function SiteOnboarding() {
   const [initialForm, setInitialForm] = useState<SiteQuestionnaire>(blankForm());
   const [activePhase, setActivePhase] = useState<1|2|3|4|5>(1);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  
+  const { createProject, users } = useAppData();
+  const { user } = useAuth();
+  
+  const [wantsProject, setWantsProject] = useState(true);
+  const [showProjectDialog, setShowProjectDialog] = useState(false);
 
   const isNew = id === 'new';
   // Only the identity header (client/site name) is locked once activated
@@ -197,6 +206,17 @@ export function SiteOnboarding() {
       toast.error('Client Name and Site Name are required.');
       return;
     }
+    
+    if (isNew && wantsProject) {
+        // If it's a new site and user checked the "create project" button
+        setShowProjectDialog(true);
+        return;
+    }
+
+    executeSave();
+  };
+
+  const executeSave = () => {
     if (isNew) {
       addPendingSite(form);
       navigate(`/sites/onboarding/${form.id}`, { replace: true });
@@ -204,7 +224,6 @@ export function SiteOnboarding() {
     } else {
       updatePendingSite(form.id, { ...form, updatedAt: new Date().toISOString() });
       if (form.status === 'Active') {
-        // Sync the actual end date with the real active site tracking if it exists
         const sites = useAppStore.getState().sites;
         const matchingSite = sites.find(s => s.name === form.siteName && s.client === form.clientName);
         if (matchingSite && form.phase5.actualEndDate !== matchingSite.endDate) {
@@ -214,6 +233,12 @@ export function SiteOnboarding() {
       setInitialForm(form);
       toast.success('Progress saved.');
     }
+  };
+  
+  const handleProjectSubmit = async (payload: any) => {
+     await createProject(payload);
+     setShowProjectDialog(false);
+     executeSave();
   };
 
   // ─── Activation ──────────────────────────────────────────────────────────
@@ -379,7 +404,16 @@ export function SiteOnboarding() {
               />
             </div>
           </div>
-          <div className="mt-4 flex justify-end">
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+              <input 
+                type="checkbox" 
+                checked={wantsProject} 
+                onChange={e => setWantsProject(e.target.checked)}
+                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+              />
+              Create a Project Task across the application for this site?
+            </label>
             <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
               <Save className="h-4 w-4" /> Save & Start Onboarding
             </Button>
@@ -758,6 +792,18 @@ export function SiteOnboarding() {
 
           </div>
         </div>
+      )}
+
+      {showProjectDialog && (
+         <CreateProjectDialog
+           initialProjectName={form.siteName}
+           onClose={() => setShowProjectDialog(false)}
+           onSubmit={handleProjectSubmit}
+           users={users}
+           currentUserId={user?.id || ''}
+           teamId="dcel-team"
+           workspaceId="dcel-team"
+         />
       )}
 
       {showUnsavedModal && (

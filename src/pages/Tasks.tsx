@@ -21,6 +21,7 @@ import { SubtaskKanbanView, MainTaskKanbanView } from "@/src/components/tasks/Ta
 import { TaskFocusView } from "@/src/components/tasks/TaskFocusView";
 
 import type { Project } from "@/src/types/tasks/project";
+import { CreateProjectDialog } from "@/src/components/tasks/CreateProjectDialog";
 
 /* ─── Shared config ────────────────────────────────────────────────────────── */
 const statusConfig: Record<SubTaskStatus, { label: string; pillClass: string; dot: string; icon: React.ElementType }> = {
@@ -372,17 +373,21 @@ function PersonalTasksView() {
 
   useEffect(() => {
     const openId = searchParams.get("open");
-    if (openId) {
+    if (openId && subtasks.length > 0) {
       setOpenSubtaskId(openId);
       const parentSub = subtasks.find(s => s.id === openId);
-      if (parentSub) setExpanded(prev => new Set([...prev, parentSub.mainTaskId]));
+      if (parentSub) {
+        setExpanded(prev => new Set([...prev, parentSub.mainTaskId]));
+        setTimeout(() => document.getElementById(`subtask-row-${openId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+      }
     }
     const openTaskId = searchParams.get("openTask");
     if (openTaskId) {
       setExpanded(prev => new Set([...prev, openTaskId]));
+      setTimeout(() => document.getElementById(`task-row-${openTaskId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
     }
     
-    // Clear 'open' and 'openTask' params without affecting 'view' or 'scope'
+    // Clear 'open' and 'openTask' params
     if (openId || openTaskId) {
        setSearchParams(prev => {
          const next = new URLSearchParams(prev);
@@ -391,8 +396,7 @@ function PersonalTasksView() {
          return next;
        }, { replace: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams, setSearchParams, subtasks]);
 
   const wsTaskIds = new Set(wsTasks.map(mt => mt.id));
   const wsSubs = subtasks.filter(s => wsTaskIds.has(s.mainTaskId));
@@ -542,7 +546,7 @@ function PersonalTasksView() {
                   const pct = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
 
                   return (
-                    <div key={mt.id}
+                    <div key={mt.id} id={`task-row-${mt.id}`}
                       className={`bg-card border rounded-xl overflow-hidden hover:shadow-sm transition-all border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority].border : 'border-l-violet-300 dark:border-l-violet-700'} border-violet-100 dark:border-violet-900/30`}>
                       {/* Task header */}
                       <div role="button" tabIndex={0}
@@ -593,7 +597,7 @@ function PersonalTasksView() {
                                   const sc2 = statusConfig[sub.status];
                                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
                                   return (
-                                    <motion.div key={sub.id ?? i}
+                                    <motion.div key={sub.id ?? i} id={`subtask-row-${sub.id}`}
                                       initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                                       transition={{ delay: i * 0.03, duration: 0.25 }}
                                       onClick={() => setOpenSubtaskId(sub.id ?? null)}
@@ -711,17 +715,21 @@ function AdminTasksView() {
 
   useEffect(() => {
     const openId = searchParams.get("open");
-    if (openId) {
+    if (openId && subtasks.length > 0) {
       setOpenSubtaskId(openId);
       const parentSub = subtasks.find(s => s.id === openId);
-      if (parentSub) setExpanded(prev => new Set([...prev, parentSub.mainTaskId]));
+      if (parentSub) {
+        setExpanded(prev => new Set([...prev, parentSub.mainTaskId]));
+        setTimeout(() => document.getElementById(`subtask-row-${openId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+      }
     }
     const openTaskId = searchParams.get("openTask");
     if (openTaskId) {
       setExpanded(prev => new Set([...prev, openTaskId]));
+      setTimeout(() => document.getElementById(`task-row-${openTaskId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
     }
     
-    // Clear 'open' and 'openTask' params without affecting 'view' or 'scope'
+    // Clear 'open' and 'openTask' params
     if (openId || openTaskId) {
        setSearchParams(prev => {
          const next = new URLSearchParams(prev);
@@ -730,8 +738,7 @@ function AdminTasksView() {
          return next;
        }, { replace: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams, setSearchParams, subtasks]);
 
   const { wsTasks: teamTasks, wsMembers, workspace: teamWs } = useWorkspace();
   const activeUsers = wsMembers;
@@ -1212,7 +1219,7 @@ function AdminTasksView() {
                 const pct = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
 
                 return (
-                  <div key={mt.id}
+                  <div key={mt.id} id={`task-row-${mt.id}`}
                     className={`bg-card border border-border rounded-xl overflow-hidden transition-colors border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority].border : 'border-l-transparent'
                       } hover:shadow-sm`}>
                     {/* Main task header */}
@@ -1287,7 +1294,7 @@ function AdminTasksView() {
                                 const assignee = users.find(u => u.id === sub.assignedTo);
                                 const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
                                 return (
-                                  <motion.div key={sub.id}
+                                  <motion.div key={sub.id} id={`subtask-row-${sub.id}`}
                                     initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                                     transition={{ delay: i * 0.03, duration: 0.25 }}
                                     onClick={() => setOpenSubtaskId(sub.id)}
@@ -2273,7 +2280,11 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
                   <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${isMe ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-muted text-foreground rounded-tl-sm'}`}>
                     <p className="whitespace-pre-wrap text-[13px]">{renderText(c.text)}</p>
                   </div>
-                  <span className="text-[10px] text-muted-foreground/50 px-1">{format(new Date(c.createdAt), 'MMM d · h:mm a')}</span>
+                  <span className="text-[10px] text-muted-foreground/50 px-1">
+                    {c.createdAt && !isNaN(new Date(c.createdAt).getTime()) 
+                      ? format(new Date(c.createdAt), 'MMM d · h:mm a') 
+                      : ''}
+                  </span>
                 </div>
               </div>
             );
@@ -2460,100 +2471,3 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
   );
 }
 
-/* ─── Create Project Dialog ────────────────────────────────────────────────── */
-function CreateProjectDialog({ onClose, onSubmit, users, currentUserId, teamId, workspaceId }: {
-  onClose: () => void;
-  onSubmit: (payload: any) => void;
-  users: AppUser[];
-  currentUserId: string;
-  teamId: string;
-  workspaceId: string;
-}) {
-  const [name, setName] = useState("");
-  const [serviceType, setServiceType] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [durationDays, setDurationDays] = useState("30");
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    
-    onSubmit({
-      name: name.trim(),
-      serviceType: serviceType.trim() || 'General',
-      startDate: startDate || new Date().toISOString(),
-      durationDays: parseInt(durationDays) || 30,
-      teamId,
-      workspaceId,
-      createdBy: currentUserId,
-    });
-    
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.18 }}
-        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md overflow-y-auto max-h-[90vh]"
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-              <FolderOpen className="w-4.5 h-4.5 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-foreground">New Project</h2>
-              <p className="text-[11px] text-muted-foreground">Create a new project</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
-            <X className="w-4 h-4 text-muted-foreground" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">
-              Project Name <span className="text-red-400">*</span>
-            </label>
-            <input required autoFocus value={name} onChange={e => setName(e.target.value)}
-              placeholder="e.g. Website Redesign"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm" />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Service Type</label>
-            <input value={serviceType} onChange={e => setServiceType(e.target.value)}
-              placeholder="e.g. Engineering, Design..."
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Start Date</label>
-              <input type="date" required value={startDate} onChange={e => setStartDate(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Duration (Days)</label>
-              <input type="number" required min="1" value={durationDays} onChange={e => setDurationDays(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-border mt-6">
-            <button type="button" onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</button>
-            <button type="submit" disabled={!name.trim() || !startDate}
-              className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-              Create Project
-            </button>
-          </div>
-        </form>
-      </motion.div>
-    </div>
-  );
-}
