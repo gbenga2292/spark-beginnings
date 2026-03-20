@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useUserStore, AppUser, UserPrivileges } from '@/src/store/userStore';
 
-/* â”€â”€ Color map for module badges â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Color map for module badges ──────────────────────────────── */
 const MODULE_COLORS: Record<string, string> = {
   Dashboard: 'bg-indigo-100 text-indigo-700',
   HR:        'bg-teal-100 text-teal-700',
@@ -67,7 +67,7 @@ export function Users() {
 
   return (
     <div className="flex flex-col gap-6 h-full">
-      {/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Header ────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">User Management</h1>
@@ -87,14 +87,14 @@ export function Users() {
         </div>
       </div>
 
-      {/* â”€â”€ Search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Search ─────────────────────────────────────────── */}
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search usersâ€¦"
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users…"
           className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 shadow-sm" />
       </div>
 
-      {/* â”€â”€ User Grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── User Grid ──────────────────────────────────────── */}
       {filtered.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-xl border border-dashed border-slate-200 py-20">
           <UsersIcon className="h-10 w-10 text-slate-300 mb-4" />

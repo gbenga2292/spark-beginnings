@@ -746,7 +746,7 @@ export function Reports() {
           </div>
 
           {siteChartView === 'table' ? (
-            /* â”€â”€ TABLE VIEW â”€â”€ */
+            /* ── TABLE VIEW ── */
             <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <div className="overflow-y-auto" style={{ maxHeight: '420px' }}>
@@ -783,7 +783,7 @@ export function Reports() {
                                   <TableCell key={site.id} className={`text-center py-1.5 px-2 text-sm ${days > 0 ? 'font-semibold text-emerald-700' : 'text-slate-300'}`}>
                                     {days > 0 ? (
                                       <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">{days}</span>
-                                    ) : 'â€”'}
+                                    ) : '—'}
                                   </TableCell>
                                 );
                               })}
@@ -800,7 +800,7 @@ export function Reports() {
               </div>
             </div>
           ) : (
-            /* â”€â”€ GANTT / SCHEDULE CHART VIEW â”€â”€ */
+            /* ── GANTT / SCHEDULE CHART VIEW ── */
             <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               {/* Legend */}
               <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200">
@@ -1002,7 +1002,7 @@ export function Reports() {
           </div>
 
           {summaryChartView === 'table' ? (
-            /* â”€â”€ TABLE VIEW â”€â”€ */
+            /* ── TABLE VIEW ── */
             <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <div className="overflow-y-auto" style={{ maxHeight: '420px' }}>
@@ -1107,7 +1107,7 @@ export function Reports() {
               </div>
             </div>
           ) : summaryChartView === 'heatmap' ? (
-            /* â”€â”€ HEAT MAP VIEW â”€â”€ */
+            /* ── HEAT MAP VIEW ── */
             (() => {
               // Find max days worked for colour scaling
               let maxWk = 1;
@@ -1120,7 +1120,7 @@ export function Reports() {
 
               const getCellStyle = (wk: number, ot: number, abs: number) => {
                 if (abs > 0 && wk === 0) {
-                  // Fully absent â€” red
+                  // Fully absent — red
                   return { backgroundColor: `rgba(239,68,68,${Math.min(0.3 + abs * 0.12, 0.85)})`, color: '#991b1b' };
                 }
                 if (wk === 0 && ot === 0 && abs === 0) {
@@ -1149,7 +1149,7 @@ export function Reports() {
                           <span key={i} className="inline-block w-5 h-4 rounded-sm" style={{ backgroundColor: `rgba(16,185,129,${v})` }}></span>
                         ))}
                       </span>
-                      Days Worked (light â†’ dark)
+                      Days Worked (light → dark)
                     </span>
                     <span className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
                       <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-600 text-[9px] font-bold">â—</span>
@@ -1212,7 +1212,7 @@ export function Reports() {
                                   const ot  = data?.months[m.value]?.otDays      || 0;
                                   const abs = data?.months[m.value]?.daysAbsent  || 0;
                                   const cellStyle = getCellStyle(wk, ot, abs);
-                                  const tooltip = `${m.label}\nâ–¸ Worked: ${wk} days\nâ–¸ OT: ${ot} days\nâ–¸ Absent: ${abs} days`;
+                                  const tooltip = `${m.label}\n▸ Worked: ${wk} days\n▸ OT: ${ot} days\n▸ Absent: ${abs} days`;
                                   return (
                                     <div
                                       key={m.value}
@@ -1222,7 +1222,7 @@ export function Reports() {
                                     >
                                       {/* Days worked number */}
                                       <span className="text-xs font-bold leading-none">
-                                        {wk + ot > 0 ? wk + ot : (abs > 0 ? '' : 'â€”')}
+                                        {wk + ot > 0 ? wk + ot : (abs > 0 ? '' : '—')}
                                       </span>
                                       {/* OT indicator dot */}
                                       {ot > 0 && (
@@ -1289,7 +1289,7 @@ export function Reports() {
               );
             })()
           ) : (
-            /* â”€â”€ BAR CHART VIEW (monthly team totals) â”€â”€ */
+            /* ── BAR CHART VIEW (monthly team totals) ── */
             (() => {
               const barData = months.map(m => ({
                 month: m.label.substring(0, 3),
@@ -1380,7 +1380,7 @@ export function Reports() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <CardTitle className="text-slate-900">Custom Employee Report Builder</CardTitle>
-              <p className="text-sm text-slate-500 mt-1">Select the data columns you want â€” then export as CSV or PDF.</p>
+              <p className="text-sm text-slate-500 mt-1">Select the data columns you want — then export as CSV or PDF.</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -1501,7 +1501,7 @@ export function Reports() {
         </CardContent>
       </Card>
 
-      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ HR REPORTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ───────────────── HR REPORTS ───────────────── */}
       <Card className="bg-white border-slate-200">
         <CardHeader className="border-b border-slate-100 pb-4">
           <div className="flex items-center justify-between flex-wrap gap-3">

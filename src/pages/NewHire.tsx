@@ -15,7 +15,7 @@ export function NewHire() {
   const departmentTasksList = useAppStore((state) => state.departmentTasksList);
   const addEmployee = useAppStore((state) => state.addEmployee);
   const navigate = useNavigate();
-  const { createMainTask } = useAppData();
+  const { createMainTask, addReminder } = useAppData();
   const { user } = useAuth();
 
   const [newHireData, setNewHireData] = useState<Partial<Employee>>({
@@ -95,6 +95,24 @@ export function NewHire() {
           subTasksForCreation
         );
         onboardingMainTaskId = mTask?.id;
+        
+        // Also fire a global reminder in the Task manager
+        if (addReminder) {
+          const reminderStart = new Date(start);
+          // Set reminder to fire at 8:00 AM on the start date
+          reminderStart.setHours(8, 0, 0, 0);
+          await addReminder({
+            title: `Start Date: ${newHireData.firstname} ${newHireData.surname}`,
+            body: `${newHireData.firstname} ${newHireData.surname} is tentatively starting today (${newHireData.department} - ${newHireData.position}). Please ensure workspace readiness.`,
+            remindAt: reminderStart.toISOString(),
+            frequency: 'once',
+            recipientIds: [user.id],
+            createdBy: user.id,
+            isActive: true,
+            sendEmail: false,
+            mainTaskId: onboardingMainTaskId
+          });
+        }
       } catch (err) {
         console.error("Failed to create onboarding main task", err);
       }

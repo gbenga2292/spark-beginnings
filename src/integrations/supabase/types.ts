@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       app_settings: {
         Row: {
+          hr_variables: Json | null
           id: string
           month_values: Json
           paye_tax_variables: Json
@@ -25,6 +26,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          hr_variables?: Json | null
           id?: string
           month_values?: Json
           paye_tax_variables?: Json
@@ -34,6 +36,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          hr_variables?: Json | null
           id?: string
           month_values?: Json
           paye_tax_variables?: Json
@@ -65,6 +68,7 @@ export type Database = {
           night_wk: number
           ot: number
           ot_site: string
+          overtime_details: string
           position: string
           staff_id: string
           staff_name: string
@@ -89,6 +93,7 @@ export type Database = {
           night_wk?: number
           ot?: number
           ot_site?: string
+          overtime_details?: string
           position?: string
           staff_id: string
           staff_name?: string
@@ -113,6 +118,7 @@ export type Database = {
           night_wk?: number
           ot?: number
           ot_site?: string
+          overtime_details?: string
           position?: string
           staff_id?: string
           staff_name?: string
@@ -187,6 +193,101 @@ export type Database = {
         }
         Relationships: []
       }
+      disciplinary_records: {
+        Row: {
+          acknowledged: boolean | null
+          action_taken: string | null
+          attachments: Json | null
+          committee_meeting_date: string | null
+          created_at: string | null
+          created_by: string | null
+          date: string
+          description: string | null
+          employee_comment: string | null
+          employee_id: string | null
+          final_result: string | null
+          id: string
+          initial_result: string | null
+          query_deadline: string | null
+          query_issued: boolean | null
+          query_replied: boolean | null
+          query_reply_text: string | null
+          reported_by: string | null
+          severity: string
+          status: string | null
+          suspension_end_date: string | null
+          suspension_start_date: string | null
+          type: string
+          updated_at: string | null
+          visible_to_employee: boolean | null
+          workflow_state: string | null
+        }
+        Insert: {
+          acknowledged?: boolean | null
+          action_taken?: string | null
+          attachments?: Json | null
+          committee_meeting_date?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          date: string
+          description?: string | null
+          employee_comment?: string | null
+          employee_id?: string | null
+          final_result?: string | null
+          id: string
+          initial_result?: string | null
+          query_deadline?: string | null
+          query_issued?: boolean | null
+          query_replied?: boolean | null
+          query_reply_text?: string | null
+          reported_by?: string | null
+          severity: string
+          status?: string | null
+          suspension_end_date?: string | null
+          suspension_start_date?: string | null
+          type: string
+          updated_at?: string | null
+          visible_to_employee?: boolean | null
+          workflow_state?: string | null
+        }
+        Update: {
+          acknowledged?: boolean | null
+          action_taken?: string | null
+          attachments?: Json | null
+          committee_meeting_date?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          description?: string | null
+          employee_comment?: string | null
+          employee_id?: string | null
+          final_result?: string | null
+          id?: string
+          initial_result?: string | null
+          query_deadline?: string | null
+          query_issued?: boolean | null
+          query_replied?: boolean | null
+          query_reply_text?: string | null
+          reported_by?: string | null
+          severity?: string
+          status?: string | null
+          suspension_end_date?: string | null
+          suspension_start_date?: string | null
+          type?: string
+          updated_at?: string | null
+          visible_to_employee?: boolean | null
+          workflow_state?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "disciplinary_records_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           account_no: string
@@ -200,15 +301,23 @@ export type Database = {
           firstname: string
           id: string
           monthly_salaries: Json
+          no_of_guarantors: number | null
+          offboarding_tasks: Json | null
+          onboarding_checklist: Json | null
+          onboarding_tasks: Json | null
+          paye_number: string | null
           paye_tax: boolean
           pension_number: string
           position: string
+          probation_period: number | null
           rent: number
           staff_type: string
           start_date: string
           status: string
           surname: string
           tax_id: string
+          tentative_start_date: string | null
+          verified_start_date: string | null
           withholding_tax: boolean
           yearly_leave: number
         }
@@ -224,15 +333,23 @@ export type Database = {
           firstname: string
           id?: string
           monthly_salaries?: Json
+          no_of_guarantors?: number | null
+          offboarding_tasks?: Json | null
+          onboarding_checklist?: Json | null
+          onboarding_tasks?: Json | null
+          paye_number?: string | null
           paye_tax?: boolean
           pension_number?: string
           position?: string
+          probation_period?: number | null
           rent?: number
           staff_type?: string
           start_date?: string
           status?: string
           surname: string
           tax_id?: string
+          tentative_start_date?: string | null
+          verified_start_date?: string | null
           withholding_tax?: boolean
           yearly_leave?: number
         }
@@ -248,19 +365,83 @@ export type Database = {
           firstname?: string
           id?: string
           monthly_salaries?: Json
+          no_of_guarantors?: number | null
+          offboarding_tasks?: Json | null
+          onboarding_checklist?: Json | null
+          onboarding_tasks?: Json | null
+          paye_number?: string | null
           paye_tax?: boolean
           pension_number?: string
           position?: string
+          probation_period?: number | null
           rent?: number
           staff_type?: string
           start_date?: string
           status?: string
           surname?: string
           tax_id?: string
+          tentative_start_date?: string | null
+          verified_start_date?: string | null
           withholding_tax?: boolean
           yearly_leave?: number
         }
         Relationships: []
+      }
+      evaluations: {
+        Row: {
+          acknowledged: boolean | null
+          created_at: string | null
+          created_by: string | null
+          date: string
+          employee_comment: string | null
+          employee_id: string | null
+          id: string
+          manager_notes: string | null
+          overall_score: number | null
+          scores: Json | null
+          status: string | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          acknowledged?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          date: string
+          employee_comment?: string | null
+          employee_id?: string | null
+          id: string
+          manager_notes?: string | null
+          overall_score?: number | null
+          scores?: Json | null
+          status?: string | null
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          acknowledged?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          employee_comment?: string | null
+          employee_id?: string | null
+          id?: string
+          manager_notes?: string | null
+          overall_score?: number | null
+          scores?: Json | null
+          status?: string | null
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoices: {
         Row: {
@@ -393,9 +574,11 @@ export type Database = {
           expected_end_date: string
           id: string
           leave_type: string
+          management: string | null
           reason: string
           start_date: string
           status: string
+          supervisor: string | null
           uploaded_file: string | null
           uploaded_file_name: string | null
         }
@@ -409,9 +592,11 @@ export type Database = {
           expected_end_date?: string
           id?: string
           leave_type?: string
+          management?: string | null
           reason?: string
           start_date?: string
           status?: string
+          supervisor?: string | null
           uploaded_file?: string | null
           uploaded_file_name?: string | null
         }
@@ -425,9 +610,11 @@ export type Database = {
           expected_end_date?: string
           id?: string
           leave_type?: string
+          management?: string | null
           reason?: string
           start_date?: string
           status?: string
+          supervisor?: string | null
           uploaded_file?: string | null
           uploaded_file_name?: string | null
         }
@@ -440,6 +627,102 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ledger_banks: {
+        Row: {
+          id: string
+          name: string
+        }
+        Insert: {
+          id?: string
+          name: string
+        }
+        Update: {
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      ledger_categories: {
+        Row: {
+          id: string
+          name: string
+        }
+        Insert: {
+          id?: string
+          name: string
+        }
+        Update: {
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      ledger_entries: {
+        Row: {
+          amount: number
+          bank: string | null
+          category: string
+          client: string | null
+          created_at: string | null
+          date: string
+          description: string | null
+          entered_by: string
+          id: string
+          site: string | null
+          updated_at: string | null
+          vendor: string | null
+          voucher_no: string
+        }
+        Insert: {
+          amount: number
+          bank?: string | null
+          category: string
+          client?: string | null
+          created_at?: string | null
+          date: string
+          description?: string | null
+          entered_by: string
+          id?: string
+          site?: string | null
+          updated_at?: string | null
+          vendor?: string | null
+          voucher_no: string
+        }
+        Update: {
+          amount?: number
+          bank?: string | null
+          category?: string
+          client?: string | null
+          created_at?: string | null
+          date?: string
+          description?: string | null
+          entered_by?: string
+          id?: string
+          site?: string | null
+          updated_at?: string | null
+          vendor?: string | null
+          voucher_no?: string
+        }
+        Relationships: []
+      }
+      ledger_vendors: {
+        Row: {
+          id: string
+          name: string
+          tin_number: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          tin_number?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          tin_number?: string | null
+        }
+        Relationships: []
       }
       loans: {
         Row: {
@@ -493,6 +776,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      main_tasks: {
+        Row: {
+          assigned_to: string | null
+          assignedTo: string | null
+          created_at: string | null
+          created_by: string | null
+          createdBy: string | null
+          deadline: string | null
+          description: string | null
+          id: string
+          is_deleted: boolean | null
+          priority: string | null
+          teamId: string | null
+          title: string | null
+          updated_at: string | null
+          workspaceId: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          assignedTo?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          createdBy?: string | null
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          priority?: string | null
+          teamId?: string | null
+          title?: string | null
+          updated_at?: string | null
+          workspaceId?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          assignedTo?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          createdBy?: string | null
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          priority?: string | null
+          teamId?: string | null
+          title?: string | null
+          updated_at?: string | null
+          workspaceId?: string | null
+        }
+        Relationships: []
       }
       payments: {
         Row: {
@@ -710,6 +1044,66 @@ export type Database = {
         }
         Relationships: []
       }
+      reminders: {
+        Row: {
+          body: string | null
+          created_at: string | null
+          created_by: string | null
+          end_at: string | null
+          frequency: string
+          id: string
+          is_active: boolean | null
+          main_task_id: string | null
+          recipient_ids: string[] | null
+          remind_at: string
+          send_email: boolean | null
+          title: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          end_at?: string | null
+          frequency: string
+          id?: string
+          is_active?: boolean | null
+          main_task_id?: string | null
+          recipient_ids?: string[] | null
+          remind_at: string
+          send_email?: boolean | null
+          title: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          end_at?: string | null
+          frequency?: string
+          id?: string
+          is_active?: boolean | null
+          main_task_id?: string | null
+          recipient_ids?: string[] | null
+          remind_at?: string
+          send_email?: boolean | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminders_main_task_id_fkey"
+            columns: ["main_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       salary_advances: {
         Row: {
           amount: number
@@ -752,28 +1146,211 @@ export type Database = {
         Row: {
           client: string
           created_at: string
+          end_date: string
           id: string
           name: string
+          start_date: string
           status: string
           vat: string
         }
         Insert: {
           client: string
           created_at?: string
+          end_date?: string
           id?: string
           name: string
+          start_date?: string
           status?: string
           vat?: string
         }
         Update: {
           client?: string
           created_at?: string
+          end_date?: string
           id?: string
           name?: string
+          start_date?: string
           status?: string
           vat?: string
         }
         Relationships: []
+      }
+      subtasks: {
+        Row: {
+          approvedBy: string | null
+          assigned_to: string | null
+          assignedTo: string | null
+          created_at: string | null
+          deadline: string | null
+          description: string | null
+          id: string
+          main_task_id: string | null
+          mainTaskId: string | null
+          pendingApprovalSince: string | null
+          priority: string | null
+          rejectedAt: string | null
+          status: string | null
+          title: string | null
+          updated_at: string | null
+          workspaceId: string | null
+        }
+        Insert: {
+          approvedBy?: string | null
+          assigned_to?: string | null
+          assignedTo?: string | null
+          created_at?: string | null
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          main_task_id?: string | null
+          mainTaskId?: string | null
+          pendingApprovalSince?: string | null
+          priority?: string | null
+          rejectedAt?: string | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+          workspaceId?: string | null
+        }
+        Update: {
+          approvedBy?: string | null
+          assigned_to?: string | null
+          assignedTo?: string | null
+          created_at?: string | null
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          main_task_id?: string | null
+          mainTaskId?: string | null
+          pendingApprovalSince?: string | null
+          priority?: string | null
+          rejectedAt?: string | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+          workspaceId?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subtasks_main_task_id_fkey"
+            columns: ["main_task_id"]
+            isOneToOne: false
+            referencedRelation: "main_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_updates: {
+        Row: {
+          author_id: string | null
+          created_at: string | null
+          id: string
+          main_task_id: string | null
+          subtask_id: string | null
+          task_id: string | null
+          text: string
+        }
+        Insert: {
+          author_id?: string | null
+          created_at?: string | null
+          id?: string
+          main_task_id?: string | null
+          subtask_id?: string | null
+          task_id?: string | null
+          text: string
+        }
+        Update: {
+          author_id?: string | null
+          created_at?: string | null
+          id?: string
+          main_task_id?: string | null
+          subtask_id?: string | null
+          task_id?: string | null
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_updates_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_updates_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          assignee_id: string | null
+          created_at: string | null
+          created_by: string | null
+          department: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          priority: string | null
+          site_id: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          assignee_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string | null
+          site_id?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          assignee_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string | null
+          site_id?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vat_payments: {
         Row: {
@@ -940,3 +1517,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

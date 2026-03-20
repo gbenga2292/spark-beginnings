@@ -1,4 +1,4 @@
-import type { TaskPriority } from '@/src/types/tasks';
+import type { TaskPriority } from './index';
 
 // ─── Project Template (preset in Settings) ────────────────────────────────
 export interface ProjectTemplateSubtask {

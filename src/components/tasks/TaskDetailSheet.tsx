@@ -95,7 +95,7 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
   const creator = mainTask ? users.find((u) => u.id === mainTask.createdBy) ?? null : null;
   const comments = subtaskId ? getSubtaskComments(subtaskId) : [];
   const workflowEvents = mainTask ? getMainTaskWorkflow(mainTask.id) : [];
-  const activeUsers = users.filter((u) => !u.isDeleted && !u.isSuspended && (u.teamId === (currentUser as any)?.teamId || u.workspaceIds?.some(id => currentUser?.workspaceIds?.includes(id))));
+  const activeUsers = users.filter((u: any) => !u.isDeleted && !u.isSuspended && (u.teamId === (currentUser as any)?.teamId || (u.workspaceIds as string[] | undefined)?.some((id: string) => ((currentUser as any)?.workspaceIds as string[] | undefined)?.includes(id))));
 
   const mentionResults: AppUser[] = mentionQuery !== null
     ? activeUsers.filter((u) =>
@@ -242,7 +242,7 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
 
   return (
     <Sheet open={!!subtaskId} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="bg-card border-l border-border w-full sm:max-w-lg overflow-hidden flex flex-col p-0 gap-0">
+      <SheetContent className="bg-white  border-l border-slate-200  w-full sm:max-w-lg overflow-hidden flex flex-col p-0 gap-0">
 
         {/* ── Header ── */}
         <SheetHeader className="px-5 pt-4 pb-0 border-b border-border flex-shrink-0">
@@ -323,11 +323,11 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
 
             {/* ── COMPLETED & LOCKED ── */}
             {subtask.status === 'completed' && (
-              <div className="rounded-xl border border-green-200 dark:border-green-900/50 bg-green-50/60 dark:bg-green-950/20 p-3 flex items-center gap-3">
+              <div className="rounded-xl border border-green-200  bg-green-50/60  p-3 flex items-center gap-3">
                 <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-green-800 dark:text-green-400">Task Completed &amp; Approved</p>
-                  <p className="text-[11px] text-green-600 dark:text-green-500 mt-0.5">
+                  <p className="text-xs font-semibold text-green-800 ">Task Completed &amp; Approved</p>
+                  <p className="text-[11px] text-green-600  mt-0.5">
                     This task has been finalised. Status is locked to reflect the approval outcome.
                   </p>
                 </div>
@@ -335,7 +335,7 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
                 {currentUser?.role === 'admin' && (
                   <button
                     onClick={() => updateSubtaskStatus(subtask.id, 'in_progress', currentUser.id)}
-                    className="flex-shrink-0 px-2.5 py-1 rounded-lg border border-green-300 dark:border-green-800 text-[11px] font-medium text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
+                    className="flex-shrink-0 px-2.5 py-1 rounded-lg border border-green-300  text-[11px] font-medium text-green-700  hover:bg-green-100 :bg-green-900/40 transition-colors"
                     title="Admin: reopen this completed task"
                   >
                     Reopen
@@ -361,22 +361,22 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
 
             {/* CREATOR: Feedback form + Approve / Reject when pending */}
             {subtask.status === 'pending_approval' && isCreator && (
-              <div className="mb-3 rounded-xl border border-amber-200/50 dark:border-amber-900/50 bg-amber-50/60 dark:bg-amber-950/20 overflow-hidden">
+              <div className="mb-3 rounded-xl border border-amber-200/50  bg-amber-50/60  overflow-hidden">
                 <div className="px-3 pt-3 pb-2">
-                  <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-500 mb-1.5">Your feedback (required)</p>
+                  <p className="text-[11px] font-semibold text-amber-800  mb-1.5">Your feedback (required)</p>
                   <textarea
                     value={approvalNote}
                     onChange={e => setApprovalNote(e.target.value)}
                     placeholder="Write feedback for the assignee — what looks good, what needs work, approval notes…"
                     rows={3}
-                    className="w-full text-xs rounded-lg border border-amber-200/50 dark:border-amber-900/50 bg-card px-3 py-2 text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all"
+                    className="w-full text-xs rounded-lg border border-amber-200/50  bg-transparent  px-3 py-2 text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all"
                   />
                   <div className="flex items-center justify-between mt-1">
                     <span className={`text-[10px] font-medium ${approvalNote.trim().length === 0
                       ? 'text-muted-foreground'
                       : approvalNote.trim().length < 5
                         ? 'text-destructive'
-                        : 'text-green-600 dark:text-green-500'
+                        : 'text-green-600 '
                       }`}>
                       {approvalNote.trim().length === 0
                         ? 'Feedback is required before approving or rejecting'
@@ -554,7 +554,7 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
 
         {/* ── Compose footer (only on updates tab) ── */}
         {tab === "updates" && (
-          <div className="px-5 pt-4 pb-8 border-t border-border flex-shrink-0 bg-card">
+          <div className="px-5 pt-4 pb-8 border-t border-border flex-shrink-0 bg-transparent">
             {/* Pending file path links */}
             {pendingFileLinks.length > 0 && (
               <div className="flex flex-col gap-1.5 mb-2">
@@ -630,7 +630,7 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
 
             {/* @ mention autocomplete popup */}
             {mentionQuery !== null && mentionResults.length > 0 && (
-              <div ref={mentionRef} className="mb-2 bg-card border border-border rounded-xl shadow-lg overflow-hidden">
+              <div ref={mentionRef} className="mb-2 bg-white  border border-border rounded-xl shadow-lg overflow-hidden">
                 <div className="px-3 py-1.5 border-b border-border">
                   <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Mention a teammate</span>
                 </div>
@@ -664,7 +664,7 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
                   onKeyDown={handleKeyDown}
                   placeholder="Post an update… use @Name or #Subtask"
                   rows={2}
-                  className="w-full px-3 py-2.5 text-sm text-foreground rounded-xl border border-border bg-card resize-none
+                  className="w-full px-3 py-2.5 text-sm text-foreground rounded-xl border border-border bg-transparent  resize-none
                     placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all pr-20"
                 />
                 {/* Quick insert icons */}
@@ -711,13 +711,18 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
 
 /* ── Comment bubble ── */
 function CommentBubble({ comment, users, currentUserId, subtasks }: {
-  comment: TaskComment; users: AppUser[];
+  comment: any; users: AppUser[];
   currentUserId: string; subtasks: SubTask[];
 }) {
-  const author = users.find((u) => u.id === comment.authorId);
-  const isMe = comment.authorId === currentUserId;
-  const createdSub = comment.createdSubtaskId
-    ? subtasks.find((s) => s.id === comment.createdSubtaskId)
+  const authorId = comment.authorId || comment.author_id;
+  const createdAt = comment.createdAt || comment.created_at || new Date().toISOString();
+  const createdSubtaskId = comment.createdSubtaskId || comment.created_subtask_id;
+  const isUrgentRequest = comment.isUrgentRequest || comment.is_urgent_request;
+
+  const author = users.find((u) => u.id === authorId);
+  const isMe = authorId === currentUserId;
+  const createdSub = createdSubtaskId
+    ? subtasks.find((s) => s.id === createdSubtaskId)
     : null;
 
   const renderText = (text: string) => {
@@ -738,8 +743,8 @@ function CommentBubble({ comment, users, currentUserId, subtasks }: {
         <div className={`flex items-center gap-1.5 text-[11px] text-muted-foreground ${isMe ? "flex-row-reverse" : ""}`}>
           <span className="font-medium text-foreground/80">{isMe ? "You" : author?.name ?? "Unknown"}</span>
           <span>·</span>
-          <span>{format(new Date(comment.createdAt), "MMM d, h:mm a")}</span>
-          {comment.isUrgentRequest && <span className="text-red-500 font-semibold text-[10px] bg-red-500/10 px-1.5 py-0.5 rounded-full border border-red-500/20">🚨 Urgent</span>}
+          <span>{format(new Date(createdAt), "MMM d, h:mm a")}</span>
+          {isUrgentRequest && <span className="text-red-500 font-semibold text-[10px] bg-red-500/10 px-1.5 py-0.5 rounded-full border border-red-500/20">🚨 Urgent</span>}
         </div>
         <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed break-words
           ${isMe ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted text-foreground rounded-tl-sm"}`}>

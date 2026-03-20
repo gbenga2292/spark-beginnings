@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Task, TaskPriority, TaskStatus } from "@/src/types/task";
+import { Task, TaskPriority, TaskStatus } from "@/src/types/tasks/task";
 import { departments } from "@/src/lib/mock-data";
 import {
   Dialog,

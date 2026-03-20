@@ -22,7 +22,7 @@ export function VatPayments() {
     const updateVatPayment = useAppStore((state) => state.updateVatPayment);
     const deleteVatPayment = useAppStore((state) => state.deleteVatPayment);
 
-    // â”€â”€â”€ Permissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Permissions ───────────────────────────────────────────
     const priv = usePriv('payments');
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -311,7 +311,7 @@ export function VatPayments() {
                                         <TableHead className="font-semibold px-4 py-3">Date</TableHead>
                                         <TableHead className="font-semibold px-4 py-3">Client</TableHead>
                                         <TableHead className="font-semibold px-4 py-3">Month</TableHead>
-                                        <TableHead className="font-semibold px-4 py-3 text-right">Amount (â‚¦)</TableHead>
+                                        <TableHead className="font-semibold px-4 py-3 text-right">Amount (₦)</TableHead>
                                         {priv.canManageVat && (
                                           <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">Actions</TableHead>
                                         )}
@@ -363,12 +363,12 @@ export function VatPayments() {
                             <div className="flex gap-4 font-mono text-sm">
                                 <div className="flex flex-col items-end">
                                     <span className="text-slate-400 text-xs font-sans tracking-tight">Total VAT</span>
-                                    <span className="text-slate-800 font-bold">â‚¦{priv?.canViewAmounts === false ? '***' : overallTotals.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <span className="text-slate-800 font-bold">₦{priv?.canViewAmounts === false ? '***' : overallTotals.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                                 <div className="h-8 w-px bg-slate-300 mx-2 hidden sm:block"></div>
                                 <div className="flex flex-col items-end">
                                     <span className="text-slate-400 text-xs font-sans tracking-tight">Total Balance</span>
-                                    <span className="text-rose-600 font-bold">â‚¦{priv?.canViewAmounts === false ? '***' : overallTotals.vatBalanceToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <span className="text-rose-600 font-bold">₦{priv?.canViewAmounts === false ? '***' : overallTotals.vatBalanceToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
                         </div>
@@ -462,7 +462,7 @@ export function VatPayments() {
                             </div>
 
                             <div className="space-y-1.5">
-                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Amount Paid (â‚¦)</label>
+                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Amount Paid (₦)</label>
                                 <Input type="number" min="0" value={form.amount} onChange={e => handleChange('amount', e.target.value)} className="font-mono bg-slate-50 font-bold text-lg text-indigo-700 h-11" />
                             </div>
                         </div>

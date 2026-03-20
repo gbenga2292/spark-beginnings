@@ -330,7 +330,7 @@ export default function Reminders() {
             onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-              className="w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              className="w-full max-w-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
               {/* Modal header */}
               <div className="flex items-center gap-3 px-6 py-4 border-b border-border flex-shrink-0 bg-gradient-to-r from-primary/5 to-transparent">

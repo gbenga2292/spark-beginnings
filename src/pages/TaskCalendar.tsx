@@ -54,26 +54,29 @@ export default function CalendarPage() {
 
   const allEvents = useMemo(() => {
     const events: CalendarEvent[] = [];
-    const activeWsId = currentUser?.activeWorkspaceId;
 
-    if (!activeWsId) return events;
-
-    // Filter main tasks by active workspace
-    const wsMainTasks = mainTasks.filter(m => m.workspaceId === activeWsId);
-    // Filter subtasks by those belonging to active workspace's main tasks
-    const wsSubtasks = subtasks.filter(s => wsMainTasks.some(m => m.id === s.mainTaskId));
-
-    const myReminders = reminders.filter(r => {
-      if (!r.isActive || (!r.recipientIds.includes(currentUser?.id ?? '') && r.createdBy !== currentUser?.id)) return false;
-      // If reminder is attached to a task/subtask, ensure it belongs to the active workspace
-      if (r.subtaskId) return wsSubtasks.some(s => s.id === r.subtaskId);
-      if (r.mainTaskId) return wsMainTasks.some(m => m.id === r.mainTaskId);
-      // If it's a floating reminder (no task attached), it's global/personal, we can show it or maybe filter it out?
-      // For now, let's only show reminders tied to this workspace, or floating ones if personal workspace
-      const currentWsType = currentUser?.workspaceIds.length === 1 ? 'personal' : 'team'; // Roughly, just allow if no task attached.
-      return true;
+    // Show all subtasks assigned to the current user that have a deadline
+    const mySubtasks = subtasks.filter(s => s.deadline && s.assignedTo === currentUser?.id);
+    mySubtasks.forEach(s => {
+      events.push({
+        id: s.id, title: s.title, time: new Date(s.deadline!),
+        type: 'task', status: s.status, colorKey: 'task',
+      });
     });
 
+    // Show all main tasks with deadlines (visible to all workspace members)
+    mainTasks.filter(m => m.deadline).forEach(m => {
+      events.push({
+        id: m.id, title: m.title, time: new Date(m.deadline!),
+        type: 'task', status: 'main', colorKey: 'main',
+      });
+    });
+
+    // Show reminders for the current user
+    const myReminders = reminders.filter(r => {
+      if (!r.isActive) return false;
+      return r.recipientIds?.includes(currentUser?.id ?? '') || r.createdBy === currentUser?.id;
+    });
     myReminders.forEach(r => {
       events.push({
         id: r.id, title: r.title, time: parseISO(r.remindAt),
@@ -81,22 +84,9 @@ export default function CalendarPage() {
       });
     });
 
-    wsSubtasks.filter(s => s.deadline && s.assignedTo === currentUser?.id).forEach(s => {
-      events.push({
-        id: s.id, title: s.title, time: new Date(s.deadline!),
-        type: 'task', status: s.status, colorKey: 'task',
-      });
-    });
-
-    wsMainTasks.filter(m => m.deadline).forEach(m => {
-      events.push({
-        id: m.id, title: m.title, time: new Date(m.deadline!),
-        type: 'task', status: 'main', colorKey: 'main',
-      });
-    });
-
     return events;
   }, [reminders, subtasks, mainTasks, currentUser]);
+
 
   const calDays = useMemo(() => {
     const monthStart = startOfMonth(calMonth);
@@ -153,7 +143,7 @@ export default function CalendarPage() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* â”€â”€â”€ Top Bar â”€â”€â”€ */}
+      {/* ─── Top Bar ─── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-3 sm:px-5 py-3 border-b border-white/10 flex-shrink-0 gap-2 sm:gap-0">
         <div className="flex items-center gap-2">
           {viewMode === 'day' && (
@@ -190,7 +180,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* â”€â”€â”€ Legend â”€â”€â”€ */}
+      {/* ─── Legend ─── */}
       <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-5 py-2 border-b border-white/10 flex-shrink-0 flex-wrap">
         {Object.entries(EVENT_TYPE_STYLES).map(([key, style]) => (
           <div key={key} className="flex items-center gap-1.5">
@@ -200,7 +190,7 @@ export default function CalendarPage() {
         ))}
       </div>
 
-      {/* â”€â”€â”€ Month View â”€â”€â”€ */}
+      {/* ─── Month View ─── */}
       {viewMode === 'month' && (
         <div className="flex-1 flex flex-col min-h-0">
           <div className="grid grid-cols-7 border-b border-white/10 flex-shrink-0">
@@ -260,7 +250,7 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* â”€â”€â”€ Day View â”€â”€â”€ */}
+      {/* ─── Day View ─── */}
       {viewMode === 'day' && (
         <div className="flex-1 flex min-h-0">
           {/* Mini calendar sidebar */}

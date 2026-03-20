@@ -11,7 +11,7 @@ import {
   Plus, Search, Circle, Loader2,
   CheckCircle2, Calendar, X, Users, Clock, ChevronDown,
   ChevronRight, UserCheck, Trash2, ArrowUpDown, Flag, MessageSquare, Send, Pencil,
-  Lock, User, FolderOpen,
+  Lock, User, FolderOpen, LayoutGrid, List
 } from "lucide-react";
 import { differenceInHours, addDays } from "date-fns";
 import { format, isToday, isTomorrow, isPast } from "date-fns";
@@ -250,6 +250,89 @@ function loadDefaultView(): TaskViewMode {
   try { return (localStorage.getItem('tf_default_view') as TaskViewMode) || 'list'; } catch { return 'list'; }
 }
 
+function ScopePicker({ scope, setScope, myCount, pendingCount }: { scope: 'all' | 'mine' | 'pending_review' | 'projects', setScope: (s: any) => void, myCount: number, pendingCount: number }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  const SCOPES = [
+    { value: 'mine', label: 'Mine', icon: User, count: myCount },
+    { value: 'all', label: 'All', icon: LayoutGrid },
+    { value: 'pending_review', label: 'Review', icon: Clock, count: pendingCount },
+    { value: 'projects', label: 'Projects', icon: FolderOpen },
+  ];
+
+  const active = SCOPES.find(s => s.value === scope) || SCOPES[1];
+
+  return (
+    <div className="relative z-20" ref={containerRef}>
+      <button
+        onClick={() => setOpen(p => !p)}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold bg-card text-foreground transition-all shadow-sm ring-1 ring-border/20 ${
+          scope === 'pending_review' && pendingCount > 0 ? 'border-amber-200 text-amber-700 bg-amber-50' : 'border-border/40 hover:bg-muted/80'
+        }`}
+      >
+        <span>{active.label}</span>
+        {active.count !== undefined && active.count > 0 && (
+          <span className={`ml-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+            active.value === 'pending_review' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400' : 'bg-primary/10 text-primary'
+          }`}>
+            {active.count}
+          </span>
+        )}
+        <ChevronDown className={`w-3 h-3 text-muted-foreground ml-1 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+           <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.97 }}
+            transition={{ duration: 0.12 }}
+            className="absolute left-0 top-full mt-1.5 z-40 bg-card border border-border rounded-xl shadow-[0...10px_rgba(0,0,0,0.1)] overflow-hidden min-w-[130px]"
+          >
+            {SCOPES.map(s => {
+              const isActive = scope === s.value;
+              return (
+                <button
+                  key={s.value}
+                  onClick={() => { setScope(s.value); setOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 text-xs transition-colors hover:bg-muted ${
+                    isActive ? "text-primary font-semibold bg-primary/5" : "text-foreground"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <s.icon className={`w-3.5 h-3.5 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                    {s.label}
+                  </span>
+                  {s.count !== undefined && s.count > 0 && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                      isActive ? 'bg-primary/20 text-primary' : 'bg-muted-foreground/20 text-muted-foreground'
+                    }`}>
+                      {s.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 type PriorityFilter = TaskPriority | 'all';
 
 /* ─── Main export ──────────────────────────────────────────────────────────── */
@@ -265,10 +348,10 @@ export default function Tasks() {
 ═══════════════════════════════════════════════════════════════════════════════ */
 function PersonalTasksView() {
   const { mainTasks, subtasks, createMainTask, addSubtask, deleteSubtask,
-    updateSubtask, updateSubtaskStatus, deleteMainTask, updateMainTask, comments } = useAppData();
+    updateSubtask, updateSubtaskStatus, deleteMainTask, updateMainTask, comments, reminders } = useAppData();
   const { user: currentUser } = useAuth();
   const { wsTasks, workspace } = useWorkspace();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -279,7 +362,13 @@ function PersonalTasksView() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
-  const [viewMode, setViewMode] = useState<TaskViewMode>(loadDefaultView());
+  
+  const [viewMode, setViewModeState] = useState<TaskViewMode>(() => (localStorage.getItem('tf_default_view') as TaskViewMode) || loadDefaultView());
+
+  const setViewMode = (v: TaskViewMode) => {
+    setViewModeState(v);
+    localStorage.setItem('tf_default_view', v);
+  };
 
   useEffect(() => {
     const openId = searchParams.get("open");
@@ -287,17 +376,23 @@ function PersonalTasksView() {
       setOpenSubtaskId(openId);
       const parentSub = subtasks.find(s => s.id === openId);
       if (parentSub) setExpanded(prev => new Set([...prev, parentSub.mainTaskId]));
-      navigate("/tasks", { replace: true });
     }
     const openTaskId = searchParams.get("openTask");
     if (openTaskId) {
       setExpanded(prev => new Set([...prev, openTaskId]));
-      navigate("/tasks", { replace: true });
+    }
+    
+    // Clear 'open' and 'openTask' params without affecting 'view' or 'scope'
+    if (openId || openTaskId) {
+       setSearchParams(prev => {
+         const next = new URLSearchParams(prev);
+         next.delete("open");
+         next.delete("openTask");
+         return next;
+       }, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => { localStorage.setItem('tf_default_view', viewMode); }, [viewMode]);
 
   const wsTaskIds = new Set(wsTasks.map(mt => mt.id));
   const wsSubs = subtasks.filter(s => wsTaskIds.has(s.mainTaskId));
@@ -323,7 +418,7 @@ function PersonalTasksView() {
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-0">
 
       {/* Toolbar */}
-      <motion.div variants={item} className="flex items-center gap-2 mb-3 flex-wrap">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-2 mb-3 flex-wrap">
         <ViewToggle value={viewMode} onChange={setViewMode} />
 
         {/* Sort */}
@@ -367,7 +462,7 @@ function PersonalTasksView() {
       </motion.div>
 
       {/* Search */}
-      <motion.div variants={item} className="mb-4">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="mb-4">
         <div className="relative w-full">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input type="text" placeholder="Search your tasks…" value={search} onChange={e => setSearch(e.target.value)}
@@ -379,19 +474,20 @@ function PersonalTasksView() {
 
       {/* ── BOARD VIEW ── */}
       {viewMode === 'board' && (
-        <motion.div variants={item}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <MainTaskKanbanView
             mainTasks={filtered}
             allSubtasks={wsSubs}
             users={[]}
             onClickTask={id => toggle(id)}
+            reminders={reminders.filter(r => r.isActive && (r.createdBy === currentUser?.id || r.recipientIds?.includes(currentUser?.id ?? '')))}
           />
         </motion.div>
       )}
 
       {/* ── FOCUS VIEW ── */}
       {viewMode === 'focus' && (
-        <motion.div variants={item}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <TaskFocusView
             subtasks={wsSubs}
             mainTasks={wsTasks}
@@ -405,7 +501,7 @@ function PersonalTasksView() {
       {viewMode === 'list' && (
         <>
           {/* Status tabs */}
-          <motion.div variants={item} className="flex items-center gap-1 mb-4 border-b border-border pb-0">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0">
             {STATUS_TABS.map(tab => {
               const isActive = statusFilter === tab.value;
               const count = tab.value === "all" ? wsTasks.length : wsTasks.filter(mt => deriveMainTaskStatus(mt.id, wsSubs) === tab.value).length;
@@ -424,7 +520,7 @@ function PersonalTasksView() {
           </motion.div>
 
           {/* Task list */}
-          <motion.div variants={item}>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
             {filtered.length === 0 ? (
               <div className="text-center py-24 bg-card border border-violet-100 dark:border-violet-900/30 rounded-xl">
                 <p className="text-4xl mb-3">📋</p>
@@ -449,8 +545,10 @@ function PersonalTasksView() {
                     <div key={mt.id}
                       className={`bg-card border rounded-xl overflow-hidden hover:shadow-sm transition-all border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority].border : 'border-l-violet-300 dark:border-l-violet-700'} border-violet-100 dark:border-violet-900/30`}>
                       {/* Task header */}
-                      <button onClick={() => toggle(mt.id)}
-                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-violet-50/50 dark:hover:bg-violet-950/20 transition-colors text-left">
+                      <div role="button" tabIndex={0}
+                        onClick={() => toggle(mt.id)}
+                        onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggle(mt.id)}
+                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-violet-50/50 dark:hover:bg-violet-950/20 transition-colors text-left cursor-pointer">
                         <div className="text-muted-foreground flex-shrink-0">
                           {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                         </div>
@@ -478,7 +576,7 @@ function PersonalTasksView() {
                         <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full flex items-center gap-1 w-max flex-shrink-0 ${sc.pillClass}`}>
                           {sc.label}
                         </span>
-                      </button>
+                      </div>
 
                       {/* Subtasks */}
                       <AnimatePresence>
@@ -578,9 +676,9 @@ function PersonalTasksView() {
 function AdminTasksView() {
   const { mainTasks, subtasks, users, comments, createMainTask, addSubtask, assignSubtask,
     updateSubtask, deleteSubtask, updateSubtaskStatus, deleteMainTask, updateMainTask,
-    postComment, getMainTaskComments, projects, createProject } = useAppData();
+    postComment, getMainTaskComments, projects, createProject, reminders } = useAppData();
   const { user: currentUser } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -590,11 +688,23 @@ function AdminTasksView() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [assignDialog, setAssignDialog] = useState<{ subtaskId: string; current: string | null } | null>(null);
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
-  const [scope, setScope] = useState<'all' | 'mine' | 'pending_review' | 'projects'>('all');
+  
+  const [scope, setScopeState] = useState<'all' | 'mine' | 'pending_review' | 'projects'>(() => (localStorage.getItem('tf_default_scope') as any) || 'all');
+  const [viewMode, setViewModeState] = useState<TaskViewMode>(() => (localStorage.getItem('tf_default_view') as TaskViewMode) || loadDefaultView());
+
+  const setScope = (s: any) => {
+    setScopeState(s);
+    localStorage.setItem('tf_default_scope', s);
+  };
+
+  const setViewMode = (v: TaskViewMode) => {
+    setViewModeState(v);
+    localStorage.setItem('tf_default_view', v);
+  };
+
   const [sortBy, setSortBy] = useState<SortOption>(loadDefaultSort());
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
-  const [viewMode, setViewMode] = useState<TaskViewMode>(loadDefaultView());
   const [showCreateProject, setShowCreateProject] = useState(false);
 
   const handleSetDefault = () => localStorage.setItem('tf_default_sort', sortBy);
@@ -605,17 +715,23 @@ function AdminTasksView() {
       setOpenSubtaskId(openId);
       const parentSub = subtasks.find(s => s.id === openId);
       if (parentSub) setExpanded(prev => new Set([...prev, parentSub.mainTaskId]));
-      navigate("/tasks", { replace: true });
     }
     const openTaskId = searchParams.get("openTask");
     if (openTaskId) {
       setExpanded(prev => new Set([...prev, openTaskId]));
-      navigate("/tasks", { replace: true });
+    }
+    
+    // Clear 'open' and 'openTask' params without affecting 'view' or 'scope'
+    if (openId || openTaskId) {
+       setSearchParams(prev => {
+         const next = new URLSearchParams(prev);
+         next.delete("open");
+         next.delete("openTask");
+         return next;
+       }, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => { localStorage.setItem('tf_default_view', viewMode); }, [viewMode]);
 
   const { wsTasks: teamTasks, wsMembers, workspace: teamWs } = useWorkspace();
   const activeUsers = wsMembers;
@@ -669,7 +785,7 @@ function AdminTasksView() {
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-0">
 
       {/* ── Toolbar — Primary Row ── */}
-      <motion.div variants={item} className="flex items-center gap-3 mb-3 flex-wrap">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-3 mb-3 flex-wrap">
         {/* View toggle */}
         <ViewToggle value={viewMode} onChange={setViewMode} />
 
@@ -677,35 +793,12 @@ function AdminTasksView() {
         <div className="w-px h-6 bg-border hidden sm:block" />
 
         {/* Scope toggle */}
-        <div className="flex items-center bg-muted/60 rounded-xl p-0.5 gap-0.5 border border-border/40">
-          <button onClick={() => setScope('mine')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${scope === 'mine' ? 'bg-card shadow-sm text-primary ring-1 ring-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'}`}>
-            Mine {mySubs.length > 0 && <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-bold ${scope === 'mine' ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'}`}>{mySubs.length}</span>}
-          </button>
-          <button onClick={() => setScope('all')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${scope === 'all' ? 'bg-card shadow-sm text-primary ring-1 ring-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'}`}>
-            All
-          </button>
-          <button onClick={() => setScope('pending_review')}
-            className={`relative px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${scope === 'pending_review'
-              ? 'bg-amber-500 text-white shadow-sm'
-              : pendingApprovalSubs.length > 0
-                ? 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'
-              }`}>
-            Review
-            {pendingApprovalSubs.length > 0 && (
-              <span className={`ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${scope === 'pending_review'
-                ? 'bg-white/30 text-white'
-                : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
-                }`}>{pendingApprovalSubs.length}</span>
-            )}
-          </button>
-          <button onClick={() => setScope('projects')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${scope === 'projects' ? 'bg-card shadow-sm text-primary ring-1 ring-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'}`}>
-            <span className="flex items-center gap-1"><FolderOpen className="w-3 h-3" /> Projects</span>
-          </button>
-        </div>
+        <ScopePicker
+          scope={scope}
+          setScope={setScope}
+          myCount={mySubs.length}
+          pendingCount={pendingApprovalSubs.length}
+        />
 
         <div className="flex-1" />
 
@@ -749,7 +842,7 @@ function AdminTasksView() {
 
       {/* ── Priority Filter Row (conditional) ── */}
       {scope === 'all' && (viewMode === 'list' || viewMode === 'compact') && (
-        <motion.div variants={item} className="mb-3">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="mb-3">
           <div className="flex items-center gap-1.5 overflow-x-auto">
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mr-1 hidden sm:inline">Priority</span>
             {(['all', ...PRIORITY_ORDER] as PriorityFilter[]).map(p => (
@@ -766,7 +859,7 @@ function AdminTasksView() {
       )}
 
       {/* Search */}
-      <motion.div variants={item} className="mb-4">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="mb-4">
         <div className="relative w-full">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input type="text"
@@ -786,29 +879,31 @@ function AdminTasksView() {
 
       {/* ── BOARD VIEW ── */}
       {viewMode === 'board' && scope === 'all' && (
-        <motion.div variants={item}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <MainTaskKanbanView
             mainTasks={tabFiltered}
             allSubtasks={teamSubtasks}
             users={activeUsers}
             onClickTask={id => { toggle(id); setViewMode('list'); }}
+            reminders={reminders.filter(r => r.isActive && (r.createdBy === currentUser?.id || r.recipientIds?.includes(currentUser?.id ?? '')))}
           />
         </motion.div>
       )}
       {viewMode === 'board' && scope === 'mine' && (
-        <motion.div variants={item}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <SubtaskKanbanView
             subtasks={filteredMySubs as SubTask[]}
             mainTasks={mainTasks}
             users={activeUsers}
             onClickSubtask={id => setOpenSubtaskId(id)}
+            reminders={reminders.filter(r => r.isActive && (r.createdBy === currentUser?.id || r.recipientIds?.includes(currentUser?.id ?? '')))}
           />
         </motion.div>
       )}
 
       {/* ── FOCUS VIEW ── */}
       {viewMode === 'focus' && (
-        <motion.div variants={item}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <TaskFocusView
             subtasks={scope === 'mine' ? mySubs : teamSubtasks}
             mainTasks={mainTasks}
@@ -820,7 +915,7 @@ function AdminTasksView() {
 
       {/* ── COMPACT VIEW ── */}
       {viewMode === 'compact' && (
-        <motion.div variants={item}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           {(() => {
             const compactPool = scope === 'mine' ? filteredMySubs : scope === 'pending_review' ? pendingApprovalSubs : (() => {
               const allSubs = tabFiltered.flatMap(mt => teamSubtasks.filter(s => s.mainTaskId === mt.id));
@@ -890,7 +985,7 @@ function AdminTasksView() {
 
       {/* ── PROJECTS VIEW ── */}
       {scope === 'projects' && (
-        <motion.div variants={item}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           {(() => {
             const wsProjects = projects.filter(p => p.workspaceId === teamWs?.id);
             if (wsProjects.length === 0) return (
@@ -952,7 +1047,7 @@ function AdminTasksView() {
 
       {viewMode === 'list' && scope === 'mine' && (
         <>
-          <motion.div variants={item} className="flex items-center gap-1 mb-4 border-b border-border pb-0 overflow-x-auto">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0 overflow-x-auto">
             {MY_STATUS_TABS.map(tab => {
               const isActive = myStatusFilter === tab.value;
               const count = tab.value === "all" ? mySubs.length : mySubs.filter(s => s.status === tab.value).length;
@@ -972,7 +1067,7 @@ function AdminTasksView() {
             })}
           </motion.div>
 
-          <motion.div variants={item}>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
             {filteredMySubs.length === 0 ? (
               <div className="text-center py-24 bg-card border border-border rounded-xl">
                 <p className="text-4xl mb-3">🎉</p>
@@ -1018,7 +1113,7 @@ function AdminTasksView() {
 
       {/* ── LIST VIEW: PENDING REVIEW ── */}
       {viewMode === 'list' && scope === 'pending_review' && (
-        <motion.div variants={item}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           {pendingApprovalSubs.length === 0 ? (
             <div className="text-center py-24 bg-card border border-border rounded-xl">
               <p className="text-4xl mb-3">✅</p>
@@ -1072,7 +1167,7 @@ function AdminTasksView() {
 
       {/* ── LIST VIEW: ALL TASKS ── */}
       {viewMode === 'list' && scope === 'all' && (<>
-        <motion.div variants={item} className="flex items-center gap-1 mb-4 border-b border-border pb-0">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0">
           {STATUS_TABS.map(tab => {
             const isActive = statusFilter === tab.value;
             const count = tab.value === "all" ? teamTasks.length
@@ -1095,7 +1190,7 @@ function AdminTasksView() {
           })}
         </motion.div>
 
-        <motion.div variants={item}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           {tabFiltered.length === 0 ? (
             <div className="text-center py-24 bg-card border border-border rounded-xl">
               <p className="text-4xl mb-3">📋</p>
@@ -1121,8 +1216,10 @@ function AdminTasksView() {
                     className={`bg-card border border-border rounded-xl overflow-hidden transition-colors border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority].border : 'border-l-transparent'
                       } hover:shadow-sm`}>
                     {/* Main task header */}
-                    <button onClick={() => toggle(mt.id)}
-                      className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-primary/5 transition-colors text-left">
+                    <div role="button" tabIndex={0}
+                      onClick={() => toggle(mt.id)}
+                      onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggle(mt.id)}
+                      className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-primary/5 transition-colors text-left cursor-pointer">
                       <div className="text-muted-foreground flex-shrink-0">
                         {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                       </div>
@@ -1172,7 +1269,7 @@ function AdminTasksView() {
                       <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full flex items-center gap-1 w-max flex-shrink-0 ${sc.pillClass}`}>
                         {sc.label}
                       </span>
-                    </button>
+                    </div>
 
                     {/* Subtask rows */}
                     <AnimatePresence>
@@ -1268,7 +1365,7 @@ function AdminTasksView() {
 
       {/* ── BOARD VIEW: PENDING REVIEW (same as list) ── */}
       {viewMode === 'board' && scope === 'pending_review' && (
-        <motion.div variants={item}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <SubtaskKanbanView
             subtasks={pendingApprovalSubs}
             mainTasks={mainTasks}
@@ -1308,6 +1405,17 @@ function AdminTasksView() {
           getComments={getMainTaskComments}
           onPost={(text) => postComment(chatTaskId, chatTaskId, currentUser?.id ?? "", text)}
           onClose={() => setChatTaskId(null)}
+        />
+      )}
+
+      {showCreateProject && (
+        <CreateProjectDialog
+          onClose={() => setShowCreateProject(false)}
+          onSubmit={(payload) => createProject(payload)}
+          users={activeUsers}
+          currentUserId={currentUser?.id ?? ""}
+          teamId={teamWs?.id ?? ""}
+          workspaceId={teamWs?.id ?? ""}
         />
       )}
 
@@ -1393,7 +1501,7 @@ function UserTasksView() {
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-0">
 
       {/* Toolbar */}
-      <motion.div variants={item} className="flex items-center gap-2 mb-3 flex-wrap">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-2 mb-3 flex-wrap">
         <ViewToggle value={viewMode} onChange={setViewMode} />
 
         <div className="flex items-center bg-muted rounded-full p-0.5">
@@ -1439,7 +1547,7 @@ function UserTasksView() {
       </motion.div>
 
       {/* Search */}
-      <motion.div variants={item} className="mb-4">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="mb-4">
         <div className="relative w-full">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input type="text" placeholder="Search tasks…" value={search} onChange={e => setSearch(e.target.value)}
@@ -1451,7 +1559,7 @@ function UserTasksView() {
 
       {/* ── BOARD VIEW ── */}
       {viewMode === 'board' && (
-        <motion.div variants={item}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <SubtaskKanbanView
             subtasks={filtered as SubTask[]}
             mainTasks={mainTasks}
@@ -1463,7 +1571,7 @@ function UserTasksView() {
 
       {/* ── FOCUS VIEW ── */}
       {viewMode === 'focus' && (
-        <motion.div variants={item}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <TaskFocusView
             subtasks={pool}
             mainTasks={mainTasks}
@@ -1476,7 +1584,7 @@ function UserTasksView() {
       {/* ── LIST VIEW ── */}
       {viewMode === 'list' && (
         <>
-          <motion.div variants={item} className="flex items-center gap-1 mb-4 border-b border-border pb-0 overflow-x-auto">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0 overflow-x-auto">
             {STATUS_TABS.map(tab => {
               const isActive = statusFilter === tab.value;
               const count = tab.value === "all" ? pool.length : pool.filter(s => s.status === tab.value).length;
@@ -1496,7 +1604,7 @@ function UserTasksView() {
             })}
           </motion.div>
 
-          <motion.div variants={item}>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
             {filtered.length === 0 ? (
               <div className="text-center py-24 bg-card border border-border rounded-xl">
                 <p className="text-4xl mb-3">📋</p>
@@ -1582,38 +1690,38 @@ function AddSubtaskInline({ mainTaskId, users, onAdd, isPersonal }: {
   const accentRing = isPersonal ? 'focus:ring-violet-200 border-violet-200/60 dark:border-violet-800/40' : 'focus:ring-primary/20 border-primary/20';
 
   if (!open) return (
-    <button onClick={() => setOpen(true)} className={`flex items-center gap-1.5 text-xs ${accentColor} transition-colors`}>
-      <Plus className="w-3.5 h-3.5" /> Add subtask
+    <button onClick={() => setOpen(true)} className={`flex items-center gap-1.5 text-xs font-semibold ${accentColor} transition-colors`}>
+      <Plus className="w-4 h-4" /> Add Subtask
     </button>
   );
 
   return (
     <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-      className={`space-y-2.5 rounded-xl p-3 border flex-1 ${isPersonal ? 'bg-violet-50/50 dark:bg-violet-950/20 border-violet-200/60 dark:border-violet-800/40' : 'bg-primary/5 border-primary/20'}`}>
+      className={`space-y-3 rounded-xl p-4 border flex-1 shadow-sm w-full ${isPersonal ? 'bg-violet-50/50 dark:bg-violet-950/20 border-violet-200/60 dark:border-violet-800/40' : 'bg-primary/5 border-primary/20'}`}>
       <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Subtask title *"
         className={`w-full px-3 py-2 rounded-lg border text-sm bg-card text-foreground focus:outline-none focus:ring-2 ${accentRing}`} />
       <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Description (optional)"
         className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-muted focus:outline-none focus:ring-2 focus:ring-primary/20" />
-      <div className={`grid ${isPersonal ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${!isPersonal ? 'md:grid-cols-3' : ''} gap-3`}>
         {!isPersonal && (
           <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-border text-sm bg-muted focus:outline-none focus:ring-2 focus:ring-primary/20">
+            className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/20">
             <option value="">Unassigned</option>
             {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         )}
         <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
-          className="px-3 py-2 rounded-lg border border-border text-sm bg-muted focus:outline-none focus:ring-2 focus:ring-primary/20" />
+          className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/20" />
         <select value={priority ?? ''} onChange={e => setPriority(e.target.value ? e.target.value as TaskPriority : undefined)}
-          className="px-3 py-2 rounded-lg border border-border text-sm bg-muted focus:outline-none focus:ring-2 focus:ring-primary/20">
+          className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/20">
           <option value="">Priority…</option>
           {PRIORITY_ORDER.map(p => <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>)}
         </select>
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-2 justify-end pt-1">
+        <button onClick={() => setOpen(false)} className="px-4 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:bg-muted transition-colors">Cancel</button>
         <button onClick={handleAdd}
-          className={`px-4 py-1.5 rounded-lg text-xs font-medium hover:opacity-90 ${isPersonal ? 'bg-violet-600 text-white hover:bg-violet-500' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}>Add</button>
-        <button onClick={() => setOpen(false)} className="px-4 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted">Cancel</button>
+          className={`px-4 py-1.5 rounded-lg text-xs font-semibold hover:opacity-90 transition-colors shadow-sm ${isPersonal ? 'bg-violet-600 text-white hover:bg-violet-500' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}>Add Subtask</button>
       </div>
     </motion.div>
   );
@@ -2344,6 +2452,104 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
             <button type="submit" disabled={!title.trim()}
               className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
               Save Changes
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+/* ─── Create Project Dialog ────────────────────────────────────────────────── */
+function CreateProjectDialog({ onClose, onSubmit, users, currentUserId, teamId, workspaceId }: {
+  onClose: () => void;
+  onSubmit: (payload: any) => void;
+  users: AppUser[];
+  currentUserId: string;
+  teamId: string;
+  workspaceId: string;
+}) {
+  const [name, setName] = useState("");
+  const [serviceType, setServiceType] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [durationDays, setDurationDays] = useState("30");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    
+    onSubmit({
+      name: name.trim(),
+      serviceType: serviceType.trim() || 'General',
+      startDate: startDate || new Date().toISOString(),
+      durationDays: parseInt(durationDays) || 30,
+      teamId,
+      workspaceId,
+      createdBy: currentUserId,
+    });
+    
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.18 }}
+        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md overflow-y-auto max-h-[90vh]"
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+              <FolderOpen className="w-4.5 h-4.5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-foreground">New Project</h2>
+              <p className="text-[11px] text-muted-foreground">Create a new project</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">
+              Project Name <span className="text-red-400">*</span>
+            </label>
+            <input required autoFocus value={name} onChange={e => setName(e.target.value)}
+              placeholder="e.g. Website Redesign"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Service Type</label>
+            <input value={serviceType} onChange={e => setServiceType(e.target.value)}
+              placeholder="e.g. Engineering, Design..."
+              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Start Date</label>
+              <input type="date" required value={startDate} onChange={e => setStartDate(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Duration (Days)</label>
+              <input type="number" required min="1" value={durationDays} onChange={e => setDurationDays(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-border mt-6">
+            <button type="button" onClick={onClose}
+              className="px-5 py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</button>
+            <button type="submit" disabled={!name.trim() || !startDate}
+              className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+              Create Project
             </button>
           </div>
         </form>

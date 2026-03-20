@@ -278,3 +278,66 @@
   border-color:     rgb(51 65 85) !important;
   color:            rgb(226 232 240) !important;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   SEMANTIC COLOR TOKENS — Tailwind v4
+   bg-card, bg-background, text-foreground, bg-muted, border-border etc.
+   depend on these CSS custom properties. Without them all surfaces
+   using semantic classes are transparent.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Light mode defaults ─────────────────────────────────────────────── */
+:root {
+  --color-background:    255 255 255;       /* white */
+  --color-foreground:    15  23  42;        /* slate-950 */
+  --color-card:          255 255 255;       /* white */
+  --color-card-foreground: 15 23 42;
+  --color-muted:         241 245 249;       /* slate-100 */
+  --color-muted-foreground: 100 116 139;    /* slate-500 */
+  --color-border:        226 232 240;       /* slate-200 */
+  --color-input:         226 232 240;
+  --color-ring:          99  102 241;       /* indigo-500 */
+  --color-primary:       99  102 241;       /* indigo-500 */
+  --color-primary-foreground: 255 255 255;
+  --color-secondary:     241 245 249;
+  --color-secondary-foreground: 15 23 42;
+  --color-accent:        241 245 249;
+  --color-accent-foreground: 15 23 42;
+  --color-destructive:   239 68  68;        /* red-500 */
+  --color-destructive-foreground: 255 255 255;
+}
+
+/* Tailwind v4 maps bg-background → background-color: rgb(var(--color-background))
+   We provide these as bare triplets so both syntaxes work. */
+.bg-background  { background-color: rgb(var(--color-background))  !important; }
+.bg-card        { background-color: rgb(var(--color-card))        !important; }
+.bg-muted       { background-color: rgb(var(--color-muted))       !important; }
+.text-foreground      { color: rgb(var(--color-foreground))           !important; }
+.text-muted-foreground { color: rgb(var(--color-muted-foreground))   !important; }
+.border-border  { border-color: rgb(var(--color-border))          !important; }
+.ring-ring      { --tw-ring-color: rgb(var(--color-ring));                      }
+/* bg-primary / text-primary keep TW defaults — they already resolve fine via indigo palette */
+
+/* ── Dark mode token overrides ──────────────────────────────────────── */
+.dark {
+  --color-background:      15  23  42;        /* slate-950 */
+  --color-foreground:     226 232 240;        /* slate-200 */
+  --color-card:            30  41  59;        /* slate-800 */
+  --color-card-foreground: 226 232 240;
+  --color-muted:           30  41  59;        /* slate-800 */
+  --color-muted-foreground: 100 116 139;      /* slate-500 */
+  --color-border:          51  65  85;        /* slate-700 */
+  --color-input:           51  65  85;
+  --color-ring:            99 102 241;
+  --color-accent:          30  41  59;
+  --color-accent-foreground: 226 232 240;
+}
+
+/* Force card-coloured surfaces opaque in dark mode */
+.dark .bg-card     { background-color: rgb(30 41 59)  !important; }  /* slate-800 */
+.dark .bg-background { background-color: rgb(15 23 42) !important; }  /* slate-950 */
+.dark .bg-muted    { background-color: rgb(30 41 59)  !important; }
+.dark .text-foreground  { color: rgb(226 232 240) !important; }
+.dark .text-muted-foreground { color: rgb(100 116 139) !important; }
+.dark .border-border    { border-color: rgb(51 65 85)  !important; }
+

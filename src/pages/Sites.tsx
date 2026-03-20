@@ -95,7 +95,7 @@ function ClientSummary() {
       "Client": r.client,
       "Site": r.name,
       "Team Size": r.teamSize,
-      "Total Cost (â‚¦)": r.cost.toFixed(2)
+      "Total Cost (₦)": r.cost.toFixed(2)
     })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Client Summary");
@@ -133,7 +133,7 @@ function ClientSummary() {
               <TableHead>Client</TableHead>
               <TableHead>Site Name</TableHead>
               <TableHead className="text-right">Staff Handled</TableHead>
-              <TableHead className="text-right">Total Cost (â‚¦)</TableHead>
+              <TableHead className="text-right">Total Cost (₦)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -143,7 +143,7 @@ function ClientSummary() {
                 <TableCell className="font-medium text-indigo-900">{r.client}</TableCell>
                 <TableCell>{r.name}</TableCell>
                 <TableCell className="text-right text-slate-500">{r.teamSize}</TableCell>
-                <TableCell className="text-right font-bold text-slate-700">â‚¦{r.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                <TableCell className="text-right font-bold text-slate-700">₦{r.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
               </TableRow>
             ))}
             {results.length === 0 && (
@@ -159,7 +159,7 @@ function ClientSummary() {
               <tr className="bg-slate-50/80 font-bold border-t-2">
                 <td colSpan={3} className="px-4 py-3 text-right">GRAND TOTAL:</td>
                 <td className="px-4 py-3 text-right text-slate-600">{results.reduce((s, r) => s + r.teamSize, 0)}</td>
-                <td className="px-4 py-3 text-right text-indigo-700 text-lg">â‚¦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-4 py-3 text-right text-indigo-700 text-lg">₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
             </tfoot>
           )}
@@ -192,7 +192,7 @@ export function Sites() {
     lines.push(`${name} is a dewatering project undertaken by DCEL on behalf of ${client}.`);
 
     if (q) {
-      // Phase 1 â€” Project Scope
+      // Phase 1 — Project Scope
       const p1 = q.phase1;
       if (p1.whatIsBeingBuilt) lines.push(`The project involves ${p1.whatIsBeingBuilt.toLowerCase()}.`);
       if (p1.excavationDepthMeters) lines.push(`Excavation is planned to a depth of ${p1.excavationDepthMeters} metres.`);
@@ -201,7 +201,7 @@ export function Sites() {
       const dataAvail = [p1.geotechnicalReportAvailable && 'geotechnical report', p1.hydrogeologicalDataAvailable && 'hydrogeological data'].filter(Boolean);
       if (dataAvail.length) lines.push(`Background data available at inquiry: ${dataAvail.join(' and ')}.`);
 
-      // Phase 2 â€” Site Assessment
+      // Phase 2 — Site Assessment
       const p2 = q.phase2;
       const visited = p2.siteVisited || p2.walkthroughCompleted;
       if (visited) lines.push(`A site visit and walkthrough were conducted to assess site conditions.`);
@@ -209,22 +209,22 @@ export function Sites() {
       if (p2.dischargeLocation) lines.push(`Dewatering discharge will be directed to ${p2.dischargeLocation}.`);
       if (p2.dieselSupplyStrategy) lines.push(`Diesel supply is to be provided by ${p2.dieselSupplyStrategy}.`);
 
-      // Phase 3 â€” Engineering
+      // Phase 3 — Engineering
       const p3 = q.phase3;
       const methods = (p3.dewateringMethods || []);
       if (methods.length) lines.push(`The approved dewatering method(s) for this site: ${methods.join(', ')}.`);
-      if (p3.totalWellpointsRequired) lines.push(`The system requires ${p3.totalWellpointsRequired} wellpoints across ${p3.totalHeadersRequired || 'â€”'} header pipes.`);
+      if (p3.totalWellpointsRequired) lines.push(`The system requires ${p3.totalWellpointsRequired} wellpoints across ${p3.totalHeadersRequired || '—'} header pipes.`);
       if (p3.totalPumpsRequired) lines.push(`A total of ${p3.totalPumpsRequired} pump(s) will be deployed.`);
       if (p3.expectedDailyDieselUsage) lines.push(`Daily diesel consumption is estimated at ${p3.expectedDailyDieselUsage}.`);
 
-      // Phase 4 â€” Commercial
+      // Phase 4 — Commercial
       const p4 = q.phase4;
       if (p4.scopeOfWorkSummary) lines.push(`Scope of work: ${p4.scopeOfWorkSummary}`);
       if (p4.scopeExclusionsSummary) lines.push(`Exclusions from scope: ${p4.scopeExclusionsSummary}`);
       if (p4.clientTaxStatus) lines.push(`Client tax classification is ${p4.clientTaxStatus}.`);
       if (p4.proposalAccepted) lines.push(`The client has formally accepted the proposal.`);
 
-      // Phase 5 â€” Handover
+      // Phase 5 — Handover
       const p5 = q.phase5;
       const milestones: string[] = [];
       if (p5.safetyPlanIntegrated) milestones.push('site safety plan integrated');
@@ -245,7 +245,7 @@ export function Sites() {
     return lines.join(' ');
   };
 
-  // â”€â”€ Permission checks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Permission checks ──────────────────────────────────────────
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const sitePriv = currentUser?.privileges?.sites;
   // Super-admin (no currentUser in store) gets full access
@@ -287,7 +287,7 @@ export function Sites() {
   const handleAdd = () => {
     if (!addForm.name || !addForm.client) { setAddError('Site name and client are required.'); return; }
     if (isDuplicate(addForm.name, addForm.client)) {
-      setAddError(`"${addForm.client} â€“ ${addForm.name}" already exists. Client + Site combination must be unique.`);
+      setAddError(`"${addForm.client} – ${addForm.name}" already exists. Client + Site combination must be unique.`);
       return;
     }
     
@@ -338,7 +338,7 @@ export function Sites() {
     if (!editingId) return;
     if (!editForm.name || !editForm.client) return;
     if (isDuplicate(editForm.name, editForm.client, editingId)) {
-      toast.error(`"${editForm.client} â€“ ${editForm.name}" already exists. Client + Site must be unique.`);
+      toast.error(`"${editForm.client} – ${editForm.name}" already exists. Client + Site must be unique.`);
       return;
     }
     // Auto status based on end date
@@ -853,7 +853,7 @@ export function Sites() {
         </DialogFooter>
       </Dialog>
 
-      {/* â”€â”€ Site Narrative Info Modal â”€â”€ */}
+      {/* ── Site Narrative Info Modal ── */}
       {narrativeSite && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">

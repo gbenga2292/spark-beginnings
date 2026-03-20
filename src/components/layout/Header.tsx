@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/src/store/auth';
 import { useUserStore, UserPrivileges } from '@/src/store/userStore';
 import { useAppStore } from '@/src/store/appStore';
+import { useAppData } from '@/src/contexts/AppDataContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
 import { Button } from '@/src/components/ui/button';
 import { useTheme } from '@/src/hooks/useTheme';
@@ -41,6 +42,7 @@ const ALL_SEARCH_ITEMS: SearchItem[] = [
 // Generate notifications from app data
 function useNotifications() {
   const { employees, attendanceRecords, leaves, pendingInvoices } = useAppStore();
+  const { reminders } = useAppData();
 
   return useMemo(() => {
     const notifs: { id: string; icon: any; text: string; time: string; color: string }[] = [];
@@ -70,8 +72,30 @@ function useNotifications() {
       notifs.push({ id: `emp-${e.id}`, icon: Users, text: `${e.firstname} ${e.surname} is active`, time: e.startDate, color: 'text-emerald-500' });
     });
 
+    // Active Reminders due in next 24h or overdue
+    const now = new Date();
+    const activeRems = reminders.filter(r => {
+      if (!r.isActive) return false;
+      const remDate = new Date(r.remindAt);
+      const diffHrs = (remDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+      // Show if overdue or within 24 hours
+      return diffHrs <= 24;
+    });
+    activeRems.forEach((r) => {
+      const remDate = new Date(r.remindAt);
+      const isPast = remDate < now;
+      notifs.push({ 
+        id: `rem-${r.id}`, 
+        icon: Bell, 
+        text: `Reminder: ${r.title}`, 
+        time: isPast ? 'Overdue' : r.remindAt.slice(0, 10), 
+        color: isPast ? 'text-red-500' : 'text-indigo-500' 
+      });
+    });
+
+    // Sort by id to keep deterministic roughly, or just rely on current push order
     return notifs.slice(0, 8);
-  }, [employees, attendanceRecords, leaves, pendingInvoices]);
+  }, [employees, attendanceRecords, leaves, pendingInvoices, reminders]);
 }
 
 export function Header({ onMenuClick }: HeaderProps) {

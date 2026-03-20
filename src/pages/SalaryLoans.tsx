@@ -139,7 +139,7 @@ export function SalaryLoans() {
                   {salaryAdvances.map(sa => (
                     <TableRow key={sa.id} className="hover:bg-slate-50/50">
                       <TableCell className="font-medium px-6 text-slate-900">{sa.employeeName}</TableCell>
-                      <TableCell className="font-mono font-medium text-slate-700">â‚¦{(priv as any)?.canViewAmounts === false ? '***' : sa.amount.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono font-medium text-slate-700">₦{(priv as any)?.canViewAmounts === false ? '***' : sa.amount.toLocaleString()}</TableCell>
                       <TableCell className="text-slate-500 text-sm">{sa.requestDate}</TableCell>
                       <TableCell>{getStatusBadge(sa.status)}</TableCell>
                     </TableRow>
@@ -180,7 +180,7 @@ export function SalaryLoans() {
                           <span className="text-[10px] uppercase tracking-wider text-slate-400 mt-0.5 font-semibold">{ln.loanType}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="font-mono font-medium text-slate-700">â‚¦{(priv as any)?.canViewAmounts === false ? '***' : ln.principalAmount.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono font-medium text-slate-700">₦{(priv as any)?.canViewAmounts === false ? '***' : ln.principalAmount.toLocaleString()}</TableCell>
                       <TableCell className="text-slate-500 text-sm">{ln.paymentStartDate}</TableCell>
                       <TableCell className="text-slate-500 text-sm">{ln.duration} mos</TableCell>
                       <TableCell>{getStatusBadge(ln.status)}</TableCell>
@@ -260,7 +260,7 @@ export function SalaryLoans() {
               >
                 <option value="">Choose an employee...</option>
                 {employees.map(emp => (
-                  <option key={emp.id} value={emp.id}>{emp.surname} {emp.firstname} â€” {emp.position}</option>
+                  <option key={emp.id} value={emp.id}>{emp.surname} {emp.firstname} — {emp.position}</option>
                 ))}
               </select>
             </div>
@@ -268,7 +268,7 @@ export function SalaryLoans() {
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <Banknote className="h-4 w-4 text-slate-400" /> Amount (â‚¦)
+                  <Banknote className="h-4 w-4 text-slate-400" /> Amount (₦)
                 </label>
                 <Input
                   type="number"

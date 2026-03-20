@@ -72,7 +72,7 @@ export function Login() {
 
   return (
     <div className="min-h-full flex">
-      {/* â”€â”€ Left Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Left Panel ─────────────────────────────────────────── */}
       <div className="hidden lg:flex lg:w-[55%] bg-gradient-to-br from-[#0d1b3e] via-[#0f2260] to-[#0d1b3e] relative overflow-hidden flex-col justify-between">
 
         {/* Decorative blobs */}
@@ -105,7 +105,7 @@ export function Login() {
               <span className="text-slate-300 text-3xl xl:text-4xl">Etc Limited</span>
             </h1>
             <p className="text-slate-400 text-base xl:text-lg max-w-sm leading-relaxed">
-              A complete HR &amp; finance platform purpose-built for DCEL's operations â€” from payroll to invoicing, all in one place.
+              A complete HR &amp; finance platform purpose-built for DCEL's operations — from payroll to invoicing, all in one place.
             </p>
           </div>
 
@@ -133,7 +133,7 @@ export function Login() {
         <div className="relative z-10 h-1 bg-gradient-to-r from-indigo-500 via-purple-400 to-blue-500" />
       </div>
 
-      {/* â”€â”€ Right Panel (Form) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Right Panel (Form) ──────────────────────────────────── */}
       <div className="w-full lg:w-[45%] flex items-center justify-center px-6 py-12 sm:px-12 bg-white">
         <div className="w-full max-w-[400px]">
 

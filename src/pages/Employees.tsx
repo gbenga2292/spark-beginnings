@@ -11,6 +11,7 @@ import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useRedaction } from '@/src/hooks/useRedaction';
 import { Dialog } from '@/src/components/ui/dialog';
+import { useAppData } from '@/src/contexts/AppDataContext';
 
 const POSITION_HIERARCHY = [
   'CEO',
@@ -35,7 +36,7 @@ const POSITION_HIERARCHY = [
 
 export function Employees() {
   const [activeTab, setActiveTab] = useState<'Active' | 'Delisted'>('Active');
-  const [detailTab, setDetailTab] = useState<'Overview' | 'Attendance' | 'Leaves' | 'Disciplinary' | 'Evaluations'>('Overview');
+  const [detailTab, setDetailTab] = useState<'Overview' | 'Attendance' | 'Leaves' | 'Disciplinary' | 'Evaluations' | 'Reminders'>('Overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -54,8 +55,9 @@ export function Employees() {
   const addDepartment = useAppStore((state) => state.addDepartment);
   const disciplinaryRecords = useAppStore((state) => state.disciplinaryRecords);
   const evaluations = useAppStore((state) => state.evaluations);
+  const { reminders } = useAppData();
 
-  // â”€â”€â”€ Permissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('employees');
   const canSeeSalary = useRedaction('employees');
 
@@ -450,7 +452,7 @@ export function Employees() {
           <Card className="shadow-sm border-slate-200">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100 flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-slate-800">Monthly Salary Matrix (â‚¦)</CardTitle>
+                <CardTitle className="text-slate-800">Monthly Salary Matrix (₦)</CardTitle>
                 <CardDescription className="mt-1">Define gross monthly salary dynamically. Subject to revision.</CardDescription>
               </div>
               <Button variant="outline" size="sm" className="bg-white shadow-sm" onClick={() => {
@@ -473,7 +475,7 @@ export function Employees() {
                   <div key={month} className="space-y-1">
                     <label className="text-xs font-bold uppercase text-slate-500">{month}</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2 text-slate-400 font-medium">â‚¦</span>
+                      <span className="absolute left-3 top-2 text-slate-400 font-medium">₦</span>
                       <Input type="number" value={formData.monthlySalaries?.[month as keyof MonthlySalary] || ''} onChange={e => setFormData({ ...formData, monthlySalaries: { ...formData.monthlySalaries!, [month]: parseFloat(e.target.value) || 0 } })} className="font-mono text-sm pl-7 bg-slate-50 focus:bg-white" />
                     </div>
                   </div>
@@ -535,7 +537,7 @@ export function Employees() {
                   <Input value={formData.pensionNumber || ''} onChange={e => setFormData({ ...formData, pensionNumber: e.target.value })} className="font-mono bg-slate-50 focus:bg-white" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Rent (â‚¦)</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Rent (₦)</label>
                   <Input type="number" value={formData.rent || 0} onChange={e => setFormData({ ...formData, rent: Number(e.target.value) })} className="font-mono bg-slate-50 focus:bg-white" />
                 </div>
               </div>
@@ -605,7 +607,7 @@ export function Employees() {
             </div>
 
             <div className="flex bg-slate-100 rounded-lg p-1 mb-6">
-              {['Overview', 'Attendance', 'Leaves', 'Disciplinary', 'Evaluations'].map(tab => (
+              {['Overview', 'Attendance', 'Leaves', 'Disciplinary', 'Evaluations', 'Reminders'].map(tab => (
                 <button
                   key={tab}
                   className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${detailTab === tab ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -651,19 +653,66 @@ export function Employees() {
                         {Object.entries(emp.monthlySalaries).map(([month, amount]) => (
                           <div key={month} className="flex justify-between">
                             <span className="text-slate-500 uppercase text-xs">{month}:</span>
-                            <span className="font-mono">â‚¦{amount.toLocaleString()}</span>
+                            <span className="font-mono">₦{amount.toLocaleString()}</span>
                           </div>
                         ))}
                       </div>
                       <div className="border-t border-slate-200 pt-3 flex justify-between items-center">
                         <span className="font-semibold">Annual Total:</span>
-                        <span className="text-xl font-bold text-indigo-600">â‚¦{totalSalary.toLocaleString()}</span>
+                        <span className="text-xl font-bold text-indigo-600">₦{totalSalary.toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
                 )}
               </>
             )}
+
+            {detailTab === 'Reminders' && (() => {
+               const empReminders = reminders.filter(r => r.title.includes(emp.firstname) && r.title.includes(emp.surname));
+               return (
+                 <div className="space-y-4">
+                   <div className="flex justify-between items-center bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                     <div>
+                       <h4 className="text-indigo-800 font-bold text-sm">Active & Past Reminders</h4>
+                       <p className="text-xs text-indigo-600">Tasks and events tied to {emp.firstname}.</p>
+                     </div>
+                   </div>
+                   {empReminders.length === 0 ? (
+                     <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                        <p className="text-slate-500 font-medium">No system reminders tied to this employee.</p>
+                     </div>
+                   ) : (
+                     <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                       <Table>
+                         <TableHeader>
+                           <TableRow className="bg-slate-50/50">
+                             <TableHead>Reminder Title</TableHead>
+                             <TableHead>Trigger Date</TableHead>
+                             <TableHead>Status</TableHead>
+                           </TableRow>
+                         </TableHeader>
+                         <TableBody>
+                           {empReminders.map(r => {
+                             const isPast = new Date(r.remindAt) < new Date();
+                             return (
+                               <TableRow key={r.id} className="hover:bg-slate-50/80">
+                                 <TableCell className="font-semibold text-slate-800 text-xs">{r.title}</TableCell>
+                                 <TableCell className="font-mono text-[11px] text-slate-500">{new Date(r.remindAt).toLocaleString()}</TableCell>
+                                 <TableCell>
+                                   <Badge variant="outline" className={`text-[10px] ${r.isActive ? (isPast ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-indigo-50 text-indigo-600 border-indigo-200') : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                     {!r.isActive ? 'Dismissed' : (isPast ? 'Overdue' : 'Pending')}
+                                   </Badge>
+                                 </TableCell>
+                               </TableRow>
+                             );
+                           })}
+                         </TableBody>
+                       </Table>
+                     </div>
+                   )}
+                 </div>
+               );
+            })()}
 
             {detailTab === 'Attendance' && (
               <div className="text-center py-10 bg-slate-50 rounded-lg border border-slate-100">
@@ -789,7 +838,7 @@ export function Employees() {
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div>
                       <h4 className="font-bold text-slate-800 text-lg">{emp.surname} {emp.firstname}</h4>
-                      <p className="text-sm text-slate-500">{viewingNarrative.data.date} â€¢ {viewingNarrative.data.type}</p>
+                      <p className="text-sm text-slate-500">{viewingNarrative.data.date} • {viewingNarrative.data.type}</p>
                     </div>
                     <Badge variant={viewingNarrative.data.severity.includes('Warning') ? 'warning' : 'destructive'}>{viewingNarrative.data.severity}</Badge>
                   </div>
@@ -813,7 +862,7 @@ export function Employees() {
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div>
                       <h4 className="font-bold text-slate-800 text-lg">{emp.surname} {emp.firstname}</h4>
-                      <p className="text-sm text-slate-500">{viewingNarrative.data.date} â€¢ {viewingNarrative.data.type}</p>
+                      <p className="text-sm text-slate-500">{viewingNarrative.data.date} • {viewingNarrative.data.type}</p>
                     </div>
                     <span className={`text-xl font-bold ${viewingNarrative.data.overallScore >= 70 ? 'text-emerald-600' : viewingNarrative.data.overallScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}>
                       {viewingNarrative.data.overallScore}%

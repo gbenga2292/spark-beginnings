@@ -17,7 +17,7 @@ export function Payments() {
     const deletePayment = useAppStore((state) => state.deletePayment);
     const vatRate = useAppStore((state) => state.payrollVariables.vatRate);
 
-    // â”€â”€â”€ Permissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Permissions ───────────────────────────────────────────
     const priv = usePriv('payments');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -316,11 +316,11 @@ export function Payments() {
                                     <TableHead className="font-semibold px-4 py-3">Date</TableHead>
                                     <TableHead className="font-semibold px-4 py-3">Client</TableHead>
                                     <TableHead className="font-semibold px-4 py-3">Site</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-right">Amount (â‚¦)</TableHead>
+                                    <TableHead className="font-semibold px-4 py-3 text-right">Amount (₦)</TableHead>
                                     <TableHead className="font-semibold px-4 py-3 text-right text-slate-500">WHT</TableHead>
                                     <TableHead className="font-semibold px-4 py-3 text-right text-slate-500">Discount</TableHead>
                                     <TableHead className="font-semibold px-4 py-3 text-center">VAT Policy</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-right">VAT (â‚¦)</TableHead>
+                                    <TableHead className="font-semibold px-4 py-3 text-right">VAT (₦)</TableHead>
                                     <TableHead className="font-semibold px-4 py-3 text-right">Amt For VAT</TableHead>
                                     <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">Actions</TableHead>
                                 </TableRow>
@@ -400,7 +400,7 @@ export function Payments() {
                                     <Input type="date" value={form.date} onChange={e => handleChange('date', e.target.value)} className="bg-slate-50 h-11" />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Amount (â‚¦)</label>
+                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Amount (₦)</label>
                                     <Input type="number" min="0" value={form.amount} onChange={e => handleChange('amount', e.target.value)} className="bg-slate-50 font-mono font-semibold text-lg text-emerald-700 h-11" />
                                 </div>
                             </div>
@@ -454,11 +454,11 @@ export function Payments() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="flex flex-col">
                                             <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Gross Payment</span>
-                                            <span className="font-mono text-slate-200 font-medium text-sm">â‚¦{priv?.canViewAmounts === false ? '***' : livePreview.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            <span className="font-mono text-slate-200 font-medium text-sm">₦{priv?.canViewAmounts === false ? '***' : livePreview.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
                                         <div className="flex flex-col border-l border-slate-700 pl-4">
                                             <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Tax Component (VAT {livePreview.payVat})</span>
-                                            <span className="font-mono text-indigo-400 font-medium text-sm">â‚¦{priv?.canViewAmounts === false ? '***' : livePreview.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            <span className="font-mono text-indigo-400 font-medium text-sm">₦{priv?.canViewAmounts === false ? '***' : livePreview.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
                                     </div>
                                 </div>

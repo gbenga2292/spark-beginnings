@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { useAppStore } from '@/src/store/appStore';
+import { useAppData } from '@/src/contexts/AppDataContext';
 import {
     Users, AlertCircle, Clock, UserPlus, CheckCircle2, Filter,
     UserX, CalendarOff, FileText, Briefcase, TrendingUp, MapPin,
@@ -55,13 +56,14 @@ export function Dashboard() {
     const salaryAdvances = useAppStore((state) => state.salaryAdvances);
     const loans = useAppStore((state) => state.loans);
     const sites = useAppStore((state) => state.sites);
+    const { reminders } = useAppData();
 
     const currentDate = new Date();
 
     const [filterYear, setFilterYear] = useState<number>(currentDate.getFullYear());
     const [filterMonth, setFilterMonth] = useState<number | null>(currentDate.getMonth() + 1);
 
-    // â”€â”€ TOP KPI CARDS â”€â”€
+    // ── TOP KPI CARDS ──
     const kpiStats = useMemo(() => {
         const activeStaff = employees.filter(e => e.status === 'Active');
         const onLeave = employees.filter(e => e.status === 'On Leave');
@@ -123,7 +125,7 @@ export function Dashboard() {
         };
     }, [employees, attendanceRecords, holidays, filterMonth, filterYear, invoices, leaves, salaryAdvances, loans, sites]);
 
-    // â”€â”€ DEPARTMENT BREAKDOWN â”€â”€
+    // ── DEPARTMENT BREAKDOWN ──
     const deptData = useMemo(() => {
         const deptMap: Record<string, number> = {};
         employees.filter(e => e.status === 'Active').forEach(emp => {
@@ -133,7 +135,7 @@ export function Dashboard() {
         return Object.entries(deptMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
     }, [employees]);
 
-    // â”€â”€ MONTHLY ATTENDANCE & OT TREND â”€â”€
+    // ── MONTHLY ATTENDANCE & OT TREND ──
     const attendanceTrend = useMemo(() => {
         return MONTHS.map(m => {
             const activeStaff = employees.filter(e => e.status === 'Active');
@@ -153,7 +155,7 @@ export function Dashboard() {
         });
     }, [employees, attendanceRecords, holidays, filterYear]);
 
-    // â”€â”€ HEADCOUNT GROWTH â”€â”€
+    // ── HEADCOUNT GROWTH ──
     const headcountChartData = useMemo(() => {
         return MONTHS.map((m) => {
             const endOfMonthTimestamp = new Date(filterYear, m.value, 0).getTime();
@@ -169,7 +171,7 @@ export function Dashboard() {
         });
     }, [employees, filterYear]);
 
-    // â”€â”€ SITE STAFFING â”€â”€
+    // ── SITE STAFFING ──
     const siteStaffing = useMemo(() => {
         const siteMap: Record<string, number> = {};
         employees.filter(e => e.status === 'Active').forEach(emp => {
@@ -179,7 +181,7 @@ export function Dashboard() {
         return Object.entries(siteMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8);
     }, [employees]);
 
-    // â”€â”€ LEAVE TYPE BREAKDOWN â”€â”€
+    // ── LEAVE TYPE BREAKDOWN ──
     const leaveBreakdown = useMemo(() => {
         const typeMap: Record<string, number> = {};
         leaves.forEach(l => {
@@ -194,7 +196,7 @@ export function Dashboard() {
         return Object.entries(typeMap).map(([name, value]) => ({ name, value }));
     }, [leaves, filterYear, filterMonth]);
 
-    // â”€â”€ ALERTS â”€â”€
+    // ── ALERTS ──
     const alerts = useMemo(() => {
         const ALERTS: { type: 'warning' | 'info' | 'urgent', msg: string }[] = [];
 
@@ -216,15 +218,26 @@ export function Dashboard() {
         }
 
         if (kpiStats.attendanceRate < 70 && kpiStats.totalPossibleDays > 0) {
-            ALERTS.push({ type: 'urgent', msg: `Low attendance rate: ${kpiStats.attendanceRate}% â€” review staffing.` });
+            ALERTS.push({ type: 'urgent', msg: `Low attendance rate: ${kpiStats.attendanceRate}% — review staffing.` });
         }
+
+        const activeRems = reminders.filter(r => r.isActive);
+        activeRems.forEach(r => {
+            const remDate = new Date(r.remindAt);
+            const diffHrs = (remDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60);
+            if (diffHrs <= 24 && diffHrs > 0) {
+                ALERTS.push({ type: 'warning', msg: `Reminder: ${r.title} is due soon.` });
+            } else if (diffHrs <= 0) {
+                ALERTS.push({ type: 'urgent', msg: `Overdue Reminder: ${r.title}.` });
+            }
+        });
 
         if (ALERTS.length === 0) {
             ALERTS.push({ type: 'info', msg: 'No pending critical actions. Systems nominal.' });
         }
 
         return ALERTS;
-    }, [holidays, currentDate, kpiStats]);
+    }, [holidays, currentDate, kpiStats, reminders]);
 
     const availableYears = Array.from({ length: Math.max(filterYear - 2023 + 1, 5) }, (_, i) => 2023 + i).reverse();
 

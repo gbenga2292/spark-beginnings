@@ -15,7 +15,7 @@ import { TaskDetailSheet } from "@/src/components/tasks/TaskDetailSheet";
 import type { TaskPriority } from "@/src/types/tasks";
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } };
-const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] } } };
+const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] } } };
 
 const statusConfig = {
   not_started: { label: "Not Started", pillClass: "chip-pending", icon: Circle },

@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 
-// â”€â”€â”€ Default blank checklist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Default blank checklist ──────────────────────────────────
 function makeDefaultChecklist(noOfGuarantors: number): OnboardingChecklist {
   return {
     emailFormsSent: false,
@@ -43,8 +43,8 @@ function makeDefaultChecklist(noOfGuarantors: number): OnboardingChecklist {
   };
 }
 
-// â”€â”€â”€ Completion predicates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”€â”€ "Done" = compulsory fields complete (verified checks are optional/advisory)
+// ─── Completion predicates ────────────────────────────────────
+// ── "Done" = compulsory fields complete (verified checks are optional/advisory)
 const task1Done = (cl: OnboardingChecklist) => cl.emailFormsSent && cl.emailFormsAcknowledged;
 const task21Done = (cl: OnboardingChecklist) => cl.guarantorFormsReturned;
 const task22Done = (cl: OnboardingChecklist) => cl.personalEmployeeFormReturned;
@@ -64,13 +64,13 @@ const task5Done = (cl: OnboardingChecklist) => cl.employmentLettersIssued;
 const allCriticalDone = (cl: OnboardingChecklist) =>
   task1Done(cl) && task2Done(cl) && task3Done(cl) && task4Done(cl) && task5Done(cl);
 
-// Advisory "fully verified" helpers (show pending badge only â€” don't block)
+// Advisory "fully verified" helpers (show pending badge only — don't block)
 const task31FullyVerified = (cl: OnboardingChecklist) => cl.guarantors.every(g => g.verified);
 const task32AccVerified = (cl: OnboardingChecklist) => cl.accountDetailsVerified;
 const task32PensionVerified = (cl: OnboardingChecklist) => cl.pensionVerified;
 const task32PayeVerified = (cl: OnboardingChecklist) => cl.payeVerified;
 
-// â”€â”€â”€ UI: Section wrapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── UI: Section wrapper ──────────────────────────────────────
 function Section({
   icon: Icon, label, color, children, defaultOpen = true, locked = false, lockMsg,
 }: {
@@ -102,7 +102,7 @@ function Section({
   );
 }
 
-// â”€â”€â”€ UI: Subsection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── UI: Subsection ───────────────────────────────────────────
 function SubSection({
   label, children, locked = false, lockMsg, done = false,
 }: {
@@ -136,7 +136,7 @@ function SubSection({
   );
 }
 
-// â”€â”€â”€ UI: Checkbox row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── UI: Checkbox row ─────────────────────────────────────────
 function CheckRow({ label, checked, onChange, disabled, hint }: {
   label: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean; hint?: string;
 }) {
@@ -162,7 +162,7 @@ function CheckRow({ label, checked, onChange, disabled, hint }: {
   );
 }
 
-// â”€â”€â”€ UI: Labeled Input â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── UI: Labeled Input ────────────────────────────────────────
 function LabeledInput({ label, value, onChange, placeholder, type = 'text', disabled }: {
   label: string; value: string; onChange: (v: string) => void;
   placeholder?: string; type?: string; disabled?: boolean;
@@ -182,14 +182,14 @@ function LabeledInput({ label, value, onChange, placeholder, type = 'text', disa
   );
 }
 
-// â”€â”€â”€ Status badge helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Status badge helper ──────────────────────────────────────
 function DoneBadge({ done }: { done: boolean }) {
   return done
     ? <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 flex items-center gap-1"><Check className="h-2.5 w-2.5" />Done</span>
     : <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 flex items-center gap-1"><Clock className="h-2.5 w-2.5" />Pending</span>;
 }
 
-// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main Component ───────────────────────────────────────────
 export function Onboarding() {
   const employees = useAppStore(s => s.employees);
   const updateEmployee = useAppStore(s => s.updateEmployee);
@@ -197,14 +197,14 @@ export function Onboarding() {
   const positions = useAppStore(s => s.positions);
   const priv = usePriv('onboarding');
   const navigate = useNavigate();
-  const { createMainTask, subtasks, updateSubtaskStatus } = useAppData();
+  const { createMainTask, subtasks, updateSubtaskStatus, addReminder } = useAppData();
   const { user } = useAuth();
 
   const [leftTab, setLeftTab] = useState<'Active' | 'Pending' | 'Terminated'>('Active');
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
 
-  // â”€â”€ Edit pending employee modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Edit pending employee modal ───────────────────────────
   const [editEmp, setEditEmp] = useState<Employee | null>(null);
   const openEdit = (emp: Employee, e: React.MouseEvent) => { e.stopPropagation(); setEditEmp({ ...emp }); };
   const closeEdit = () => setEditEmp(null);
@@ -235,14 +235,14 @@ export function Onboarding() {
     toast.success('Employee details updated.');
     closeEdit();
   };
-  // â”€â”€ Suspend / Resume toggle for Onboarding employees â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Suspend / Resume toggle for Onboarding employees ─────────────
   const handleSuspendToggle = (emp: Employee, e: React.MouseEvent) => {
     e.stopPropagation();
     const suspending = !emp.onboardingSuspended;
     updateEmployee(emp.id, { onboardingSuspended: suspending });
     toast.info(suspending
-      ? `${emp.firstname} ${emp.surname}â€™s onboarding has been suspended.`
-      : `${emp.firstname} ${emp.surname}â€™s onboarding has been resumed.`
+      ? `${emp.firstname} ${emp.surname}’s onboarding has been suspended.`
+      : `${emp.firstname} ${emp.surname}’s onboarding has been resumed.`
     );
   };
 
@@ -279,7 +279,7 @@ export function Onboarding() {
     else if (emp.status === 'Terminated') setActiveTaskType('Offboarding');
   };
 
-  // â”€â”€ Active checklist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Active checklist ──────────────────────────────────────
   const cl: OnboardingChecklist = useMemo(() => {
     if (!selectedEmployee) return makeDefaultChecklist(1);
     return selectedEmployee.onboardingChecklist ?? makeDefaultChecklist(selectedEmployee.noOfGuarantors ?? 1);
@@ -298,7 +298,7 @@ export function Onboarding() {
 
   const criticalDone = allCriticalDone(cl);
 
-  // â”€â”€ Computed unlock flags â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Computed unlock flags ─────────────────────────────────
   const t1Done = task1Done(cl);
   const t2Unlocked = t1Done;
   const t21Done = task21Done(cl);
@@ -308,7 +308,7 @@ export function Onboarding() {
   const t23Done = task23Done(cl);
   const t2FullDone = cl.formsReturned && t21Done && t22Done && t23Done;
   const t3Unlocked = t1Done && t2FullDone;
-  // Within task 3 â€” unlock by compulsory fields only, verified badges are advisory
+  // Within task 3 — unlock by compulsory fields only, verified badges are advisory
   const t31Done = task31Done(cl);        // name+phone filled
   const t32DocsDone = task32DocsDone(cl);
   const t32Docs2Unlocked = t31Done;      // docs section after guarantors filled
@@ -328,10 +328,10 @@ export function Onboarding() {
   const pensionVerified = task32PensionVerified(cl);
   const payeVerified = task32PayeVerified(cl);
 
-  // â”€â”€ Activate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Activate ──────────────────────────────────────────────
   const handleActivate = async () => {
     if (!selectedEmployee) return;
-    if (!criticalDone) { toast.error('Complete all required tasks (1â€“5) before activation.'); return; }
+    if (!criticalDone) { toast.error('Complete all required tasks (1–5) before activation.'); return; }
     const ok = await showConfirm(
       `Activate ${selectedEmployee.firstname} ${selectedEmployee.surname}? Verified start date (${cl.verifiedStartDate}) will become their official start date.`,
       { confirmLabel: 'Activate Employee' }
@@ -340,23 +340,24 @@ export function Onboarding() {
 
     const startDate = cl.verifiedStartDate || selectedEmployee.startDate;
     
-    // Auto-spawn probation evaluation task if applicable
-    if (selectedEmployee.probationPeriod && selectedEmployee.probationPeriod > 0 && createMainTask && user) {
+    // Auto-spawn probation evaluation reminder if applicable
+    if (selectedEmployee.probationPeriod && selectedEmployee.probationPeriod > 0 && addReminder && user) {
       const evaluationDate = new Date(startDate);
       evaluationDate.setDate(evaluationDate.getDate() + selectedEmployee.probationPeriod);
+      evaluationDate.setHours(8, 0, 0, 0);
       try {
-        await createMainTask(
-          {
-            title: `Probation Evaluation: ${selectedEmployee.firstname} ${selectedEmployee.surname}`,
-            description: `Auto-generated reminder to conduct a ${selectedEmployee.probationPeriod}-day probation evaluation for ${selectedEmployee.firstname} ${selectedEmployee.surname}.`,
-            assignedTo: user.id,
-            priority: 'medium',
-            deadline: evaluationDate.toISOString()
-          },
-          []
-        );
+        await addReminder({
+          title: `Probation Evaluation: ${selectedEmployee.firstname} ${selectedEmployee.surname}`,
+          body: `Reminder to conduct a ${selectedEmployee.probationPeriod}-day probation evaluation for ${selectedEmployee.firstname} ${selectedEmployee.surname} (${selectedEmployee.department} - ${selectedEmployee.position}).`,
+          remindAt: evaluationDate.toISOString(),
+          frequency: 'once',
+          recipientIds: [user.id],
+          createdBy: user.id,
+          isActive: true,
+          sendEmail: false
+        });
       } catch (e) {
-        console.error("Failed to create probation evaluation task", e);
+        console.error("Failed to create probation evaluation reminder", e);
       }
     }
 
@@ -430,7 +431,7 @@ export function Onboarding() {
       {/* Main Split */}
       <div className="grid gap-6 md:grid-cols-12 items-start">
 
-        {/* â”€â”€ Left Column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Left Column ────────────────────────────────── */}
         <Card className="md:col-span-5 lg:col-span-4 border-none shadow-sm bg-white overflow-hidden flex flex-col h-[720px]">
           <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4 px-5 space-y-3">
             <CardTitle className="text-base font-bold text-slate-800 flex items-center justify-between">
@@ -592,7 +593,7 @@ export function Onboarding() {
           </CardContent>
         </Card>
 
-        {/* â”€â”€ Right Column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Right Column ───────────────────────────────── */}
         <Card className="md:col-span-7 lg:col-span-8 border-none shadow-lg bg-white overflow-hidden min-h-[720px] flex flex-col ring-1 ring-slate-100">
           <CardHeader className="border-b border-slate-100 bg-white/50 sticky top-0 z-10 p-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div className="space-y-1 flex-1">
@@ -628,7 +629,7 @@ export function Onboarding() {
             {isOnboarding && selectedEmployee && (
               <div className="space-y-3">
 
-                {/* â”€ Dynamic Auto-Tasks â”€ */}
+                {/* ─ Dynamic Auto-Tasks ─ */}
                 {selectedEmployee.onboardingMainTaskId && (
                   <Section icon={Activity} label="Auto-Generated Workflow Tasks" color="bg-blue-50 text-blue-700" defaultOpen={true}>
                     <div className="space-y-2">
@@ -662,7 +663,7 @@ export function Onboarding() {
                   </Section>
                 )}
 
-                {/* â”€ Task 1 â”€ */}
+                {/* ─ Task 1 ─ */}
                 <Section icon={Mail} label="1. Send Necessary Information (Forms)" color="bg-indigo-50 text-indigo-700"
                   defaultOpen={!t1Done}>
                   <div className="flex items-center justify-between mb-1">
@@ -683,7 +684,7 @@ export function Onboarding() {
                   />
                 </Section>
 
-                {/* â”€ Task 2 â”€ */}
+                {/* ─ Task 2 ─ */}
                 <Section icon={RotateCcw} label="2. Return of Forms" color="bg-violet-50 text-violet-700"
                   locked={!t2Unlocked} lockMsg="Complete Task 1 first" defaultOpen={t1Done && !t2FullDone}>
                   <div className="flex items-center justify-between mb-1">
@@ -691,26 +692,26 @@ export function Onboarding() {
                     <DoneBadge done={t2FullDone} />
                   </div>
 
-                  {/* 2 â€” main */}
+                  {/* 2 — main */}
                   <CheckRow label="Employee returned completed forms" checked={cl.formsReturned} onChange={v => updateCL({ formsReturned: v })} />
 
-                  {/* 2.1 â€” Guarantor forms */}
-                  <SubSection label="2.1 â€” Guarantor Forms" locked={!cl.formsReturned} lockMsg="Mark main form return first" done={t21Done}>
+                  {/* 2.1 — Guarantor forms */}
+                  <SubSection label="2.1 — Guarantor Forms" locked={!cl.formsReturned} lockMsg="Mark main form return first" done={t21Done}>
                     <CheckRow label="Guarantor forms have been returned" checked={cl.guarantorFormsReturned} onChange={v => updateCL({ guarantorFormsReturned: v })} />
                   </SubSection>
 
-                  {/* 2.2 â€” Personal Employee Form */}
-                  <SubSection label="2.2 â€” Personal Employee Form" locked={!t22Unlocked} lockMsg="Complete 2.1 first" done={t22Done}>
+                  {/* 2.2 — Personal Employee Form */}
+                  <SubSection label="2.2 — Personal Employee Form" locked={!t22Unlocked} lockMsg="Complete 2.1 first" done={t22Done}>
                     <CheckRow label="Personal employee form has been returned" checked={cl.personalEmployeeFormReturned} onChange={v => updateCL({ personalEmployeeFormReturned: v })} />
                   </SubSection>
 
-                  {/* 2.3 â€” Passport */}
-                  <SubSection label="2.3 â€” Passport (Copy)" locked={!t23Unlocked} lockMsg="Complete 2.2 first" done={t23Done}>
+                  {/* 2.3 — Passport */}
+                  <SubSection label="2.3 — Passport (Copy)" locked={!t23Unlocked} lockMsg="Complete 2.2 first" done={t23Done}>
                     <CheckRow label="Passport copy has been submitted" checked={cl.passportReturned} onChange={v => updateCL({ passportReturned: v })} />
                   </SubSection>
                 </Section>
 
-                {/* â”€ Task 3 â”€ */}
+                {/* ─ Task 3 ─ */}
                 <Section icon={ShieldCheck} label="3. Verification of Documents" color="bg-sky-50 text-sky-700"
                   locked={!t3Unlocked} lockMsg="Complete all of Task 2 first" defaultOpen={t3Unlocked && !t3Done}>
                   <div className="flex items-center justify-between mb-1">
@@ -718,9 +719,9 @@ export function Onboarding() {
                     <DoneBadge done={t3Done} />
                   </div>
 
-                  {/* 3.1 â€” Guarantors */}
-                  <SubSection label="3.1 â€” Guarantor Information" done={t31Done}>
-                    <p className="text-[11px] text-slate-500">Fill name &amp; phone for each guarantor. The verified checkbox is advisory â€” you can proceed without ticking it.</p>
+                  {/* 3.1 — Guarantors */}
+                  <SubSection label="3.1 — Guarantor Information" done={t31Done}>
+                    <p className="text-[11px] text-slate-500">Fill name &amp; phone for each guarantor. The verified checkbox is advisory — you can proceed without ticking it.</p>
                     {cl.guarantors.map((g, i) => {
                       const inputsFilled = g.name.trim() !== '' && g.phone.trim() !== '';
                       return (
@@ -766,15 +767,15 @@ export function Onboarding() {
                       );
                     })}
                     {!allGuarantorsVerified && t31Done && (
-                      <p className="text-[11px] text-amber-600 flex items-center gap-1 mt-1"><Clock className="h-3 w-3" />Some guarantors not yet verified â€” you can still proceed.</p>
+                      <p className="text-[11px] text-amber-600 flex items-center gap-1 mt-1"><Clock className="h-3 w-3" />Some guarantors not yet verified — you can still proceed.</p>
                     )}
                   </SubSection>
 
-                  {/* 3.2 â€” Document checklist (unlocked after 3.1) */}
-                  <SubSection label="3.2 â€” Document Checklist" locked={!t31Done} lockMsg="Complete 3.1 first" done={t32DocsDone}>
+                  {/* 3.2 — Document checklist (unlocked after 3.1) */}
+                  <SubSection label="3.2 — Document Checklist" locked={!t31Done} lockMsg="Complete 3.1 first" done={t32DocsDone}>
                     <p className="text-[11px] text-slate-500">Tick each document after it has been physically verified.</p>
                     <CheckRow label="Passport Photos submitted" checked={cl.passportPhotos} onChange={v => updateCL({ passportPhotos: v })} />
-                    {/* Address â€” input required BEFORE checkbox can be ticked */}
+                    {/* Address — input required BEFORE checkbox can be ticked */}
                     <div className="space-y-1.5">
                       <LabeledInput
                         label="Employee Residential Address"
@@ -793,9 +794,9 @@ export function Onboarding() {
                     <CheckRow label="Educational Qualification Credentials submitted" checked={cl.educationalCredentials} onChange={v => updateCL({ educationalCredentials: v })} />
                   </SubSection>
 
-                  {/* 3.2 â€” Account Details (unlocked after docs) */}
-                  <SubSection label="3.2 â€” Account Details" locked={!t32Docs2Unlocked} lockMsg="Complete 3.1 first" done={t32AccDone}>
-                    <p className="text-[11px] text-slate-500">Enter bank details â€” these will be saved to the employee record on activation. Verified checkbox is advisory.</p>
+                  {/* 3.2 — Account Details (unlocked after docs) */}
+                  <SubSection label="3.2 — Account Details" locked={!t32Docs2Unlocked} lockMsg="Complete 3.1 first" done={t32AccDone}>
+                    <p className="text-[11px] text-slate-500">Enter bank details — these will be saved to the employee record on activation. Verified checkbox is advisory.</p>
                     <div className={`p-3 rounded-lg border grid grid-cols-2 gap-3 transition-colors ${cl.bankName.trim() && cl.accountNo.trim() ? 'border-sky-200 bg-sky-50/20' : 'border-slate-200'}`}>
                       <LabeledInput label="Bank Name *" value={cl.bankName} onChange={v => updateCL({ bankName: v })} placeholder="e.g. First Bank" />
                       <div className="space-y-1">
@@ -823,12 +824,12 @@ export function Onboarding() {
                       hint={!(cl.bankName.trim() && cl.accountNo.trim()) ? 'Enter bank name and account number to unlock' : undefined}
                     />
                     {!accVerified && t32AccDone && (
-                      <p className="text-[11px] text-amber-500 flex items-center gap-1"><Clock className="h-3 w-3" />Account not yet verified â€” you can still proceed.</p>
+                      <p className="text-[11px] text-amber-500 flex items-center gap-1"><Clock className="h-3 w-3" />Account not yet verified — you can still proceed.</p>
                     )}
                   </SubSection>
 
-                  {/* 3.2 â€” Pension (unlocked after account done) */}
-                  <SubSection label="3.2 â€” Pension Number" locked={!t32PensionUnlocked} lockMsg="Complete account details first" done={t32PensionDone}>
+                  {/* 3.2 — Pension (unlocked after account done) */}
+                  <SubSection label="3.2 — Pension Number" locked={!t32PensionUnlocked} lockMsg="Complete account details first" done={t32PensionDone}>
                     <LabeledInput label="Enter Pension Number *" value={cl.pensionNumberInput}
                       onChange={v => updateCL({ pensionNumberInput: v, pensionVerified: cl.pensionVerified && v.trim() !== '' })}
                       placeholder="e.g. PEN/123456" />
@@ -841,12 +842,12 @@ export function Onboarding() {
                       hint={!cl.pensionNumberInput.trim() ? 'Enter pension number above to enable this' : undefined}
                     />
                     {!pensionVerified && t32PensionDone && (
-                      <p className="text-[11px] text-amber-500 flex items-center gap-1"><Clock className="h-3 w-3" />Pension not yet verified â€” you can still proceed.</p>
+                      <p className="text-[11px] text-amber-500 flex items-center gap-1"><Clock className="h-3 w-3" />Pension not yet verified — you can still proceed.</p>
                     )}
                   </SubSection>
 
-                  {/* 3.2 â€” PAYE (unlocked after pension done) */}
-                  <SubSection label="3.2 â€” PAYE Number" locked={!t32PayeUnlocked} lockMsg="Complete pension number first" done={t32PayeDone}>
+                  {/* 3.2 — PAYE (unlocked after pension done) */}
+                  <SubSection label="3.2 — PAYE Number" locked={!t32PayeUnlocked} lockMsg="Complete pension number first" done={t32PayeDone}>
                     <LabeledInput label="Enter PAYE Number *" value={cl.payeNumberInput}
                       onChange={v => updateCL({ payeNumberInput: v, payeVerified: cl.payeVerified && v.trim() !== '' })}
                       placeholder="e.g. PAYE/654321" />
@@ -859,13 +860,13 @@ export function Onboarding() {
                       hint={!cl.payeNumberInput.trim() ? 'Enter PAYE number above to enable this' : undefined}
                     />
                     {!payeVerified && t32PayeDone && (
-                      <p className="text-[11px] text-amber-500 flex items-center gap-1"><Clock className="h-3 w-3" />PAYE not yet verified â€” you can still proceed.</p>
+                      <p className="text-[11px] text-amber-500 flex items-center gap-1"><Clock className="h-3 w-3" />PAYE not yet verified — you can still proceed.</p>
                     )}
                   </SubSection>
                 </Section>
 
-                {/* â”€ Task 4 â”€ */}
-                <Section icon={CalendarCheck2} label="4. Resumption â€” Verified Start Date" color="bg-amber-50 text-amber-700"
+                {/* ─ Task 4 ─ */}
+                <Section icon={CalendarCheck2} label="4. Resumption — Verified Start Date" color="bg-amber-50 text-amber-700"
                   locked={!t4Unlocked} lockMsg="Complete all of Task 3 first" defaultOpen={t4Unlocked && !t4Done}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs text-amber-700">Tentative date: <strong>{selectedEmployee.tentativeStartDate || selectedEmployee.startDate}</strong></span>
@@ -875,29 +876,29 @@ export function Onboarding() {
                   <div className={`p-3 rounded-lg border transition-colors ${cl.verifiedStartDate ? 'border-emerald-200 bg-emerald-50/30' : 'border-amber-200 bg-amber-50/20'}`}>
                     <LabeledInput type="date" label="Verified / Official Start Date *" value={cl.verifiedStartDate} onChange={v => updateCL({ verifiedStartDate: v })} />
                     {cl.verifiedStartDate
-                      ? <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-1.5"><Check className="h-3 w-3" />Date set â€” will update employee record on activation.</p>
+                      ? <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-1.5"><Check className="h-3 w-3" />Date set — will update employee record on activation.</p>
                       : <p className="text-[11px] text-amber-600 flex items-center gap-1 mt-1.5"><Lock className="h-3 w-3" />A verified date is required before Task 5 unlocks.</p>
                     }
                   </div>
                 </Section>
 
-                {/* â”€ Task 5 â”€ */}
+                {/* ─ Task 5 ─ */}
                 <Section icon={FileSignature} label="5. Giving Out Employment Letters (Print, Sign & Return)" color="bg-teal-50 text-teal-700"
                   locked={!t5Unlocked} lockMsg="Set verified start date first" defaultOpen={t5Unlocked && !t5Done}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs text-slate-500">Confirm both parties have signed and a copy returned.</span>
                     <DoneBadge done={t5Done} />
                   </div>
-                  <CheckRow label="Employment letters printed, signed, and returned âœ“" checked={cl.employmentLettersIssued} onChange={v => updateCL({ employmentLettersIssued: v })} />
+                  <CheckRow label="Employment letters printed, signed, and returned ✓" checked={cl.employmentLettersIssued} onChange={v => updateCL({ employmentLettersIssued: v })} />
                   {!cl.employmentLettersIssued && <p className="text-[11px] text-amber-600 flex items-center gap-1"><Lock className="h-3 w-3" />Must be ticked before activation is allowed.</p>}
                 </Section>
 
-                {/* â”€ Activation Gate â”€ */}
+                {/* ─ Activation Gate ─ */}
                 <div className={`p-5 rounded-xl border-2 transition-all ${criticalDone ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
                       <p className={`font-bold text-sm ${criticalDone ? 'text-emerald-700' : 'text-slate-500'}`}>
-                        {criticalDone ? 'âœ… All critical tasks complete â€” ready to activate!' : 'ðŸ”’ Complete tasks 1â€“5 in sequence to unlock activation'}
+                        {criticalDone ? '✅ All critical tasks complete — ready to activate!' : '🔒 Complete tasks 1–5 in sequence to unlock activation'}
                       </p>
                       <p className="text-xs text-slate-400 mt-1">Tasks 6 (Orientation) and 8 (PPE &amp; Handbook) can be completed after activation.</p>
                     </div>
@@ -916,7 +917,7 @@ export function Onboarding() {
                   </div>
                 </div>
 
-                {/* â”€ Post-activation previews â”€ */}
+                {/* ─ Post-activation previews ─ */}
                 <div className="space-y-2 opacity-50 pointer-events-none">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2"><Siren className="h-3.5 w-3.5" />Post-Activation Tasks (Available after employee is activated)</p>
                   <Section icon={GraduationCap} label="6. Orientation (HR, Department, Site Equipment, HSE)" color="bg-purple-50 text-purple-700" defaultOpen={false}>
@@ -933,7 +934,7 @@ export function Onboarding() {
             {isHistory && selectedEmployee && (
               <div className="space-y-4">
                 <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
-                  <p className="text-sm font-bold text-emerald-700 mb-1">Onboarding Completed âœ…</p>
+                  <p className="text-sm font-bold text-emerald-700 mb-1">Onboarding Completed ✅</p>
                   <div className="text-xs text-emerald-600 space-x-4">
                     <span>Verified Start: <strong>{selectedEmployee.verifiedStartDate || selectedEmployee.startDate}</strong></span>
                     {selectedEmployee.probationPeriod && <span>Probation: <strong>{selectedEmployee.probationPeriod} days</strong></span>}
@@ -1000,7 +1001,7 @@ export function Onboarding() {
         </Card>
       </div>
 
-      {/* â”€â”€ Edit Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Edit Modal ────────────────────────────────────── */}
       {editEmp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 overflow-hidden">

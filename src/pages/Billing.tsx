@@ -20,7 +20,7 @@ export function Billing() {
   const deleteInvoice = useAppStore(state => state.deleteInvoice);
   const vatRate = useAppStore(state => state.payrollVariables.vatRate);
 
-  // â”€â”€â”€ Permissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('billing');
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -593,7 +593,7 @@ export function Billing() {
                 <TableHead className="font-semibold px-4 py-3 text-right">Equipment</TableHead>
                 <TableHead className="font-semibold px-4 py-3 text-right">Dates & Dur</TableHead>
                 <TableHead className="font-semibold px-4 py-3 text-right">Cost Bkdn</TableHead>
-                <TableHead className="font-semibold px-4 py-3 text-right">Totals (â‚¦)</TableHead>
+                <TableHead className="font-semibold px-4 py-3 text-right">Totals (₦)</TableHead>
                 {(priv.canEdit || priv.canDelete) && (
                   <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">Actions</TableHead>
                 )}
@@ -789,15 +789,15 @@ export function Billing() {
                   <div className="grid grid-cols-3 gap-4">
                     <div className="flex flex-col">
                       <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Gross Total</span>
-                      <span className="font-mono text-slate-200 font-medium text-sm">â‚¦{priv?.canViewAmounts === false ? '***' : livePreview.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-slate-200 font-medium text-sm">₦{priv?.canViewAmounts === false ? '***' : livePreview.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex flex-col border-l border-slate-700 pl-4">
                       <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Tax (VAT {livePreview.vatInc})</span>
-                      <span className="font-mono text-indigo-400 font-medium text-sm">â‚¦{priv?.canViewAmounts === false ? '***' : livePreview.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-indigo-400 font-medium text-sm">₦{priv?.canViewAmounts === false ? '***' : livePreview.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex flex-col border-l border-slate-700 pl-4">
                       <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Final Amount Due</span>
-                      <span className="font-mono text-emerald-400 font-bold text-lg leading-none">â‚¦{priv?.canViewAmounts === false ? '***' : livePreview.totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-emerald-400 font-bold text-lg leading-none">₦{priv?.canViewAmounts === false ? '***' : livePreview.totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   </div>
                 </div>

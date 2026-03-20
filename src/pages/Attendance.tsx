@@ -47,7 +47,7 @@ export function Attendance() {
   const [activeTab, setActiveTab] = useState('entry');
   const [departmentFilter, setDepartmentFilter] = useState('OPERATIONS');
 
-  // â”€â”€â”€ Permissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('attendance');
   // For export we piggyback off the reports canExport privilege
   const reportPriv = usePriv('reports');
@@ -256,7 +256,7 @@ export function Attendance() {
     return format(d, 'yyyy-MM-dd');
   };
 
-  // Excel DOW: WEEKDAY(date, 2) â†’ 1=Monday, 7=Sunday
+  // Excel DOW: WEEKDAY(date, 2) → 1=Monday, 7=Sunday
   const getDOW = (dateStr: string) => {
     const d = new Date(dateStr);
     const jsDay = d.getDay(); // 0=Sun, 1=Mon...6=Sat
@@ -388,9 +388,9 @@ export function Attendance() {
 
       // Col 12: OT (Overtime)
       // Three conditions:
-      // 1. Sunday + worked â†’ OT
-      // 2. Public holiday + worked â†’ OT
-      // 3. Day=Yes AND Night=Yes AND NDW=Yes â†’ OT
+      // 1. Sunday + worked → OT
+      // 2. Public holiday + worked → OT
+      // 3. Day=Yes AND Night=Yes AND NDW=Yes → OT
       // 4. Non-operations manual overtime ticked
       const worked = raw.day === 'Yes' || raw.night === 'Yes';
       let ot = 0;
@@ -496,7 +496,7 @@ export function Attendance() {
 
       <Tabs className="w-full flex-1 flex flex-col min-h-0">
         <TabsContent active={activeTab === 'entry'} className="flex-1 flex flex-col min-h-0">
-          {/* Toolbar: date, filters, search, actions â€” all in one row */}
+          {/* Toolbar: date, filters, search, actions — all in one row */}
           <div className="flex flex-wrap items-center gap-2 py-2 px-0">
             {/* Date controls */}
             <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1.5 shadow-sm">
@@ -636,7 +636,7 @@ export function Attendance() {
                               value={dayVal}
                               onChange={(e) => handleSelectChange(employee.id, 'day', e.target.value)}
                             >
-                              <option value="">â€”</option>
+                              <option value="">&mdash; Select &mdash;</option>
                               <optgroup label="Sites">
                                 {sites.filter(s => s.status === 'Active').map(site => (
                                   <option key={`d-${site.id}`} value={site.name}>{site.name} ({site.client})</option>
@@ -661,7 +661,7 @@ export function Attendance() {
                                 value={nightVal}
                                 onChange={(e) => handleSelectChange(employee.id, 'night', e.target.value)}
                               >
-                                <option value="">â€”</option>
+                                <option value="">&mdash; Select &mdash;</option>
                                 <optgroup label="Sites">
                                   {sites.filter(s => s.status === 'Active').map(site => (
                                     <option key={`n-${site.id}`} value={site.name}>{site.name} ({site.client})</option>
@@ -859,7 +859,7 @@ export function Attendance() {
                         <td className="py-1.5 px-2 text-center">{r.ndw}</td>
                         <td className="py-1.5 px-2 text-center">{r.mth}</td>
                         <td className={`py-1.5 px-2 text-center font-bold ${r.isPresent === 'Yes' ? 'text-emerald-600' : 'text-slate-300'}`}>
-                          {r.isPresent === 'Yes' ? 'âœ“' : 'â€”'}
+                          {r.isPresent === 'Yes' ? '✓' : '—'}
                         </td>
                         <td className="py-1.5 px-2 text-center">{r.day2}</td>
                       </tr>
