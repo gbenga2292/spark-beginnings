@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Input } from '@/src/components/ui/input';
-import { Download, FileText, Calculator, CreditCard, ChevronDown, X, Printer } from 'lucide-react';
+import { Download, CreditCard, ChevronDown, X, Printer } from 'lucide-react';
 import { useAppStore, Employee } from '@/src/store/appStore';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import logoSrc from '../../logo/logo-2.png';
@@ -13,6 +13,7 @@ import { usePriv } from '@/src/hooks/usePriv';
 
 interface PayrollRecord {
   id: string;
+  employeeCode?: string;
   sn: number;
   surname: string;
   firstname: string;
@@ -75,6 +76,8 @@ export function Payroll() {
   const [printSelectedMonths, setPrintSelectedMonths] = useState<string[]>([]);
   const [printSelectedEmployees, setPrintSelectedEmployees] = useState<string[]>([]);
   const [printSelectedDepts, setPrintSelectedDepts] = useState<string[]>([]);
+  const [printSelectedColumns, setPrintSelectedColumns] = useState<string[]>([]);
+  const [printViewMode, setPrintViewMode] = useState<'LIST' | 'MATRIX'>('LIST');
   const [filterDept, setFilterDept] = useState<string>('');
   const [showFilterPanel, setShowFilterPanel] = useState(false);
 
@@ -123,6 +126,35 @@ export function Payroll() {
 
   // OPERATIONS departments – purely attendance-based pay
   const OPERATIONS_DEPARTMENTS = ['OPERATIONS', 'ENGINEERING'];
+
+  // Each column: id, label, summable (can be totalled), types it applies to ('all' or specific)
+  const AVAILABLE_COLUMNS: Array<{ id: string; label: string; summable: boolean; types: string[] }> = [
+    { id: 'sn',               label: 'S/N',               summable: false, types: ['all'] },
+    { id: 'employee_name',    label: 'Employee Name',     summable: false, types: ['all'] },
+    { id: 'month',            label: 'Month',             summable: false, types: ['all'] },
+    { id: 'bank_name',        label: 'Bank Name',         summable: false, types: ['all'] },
+    { id: 'account_number',   label: 'Account No',        summable: false, types: ['all'] },
+    { id: 'basic',            label: 'Basic Salary',      summable: true,  types: ['PAYE'] },
+    { id: 'housing',          label: 'Housing',           summable: true,  types: ['PAYE'] },
+    { id: 'transport',        label: 'Transport',         summable: true,  types: ['PAYE'] },
+    { id: 'other',            label: 'Other Allowances',  summable: true,  types: ['PAYE'] },
+    { id: 'gross',            label: 'Gross Pay',         summable: true,  types: ['PAYE', 'NSITF'] },
+    { id: 'paye',             label: 'PAYE Tax',          summable: true,  types: ['PAYE'] },
+    { id: 'net_pay',          label: 'Net (Take-Home)',   summable: true,  types: ['PAYE'] },
+    { id: 'pensionable',      label: 'Pensionable Sum',   summable: true,  types: ['PENSION'] },
+    { id: 'employee_pension', label: 'Employee Pension',  summable: true,  types: ['PENSION'] },
+    { id: 'employer_pension', label: 'Employer Pension',  summable: true,  types: ['PENSION'] },
+    { id: 'total_pension',    label: 'Total Pension',     summable: true,  types: ['PENSION'] },
+    { id: 'nsitf_rate',       label: 'NSITF Ratio',       summable: false, types: ['NSITF'] },
+    { id: 'nsitf_amount',     label: 'NSITF Amount',      summable: true,  types: ['NSITF'] },
+  ];
+
+  const DEFAULT_COLUMNS: Record<string, string[]> = {
+    PAYSLIPS: [],
+    PAYE:    ['sn', 'employee_name', 'month', 'bank_name', 'account_number', 'basic', 'housing', 'transport', 'other', 'gross', 'paye'],
+    PENSION: ['sn', 'employee_name', 'month', 'bank_name', 'account_number', 'pensionable', 'employee_pension', 'employer_pension', 'total_pension'],
+    NSITF:   ['sn', 'employee_name', 'month', 'bank_name', 'account_number', 'gross', 'nsitf_rate', 'nsitf_amount'],
+  };
 
   const months = [
     { key: 'jan', label: 'January' },
@@ -312,6 +344,7 @@ export function Payroll() {
 
           return {
             id: emp.id,
+            employeeCode: emp.employeeCode,
             sn: snCounter++,
             surname: emp.surname,
             firstname: emp.firstname,
@@ -352,7 +385,8 @@ export function Payroll() {
         const mLabel = months.find(m => m.key === mKey)?.label || mKey;
         const data = calculatePayrollForMonth(mKey);
         data.forEach(record => {
-          if (printSelectedEmployees.length === 0 || printSelectedEmployees.includes(record.id)) {
+          // Now empty printSelectedEmployees means NONE (explicit list always used)
+          if (printSelectedEmployees.length > 0 && printSelectedEmployees.includes(record.id)) {
             slips.push({ monthLabel: mLabel, monthKey: mKey, record });
           }
         });
@@ -378,8 +412,11 @@ export function Payroll() {
 
     const handleOpenPrintDialog = (type: 'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF') => {
       setPrintSelectedMonths([selectedMonth]);
-      setPrintSelectedEmployees([]);
+      // Seed with ALL active employee IDs so all checkboxes appear checked
+      setPrintSelectedEmployees(employees.filter(e => e.status === 'Active').map(e => e.id));
       setPrintType(type);
+      setPrintDialogOpen(true);
+      setPrintSelectedColumns(DEFAULT_COLUMNS[type] || []);
     };
 
     const handlePrint = () => {
@@ -428,7 +465,7 @@ export function Payroll() {
         <div class="two-col">
           <table class="info-table">
             <tr><td>Name:</td><td><strong>${slip.record.firstname} ${slip.record.surname}</strong></td></tr>
-            <tr><td>ID:</td><td>${slip.record.id}</td></tr>
+            <tr><td>ID:</td><td>${slip.record.employeeCode || slip.record.id}</td></tr>
             <tr><td>Position:</td><td>${slip.record.position}</td></tr>
           </table>
           <table class="info-table">
@@ -609,29 +646,9 @@ export function Payroll() {
 
               <div className="flex gap-3">
                 {priv.canGenerate && (
-                  <div className="flex gap-2 relative group">
-                    <Button onClick={() => handleOpenPrintDialog('PAYSLIPS')} variant="outline" className="gap-2 shrink-0 border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700">
-                      <Printer className="h-4 w-4" />
-                      Print Schedule
-                    </Button>
-                    <div className="absolute top-full left-0 mt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 flex flex-col gap-1 w-full pt-1">
-                      {priv.canViewPayeSchedule && (
-                        <Button onClick={() => handleOpenPrintDialog('PAYE')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
-                          <FileText className="h-4 w-4 text-rose-500" /> PAYE Schedule
-                        </Button>
-                      )}
-                      {priv.canViewPensionSchedule && (
-                        <Button onClick={() => handleOpenPrintDialog('PENSION')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
-                          <FileText className="h-4 w-4 text-emerald-500" /> Pension Schedule
-                        </Button>
-                      )}
-                      {priv.canViewNsitfSchedule && (
-                        <Button onClick={() => handleOpenPrintDialog('NSITF')} variant="outline" className="gap-2 w-full justify-start shadow-md bg-white border border-slate-200">
-                          <FileText className="h-4 w-4 text-blue-500" /> NSITF Schedule
-                        </Button>
-                      )}
-                    </div>
-                  </div>
+                  <Button variant="outline" size="sm" className="gap-2 border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700" onClick={() => handleOpenPrintDialog('PAYSLIPS')}>
+                    <Printer className="h-4 w-4" /> Print Schedule
+                  </Button>
                 )}
                 {finRepPriv.canExport && (
                   <Button variant="outline" className="gap-2">
@@ -1025,7 +1042,12 @@ export function Payroll() {
 
                   <div>
                     <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1">Select Months</h4>
-                    <div className="space-y-2 mt-2">
+                    <div className="flex gap-2 mb-2">
+                      <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedMonths(months.map(m => m.key))}>Select All</button>
+                      <span className="text-slate-300">|</span>
+                      <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedMonths([])}>Select None</button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1 mt-1">
                       {months.map(m => (
                         <label key={m.key} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                           <input
@@ -1043,18 +1065,44 @@ export function Payroll() {
                     </div>
                   </div>
 
+                  {/* View Mode Toggle */}
+                  {printType !== 'PAYSLIPS' && printSelectedMonths.length > 1 && (
+                    <div className="mt-4">
+                      <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1 flex items-center justify-between">
+                        Layout Mode
+                      </h4>
+                      <div className="flex gap-2">
+                        <button 
+                          className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border ${printViewMode === 'LIST' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                          onClick={() => setPrintViewMode('LIST')}
+                        >
+                          Row per Month
+                        </button>
+                        <button 
+                          className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border ${printViewMode === 'MATRIX' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                          onClick={() => setPrintViewMode('MATRIX')}
+                        >
+                          Month Columns
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Department filter */}
                   <div>
-                    <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1 flex justify-between items-center">
+                    <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1 flex items-center justify-between">
                       Filter by Department
-                      <button
-                        className="text-xs text-indigo-600 font-medium hover:underline"
-                        onClick={() => { setPrintSelectedDepts([]); setPrintSelectedEmployees([]); }}
-                      >
-                        Clear
-                      </button>
+                      <div className="flex gap-2">
+                        <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => {
+                          const all = [...new Set(employees.filter(e => e.status === 'Active').map(e => e.department).filter(Boolean))].sort();
+                          setPrintSelectedDepts(all);
+                          setPrintSelectedEmployees(employees.filter(e => e.status === 'Active' && all.includes(e.department)).map(e => e.id));
+                        }}>All</button>
+                        <span className="text-slate-300">|</span>
+                        <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => { setPrintSelectedDepts([]); setPrintSelectedEmployees([]); }}>None</button>
+                      </div>
                     </h4>
-                    <div className="space-y-2 mt-2">
+                    <div className="space-y-1 mt-2 max-h-[110px] overflow-y-auto">
                       {[...new Set(employees.filter(e => e.status === 'Active').map(e => e.department).filter(Boolean))].sort().map(dept => (
                         <label key={dept} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                           <input
@@ -1084,28 +1132,24 @@ export function Payroll() {
                   </div>
 
                   <div>
-                    <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1 flex justify-between items-center">
+                    <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1 flex items-center justify-between">
                       Select Employees
-                      <button
-                        className="text-xs text-indigo-600 font-medium hover:underline"
-                        onClick={() => setPrintSelectedEmployees([])}
-                      >
-                        Select All
-                      </button>
+                      <div className="flex gap-2">
+                        <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedEmployees(employees.filter(e => e.status === 'Active').map(e => e.id))}>All</button>
+                        <span className="text-slate-300">|</span>
+                        <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedEmployees([])}>None</button>
+                      </div>
                     </h4>
-                    <div className="space-y-2 mt-2 max-h-[300px] overflow-y-auto pr-2">
+                    <div className="space-y-1 mt-2 max-h-[200px] overflow-y-auto pr-2">
                       {employees.filter(e => e.status === 'Active').sort((a, b) => (a.position || '').localeCompare(b.position || '')).map(emp => (
                         <label key={emp.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                           <input
                             type="checkbox"
                             className="rounded border-slate-300 text-indigo-600"
-                            checked={printSelectedEmployees.length === 0 || printSelectedEmployees.includes(emp.id)}
+                            checked={printSelectedEmployees.includes(emp.id)}
                             onChange={(e) => {
-                              let curr = printSelectedEmployees.length === 0 ? employees.filter(e => e.status === 'Active').map(e => e.id) : [...printSelectedEmployees];
-                              if (e.target.checked) curr.push(emp.id);
-                              else curr = curr.filter(id => id !== emp.id);
-                              if (curr.length === employees.filter(e => e.status === 'Active').length) curr = [];
-                              setPrintSelectedEmployees(curr);
+                              if (e.target.checked) setPrintSelectedEmployees(prev => [...prev, emp.id]);
+                              else setPrintSelectedEmployees(prev => prev.filter(id => id !== emp.id));
                             }}
                           />
                           {emp.firstname} {emp.surname}
@@ -1114,6 +1158,80 @@ export function Payroll() {
                       ))}
                     </div>
                   </div>
+
+                  {/* Columns to Include */}
+                  {printType !== 'PAYSLIPS' && (() => {
+                    // Only show columns relevant to this schedule type
+                    const relevantCols = AVAILABLE_COLUMNS.filter(c => c.types.includes('all') || c.types.includes(printType));
+                    return (
+                      <div>
+                        <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1 flex items-center justify-between">
+                          Columns to Include
+                          <div className="flex gap-2">
+                            <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedColumns(relevantCols.map(c => c.id))}>All</button>
+                            <span className="text-slate-300">|</span>
+                            <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedColumns([])}>None</button>
+                          </div>
+                        </h4>
+                        <div className="flex flex-col gap-1 mt-1">
+                          {relevantCols.map((col, idx) => (
+                            <div key={col.id} className="flex items-center gap-1">
+                              <input
+                                type="checkbox"
+                                id={`col-${col.id}`}
+                                className="rounded border-slate-300 text-indigo-600 shrink-0"
+                                checked={printSelectedColumns.includes(col.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    // Insert at correct position to maintain order
+                                    const allIds = relevantCols.map(c => c.id);
+                                    const newCols = allIds.filter(id => printSelectedColumns.includes(id) || id === col.id);
+                                    setPrintSelectedColumns(newCols);
+                                  } else {
+                                    setPrintSelectedColumns(printSelectedColumns.filter(id => id !== col.id));
+                                  }
+                                }}
+                              />
+                              <label htmlFor={`col-${col.id}`} className="text-sm text-slate-700 cursor-pointer flex-1">{col.label}</label>
+                              <div className="flex gap-0.5 shrink-0">
+                                <button
+                                  className="text-slate-400 hover:text-slate-700 disabled:opacity-30 px-0.5"
+                                  disabled={idx === 0 || !printSelectedColumns.includes(col.id)}
+                                  onClick={() => {
+                                    const allIds = relevantCols.map(c => c.id);
+                                    const selOrdered = allIds.filter(id => printSelectedColumns.includes(id));
+                                    const pos = selOrdered.indexOf(col.id);
+                                    if (pos <= 0) return;
+                                    const next = [...selOrdered];
+                                    [next[pos - 1], next[pos]] = [next[pos], next[pos - 1]];
+                                    // Rebuild full ordered list preserving non-selected slots
+                                    const result = allIds.filter(id => next.includes(id));
+                                    setPrintSelectedColumns(result);
+                                  }}
+                                  title="Move up"
+                                >▲</button>
+                                <button
+                                  className="text-slate-400 hover:text-slate-700 disabled:opacity-30 px-0.5"
+                                  disabled={idx === relevantCols.length - 1 || !printSelectedColumns.includes(col.id)}
+                                  onClick={() => {
+                                    const allIds = relevantCols.map(c => c.id);
+                                    const selOrdered = allIds.filter(id => printSelectedColumns.includes(id));
+                                    const pos = selOrdered.indexOf(col.id);
+                                    if (pos < 0 || pos >= selOrdered.length - 1) return;
+                                    const next = [...selOrdered];
+                                    [next[pos], next[pos + 1]] = [next[pos + 1], next[pos]];
+                                    const result = allIds.filter(id => next.includes(id));
+                                    setPrintSelectedColumns(result);
+                                  }}
+                                  title="Move down"
+                                >▼</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Preview Area */}
@@ -1138,7 +1256,7 @@ export function Payroll() {
                             <table className="w-full text-sm">
                               <tbody>
                                 <tr><td className="py-1 text-slate-600">Name:</td><td className="py-1 font-medium">{slip.record.firstname} {slip.record.surname}</td></tr>
-                                <tr><td className="py-1 text-slate-600">Employee ID:</td><td className="py-1 font-mono">{slip.record.id}</td></tr>
+                                <tr><td className="py-1 text-slate-600">Employee ID:</td><td className="py-1 font-mono">{slip.record.employeeCode || slip.record.id}</td></tr>
                                 <tr><td className="py-1 text-slate-600">Position:</td><td className="py-1">{slip.record.position}</td></tr>
                                 <tr><td className="py-1 text-slate-600">Department:</td><td className="py-1">{slip.record.department}</td></tr>
                               </tbody>
@@ -1206,140 +1324,266 @@ export function Payroll() {
 
                       </div>
                     ))
-                  ) : printType === 'PAYE' || printType === 'PENSION' || printType === 'NSITF' ? (
-                    <div className="bg-white p-10 mx-auto shadow-sm max-w-5xl rounded-sm print-break" id="print-area-content">
-                      <div className="border-b-2 border-indigo-600 pb-4 mb-6" style={{ borderBottom: '2px solid #4f46e5', paddingBottom: '16px', marginBottom: '24px' }}>
-                        <div className="flex justify-between items-end" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                          <div>
-                            <img src={logoSrc} alt="Company Logo" className="h-12 w-auto mb-2" style={{ height: '48px', width: 'auto', marginBottom: '8px' }} />
-                            <h2 className="text-xl font-bold uppercase tracking-wider text-slate-900" style={{ fontSize: '20px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0f172a', margin: '0' }}>
-                              {printType === 'PAYE' ? 'PAYE TAX SCHEDULE' : printType === 'PENSION' ? 'PENSION CONTRIBUTION SCHEDULE' : 'NSITF SCHEDULE'}
-                            </h2>
-                            <p className="text-sm text-slate-500 mt-1" style={{ fontSize: '14px', color: '#64748b', marginTop: '4px', marginBottom: '0' }}>
-                              Generated on {new Date().toLocaleDateString()}
-                            </p>
+                  ) : printType === 'PAYE' || printType === 'PENSION' || printType === 'NSITF' ? (() => {
+                    // ── Ordered selected columns for this schedule type ──────────────
+                    const relevantCols = AVAILABLE_COLUMNS.filter(c => c.types.includes('all') || c.types.includes(printType));
+                    const orderedCols = printSelectedColumns
+                      .filter(id => relevantCols.some(c => c.id === id))
+                      .map(id => relevantCols.find(c => c.id === id)!);
+
+                    const filteredSlips = payslipsToPrint.filter(slip =>
+                      printType === 'PAYE'
+                        ? (slip.record.staffType === 'INTERNAL' && !slip.record.department.trim().toLowerCase().includes('adhoc'))
+                        : printType === 'PENSION'
+                          ? (slip.record.staffType === 'INTERNAL' && !slip.record.department.trim().toLowerCase().includes('adhoc'))
+                          : (slip.record.nsitf > 0 && !slip.record.department.trim().toLowerCase().includes('adhoc'))
+                    );
+
+                    const accentColor = printType === 'PAYE' ? '#7c3aed' : printType === 'PENSION' ? '#0d9488' : '#2563eb';
+                    const accentLight = printType === 'PAYE' ? '#ede9fe' : printType === 'PENSION' ? '#ccfbf1' : '#dbeafe';
+
+                    // Cell value getter
+                    const getCellValue = (col: typeof orderedCols[0], slip: typeof filteredSlips[0], idx: number): React.ReactNode => {
+                      const pSum = slip.record.basicSalary + slip.record.housing + slip.record.transport;
+                      switch (col.id) {
+                        case 'sn':             return <span style={{ color: '#94a3b8', fontSize: '12px' }}>{idx + 1}</span>;
+                        case 'employee_name':  return <span style={{ fontWeight: 600, color: '#0f172a' }}>{slip.record.surname} {slip.record.firstname}</span>;
+                        case 'month':          return <span style={{ color: '#6366f1', fontSize: '12px', fontWeight: 500 }}>{slip.monthLabel}</span>;
+                        case 'bank_name':      return <span style={{ fontSize: '12px' }}>{slip.record.bankName}</span>;
+                        case 'account_number': return <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#475569' }}>{slip.record.accountNo}</span>;
+                        case 'basic':          return <span style={{ fontFamily: 'monospace' }}>{fm(slip.record.basicSalary)}</span>;
+                        case 'housing':        return <span style={{ fontFamily: 'monospace' }}>{fm(slip.record.housing)}</span>;
+                        case 'transport':      return <span style={{ fontFamily: 'monospace' }}>{fm(slip.record.transport)}</span>;
+                        case 'other':          return <span style={{ fontFamily: 'monospace' }}>{fm(slip.record.otherAllowances)}</span>;
+                        case 'gross':          return <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{fm(slip.record.grossPay)}</span>;
+                        case 'paye':           return <span style={{ fontFamily: 'monospace', color: '#dc2626', fontWeight: 700 }}>{fm(slip.record.paye)}</span>;
+                        case 'net_pay':        return <span style={{ fontFamily: 'monospace', color: '#059669', fontWeight: 700 }}>{fm(slip.record.takeHomePay)}</span>;
+                        case 'pensionable':    return <span style={{ fontFamily: 'monospace' }}>{fm(pSum)}</span>;
+                        case 'employee_pension': return <span style={{ fontFamily: 'monospace', color: '#d97706' }}>{fm(slip.record.pension)}</span>;
+                        case 'employer_pension': return <span style={{ fontFamily: 'monospace', color: '#4f46e5' }}>{fm(slip.record.employerPension)}</span>;
+                        case 'total_pension':  return <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#059669' }}>{fm(slip.record.pension + slip.record.employerPension)}</span>;
+                        case 'nsitf_rate':     return <span style={{ fontFamily: 'monospace', color: '#6b7280' }}>{payrollVariables.nsitfRate}%</span>;
+                        case 'nsitf_amount':   return <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#059669' }}>{fm(slip.record.nsitf)}</span>;
+                        default: return null;
+                      }
+                    };
+
+                    // Grand total getter
+                    const getTotal = (colId: string): number => {
+                      switch (colId) {
+                        case 'basic':            return filteredSlips.reduce((s, x) => s + x.record.basicSalary, 0);
+                        case 'housing':          return filteredSlips.reduce((s, x) => s + x.record.housing, 0);
+                        case 'transport':        return filteredSlips.reduce((s, x) => s + x.record.transport, 0);
+                        case 'other':            return filteredSlips.reduce((s, x) => s + x.record.otherAllowances, 0);
+                        case 'gross':            return filteredSlips.reduce((s, x) => s + x.record.grossPay, 0);
+                        case 'paye':             return filteredSlips.reduce((s, x) => s + x.record.paye, 0);
+                        case 'net_pay':          return filteredSlips.reduce((s, x) => s + x.record.takeHomePay, 0);
+                        case 'pensionable':      return filteredSlips.reduce((s, x) => s + x.record.basicSalary + x.record.housing + x.record.transport, 0);
+                        case 'employee_pension': return filteredSlips.reduce((s, x) => s + x.record.pension, 0);
+                        case 'employer_pension': return filteredSlips.reduce((s, x) => s + x.record.employerPension, 0);
+                        case 'total_pension':    return filteredSlips.reduce((s, x) => s + x.record.pension + x.record.employerPension, 0);
+                        case 'nsitf_amount':     return filteredSlips.reduce((s, x) => s + x.record.nsitf, 0);
+                        default: return 0;
+                      }
+                    };
+
+                    // Label colspan = leading non-summable selected columns
+                    let labelSpan = 0;
+                    for (const c of orderedCols) { if (!c.summable) labelSpan++; else break; }
+                    if (labelSpan === 0) labelSpan = 1;
+
+                    const colIsNumeric = (id: string) => !['sn','employee_name','month','bank_name','account_number'].includes(id);
+
+                    return (
+                      <div className="bg-white mx-auto shadow-lg max-w-5xl rounded-sm print-break" id="print-area-content"
+                        style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", overflow: 'hidden' }}>
+
+                        {/* ── Premium print-safe header ── */}
+                        <div style={{
+                          padding: '28px 36px 16px',
+                          borderBottom: `3px solid ${accentColor}`,
+                          position: 'relative',
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative' }}>
+                            <div>
+                              <img src={logoSrc} alt="Company Logo" style={{ height: 48, width: 'auto', marginBottom: 16 }} />
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                                <div style={{ width: 4, height: 28, background: accentColor, borderRadius: 2, flexShrink: 0 }} />
+                                <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#0f172a' }}>
+                                  {printType === 'PAYE' ? 'PAYE Tax Schedule' : printType === 'PENSION' ? 'Pension Contribution Schedule' : 'NSITF Schedule'}
+                                </h2>
+                              </div>
+                              <p style={{ margin: 0, fontSize: 13, color: '#64748b', marginLeft: 14 }}>
+                                Generated: {new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' })}
+                              </p>
+                            </div>
+                            {/* The "Total Employees" box has been removed as requested */}
                           </div>
-                          <div className="text-right" style={{ textAlign: 'right' }}>
-                            <p className="font-semibold text-sm text-slate-600" style={{ fontWeight: 600, fontSize: '14px', color: '#475569', margin: '0' }}>Total Valid Records: {payslipsToPrint.filter(s => printType === 'PAYE' ? (s.record.staffType === 'INTERNAL' && !s.record.department.trim().toLowerCase().includes('adhoc')) : printType === 'PENSION' ? (s.record.staffType === 'INTERNAL' && !s.record.department.trim().toLowerCase().includes('adhoc')) : (s.record.nsitf > 0 && !s.record.department.trim().toLowerCase().includes('adhoc'))).length}</p>
+                        </div>
+
+                        {/* ── Month/Period pills ── */}
+                        {printSelectedMonths.length > 0 && (
+                          <div style={{ background: accentLight, padding: '8px 36px', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: accentColor, textTransform: 'uppercase', letterSpacing: '0.08em', marginRight: 4 }}>Period:</span>
+                            {printSelectedMonths.map(mk => {
+                              const lbl = months.find(m => m.key === mk)?.label || mk;
+                              return <span key={mk} style={{ background: 'white', color: accentColor, border: `1px solid ${accentColor}33`, borderRadius: 100, padding: '2px 10px', fontSize: 12, fontWeight: 500 }}>{lbl}</span>;
+                            })}
+                          </div>
+                        )}
+
+                        {/* ── Table ── */}
+                        <div style={{ padding: '0 0 32px' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                            {printViewMode === 'MATRIX' && printSelectedMonths.length > 1 ? (() => {
+                              const empIds = [...new Set(filteredSlips.map(s => s.record.id))];
+                              const getMetric = (slip: typeof filteredSlips[0]) => {
+                                if (printType === 'PAYE') return slip.record.paye;
+                                if (printType === 'PENSION') return slip.record.pension + slip.record.employerPension;
+                                if (printType === 'NSITF') return slip.record.nsitf;
+                                return 0;
+                              };
+                              const mData = empIds.map(eid => {
+                                const empSlips = filteredSlips.filter(s => s.record.id === eid);
+                                const monthVals: Record<string, number> = {};
+                                let rowTotal = 0;
+                                empSlips.forEach(s => {
+                                  const val = getMetric(s);
+                                  monthVals[s.monthKey] = val;
+                                  rowTotal += val;
+                                });
+                                return { record: empSlips[0].record, monthVals, rowTotal };
+                              });
+
+                              const metadataCols = orderedCols.filter(c => !c.summable && c.id !== 'month');
+
+                              return (
+                                <>
+                                  <thead>
+                                    <tr style={{ background: '#f8fafc', borderBottom: `3px solid ${accentColor}` }}>
+                                      {metadataCols.map(col => (
+                                        <th key={col.id} style={{ padding: '12px 10px', textAlign: colIsNumeric(col.id) ? 'right' : 'left', fontSize: 11, fontWeight: 700, color: '#475569', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                                          {col.label}
+                                        </th>
+                                      ))}
+                                      {printSelectedMonths.map(mk => (
+                                        <th key={mk} style={{ padding: '12px 10px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: '#475569', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                                          {months.find(m => m.key === mk)?.label || mk} (₦)
+                                        </th>
+                                      ))}
+                                      <th style={{ padding: '12px 10px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: '#0f172a', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Total (₦)</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {mData.map((row, idx) => {
+                                      const dummySlip = { record: row.record, monthLabel: '', monthKey: '' } as typeof filteredSlips[0];
+                                      return (
+                                        <tr key={row.record.id} style={{ background: idx % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }} className="hover:bg-indigo-50/30">
+                                          {metadataCols.map(col => (
+                                            <td key={col.id} style={{ padding: '11px 10px', textAlign: colIsNumeric(col.id) ? 'right' : 'left', verticalAlign: 'middle' }}>
+                                              {getCellValue(col, dummySlip, idx)}
+                                            </td>
+                                          ))}
+                                          {printSelectedMonths.map(mk => (
+                                            <td key={mk} style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', color: '#0f172a' }}>
+                                              {row.monthVals[mk] ? fm(row.monthVals[mk]) : '—'}
+                                            </td>
+                                          ))}
+                                          <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#059669' }}>
+                                            {fm(row.rowTotal)}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                    
+                                    {/* Grand total row inside tbody so it prints only on the last page */}
+                                    <tr style={{ background: `${accentColor}0f`, borderTop: `2px solid ${accentColor}` }}>
+                                      {metadataCols.map((col, i) => (
+                                        <td key={col.id} style={{ padding: '12px 10px', fontWeight: 800, fontSize: 12, color: accentColor, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                          {i === metadataCols.length - 1 ? 'Grand Total' : ''}
+                                        </td>
+                                      ))}
+                                      {printSelectedMonths.map(mk => {
+                                        const monthGrandTotal = mData.reduce((s, row) => s + (row.monthVals[mk] || 0), 0);
+                                        return (
+                                          <td key={mk} style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 800, fontSize: 13, color: '#0f172a' }}>
+                                            {fm(monthGrandTotal)}
+                                          </td>
+                                        );
+                                      })}
+                                      <td style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 800, fontSize: 14, color: '#059669' }}>
+                                        {fm(mData.reduce((s, row) => s + row.rowTotal, 0))}
+                                      </td>
+                                    </tr>
+                                  </tbody>
+                                </>
+                              );
+                            })() : (
+                              <>
+                                <thead>
+                                  <tr style={{ background: '#f8fafc', borderBottom: `3px solid ${accentColor}` }}>
+                                    {orderedCols.map(col => (
+                                      <th key={col.id} style={{
+                                        padding: '12px 10px',
+                                        textAlign: colIsNumeric(col.id) ? 'right' : 'left',
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        color: '#475569',
+                                        letterSpacing: '0.06em',
+                                        textTransform: 'uppercase',
+                                        whiteSpace: 'nowrap',
+                                      }}>
+                                        {col.label}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {filteredSlips.map((slip, idx) => (
+                                    <tr key={idx} style={{ background: idx % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}
+                                      className="hover:bg-indigo-50/30">
+                                      {orderedCols.map(col => (
+                                        <td key={col.id} style={{
+                                          padding: '11px 10px',
+                                          textAlign: colIsNumeric(col.id) ? 'right' : 'left',
+                                          verticalAlign: 'middle',
+                                        }}>
+                                          {getCellValue(col, slip, idx)}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  ))}
+
+                                  {/* Grand total row inside tbody so it prints only on the last page */}
+                                  <tr style={{ background: `${accentColor}0f`, borderTop: `2px solid ${accentColor}` }}>
+                                    {orderedCols.slice(0, labelSpan).map((col, i) => (
+                                      <td key={col.id} colSpan={i === labelSpan - 1 ? 1 : 1}
+                                        style={{ padding: '12px 10px', fontWeight: 800, fontSize: 12, color: accentColor, textAlign: 'right', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                        {i === labelSpan - 1 ? 'Grand Total' : ''}
+                                      </td>
+                                    ))}
+                                    {orderedCols.slice(labelSpan).map(col => (
+                                      <td key={col.id} style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 800, fontSize: 13, color: col.summable ? '#0f172a' : '#94a3b8' }}>
+                                        {col.summable ? fm(getTotal(col.id)) : '—'}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                </tbody>
+                              </>
+                            )}
+                          </table>
+                        </div>
+
+                        {/* ── Footer ── */}
+                        <div style={{ borderTop: '1px solid #e2e8f0', padding: '14px 36px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+                          <p style={{ margin: 0, fontSize: 11, color: '#94a3b8' }}>This is a computer-generated payroll schedule. No manual signature required.</p>
+                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: `${accentColor}22`, border: `2px solid ${accentColor}44`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ fontSize: 14 }}>✓</span>
                           </div>
                         </div>
                       </div>
-
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-left bg-slate-50 border-b-2">
-                            <th className="py-3 px-2 text-slate-600">S/N</th>
-                            <th className="py-3 px-2 text-slate-600">Employee Name</th>
-                            <th className="py-3 px-2 text-slate-600">Month</th>
-                            {printType === 'PAYE' ? (
-                              <>
-                                <th className="py-3 px-2 text-right text-slate-600">Basic (₦)</th>
-                                <th className="py-3 px-2 text-right text-slate-600">Housing (₦)</th>
-                                <th className="py-3 px-2 text-right text-slate-600">Transport (₦)</th>
-                                <th className="py-3 px-2 text-right text-slate-600">Other (₦)</th>
-                                <th className="py-3 px-2 text-right text-slate-600">Gross Pay (₦)</th>
-                                <th className="py-3 px-2 text-right text-slate-600">PAYE Deducted (₦)</th>
-                              </>
-                            ) : printType === 'PENSION' ? (
-                              <>
-                                <th className="py-3 px-2 text-right text-slate-600">Pensionable Sum (₦)</th>
-                                <th className="py-3 px-2 text-right text-slate-600">Employee (₦)</th>
-                                <th className="py-3 px-2 text-right text-slate-600">Employer (₦)</th>
-                                <th className="py-3 px-2 text-right font-bold text-slate-800">Total (₦)</th>
-                              </>
-                            ) : (
-                              <>
-                                <th className="py-3 px-2 text-right text-slate-600">Gross Pay (₦)</th>
-                                <th className="py-3 px-2 text-right text-slate-600">NSITF Ratio (%)</th>
-                                <th className="py-3 px-2 text-right font-bold text-slate-800">Amount (₦)</th>
-                              </>
-                            )}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {payslipsToPrint
-                            .filter(slip => printType === 'PAYE'
-                              ? (slip.record.staffType === 'INTERNAL' && !slip.record.department.trim().toLowerCase().includes('adhoc'))
-                              : printType === 'PENSION'
-                                ? (slip.record.staffType === 'INTERNAL' && !slip.record.department.trim().toLowerCase().includes('adhoc'))
-                                : (slip.record.nsitf > 0 && !slip.record.department.trim().toLowerCase().includes('adhoc')))
-                            .map((slip, idx) => {
-                              const pSum = slip.record.basicSalary + slip.record.housing + slip.record.transport;
-                              return (
-                                <tr key={idx} className="hover:bg-slate-50">
-                                  <td className="py-2.5 px-2">{idx + 1}</td>
-                                  <td className="py-2.5 px-2 font-medium">{slip.record.surname} {slip.record.firstname}</td>
-                                  <td className="py-2.5 px-2 text-slate-500">{slip.monthLabel}</td>
-                                  {printType === 'PAYE' ? (
-                                    <>
-                                      <td className="py-2.5 px-2 text-right font-mono">{fm(slip.record.basicSalary)}</td>
-                                      <td className="py-2.5 px-2 text-right font-mono">{fm(slip.record.housing)}</td>
-                                      <td className="py-2.5 px-2 text-right font-mono">{fm(slip.record.transport)}</td>
-                                      <td className="py-2.5 px-2 text-right font-mono">{fm(slip.record.otherAllowances)}</td>
-                                      <td className="py-2.5 px-2 text-right font-mono">{fm(slip.record.grossPay)}</td>
-                                      <td className="py-2.5 px-2 text-right font-mono font-bold text-red-600">{fm(slip.record.paye)}</td>
-                                    </>
-                                  ) : printType === 'PENSION' ? (
-                                    <>
-                                      <td className="py-2.5 px-2 text-right font-mono">{fm(pSum)}</td>
-                                      <td className="py-2.5 px-2 text-right font-mono text-amber-600">{fm(slip.record.pension)}</td>
-                                      <td className="py-2.5 px-2 text-right font-mono text-indigo-600">{fm(slip.record.employerPension)}</td>
-                                      <td className="py-2.5 px-2 text-right font-mono font-bold text-emerald-700">{fm(slip.record.pension + slip.record.employerPension)}</td>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <td className="py-2.5 px-2 text-right font-mono">{fm(slip.record.grossPay)}</td>
-                                      <td className="py-2.5 px-2 text-right font-mono text-slate-500">{payrollVariables.nsitfRate}%</td>
-                                      <td className="py-2.5 px-2 text-right font-mono font-bold text-emerald-700">{fm(slip.record.nsitf)}</td>
-                                    </>
-                                  )}
-                                </tr>
-                              );
-                            })}
-                        </tbody>
-                        <tfoot>
-                          <tr className="border-t-2 bg-slate-50">
-                            <td colSpan={3} className="py-3 px-2 text-right font-bold text-slate-700">GRAND TOTAL:</td>
-                            {printType === 'PAYE' ? (
-                              <>
-                                <td className="py-3 px-2 text-right font-mono text-slate-600">{fm(payslipsToPrint.reduce((s, x) => s + x.record.basicSalary, 0))}</td>
-                                <td className="py-3 px-2 text-right font-mono text-slate-600">{fm(payslipsToPrint.reduce((s, x) => s + x.record.housing, 0))}</td>
-                                <td className="py-3 px-2 text-right font-mono text-slate-600">{fm(payslipsToPrint.reduce((s, x) => s + x.record.transport, 0))}</td>
-                                <td className="py-3 px-2 text-right font-mono text-slate-600">{fm(payslipsToPrint.reduce((s, x) => s + x.record.otherAllowances, 0))}</td>
-                                <td className="py-3 px-2 text-right font-mono font-bold">{fm(payslipsToPrint.reduce((s, x) => s + x.record.grossPay, 0))}</td>
-                                <td className="py-3 px-2 text-right font-mono font-bold text-red-600">{fm(payslipsToPrint.reduce((s, x) => s + x.record.paye, 0))}</td>
-                              </>
-                            ) : printType === 'PENSION' ? (
-                              <>
-                                <td className="py-3 px-2 text-right font-mono font-bold text-slate-700">
-                                  {fm(payslipsToPrint.reduce((s, x) => s + (x.record.pension > 0 ? (x.record.basicSalary + x.record.housing + x.record.transport) : 0), 0))}
-                                </td>
-                                <td className="py-3 px-2 text-right font-mono font-bold text-amber-600">
-                                  {fm(payslipsToPrint.reduce((s, x) => s + x.record.pension, 0))}
-                                </td>
-                                <td className="py-3 px-2 text-right font-mono font-bold text-indigo-600">
-                                  {fm(payslipsToPrint.reduce((s, x) => s + x.record.employerPension, 0))}
-                                </td>
-                                <td className="py-3 px-2 text-right font-mono font-bold text-emerald-700">
-                                  {fm(payslipsToPrint.reduce((s, x) => s + (x.record.pension + x.record.employerPension), 0))}
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td className="py-3 px-2 text-right font-mono font-bold text-slate-700">
-                                  {fm(payslipsToPrint.reduce((s, x) => s + ((x.record.nsitf > 0 && x.record.department.trim().toLowerCase() !== 'adhoc staff') ? x.record.grossPay : 0), 0))}
-                                </td>
-                                <td className="py-3 px-2"></td>
-                                <td className="py-3 px-2 text-right font-mono font-bold text-emerald-700">
-                                  {fm(payslipsToPrint.reduce((s, x) => s + ((x.record.nsitf > 0 && x.record.department.trim().toLowerCase() !== 'adhoc staff') ? x.record.nsitf : 0), 0))}
-                                </td>
-                              </>
-                            )}
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  ) : null}
+                    );
+                  })() : null}
                 </div>
               </div>
 
