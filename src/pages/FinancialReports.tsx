@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+﻿import { useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -51,7 +51,7 @@ export function FinancialReports() {
   const [accountsTab, setAccountsTab] = useState<'payroll' | 'loans'>('payroll');
   const [payrollYear, setPayrollYear] = useState<number>(new Date().getFullYear());
   const [payrollMonth, setPayrollMonth] = useState<number | null>(new Date().getMonth() + 1);
-  const [mainTab, setMainTab] = useState<'financial' | 'site-summary' | 'ledger-summary'>('financial');
+  const [mainTab, setMainTab] = useState<'client-account' | 'payroll-summary' | 'site-summary' | 'ledger-summary'>('client-account');
   const sitesPriv = usePriv('sites');
   const [ledgerSummaryYear, setLedgerSummaryYear] = useState<string>(String(new Date().getFullYear()));
   const [ledgerSummaryView, setLedgerSummaryView] = useState<'category' | 'bank' | 'client' | 'site'>('category');
@@ -581,10 +581,16 @@ export function FinancialReports() {
         
         <div className="flex gap-6 mt-2 overflow-x-auto">
           <button 
-            className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${mainTab === 'financial' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} 
-            onClick={() => setMainTab('financial')}
+            className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${mainTab === 'client-account' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} 
+            onClick={() => setMainTab('client-account')}
           >
-            Financial Analytics
+            Client Account
+          </button>
+          <button 
+            className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${mainTab === 'payroll-summary' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} 
+            onClick={() => setMainTab('payroll-summary')}
+          >
+            Payroll Summary
           </button>
           {sitesPriv.canViewClientSummary && (
             <button 
@@ -775,7 +781,7 @@ export function FinancialReports() {
             </div>
           );
         })()
-      ) : (
+      ) : mainTab === 'client-account' ? (
         <>
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
@@ -803,93 +809,6 @@ export function FinancialReports() {
         </div>
       </div>
 
-      {/* PAYROLL EXPOSURE SECTION */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800 flex items-center gap-2">
-          <DollarSign className="w-5 h-5 text-indigo-600" /> Payroll & Statutory Overview
-        </h2>
-        <div className="flex items-center gap-2">
-          <select value={payrollMonth ?? ''} onChange={e => setPayrollMonth(e.target.value === '' ? null : Number(e.target.value))}
-            className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
-            <option value="">All Months</option>
-            {MONTHS_LIST.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-          <select value={payrollYear} onChange={e => setPayrollYear(Number(e.target.value))}
-            className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
-            {[currentYear, currentYear - 1, currentYear - 2].map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </div>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card className="bg-gradient-to-br from-slate-900 to-indigo-900 text-white border-0 shadow-xl overflow-hidden relative">
-          <div className="absolute right-0 top-0 opacity-10"><DollarSign className="w-32 h-32 -mt-4 -mr-4" /></div>
-          <CardHeader className="pb-2 relative z-10">
-            <CardTitle className="text-sm font-medium text-indigo-200 uppercase tracking-widest flex justify-between">
-              Payroll Exposure <Badge variant="outline" className="text-[10px] text-white/60 border-white/20">{payrollMonth ? MONTHS_LIST.find(m => m.value === payrollMonth)?.label : 'All Months'} {payrollYear}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="text-4xl font-black mb-1">₦{fm(payrollStats.totalGrossExposure)}</div>
-            <p className="text-xs text-indigo-300 flex items-center mt-1 font-medium">Gross liability based on attendance.</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="absolute right-0 top-0 opacity-[0.03] text-rose-500"><Backpack className="w-32 h-32 -mt-4 -mr-4" /></div>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Est. Statutory Liab.</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(payrollStats.totalStatutory)}</div>
-            <p className="text-xs text-slate-500 flex items-center mt-1">Projected PAYE, Pension & NSITF.</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="absolute right-0 top-0 opacity-[0.03] text-amber-500"><CreditCard className="w-32 h-32 -mt-4 -mr-4" /></div>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Active Outstanding Adv.</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(payrollStats.outstandingLoans)}</div>
-            <p className="text-xs text-slate-500 flex items-center mt-1"><TrendingUp className="h-3 w-3 mr-1 text-slate-400" /> Capital returning to company.</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Annual Payroll & Overtime Trend */}
-      <Card className="shadow-sm border-slate-200">
-        <CardHeader className="bg-slate-50/50 border-b pb-4">
-          <CardTitle className="text-lg flex items-center justify-between gap-2 text-slate-800">
-            <span className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-indigo-600" /> Annual Payroll & Overtime Trend (Gross)</span>
-            <Badge variant="outline" className="font-normal text-xs bg-white text-slate-500">{payrollYear} Performance</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={payrollChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis yAxisId="left" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false}
-                  tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
-                <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false}
-                  tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
-                <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString()}`} />
-                <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
-                  <LabelList dataKey="Payroll" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
-                </Line>
-                <Line yAxisId="right" type="monotone" name="Overtime Burn" dataKey="Overtime" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
-                  <LabelList dataKey="Overtime" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#f59e0b' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
-                </Line>
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Top Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1381,6 +1300,98 @@ export function FinancialReports() {
           </div>
         </CardContent>
       </Card>
+      </>
+      ) : (
+        <>
+      {/* ═══════════════════ PAYROLL SUMMARY TAB ═══════════════════ */}
+
+      {/* PAYROLL EXPOSURE SECTION */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800 flex items-center gap-2">
+          <DollarSign className="w-5 h-5 text-indigo-600" /> Payroll & Statutory Overview
+        </h2>
+        <div className="flex items-center gap-2">
+          <select value={payrollMonth ?? ''} onChange={e => setPayrollMonth(e.target.value === '' ? null : Number(e.target.value))}
+            className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
+            <option value="">All Months</option>
+            {MONTHS_LIST.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
+          <select value={payrollYear} onChange={e => setPayrollYear(Number(e.target.value))}
+            className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
+            {[currentYear, currentYear - 1, currentYear - 2].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card className="bg-gradient-to-br from-slate-900 to-indigo-900 text-white border-0 shadow-xl overflow-hidden relative">
+          <div className="absolute right-0 top-0 opacity-10"><DollarSign className="w-32 h-32 -mt-4 -mr-4" /></div>
+          <CardHeader className="pb-2 relative z-10">
+            <CardTitle className="text-sm font-medium text-indigo-200 uppercase tracking-widest flex justify-between">
+              Payroll Exposure <Badge variant="outline" className="text-[10px] text-white/60 border-white/20">{payrollMonth ? MONTHS_LIST.find(m => m.value === payrollMonth)?.label : 'All Months'} {payrollYear}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="relative z-10">
+            <div className="text-4xl font-black mb-1">₦{fm(payrollStats.totalGrossExposure)}</div>
+            <p className="text-xs text-indigo-300 flex items-center mt-1 font-medium">Gross liability based on attendance.</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute right-0 top-0 opacity-[0.03] text-rose-500"><Backpack className="w-32 h-32 -mt-4 -mr-4" /></div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Est. Statutory Liab.</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(payrollStats.totalStatutory)}</div>
+            <p className="text-xs text-slate-500 flex items-center mt-1">Projected PAYE, Pension & NSITF.</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute right-0 top-0 opacity-[0.03] text-amber-500"><CreditCard className="w-32 h-32 -mt-4 -mr-4" /></div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Active Outstanding Adv.</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(payrollStats.outstandingLoans)}</div>
+            <p className="text-xs text-slate-500 flex items-center mt-1"><TrendingUp className="h-3 w-3 mr-1 text-slate-400" /> Capital returning to company.</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Annual Payroll & Overtime Trend */}
+      <Card className="shadow-sm border-slate-200">
+        <CardHeader className="bg-slate-50/50 border-b pb-4">
+          <CardTitle className="text-lg flex items-center justify-between gap-2 text-slate-800">
+            <span className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-indigo-600" /> Annual Payroll & Overtime Trend (Gross)</span>
+            <Badge variant="outline" className="font-normal text-xs bg-white text-slate-500">{payrollYear} Performance</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={payrollChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis yAxisId="left" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false}
+                  tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
+                <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false}
+                  tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
+                <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString()}`} />
+                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
+                  <LabelList dataKey="Payroll" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                </Line>
+                <Line yAxisId="right" type="monotone" name="Overtime Burn" dataKey="Overtime" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
+                  <LabelList dataKey="Overtime" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#f59e0b' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                </Line>
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ───────────────── ACCOUNTS REPORTS ───────────────── */}
       <Card className="bg-white border-slate-200 mb-6">
@@ -1548,20 +1559,15 @@ export function FinancialReports() {
                               isEven ? 'bg-white' : 'bg-slate-50/70'
                             } hover:bg-teal-50/60`}
                           >
-                            {/* Month */}
                             <div className="py-3 px-4 flex items-center gap-2.5">
                               <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-[10px] font-black bg-gradient-to-br from-[#1f6075] to-[#1a4a5c] text-white shadow-sm shrink-0">
                                 {row.monthLabel.slice(0, 3).toUpperCase()}
                               </span>
                               <span className="text-sm font-semibold text-slate-800">{row.monthLabel}</span>
                             </div>
-
-                            {/* Salary */}
                             <div className="py-3 px-4 text-right">
                               <span className="text-sm font-mono text-slate-700">₦{fm(row.salary)}</span>
                             </div>
-
-                            {/* Overtime */}
                             <div className="py-3 px-4 text-right">
                               {row.overtime > 0 ? (
                                 <span className="inline-flex items-center gap-1 text-sm font-mono text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5">
@@ -1571,25 +1577,17 @@ export function FinancialReports() {
                                 <span className="text-sm font-mono text-slate-400">—</span>
                               )}
                             </div>
-
-                            {/* Gross Pay – accent col */}
                             <div className="py-3 px-4 text-right bg-teal-50/50 border-l border-r border-teal-100 group-hover:bg-teal-100/40">
                               <span className="text-sm font-mono font-bold text-teal-800">₦{fm(row.grossPay)}</span>
                             </div>
-
-                            {/* Other Pay */}
                             <div className="py-3 px-4 text-right">
                               <span className="text-sm font-mono text-slate-600">₦{fm(row.otherPay)}</span>
                             </div>
-
-                            {/* PAYE */}
                             <div className="py-3 px-4 text-right">
                               <span className="inline-flex items-center gap-1 text-xs font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-0.5">
                                 ₦{fm(row.paye)}
                               </span>
                             </div>
-
-                            {/* Total Payout – accent col */}
                             <div className="py-3 px-4 bg-slate-800/[0.03] border-l border-slate-200 group-hover:bg-slate-800/[0.06]">
                               <div className="flex flex-col items-end gap-1">
                                 <span className="text-sm font-mono font-extrabold text-slate-900">₦{fm(row.totalPayout)}</span>
@@ -1614,7 +1612,7 @@ export function FinancialReports() {
                         </span>
                       </div>
                       {[gSalary, gOvertime, gGrossPay, gOtherPay, gPaye, gTotalPayout].map((val, i) => {
-                        const isAccent = i === 2 || i === 5; // grossPay & totalPayout
+                        const isAccent = i === 2 || i === 5;
                         const isPaye   = i === 4;
                         return (
                           <div
@@ -1785,6 +1783,135 @@ export function FinancialReports() {
               );
             })()
           )}
+        </CardContent>
+      </Card>
+
+      {/* Custom Financial Report Builder */}
+      <Card className="bg-white border-slate-200 mb-6">
+        <CardHeader className="border-b border-slate-100 pb-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <CardTitle className="text-slate-900">Custom Financial Report Builder</CardTitle>
+              <p className="text-sm text-slate-500 mt-1">Pick the data modules you need — export as a multi-sheet Excel or a PDF summary.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSelectedFields(selectedFields.length === ALL_FINANCIAL_FIELDS.length ? [] : ALL_FINANCIAL_FIELDS)}
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline underline-offset-2 transition-colors"
+              >
+                {selectedFields.length === ALL_FINANCIAL_FIELDS.length ? 'Deselect All' : 'Select All'}
+              </button>
+              <span className="text-xs text-slate-400">{selectedFields.length} / {ALL_FINANCIAL_FIELDS.length} modules</span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="space-y-6">
+            {/* Tab Navigation */}
+            <div className="flex overflow-x-auto gap-2 pb-2 hide-scrollbar border-b border-slate-100">
+              {FINANCIAL_REPORT_GROUPS.map(group => {
+                const isActive = activeFinBuilderTab === group.group;
+                const groupSelectedCount = group.fields.filter(f => selectedFields.includes(f)).length;
+                return (
+                  <button
+                    key={group.group}
+                    onClick={() => setActiveFinBuilderTab(group.group)}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors whitespace-nowrap border-b-2 ${
+                      isActive 
+                        ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50' 
+                        : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                    }`}
+                  >
+                    {group.group}
+                    {groupSelectedCount > 0 && (
+                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-100 text-indigo-800 text-[10px]">
+                        {groupSelectedCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Active Tab Content */}
+            {FINANCIAL_REPORT_GROUPS.filter(g => g.group === activeFinBuilderTab).map(group => {
+              const checkColor: Record<string, string> = {
+                indigo:  'accent-indigo-600',
+                emerald: 'accent-emerald-600',
+                amber:   'accent-amber-500',
+                violet:  'accent-violet-600',
+              };
+              const allGroupSelected = group.fields.every(f => selectedFields.includes(f));
+              return (
+                <div key={group.group} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex items-center justify-between mb-3 px-1">
+                    <p className="text-sm font-medium text-slate-500">Select modules to include in your report:</p>
+                    <button
+                      onClick={() => {
+                        if (allGroupSelected) {
+                          setSelectedFields(prev => prev.filter(f => !group.fields.includes(f)));
+                        } else {
+                          setSelectedFields(prev => [...new Set([...prev, ...group.fields])]);
+                        }
+                      }}
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                    >
+                      {allGroupSelected ? '- Deselect Group' : '+ Select Group'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 bg-slate-50 p-5 rounded-xl border border-slate-100">
+                    {group.fields.map(field => (
+                      <label key={field} className="flex items-start gap-3 text-sm font-medium text-slate-700 cursor-pointer hover:text-slate-900 transition-colors bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedFields.includes(field)}
+                          onChange={() => toggleField(field)}
+                          className={`mt-0.5 h-4 w-4 rounded border-slate-300 ${checkColor[group.color]} transition-all`}
+                        />
+                        <span className="leading-tight">{field}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Preview bar */}
+            {selectedFields.length > 0 && (
+              <div className="flex items-start sm:items-center gap-3 text-xs text-slate-500 bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 sm:px-4 sm:py-3 animate-in fade-in">
+                <CheckCircle2 className="h-5 w-5 text-indigo-500 flex-shrink-0 mt-0.5 sm:mt-0" />
+                <div>
+                  Report will include <strong className="text-indigo-700">{selectedFields.length} module{selectedFields.length > 1 ? 's' : ''}</strong>. Excel = one sheet per module. PDF = key metric summary.
+                  <div className="text-indigo-600/80 italic mt-0.5">{selectedFields.slice(0, 5).join(', ')}{selectedFields.length > 5 ? ` +${selectedFields.length - 5} more` : ''}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Export buttons */}
+            <div className="pt-2 flex flex-wrap items-center justify-end gap-3">
+              {priv.canExport ? (
+                <>
+                  <Button
+                    variant="outline"
+                    className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                    onClick={generateCustomReport}
+                    disabled={selectedFields.length === 0}
+                  >
+                    <FileSpreadsheet className="h-4 w-4" /> Export Excel
+                  </Button>
+                  <Button
+                    className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                    onClick={generateCustomReportPdf}
+                    disabled={selectedFields.length === 0}
+                  >
+                    <FileText className="h-4 w-4" /> Export PDF Summary
+                  </Button>
+                </>
+              ) : (
+                <p className="text-xs text-slate-400 italic">Export not permitted</p>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
       </>
