@@ -134,17 +134,19 @@ export function Payroll() {
     { id: 'month',            label: 'Month',             summable: false, types: ['all'] },
     { id: 'bank_name',        label: 'Bank Name',         summable: false, types: ['all'] },
     { id: 'account_number',   label: 'Account No',        summable: false, types: ['all'] },
-    { id: 'paye_id',          label: 'PAYE ID',           summable: false, types: ['PAYE'] },
-    { id: 'pension_pin',      label: 'Pension Number',    summable: false, types: ['PENSION'] },
-    { id: 'basic',            label: 'Basic Salary',      summable: true,  types: ['PAYE'] },
-    { id: 'housing',          label: 'Housing',           summable: true,  types: ['PAYE'] },
-    { id: 'transport',        label: 'Transport',         summable: true,  types: ['PAYE'] },
-    { id: 'other',            label: 'Other Allowances',  summable: true,  types: ['PAYE'] },
-    { id: 'gross',            label: 'Gross Pay',         summable: true,  types: ['PAYE', 'NSITF'] },
-    { id: 'paye',             label: 'PAYE Tax',          summable: true,  types: ['PAYE'] },
-    { id: 'net_pay',          label: 'Net (Take-Home)',   summable: true,  types: ['PAYE'] },
+    { id: 'paye_id',          label: 'PAYE ID',           summable: false, types: ['PAYE', 'PAYSLIPS'] },
+    { id: 'pension_pin',      label: 'Pension Number',    summable: false, types: ['PENSION', 'PAYSLIPS'] },
+    { id: 'basic',            label: 'Basic Salary',      summable: true,  types: ['PAYE', 'PAYSLIPS'] },
+    { id: 'housing',          label: 'Housing',           summable: true,  types: ['PAYE', 'PAYSLIPS'] },
+    { id: 'transport',        label: 'Transport',         summable: true,  types: ['PAYE', 'PAYSLIPS'] },
+    { id: 'other',            label: 'Other Allowances',  summable: true,  types: ['PAYE', 'PAYSLIPS'] },
+    { id: 'overtime',         label: 'Overtime Pay',      summable: true,  types: ['PAYSLIPS'] },
+    { id: 'gross',            label: 'Gross Pay',         summable: true,  types: ['PAYE', 'NSITF', 'PAYSLIPS'] },
+    { id: 'paye',             label: 'PAYE Tax',          summable: true,  types: ['PAYE', 'PAYSLIPS'] },
+    { id: 'loan',             label: 'Loan Repayment',    summable: true,  types: ['PAYSLIPS'] },
+    { id: 'net_pay',          label: 'Net (Take-Home)',   summable: true,  types: ['PAYE', 'PAYSLIPS'] },
     { id: 'pensionable',      label: 'Pensionable Sum',   summable: true,  types: ['PENSION'] },
-    { id: 'employee_pension', label: 'Employee Pension',  summable: true,  types: ['PENSION'] },
+    { id: 'employee_pension', label: 'Employee Pension',  summable: true,  types: ['PENSION', 'PAYSLIPS'] },
     { id: 'employer_pension', label: 'Employer Pension',  summable: true,  types: ['PENSION'] },
     { id: 'total_pension',    label: 'Total Pension',     summable: true,  types: ['PENSION'] },
     { id: 'nsitf_rate',       label: 'NSITF Ratio',       summable: false, types: ['NSITF'] },
@@ -152,7 +154,7 @@ export function Payroll() {
   ];
 
   const DEFAULT_COLUMNS: Record<string, string[]> = {
-    PAYSLIPS: [],
+    PAYSLIPS: ['employee_name', 'month', 'bank_name', 'account_number', 'basic', 'housing', 'transport', 'other', 'overtime', 'gross', 'paye', 'loan', 'employee_pension', 'net_pay'],
     PAYE:    ['sn', 'employee_name', 'paye_id', 'month', 'bank_name', 'account_number', 'basic', 'housing', 'transport', 'other', 'gross', 'paye'],
     PENSION: ['sn', 'employee_name', 'pension_pin', 'month', 'bank_name', 'account_number', 'pensionable', 'employee_pension', 'employer_pension', 'total_pension'],
     NSITF:   ['sn', 'employee_name', 'month', 'bank_name', 'account_number', 'gross', 'nsitf_rate', 'nsitf_amount'],
@@ -1162,7 +1164,7 @@ export function Payroll() {
                   </div>
 
                   {/* Columns to Include */}
-                  {printType !== 'PAYSLIPS' && (() => {
+                  {(() => {
                     // Only show columns relevant to this schedule type
                     const relevantCols = AVAILABLE_COLUMNS.filter(c => c.types.includes('all') || c.types.includes(printType));
                     return (
@@ -1228,8 +1230,10 @@ export function Payroll() {
                             <h3 className="text-sm font-semibold text-slate-500 uppercase mb-2">Employee Details</h3>
                             <table className="w-full text-sm">
                               <tbody>
-                                <tr><td className="py-1 text-slate-600">Name:</td><td className="py-1 font-medium">{slip.record.firstname} {slip.record.surname}</td></tr>
+                                {printSelectedColumns.includes('employee_name') && <tr><td className="py-1 text-slate-600">Name:</td><td className="py-1 font-medium">{slip.record.firstname} {slip.record.surname}</td></tr>}
                                 <tr><td className="py-1 text-slate-600">Employee ID:</td><td className="py-1 font-mono">{slip.record.employeeCode || slip.record.id}</td></tr>
+                                {printSelectedColumns.includes('paye_id') && <tr><td className="py-1 text-slate-600">PAYE ID:</td><td className="py-1 font-mono">{(() => { const emp = employees.find(e => e.id === slip.record.id); return emp?.payeNumber || emp?.taxId || 'N/A'; })()}</td></tr>}
+                                {printSelectedColumns.includes('pension_pin') && <tr><td className="py-1 text-slate-600">Pension No:</td><td className="py-1 font-mono">{(() => { const emp = employees.find(e => e.id === slip.record.id); return emp?.pensionNumber || 'N/A'; })()}</td></tr>}
                                 <tr><td className="py-1 text-slate-600">Position:</td><td className="py-1">{slip.record.position}</td></tr>
                                 <tr><td className="py-1 text-slate-600">Department:</td><td className="py-1">{slip.record.department}</td></tr>
                               </tbody>
@@ -1239,9 +1243,9 @@ export function Payroll() {
                             <h3 className="text-sm font-semibold text-slate-500 uppercase mb-2">Payment Details</h3>
                             <table className="w-full text-sm">
                               <tbody>
-                                <tr><td className="py-1 text-slate-600">Pay Period:</td><td className="py-1 font-medium">{slip.monthLabel}</td></tr>
-                                <tr><td className="py-1 text-slate-600">Bank:</td><td className="py-1">{slip.record.bankName}</td></tr>
-                                <tr><td className="py-1 text-slate-600">Account No:</td><td className="py-1 font-mono">{slip.record.accountNo}</td></tr>
+                                {printSelectedColumns.includes('month') && <tr><td className="py-1 text-slate-600">Pay Period:</td><td className="py-1 font-medium">{slip.monthLabel}</td></tr>}
+                                {printSelectedColumns.includes('bank_name') && <tr><td className="py-1 text-slate-600">Bank:</td><td className="py-1">{slip.record.bankName}</td></tr>}
+                                {printSelectedColumns.includes('account_number') && <tr><td className="py-1 text-slate-600">Account No:</td><td className="py-1 font-mono">{slip.record.accountNo}</td></tr>}
                               </tbody>
                             </table>
                           </div>
@@ -1255,12 +1259,12 @@ export function Payroll() {
                               <tr className="text-left"><th className="py-2 text-slate-600">Description</th><th className="py-2 text-right text-slate-600">Amount (₦)</th></tr>
                             </thead>
                             <tbody>
-                              <tr><td className="py-2">Basic Salary</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.basicSalary.toLocaleString()}</td></tr>
-                              {slip.record.housing > 0 && <tr><td className="py-2">Housing Allowance</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.housing.toLocaleString()}</td></tr>}
-                              {slip.record.transport > 0 && <tr><td className="py-2">Transport Allowance</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.transport.toLocaleString()}</td></tr>}
-                              {slip.record.otherAllowances > 0 && <tr><td className="py-2">Other Allowances</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.otherAllowances.toLocaleString()}</td></tr>}
-                              {slip.record.overtime > 0 && <tr><td className="py-2">Overtime Pay</td><td className="py-2 text-right font-mono text-emerald-600">+{priv?.canViewAmounts === false ? '***' : slip.record.overtime.toLocaleString()}</td></tr>}
-                              <tr className="border-t font-semibold"><td className="py-2">GROSS PAY</td><td className="py-2 text-right font-mono text-lg">{priv?.canViewAmounts === false ? '***' : slip.record.grossPay.toLocaleString()}</td></tr>
+                              {printSelectedColumns.includes('basic') && <tr><td className="py-2">Basic Salary</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.basicSalary.toLocaleString()}</td></tr>}
+                              {printSelectedColumns.includes('housing') && slip.record.housing > 0 && <tr><td className="py-2">Housing Allowance</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.housing.toLocaleString()}</td></tr>}
+                              {printSelectedColumns.includes('transport') && slip.record.transport > 0 && <tr><td className="py-2">Transport Allowance</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.transport.toLocaleString()}</td></tr>}
+                              {printSelectedColumns.includes('other') && slip.record.otherAllowances > 0 && <tr><td className="py-2">Other Allowances</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.otherAllowances.toLocaleString()}</td></tr>}
+                              {printSelectedColumns.includes('overtime') && slip.record.overtime > 0 && <tr><td className="py-2">Overtime Pay</td><td className="py-2 text-right font-mono text-emerald-600">+{priv?.canViewAmounts === false ? '***' : slip.record.overtime.toLocaleString()}</td></tr>}
+                              {printSelectedColumns.includes('gross') && <tr className="border-t font-semibold"><td className="py-2">GROSS PAY</td><td className="py-2 text-right font-mono text-lg">{priv?.canViewAmounts === false ? '***' : slip.record.grossPay.toLocaleString()}</td></tr>}
                             </tbody>
                           </table>
                         </div>
@@ -1273,21 +1277,33 @@ export function Payroll() {
                               <tr className="text-left"><th className="py-2 text-slate-600">Description</th><th className="py-2 text-right text-slate-600">Amount (₦)</th></tr>
                             </thead>
                             <tbody>
-                              {slip.record.paye > 0 && <tr><td className="py-2">PAYE Tax</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.paye.toLocaleString()}</td></tr>}
-                              {slip.record.loanRepayment > 0 && <tr><td className="py-2">Loan & Advance Repayment</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.loanRepayment.toLocaleString()}</td></tr>}
-                              {slip.record.pension > 0 && <tr><td className="py-2">Pension Contribution</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.pension.toLocaleString()}</td></tr>}
-                              <tr className="border-t font-semibold"><td className="py-2">TOTAL DEDUCTIONS</td><td className="py-2 text-right font-mono text-red-600 text-lg">-{priv?.canViewAmounts === false ? '***' : (slip.record.paye + slip.record.loanRepayment + slip.record.pension).toLocaleString()}</td></tr>
+                              {printSelectedColumns.includes('paye') && slip.record.paye > 0 && <tr><td className="py-2">PAYE Tax</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.paye.toLocaleString()}</td></tr>}
+                              {printSelectedColumns.includes('loan') && slip.record.loanRepayment > 0 && <tr><td className="py-2">Loan & Advance Repayment</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.loanRepayment.toLocaleString()}</td></tr>}
+                              {printSelectedColumns.includes('employee_pension') && slip.record.pension > 0 && <tr><td className="py-2">Pension Contribution</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.pension.toLocaleString()}</td></tr>}
+                              
+                              <tr className="border-t font-semibold">
+                                <td className="py-2">TOTAL DEDUCTIONS</td>
+                                <td className="py-2 text-right font-mono text-red-600 text-lg">
+                                  -{priv?.canViewAmounts === false ? '***' : (
+                                    (printSelectedColumns.includes('paye') ? slip.record.paye : 0) + 
+                                    (printSelectedColumns.includes('loan') ? slip.record.loanRepayment : 0) + 
+                                    (printSelectedColumns.includes('employee_pension') ? slip.record.pension : 0)
+                                  ).toLocaleString()}
+                                </td>
+                              </tr>
                             </tbody>
                           </table>
                         </div>
 
                         {/* Net Pay */}
-                        <div className="bg-emerald-50 p-6 rounded-lg border border-emerald-100">
-                          <div className="flex justify-between items-center">
-                            <span className="text-lg font-bold text-slate-900">TAKE HOME PAY</span>
-                            <span className="text-3xl font-bold text-emerald-700">₦{priv?.canViewAmounts === false ? '***' : slip.record.takeHomePay.toLocaleString()}</span>
+                        {printSelectedColumns.includes('net_pay') && (
+                          <div className="bg-emerald-50 p-6 rounded-lg border border-emerald-100">
+                            <div className="flex justify-between items-center">
+                              <span className="text-lg font-bold text-slate-900">TAKE HOME PAY</span>
+                              <span className="text-3xl font-bold text-emerald-700">₦{priv?.canViewAmounts === false ? '***' : slip.record.takeHomePay.toLocaleString()}</span>
+                            </div>
                           </div>
-                        </div>
+                        )}
 
                         {/* Footer */}
                         <div className="mt-8 pt-4 border-t text-center text-xs text-slate-400">
