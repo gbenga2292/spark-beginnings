@@ -1,319 +1,467 @@
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { useAppData, deriveMainTaskStatus, getMainTaskProgress } from '@/src/contexts/AppDataContext';
+import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useWorkspace } from '@/src/hooks/use-workspace';
-import { CheckCircle2, Loader2, Circle, Calendar, Users, BarChart3, Clock, TrendingUp } from 'lucide-react';
-import { format, isPast } from 'date-fns';
-
-
-const statusLabels = { not_started: 'Not Started', in_progress: 'In Progress', completed: 'Completed' } as const;
-const statusStyle = {
-    not_started: 'bg-gray-100 text-gray-600 border-gray-200',
-    in_progress: 'bg-blue-50 text-blue-700 border-blue-200',
-    completed: 'bg-green-50 text-green-700 border-green-200',
-};
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid,
+    Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area,
+} from 'recharts';
+import {
+    format, subDays, isPast, parseISO, startOfMonth, endOfMonth,
+    startOfYear, endOfYear, isSameDay, isWithinInterval, getDaysInMonth,
+    getYear, getMonth,
+} from 'date-fns';
+import { Download, AlertCircle, Clock, CheckCircle2, Activity, Filter, FileText, ChevronDown, CalendarDays } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
-const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
+const item      = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
+
+const MONTHS = [
+    'January','February','March','April','May','June',
+    'July','August','September','October','November','December',
+];
+
+/* ── Build year list from subtask timestamps ──────────────────────────────── */
+function buildYearList(subtasks: { createdAt?: string }[]): number[] {
+    const set = new Set<number>();
+    const curr = new Date().getFullYear();
+    set.add(curr);
+    subtasks.forEach(s => {
+        if (s.createdAt) {
+            try { set.add(getYear(parseISO(s.createdAt))); } catch {}
+        }
+    });
+    return Array.from(set).sort((a, b) => b - a); // newest first
+}
 
 export default function Reports() {
-    const { user: currentUser } = useAuth();
-    return currentUser?.role === 'admin' ? <AdminReports /> : <UserReports />;
+    useAuth(); // keep auth context alive
+    return <AnalyticsDashboard />;
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   ADMIN VIEW — full company-wide dashboard
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-function AdminReports() {
+/* ─── ANALYTICS CORE ENGINE ────────────────────────────────────────────────── */
+function AnalyticsDashboard() {
     const { subtasks } = useAppData();
-    const { user: currentUser } = useAuth();
-    const { wsTasks: teamTasks, wsMembers: teamUsers, workspace } = useWorkspace();
+    const { wsTasks: mainTasks, wsMembers: teamUsers, workspace } = useWorkspace();
 
-    // Active workspace scoped data
-    const teamTaskIds = new Set(teamTasks.map(mt => mt.id));
-    const teamSubtasks = subtasks.filter(s => teamTaskIds.has(s.mainTaskId));
+    // ── Filter state ─────────────────────────────────────────────────────────
+    // Rolling window (days) — used when year+month are both blank
+    const [rolling, setRolling]       = useState<number | null>(30);
+    const [filterYear, setFilterYear] = useState<number | ''>('');   // '' = all
+    const [filterMonth, setFilterMonth] = useState<number | ''>(''); // '' = all  (0-indexed)
 
-    const totalSubs = teamSubtasks.length;
-    const completedSubs = teamSubtasks.filter((s) => s.status === 'completed').length;
-    const inProgressSubs = teamSubtasks.filter((s) => s.status === 'in_progress').length;
-    const notStartedSubs = teamSubtasks.filter((s) => s.status === 'not_started').length;
+    const yearList = useMemo(() => buildYearList(subtasks), [subtasks]);
 
-    const userWorkload = teamUsers.map((u) => {
-        const mySubs = teamSubtasks.filter((s) => s.assignedTo === u.id);
+    // ── Resolve effective date interval ──────────────────────────────────────
+    // Priority: Year+Month > Year only > Rolling window
+    const { intervalStart, intervalEnd, bucketMode } = useMemo((): {
+        intervalStart: Date;
+        intervalEnd: Date;
+        bucketMode: 'daily' | 'monthly';
+    } => {
+        const now = new Date();
+
+        if (filterYear !== '') {
+            if (filterMonth !== '') {
+                // Specific month of specific year — daily buckets
+                const ref = new Date(filterYear, filterMonth as number, 1);
+                return {
+                    intervalStart: startOfMonth(ref),
+                    intervalEnd:   endOfMonth(ref),
+                    bucketMode:    'daily',
+                };
+            }
+            // Whole year — monthly buckets
+            const ref = new Date(filterYear, 0, 1);
+            return {
+                intervalStart: startOfYear(ref),
+                intervalEnd:   endOfYear(ref),
+                bucketMode:    'monthly',
+            };
+        }
+
+        // Rolling window fallback (or "all time" if rolling is null)
+        const days = rolling ?? 365;
         return {
-            user: u,
-            total: mySubs.length,
-            completed: mySubs.filter((s) => s.status === 'completed').length,
-            inProgress: mySubs.filter((s) => s.status === 'in_progress').length,
-            notStarted: mySubs.filter((s) => s.status === 'not_started').length,
+            intervalStart: startOfDay(subDays(now, days)),
+            intervalEnd:   now,
+            bucketMode:    'daily',
         };
-    }).sort((a, b) => b.total - a.total);
+    }, [filterYear, filterMonth, rolling]);
 
+    // ── Subtasks within the resolved interval ────────────────────────────────
+    const validSubs = useMemo(() =>
+        subtasks.filter(s => {
+            if (!s.createdAt) return false;
+            try {
+                return isWithinInterval(parseISO(s.createdAt), { start: intervalStart, end: intervalEnd });
+            } catch { return false; }
+        }),
+    [subtasks, intervalStart, intervalEnd]);
+
+    // All-time subtasks for bottleneck (unfiltered by date)
+    const allSubs = subtasks;
+
+    const completedSubs  = validSubs.filter(s => s.status === 'completed');
+    const inProgressSubs = validSubs.filter(s => s.status === 'in_progress');
+
+    // ── Avg closure time (days between createdAt → updatedAt where completed) ─
+    const avgClosureDays = useMemo(() => {
+        const pairs = completedSubs
+            .filter(s => s.createdAt && s.updatedAt)
+            .map(s => {
+                try {
+                    const created = parseISO(s.createdAt!);
+                    const closed  = parseISO(s.updatedAt!);
+                    return Math.max(0, (closed.getTime() - created.getTime()) / 86_400_000);
+                } catch { return null; }
+            })
+            .filter((v): v is number => v !== null);
+        if (pairs.length === 0) return null;
+        return (pairs.reduce((a, b) => a + b, 0) / pairs.length).toFixed(1);
+    }, [completedSubs]);
+
+    // ── 1. Bottleneck Analysis (uses ALL subtasks — not date-filtered) ────────
+    const bottleneckData = useMemo(() =>
+        teamUsers.map(user => {
+            const userSubs    = allSubs.filter(s => s.assignedTo === user.id);
+            const overdue     = userSubs.filter(s => s.deadline && isPast(parseISO(s.deadline)) && s.status !== 'completed').length;
+            const stuckInProg = userSubs.filter(s => s.status === 'in_progress').length;
+            const completed   = userSubs.filter(s => s.status === 'completed').length;
+            return { ...user, total: userSubs.length, overdue, stuckInProg, completed, riskScore: (overdue * 3) + stuckInProg };
+        }).filter(u => u.total > 0).sort((a, b) => b.riskScore - a.riskScore),
+    [teamUsers, allSubs]);
+
+    // ── 2. Velocity chart — bucket by day or month within the interval ────────
+    const velocityData = useMemo(() => {
+        if (bucketMode === 'monthly') {
+            // 12 monthly buckets for the selected year
+            return MONTHS.map((label, mIdx) => {
+                const ref   = new Date(filterYear as number, mIdx, 1);
+                const start = startOfMonth(ref);
+                const end   = endOfMonth(ref);
+
+                const created = subtasks.filter(s => {
+                    if (!s.createdAt) return false;
+                    try { return isWithinInterval(parseISO(s.createdAt), { start, end }); } catch { return false; }
+                }).length;
+
+                const closed = subtasks.filter(s => {
+                    if (s.status !== 'completed' || !s.updatedAt) return false;
+                    try { return isWithinInterval(parseISO(s.updatedAt), { start, end }); } catch { return false; }
+                }).length;
+
+                return { date: label.slice(0, 3), created, closed };
+            });
+        }
+
+        // Daily buckets
+        const days: { date: string; created: number; closed: number }[] = [];
+        let cursor = new Date(intervalStart);
+        while (cursor <= intervalEnd) {
+            const day      = new Date(cursor);
+            const dayLabel = format(day, 'MMM d');
+
+            const created = subtasks.filter(s => {
+                if (!s.createdAt) return false;
+                try { return isSameDay(parseISO(s.createdAt), day); } catch { return false; }
+            }).length;
+
+            const closed = subtasks.filter(s => {
+                if (s.status !== 'completed' || !s.updatedAt) return false;
+                try { return isSameDay(parseISO(s.updatedAt), day); } catch { return false; }
+            }).length;
+
+            days.push({ date: dayLabel, created, closed });
+            cursor.setDate(cursor.getDate() + 1);
+        }
+        return days;
+    }, [subtasks, intervalStart, intervalEnd, bucketMode, filterYear]);
+
+    // ── 3. Project health (within interval) ──────────────────────────────────
+    const projectHealthData = useMemo(() =>
+        mainTasks.map(mt => {
+            const mSubs = validSubs.filter(s => s.mainTaskId === mt.id);
+            const comp  = mSubs.filter(s => s.status === 'completed').length;
+            return {
+                name:      mt.title.length > 18 ? mt.title.slice(0, 18) + '…' : mt.title,
+                completed: comp,
+                remaining: mSubs.length - comp,
+                total:     mSubs.length,
+            };
+        }).filter(p => p.total > 0).sort((a, b) => b.total - a.total).slice(0, 8),
+    [mainTasks, validSubs]);
+
+    // ── Excel export ─────────────────────────────────────────────────────────
+    const handleExport = () => {
+        const rows = validSubs.map(s => ({
+            'Project':  mainTasks.find(m => m.id === s.mainTaskId)?.title ?? 'Unknown',
+            'Task ID':  s.id ?? '',
+            'Title':    s.title,
+            'Status':   s.status,
+            'Assignee': teamUsers.find(u => u.id === s.assignedTo)?.name ?? 'Unassigned',
+            'Deadline': s.deadline ? format(parseISO(s.deadline), 'yyyy-MM-dd') : 'No Deadline',
+            'Overdue':  s.deadline && isPast(parseISO(s.deadline)) && s.status !== 'completed' ? 'YES' : 'NO',
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Task Report');
+        XLSX.writeFile(wb, `Task_Report_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+    };
+
+    // ── Human-readable period label ───────────────────────────────────────────
+    const periodLabel = useMemo(() => {
+        if (filterYear !== '') {
+            if (filterMonth !== '') return `${MONTHS[filterMonth as number]} ${filterYear}`;
+            return `Full Year ${filterYear}`;
+        }
+        if (rolling) return `Last ${rolling} days`;
+        return 'All time';
+    }, [filterYear, filterMonth, rolling]);
+
+    function startOfDay(d: Date) { const c = new Date(d); c.setHours(0,0,0,0); return c; }
+
+    /* ── RENDER ──────────────────────────────────────────────────────────── */
     return (
-        <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
-            <motion.div variants={item}>
-                <h2 className="text-lg font-semibold text-foreground">Reports &amp; Monitoring</h2>
-                <p className="text-sm text-muted-foreground">{workspace?.name ?? 'Workspace'} progress overview</p>
+        <motion.div variants={container} initial="hidden" animate="show" className="space-y-5 h-full flex flex-col min-h-0 pb-6">
+
+            {/* ── Page Header ── */}
+            <motion.div variants={item} className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-indigo-500" /> Analytical Reports
+                    </h1>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                        Showing: <span className="font-semibold text-foreground">{periodLabel}</span>
+                        {' · '}{workspace?.name}
+                    </p>
+                </div>
+                <button onClick={handleExport}
+                    className="self-start flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-all">
+                    <Download className="h-4 w-4" /> Export XLSX
+                </button>
             </motion.div>
 
-            {/* Summary cards */}
-            <motion.div variants={item} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* ── Filter Bar ── */}
+            <motion.div variants={item}
+                className="flex flex-wrap items-center gap-3 p-4 bg-card border border-border rounded-2xl shadow-sm">
+
+                <CalendarDays className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Filter Period</span>
+
+                {/* Year */}
+                <div className="relative">
+                    <select
+                        value={filterYear}
+                        onChange={e => {
+                            const val = e.target.value === '' ? '' : Number(e.target.value);
+                            setFilterYear(val);
+                            setFilterMonth('');  // reset month when year changes
+                            if (val !== '') setRolling(null); // year takes priority
+                        }}
+                        className="appearance-none pl-3 pr-8 py-2 bg-background border border-border rounded-lg text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer shadow-sm">
+                        <option value="">All Years</option>
+                        {yearList.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                </div>
+
+                {/* Month — only enabled when a year is selected */}
+                <div className="relative">
+                    <select
+                        value={filterMonth}
+                        disabled={filterYear === ''}
+                        onChange={e => {
+                            setFilterMonth(e.target.value === '' ? '' : Number(e.target.value));
+                        }}
+                        className="appearance-none pl-3 pr-8 py-2 bg-background border border-border rounded-lg text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                        <option value="">All Months</option>
+                        {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                </div>
+
+                {/* Divider */}
+                <div className="h-5 w-px bg-border mx-1" />
+
+                {/* Rolling window — active only when no year is selected */}
+                <div className="relative">
+                    <select
+                        value={rolling ?? ''}
+                        disabled={filterYear !== ''}
+                        onChange={e => {
+                            setRolling(e.target.value === '' ? null : Number(e.target.value));
+                        }}
+                        className="appearance-none pl-3 pr-8 py-2 bg-background border border-border rounded-lg text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                        <option value="">Rolling window</option>
+                        <option value={7}>Last 7 days</option>
+                        <option value={14}>Last 14 days</option>
+                        <option value={30}>Last 30 days</option>
+                        <option value={60}>Last 60 days</option>
+                        <option value={90}>Last 90 days</option>
+                        <option value={180}>Last 6 months</option>
+                        <option value={365}>Last 12 months</option>
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                </div>
+
+                {/* Clear filters */}
+                {(filterYear !== '' || rolling !== 30) && (
+                    <button
+                        onClick={() => { setFilterYear(''); setFilterMonth(''); setRolling(30); }}
+                        className="text-xs font-semibold text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors ml-1">
+                        Reset
+                    </button>
+                )}
+            </motion.div>
+
+            {/* ── Stat Cards ── */}
+            <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                    { label: 'Total Tasks', value: totalSubs, icon: BarChart3, color: 'border-border bg-card', valueColor: 'text-foreground' },
-                    { label: 'Completed', value: completedSubs, icon: CheckCircle2, color: 'border-green-200 bg-green-50', valueColor: 'text-green-700' },
-                    { label: 'In Progress', value: inProgressSubs, icon: Loader2, color: 'border-blue-200 bg-blue-50', valueColor: 'text-blue-700' },
-                    { label: 'Not Started', value: notStartedSubs, icon: Circle, color: 'border-border bg-muted/50', valueColor: 'text-muted-foreground' },
-                ].map((c) => (
-                    <div key={c.label} className={`border rounded-2xl p-4 ${c.color}`}>
-                        <c.icon className={`w-4 h-4 mb-2 ${c.valueColor}`} />
-                        <p className={`text-2xl font-bold tabular-nums ${c.valueColor}`}>{c.value}</p>
-                        <p className="text-xs font-medium text-muted-foreground mt-0.5">{c.label}</p>
-                        {totalSubs > 0 && <p className="text-[11px] text-muted-foreground/70 mt-1">{Math.round((c.value / totalSubs) * 100)}% of total</p>}
+                    {
+                        icon: <FileText className="w-5 h-5" />,
+                        bg: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600',
+                        label: 'Total Workload',
+                        value: validSubs.length,
+                        sub: 'Subtasks in this period',
+                    },
+                    {
+                        icon: <CheckCircle2 className="w-5 h-5" />,
+                        bg: 'bg-green-100 dark:bg-green-900/30 text-green-600',
+                        label: 'Completed',
+                        value: completedSubs.length,
+                        sub: `${validSubs.length > 0 ? Math.round((completedSubs.length / validSubs.length) * 100) : 0}% completion rate`,
+                        subColor: 'text-green-600',
+                    },
+                    {
+                        icon: <Clock className="w-5 h-5" />,
+                        bg: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600',
+                        label: 'Avg Closure Time',
+                        value: avgClosureDays !== null ? `${avgClosureDays}d` : '—',
+                        sub: 'createdAt → completedAt',
+                    },
+                    {
+                        icon: <AlertCircle className="w-5 h-5" />,
+                        bg: 'bg-red-100 dark:bg-red-900/30 text-red-600',
+                        label: 'Critical Risk',
+                        value: bottleneckData.reduce((a, b) => a + b.overdue, 0),
+                        sub: 'Overdue tasks (all time)',
+                        subColor: 'text-red-600',
+                    },
+                ].map(card => (
+                    <div key={card.label} className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className={`p-2 rounded-xl ${card.bg}`}>{card.icon}</div>
+                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{card.label}</p>
+                        </div>
+                        <p className="text-3xl font-black text-foreground">{card.value}</p>
+                        <p className={`text-[11px] mt-1 ${card.subColor ?? 'text-muted-foreground'}`}>{card.sub}</p>
                     </div>
                 ))}
             </motion.div>
 
-            {/* Main Task progress */}
-            <motion.div variants={item} className="bg-card border border-border rounded-2xl overflow-hidden">
-                <div className="px-5 py-4 border-b border-border">
-                    <h3 className="text-sm font-semibold text-foreground">Task Progress</h3>
-                </div>
-                <div className="divide-y divide-border/50">
-                    {teamTasks.map((mt) => {
-                        const progress = getMainTaskProgress(mt.id, teamSubtasks);
-                        const status = deriveMainTaskStatus(mt.id, teamSubtasks);
-                        const pct = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
-                        const assignees = [...new Set(teamSubtasks.filter((s) => s.mainTaskId === mt.id && s.assignedTo).map((s) => s.assignedTo!))]
-                            .map((uid) => teamUsers.find((u) => u.id === uid)).filter(Boolean);
-                        const subs = teamSubtasks.filter((s) => s.mainTaskId === mt.id);
+            {/* ── Charts ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 flex-1 min-h-0">
 
-                        return (
-                            <div key={mt.id} className="px-5 py-4">
-                                <div className="flex items-start justify-between gap-4 mb-2">
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-sm font-semibold text-foreground">{mt.title}</p>
-                                            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${statusStyle[status]}`}>
-                                                {statusLabels[status]}
-                                            </span>
-                                        </div>
-                                        {mt.deadline && (
-                                            <p className={`text-xs mt-0.5 flex items-center gap-1 ${isPast(new Date(mt.deadline)) && status !== 'completed' ? 'text-red-500' : 'text-muted-foreground'}`}>
-                                                <Calendar className="w-3 h-3" /> Due {format(new Date(mt.deadline), 'MMMM d, yyyy')}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <span className="text-sm font-bold text-foreground flex-shrink-0">{pct}%</span>
-                                </div>
-                                <div className="w-full h-2 bg-muted rounded-full overflow-hidden mb-3">
-                                    <motion.div
-                                        initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.7, ease: 'easeOut' }}
-                                        className={`h-full rounded-full ${status === 'completed' ? 'bg-green-500' : 'bg-blue-500'}`}
-                                    />
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
-                                    {subs.map((sub) => {
-                                        const assignee = teamUsers.find((u) => u.id === sub.assignedTo);
-                                        return (
-                                            <div key={sub.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs border ${statusStyle[sub.status]}`}>
-                                                {sub.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" /> :
-                                                    sub.status === 'in_progress' ? <Loader2 className="w-3.5 h-3.5 flex-shrink-0 animate-spin" /> :
-                                                        <Circle className="w-3.5 h-3.5 flex-shrink-0 text-gray-400" />}
-                                                <span className="flex-1 truncate font-medium">{sub.title}</span>
-                                                {assignee && (
-                                                    <div title={assignee.name} className={`w-5 h-5 rounded-full ${assignee.avatarColor} flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0`}>
-                                                        {assignee.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                                <div className="flex items-center gap-3 mt-2">
-                                    <span className="text-xs text-muted-foreground">{progress.completed}/{progress.total} modules completed</span>
-                                    <div className="flex -space-x-1">
-                                        {assignees.map((u) => u && (
-                                            <div key={u.id} title={u.name} className={`w-5 h-5 rounded-full ${u.avatarColor} border-2 border-card flex items-center justify-center text-white text-[8px] font-bold`}>
-                                                {u.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </motion.div>
+                {/* Velocity / Burn Chart */}
+                <motion.div variants={item} className="lg:col-span-2 bg-card border border-border rounded-2xl shadow-sm p-5 flex flex-col">
+                    <div className="mb-4">
+                        <h3 className="text-sm font-semibold text-foreground">Task Velocity / Burn Chart</h3>
+                        <p className="text-xs text-muted-foreground">
+                            {bucketMode === 'monthly' ? 'Monthly' : 'Daily'} throughput — created vs closed · {periodLabel}
+                        </p>
+                    </div>
+                    <div className="flex-1 w-full min-h-[250px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={velocityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="gClosed" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.35} />
+                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="gCreated" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%"  stopColor="#94a3b8" stopOpacity={0.25} />
+                                        <stop offset="95%" stopColor="#94a3b8" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="opacity-[0.08]" />
+                                <XAxis dataKey="date" axisLine={false} tickLine={false}
+                                    tick={{ fontSize: 10, fill: 'currentColor' }} className="text-muted-foreground"
+                                    interval={velocityData.length > 30 ? Math.ceil(velocityData.length / 15) : 0} />
+                                <YAxis axisLine={false} tickLine={false}
+                                    tick={{ fontSize: 10, fill: 'currentColor' }} className="text-muted-foreground"
+                                    allowDecimals={false} />
+                                <RechartsTooltip
+                                    contentStyle={{ borderRadius: '12px', border: '1px solid var(--border)', backgroundColor: 'var(--card)', fontSize: 12 }}
+                                    itemStyle={{ fontWeight: 600 }} />
+                                <Area type="monotone" dataKey="created" name="New Tasks"
+                                    stroke="#94a3b8" strokeWidth={2} fillOpacity={1} fill="url(#gCreated)" />
+                                <Area type="monotone" dataKey="closed" name="Closed Tasks"
+                                    stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill="url(#gClosed)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </motion.div>
 
-            {/* Team workload */}
-            <motion.div variants={item} className="bg-card border border-border rounded-2xl overflow-hidden">
-                <div className="px-5 py-4 border-b border-border flex items-center gap-2">
-                    <Users className="w-4 h-4 text-muted-foreground" />
-                    <h3 className="text-sm font-semibold text-foreground">Team Workload</h3>
-                </div>
-                <div className="divide-y divide-border/50">
-                    {userWorkload.map(({ user, total, completed, inProgress, notStarted }) => {
-                        const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-                        return (
-                            <div key={user.id} className="px-5 py-3.5 flex items-center gap-4">
-                                <div className={`w-9 h-9 rounded-full ${user.avatarColor} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
-                                    {user.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                {/* Bottleneck Radar */}
+                <motion.div variants={item} className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                    <div className="p-4 border-b border-border/50 bg-slate-50/50 dark:bg-slate-900/40">
+                        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                            <Filter className="w-4 h-4 text-rose-500" /> Bottleneck Radar
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">Ranked by operational blockages (all time)</p>
+                    </div>
+                    <div className="overflow-y-auto flex-1 p-2">
+                        {bottleneckData.length === 0 ? (
+                            <p className="text-center text-xs text-muted-foreground py-12">No blocked team members — great!</p>
+                        ) : bottleneckData.map(u => (
+                            <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors">
+                                <div className={`w-8 h-8 rounded-full ${u.avatarColor} flex-shrink-0 flex items-center justify-center text-white text-[10px] font-bold shadow-sm`}>
+                                    {u.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <div>
-                                            <span className="text-sm font-medium text-foreground">{user.name}</span>
-                                            {user.department && <span className="ml-2 text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{user.department}</span>}
-                                        </div>
-                                        <span className="text-xs text-muted-foreground flex-shrink-0">{completed}/{total} done</span>
-                                    </div>
-                                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                                        <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6, ease: 'easeOut' }}
-                                            className="h-full bg-blue-500 rounded-full" />
-                                    </div>
-                                    <div className="flex gap-3 mt-1 text-[11px] text-muted-foreground">
-                                        <span className="text-green-600">{completed} done</span>
-                                        <span className="text-blue-600">{inProgress} active</span>
-                                        <span>{notStarted} pending</span>
+                                    <p className="text-xs font-bold text-foreground truncate">{u.name}</p>
+                                    <div className="flex gap-1.5 mt-1 flex-wrap">
+                                        {u.overdue > 0     && <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-semibold">{u.overdue} Overdue</span>}
+                                        {u.stuckInProg > 0 && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">{u.stuckInProg} In Prog</span>}
                                     </div>
                                 </div>
+                                <p className="text-xs font-black text-rose-500 flex-shrink-0">Risk {u.riskScore}</p>
                             </div>
-                        );
-                    })}
-                    {userWorkload.length === 0 && (
-                        <p className="px-5 py-8 text-sm text-muted-foreground text-center">No team members yet.</p>
+                        ))}
+                    </div>
+                </motion.div>
+
+                {/* Project Pipeline */}
+                <motion.div variants={item} className="lg:col-span-3 bg-card border border-border rounded-2xl shadow-sm p-5 min-h-64 flex flex-col">
+                    <div className="mb-4">
+                        <h3 className="text-sm font-semibold text-foreground">Project Pipeline Health</h3>
+                        <p className="text-xs text-muted-foreground">Completion ratios for active projects · {periodLabel}</p>
+                    </div>
+                    {projectHealthData.length === 0 ? (
+                        <p className="text-center text-xs text-muted-foreground py-12">No project data in this period.</p>
+                    ) : (
+                        <div className="flex-1 min-h-0" style={{ height: Math.max(200, projectHealthData.length * 40) }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={projectHealthData} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} className="opacity-[0.08]" stroke="currentColor" />
+                                    <XAxis type="number" axisLine={false} tickLine={false}
+                                        tick={{ fontSize: 10, fill: 'currentColor' }} className="text-muted-foreground"
+                                        allowDecimals={false} />
+                                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false}
+                                        tick={{ fontSize: 11, fill: 'currentColor' }} width={140} className="text-muted-foreground font-medium" />
+                                    <RechartsTooltip cursor={{ fill: 'var(--muted)', opacity: 0.4 }}
+                                        contentStyle={{ borderRadius: '12px', border: '1px solid var(--border)', backgroundColor: 'var(--card)', fontSize: 12 }} />
+                                    <Bar dataKey="completed" name="Completed" stackId="a" fill="#10b981" barSize={14} />
+                                    <Bar dataKey="remaining" name="Remaining"  stackId="a" fill="#e2e8f0" radius={[0, 4, 4, 0]} barSize={14} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
                     )}
-                </div>
-            </motion.div>
+                </motion.div>
+            </div>
         </motion.div>
     );
 }
-
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   USER VIEW — personal stats only, no other user's data
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-function UserReports() {
-    const { user: currentUser } = useAuth();
-    const { subtasks } = useAppData();
-    const { wsTasks: teamTasks } = useWorkspace();
-
-    // Active workspace scoped data
-    const teamTaskIds = new Set(teamTasks.map(mt => mt.id));
-    const teamSubtasks = subtasks.filter(s => teamTaskIds.has(s.mainTaskId));
-
-    const mySubs = teamSubtasks.filter((s) => s.assignedTo === currentUser?.id);
-    const completed = mySubs.filter((s) => s.status === 'completed').length;
-    const inProgress = mySubs.filter((s) => s.status === 'in_progress').length;
-    const notStarted = mySubs.filter((s) => s.status === 'not_started').length;
-    const total = mySubs.length;
-    const overallPct = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-    // Main tasks the user is involved in
-    const myProjectIds = [...new Set(mySubs.map((s) => s.mainTaskId))];
-    const myProjects = teamTasks.filter((mt) => myProjectIds.includes(mt.id));
-
-    return (
-        <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
-            <motion.div variants={item}>
-                <h2 className="text-lg font-semibold text-foreground">My Progress Report</h2>
-                <p className="text-sm text-muted-foreground">Your personal task performance overview</p>
-            </motion.div>
-
-            {/* Personal stats */}
-            <motion.div variants={item} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                    { label: 'Assigned to Me', value: total, icon: BarChart3, color: 'border-border bg-card', valueColor: 'text-foreground' },
-                    { label: 'Completed', value: completed, icon: CheckCircle2, color: 'border-green-200 bg-green-50', valueColor: 'text-green-700' },
-                    { label: 'In Progress', value: inProgress, icon: TrendingUp, color: 'border-blue-200 bg-blue-50', valueColor: 'text-blue-700' },
-                    { label: 'Not Started', value: notStarted, icon: Clock, color: 'border-amber-200 bg-amber-50', valueColor: 'text-amber-700' },
-                ].map((c) => (
-                    <div key={c.label} className={`border rounded-2xl p-4 ${c.color}`}>
-                        <c.icon className={`w-4 h-4 mb-2 ${c.valueColor}`} />
-                        <p className={`text-2xl font-bold tabular-nums ${c.valueColor}`}>{c.value}</p>
-                        <p className="text-xs font-medium text-muted-foreground mt-0.5">{c.label}</p>
-                        {total > 0 && <p className="text-[11px] text-muted-foreground/70 mt-1">{Math.round((c.value / total) * 100)}% of mine</p>}
-                    </div>
-                ))}
-            </motion.div>
-
-            {/* Overall progress bar */}
-            <motion.div variants={item} className="bg-card border border-border rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-foreground">Overall Completion</h3>
-                    <span className="text-2xl font-bold text-foreground">{overallPct}%</span>
-                </div>
-                <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
-                    <motion.div initial={{ width: 0 }} animate={{ width: `${overallPct}%` }} transition={{ duration: 0.8, ease: 'easeOut' }}
-                        className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full" />
-                </div>
-                <div className="flex gap-4 mt-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />{completed} completed</span>
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />{inProgress} in progress</span>
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />{notStarted} not started</span>
-                </div>
-            </motion.div>
-
-            {/* My Subtasks by Main Task */}
-            {myProjects.length > 0 && (
-                <motion.div variants={item} className="bg-card border border-border rounded-2xl overflow-hidden">
-                    <div className="px-5 py-4 border-b border-border">
-                        <h3 className="text-sm font-semibold text-foreground">My Subtasks by Main Task</h3>
-                        <p className="text-xs text-muted-foreground mt-0.5">Main tasks you are contributing to</p>
-                    </div>
-                    <div className="divide-y divide-border/50">
-                        {myProjects.map((mt) => {
-                            const projectSubs = mySubs.filter((s) => s.mainTaskId === mt.id);
-                            const projCompleted = projectSubs.filter((s) => s.status === 'completed').length;
-                            const projPct = projectSubs.length > 0 ? Math.round((projCompleted / projectSubs.length) * 100) : 0;
-                            const status = deriveMainTaskStatus(mt.id, teamSubtasks);
-
-                            return (
-                                <div key={mt.id} className="px-5 py-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div>
-                                            <p className="text-sm font-semibold text-foreground">{mt.title}</p>
-                                            {mt.deadline && (
-                                                <p className={`text-xs flex items-center gap-1 mt-0.5 ${isPast(new Date(mt.deadline)) && status !== 'completed' ? 'text-red-500' : 'text-muted-foreground'}`}>
-                                                    <Calendar className="w-3 h-3" />Due {format(new Date(mt.deadline), 'MMM d, yyyy')}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <span className="text-sm font-bold text-foreground">{projPct}%</span>
-                                    </div>
-                                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mb-3">
-                                        <motion.div initial={{ width: 0 }} animate={{ width: `${projPct}%` }} transition={{ duration: 0.6 }}
-                                            className={`h-full rounded-full ${projCompleted === projectSubs.length ? 'bg-green-500' : 'bg-blue-500'}`} />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        {projectSubs.map((sub) => (
-                                            <div key={sub.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs border ${statusStyle[sub.status]}`}>
-                                                {sub.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" /> :
-                                                    sub.status === 'in_progress' ? <Loader2 className="w-3.5 h-3.5 flex-shrink-0 animate-spin" /> :
-                                                        <Circle className="w-3.5 h-3.5 flex-shrink-0 text-gray-400" />}
-                                                <span className="flex-1 truncate font-medium">{sub.title}</span>
-                                                {sub.deadline && (
-                                                    <span className={`text-[10px] ${isPast(new Date(sub.deadline)) && sub.status !== 'completed' ? 'text-red-500' : 'text-current opacity-60'}`}>
-                                                        {format(new Date(sub.deadline), 'MMM d')}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </motion.div>
-            )}
-
-            {total === 0 && (
-                <motion.div variants={item} className="text-center py-20 bg-card border border-border rounded-2xl">
-                    <p className="text-4xl mb-3">ðŸ“‹</p>
-                    <p className="text-base font-medium text-foreground">No tasks assigned yet</p>
-                    <p className="text-sm text-muted-foreground mt-1">Your progress will appear here once tasks are assigned to you.</p>
-                </motion.div>
-            )}
-        </motion.div>
-    );
-}
-

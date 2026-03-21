@@ -1,16 +1,17 @@
-name: Build/Release Electron App
+name: Build & Release Electron App
 
 on:
   push:
     tags:
-      - 'v*' # Trigger workflow on version tags, e.g. v1.0.0
+      - 'v*'           # Triggers on version tags like v1.0.0, v1.2.3
+  workflow_dispatch:   # Allows manual trigger from GitHub Actions UI
 
 jobs:
   release:
     runs-on: windows-latest
 
     permissions:
-      contents: write # Needed to create a GitHub Release
+      contents: write  # Required to create GitHub Releases and upload assets
 
     steps:
       - name: Checkout Code
@@ -22,20 +23,13 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: npm ci
 
-      - name: Build Vite App
+      - name: Build Vite Web App
         run: npm run build:dev
 
-      - name: Build & Release Electron App
-        uses: samuelmeuli/action-electron-builder@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          release: true
-          mac_certs: false
-          windows_certs: false # set these up if you intend to sign the executable eventually
-          build_script_name: false
+      - name: Package & Publish Electron App
+        run: npm run electron:build:win
         env:
-          # Required for some builder setups
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
