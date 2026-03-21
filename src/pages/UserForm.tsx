@@ -8,6 +8,7 @@ import {
   LayoutDashboard, Users as UsersIcon, Building2, Landmark, Settings,
 } from 'lucide-react';
 import { useUserStore, AppUser, UserPrivileges, FULL_ACCESS, NO_ACCESS, PrivilegePreset } from '@/src/store/userStore';
+import { supabase } from '@/src/integrations/supabase/client';
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    Privilege tree definition (mirrors sidebar structure)
@@ -22,8 +23,23 @@ const PRIV_GROUPS: PG[] = [
     pages: [
       { key: 'dashboard', label: 'Main Dashboard', parentKey: 'dashboard', masterField: 'canView',
         fields: [{ key: 'canView', label: 'Can View' }] },
-      { key: 'financeDashboard', label: 'Finance Dashboard', parentKey: 'financeDashboard', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'Can View' }, { key: 'canViewAmounts', label: 'View Amounts', special: true }] },
+    ],
+  },
+  {
+    name: 'Tasks', icon: BookmarkPlus, color: 'blue',
+    pages: [
+      { key: 'tasks', label: 'Task Management', parentKey: 'tasks', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'Master View Tasks' },
+          { key: 'canViewMyTasks', label: 'My Tasks Board' },
+          { key: 'canViewDashboard', label: 'Task Dashboard' },
+          { key: 'canViewReminders', label: 'Reminders' },
+          { key: 'canViewReports', label: 'Task Reports' },
+          { key: 'canCreateTasks', label: 'Create Tasks' },
+          { key: 'canEditTasks', label: 'Edit Tasks' },
+          { key: 'canDeleteTasks', label: 'Delete Tasks', danger: true },
+        ] 
+      },
     ],
   },
   {
@@ -97,6 +113,7 @@ const COLORS: Record<string, { bg: string; text: string; border: string; badge: 
   violet: { bg: 'bg-violet-50',  text: 'text-violet-700',  border: 'border-violet-200', badge: 'bg-violet-100 text-violet-700' },
   amber:  { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',  badge: 'bg-amber-100 text-amber-700' },
   emerald:{ bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200',badge: 'bg-emerald-100 text-emerald-700' },
+  blue:   { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200',   badge: 'bg-blue-100 text-blue-700' },
   slate:  { bg: 'bg-slate-100',  text: 'text-slate-700',   border: 'border-slate-300',  badge: 'bg-slate-200 text-slate-700' },
 };
 
@@ -134,6 +151,7 @@ export function UserForm() {
   const [email, setEmail] = useState(editingUser?.email ?? '');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [isActive, setIsActive] = useState(editingUser?.isActive ?? true);
   const [privileges, setPrivileges] = useState<UserPrivileges>(() => {
     if (!editingUser) return JSON.parse(JSON.stringify(NO_ACCESS));
     // Backfill: merge stored privileges on top of NO_ACCESS so any section
@@ -197,17 +215,52 @@ export function UserForm() {
   const totalG = PRIV_GROUPS.reduce((a, g) => a + (groupStats[g.name]?.g ?? 0), 0);
   const totalT = PRIV_GROUPS.reduce((a, g) => a + (groupStats[g.name]?.t ?? 0), 0);
 
-  const handleSave = () => {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
     if (!name.trim() || !email.trim()) return;
-    if (isEdit && editingUser) {
-      const data: Partial<AppUser> = { name, email, privileges };
-      if (password.trim()) data.password = password;
-      updateUser(editingUser.id, data);
-    } else {
-      if (!password.trim()) return;
-      addUser({ id: crypto.randomUUID(), name, email, password, privileges, isActive: true, createdAt: new Date().toISOString() });
+    setIsSaving(true);
+    try {
+      if (isEdit && editingUser) {
+        const data: Partial<AppUser> = { name, email, privileges, isActive };
+        if (password.trim()) data.password = password;
+        updateUser(editingUser.id, data);
+        navigate('/users');
+      } else {
+        if (!password.trim()) {
+          setIsSaving(false);
+          return;
+        }
+        const { data, error } = await supabase.functions.invoke('admin-create-user', {
+          body: { email, password, name, privileges }
+        });
+        if (error) {
+          throw new Error(error.message || 'Error executing edge function');
+        }
+        if (data?.error) {
+           throw new Error(data.error);
+        }
+        if (data?.user) {
+          addUser({ 
+            id: data.user.id, 
+            name, 
+            email, 
+            password: '', 
+            privileges, 
+            isActive, 
+            createdAt: new Date().toISOString() 
+          });
+          navigate('/users');
+        } else {
+          throw new Error('User creation response was empty');
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'An error occurred while creating the user');
+    } finally {
+      setIsSaving(false);
     }
-    navigate('/users');
   };
 
   const handleSavePreset = () => {
@@ -228,8 +281,8 @@ export function UserForm() {
           <p className="text-sm text-slate-500 mt-0.5">{isEdit ? 'Modify user details and permissions' : 'Fill in details and assign permissions'}</p>
         </div>
         <Button variant="outline" onClick={() => navigate('/users')} className="h-9 text-sm">Cancel</Button>
-        <Button onClick={handleSave} className="h-9 text-sm bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5">
-          <Save className="h-3.5 w-3.5" /> {isEdit ? 'Save Changes' : 'Create User'}
+        <Button disabled={isSaving} onClick={handleSave} className="h-9 text-sm bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5">
+          <Save className="h-3.5 w-3.5" /> {isEdit ? 'Save Changes' : (isSaving ? 'Creating...' : 'Create User')}
         </Button>
       </div>
 
@@ -247,11 +300,17 @@ export function UserForm() {
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <label className="text-xs font-semibold text-slate-600">{isEdit ? 'New Password (leave blank to keep)' : 'Password *'}</label>
-            <div className="relative max-w-sm">
-              <Input type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="h-9 text-sm pr-9" />
-              <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600">
-                {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+            <div className="relative max-w-sm flex items-center gap-4">
+              <div className="relative flex-1">
+                <Input type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="h-9 text-sm pr-9" />
+                <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600">
+                  {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 min-w-max">
+                <Sw on={isActive} set={setIsActive} size="sm" />
+                <span className="text-xs font-semibold text-slate-700">{isActive ? 'Account Active' : 'Account Disabled'}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -410,8 +469,8 @@ export function UserForm() {
         </span>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => navigate('/users')} className="h-9 text-sm">Cancel</Button>
-          <Button onClick={handleSave} className="h-9 text-sm bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5">
-            <Save className="h-3.5 w-3.5" /> {isEdit ? 'Save Changes' : 'Create User'}
+          <Button disabled={isSaving} onClick={handleSave} className="h-9 text-sm bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5">
+            <Save className="h-3.5 w-3.5" /> {isEdit ? 'Save Changes' : (isSaving ? 'Creating...' : 'Create User')}
           </Button>
         </div>
       </div>

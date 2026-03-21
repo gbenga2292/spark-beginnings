@@ -54,11 +54,18 @@ export function Login() {
         return;
       }
 
+      let userRole: any = 'Employee';
+      if (profile?.privileges) {
+        if (profile.privileges.users?.canManage) userRole = 'Super Admin';
+        else if (profile.privileges.employees?.canEdit) userRole = 'HR Manager';
+        else if (profile.privileges.billing?.canCreate) userRole = 'Finance';
+      }
+
       login({
         id: user.id,
         name: profile?.name || user.email || '',
         email: user.email || '',
-        role: 'Super Admin',
+        role: userRole,
         avatar: profile?.avatar,
       });
       setCurrentUser(user.id);

@@ -333,7 +333,10 @@ function ledgerEntryToDb(e: LedgerEntry) {
 
 // ─── FETCH ALL ───────────────────────────────────────────────
 
-export async function fetchAllAppData() {
+export async function fetchAllAppData(privs?: any) {
+  const isAdmin = privs?.users?.canManage === true;
+  const canView = (mod: string) => isAdmin || (privs && privs[mod] && privs[mod].canView === true);
+
   const [
     sitesRes, clientsRes, employeesRes, attendanceRes,
     invoicesRes, pendingInvRes, advancesRes, loansRes,
@@ -343,29 +346,29 @@ export async function fetchAllAppData() {
     disciplinaryRes, evaluationsRes,
     lCatRes, lVenRes, lBankRes, lEntRes,
   ] = await Promise.all([
-    supabase.from('sites').select('*').order('created_at'),
-    supabase.from('clients').select('*').order('name'),
-    supabase.from('employees').select('*').order('surname'),
-    supabase.from('attendance_records').select('*').order('date'),
-    supabase.from('invoices').select('*').order('date', { ascending: false }),
-    supabase.from('pending_invoices').select('*').order('created_at'),
-    supabase.from('salary_advances').select('*').order('request_date', { ascending: false }),
-    supabase.from('loans').select('*').order('start_date', { ascending: false }),
-    supabase.from('payments').select('*').order('date', { ascending: false }),
-    supabase.from('vat_payments').select('*').order('date', { ascending: false }),
+    canView('sites') ? supabase.from('sites').select('*').order('created_at') : Promise.resolve({ data: [] }),
+    canView('sites') ? supabase.from('clients').select('*').order('name') : Promise.resolve({ data: [] }),
+    canView('employees') ? supabase.from('employees').select('*').order('surname') : Promise.resolve({ data: [] }),
+    canView('attendance') ? supabase.from('attendance_records').select('*').order('date') : Promise.resolve({ data: [] }),
+    canView('billing') ? supabase.from('invoices').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
+    canView('billing') ? supabase.from('pending_invoices').select('*').order('created_at') : Promise.resolve({ data: [] }),
+    canView('salaryLoans') ? supabase.from('salary_advances').select('*').order('request_date', { ascending: false }) : Promise.resolve({ data: [] }),
+    canView('salaryLoans') ? supabase.from('loans').select('*').order('start_date', { ascending: false }) : Promise.resolve({ data: [] }),
+    canView('payments') ? supabase.from('payments').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
+    canView('payments') ? supabase.from('vat_payments').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     supabase.from('public_holidays').select('*').order('date'),
     supabase.from('department_tasks').select('*'),
-    supabase.from('leaves').select('*').order('start_date', { ascending: false }),
+    canView('leaves') ? supabase.from('leaves').select('*').order('start_date', { ascending: false }) : Promise.resolve({ data: [] }),
     supabase.from('leave_types').select('*').order('name'),
     supabase.from('app_settings').select('*').limit(1).maybeSingle(),
     supabase.from('positions').select('*').order('name'),
     supabase.from('departments').select('*').order('name'),
-    supabase.from('disciplinary_records').select('*').order('date', { ascending: false }),
-    supabase.from('evaluations').select('*').order('date', { ascending: false }),
-    supabase.from('ledger_categories').select('*').order('name'),
-    supabase.from('ledger_vendors').select('*').order('name'),
-    supabase.from('ledger_banks').select('*').order('name'),
-    supabase.from('ledger_entries').select('*').order('date', { ascending: false }),
+    canView('disciplinary') ? supabase.from('disciplinary_records').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
+    canView('evaluations') ? supabase.from('evaluations').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
+    canView('ledger') ? supabase.from('ledger_categories').select('*').order('name') : Promise.resolve({ data: [] }),
+    canView('ledger') ? supabase.from('ledger_vendors').select('*').order('name') : Promise.resolve({ data: [] }),
+    canView('ledger') ? supabase.from('ledger_banks').select('*').order('name') : Promise.resolve({ data: [] }),
+    canView('ledger') ? supabase.from('ledger_entries').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
   ]);
 
   const settings = settingsRes.data;
@@ -407,7 +410,10 @@ export async function fetchAllAppData() {
   };
 }
 
-export async function fetchAllUsers() {
+export async function fetchAllUsers(privs?: any) {
+  const isAdmin = privs?.users?.canManage === true;
+  const canView = isAdmin || (privs && privs.users && privs.users.canView === true);
+  if (!canView) return [];
   const { data } = await supabase.from('profiles').select('*').order('created_at');
   return (data || []).map(dbToProfile);
 }

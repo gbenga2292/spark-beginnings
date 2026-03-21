@@ -13,6 +13,7 @@ import { GlobalDragScroll } from './components/ui/GlobalDragScroll';
 import { useTheme } from './hooks/useTheme';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { TaskProvider } from './contexts/AppDataContext';
+import { ProtectedRoute } from './components/common/ProtectedRoute';
 
 // ── Lazy-loaded pages ─────────────────────────────────────────────────────────
 // These are code-split to keep the initial bundle small. Each page loads on demand.
@@ -32,6 +33,7 @@ const StartOffboarding = lazy(() => import('./pages/StartOffboarding').then(m =>
 const Reports = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
 const FinancialReports = lazy(() => import('./pages/FinancialReports').then(m => ({ default: m.FinancialReports })));
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
+const ActivityLog = lazy(() => import('./pages/ActivityLog').then((m) => ({ default: m.ActivityLog })));
 const Profile = lazy(() => import('./pages/Profile').then(m => ({ default: m.Profile })));
 const Leaves = lazy(() => import('./pages/Leaves').then(m => ({ default: m.Leaves })));
 const LeaveSummary = lazy(() => import('./pages/LeaveSummary').then(m => ({ default: m.LeaveSummary })));
@@ -41,9 +43,10 @@ const SalaryLoans = lazy(() => import('./pages/SalaryLoans').then(m => ({ defaul
 const Disciplinary = lazy(() => import('./pages/Disciplinary').then(m => ({ default: m.Disciplinary })));
 const Evaluations = lazy(() => import('./pages/Evaluations').then(m => ({ default: m.Evaluations })));
 const Ledger = lazy(() => import('./pages/Ledger').then(m => ({ default: m.Ledger })));
-const Tasks = lazy(() => import('./pages/Tasks'));
 const TaskDashboard = lazy(() => import('./pages/TaskDashboard'));
 const TaskReminders = lazy(() => import('./pages/TaskReminders'));
+const Tasks = lazy(() => import('./pages/Tasks'));
+const TaskReports = lazy(() => import('./pages/TaskReports'));
 
 // ── Suspense fallback ─────────────────────────────────────────────────────────
 function PageLoader() {
@@ -104,39 +107,43 @@ function AppContent() {
         <Route path="/login" element={<Login />} />
         <Route path="/setup" element={<SuperAdminSetup />} />
         <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
-          <Route index element={<Dashboard />} />
-          <Route path="attendance" element={<Attendance />} />
-          <Route path="employees" element={<Employees />} />
-          <Route path="sites" element={<Sites />} />
-          <Route path="sites/onboarding/:id" element={<SiteOnboarding />} />
-          <Route path="payroll" element={<Payroll />} />
-          <Route path="client-accounts" element={<ClientAccounts />} />
+          <Route index element={<ProtectedRoute requiredModule="dashboard"><Dashboard /></ProtectedRoute>} />
+          <Route path="attendance" element={<ProtectedRoute requiredModule="attendance"><Attendance /></ProtectedRoute>} />
+          <Route path="employees" element={<ProtectedRoute requiredModule="employees"><Employees /></ProtectedRoute>} />
+          <Route path="sites" element={<ProtectedRoute requiredModule="sites"><Sites /></ProtectedRoute>} />
+          <Route path="sites/onboarding/:id" element={<ProtectedRoute requiredModule="sites"><SiteOnboarding /></ProtectedRoute>} />
+          <Route path="payroll" element={<ProtectedRoute requiredModule="payroll"><Payroll /></ProtectedRoute>} />
+          <Route path="client-accounts" element={<ProtectedRoute requiredModule="sites"><ClientAccounts /></ProtectedRoute>} />
           <Route path="invoices" element={<Navigate to="/client-accounts" replace />} />
           <Route path="payments" element={<Navigate to="/client-accounts" replace />} />
           <Route path="vat" element={<Navigate to="/client-accounts" replace />} />
-          <Route path="onboarding" element={<Onboarding />} />
-          <Route path="onboarding/new" element={<NewHire />} />
-          <Route path="onboarding/contract" element={<GenerateContract />} />
-          <Route path="onboarding/offboard" element={<StartOffboarding />} />
-          <Route path="reports" element={<Reports />} />
-          <Route path="financial-reports" element={<FinancialReports />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="profile" element={<Profile />} />
+          <Route path="onboarding" element={<ProtectedRoute requiredModule="onboarding"><Onboarding /></ProtectedRoute>} />
+          <Route path="onboarding/new" element={<ProtectedRoute requiredModule="onboarding"><NewHire /></ProtectedRoute>} />
+          <Route path="onboarding/contract" element={<ProtectedRoute requiredModule="onboarding"><GenerateContract /></ProtectedRoute>} />
+          <Route path="onboarding/offboard" element={<ProtectedRoute requiredModule="onboarding"><StartOffboarding /></ProtectedRoute>} />
+          <Route path="reports" element={<ProtectedRoute requiredModule="reports"><Reports /></ProtectedRoute>} />
+          <Route path="financial-reports" element={<ProtectedRoute requiredModule="financialReports"><FinancialReports /></ProtectedRoute>} />
+          {/* Using variables for default Settings view */}
+          <Route path="settings" element={<ProtectedRoute requiredModule="variables"><Settings /></ProtectedRoute>} />
+          <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="variables" element={<Navigate to="/settings" replace />} />
-          <Route path="leaves" element={<Leaves />} />
-          <Route path="leave-summary" element={<LeaveSummary />} />
-          <Route path="users" element={<Users />} />
-          <Route path="users/new" element={<UserForm />} />
-          <Route path="users/:id/edit" element={<UserForm />} />
-          <Route path="salary-loans" element={<SalaryLoans />} />
-          <Route path="disciplinary" element={<Disciplinary />} />
-          <Route path="evaluations" element={<Evaluations />} />
-          <Route path="ledger" element={<Ledger />} />
+          <Route path="leaves" element={<ProtectedRoute requiredModule="leaves"><Leaves /></ProtectedRoute>} />
+          <Route path="leave-summary" element={<ProtectedRoute requiredModule="leaves"><LeaveSummary /></ProtectedRoute>} />
+          <Route path="users" element={<ProtectedRoute requiredModule="users"><Users /></ProtectedRoute>} />
+          <Route path="users/new" element={<ProtectedRoute requiredModule="users"><UserForm /></ProtectedRoute>} />
+          <Route path="users/:id/edit" element={<ProtectedRoute requiredModule="users"><UserForm /></ProtectedRoute>} />
+          <Route path="salary-loans" element={<ProtectedRoute requiredModule="salaryLoans"><SalaryLoans /></ProtectedRoute>} />
+          <Route path="disciplinary" element={<ProtectedRoute requiredModule="disciplinary"><Disciplinary /></ProtectedRoute>} />
+          <Route path="evaluations" element={<ProtectedRoute requiredModule="evaluations"><Evaluations /></ProtectedRoute>} />
+          <Route path="ledger" element={<ProtectedRoute requiredModule="ledger"><Ledger /></ProtectedRoute>} />
           
           {/* Task Manager Module */}
-          <Route path="tasks" element={<Tasks />} />
-          <Route path="tasks/dashboard" element={<TaskDashboard />} />
-          <Route path="tasks/reminders" element={<TaskReminders />} />
+          <Route path="tasks" element={<ProtectedRoute requiredModule="tasks"><Tasks /></ProtectedRoute>} />
+          <Route path="tasks/dashboard" element={<ProtectedRoute requiredModule="tasks"><TaskDashboard /></ProtectedRoute>} />
+          <Route path="tasks/reminders" element={<ProtectedRoute requiredModule="tasks"><TaskReminders /></ProtectedRoute>} />
+          <Route path="tasks/reports" element={<ProtectedRoute requiredModule="tasks"><TaskReports /></ProtectedRoute>} />
+
+          <Route path="activity-log" element={<ProtectedRoute requiredModule="variables"><ActivityLog /></ProtectedRoute>} />
           
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

@@ -31,6 +31,7 @@ import {
   ClipboardCheck,
   BarChart2,
   Bell,
+  History,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -68,6 +69,17 @@ const navigation: NavCategory[] = [
       { name: 'Dashboard', href: '/', icon: LayoutDashboard, privKey: 'dashboard', privField: 'canView' },
     ],
   },
+  // ── Tasks ────────────────────────────────────────────────────────
+  {
+    name: 'Tasks',
+    icon: ListTodo,
+    items: [
+      { name: 'Dashboard', href: '/tasks/dashboard', icon: BarChart2, privKey: 'tasks', privField: 'canViewDashboard' },
+      { name: 'My Tasks', href: '/tasks', icon: ClipboardCheck, privKey: 'tasks', privField: 'canViewMyTasks' },
+      { name: 'Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'tasks', privField: 'canViewReminders' },
+      { name: 'Reports', href: '/tasks/reports', icon: BarChart3, privKey: 'tasks', privField: 'canViewReports' },
+    ],
+  },
   // ── HR ───────────────────────────────────────────────────────────────────
   {
     name: 'HR',
@@ -81,16 +93,6 @@ const navigation: NavCategory[] = [
       { name: 'Evaluations', href: '/evaluations', icon: ClipboardList, privKey: 'evaluations', privField: 'canView' },
       { name: 'Disciplinary', href: '/disciplinary', icon: AlertTriangle, privKey: 'disciplinary', privField: 'canView' },
       { name: 'HR Reports', href: '/reports', icon: FileText, privKey: 'reports', privField: 'canView' },
-    ],
-  },
-  // ── Tasks — same structure as every other category ────────────────────────
-  {
-    name: 'Tasks',
-    icon: ListTodo,
-    items: [
-      { name: 'My Tasks', href: '/tasks', icon: ClipboardCheck, privKey: 'custom', privField: '', visible: () => true },
-      { name: 'Dashboard', href: '/tasks/dashboard', icon: BarChart2, privKey: 'custom', privField: '', visible: () => true },
-      { name: 'Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'custom', privField: '', visible: () => true },
     ],
   },
   // ── Admin ─────────────────────────────────────────────────────────────────
@@ -119,6 +121,7 @@ const navigation: NavCategory[] = [
     items: [
       { name: 'Settings', href: '/settings', icon: Settings, privKey: 'variables', privField: 'canView' },
       { name: 'Users', href: '/users', icon: ShieldCheck, privKey: 'users', privField: 'canView' },
+      { name: 'Activity Log', href: '/activity-log', icon: History, privKey: 'variables', privField: 'canView' },
     ],
   },
 ];
@@ -127,7 +130,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const location = useLocation();
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const { isDark } = useTheme();
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(['HR', 'Settings', 'Account', 'Tasks']);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const getVisibleItems = (items: NavItem[]) => {
@@ -248,21 +251,14 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                       if (isCollapsed) setIsCollapsed(false);
                       else toggleCategory(category.name);
                     }}
-                    title={isCollapsed ? category.name : undefined}
                     className={cn(
-                      'flex w-full items-center justify-between rounded-md py-2 text-sm font-semibold transition-colors',
-                      isCollapsed ? 'px-0 justify-center' : 'px-3',
-                      isAnyItemActive ? catBtnActive : catBtnBase
+                      'flex w-full items-center justify-between px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors',
+                      isCollapsed && 'justify-center cursor-default hover:text-slate-500'
                     )}
                   >
-                    <div className={cn('flex items-center', isCollapsed && 'justify-center w-full')}>
-                      <category.icon className={cn('h-5 w-5', !isCollapsed && 'mr-3')} />
-                      {!isCollapsed && category.name}
-                    </div>
+                    <span>{isCollapsed ? '•••' : category.name}</span>
                     {!isCollapsed && (
-                      <ChevronDown
-                        className={cn('h-4 w-4 transition-transform opacity-60', isExpanded ? 'rotate-180' : '')}
-                      />
+                      <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', isExpanded ? 'rotate-180' : '')} />
                     )}
                   </button>
 

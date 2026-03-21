@@ -37,9 +37,16 @@ export function useDataLoader(isAuthenticated: boolean) {
 
     (async () => {
       try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        let userPrivs: any = null;
+        if (authUser) {
+           const { data: profile } = await supabase.from('profiles').select('privileges').eq('id', authUser.id).single();
+           userPrivs = profile?.privileges;
+        }
+
         const [appData, users, presets] = await Promise.all([
-          fetchAllAppData(),
-          fetchAllUsers(),
+          fetchAllAppData(userPrivs),
+          fetchAllUsers(userPrivs),
           fetchPresets(),
         ]);
 
@@ -111,8 +118,6 @@ export function useDataLoader(isAuthenticated: boolean) {
 
         // ── Set currentUserId to the logged-in Supabase user ────────
         // This must happen AFTER users are loaded so getCurrentUser() works.
-        // We re-read the Supabase session here to get the current user's id.
-        const { data: { user: authUser } } = await supabase.auth.getUser();
         const currentSupabaseId = authUser?.id ?? useUserStore.getState().currentUserId;
 
         useUserStore.setState({

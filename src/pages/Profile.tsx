@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/src/store/auth';
 import { useUserStore } from '@/src/store/userStore';
@@ -60,6 +60,86 @@ export function Profile() {
   // Messages
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  // MFA States
+  const [mfaStatus, setMfaStatus] = useState<'unverified' | 'verified' | 'loading'>('loading');
+  const [factors, setFactors] = useState<any[]>([]);
+  const [isEnrollingMfa, setIsEnrollingMfa] = useState(false);
+  const [mfaQr, setMfaQr] = useState('');
+  const [mfaSecret, setMfaSecret] = useState('');
+  const [mfaFactorId, setMfaFactorId] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
+
+  useEffect(() => {
+    const checkMfa = async () => {
+      try {
+        const { data: factorsData } = await supabase.auth.mfa.listFactors();
+        const activeFactors = factorsData?.totp ?? [];
+        setFactors(activeFactors.filter(f => f.status === 'verified'));
+        if (activeFactors.some(f => f.status === 'verified')) {
+           setMfaStatus('verified');
+        } else {
+           setMfaStatus('unverified');
+        }
+      } catch (err) {
+        console.error('Failed to load MFA:', err);
+        setMfaStatus('unverified');
+      }
+    };
+    checkMfa();
+  }, []);
+
+  const handleEnrollMfa = async () => {
+    setIsEnrollingMfa(true);
+    setErrorMessage('');
+    try {
+      const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp' });
+      if (error) throw error;
+      setMfaFactorId(data.id);
+      setMfaQr(data.totp.qr_code);
+      setMfaSecret(data.totp.secret);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to start MFA enrollment');
+      setIsEnrollingMfa(false);
+    }
+  };
+
+  const handleVerifyMfa = async () => {
+    setErrorMessage('');
+    try {
+      const { data: challenge, error: challengeErr } = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
+      if (challengeErr) throw challengeErr;
+      
+      const { error } = await supabase.auth.mfa.verify({
+        factorId: mfaFactorId,
+        challengeId: challenge.id,
+        code: mfaCode
+      });
+      if (error) throw error;
+      setSuccessMessage('Two-Factor Authentication successfully enabled!');
+      setMfaStatus('verified');
+      setIsEnrollingMfa(false);
+      
+      const { data: factorsData } = await supabase.auth.mfa.listFactors();
+      setFactors(factorsData?.totp?.filter(f => f.status === 'verified') ?? []);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Invalid code. Please try again.');
+    }
+  };
+
+  const handleUnenrollMfa = async () => {
+    if (!window.confirm("Are you sure you want to disable Two-Factor Authentication? This makes your account less secure.")) return;
+    try {
+      for (const factor of factors) {
+        await supabase.auth.mfa.unenroll({ factorId: factor.id });
+      }
+      setMfaStatus('unverified');
+      setSuccessMessage('Two-Factor Authentication disabled');
+      setFactors([]);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Error disabling MFA');
+    }
+  };
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -136,50 +216,43 @@ export function Profile() {
     setCurrentPassword('');
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     setErrorMessage('');
     setSuccessMessage('');
 
-    if (!currentUser) {
-      setErrorMessage('User not found');
-      return;
-    }
-
-    if (!currentPassword) {
-      setErrorMessage('Please enter your current password');
-      return;
-    }
-
-    if (currentPassword !== currentUser.password) {
-      setErrorMessage('Current password is incorrect');
-      return;
-    }
-
+    if (!currentUser) return;
     if (!newPassword) {
       setErrorMessage('Please enter a new password');
       return;
     }
-
-    if (newPassword.length < 4) {
-      setErrorMessage('Password must be at least 4 characters');
+    if (newPassword.length < 6) {
+      setErrorMessage('Password must be at least 6 characters');
       return;
     }
-
     if (newPassword !== confirmPassword) {
       setErrorMessage('New passwords do not match');
       return;
     }
 
-    // Update password
-    updateUser(currentUser.id, {
-      password: newPassword,
-    });
+    try {
+      // Actually securely update the password with Supabase Auth!
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
 
-    setSuccessMessage('Password changed successfully');
-    setIsChangingPassword(false);
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+      if (error) throw error;
+
+      // Also update local cache so other components don't freak out
+      updateUser(currentUser.id, { password: newPassword });
+
+      setSuccessMessage('Password changed successfully');
+      setIsChangingPassword(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to securely update password');
+    }
   };
 
   if (!currentUser) {
@@ -389,76 +462,113 @@ export function Profile() {
             </CardHeader>
             <CardContent>
               {isChangingPassword ? (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Current Password</label>
-                    <Input
-                      type="password"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      placeholder="Enter current password"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">New Password</label>
-                    <Input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Enter new password"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Confirm New Password</label>
-                    <Input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Confirm new password"
-                    />
-                  </div>
-                  <div className="flex gap-3 pt-2">
-                    <Button 
-                      onClick={handleChangePassword}
-                      className="bg-indigo-600 hover:bg-indigo-700"
-                    >
-                      <Lock className="h-4 w-4 mr-2" />
-                      Update Password
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={() => {
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700">New Password</label>
+                      <Input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Enter new password (min. 6 chars)"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700">Confirm New Password</label>
+                      <Input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Confirm new password"
+                      />
+                    </div>
+                    <div className="flex gap-3 pt-2 items-center">
+                      <Button onClick={handleChangePassword} className="bg-indigo-600 hover:bg-indigo-700">
+                        <Lock className="h-4 w-4 mr-2" /> Update Password
+                      </Button>
+                      <Button variant="outline" onClick={() => {
                         setIsChangingPassword(false);
-                        setCurrentPassword('');
                         setNewPassword('');
                         setConfirmPassword('');
                         setErrorMessage('');
-                      }}
-                    >
-                      Cancel
+                      }}>Cancel</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-4 py-4">
+                    <div className="h-10 w-10 shrink-0 rounded-xl bg-orange-50 flex items-center justify-center">
+                      <Lock className="h-5 w-5 text-orange-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900">Password</p>
+                      <p className="text-xs text-slate-500 truncate">Change your login password</p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setIsChangingPassword(true)}>
+                      Change
                     </Button>
                   </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-4 py-4">
-                  <div className="h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center">
-                    <Lock className="h-6 w-6 text-emerald-600" />
+                )}
+                
+                {/* MFA / Two-Factor Authentication Divider */}
+                <div className="h-px bg-slate-100 my-4" />
+                
+                {isEnrollingMfa ? (
+                  <div className="space-y-4 bg-slate-50 border border-slate-200 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-slate-800">Set Up Two-Factor Authentication</p>
+                    <p className="text-xs text-slate-600">Scan this QR code with your authenticator app (Authy, Google Authenticator, etc).</p>
+                    
+                    <div className="flex flex-col items-center">
+                      <div className="bg-white p-2 rounded-xl shadow-sm inline-block" dangerouslySetInnerHTML={{ __html: mfaQr }} />
+                      <p className="text-[10px] text-slate-500 mt-2 tracking-widest font-mono text-center max-w-[250px] break-all">{mfaSecret}</p>
+                    </div>
+                    
+                    <div className="space-y-2 pt-2">
+                       <label className="text-xs font-semibold text-slate-700">Enter Verification Code</label>
+                       <Input 
+                         type="text" 
+                         value={mfaCode} 
+                         onChange={(e) => setMfaCode(e.target.value)}
+                         placeholder="000000"
+                         className="font-mono text-center tracking-widest text-lg h-12"
+                         maxLength={6}
+                       />
+                    </div>
+                    
+                    <div className="flex gap-3 pt-2">
+                      <Button onClick={handleVerifyMfa} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
+                        Verify & Enable
+                      </Button>
+                      <Button variant="outline" className="w-full" onClick={() => setIsEnrollingMfa(false)}>
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-900">Password</p>
-                    <p className="text-xs text-slate-500">Last changed: Never</p>
+                ) : (
+                  <div className="flex items-center gap-4 py-4">
+                    <div className="h-10 w-10 shrink-0 rounded-xl bg-emerald-50 flex items-center justify-center">
+                       <Shield className="h-5 w-5 text-emerald-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                       <p className="text-sm font-medium text-slate-900 flex items-center gap-2">
+                          Two-Factor Authentication
+                          {mfaStatus === 'verified' && <span className="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded-full font-bold">ACTIVE</span>}
+                       </p>
+                       <p className="text-xs text-slate-500 truncate">Adds an extra layer of security to your account.</p>
+                    </div>
+                    {mfaStatus === 'loading' ? (
+                       <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                    ) : mfaStatus === 'verified' ? (
+                       <Button variant="outline" size="sm" onClick={handleUnenrollMfa} className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200">
+                         Disable
+                       </Button>
+                    ) : (
+                       <Button variant="outline" size="sm" onClick={handleEnrollMfa}>
+                         Enable
+                       </Button>
+                    )}
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setIsChangingPassword(true)}
-                  >
-                    Change
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
           {/* Appearance / Theme */}
           <Card>
             <CardHeader>

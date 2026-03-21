@@ -4,7 +4,18 @@ import { db } from '@/src/lib/supabaseService';
 
 // ─── Dashboard ───────────────────────────────────────────────
 export interface DashboardPriv    { canView: boolean; }
-export interface FinanceDashPriv  { canView: boolean; canViewAmounts: boolean; }
+
+// ─── Tasks ───────────────────────────────────────────────────
+export interface TasksPriv {
+  canView: boolean;
+  canViewMyTasks: boolean;
+  canViewDashboard: boolean;
+  canViewReminders: boolean;
+  canViewReports: boolean;
+  canCreateTasks: boolean;
+  canEditTasks: boolean;
+  canDeleteTasks: boolean;
+}
 
 // ─── HR ──────────────────────────────────────────────────────
 export interface EmployeesPriv   { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canViewSalary: boolean; canExport: boolean; }
@@ -45,7 +56,6 @@ export interface UsersPriv     { canView: boolean; canManage: boolean; }
 // ─── Master interface ─────────────────────────────────────────
 export interface UserPrivileges {
   dashboard:         DashboardPriv;
-  financeDashboard:  FinanceDashPriv;
   employees:         EmployeesPriv;
   disciplinary:      DisciplinaryPriv;
   evaluations:       EvaluationsPriv;
@@ -62,6 +72,7 @@ export interface UserPrivileges {
   ledger:            LedgerPriv;
   variables:         VariablesPriv;
   users:             UsersPriv;
+  tasks:             TasksPriv;
 }
 
 export interface AppUser {
@@ -84,7 +95,6 @@ export interface PrivilegePreset {
 // ─── FULL ACCESS ─────────────────────────────────────────────
 export const FULL_ACCESS: UserPrivileges = {
   dashboard:        { canView: true },
-  financeDashboard: { canView: true, canViewAmounts: true },
   employees:        { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewSalary: true, canExport: true },
   disciplinary:     { canView: true, canAdd: true, canEdit: true, canDelete: true },
   evaluations:      { canView: true, canAdd: true, canEdit: true, canDelete: true },
@@ -101,12 +111,12 @@ export const FULL_ACCESS: UserPrivileges = {
   ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
   variables:        { canView: true, canEdit: true, canImport: true, canExport: true },
   users:            { canView: true, canManage: true },
+  tasks:            { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: true },
 };
 
 // ─── NO ACCESS ───────────────────────────────────────────────
 export const NO_ACCESS: UserPrivileges = {
   dashboard:        { canView: false },
-  financeDashboard: { canView: false, canViewAmounts: false },
   employees:        { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewSalary: false, canExport: false },
   disciplinary:     { canView: false, canAdd: false, canEdit: false, canDelete: false },
   evaluations:      { canView: false, canAdd: false, canEdit: false, canDelete: false },
@@ -123,6 +133,7 @@ export const NO_ACCESS: UserPrivileges = {
   ledger:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
   variables:        { canView: false, canEdit: false, canImport: false, canExport: false },
   users:            { canView: false, canManage: false },
+  tasks:            { canView: false, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false },
 };
 
 // ─── DEFAULT PRESETS ─────────────────────────────────────────
@@ -142,6 +153,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       salaryLoans: { canView: true, canAdd: true, canEdit: false, canDelete: false, canViewAmounts: true },
       reports:     { canView: true, canExport: true },
       payroll:     { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true },
+      tasks:       { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: false },
     },
   },
   {
@@ -149,7 +161,6 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
     privileges: {
       ...NO_ACCESS,
       dashboard:        { canView: true },
-      financeDashboard: { canView: true, canViewAmounts: true },
       salaryLoans:      { canView: true, canAdd: true, canEdit: false, canDelete: false, canViewAmounts: true },
       billing:          { canView: true, canCreate: true, canEdit: true, canDelete: false, canViewAmounts: true, canImport: true, canExport: true },
       payments:         { canView: true, canAdd: true, canEdit: true, canDelete: false, canViewAmounts: true, canViewVat: true, canManageVat: false, canImport: true, canExport: true },
@@ -157,6 +168,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       financialReports: { canView: true, canExport: true, canViewAmounts: true, canViewPayrollSummary: true, canViewLoansAndAdvances: true },
       ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: false, canExport: true },
       reports:          { canView: true, canExport: true },
+      tasks:            { canView: false, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false },
     },
   },
   {
@@ -164,7 +176,6 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
     privileges: {
       ...NO_ACCESS,
       dashboard:        { canView: true },
-      financeDashboard: { canView: true, canViewAmounts: false },
       employees:        { canView: true, canAdd: false, canEdit: false, canDelete: false, canViewSalary: false, canExport: false },
       onboarding:       { canView: true, canAdd: false, canEdit: false, canDelete: false },
       attendance:       { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
@@ -177,6 +188,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       payroll:          { canView: true, canGenerate: false, canViewAmounts: false, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false },
       financialReports: { canView: true, canExport: false, canViewAmounts: false, canViewPayrollSummary: false, canViewLoansAndAdvances: false },
       ledger:           { canView: true, canAdd: false, canEdit: false, canDelete: false, canExport: false },
+      tasks:            { canView: true, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false },
     },
   },
 ];
