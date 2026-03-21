@@ -4,14 +4,15 @@ import { Input } from '@/src/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Badge } from '@/src/components/ui/badge';
 import {
-  Save, Building, Bell, Link as LinkIcon, CloudDownload,
+  Save, Building, Link as LinkIcon, CloudDownload,
   RefreshCw, Library, Pencil, X, Mail, Phone, MapPin, Hash, CheckCircle2,
-  DatabaseBackup, Upload, Download, Clock, ShieldCheck, AlertTriangle, Trash2
+  DatabaseBackup, Upload, Download, Clock, ShieldCheck, AlertTriangle,
 } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Variables } from './Variables';
 import { useAppStore } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
+import { supabase } from '@/src/integrations/supabase/client';
 
 interface CompanyInfo {
   name: string;
@@ -56,6 +57,8 @@ export function Settings() {
   const [saved, setSaved] = useState<CompanyInfo>(DEFAULT_COMPANY);
   const [draft, setDraft] = useState<CompanyInfo>(DEFAULT_COMPANY);
   const [justSaved, setJustSaved] = useState(false);
+  const [isSavingDB, setIsSavingDB] = useState(false);
+  const [settingsRowId, setSettingsRowId] = useState<string | null>(null);
 
   /* ── Backup state ───────────────────────────────────────────── */
   const [backupSettings, setBackupSettings] = useState<BackupSettings>(() => {
@@ -77,6 +80,28 @@ export function Settings() {
       window.electronAPI.getVersion().then((v: string) => setAppVersion(v)).catch(console.error);
     }
   }, [isElectron]);
+
+  /* ── Load company info from Supabase on mount ─────────────────── */
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('id, company_name, company_reg_number, company_email, company_phone, company_address')
+        .limit(1)
+        .single();
+      if (error || !data) return; // table empty or RLS — keep defaults
+      setSettingsRowId(data.id);
+      const loaded: CompanyInfo = {
+        name:      data.company_name      ?? DEFAULT_COMPANY.name,
+        regNumber: data.company_reg_number ?? DEFAULT_COMPANY.regNumber,
+        email:     data.company_email      ?? DEFAULT_COMPANY.email,
+        phone:     data.company_phone      ?? DEFAULT_COMPANY.phone,
+        address:   data.company_address    ?? DEFAULT_COMPANY.address,
+      };
+      setSaved(loaded);
+      setDraft(loaded);
+    })();
+  }, []);
 
   /* ── Save backup settings to localStorage ─────────────────── */
   const saveBackupSettings = (settings: BackupSettings) => {
@@ -229,11 +254,33 @@ export function Settings() {
 
   const handleEditStart = () => { setDraft({ ...saved }); setIsEditing(true); };
   const handleCancel    = () => { setDraft({ ...saved }); setIsEditing(false); };
-  const handleSave      = () => {
-    setSaved({ ...draft });
-    setIsEditing(false);
-    setJustSaved(true);
-    setTimeout(() => setJustSaved(false), 2500);
+  const handleSave      = async () => {
+    setIsSavingDB(true);
+    try {
+      const payload = {
+        company_name:        draft.name,
+        company_reg_number:  draft.regNumber,
+        company_email:       draft.email,
+        company_phone:       draft.phone,
+        company_address:     draft.address,
+        updated_at:          new Date().toISOString(),
+      };
+      if (settingsRowId) {
+        await supabase.from('app_settings').update(payload).eq('id', settingsRowId);
+      } else {
+        const { data } = await supabase.from('app_settings').insert(payload).select('id').single();
+        if (data) setSettingsRowId(data.id);
+      }
+      setSaved({ ...draft });
+      setIsEditing(false);
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2500);
+      toast.success('Company information saved to database.');
+    } catch (err) {
+      toast.error('Failed to save. Please try again.');
+    } finally {
+      setIsSavingDB(false);
+    }
   };
 
   const fields: { key: keyof CompanyInfo; label: string; icon: any; type?: string; fullWidth?: boolean }[] = [
@@ -258,23 +305,20 @@ export function Settings() {
 
       <Tabs className="w-full">
         <TabsList className="mb-8 bg-slate-100 flex-wrap gap-y-1">
-          <TabsTrigger active={activeTab === 'general'}       onClick={() => setActiveTab('general')}       className="w-32">
-            <Building      className="mr-2 h-4 w-4" /> General
+          <TabsTrigger active={activeTab === 'general'}      onClick={() => setActiveTab('general')}      className="w-32">
+            <Building       className="mr-2 h-4 w-4" /> General
           </TabsTrigger>
-          <TabsTrigger active={activeTab === 'backup'}        onClick={() => setActiveTab('backup')}        className="w-40">
+          <TabsTrigger active={activeTab === 'backup'}       onClick={() => setActiveTab('backup')}       className="w-40">
             <DatabaseBackup className="mr-2 h-4 w-4" /> Backup &amp; Restore
           </TabsTrigger>
-          <TabsTrigger active={activeTab === 'notifications'} onClick={() => setActiveTab('notifications')} className="w-36">
-            <Bell          className="mr-2 h-4 w-4" /> Notifications
+          <TabsTrigger active={activeTab === 'integrations'} onClick={() => setActiveTab('integrations')} className="w-36">
+            <LinkIcon       className="mr-2 h-4 w-4" /> Integrations
           </TabsTrigger>
-          <TabsTrigger active={activeTab === 'integrations'}  onClick={() => setActiveTab('integrations')}  className="w-36">
-            <LinkIcon      className="mr-2 h-4 w-4" /> Integrations
+          <TabsTrigger active={activeTab === 'updates'}      onClick={() => setActiveTab('updates')}      className="w-32">
+            <CloudDownload  className="mr-2 h-4 w-4" /> Updates
           </TabsTrigger>
-          <TabsTrigger active={activeTab === 'updates'}       onClick={() => setActiveTab('updates')}       className="w-32">
-            <CloudDownload className="mr-2 h-4 w-4" /> Updates
-          </TabsTrigger>
-          <TabsTrigger active={activeTab === 'variables'}     onClick={() => setActiveTab('variables')}     className="w-36">
-            <Library       className="mr-2 h-4 w-4" /> Variables
+          <TabsTrigger active={activeTab === 'variables'}    onClick={() => setActiveTab('variables')}    className="w-36">
+            <Library        className="mr-2 h-4 w-4" /> Variables
           </TabsTrigger>
         </TabsList>
 
@@ -305,8 +349,9 @@ export function Settings() {
                       <Button variant="ghost" size="sm" onClick={handleCancel} className="gap-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 h-9">
                         <X className="h-4 w-4" /> Cancel
                       </Button>
-                      <Button size="sm" onClick={handleSave} className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9 px-4">
-                        <Save className="h-4 w-4" /> Save Changes
+                      <Button size="sm" onClick={handleSave} disabled={isSavingDB} className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9 px-4">
+                        {isSavingDB ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        {isSavingDB ? 'Saving…' : 'Save Changes'}
                       </Button>
                     </>
                   ) : (
@@ -547,35 +592,6 @@ export function Settings() {
           </div>
         </TabsContent>
 
-        {/* ─────────── NOTIFICATIONS TAB ───────────────────────────── */}
-        <TabsContent active={activeTab === 'notifications'}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Email &amp; SMS Alerts</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                {['Leave Requests', 'Payroll Processing', 'New Hire Onboarding', 'Document Expiry', 'System Updates'].map((item) => (
-                  <div key={item} className="flex items-center justify-between border-b border-slate-100 pb-4 last:border-0 last:pb-0">
-                    <div>
-                      <p className="font-medium text-slate-900">{item}</p>
-                      <p className="text-sm text-slate-500">Receive notifications for {item.toLowerCase()}.</p>
-                    </div>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 text-sm text-slate-600">
-                        <input type="checkbox" defaultChecked className="rounded border-slate-300 h-4 w-4" /> Email
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-slate-600">
-                        <input type="checkbox" className="rounded border-slate-300 h-4 w-4" /> SMS
-                      </label>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* ─────────── INTEGRATIONS TAB ────────────────────────────── */}
         <TabsContent active={activeTab === 'integrations'}>
           <Card>
@@ -587,8 +603,7 @@ export function Settings() {
                 {[
                   { letter: 'W', name: 'Microsoft Word',  desc: 'Document Generation', bg: 'bg-blue-100',    text: 'text-blue-600',    connected: true  },
                   { letter: 'X', name: 'Microsoft Excel', desc: 'Data Import/Export',  bg: 'bg-emerald-100', text: 'text-emerald-600', connected: true  },
-                  { letter: 'Q', name: 'QuickBooks',       desc: 'Accounting Sync',     bg: 'bg-green-100',   text: 'text-green-600',  connected: false },
-                  { letter: 'S', name: 'Stripe',           desc: 'Payment Gateway',     bg: 'bg-slate-100',   text: 'text-slate-600',  connected: false },
+                  { letter: 'Q', name: 'QuickBooks',      desc: 'Accounting Sync',     bg: 'bg-green-100',   text: 'text-green-600',   connected: false },
                 ].map(({ letter, name, desc, bg, text, connected }) => (
                   <div key={name} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
                     <div className="flex items-center gap-3">
