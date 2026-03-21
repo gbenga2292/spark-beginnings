@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { TabsContent } from '@/src/components/ui/tabs';
-import { Search, Download, FileText, ChevronLeft, ChevronRight, X, Eye, BookOpen } from 'lucide-react';
+import { Search, Download, Upload, FileText, ChevronLeft, ChevronRight, X, Eye, BookOpen } from 'lucide-react';
 import { useAppStore, LedgerEntry } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { usePriv } from '@/src/hooks/usePriv';
@@ -40,6 +40,9 @@ export function Ledger() {
   const addLedgerEntry = useAppStore((state) => state.addLedgerEntry);
   const updateLedgerEntry = useAppStore((state) => state.updateLedgerEntry);
   const deleteLedgerEntry = useAppStore((state) => state.deleteLedgerEntry);
+  const addLedgerCategory = useAppStore((state) => state.addLedgerCategory);
+  const addLedgerBank = useAppStore((state) => state.addLedgerBank);
+  const addLedgerVendor = useAppStore((state) => state.addLedgerVendor);
 
   const [tab, setTab] = useState('entry');
 
@@ -110,35 +113,42 @@ export function Ledger() {
     setItems(loadedItems);
   };
 
-  // Navigate forward through vouchers: 01 → 02 → 03 ...
-  const handleNextVoucher = () => {
-    if (distinctVouchers.length === 0) return;
-    if (!activeVoucherNo) {
-      // No voucher loaded — start from the first one
-      loadVoucher(distinctVouchers[0]);
-      return;
+  const getCurrentVoucherSeq = () => {
+    const vno = activeVoucherNo || generatedVoucherNo;
+    if (!vno) return null;
+    const parts = vno.split('-');
+    if (parts.length === 4) {
+      return {
+        prefix: `${parts[0]}-${parts[1]}-${parts[2]}-`,
+        seq: parseInt(parts[3], 10)
+      };
     }
-    const idx = distinctVouchers.indexOf(activeVoucherNo);
-    if (idx >= 0 && idx < distinctVouchers.length - 1) {
-      loadVoucher(distinctVouchers[idx + 1]);
-    }
-    // Already at the last voucher — stay put
+    return null;
   };
 
-  // Navigate backward through vouchers: 03 → 02 → 01 ...
-  const handlePrevVoucher = () => {
-    if (distinctVouchers.length === 0) return;
-    if (!activeVoucherNo) {
-      // No voucher loaded — start from the last one
-      loadVoucher(distinctVouchers[distinctVouchers.length - 1]);
-      return;
+  const navigateSequence = (direction: 'next' | 'prev') => {
+    const cur = getCurrentVoucherSeq();
+    if (!cur) return;
+    
+    let nextSeq = direction === 'next' ? cur.seq + 1 : cur.seq - 1;
+    if (nextSeq < 1) nextSeq = 1;
+
+    const nextVno = `${cur.prefix}${String(nextSeq).padStart(2, '0')}`;
+    
+    if (nextVno === (activeVoucherNo || generatedVoucherNo)) return;
+
+    const exists = ledgerEntries.some(e => e.voucherNo === nextVno);
+    if (exists) {
+      loadVoucher(nextVno);
+    } else {
+      toast.info(`Notice: Voucher ${nextVno} has no entry.`);
+      handleClear();
+      setActiveVoucherNo(nextVno);
     }
-    const idx = distinctVouchers.indexOf(activeVoucherNo);
-    if (idx > 0) {
-      loadVoucher(distinctVouchers[idx - 1]);
-    }
-    // Already at the first voucher — stay put
   };
+
+  const handleNextVoucher = () => navigateSequence('next');
+  const handlePrevVoucher = () => navigateSequence('prev');
 
   const handleClear = () => {
     setActiveVoucherNo('');
@@ -157,7 +167,15 @@ export function Ledger() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleDateChange = (newDate: string) => {
+    if (activeVoucherNo) {
+      toast.info('Form cleared for a new voucher based on the selected date.');
+      handleClear();
+    }
+    setVoucherDate(newDate);
+  };
+
+  const handleSubmit = async () => {
     if (!voucherDate || !paidFrom) {
       toast.error('Voucher Date and Paid From (Bank) are required.');
       return;
@@ -165,6 +183,14 @@ export function Ledger() {
 
     const targetVoucherNo = activeVoucherNo || generatedVoucherNo;
     const existingRecords = ledgerEntries.filter(e => e.voucherNo === targetVoucherNo);
+    
+    if (activeVoucherNo && existingRecords.length > 0) {
+      const confirmed = await showConfirm(
+        `A change has been made to voucher ${targetVoucherNo}.\n\nAre you sure you want to overwrite the existing record?`,
+        { variant: 'danger', confirmLabel: 'Yes, Overwrite' }
+      );
+      if (!confirmed) return;
+    }
     
     // Track which records are actively updated/created
     const keptIds = new Set<string>();
@@ -250,27 +276,51 @@ export function Ledger() {
 
   // Record Search States
   const [search, setSearch] = useState('');
+  const [searchKey, setSearchKey] = useState<string>('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [dateFilterType, setDateFilterType] = useState<'transaction' | 'voucher'>('transaction');
 
   const filteredEntries = useMemo(() => {
     return ledgerEntries.filter(e => {
-      if (fromDate && e.date < fromDate) return false;
-      if (toDate && e.date > toDate) return false;
+      if (fromDate || toDate) {
+        let targetDate = e.date;
+        if (dateFilterType === 'voucher') {
+          const match = e.voucherNo.match(/^VN(\d{2})-(\d{2})-(\d{2})/);
+          if (match) targetDate = `20${match[1]}-${match[2]}-${match[3]}`;
+        }
+        if (fromDate && targetDate < fromDate) return false;
+        if (toDate && targetDate > toDate) return false;
+      }
+      
       if (search) {
         const q = search.toLowerCase();
-        return (
-          e.voucherNo.toLowerCase().includes(q) ||
-          (e.description || '').toLowerCase().includes(q) ||
-          e.category.toLowerCase().includes(q) ||
-          e.client.toLowerCase().includes(q) ||
-          e.vendor.toLowerCase().includes(q) ||
-          e.bank.toLowerCase().includes(q)
-        );
+        switch (searchKey) {
+          case 'voucherNo': return e.voucherNo.toLowerCase().includes(q);
+          case 'description': return (e.description || '').toLowerCase().includes(q);
+          case 'category': return e.category.toLowerCase().includes(q);
+          case 'client': return e.client.toLowerCase().includes(q);
+          case 'site': return (e.site || '').toLowerCase().includes(q);
+          case 'vendor': return e.vendor.toLowerCase().includes(q);
+          case 'bank': return e.bank.toLowerCase().includes(q);
+          case 'amount': return String(e.amount).includes(q);
+          case 'all':
+          default:
+            return (
+              e.voucherNo.toLowerCase().includes(q) ||
+              (e.description || '').toLowerCase().includes(q) ||
+              e.category.toLowerCase().includes(q) ||
+              e.client.toLowerCase().includes(q) ||
+              e.vendor.toLowerCase().includes(q) ||
+              e.bank.toLowerCase().includes(q) ||
+              String(e.amount).includes(q) ||
+              (e.site || '').toLowerCase().includes(q)
+            );
+        }
       }
       return true;
     });
-  }, [ledgerEntries, search, fromDate, toDate]);
+  }, [ledgerEntries, search, searchKey, fromDate, toDate, dateFilterType]);
 
   const handleExport = () => {
     if (!priv?.canExport) return;
@@ -282,6 +332,99 @@ export function Ledger() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Ledger Entries');
     XLSX.writeFile(workbook, 'Ledger_Entries.xlsx');
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!priv?.canAdd) {
+      toast.error('You do not have permission to add entries.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+        
+        const existingCats = new Set(ledgerCategories.map(c => c.name.toLowerCase()));
+        const existingBanks = new Set(ledgerBanks.map(b => b.name.toLowerCase()));
+        const existingVendors = new Set(ledgerVendors.map(v => v.name.toLowerCase()));
+
+        let importedCount = 0;
+        data.forEach((row: any) => {
+          const voucherNo = row['Voucher No'] || row.voucher_no || row.voucherNo;
+          const date = row['Transaction Date'] || row['Date'] || row.date || row['Voucher Date'];
+          const description = row['Description'] || row.description || '';
+          const category = row['Category'] || row.category;
+          const amount = row['Amount'] || row.amount;
+          const client = row['Client'] || row.client || '';
+          const site = row['Site'] || row.site || '';
+          const vendor = row['Vendor Name'] || row['Vendor'] || row.vendor || '';
+          const bank = row['Paid From'] || row['Bank'] || row.bank;
+          const enteredBy = row['Entered By'] || row.entered_by || row.enteredBy || currentUser?.name || 'Imported';
+          
+          if (!voucherNo || !date || !category || !amount || !bank) return;
+          
+          // Basic duplicate check by combining fields
+          const isDup = ledgerEntries.some(e => e.voucherNo === voucherNo && e.category === category && e.amount === Number(amount) && e.description === description);
+          if (isDup) return;
+
+          const catKey = String(category).toLowerCase();
+          if (!existingCats.has(catKey)) {
+            addLedgerCategory({ id: crypto.randomUUID(), name: String(category) });
+            existingCats.add(catKey);
+          }
+          
+          const bankKey = String(bank).toLowerCase();
+          if (!existingBanks.has(bankKey)) {
+            addLedgerBank({ id: crypto.randomUUID(), name: String(bank) });
+            existingBanks.add(bankKey);
+          }
+          
+          if (vendor && String(vendor).toLowerCase() !== 'none') {
+            const vendorKey = String(vendor).toLowerCase();
+            if (!existingVendors.has(vendorKey)) {
+              addLedgerVendor({ id: crypto.randomUUID(), name: String(vendor) });
+              existingVendors.add(vendorKey);
+            }
+          }
+
+          addLedgerEntry({
+            id: crypto.randomUUID(),
+            voucherNo: String(voucherNo),
+            date: String(date),
+            description: String(description),
+            category: String(category),
+            amount: Number(amount),
+            client: String(client),
+            site: String(site),
+            vendor: String(vendor),
+            bank: String(bank),
+            enteredBy: String(enteredBy)
+          });
+          importedCount++;
+        });
+
+        if (importedCount > 0) {
+          toast.success(`Successfully imported ${importedCount} ledger entries.`);
+        } else {
+          toast.info('No new valid entries found to import (may be duplicates).');
+        }
+      } catch (err) {
+        console.error('Import Error:', err);
+        toast.error('Failed to parse file. Please ensure it is a valid Excel/CSV file matching the Ledger Export format.');
+      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsBinaryString(file);
   };
 
   // Summaries (kept for the hidden summary tab)
@@ -420,7 +563,7 @@ export function Ledger() {
               <div className="flex items-center gap-4">
                 <label className="text-sm font-bold text-slate-600 uppercase tracking-widest w-32 shrink-0">Voucher Date</label>
                 <div className="max-w-[200px] w-full">
-                  <Input type="date" value={voucherDate} onChange={e => setVoucherDate(e.target.value)} className="bg-white shadow-inner border-slate-300 font-medium text-slate-700" />
+                  <Input type="date" value={voucherDate} onChange={e => handleDateChange(e.target.value)} className="bg-white shadow-inner border-slate-300 font-medium text-slate-700" />
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -611,16 +754,47 @@ export function Ledger() {
                 </CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <select 
+                    className="h-9 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-600 font-medium" 
+                    value={dateFilterType} 
+                    onChange={e => setDateFilterType(e.target.value as any)}
+                  >
+                    <option value="transaction">Trans Date</option>
+                    <option value="voucher">Voucher Date</option>
+                  </select>
+                  <Input type="date" className="h-9 w-32 text-xs" value={fromDate} onChange={e => setFromDate(e.target.value)} />
+                  <span className="text-slate-400 text-xs px-1">to</span>
+                  <Input type="date" className="h-9 w-32 text-xs" value={toDate} onChange={e => setToDate(e.target.value)} />
+                </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-500">From</span>
-                  <Input type="date" className="h-9 w-36" value={fromDate} onChange={e => setFromDate(e.target.value)} />
-                  <span className="text-sm text-slate-500">To</span>
-                  <Input type="date" className="h-9 w-36" value={toDate} onChange={e => setToDate(e.target.value)} />
+                  <select 
+                    className="h-9 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-600 font-medium max-w-[120px]" 
+                    value={searchKey} 
+                    onChange={e => setSearchKey(e.target.value)}
+                  >
+                    <option value="all">All Fields</option>
+                    <option value="description">Description</option>
+                    <option value="amount">Amount</option>
+                    <option value="category">Category</option>
+                    <option value="client">Client</option>
+                    <option value="site">Site</option>
+                    <option value="vendor">Vendor</option>
+                    <option value="voucherNo">Voucher No.</option>
+                  </select>
+                  <div className="relative w-full md:w-52">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                    <Input placeholder="Search..." className="pl-8 h-9 text-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
+                  </div>
                 </div>
-                <div className="relative w-full md:w-64">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                  <Input placeholder="Search voucher, category..." className="pl-9 h-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-                </div>
+                {priv?.canAdd && (
+                  <>
+                    <input type="file" ref={fileInputRef} accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImport} />
+                    <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="h-9">
+                      <Upload className="mr-2 h-4 w-4" /> Import
+                    </Button>
+                  </>
+                )}
                 {priv.canExport && (
                   <Button variant="outline" onClick={handleExport} className="h-9">
                     <Download className="mr-2 h-4 w-4" /> Export
