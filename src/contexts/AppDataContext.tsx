@@ -173,6 +173,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 const camel = mapReminderToCamel(payload.new);
                 setReminders(prev => {
                     if (prev.some(r => r.id === camel.id)) return prev;
+                    
+                    if (camel.recipientIds && camel.recipientIds.includes(user?.id)) {
+                        toast.info(`Notification: ${camel.title}`);
+                    }
+                    
                     return [...prev, camel];
                 });
             })
@@ -365,7 +370,63 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     const getMainTaskComments = useCallback((id: string) => comments.filter(c => c.task_id === id || c.main_task_id === id), [comments]);
     // Since task_updates has no subtask_id column, comments are now keyed by subtask_id stored in-memory (augmented on insert)
     const getSubtaskComments = useCallback((subtaskId: string) => comments.filter(c => c.subtask_id === subtaskId || c.task_id === subtaskId), [comments]);
-    const getMainTaskWorkflow = useCallback((_mainTaskId: string) => [], []);
+    const getMainTaskWorkflow = useCallback((mainTaskId: string) => {
+        const events: any[] = [];
+        const mt = mainTasks.find(m => m.id === mainTaskId);
+        if (mt) {
+            events.push({
+                id: `mt-${mt.id}`,
+                type: 'task_created',
+                actorId: mt.createdBy,
+                targetUserIds: [],
+                mainTaskId: mt.id,
+                workspaceId: mt.workspaceId,
+                label: `Created task "${mt.title}"`,
+                createdAt: mt.createdAt || new Date().toISOString(),
+            });
+            const mtSubs = subtasks.filter(s => s.mainTaskId === mainTaskId || s.main_task_id === mainTaskId);
+            mtSubs.forEach(s => {
+                if (s.assignedTo) {
+                    events.push({
+                        id: `assign-${s.id}`,
+                        type: 'subtask_assigned',
+                        actorId: mt.createdBy, 
+                        targetUserIds: [s.assignedTo],
+                        mainTaskId: mt.id,
+                        workspaceId: mt.workspaceId,
+                        subtaskId: s.id,
+                        label: `Delegated subtask "${s.title}"`,
+                        createdAt: s.createdAt || s.created_at || mt.createdAt || new Date().toISOString(), 
+                    });
+                }
+            });
+            const mtComms = comments.filter(c => c.main_task_id === mainTaskId || c.task_id === mainTaskId);
+            mtComms.forEach(c => {
+                const text = c.text || "";
+                const mentions = Array.from(text.matchAll(/@(\w+)/g)).map(m => m[1].toLowerCase());
+                const targetIds: string[] = [];
+                if (mentions.length > 0) {
+                    users.forEach(u => {
+                        const fname = (u.name || "").split(' ')[0].toLowerCase();
+                        if (mentions.includes(fname)) targetIds.push(u.id);
+                    });
+                }
+                events.push({
+                    id: `comm-${c.id}`,
+                    type: targetIds.length > 0 ? 'user_mentioned' : 'comment_posted', // standard render config matches
+                    actorId: c.author_id || c.authorId,
+                    targetUserIds: targetIds,
+                    mainTaskId: mt.id,
+                    subtaskId: c.subtask_id || c.subtaskId,
+                    commentId: c.id,
+                    label: targetIds.length > 0 ? `Mentioned users for input` : `Posted an update`,
+                    createdAt: c.created_at || c.createdAt || new Date().toISOString(),
+                    isUrgent: c.is_urgent_request
+                });
+            });
+        }
+        return events.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    }, [mainTasks, subtasks, comments, users]);
 
     const addReminder = useCallback(async (rem: any) => {
         const payload = {

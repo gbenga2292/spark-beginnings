@@ -46,13 +46,13 @@ export function Profile() {
   
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState<string | undefined>(user?.avatar);
+  const [avatarPreview, setAvatarPreview] = useState<string | undefined>(currentUser?.avatar || user?.avatar);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Form states
-  const [name, setName] = useState(user?.name || '');
-  const [email, setEmail] = useState(user?.email || '');
+  const [name, setName] = useState(currentUser?.name || user?.name || '');
+  const [email, setEmail] = useState(currentUser?.email || user?.email || '');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -311,9 +311,9 @@ export function Profile() {
           <CardContent className="flex flex-col items-center">
             <div className="relative mb-4">
               <Avatar className="w-32 h-32 border-4 border-white shadow-lg">
-                <AvatarImage src={avatarPreview} alt={user?.name} referrerPolicy="no-referrer" />
-                <AvatarFallback className="text-3xl bg-indigo-100 text-indigo-700 font-bold">
-                  {user?.name?.charAt(0)}
+                <AvatarImage src={avatarPreview || currentUser?.avatar} alt={currentUser?.name || user?.name} referrerPolicy="no-referrer" />
+                <AvatarFallback className="text-3xl bg-indigo-100 text-indigo-700 font-bold uppercase">
+                  {(currentUser?.name || user?.name || '?').charAt(0)}
                 </AvatarFallback>
               </Avatar>
               <button
@@ -334,8 +334,8 @@ export function Profile() {
                 className="hidden"
               />
             </div>
-            <h2 className="text-xl font-bold text-slate-900">{user?.name}</h2>
-            <p className="text-slate-500 text-sm">{user?.email}</p>
+            <h2 className="text-xl font-bold text-slate-900">{currentUser?.name || user?.name}</h2>
+            <p className="text-slate-500 text-sm">{currentUser?.email || user?.email}</p>
             <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-full">
               <Building2 className="h-3 w-3" />
               {user?.role || 'Employee'}
@@ -399,8 +399,8 @@ export function Profile() {
                       variant="outline"
                       onClick={() => {
                         setIsEditing(false);
-                        setName(user?.name || '');
-                        setAvatarPreview(user?.avatar);
+                        setName(currentUser?.name || user?.name || '');
+                        setAvatarPreview(currentUser?.avatar || user?.avatar);
                         setCurrentPassword('');
                         setErrorMessage('');
                       }}
@@ -418,7 +418,7 @@ export function Profile() {
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Full Name</p>
-                        <p className="text-sm font-medium text-slate-900">{user?.name}</p>
+                        <p className="text-sm font-medium text-slate-900">{currentUser?.name || user?.name}</p>
                       </div>
                     </div>
                   </div>
@@ -429,7 +429,7 @@ export function Profile() {
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Email Address</p>
-                        <p className="text-sm font-medium text-slate-900">{user?.email}</p>
+                        <p className="text-sm font-medium text-slate-900">{currentUser?.email || user?.email}</p>
                       </div>
                     </div>
                   </div>

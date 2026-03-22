@@ -2,7 +2,6 @@ import { useUserStore, UserPrivileges } from '@/src/store/userStore';
 
 type RedactionKey =
   | 'employees'
-  | 'financeDashboard'
   | 'salaryLoans'
   | 'billing'
   | 'payments'
@@ -23,7 +22,6 @@ export function useRedaction(page: RedactionKey): boolean {
 
   switch (page) {
     case 'employees':        return priv.employees?.canViewSalary ?? false;
-    case 'financeDashboard': return priv.financeDashboard?.canViewAmounts ?? false;
     case 'salaryLoans':      return priv.salaryLoans?.canViewAmounts ?? false;
     case 'billing':          return priv.billing?.canViewAmounts ?? false;
     case 'payments':         return priv.payments?.canViewAmounts ?? false;

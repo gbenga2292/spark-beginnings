@@ -37,6 +37,8 @@ const POSITION_HIERARCHY = [
 export function Employees() {
   const [activeTab, setActiveTab] = useState<'Active' | 'Delisted'>('Active');
   const [detailTab, setDetailTab] = useState<'Overview' | 'Attendance' | 'Leaves' | 'Disciplinary' | 'Evaluations' | 'Reminders'>('Overview');
+  const [activeTabMonth, setActiveTabMonth] = useState<string>('All');
+  const [activeTabYear, setActiveTabYear] = useState<string>(new Date().getFullYear().toString());
   const [searchTerm, setSearchTerm] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -46,6 +48,8 @@ export function Employees() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const employees = useAppStore((state) => state.employees);
+  const attendanceRecords = useAppStore((state) => state.attendanceRecords);
+  const leaves = useAppStore((state) => state.leaves);
   const addEmployee = useAppStore((state) => state.addEmployee);
   const updateEmployee = useAppStore((state) => state.updateEmployee);
   const deleteEmployee = useAppStore((state) => state.deleteEmployee);
@@ -210,10 +214,10 @@ export function Employees() {
           emp.position, emp.status, emp.yearlyLeave, emp.startDate || '',
           emp.endDate || '', emp.bankName || '', emp.accountNo || '', emp.taxId || '',
           emp.pensionNumber || '', emp.payeTax, emp.withholdingTax, emp.excludeFromOnboarding || false, emp.rent || 0,
-          emp.monthlySalaries.jan, emp.monthlySalaries.feb, emp.monthlySalaries.mar,
-          emp.monthlySalaries.apr, emp.monthlySalaries.may, emp.monthlySalaries.jun,
-          emp.monthlySalaries.jul, emp.monthlySalaries.aug, emp.monthlySalaries.sep,
-          emp.monthlySalaries.oct, emp.monthlySalaries.nov, emp.monthlySalaries.dec
+          canSeeSalary ? emp.monthlySalaries.jan : '***', canSeeSalary ? emp.monthlySalaries.feb : '***', canSeeSalary ? emp.monthlySalaries.mar : '***',
+          canSeeSalary ? emp.monthlySalaries.apr : '***', canSeeSalary ? emp.monthlySalaries.may : '***', canSeeSalary ? emp.monthlySalaries.jun : '***',
+          canSeeSalary ? emp.monthlySalaries.jul : '***', canSeeSalary ? emp.monthlySalaries.aug : '***', canSeeSalary ? emp.monthlySalaries.sep : '***',
+          canSeeSalary ? emp.monthlySalaries.oct : '***', canSeeSalary ? emp.monthlySalaries.nov : '***', canSeeSalary ? emp.monthlySalaries.dec : '***'
         ];
         return data.map(extractCSV).join(',');
       });
@@ -449,40 +453,42 @@ export function Employees() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-slate-800">Monthly Salary Matrix (₦)</CardTitle>
-                <CardDescription className="mt-1">Define gross monthly salary dynamically. Subject to revision.</CardDescription>
-              </div>
-              <Button variant="outline" size="sm" className="bg-white shadow-sm" onClick={() => {
-                const janVal = formData.monthlySalaries?.jan || 0;
-                setFormData({
-                  ...formData,
-                  monthlySalaries: {
-                    jan: janVal, feb: janVal, mar: janVal, apr: janVal,
-                    may: janVal, jun: janVal, jul: janVal, aug: janVal,
-                    sep: janVal, oct: janVal, nov: janVal, dec: janVal
-                  }
-                });
-              }}>
-                Copy Jan to All
-              </Button>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].map((month) => (
-                  <div key={month} className="space-y-1">
-                    <label className="text-xs font-bold uppercase text-slate-500">{month}</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-slate-400 font-medium">₦</span>
-                      <Input type="number" value={formData.monthlySalaries?.[month as keyof MonthlySalary] || ''} onChange={e => setFormData({ ...formData, monthlySalaries: { ...formData.monthlySalaries!, [month]: parseFloat(e.target.value) || 0 } })} className="font-mono text-sm pl-7 bg-slate-50 focus:bg-white" />
+          {canSeeSalary && (
+            <Card className="shadow-sm border-slate-200">
+              <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-slate-800">Monthly Salary Matrix (₦)</CardTitle>
+                  <CardDescription className="mt-1">Define gross monthly salary dynamically. Subject to revision.</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" className="bg-white shadow-sm" onClick={() => {
+                  const janVal = formData.monthlySalaries?.jan || 0;
+                  setFormData({
+                    ...formData,
+                    monthlySalaries: {
+                      jan: janVal, feb: janVal, mar: janVal, apr: janVal,
+                      may: janVal, jun: janVal, jul: janVal, aug: janVal,
+                      sep: janVal, oct: janVal, nov: janVal, dec: janVal
+                    }
+                  });
+                }}>
+                  Copy Jan to All
+                </Button>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].map((month) => (
+                    <div key={month} className="space-y-1">
+                      <label className="text-xs font-bold uppercase text-slate-500">{month}</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2 text-slate-400 font-medium">₦</span>
+                        <Input type="number" value={formData.monthlySalaries?.[month as keyof MonthlySalary] || ''} onChange={e => setFormData({ ...formData, monthlySalaries: { ...formData.monthlySalaries!, [month]: parseFloat(e.target.value) || 0 } })} className="font-mono text-sm pl-7 bg-slate-50 focus:bg-white" />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* --- RIGHT COLUMN: Secondary Details --- */}
@@ -606,16 +612,44 @@ export function Employees() {
               </div>
             </div>
 
-            <div className="flex bg-slate-100 rounded-lg p-1 mb-6">
-              {['Overview', 'Attendance', 'Leaves', 'Disciplinary', 'Evaluations', 'Reminders'].map(tab => (
-                <button
-                  key={tab}
-                  className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${detailTab === tab ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                  onClick={() => setDetailTab(tab as any)}
-                >
-                  {tab}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
+              <div className="flex bg-slate-100 rounded-lg p-1 grow md:grow-0 overflow-x-auto whitespace-nowrap scrollbar-hide">
+                {['Overview', 'Attendance', 'Leaves', 'Disciplinary', 'Evaluations', 'Reminders'].map(tab => (
+                  <button
+                    key={tab}
+                    className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-md transition-all ${detailTab === tab ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    onClick={() => setDetailTab(tab as any)}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+              
+              {(detailTab === 'Attendance' || detailTab === 'Leaves' || detailTab === 'Disciplinary' || detailTab === 'Evaluations') && (
+                <div className="flex gap-2 shrink-0 ml-auto">
+                  <select
+                    value={activeTabMonth}
+                    onChange={(e) => setActiveTabMonth(e.target.value)}
+                    className="h-8 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  >
+                    <option value="All">All Months</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
+                      <option key={m} value={m}>{new Date(0, m - 1).toLocaleString('default', { month: 'short' })}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={activeTabYear}
+                    onChange={(e) => setActiveTabYear(e.target.value)}
+                    className="h-8 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  >
+                    <option value="All">All Years</option>
+                    {Array.from({ length: 5 }, (_, i) => {
+                      const yr = new Date().getFullYear() - 2 + i;
+                      return <option key={yr} value={yr}>{yr}</option>;
+                    })}
+                  </select>
+                </div>
+              )}
             </div>
 
             {detailTab === 'Overview' && (
@@ -671,12 +705,6 @@ export function Employees() {
                const empReminders = reminders.filter(r => r.title.includes(emp.firstname) && r.title.includes(emp.surname));
                return (
                  <div className="space-y-4">
-                   <div className="flex justify-between items-center bg-indigo-50 p-4 rounded-lg border border-indigo-100">
-                     <div>
-                       <h4 className="text-indigo-800 font-bold text-sm">Active & Past Reminders</h4>
-                       <p className="text-xs text-indigo-600">Tasks and events tied to {emp.firstname}.</p>
-                     </div>
-                   </div>
                    {empReminders.length === 0 ? (
                      <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
                         <p className="text-slate-500 font-medium">No system reminders tied to this employee.</p>
@@ -714,33 +742,129 @@ export function Employees() {
                );
             })()}
 
-            {detailTab === 'Attendance' && (
-              <div className="text-center py-10 bg-slate-50 rounded-lg border border-slate-100">
-                <p className="text-slate-500 font-medium">Attendance records will appear here.</p>
-                <p className="text-xs text-slate-400 mt-1">Integrated with daily time tracking and absence triggers.</p>
-              </div>
-            )}
+            {detailTab === 'Attendance' && (() => {
+              const empAtt = attendanceRecords
+                .filter(r => r.staffId === emp.id)
+                .filter(r => activeTabYear === 'All' ? true : r.date?.startsWith(activeTabYear))
+                .filter(r => activeTabMonth === 'All' ? true : new Date(r.date || '').getMonth() + 1 === parseInt(activeTabMonth))
+                .sort((a,b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+              
+              const actualWorkdays = empAtt.reduce((sum, r) => sum + ((Number(r.dayWk) || 0) + (Number(r.nightWk) || 0)), 0);
+              const absentDays = empAtt.filter(r => r.isPresent === 'No').length;
+              const overtimeHours = empAtt.reduce((sum, r) => sum + (Number(r.ot) || 0), 0);
 
-            {detailTab === 'Leaves' && (
-              <div className="text-center py-10 bg-slate-50 rounded-lg border border-slate-100">
-                <p className="text-slate-500 font-medium">Leave history & balances will appear here.</p>
-                <p className="text-xs text-slate-400 mt-1">Track sick, vacation, and compassionate leaves.</p>
-              </div>
-            )}
+              return (
+                <div className="space-y-4">
+                  <div className="text-sm font-bold text-slate-700">
+                     <span>Actual Workdays: {actualWorkdays}</span>
+                     <span className="mx-2 text-slate-300">|</span>
+                     <span>Absent: {absentDays}</span>
+                     <span className="mx-2 text-slate-300">|</span>
+                     <span>Overtime: {overtimeHours} hrs</span>
+                  </div>
+                  {empAtt.length === 0 ? (
+                    <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                      <p className="text-slate-500 font-medium">No attendance records found for selected period.</p>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-slate-50/50">
+                            <TableHead className="w-24">Date</TableHead>
+                            <TableHead>Client/Site</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {empAtt.map(r => (
+                            <TableRow key={r.id}>
+                              <TableCell className="font-mono text-[11px] text-slate-500">{r.date}</TableCell>
+                              <TableCell className="text-xs text-slate-600">
+                                {r.dayClient && r.dayClient !== 'N/A' ? `${r.dayClient} - ${r.daySite}` : 'N/A'}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className={r.isPresent === 'Yes' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-rose-50 text-rose-600 border-rose-200'}>
+                                  {r.isPresent === 'Yes' ? 'Present' : 'Absent'}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {detailTab === 'Leaves' && (() => {
+              const empLeaves = leaves
+                .filter(l => l.employeeId === emp.id)
+                .filter(l => activeTabYear === 'All' ? true : l.startDate?.startsWith(activeTabYear))
+                .filter(l => activeTabMonth === 'All' ? true : new Date(l.startDate || '').getMonth() + 1 === parseInt(activeTabMonth))
+                .sort((a,b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime());
+              
+              const totalTaken = empLeaves.filter(l => l.status !== 'Cancelled').reduce((acc, l) => acc + l.duration, 0);
+              const entitlement = emp.yearlyLeave || 20;
+              const remaining = entitlement - totalTaken;
+
+              return (
+                <div className="space-y-4">
+                  <div className="text-sm font-bold text-slate-700">
+                     <span>Entitled: {entitlement}</span>
+                     <span className="mx-2 text-slate-300">|</span>
+                     <span>Taken: {totalTaken}</span>
+                     <span className="mx-2 text-slate-300">|</span>
+                     <span>Remaining: {remaining}</span>
+                  </div>
+                  {empLeaves.length === 0 ? (
+                    <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                      <p className="text-slate-500 font-medium">No leave records found for selected period.</p>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-slate-50/50">
+                            <TableHead>Type</TableHead>
+                            <TableHead>Dates</TableHead>
+                            <TableHead>Duration</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {empLeaves.map(l => (
+                            <TableRow key={l.id}>
+                              <TableCell className="font-semibold text-xs">{l.leaveType}</TableCell>
+                              <TableCell className="font-mono text-[11px] text-slate-500">{l.startDate} to {l.expectedEndDate}</TableCell>
+                              <TableCell className="text-[11px]">{l.duration} Days</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className={l.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200'}>
+                                  {l.status}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {detailTab === 'Disciplinary' && (() => {
-               const empDiscip = disciplinaryRecords.filter(r => r.employeeId === emp.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+               const empDiscip = disciplinaryRecords
+                 .filter(r => r.employeeId === emp.id)
+                 .filter(r => activeTabYear === 'All' ? true : r.date?.startsWith(activeTabYear))
+                 .filter(r => activeTabMonth === 'All' ? true : new Date(r.date || '').getMonth() + 1 === parseInt(activeTabMonth))
+                 .sort((a,b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
                return (
                  <div className="space-y-4">
-                   <div className="flex justify-between items-center bg-rose-50 p-4 rounded-lg border border-rose-100">
-                     <div>
-                       <h4 className="text-rose-800 font-bold text-sm">Disciplinary Record</h4>
-                       <p className="text-xs text-rose-600">Track infractions, warnings, and suspensions.</p>
-                     </div>
-                   </div>
                    {empDiscip.length === 0 ? (
                      <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
-                        <p className="text-slate-500 font-medium">No active disciplinary events.</p>
+                        <p className="text-slate-500 font-medium">No active disciplinary events for selected period.</p>
                         <p className="text-xs text-slate-400 mt-1">Good standing.</p>
                      </div>
                    ) : (
@@ -778,18 +902,16 @@ export function Employees() {
             })()}
 
             {detailTab === 'Evaluations' && (() => {
-               const empEvals = evaluations.filter(e => e.employeeId === emp.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+               const empEvals = evaluations
+                 .filter(e => e.employeeId === emp.id)
+                 .filter(e => activeTabYear === 'All' ? true : e.date?.startsWith(activeTabYear))
+                 .filter(e => activeTabMonth === 'All' ? true : new Date(e.date || '').getMonth() + 1 === parseInt(activeTabMonth))
+                 .sort((a,b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
                return (
                  <div className="space-y-4">
-                   <div className="flex justify-between items-center bg-indigo-50 p-4 rounded-lg border border-indigo-100">
-                     <div>
-                       <h4 className="text-indigo-800 font-bold text-sm">Performance Evaluations</h4>
-                       <p className="text-xs text-indigo-600">Track probation & recurring reviews.</p>
-                     </div>
-                   </div>
                    {empEvals.length === 0 ? (
                      <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
-                        <p className="text-slate-500 font-medium">No evaluation records found.</p>
+                        <p className="text-slate-500 font-medium">No evaluation records found for selected period.</p>
                         <p className="text-xs text-slate-400 mt-1">Schedule a review to get started.</p>
                      </div>
                    ) : (

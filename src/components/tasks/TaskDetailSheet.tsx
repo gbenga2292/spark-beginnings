@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/src/components/task_ui/sheet";
+import { Avatar, AvatarFallback, AvatarImage } from "@/src/components/ui/avatar";
 import {
   Circle, Loader2, CheckCircle2, Calendar, User, MessageSquare,
   Send, X, Hash, Plus, GitBranch, AlertTriangle, Paperclip,
@@ -9,6 +10,7 @@ import {
 import { format, isPast } from "date-fns";
 import { useAuth } from '@/src/hooks/useAuth';
 import { useAppData } from '@/src/contexts/AppDataContext';
+import { toast } from '@/src/components/ui/toast';
 import type { SubTask, SubTaskStatus, TaskComment, AppUser, CommentAttachment, WorkflowEvent } from "@/src/types/tasks";
 
 const statusConfig: Record<SubTaskStatus, { label: string; pillClass: string; icon: React.ElementType }> = {
@@ -68,6 +70,7 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
     subtasks, mainTasks, users,
     updateSubtaskStatus, approveSubtask, rejectSubtask,
     postComment, getSubtaskComments, getMainTaskWorkflow,
+    addReminder, addSubtask,
   } = useAppData();
 
   const [tab, setTab] = useState<TabType>("updates");
@@ -175,6 +178,48 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
     const trimmed = text.trim();
     if (!trimmed || !currentUser) return;
     postComment(subtask.id, subtask.mainTaskId, currentUser.id, trimmed, pendingAttachments, pendingFileLinks.length > 0 ? pendingFileLinks : undefined);
+
+    // Find mentioned users
+    const mentionedNames = new Set(Array.from(trimmed.matchAll(/@(\w+)/g)).map(m => m[1].toLowerCase()));
+    if (mentionedNames.size > 0 && subtask && mainTask) {
+      activeUsers.forEach(u => {
+        const uFirstName = u.name.split(' ')[0].toLowerCase();
+        if (mentionedNames.has(uFirstName) && u.id !== currentUser.id) {
+          const cUser = activeUsers.find(a => a.id === currentUser.id);
+          addReminder({
+            title: `Mentioned by ${cUser?.name?.split(' ')[0] || 'Unknown'} in ${subtask.title}`,
+            body: trimmed.slice(0, 100),
+            remindAt: new Date().toISOString(),
+            recipientIds: [u.id],
+            subtaskId: subtask.id,
+            mainTaskId: mainTask.id,
+          });
+        }
+      });
+    }
+
+    // Find hash tags to create branching subtasks
+    const hashMatch = trimmed.match(/#(.+)/);
+    if (hashMatch && subtask) {
+      let assignedUserId: string | null = null;
+      if (mentionedNames.size > 0) {
+        const firstMention = Array.from(mentionedNames)[0];
+        const assignedUser = activeUsers.find(u => u.name.split(' ')[0].toLowerCase() === firstMention);
+        if (assignedUser) assignedUserId = assignedUser.id;
+      }
+      
+      const titleStr = hashMatch[1].trim();
+      if (titleStr) {
+        addSubtask({
+          title: titleStr,
+          mainTaskId: subtask.mainTaskId,
+          description: `Branched from subtask: ${subtask.title}\n\nOriginal Request: ${trimmed}`,
+          assignedTo: assignedUserId
+        });
+        toast.success("Branched subtask created!");
+      }
+    }
+
     setText("");
     setPendingAttachments([]);
     setPendingFileLinks([]);
@@ -292,7 +337,15 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
             <div className="flex items-center gap-1.5">
               <User className="w-3 h-3" />
               {assignee
-                ? <div className="flex items-center gap-1"><div className={`w-4 h-4 rounded-full ${assignee.avatarColor} flex items-center justify-center text-white text-[8px] font-bold`}>{assignee.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}</div><span className="font-medium text-foreground">{assignee.name}</span></div>
+                ? <div className="flex items-center gap-1">
+                    <Avatar className="w-4 h-4">
+                      <AvatarImage src={assignee.avatarUrl || (assignee as any).avatar} />
+                      <AvatarFallback className={`text-[8px] text-white font-bold ${assignee.avatarColor}`}>
+                        {assignee.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium text-foreground">{assignee.name}</span>
+                  </div>
                 : <span className="italic">Unassigned</span>}
             </div>
             {subtask.deadline && (
@@ -303,7 +356,12 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
             )}
             {creator && (
               <div className="flex items-center gap-1 ml-auto">
-                <div className={`w-4 h-4 rounded-full ${creator.avatarColor} flex items-center justify-center text-white text-[8px] font-bold`}>{creator.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}</div>
+                <Avatar className="w-4 h-4">
+                  <AvatarImage src={creator.avatarUrl || (creator as any).avatar} />
+                  <AvatarFallback className={`text-[8px] text-white font-bold ${creator.avatarColor}`}>
+                    {creator.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                  </AvatarFallback>
+                </Avatar>
                 <span>{creator.name.split(' ')[0]}</span>
               </div>
             )}
@@ -523,18 +581,24 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 flex-wrap">
                               {actor && (
                                 <span className="flex items-center gap-1">
-                                  <div className={`w-4 h-4 rounded-full ${actor.avatarColor} flex items-center justify-center text-white text-[8px] font-bold`}>
-                                    {actor.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                                  </div>
+                                  <Avatar className="w-4 h-4">
+                                    <AvatarImage src={actor.avatarUrl || (actor as any).avatar} />
+                                    <AvatarFallback className={`text-[8px] text-white font-bold ${actor.avatarColor}`}>
+                                      {actor.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                                    </AvatarFallback>
+                                  </Avatar>
                                   <span>{actor.name.split(" ")[0]}</span>
                                 </span>
                               )}
                               {targets.length > 0 && <span className="text-muted-foreground/60">→</span>}
                               {targets.map((t) => (
                                 <span key={t.id} className="flex items-center gap-1">
-                                  <div className={`w-4 h-4 rounded-full ${t.avatarColor} flex items-center justify-center text-white text-[8px] font-bold`}>
-                                    {t.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                                  </div>
+                                  <Avatar className="w-4 h-4">
+                                    <AvatarImage src={t.avatarUrl || (t as any).avatar} />
+                                    <AvatarFallback className={`text-[8px] text-white font-bold ${t.avatarColor}`}>
+                                      {t.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                                    </AvatarFallback>
+                                  </Avatar>
                                   <span>{t.name.split(" ")[0]}</span>
                                 </span>
                               ))}
@@ -640,9 +704,12 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
                       <button type="button"
                         onMouseDown={(e) => { e.preventDefault(); selectMention(u); }}
                         className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${i === mentionIndex ? "bg-primary/10" : "hover:bg-muted"}`}>
-                        <div className={`w-7 h-7 rounded-full ${u.avatarColor} flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0`}>
-                          {u.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                        </div>
+                        <Avatar className="w-7 h-7 flex-shrink-0">
+                          <AvatarImage src={u.avatarUrl || (u as any).avatar} />
+                          <AvatarFallback className={`text-[10px] text-white font-bold ${u.avatarColor}`}>
+                            {u.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-foreground truncate">{u.name}</p>
                           <p className="text-[11px] text-muted-foreground truncate">{u.email}</p>
@@ -736,9 +803,12 @@ function CommentBubble({ comment, users, currentUserId, subtasks }: {
 
   return (
     <div className={`flex gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
-      <div className={`w-7 h-7 rounded-full ${author?.avatarColor ?? "bg-gray-400"} flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0 mt-0.5`}>
-        {author?.name.split(" ").map((n) => n[0]).join("").slice(0, 2) ?? "?"}
-      </div>
+      <Avatar className="w-7 h-7 flex-shrink-0 mt-0.5">
+        <AvatarImage src={author?.avatarUrl || (author as any)?.avatar} />
+        <AvatarFallback className={`text-[9px] text-white font-bold ${author?.avatarColor ?? "bg-gray-400"}`}>
+          {author?.name.split(" ").map((n) => n[0]).join("").slice(0, 2) ?? "?"}
+        </AvatarFallback>
+      </Avatar>
       <div className={`flex-1 max-w-[80%] ${isMe ? "items-end" : "items-start"} flex flex-col gap-1`}>
         <div className={`flex items-center gap-1.5 text-[11px] text-muted-foreground ${isMe ? "flex-row-reverse" : ""}`}>
           <span className="font-medium text-foreground/80">{isMe ? "You" : author?.name ?? "Unknown"}</span>

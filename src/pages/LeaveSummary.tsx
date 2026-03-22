@@ -25,7 +25,7 @@ export function LeaveSummary() {
         return acc + l.duration;
       }, 0);
       
-      const entitlement = 21; // Could be dynamic from store based on hierarchy
+      const entitlement = emp.yearlyLeave || 20;
       const remaining = entitlement - totalTaken;
 
       const isCurrentlyOnLeave = empLeaves.some(l => {

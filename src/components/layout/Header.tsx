@@ -32,7 +32,7 @@ const ALL_SEARCH_ITEMS: SearchItem[] = [
   { label: 'Sites & Clients', description: 'Site assignments', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView', keywords: ['site', 'client', 'location', 'project', 'assignment'] },
   { label: 'Onboarding', description: 'New hire onboarding', href: '/onboarding', icon: UserPlus, privKey: 'employees', privField: 'canView', keywords: ['onboarding', 'new hire', 'orientation', 'induction'] },
   { label: 'Payroll', description: 'Salary & compensation', href: '/payroll', icon: Wallet, privKey: 'payroll', privField: 'canView', keywords: ['payroll', 'salary', 'pay', 'wage', 'compensation', 'deduction', 'pension', 'tax'] },
-  { label: 'Financial Hub', description: 'Invoices, payments & VAT', href: '/finance', icon: Landmark, privKey: 'financeDashboard', privField: 'canView', keywords: ['finance', 'invoice', 'billing', 'payment', 'vat', 'receipt', 'money', 'revenue', 'loan', 'advance'] },
+  { label: 'Client Accounts', description: 'Invoices, payments & VAT', href: '/client-accounts', icon: Landmark, privKey: 'billing', privField: 'canView', keywords: ['finance', 'invoice', 'billing', 'payment', 'vat', 'receipt', 'money', 'revenue', 'loan', 'advance'] },
   { label: 'Reports', description: 'Export & analysis', href: '/reports', icon: FileText, privKey: 'reports', privField: 'canView', keywords: ['report', 'export', 'analysis', 'data', 'download', 'pdf', 'excel'] },
   { label: 'Variables', description: 'Tax rates & config', href: '/variables', icon: Library, privKey: 'variables', privField: 'canView', keywords: ['variable', 'tax', 'rate', 'config', 'paye', 'pension', 'allowance', 'holiday'] },
   { label: 'Settings', description: 'App preferences', href: '/settings', icon: Settings, privKey: null, privField: 'canView', keywords: ['settings', 'preference', 'company', 'notification', 'integration', 'security'] },
@@ -45,7 +45,7 @@ function useNotifications() {
   const { reminders } = useAppData();
 
   return useMemo(() => {
-    const notifs: { id: string; icon: any; text: string; time: string; color: string }[] = [];
+    const notifs: { id: string; icon: any; text: string; time: string; color: string; url?: string }[] = [];
 
     // Pending leave requests
     const recentLeaves = leaves.slice(-3);
@@ -74,8 +74,10 @@ function useNotifications() {
 
     // Active Reminders due in next 24h or overdue
     const now = new Date();
+    const currentUser = useUserStore.getState().getCurrentUser();
     const activeRems = reminders.filter(r => {
       if (!r.isActive) return false;
+      if (currentUser && r.recipientIds && r.recipientIds.length > 0 && !r.recipientIds.includes(currentUser.id)) return false;
       const remDate = new Date(r.remindAt);
       const diffHrs = (remDate.getTime() - now.getTime()) / (1000 * 60 * 60);
       // Show if overdue or within 24 hours
@@ -87,9 +89,10 @@ function useNotifications() {
       notifs.push({ 
         id: `rem-${r.id}`, 
         icon: Bell, 
-        text: `Reminder: ${r.title}`, 
+        text: `${r.title}`, 
         time: isPast ? 'Overdue' : r.remindAt.slice(0, 10), 
-        color: isPast ? 'text-red-500' : 'text-indigo-500' 
+        color: isPast ? 'text-red-500' : 'text-indigo-500',
+        url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined
       });
     });
 
@@ -170,7 +173,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     : 0;
 
   return (
-    <header className={`flex h-14 items-center justify-between border-b px-4 md:px-6 gap-4 transition-colors duration-200 ${
+    <header className={`flex h-14 items-center justify-between border-b px-4 md:px-6 gap-4 transition-colors duration-200 relative z-[100] ${
       isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-slate-200'
     }`}>
       {/* Left: Menu + Search */}
@@ -275,7 +278,8 @@ export function Header({ onMenuClick }: HeaderProps) {
                   </div>
                 ) : (
                   notifications.map((n) => (
-                    <div key={n.id} className={`flex items-start gap-3 px-4 py-3 transition-colors border-b last:border-0 ${
+                    <div key={n.id} onClick={() => { if (n.url) { navigate(n.url); setNotifOpen(false); } }} 
+                      className={`flex items-start gap-3 px-4 py-3 transition-colors border-b last:border-0 ${n.url ? 'cursor-pointer' : ''} ${
                       isDark ? 'hover:bg-slate-700/50 border-slate-700/50' : 'hover:bg-slate-50 border-slate-50'
                     }`}>
                       <div className={`h-7 w-7 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 ${n.color} ${
@@ -308,12 +312,14 @@ export function Header({ onMenuClick }: HeaderProps) {
             }`}
           >
             <div className="hidden sm:flex flex-col items-end">
-              <span className={`text-xs font-semibold leading-tight ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{user?.name}</span>
-              <span className="text-[10px] text-slate-400 leading-tight">{currentUser?.email}</span>
+              <span className={`text-xs font-semibold leading-tight ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{currentUser?.name || user?.name}</span>
+              <span className="text-[10px] text-slate-400 leading-tight">{currentUser?.email || user?.email}</span>
             </div>
             <Avatar className="h-8 w-8">
-              <AvatarImage src={user?.avatar} alt={user?.name} referrerPolicy="no-referrer" />
-              <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700 font-bold">{user?.name?.charAt(0)}</AvatarFallback>
+              <AvatarImage src={currentUser?.avatar || user?.avatar} alt={currentUser?.name || user?.name} referrerPolicy="no-referrer" />
+              <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700 font-bold uppercase">
+                {(currentUser?.name || user?.name || '?').charAt(0)}
+              </AvatarFallback>
             </Avatar>
           </button>
 
@@ -327,12 +333,12 @@ export function Header({ onMenuClick }: HeaderProps) {
               }`}>
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
-                    <AvatarImage src={user?.avatar} alt={user?.name} referrerPolicy="no-referrer" />
-                    <AvatarFallback className="bg-indigo-700 text-white font-bold">{user?.name?.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={currentUser?.avatar || user?.avatar} alt={currentUser?.name || user?.name} referrerPolicy="no-referrer" />
+                    <AvatarFallback className="bg-indigo-700 text-white font-bold uppercase">{(currentUser?.name || user?.name || '?').charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <p className={`text-sm font-bold truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{user?.name}</p>
-                    <p className="text-[11px] text-slate-500 truncate">{currentUser?.email}</p>
+                    <p className={`text-sm font-bold truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{currentUser?.name || user?.name}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{currentUser?.email || user?.email}</p>
                   </div>
                 </div>
                 <div className="mt-3 flex gap-2">

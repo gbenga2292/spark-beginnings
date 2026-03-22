@@ -8,6 +8,7 @@ import {
   LayoutDashboard, Users as UsersIcon, Building2, Landmark, Settings,
 } from 'lucide-react';
 import { useUserStore, AppUser, UserPrivileges, FULL_ACCESS, NO_ACCESS, PrivilegePreset } from '@/src/store/userStore';
+import { useAppStore } from '@/src/store/appStore';
 import { supabase } from '@/src/integrations/supabase/client';
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -145,6 +146,7 @@ export function UserForm() {
   const isEdit = Boolean(id);
 
   const { users, presets, addUser, updateUser, addPreset } = useUserStore();
+  const { employees } = useAppStore();
   const editingUser = isEdit ? users.find((u) => u.id === id) ?? null : null;
 
   const [name, setName] = useState(editingUser?.name ?? '');
@@ -292,7 +294,24 @@ export function UserForm() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-600">Full Name *</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" className="h-9 text-sm" />
+            <select
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="flex w-full h-9 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
+            >
+              <option value="" disabled>Select Employee...</option>
+              {employees.map(emp => {
+                const fullName = `${emp.firstname} ${emp.surname}`.trim();
+                return (
+                  <option key={emp.id} value={fullName}>
+                    {fullName} {emp.employeeCode ? `(${emp.employeeCode})` : ''}
+                  </option>
+                );
+              })}
+              {name && !employees.find(e => `${e.firstname} ${e.surname}`.trim() === name) && (
+                <option value={name}>{name}</option>
+              )}
+            </select>
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-600">Email Address *</label>

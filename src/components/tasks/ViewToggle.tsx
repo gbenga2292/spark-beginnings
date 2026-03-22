@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { List, LayoutGrid, Target, AlignJustify, ChevronDown } from "lucide-react";
+import { List, LayoutGrid, Target, AlignJustify, ChevronDown, CalendarRange } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-export type TaskViewMode = "list" | "compact" | "board" | "focus";
+export type TaskViewMode = "list" | "compact" | "board" | "focus" | "gantt";
 
 interface ViewToggleProps {
   value: TaskViewMode;
@@ -14,6 +14,7 @@ const VIEWS: { mode: TaskViewMode; icon: React.ElementType; label: string }[] = 
   { mode: "compact", icon: AlignJustify, label: "Compact" },
   { mode: "board", icon: LayoutGrid, label: "Board" },
   { mode: "focus", icon: Target, label: "Focus" },
+  { mode: "gantt", icon: CalendarRange, label: "Gantt Chart" },
 ];
 
 export function ViewToggle({ value, onChange }: ViewToggleProps) {
@@ -35,7 +36,7 @@ export function ViewToggle({ value, onChange }: ViewToggleProps) {
   const ActiveIcon = activeView.icon;
 
   return (
-    <div className="relative z-20" ref={containerRef}>
+    <div className="relative z-50" ref={containerRef}>
       <button
         onClick={() => setOpen(p => !p)}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/40 bg-card text-xs font-semibold text-foreground hover:bg-muted/80 transition-all shadow-sm ring-1 ring-border/20"

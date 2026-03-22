@@ -222,8 +222,8 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
                   `}
                 >
                   <div className="flex items-center justify-center mb-0.5 mt-1">
-                    <span className={`text-[10px] sm:text-base font-medium sm:font-bold w-5 h-5 sm:w-8 sm:h-8 flex items-center justify-center rounded-full
-                      ${isTodayDay ? 'bg-primary text-primary-foreground' : 'text-white/80'}
+                    <span className={`text-[10px] sm:text-base font-medium sm:font-bold w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center rounded-full
+                      ${isTodayDay ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-white/80'}
                     `}>
                       {format(day, 'd')}
                     </span>
@@ -291,12 +291,12 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
                     <button key={day.toISOString()} onClick={() => setSelectedDate(day)}
                       className={`relative w-full aspect-square flex items-center justify-center text-[10px] font-medium rounded-full transition-all
                         ${!isCurrentMonth ? 'text-white/15' : 'text-white/70'}
-                        ${isTodayDay && !isSelected ? 'text-primary font-bold' : ''}
-                        ${isSelected ? 'bg-primary text-primary-foreground' : 'hover:bg-white/10'}
+                        ${isTodayDay && !isSelected ? 'text-indigo-400 font-bold' : ''}
+                        ${isSelected ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'hover:bg-white/10'}
                       `}>
                       {format(day, 'd')}
                       {hasEvents && !isSelected && (
-                        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />
+                        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-indigo-500" />
                       )}
                     </button>
                   );

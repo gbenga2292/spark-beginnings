@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/src/integrations/supabase/client';
 import { format } from 'date-fns';
-import { Activity, Search, Server, FileText, Database, ShieldAlert, Settings, HardDrive, RefreshCcw } from 'lucide-react';
+import { Activity, Search, Server, FileText, Database, ShieldAlert, Settings, HardDrive, RefreshCcw, Plus, Edit2, Trash2 } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
 import { useUserStore } from '@/src/store/userStore';
@@ -22,11 +22,11 @@ export function ActivityLog() {
       let query = supabase.from('audit_logs').select('*');
       
       if (filterAction !== 'ALL') {
-        query = query.eq('action', filterAction);
+        query = query.eq('action_type', filterAction);
       }
       
       const { data, error } = await query
-        .order('changed_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
         
       if (error) throw error;
@@ -57,9 +57,99 @@ export function ActivityLog() {
     }
   };
 
+  const getTableFriendlyName = (name: string) => {
+    const map: Record<string, string> = {
+      profiles: 'User Account',
+      employees: 'Employee',
+      attendance_records: 'Attendance',
+      leaves: 'Leave Request',
+      invoices: 'Invoice',
+      pending_invoices: 'Pending Invoice',
+      disciplinary_records: 'Disciplinary',
+      evaluations: 'Evaluation',
+      salary_advances: 'Salary Advance',
+      loans: 'Loan',
+      payments: 'Payment',
+      sites: 'Site',
+      clients: 'Client'
+    };
+    return map[name] || name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const getRecordIdentifier = (data: any) => {
+    if (!data) return 'N/A';
+    const idDesc = data.name || data.email || data.title || data.invoice_number || data.employee_code ||
+      (data.firstname && data.surname ? `${data.firstname} ${data.surname}` : null);
+    if (idDesc) return idDesc;
+    if (data.id) return String(data.id).slice(0, 8) + '...';
+    return 'Unknown Record';
+  };
+
+  const formatVal = (v: any) => {
+    if (v === null || v === undefined || v === '') return 'empty';
+    if (typeof v === 'object') return JSON.stringify(v);
+    return String(v);
+  };
+
+  const renderChanges = (log: any) => {
+    const ignoreKeys = ['id', 'created_at', 'updated_at', 'avatar', 'inserted_at', 'passphrase', 'password'];
+    
+    if (log.action_type === 'UPDATE') {
+      const oldData = log.old_data || {};
+      const newData = log.new_data || {};
+      const diffs = [];
+      for (const key of Object.keys(newData)) {
+        if (ignoreKeys.includes(key)) continue;
+        const oldVal = oldData[key];
+        const newVal = newData[key];
+        if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+          diffs.push({ key: key.replace(/_/g, ' '), oldVal, newVal });
+        }
+      }
+      if (diffs.length === 0) return <span className="text-slate-400 italic font-mono text-xs">No trackable business fields modified.</span>;
+      return (
+        <ul className="space-y-1.5 mt-1">
+          {diffs.map((d, i) => (
+            <li key={i} className="text-[13px] text-slate-600">
+              <span className="font-semibold text-slate-700 capitalize">{d.key}</span> changed from{' '}
+              <span className="text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded font-mono text-xs line-through">
+                {formatVal(d.oldVal)}
+              </span>{' '}
+              to{' '}
+              <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-mono text-xs shadow-sm">
+                {formatVal(d.newVal)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      );
+    }
+
+    if (log.action_type === 'INSERT') {
+      const data = log.new_data || {};
+      const fields = Object.entries(data).filter(([k, v]) => !ignoreKeys.includes(k) && v !== null && v !== '');
+      return (
+        <ul className="space-y-1 mt-1">
+          {fields.slice(0, 5).map(([k, v], i) => (
+            <li key={i} className="text-[13px] text-slate-600">
+              <span className="font-semibold capitalize text-slate-700">{k.replace(/_/g, ' ')}:</span> <span className="font-mono text-xs text-indigo-700 bg-indigo-50 px-1 rounded">{formatVal(v)}</span>
+            </li>
+          ))}
+          {fields.length > 5 && <li className="text-[11px] text-slate-400 italic mt-1">...and {fields.length - 5} more fields recorded.</li>}
+        </ul>
+      );
+    }
+
+    if (log.action_type === 'DELETE') {
+      return <span className="text-red-500 text-[13px] font-medium italic">This record and all its data was deleted permanently.</span>;
+    }
+
+    return null;
+  };
+
   const filteredLogs = logs.filter(l => 
     l.table_name.toLowerCase().includes(search.toLowerCase()) || 
-    getUserName(l.changed_by).toLowerCase().includes(search.toLowerCase())
+    getUserName(l.user_id).toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -102,70 +192,59 @@ export function ActivityLog() {
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex-1 overflow-hidden flex flex-col">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase font-semibold">
-              <tr>
-                <th className="px-6 py-4">Timestamp</th>
-                <th className="px-6 py-4">User</th>
-                <th className="px-6 py-4">Action</th>
-                <th className="px-6 py-4">Table</th>
-                <th className="px-6 py-4">Record ID</th>
-                <th className="px-6 py-4">Details</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">Loading audit trail...</td>
-                </tr>
-              ) : filteredLogs.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">No activity logs found.</td>
-                </tr>
-              ) : filteredLogs.map(log => (
-                <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4 text-xs font-medium text-slate-600 whitespace-nowrap">
-                    {format(new Date(log.changed_at), 'MMM d, yyyy HH:mm:ss')}
-                  </td>
-                  <td className="px-6 py-4 font-medium text-slate-900">
-                    {getUserName(log.changed_by)}
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge variant="outline" className={`${getActionColor(log.action)}`}>
-                      {log.action}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 font-mono text-xs text-indigo-600 bg-indigo-50/50 rounded px-2 w-max inline-block mt-2 ml-4">
-                    {log.table_name}
-                  </td>
-                  <td className="px-6 py-4 font-mono text-xs text-slate-500">
-                    {log.record_id ? String(log.record_id).slice(0, 12) + (String(log.record_id).length > 12 ? '...' : '') : 'N/A'}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="max-w-[400px] max-h-24 overflow-y-auto text-xs font-mono bg-slate-900 text-slate-300 p-2 rounded-lg scrollbar-thin">
-                      {log.action === 'UPDATE' && (
-                        <div>
-                           <span className="text-slate-500 block mb-1">{"// Changes:"}</span>
-                           {JSON.stringify(log.new_data, null, 2)}
-                        </div>
-                      )}
-                      {log.action === 'INSERT' && JSON.stringify(log.new_data, null, 2)}
-                      {log.action === 'DELETE' && JSON.stringify(log.old_data, null, 2)}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="border-t border-slate-200 bg-slate-50 px-6 py-3 flex items-center justify-between">
-          <p className="text-xs text-slate-500">Showing page {page + 1}</p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => Math.max(0, p - 1))}>Previous</Button>
-            <Button variant="outline" size="sm" disabled={logs.length < PAGE_SIZE} onClick={() => setPage(p => p + 1)}>Next</Button>
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin flex flex-col gap-6">
+        {loading ? (
+          <p className="text-center text-slate-400 py-12">Loading audit trail...</p>
+        ) : filteredLogs.length === 0 ? (
+          <p className="text-center text-slate-400 py-12">No activity logs found.</p>
+        ) : (
+          <div className="relative space-y-6 before:absolute before:inset-0 before:ml-[1.1rem] before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-px before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
+            {filteredLogs.map((log, index) => {
+              const uName = getUserName(log.user_id);
+              const tName = getTableFriendlyName(log.table_name);
+              const rId = getRecordIdentifier(log.new_data || log.old_data);
+              const time = format(new Date(log.created_at || new Date()), 'MMM d, yyyy h:mm a');
+              
+              const isInsert = log.action_type === 'INSERT';
+              const isUpdate = log.action_type === 'UPDATE';
+              const isDelete = log.action_type === 'DELETE';
+
+              return (
+                <div key={log.id} className="relative flex items-start gap-4 md:gap-6 group">
+                  <div className="hidden md:block w-32 shrink-0 text-right pt-2.5">
+                    <span className="text-xs font-medium text-slate-400 block">{format(new Date(log.created_at || new Date()), 'MMM d, yyyy')}</span>
+                    <span className="text-xs font-semibold text-slate-500 block">{format(new Date(log.created_at || new Date()), 'h:mm a')}</span>
+                  </div>
+                  <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center border-4 border-white shadow-sm ring-1 ring-slate-100 z-10 transition-transform group-hover:scale-110 
+                    ${isInsert ? 'bg-emerald-100 text-emerald-600' : isUpdate ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'}`}>
+                    {isInsert && <Plus className="w-4 h-4" />}
+                    {isUpdate && <Edit2 className="w-4 h-4" />}
+                    {isDelete && <Trash2 className="w-4 h-4" />}
+                  </div>
+                  <div className="flex-1 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md transition-shadow p-4 relative top-1">
+                     <p className="text-[14px] text-slate-800 leading-snug">
+                       <span className="font-bold text-slate-900">{uName}</span>{' '}
+                       {isInsert ? 'created a new' : isUpdate ? 'updated the' : 'deleted the'}{' '}
+                       <span className="font-semibold">{tName.toLowerCase()}</span>{' '}
+                       record for <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-indigo-700">{rId}</span>.
+                     </p>
+                     <p className="text-xs text-slate-400 mt-1 mb-3 md:hidden">{time}</p>
+                     
+                     <div className="bg-slate-50/80 border border-slate-100 rounded-lg p-3">
+                       {renderChanges(log)}
+                     </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        )}
+      </div>
+      <div className="bg-white border text-center border-slate-200 rounded-xl px-4 py-3 shadow-sm flex items-center justify-between">
+        <p className="text-xs text-slate-500">Showing page {page + 1}</p>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => Math.max(0, p - 1))}>Previous</Button>
+          <Button variant="outline" size="sm" disabled={logs.length < PAGE_SIZE} onClick={() => setPage(p => p + 1)}>Next</Button>
         </div>
       </div>
     </div>

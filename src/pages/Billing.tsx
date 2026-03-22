@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react';
 import { useAppStore, PendingInvoice, Invoice } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download } from 'lucide-react';
+import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { usePriv } from '@/src/hooks/usePriv';
+import { useAppData } from '@/src/contexts/AppDataContext';
+import { useAuth } from '@/src/hooks/useAuth';
 
 export function Billing() {
   const sites = useAppStore((state) => state.sites);
@@ -22,6 +24,8 @@ export function Billing() {
 
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('billing');
+  const { addReminder } = useAppData();
+  const { user: currentUser } = useAuth();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isViewingActive, setIsViewingActive] = useState(true);
@@ -44,10 +48,12 @@ export function Billing() {
     mobDemob: '',
     installation: '',
     damages: '',
+    createReminder: true,
+    sendEmailNotification: true,
   };
   const [form, setForm] = useState(initialForm);
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: string, value: string | boolean) => {
     setForm(prev => ({ ...prev, [field]: value }));
   };
 
@@ -230,6 +236,20 @@ export function Billing() {
       }
     }
 
+    if (form.createReminder && currentUser && data.endDate) {
+      const reminderDateObj = new Date(data.endDate);
+      addReminder({
+        title: `Next Invoice for ${form.client} - ${form.site}`,
+        body: `Invoice ${form.invoiceNo} is pending payment. The duration has lapsed. Please notify the client to see if they want to extend or send a new invoice.`,
+        remindAt: reminderDateObj.toISOString(),
+        frequency: 'once',
+        recipientIds: [currentUser.id],
+        sendEmail: !!form.sendEmailNotification,
+        isActive: true,
+        createdBy: currentUser.id
+      });
+    }
+
     setIsModalOpen(false);
     handleClear();
   };
@@ -252,6 +272,8 @@ export function Billing() {
       mobDemob: 'mobDemob' in inv ? String(inv.mobDemob ?? 0) : '0',
       installation: 'installation' in inv ? String(inv.installation ?? 0) : '0',
       damages: 'damages' in inv ? String(inv.damages ?? 0) : '0',
+      createReminder: false, // Don't recreate a reminder automatically on edit
+      sendEmailNotification: true,
     });
     setIsModalOpen(true);
   };
@@ -774,6 +796,23 @@ export function Billing() {
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Damages</label>
                     <Input type="number" min="0" value={form.damages} onChange={e => handleChange('damages', e.target.value)} className="bg-slate-50" />
                   </div>
+                </div>
+              </div>
+
+              {/* Automatic Reminder Section */}
+              <div className="pt-5 border-t border-slate-100">
+                <label className="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-3 block">Follow-Up Reminders</label>
+                <div className="flex flex-col gap-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={!!form.createReminder} onChange={e => handleChange('createReminder', e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                    <span className="text-sm font-medium text-slate-700">Auto-create reminder for next invoice date</span>
+                  </label>
+                  {form.createReminder && (
+                    <label className="flex items-center gap-3 cursor-pointer pl-7">
+                       <input type="checkbox" checked={!!form.sendEmailNotification} onChange={e => handleChange('sendEmailNotification', e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                       <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><Mail className="w-4 h-4" /> Send email notification along with this reminder</span>
+                    </label>
+                  )}
                 </div>
               </div>
 

@@ -11,6 +11,8 @@ import {
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Variables } from './Variables';
 import { useAppStore } from '@/src/store/appStore';
+import { useUserStore } from '@/src/store/userStore';
+import { useAppData } from '@/src/contexts/AppDataContext';
 import { toast } from '@/src/components/ui/toast';
 import { supabase } from '@/src/integrations/supabase/client';
 
@@ -74,6 +76,8 @@ export function Settings() {
 
   // Get all app data from store
   const state = useAppStore();
+  const userState = useUserStore();
+  const taskState = useAppData();
 
   useEffect(() => {
     if (isElectron && window.electronAPI?.getVersion) {
@@ -135,9 +139,26 @@ export function Settings() {
         departmentTasksList: state.departmentTasksList,
         leaves: state.leaves,
         leaveTypes: state.leaveTypes,
+        pendingSites: state.pendingSites,
+        disciplinaryRecords: state.disciplinaryRecords,
+        evaluations: state.evaluations,
+        ledgerCategories: state.ledgerCategories,
+        ledgerVendors: state.ledgerVendors,
+        ledgerBanks: state.ledgerBanks,
+        ledgerEntries: state.ledgerEntries,
+        hrVariables: state.hrVariables,
+        // User Store
+        users: userState.users,
+        presets: userState.presets,
+        // Task Context
+        mainTasks: taskState.mainTasks,
+        subtasks: taskState.subtasks,
+        comments: taskState.comments,
+        projects: taskState.projects,
+        reminders: taskState.reminders,
       },
     };
-  }, [state, appVersion]);
+  }, [state, userState, taskState, appVersion]);
 
   /* ── Manual backup to file ───────────────────────────────── */
   const handleManualBackup = async () => {
@@ -206,6 +227,14 @@ export function Settings() {
         if (d.departmentTasksList)  useAppStore.setState({ departmentTasksList: d.departmentTasksList });
         if (d.leaves)               useAppStore.setState({ leaves: d.leaves });
         if (d.leaveTypes)           useAppStore.setState({ leaveTypes: d.leaveTypes });
+        if (d.pendingSites)         useAppStore.setState({ pendingSites: d.pendingSites });
+        if (d.disciplinaryRecords)  useAppStore.setState({ disciplinaryRecords: d.disciplinaryRecords });
+        if (d.evaluations)          useAppStore.setState({ evaluations: d.evaluations });
+        if (d.ledgerCategories)     useAppStore.setState({ ledgerCategories: d.ledgerCategories });
+        if (d.ledgerVendors)        useAppStore.setState({ ledgerVendors: d.ledgerVendors });
+        if (d.ledgerBanks)          useAppStore.setState({ ledgerBanks: d.ledgerBanks });
+        if (d.ledgerEntries)        useAppStore.setState({ ledgerEntries: d.ledgerEntries });
+        if (d.hrVariables)          useAppStore.setState({ hrVariables: d.hrVariables });
 
         const bDate = new Date(backup.backupDate).toLocaleString();
         toast.success(`Data restored from backup dated ${bDate}`);
