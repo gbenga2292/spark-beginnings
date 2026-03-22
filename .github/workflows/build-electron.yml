@@ -30,6 +30,6 @@ jobs:
         run: npm run build:dev
 
       - name: Package & Publish Electron App
-        run: npm run electron:build:win
+        run: npx electron-builder --win --x64 --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

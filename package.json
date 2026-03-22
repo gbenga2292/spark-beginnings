@@ -1,12 +1,12 @@
 {
   "name": "dcel-hr-app",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "main": "electron/main.cjs",
   "repository": {
     "type": "git",
-    "url": "https://github.com/gbenga2292/dcel-hr-app.git"
+    "url": "https://github.com/gbenga2292/spark-beginnings.git"
   },
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
@@ -135,7 +135,7 @@
       {
         "provider": "github",
         "owner": "gbenga2292",
-        "repo": "dcel-hr-app",
+        "repo": "spark-beginnings",
         "releaseType": "release"
       }
     ]
