@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useAppStore } from '@/src/store/appStore';
+import { useAppStore, DEFAULT_OFFBOARDING_TASKS } from '@/src/store/appStore';
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
@@ -64,6 +64,22 @@ export function useDataLoader(isAuthenticated: boolean) {
         // Preserve pendingSites from localStorage — they have no Supabase table yet
         const localPendingSites = useAppStore.getState().pendingSites;
 
+        // Auto-seed default general offboarding tasks if missing
+        let processedDeptTasks = appData.departmentTasksList.length > 0 ? [...appData.departmentTasksList] : [...useAppStore.getState().departmentTasksList];
+        let hasAllTask = false;
+        processedDeptTasks = processedDeptTasks.map((d: any) => {
+          if (d.department === 'ALL') {
+             hasAllTask = true;
+             if (!d.offboardingTasks || d.offboardingTasks.length === 0) {
+               return { ...d, offboardingTasks: [...DEFAULT_OFFBOARDING_TASKS] };
+             }
+          }
+          return d;
+        });
+        if (!hasAllTask) {
+          processedDeptTasks.push({ department: 'ALL', onboardingTasks: [], offboardingTasks: [...DEFAULT_OFFBOARDING_TASKS] });
+        }
+
         // Hydrate appStore
         useAppStore.setState({
           sites: appData.sites,
@@ -77,7 +93,7 @@ export function useDataLoader(isAuthenticated: boolean) {
           payments: appData.payments,
           vatPayments: appData.vatPayments,
           publicHolidays: appData.publicHolidays,
-          departmentTasksList: appData.departmentTasksList.length > 0 ? appData.departmentTasksList : useAppStore.getState().departmentTasksList,
+          departmentTasksList: processedDeptTasks,
           leaves: appData.leaves,
           leaveTypes: appData.leaveTypes.length > 0 ? appData.leaveTypes : useAppStore.getState().leaveTypes,
           disciplinaryRecords: appData.disciplinaryRecords,
@@ -302,7 +318,30 @@ export function useRealtimeData(isAuthenticated: boolean) {
               }
               break;
             }
-            // You can add payments, vat_payments and others if needed
+            case 'payments': {
+              const current = appState.payments;
+              if (eventType === 'INSERT') {
+                useAppStore.setState({ payments: [...current, dbToPayment(newRow)] });
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToPayment(newRow);
+                useAppStore.setState({ payments: current.map(p => p.id === updated.id ? updated : p) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ payments: current.filter(p => p.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'vat_payments': {
+              const current = appState.vatPayments;
+              if (eventType === 'INSERT') {
+                useAppStore.setState({ vatPayments: [...current, dbToVatPayment(newRow)] });
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToVatPayment(newRow);
+                useAppStore.setState({ vatPayments: current.map(p => p.id === updated.id ? updated : p) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ vatPayments: current.filter(p => p.id !== oldRow.id) });
+              }
+              break;
+            }
           }
         }
       )

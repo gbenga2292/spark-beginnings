@@ -35,6 +35,34 @@ export interface DepartmentTasks {
   offboardingTasks: { title: string; assignee: string }[];
 }
 
+export const DEFAULT_OFFBOARDING_TASKS = [
+  { title: '1. Documentation & Compliance - Receive and file resignation/termination letter', assignee: 'HR' },
+  { title: '1. Documentation & Compliance - Update personnel records', assignee: 'HR' },
+  { title: '1. Documentation & Compliance - Prepare final salary settlement', assignee: 'Finance' },
+  { title: '2. Access & Security - Remove from Whatsapp Group or Internal Groups', assignee: 'IT' },
+  { title: '2. Access & Security - Collect company property (laptop, phone, ID badge, keys, credit cards, uniforms)', assignee: 'Operations' },
+  { title: '3. Knowledge Transfer - Ensure handover of ongoing projects/tasks', assignee: 'Management' },
+  { title: '3. Knowledge Transfer - Collect important files and documentation', assignee: 'Management' },
+  { title: '3. Knowledge Transfer - Redirect client communications and responsibilities', assignee: 'Management' },
+  { title: '3. Knowledge Transfer - Assign replacement or interim staff', assignee: 'Management' },
+  { title: '4. Employee Relations - Conduct exit interview', assignee: 'HR' },
+  { title: '4. Employee Relations - Communicate departure to relevant teams', assignee: 'HR' },
+  { title: '4. Employee Relations - Thank employee for contributions', assignee: 'HR' },
+  { title: '4. Employee Relations - Provide reference letter (if applicable)', assignee: 'HR' },
+  { title: '5. Benefits & Post-Employment - Notify benefits providers (health insurance, pension, etc.)', assignee: 'HR' },
+  { title: '5. Benefits & Post-Employment - Issue employment certificate/clearance letter', assignee: 'HR' },
+  { title: '5. Benefits & Post-Employment - Provide tax forms and final payslip', assignee: 'Finance' },
+  { title: '5. Benefits & Post-Employment - Invite to alumni network (if applicable)', assignee: 'HR' },
+  { title: '6. Final HR Sign-Off - All documentation completed', assignee: 'HR' },
+  { title: '6. Final HR Sign-Off - Payroll & benefits settled', assignee: 'Finance' },
+  { title: '6. Final HR Sign-Off - IT/system access revoked', assignee: 'IT' },
+  { title: '6. Final HR Sign-Off - Company assets returned', assignee: 'Operations' },
+  { title: '6. Final HR Sign-Off - Knowledge transfer verified', assignee: 'Management' },
+  { title: '6. Final HR Sign-Off - Exit interview conducted', assignee: 'HR' },
+  { title: '6. Final HR Sign-Off - Internal communication sent', assignee: 'HR' },
+  { title: '6. Final HR Sign-Off - Legal compliance confirmed', assignee: 'HR' }
+];
+
 export interface ServiceTemplate {
   serviceName: string;
   subtasks: { title: string; assignee: string; description?: string }[];
