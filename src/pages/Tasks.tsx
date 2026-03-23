@@ -637,7 +637,7 @@ function AdminTasksView() {
       )}
 
       {/* ── GANTT VIEW ── */}
-      {viewMode === 'gantt' && (
+      {viewMode === 'gantt' && scope !== 'projects' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <TaskGanttView
             mainTasks={scope === 'mine' ? mainTasks.filter(m => filteredMySubs.some(s => s.mainTaskId === m.id)) : tabFiltered}
@@ -653,7 +653,7 @@ function AdminTasksView() {
       )}
 
       {/* ── FOCUS VIEW ── */}
-      {viewMode === 'focus' && (
+      {viewMode === 'focus' && scope !== 'projects' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <TaskFocusView
             subtasks={scope === 'mine' ? mySubs : teamSubtasks}
@@ -665,7 +665,7 @@ function AdminTasksView() {
       )}
 
       {/* ── COMPACT VIEW ── */}
-      {viewMode === 'compact' && (
+      {viewMode === 'compact' && scope !== 'projects' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           {(() => {
             const compactPool = scope === 'mine' ? filteredMySubs : scope === 'pending_review' ? pendingApprovalSubs : (() => {
