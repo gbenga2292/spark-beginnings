@@ -4,19 +4,7 @@ import { useTheme } from '@/src/hooks/useTheme';
 import { useUserStore } from '@/src/store/userStore';
 import { useNavigate as useRRNavigate } from 'react-router-dom';
 
-declare global {
-  interface Window {
-    electronAPI?: {
-      isElectron: boolean;
-      platform: string;
-      showMenu: (id: string, x: number, y: number) => void;
-      getVersion: () => Promise<string>;
-      checkForUpdates: () => void;
-      setTitleBarOverlay: (opts: { color: string; symbolColor: string; height: number }) => void;
-      updateMenuPrivileges: (privs: Record<string, any> | null) => void;
-    };
-  }
-}
+const getElectronAPI = () => (window as any).electronAPI;
 
 const MENU_ITEMS = [
   { id: 'file',     label: 'File' },
@@ -25,8 +13,8 @@ const MENU_ITEMS = [
 ];
 
 export function TitleBar() {
-  const isElectron = window.electronAPI?.isElectron;
-  const isMac = window.electronAPI?.platform === 'darwin';
+  const isElectron = getElectronAPI()?.isElectron;
+  const isMac = getElectronAPI()?.platform === 'darwin';
   const [version, setVersion] = useState('');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const { isDark, toggle } = useTheme();
@@ -39,13 +27,13 @@ export function TitleBar() {
   };
 
   useEffect(() => {
-    window.electronAPI?.getVersion().then(v => setVersion(v)).catch(() => {});
+    getElectronAPI()?.getVersion().then((v: string) => setVersion(v)).catch(() => {});
   }, []);
 
   // Push current user privileges to main so Navigate menu reflects access
   useEffect(() => {
-    if (!window.electronAPI?.updateMenuPrivileges) return;
-    window.electronAPI.updateMenuPrivileges(
+    if (!getElectronAPI()?.updateMenuPrivileges) return;
+    getElectronAPI().updateMenuPrivileges(
       currentUser ? currentUser.privileges : null
     );
   }, [currentUser]);
@@ -59,11 +47,11 @@ export function TitleBar() {
 
   // Sync the native Windows close/min/max button strip with the current theme
   useEffect(() => {
-    if (!window.electronAPI?.setTitleBarOverlay) return;
+    if (!getElectronAPI()?.setTitleBarOverlay) return;
     if (isDark) {
-      window.electronAPI.setTitleBarOverlay({ color: '#0f172a', symbolColor: '#94a3b8', height: 40 });
+      getElectronAPI().setTitleBarOverlay({ color: '#0f172a', symbolColor: '#94a3b8', height: 40 });
     } else {
-      window.electronAPI.setTitleBarOverlay({ color: '#ffffff', symbolColor: '#475569', height: 40 });
+      getElectronAPI().setTitleBarOverlay({ color: '#ffffff', symbolColor: '#475569', height: 40 });
     }
   }, [isDark]);
 
@@ -73,7 +61,7 @@ export function TitleBar() {
     e.stopPropagation();
     setActiveMenu(id);
     const rect = e.currentTarget.getBoundingClientRect();
-    window.electronAPI?.showMenu(id, rect.left, rect.bottom + 2);
+    getElectronAPI()?.showMenu(id, rect.left, rect.bottom + 2);
     // Clear active state after a short delay
     setTimeout(() => setActiveMenu(null), 300);
   };
@@ -144,17 +132,11 @@ export function TitleBar() {
             <ChevronDown className={`h-2.5 w-2.5 transition-transform opacity-50 group-hover:opacity-100 ${activeMenu === id ? 'rotate-180 opacity-100' : ''}`} />
           </button>
         ))}
-      </div>
 
-      {/* Spacer — draggable */}
-      <div className="flex-1" style={{ WebkitAppRegion: 'drag' } as any} />
+        {/* Subtle divider */}
+        <div className={`h-4 w-px mx-2 ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
 
-      {/* Right Controls */}
-      <div
-        className="flex items-center gap-1 pr-2"
-        style={{ WebkitAppRegion: 'no-drag' } as any}
-      >
-        {/* Theme toggle */}
+        {/* Theme toggle moved next to the Menu */}
         <button
           onClick={toggle}
           title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
@@ -175,9 +157,16 @@ export function TitleBar() {
             {isDark ? 'Light' : 'Dark'}
           </span>
         </button>
+      </div>
 
-        {/* Subtle divider */}
-        <div className={`h-4 w-px mx-1 ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
+      {/* Spacer — draggable */}
+      <div className="flex-1" style={{ WebkitAppRegion: 'drag' } as any} />
+
+      {/* Right Controls */}
+      <div
+        className="flex items-center gap-1 pr-[140px]" /* Safe spacing to prevent window controls overlay on Windows */
+        style={{ WebkitAppRegion: 'no-drag' } as any}
+      >
 
         {/* Status indicator */}
         <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium ${
