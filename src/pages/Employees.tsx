@@ -1,10 +1,11 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/src/components/ui/avatar';
-import { Search, Plus, MoreHorizontal, Download, Upload, ArrowLeft, Save, Pencil, Trash2, Eye, X } from 'lucide-react';
+import { Search, Plus, MoreHorizontal, Download, Upload, ArrowLeft, Save, Pencil, Trash2, Eye, X, Network } from 'lucide-react';
 import { useAppStore, Employee, MonthlySalary } from '@/src/store/appStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -35,6 +36,7 @@ const POSITION_HIERARCHY = [
 ];
 
 export function Employees() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'Active' | 'Delisted'>('Active');
   const [detailTab, setDetailTab] = useState<'Overview' | 'Attendance' | 'Leaves' | 'Disciplinary' | 'Evaluations' | 'Reminders'>('Overview');
   const [activeTabMonth, setActiveTabMonth] = useState<string>('All');
@@ -73,7 +75,7 @@ export function Employees() {
       emp.firstname.toLowerCase().includes(searchLow) ||
       emp.department.toLowerCase().includes(searchLow) ||
       (emp.employeeCode?.toLowerCase() || '').includes(searchLow);
-    const matchesTab = activeTab === 'Delisted' ? emp.status === 'Terminated' : emp.status !== 'Terminated';
+    const matchesTab = activeTab === 'Delisted' ? emp.status === 'Terminated' : (emp.status === 'Active' || emp.status === 'On Leave');
     return matchesSearch && matchesTab;
   }).sort((a, b) => {
     if (sortBy === 'name') return (a.surname + a.firstname).localeCompare(b.surname + b.firstname);
@@ -292,8 +294,8 @@ export function Employees() {
             const importedDept = vals[3 + offset]?.trim();
             const importedPosition = vals[5 + offset]?.trim();
             
-            if (importedDept && !departments.includes(importedDept)) newDepartments.add(importedDept);
-            if (importedPosition && !positions.includes(importedPosition)) newPositions.add(importedPosition);
+            if (importedDept && !departments.some(d => d.name === importedDept)) newDepartments.add(importedDept);
+            if (importedPosition && !positions.some(p => p.title === importedPosition)) newPositions.add(importedPosition);
 
             const providedId = vals[0]?.trim() || '';
             const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(providedId);
@@ -346,11 +348,11 @@ export function Employees() {
         let addedDeptCount = 0;
         let addedPosCount = 0;
         newDepartments.forEach(dept => {
-          addDepartment(dept);
+          addDepartment({ id: crypto.randomUUID(), name: dept, staffType: 'INTERNAL', workDaysPerWeek: 5 });
           addedDeptCount++;
         });
         newPositions.forEach(pos => {
-          addPosition(pos);
+          addPosition({ id: crypto.randomUUID(), title: pos, departmentId: '' });
           addedPosCount++;
         });
 
@@ -409,26 +411,52 @@ export function Employees() {
                   <Input value={formData.employeeCode || ''} onChange={e => setFormData({ ...formData, employeeCode: e.target.value })} placeholder="e.g. EMP-001 (Auto-generated if empty)" className="bg-slate-50 focus:bg-white font-mono" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Department</label>
-                  <select className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" value={formData.department || ''} onChange={e => setFormData({ ...formData, department: e.target.value })}>
-                    <option value="" disabled>Select Department</option>
-                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Position</label>
+                  <select className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                    value={formData.position || ''} 
+                    onChange={e => {
+                      const newPos = e.target.value;
+                      const posObj = positions.find(p => p.title === newPos);
+                      let deptObj = null;
+                      if (posObj?.departmentId) {
+                        deptObj = departments.find(d => d.id === posObj.departmentId);
+                      }
+                      setFormData({ 
+                        ...formData, 
+                        position: newPos,
+                        department: deptObj ? deptObj.name : '',
+                        staffType: deptObj ? deptObj.staffType : 'INTERNAL'
+                      });
+                    }}>
+                    <option value="" disabled>Select Position</option>
+                    {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Position</label>
-                  <select className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" value={formData.position || ''} onChange={e => setFormData({ ...formData, position: e.target.value })}>
-                    <option value="" disabled>Select Position</option>
-                    {positions.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Department</label>
+                  <Input value={formData.department || ''} disabled className="bg-slate-100/50 text-slate-500 cursor-not-allowed" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Staff Type</label>
-                  <select className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" value={formData.staffType} onChange={e => setFormData({ ...formData, staffType: e.target.value as any })}>
-                    <option value="INTERNAL">INTERNAL</option>
-                    <option value="EXTERNAL">EXTERNAL</option>
-                  </select>
+                  <Input value={formData.staffType || 'INTERNAL'} disabled className="bg-slate-100/50 text-slate-500 cursor-not-allowed uppercase font-bold text-xs" />
                 </div>
+                {formData.staffType === 'INTERNAL' && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Line Manager</label>
+                    <select 
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                      value={formData.lineManager || ''} 
+                      onChange={e => setFormData({ ...formData, lineManager: e.target.value || undefined })}
+                    >
+                      <option value="">None / Top Executive</option>
+                      {employees
+                        .filter(emp => emp.staffType === 'INTERNAL' && emp.id !== formData.id && emp.status === 'Active')
+                        .map(emp => (
+                          <option key={emp.id} value={emp.id}>{emp.firstname} {emp.surname} ({emp.position})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
                   <select className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}>
@@ -1041,6 +1069,9 @@ export function Employees() {
               <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
             </label>
           )}
+          <Button variant="outline" className="gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 shadow-sm" onClick={() => navigate('/organogram')}>
+            <Network className="h-4 w-4" /> Organogram
+          </Button>
           {priv.canAdd && (
             <Button className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md mx-2 transition-all" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'INTERNAL', status: 'Active', payeTax: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
               <Plus className="h-4 w-4" /> Add Employee

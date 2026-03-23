@@ -45,14 +45,28 @@ export function TitleBar() {
     return () => window.removeEventListener('electron-navigate', handler as EventListener);
   }, []);
 
-  // Sync the native Windows close/min/max button strip with the current theme
+  // Sync the native Windows close/min/max button strip with the current theme and zoom scale
   useEffect(() => {
     if (!getElectronAPI()?.setTitleBarOverlay) return;
-    if (isDark) {
-      getElectronAPI().setTitleBarOverlay({ color: '#0f172a', symbolColor: '#94a3b8', height: 40 });
-    } else {
-      getElectronAPI().setTitleBarOverlay({ color: '#ffffff', symbolColor: '#475569', height: 40 });
-    }
+
+    const updateControls = () => {
+      // Approximate browser zoom level so the native controls scale with the CSS h-10 container
+      let zoom = window.innerWidth ? window.outerWidth / window.innerWidth : 1;
+      zoom = Math.round(zoom * 20) / 20; // Snap to nearest 0.05 to ignore OS window borders
+      if (zoom < 0.2 || zoom > 5) zoom = 1;
+
+      const height = Math.round(40 * zoom);
+
+      if (isDark) {
+        getElectronAPI().setTitleBarOverlay({ color: '#0f172a', symbolColor: '#94a3b8', height });
+      } else {
+        getElectronAPI().setTitleBarOverlay({ color: '#ffffff', symbolColor: '#475569', height });
+      }
+    };
+
+    updateControls();
+    window.addEventListener('resize', updateControls);
+    return () => window.removeEventListener('resize', updateControls);
   }, [isDark]);
 
   if (!isElectron) return null;
@@ -68,7 +82,7 @@ export function TitleBar() {
 
   return (
     <div
-      className={`shrink-0 h-10 flex items-center select-none z-[100] border-b transition-colors duration-200 ${
+      className={`shrink-0 h-10 flex items-center select-none z-40 border-b transition-colors duration-200 ${
         isDark
           ? 'bg-slate-900 border-slate-700/60'
           : 'bg-white border-slate-200'

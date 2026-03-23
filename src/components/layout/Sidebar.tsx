@@ -174,7 +174,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       {/* Sidebar Container */}
       <div
         className={cn(
-          'fixed lg:relative flex h-full flex-col border-r transition-all duration-300 z-50',
+          'fixed lg:relative flex h-full flex-col border-r transition-all duration-300 z-40',
           sidebarBg,
           isCollapsed ? 'w-20' : 'w-64',
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'

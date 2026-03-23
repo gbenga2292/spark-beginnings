@@ -18,6 +18,7 @@ import { ProtectedRoute } from './components/common/ProtectedRoute';
 // ── Lazy-loaded pages ─────────────────────────────────────────────────────────
 // These are code-split to keep the initial bundle small. Each page loads on demand.
 const Employees = lazy(() => import('./pages/Employees').then(m => ({ default: m.Employees })));
+const Organogram = lazy(() => import('./pages/Organogram').then(m => ({ default: m.Organogram })));
 const Sites = lazy(() => import('./pages/Sites').then(m => ({ default: m.Sites })));
 const SiteOnboarding = lazy(() => import('./pages/SiteOnboarding').then(m => ({ default: m.SiteOnboarding })));
 const Attendance = lazy(() => import('./pages/Attendance').then(m => ({ default: m.Attendance })));
@@ -110,6 +111,7 @@ function AppContent() {
           <Route index element={<ProtectedRoute requiredModule="dashboard"><Dashboard /></ProtectedRoute>} />
           <Route path="attendance" element={<ProtectedRoute requiredModule="attendance"><Attendance /></ProtectedRoute>} />
           <Route path="employees" element={<ProtectedRoute requiredModule="employees"><Employees /></ProtectedRoute>} />
+          <Route path="organogram" element={<ProtectedRoute requiredModule="employees"><Organogram /></ProtectedRoute>} />
           <Route path="sites" element={<ProtectedRoute requiredModule="sites"><Sites /></ProtectedRoute>} />
           <Route path="sites/onboarding/:id" element={<ProtectedRoute requiredModule="sites"><SiteOnboarding /></ProtectedRoute>} />
           <Route path="payroll" element={<ProtectedRoute requiredModule="payroll"><Payroll /></ProtectedRoute>} />

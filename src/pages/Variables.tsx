@@ -20,8 +20,10 @@ export function Variables() {
   const clients = useAppStore((state) => state.clients);
   const addPosition = useAppStore((state) => state.addPosition);
   const removePosition = useAppStore((state) => state.removePosition);
+  const updatePosition = useAppStore((state) => state.updatePosition);
   const addDepartment = useAppStore((state) => state.addDepartment);
   const removeDepartment = useAppStore((state) => state.removeDepartment);
+  const updateDepartment = useAppStore((state) => state.updateDepartment);
   const addClient = useAppStore((state) => state.addClient);
   const removeClient = useAppStore((state) => state.removeClient);
   const storePayrollVariables = useAppStore((state) => state.payrollVariables);
@@ -132,7 +134,9 @@ export function Variables() {
   ];
 
   const [newPosition, setNewPosition] = useState('');
+  const [newPosDeptId, setNewPosDeptId] = useState('');
   const [newDepartment, setNewDepartment] = useState('');
+  const [newDeptStaffType, setNewDeptStaffType] = useState<'INTERNAL' | 'EXTERNAL'>('INTERNAL');
   const [newClient, setNewClient] = useState('');
   const [newLeaveType, setNewLeaveType] = useState('');
 
@@ -148,16 +152,24 @@ export function Variables() {
   };
 
   const handleAddPosition = () => {
-    if (newPosition && !positions.includes(newPosition)) {
-      addPosition(newPosition);
+    if (newPosition && newPosDeptId && !positions.some(p => p.title.toLowerCase() === newPosition.toLowerCase() && p.departmentId === newPosDeptId)) {
+      addPosition({ id: crypto.randomUUID(), title: newPosition, departmentId: newPosDeptId });
       setNewPosition('');
+      setNewPosDeptId('');
+    } else if (!newPosDeptId) {
+      toast.error('Select a department for the new position.');
+    } else {
+      toast.error('Position already exists in this department.');
     }
   };
 
   const handleAddDepartment = () => {
-    if (newDepartment && !departments.includes(newDepartment)) {
-      addDepartment(newDepartment);
+    if (newDepartment && !departments.some(d => d.name.toLowerCase() === newDepartment.toLowerCase())) {
+      addDepartment({ id: crypto.randomUUID(), name: newDepartment, staffType: newDeptStaffType, workDaysPerWeek: 5 });
       setNewDepartment('');
+      setNewDeptStaffType('INTERNAL');
+    } else if (newDepartment) {
+      toast.error('Department name already exists.');
     }
   };
 
@@ -290,10 +302,13 @@ export function Variables() {
     try {
       const wb = XLSX.utils.book_new();
 
-      const posData = positions.map(p => ({ Position: p }));
+      const posData = positions.map(p => {
+        const dept = departments.find(d => d.id === p.departmentId);
+        return { Position: p.title, Department: dept?.name || 'Unassigned' };
+      });
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(posData), 'Positions');
 
-      const deptData = departments.map(d => ({ Department: d }));
+      const deptData = departments.map(d => ({ Department: d.name, 'Staff Type': d.staffType, 'Work Days/Week': d.workDaysPerWeek }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(deptData), 'Departments');
 
       const clientData = clients.map(c => ({ Client: c }));
@@ -379,17 +394,34 @@ export function Variables() {
             const data = evt.target?.result;
             const wb = XLSX.read(data, { type: 'binary' });
 
-            if (wb.SheetNames.includes('Positions')) {
-              const posData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Positions']);
-              posData.forEach(row => {
-                if (row.Position && !positions.includes(row.Position)) addPosition(String(row.Position));
-              });
-            }
-
             if (wb.SheetNames.includes('Departments')) {
               const deptData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Departments']);
               deptData.forEach(row => {
-                if (row.Department && !departments.includes(row.Department)) addDepartment(String(row.Department));
+                const depName = String(row.Department || '').trim();
+                if (depName && !departments.some(d => d.name.toLowerCase() === depName.toLowerCase())) {
+                  addDepartment({
+                    id: crypto.randomUUID(),
+                    name: depName,
+                    staffType: row['Staff Type'] === 'EXTERNAL' ? 'EXTERNAL' : 'INTERNAL',
+                    workDaysPerWeek: Number(row['Work Days/Week']) || 5
+                  });
+                }
+              });
+            }
+
+            if (wb.SheetNames.includes('Positions')) {
+              const posData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Positions']);
+              posData.forEach(row => {
+                const posName = String(row.Position || '').trim();
+                const depName = String(row.Department || '').trim();
+                let deptId = null;
+                if (depName) {
+                  const existingDept = useAppStore.getState().departments.find(d => d.name.toLowerCase() === depName.toLowerCase());
+                  if (existingDept) deptId = existingDept.id;
+                }
+                if (posName && !positions.some(p => p.title.toLowerCase() === posName.toLowerCase() && p.departmentId === deptId)) {
+                   addPosition({ id: crypto.randomUUID(), title: posName, departmentId: deptId });
+                }
               });
             }
 
@@ -706,7 +738,7 @@ export function Variables() {
                           <option value="Engineering">Engineering</option>
                           <option value="Operations">Operations</option>
                           <option value="Site Manager">Site Manager</option>
-                          {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                          {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                         </select>
                         <Button 
                           variant="outline" 
@@ -949,24 +981,82 @@ export function Variables() {
             </CardHeader>
             <CardContent>
               {priv.canEdit && (
-                <div className="flex gap-2 mb-4">
+                 <div className="flex gap-2 mb-4">
                   <Input placeholder="New Position" value={newPosition} onChange={(e) => setNewPosition(e.target.value)} className="flex-1" />
+                  <select
+                    className="h-10 rounded border border-slate-200 px-3 w-40 text-sm bg-white"
+                    value={newPosDeptId}
+                    onChange={(e) => setNewPosDeptId(e.target.value)}
+                  >
+                    <option value="">-- Dept --</option>
+                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
                   <Button onClick={handleAddPosition} variant="outline" className="gap-2">
                     <Plus className="h-4 w-4" /> Add
                   </Button>
                 </div>
               )}
-              <div className="flex flex-wrap gap-2">
-                {positions.map(pos => (
-                  <div key={pos} className="bg-slate-100 border border-slate-200 rounded-full px-3 py-1 text-sm flex items-center gap-2">
-                    {pos}
-                    {priv.canEdit && (
-                      <button onClick={() => removePosition(pos)} className="text-slate-400 hover:text-red-500">
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+              <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto w-full">
+                <Table>
+                  <TableHeader className="bg-slate-50 sticky top-0">
+                    <TableRow>
+                      <TableHead>Position Title</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead className="w-[60px] text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {positions.length === 0 ? (
+                      <TableRow><TableCell colSpan={3} className="text-center text-slate-500 py-4 italic">No positions defined.</TableCell></TableRow>
+                    ) : (
+                      positions.map(pos => {
+                        return (
+                          <TableRow key={pos.id}>
+                            <TableCell className="align-middle">
+                              {priv.canEdit ? (
+                                <Input 
+                                  value={pos.title}
+                                  onChange={(e) => updatePosition(pos.id, { title: e.target.value })}
+                                  className="h-8 max-w-[250px]"
+                                />
+                              ) : (
+                                <span className="font-medium text-slate-800">{pos.title}</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="align-middle bg-transparent">
+                              {priv.canEdit ? (
+                                <select
+                                  className="h-8 rounded border border-slate-200 px-2 text-sm bg-white min-w-[120px]"
+                                  value={pos.departmentId || ''}
+                                  onChange={(e) => updatePosition(pos.id, { departmentId: e.target.value })}
+                                >
+                                  <option value="">Unassigned</option>
+                                  {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                </select>
+                              ) : (
+                                <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded-md">
+                                  {departments.find(d => d.id === pos.departmentId)?.name || 'Unassigned'}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right align-middle">
+                              {priv.canEdit && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removePosition(pos.id)}
+                                  className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
-                  </div>
-                ))}
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
@@ -975,44 +1065,96 @@ export function Variables() {
           <Card className="shadow-sm border-slate-200">
             <CardHeader>
               <CardTitle>Departments</CardTitle>
-              <CardDescription>Manage available departments.</CardDescription>
+              <CardDescription>Manage available departments and their internal/external staff classification.</CardDescription>
             </CardHeader>
             <CardContent>
               {priv.canEdit && (
                 <div className="flex gap-2 mb-4">
                   <Input placeholder="New Department" value={newDepartment} onChange={(e) => setNewDepartment(e.target.value)} className="flex-1" />
+                  <select
+                    className="h-10 rounded border border-slate-200 px-3 w-40 text-sm bg-white"
+                    value={newDeptStaffType}
+                    onChange={(e) => setNewDeptStaffType(e.target.value as any)}
+                  >
+                    <option value="INTERNAL">INTERNAL</option>
+                    <option value="EXTERNAL">EXTERNAL</option>
+                  </select>
                   <Button onClick={handleAddDepartment} variant="outline" className="gap-2">
                     <Plus className="h-4 w-4" /> Add
                   </Button>
                 </div>
               )}
-              <div className="border rounded-md overflow-hidden">
+              <div className="border rounded-md overflow-hidden overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-slate-50">
                     <TableRow>
                       <TableHead>Department</TableHead>
-                      <TableHead className="w-40 text-center">Work Days/Week</TableHead>
-                      <TableHead className="w-[100px] text-right">Action</TableHead>
+                      <TableHead>Parent Dept</TableHead>
+                      <TableHead className="w-32 text-center">Staff Type</TableHead>
+                      <TableHead className="w-32 text-center">Work Days/Wk</TableHead>
+                      <TableHead className="w-[80px] text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {departments.map(dep => {
-                      const defaultDays = ['OPERATIONS', 'ENGINEERING'].includes(dep.toUpperCase()) ? 6 : 5;
-                      const days = localPayrollVars.departmentWorkDays?.[dep] ?? defaultDays;
                       return (
-                        <TableRow key={dep}>
-                          <TableCell className="font-medium text-slate-800">{dep}</TableCell>
+                        <TableRow key={dep.id}>
+                          <TableCell className="font-medium text-slate-800">
+                            {priv.canEdit ? (
+                              <Input 
+                                value={dep.name} 
+                                onChange={(e) => updateDepartment(dep.id, { name: e.target.value })} 
+                                className="h-8 md:max-w-[200px]" 
+                              />
+                            ) : (
+                              dep.name
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {priv.canEdit ? (
+                              <select
+                                className="h-8 rounded border border-slate-200 px-2 text-sm bg-white w-full"
+                                value={dep.parentDepartmentId || ''}
+                                onChange={(e) => updateDepartment(dep.id, { parentDepartmentId: e.target.value || null })}
+                              >
+                                <option value="">None (Top Level)</option>
+                                {departments.filter(d => d.id !== dep.id).map(d => (
+                                  <option key={d.id} value={d.id}>{d.name}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded-md block truncate">
+                                {departments.find(d => d.id === dep.parentDepartmentId)?.name || 'None'}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {priv.canEdit ? (
+                                <select
+                                  className="h-8 rounded border border-slate-200 text-xs px-2 w-full text-center bg-white"
+                                  value={dep.staffType}
+                                  onChange={(e) => updateDepartment(dep.id, { staffType: e.target.value as any })}
+                                >
+                                  <option value="INTERNAL">INTERNAL</option>
+                                  <option value="EXTERNAL">EXTERNAL</option>
+                                </select>
+                            ) : (
+                                <span className={`text-xs font-bold px-2 py-1 rounded-full ${dep.staffType === 'EXTERNAL' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}`}>
+                                    {dep.staffType}
+                                </span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-center">
                             <Input
                               type="number"
                               min={1}
                               max={7}
-                              value={days}
+                              value={dep.workDaysPerWeek}
                               onChange={(e) => {
-                                const nw = { ...(localPayrollVars.departmentWorkDays || {}), [dep]: Math.max(1, Math.min(7, Number(e.target.value))) };
-                                updateLocalPayrollVariables({ departmentWorkDays: nw });
+                                updateDepartment(dep.id, { workDaysPerWeek: Math.max(1, Math.min(7, Number(e.target.value))) });
                               }}
-                              className="h-8 w-20 mx-auto text-center"
+                              className="h-8 w-16 mx-auto text-center"
+                              disabled={!priv.canEdit}
                             />
                           </TableCell>
                           <TableCell className="text-right">
@@ -1020,7 +1162,7 @@ export function Variables() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => removeDepartment(dep)}
+                                onClick={() => removeDepartment(dep.id)}
                                 className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -1123,7 +1265,7 @@ export function Variables() {
               <div className="flex gap-2">
                 <select className="flex-1 h-10 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer" value={taskDeptFilter} onChange={(e) => setTaskDeptFilter(e.target.value)}>
                   <option value="ALL">ALL DEPARTMENTS (always applied)</option>
-                  {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                  {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                 </select>
               </div>
 
@@ -1172,7 +1314,7 @@ export function Variables() {
                           <option value="IT">IT</option>
                           <option value="Finance">Finance</option>
                           <option value="Management">Management</option>
-                          {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                          {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                         </select>
                         <select className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" value={newTaskPosition} onChange={e => setNewTaskPosition(e.target.value)}>
                           <option value="start">Insert before Step 1</option>
@@ -1233,7 +1375,7 @@ export function Variables() {
                         <option value="IT">IT</option>
                         <option value="Finance">Finance</option>
                         <option value="Management">Management</option>
-                        {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                        {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                       </select>
                       <Button variant="outline" onClick={handleAddOffboardingTask} className="gap-1 border-rose-300 text-rose-700 hover:bg-rose-50 shrink-0 h-9" disabled={!newOffTaskTitle || !newOffTaskAssignee}>
                         <Plus className="h-3.5 w-3.5" /> Add
@@ -1381,7 +1523,7 @@ export function Variables() {
                 >
                   <option value="">— All (6 days/wk default) —</option>
                   {departments.map(d => (
-                    <option key={d} value={d}>{d}</option>
+                    <option key={d.id} value={d.name}>{d.name}</option>
                   ))}
                 </select>
                 {monthConfigDept && (() => {

@@ -6,7 +6,7 @@ import { supabase } from '@/src/integrations/supabase/client';
 import type {
   Site, Employee, AttendanceRecord, Invoice, PendingInvoice,
   SalaryAdvance, Loan, Payment, VatPayment, LeaveRecord, DepartmentTasks,
-  DisciplinaryRecord, EvaluationRecord,
+  DisciplinaryRecord, EvaluationRecord, Department, Position,
   LedgerCategory, LedgerVendor, LedgerBank, LedgerEntry
 } from '@/src/store/appStore';
 import type { AppUser, PrivilegePreset } from '@/src/store/userStore';
@@ -34,6 +34,7 @@ export function dbToEmployee(r: any): Employee {
     tentativeStartDate: r.tentative_start_date || undefined,
     verifiedStartDate: r.verified_start_date || undefined,
     onboardingChecklist: r.onboarding_checklist || undefined,
+    lineManager: r.line_manager || undefined,
   };
 }
 
@@ -204,6 +205,7 @@ function employeeToDb(e: Employee) {
     tentative_start_date: e.tentativeStartDate ?? null,
     verified_start_date: e.verifiedStartDate ?? null,
     onboarding_checklist: e.onboardingChecklist ?? null,
+    line_manager: e.lineManager ?? null,
   };
 }
 
@@ -398,8 +400,18 @@ export async function fetchAllAppData(privs?: any) {
     ledgerVendors: (lVenRes.data || []).map(dbToLedgerVendor),
     ledgerBanks: (lBankRes.data || []).map(dbToLedgerBank),
     ledgerEntries: (lEntRes.data || []).map(dbToLedgerEntry),
-    positions: (positionsRes.data || []).map((p: any) => p.name),
-    departments: (departmentsRes.data || []).map((d: any) => d.name),
+    positions: (positionsRes.data || []).map((p: any) => ({
+      id: p.id,
+      title: p.title || p.name,
+      departmentId: p.department_id || null,
+    })) as Position[],
+    departments: (departmentsRes.data || []).map((d: any) => ({
+      id: d.id,
+      name: d.name,
+      staffType: d.staff_type || 'INTERNAL',
+      workDaysPerWeek: d.work_days_per_week || 5,
+      parentDepartmentId: d.parent_department_id || null,
+    })) as Department[],
     payrollVariables: settings?.payroll_variables || undefined,
     payeTaxVariables: settings?.paye_tax_variables || undefined,
     monthValues: settings?.month_values || undefined,
@@ -473,22 +485,38 @@ export const db = {
   },
 
   // Positions
-  async insertPosition(name: string) {
-    const { error } = await supabase.from('positions').insert({ name });
+  async insertPosition(p: Position) {
+    const { error } = await supabase.from('positions').insert({ id: p.id, title: p.title, department_id: p.departmentId });
     if (error) console.error('insertPosition:', error);
   },
-  async deletePosition(name: string) {
-    const { error } = await supabase.from('positions').delete().eq('name', name);
+  async updatePosition(id: string, p: Partial<Position>) {
+    const update: any = {};
+    if (p.title !== undefined) update.title = p.title;
+    if (p.departmentId !== undefined) update.department_id = p.departmentId;
+    const { error } = await supabase.from('positions').update(update).eq('id', id);
+    if (error) console.error('updatePosition:', error);
+  },
+  async deletePosition(id: string) {
+    const { error } = await supabase.from('positions').delete().eq('id', id);
     if (error) console.error('deletePosition:', error);
   },
 
   // Departments
-  async insertDepartment(name: string) {
-    const { error } = await supabase.from('departments').insert({ name });
+  async insertDepartment(d: Department) {
+    const { error } = await supabase.from('departments').insert({ id: d.id, name: d.name, staff_type: d.staffType, work_days_per_week: d.workDaysPerWeek, parent_department_id: d.parentDepartmentId || null });
     if (error) console.error('insertDepartment:', error);
   },
-  async deleteDepartment(name: string) {
-    const { error } = await supabase.from('departments').delete().eq('name', name);
+  async updateDepartment(id: string, d: Partial<Department>) {
+    const update: any = {};
+    if (d.name !== undefined) update.name = d.name;
+    if (d.staffType !== undefined) update.staff_type = d.staffType;
+    if (d.workDaysPerWeek !== undefined) update.work_days_per_week = d.workDaysPerWeek;
+    if (d.parentDepartmentId !== undefined) update.parent_department_id = d.parentDepartmentId || null;
+    const { error } = await supabase.from('departments').update(update).eq('id', id);
+    if (error) console.error('updateDepartment:', error);
+  },
+  async deleteDepartment(id: string) {
+    const { error } = await supabase.from('departments').delete().eq('id', id);
     if (error) console.error('deleteDepartment:', error);
   },
 
@@ -527,6 +555,7 @@ export const db = {
     if (e.verifiedStartDate !== undefined) update.verified_start_date = e.verifiedStartDate;
     if (e.onboardingChecklist !== undefined) update.onboarding_checklist = e.onboardingChecklist;
     if (e.payeNumber !== undefined) update.paye_number = e.payeNumber;
+    if (e.lineManager !== undefined) update.line_manager = e.lineManager;
     const { error } = await supabase.from('employees').update(update).eq('id', id);
     if (error) console.error('updateEmployee:', error);
   },

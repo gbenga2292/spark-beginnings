@@ -2,9 +2,13 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar as CalendarIcon, X } from 'lucide-react';
 import CalendarPage from '@/src/pages/TaskCalendar';
+import { useTheme } from '@/src/hooks/useTheme';
 
 export function DesktopFloatingCalendar() {
   const [open, setOpen] = useState(false);
+  const { isDark } = useTheme();
+  
+  const isMac = (window as any).electronAPI?.platform === 'darwin';
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
@@ -12,11 +16,39 @@ export function DesktopFloatingCalendar() {
     return () => window.removeEventListener('keydown', h);
   }, [open]);
 
+  // Dynamically update TitleBar overlay color when calendar is open
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (!api?.setTitleBarOverlay) return;
+    
+    const updateOverlay = () => {
+      let zoom = window.innerWidth ? window.outerWidth / window.innerWidth : 1;
+      zoom = Math.round(zoom * 20) / 20;
+      if (zoom < 0.2 || zoom > 5) zoom = 1;
+      const height = Math.round(40 * zoom);
+
+      if (open) {
+        // Keep window controls visible via symbolColor
+        api.setTitleBarOverlay({ color: '#0f111a', symbolColor: '#ffffff', height });
+      } else {
+        if (isDark) {
+          api.setTitleBarOverlay({ color: '#0f172a', symbolColor: '#94a3b8', height });
+        } else {
+          api.setTitleBarOverlay({ color: '#ffffff', symbolColor: '#475569', height });
+        }
+      }
+    };
+
+    updateOverlay();
+    window.addEventListener('resize', updateOverlay);
+    return () => window.removeEventListener('resize', updateOverlay);
+  }, [open, isDark]);
+
   return (
     <>
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 md:w-16 md:h-16 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-600/30 flex items-center justify-center hover:bg-indigo-500 transition-all active:scale-95 hover:scale-105"
+        className="fixed bottom-6 right-6 z-[150] w-14 h-14 md:w-16 md:h-16 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-600/30 flex items-center justify-center hover:bg-indigo-500 transition-all active:scale-95 hover:scale-105"
         title="Open Calendar"
       >
         <CalendarIcon className="w-6 h-6 md:w-7 md:h-7" />
@@ -27,7 +59,7 @@ export function DesktopFloatingCalendar() {
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-xl flex flex-col"
+            className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-xl flex flex-col"
             onClick={() => setOpen(false)}
           >
             <motion.div
@@ -37,7 +69,7 @@ export function DesktopFloatingCalendar() {
               onClick={e => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="flex items-center justify-between px-4 sm:px-6 py-4 flex-shrink-0 bg-[#0f111a] border-b border-white/5">
+              <div className={`flex items-center justify-between py-4 flex-shrink-0 bg-[#0f111a] border-b border-white/5 ${isMac ? 'pl-[90px] pr-4 sm:pr-6' : 'pl-4 sm:pl-6 pr-[200px]'}`}>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-indigo-500/20 backdrop-blur-sm flex items-center justify-center">
                     <CalendarIcon className="w-5 h-5 text-indigo-400" />

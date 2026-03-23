@@ -35,6 +35,20 @@ export interface DepartmentTasks {
   offboardingTasks: { title: string; assignee: string }[];
 }
 
+export interface Department {
+  id: string;
+  name: string;
+  staffType: 'INTERNAL' | 'EXTERNAL';
+  workDaysPerWeek: number;
+  parentDepartmentId?: string | null;
+}
+
+export interface Position {
+  id: string;
+  title: string;
+  departmentId: string | null;
+}
+
 export const DEFAULT_OFFBOARDING_TASKS = [
   { title: '1. Documentation & Compliance - Receive and file resignation/termination letter', assignee: 'HR' },
   { title: '1. Documentation & Compliance - Update personnel records', assignee: 'HR' },
@@ -107,36 +121,50 @@ export interface GuarantorInfo {
 }
 
 export interface OnboardingChecklist {
-  // Task 1
-  emailFormsSent: boolean;
-  emailFormsAcknowledged: boolean;
-  // Task 2: Return of forms
-  formsReturned: boolean;
-  guarantorFormsReturned: boolean;      // 2.1
-  personalEmployeeFormReturned: boolean; // 2.2
-  passportReturned: boolean;             // 2.3
-  // Task 3: Document verification
-  guarantors: GuarantorInfo[];           // 3.1 - each has name, phone, verified
-  passportPhotos: boolean;
-  addressVerification: boolean;
-  verifiedAddress?: string;          // 3.2 - typed address after verification
-  educationalCredentials: boolean;
-  // Task 3.2: Account details
+  // 1. Send Necessary Information (Forms)
+  employeeFormsSent: boolean;
+  guarantorFormsSent: boolean;
+  formsAcknowledged: boolean;
+
+  // 2. Return of Forms
+  guarantorFormReturned: boolean;
+  guarantorFormWithPassport: boolean;
+  personalEmployeeFormReturned: boolean;
+  personalEmployeeFormWithPassport: boolean;
+  educationCredentialSubmitted: boolean;
+
+  // 3. Verification of Documents
+  guarantors: GuarantorInfo[];
+  passportPhotosVerified: boolean;
+  addressVerification: boolean; // meaning address input & verified
+  verifiedAddress?: string;
+  educationCredentialVerified: boolean;
   bankName: string;
   accountNo: string;
   accountDetailsVerified: boolean;
-  // Task 3.2: Pension & PAYE
-  pensionVerified: boolean;
   pensionNumberInput: string;
-  payeVerified: boolean;
+  pensionVerified: boolean;
   payeNumberInput: string;
-  // Task 4: Resumption
+  payeVerified: boolean;
+
+  // 4. Employment Letters
+  employmentLetterPrinted: boolean;
+  employmentLetterSigned: boolean;
+  employmentLetterReturned: boolean;
+
+  // 5. Resumption
   verifiedStartDate: string;
-  // Task 5: Employment letters
-  employmentLettersIssued: boolean;
-  // Post-activation tasks (6 & 8)
-  orientationDone: boolean;
-  ppeHandbookIssued: boolean;
+
+  // Post Onboarding (6. Orientation)
+  hrOrientation: boolean;
+  departmentOrientation: boolean;
+  siteOrientation: boolean;
+  hseOrientation: boolean;
+
+  // 7. Provision of PPE, Handbook & Requirements
+  ppeIssued: boolean;
+  handbookProvided: boolean;
+  otherRequirementsSupplied: boolean;
 }
 
 export interface Employee {
@@ -172,6 +200,7 @@ export interface Employee {
   onboardingChecklist?: OnboardingChecklist;
   onboardingMainTaskId?: string;
   onboardingSuspended?: boolean;   // suspend/resume onboarding without deleting
+  lineManager?: string;            // ID of the line manager (typically CEO or Head of Dept)
 }
 
 export interface DisciplinaryRecord {
@@ -359,8 +388,8 @@ interface AppState {
   attendanceRecords: AttendanceRecord[];
   disciplinaryRecords: DisciplinaryRecord[];
   evaluations: EvaluationRecord[];
-  positions: string[];
-  departments: string[];
+  positions: Position[];
+  departments: Department[];
   invoices: Invoice[];
   pendingInvoices: PendingInvoice[];
   salaryAdvances: SalaryAdvance[];
@@ -398,10 +427,12 @@ interface AppState {
   updateEvaluation: (id: string, evalRecord: Partial<EvaluationRecord>) => void;
   deleteEvaluation: (id: string) => void;
 
-  addPosition: (position: string) => void;
-  removePosition: (position: string) => void;
-  addDepartment: (department: string) => void;
-  removeDepartment: (department: string) => void;
+  addPosition: (position: Position) => void;
+  updatePosition: (id: string, position: Partial<Position>) => void;
+  removePosition: (id: string) => void;
+  addDepartment: (department: Department) => void;
+  updateDepartment: (id: string, department: Partial<Department>) => void;
+  removeDepartment: (id: string) => void;
   addInvoice: (invoice: Invoice) => void;
   updateInvoice: (id: string, invoice: Partial<Invoice>) => void;
   deleteInvoice: (id: string) => void;
@@ -588,9 +619,11 @@ export const useAppStore = create<AppState>()(
 
       // Positions & Departments
       addPosition: (position) => { set((s) => ({ positions: [...s.positions, position] })); db.insertPosition(position); },
-      removePosition: (position) => { set((s) => ({ positions: s.positions.filter(p => p !== position) })); db.deletePosition(position); },
+      updatePosition: (id, position) => { set((s) => ({ positions: s.positions.map(p => p.id === id ? { ...p, ...position } : p) })); db.updatePosition(id, position); },
+      removePosition: (id) => { set((s) => ({ positions: s.positions.filter(p => p.id !== id) })); db.deletePosition(id); },
       addDepartment: (department) => { set((s) => ({ departments: [...s.departments, department] })); db.insertDepartment(department); },
-      removeDepartment: (department) => { set((s) => ({ departments: s.departments.filter(d => d !== department) })); db.deleteDepartment(department); },
+      updateDepartment: (id, department) => { set((s) => ({ departments: s.departments.map(d => d.id === id ? { ...d, ...department } : d) })); db.updateDepartment(id, department); },
+      removeDepartment: (id) => { set((s) => ({ departments: s.departments.filter(d => d.id !== id) })); db.deleteDepartment(id); },
 
       // Invoices
       addInvoice: (invoice) => { set((s) => ({ invoices: [...s.invoices, invoice] })); db.insertInvoice(invoice); },

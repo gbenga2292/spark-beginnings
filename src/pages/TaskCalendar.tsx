@@ -34,6 +34,7 @@ const EVENT_TYPE_STYLES = {
 };
 
 type ViewMode = 'month' | 'day';
+type FilterMode = 'all' | 'mine';
 
 interface CalendarEvent {
   id: string;
@@ -53,34 +54,45 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
   const [calMonth, setCalMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [previewEvent, setPreviewEvent] = useState<CalendarEvent | null>(null);
 
   const allEvents = useMemo(() => {
     const events: CalendarEvent[] = [];
 
-    // Show all subtasks assigned to the current user that have a deadline
-    const mySubtasks = subtasks.filter(s => s.deadline && s.assignedTo === currentUser?.id);
-    mySubtasks.forEach(s => {
+    // Subtasks
+    const relevantSubtasks = filterMode === 'all'
+      ? subtasks.filter(s => s.deadline)
+      : subtasks.filter(s => s.deadline && s.assignedTo === currentUser?.id);
+
+    relevantSubtasks.forEach(s => {
       events.push({
-        id: s.id, title: s.title, time: new Date(s.deadline!),
+        id: s.id || 'unknown', title: s.title, time: new Date(s.deadline!),
         type: 'task', status: s.status, colorKey: 'task',
       });
     });
 
-    // Show all main tasks with deadlines (visible to all workspace members)
-    mainTasks.filter(m => m.deadline).forEach(m => {
+    // Main tasks
+    const relevantMainTasks = filterMode === 'all'
+      ? mainTasks.filter(m => m.deadline)
+      : mainTasks.filter(m => m.deadline && (m.assignedTo === currentUser?.id || m.createdBy === currentUser?.id));
+
+    relevantMainTasks.forEach(m => {
       events.push({
         id: m.id, title: m.title, time: new Date(m.deadline!),
         type: 'task', status: 'main', colorKey: 'main',
       });
     });
 
-    // Show reminders for the current user
-    const myReminders = reminders.filter(r => {
-      if (!r.isActive) return false;
-      return r.recipientIds?.includes(currentUser?.id ?? '') || r.createdBy === currentUser?.id;
-    });
-    myReminders.forEach(r => {
+    // Reminders
+    const relevantReminders = filterMode === 'all'
+      ? reminders.filter(r => r.isActive)
+      : reminders.filter(r => {
+          if (!r.isActive) return false;
+          return r.recipientIds?.includes(currentUser?.id ?? '') || r.createdBy === currentUser?.id;
+        });
+
+    relevantReminders.forEach(r => {
       events.push({
         id: r.id, title: r.title, time: parseISO(r.remindAt),
         type: 'reminder', body: r.body, colorKey: 'reminder',
@@ -88,7 +100,7 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
     });
 
     return events;
-  }, [reminders, subtasks, mainTasks, currentUser]);
+  }, [reminders, subtasks, mainTasks, currentUser, filterMode]);
 
 
   const calDays = useMemo(() => {
@@ -166,6 +178,14 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
         </div>
 
         <div className="flex items-center gap-2">
+          <select
+            value={filterMode}
+            onChange={(e) => setFilterMode(e.target.value as FilterMode)}
+            className="bg-white/10 text-white border border-white/20 text-xs sm:text-sm rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+          >
+            <option value="all" className="bg-[#0f111a] text-white">All Tasks & Reminders</option>
+            <option value="mine" className="bg-[#0f111a] text-white">My Tasks & Reminders</option>
+          </select>
           <button onClick={goToToday}
             className="px-3 py-1.5 rounded-lg border border-white/20 text-xs sm:text-sm font-medium text-white hover:bg-white/10 transition-colors">
             Today

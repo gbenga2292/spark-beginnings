@@ -15,6 +15,7 @@ export function NewHire() {
   const departmentTasksList = useAppStore((state) => state.departmentTasksList);
   const addEmployee = useAppStore((state) => state.addEmployee);
   const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { createMainTask, addReminder } = useAppData();
   const { user } = useAuth();
 
@@ -32,10 +33,14 @@ export function NewHire() {
   });
 
   const handleStartNewHire = async () => {
+    if (isSubmitting) return;
+
     if (!newHireData.firstname || !newHireData.surname || !newHireData.tentativeStartDate || !newHireData.department || !newHireData.position) {
       toast.error('Please fill in all basic employee details and tentative start date.');
       return;
     }
+    
+    setIsSubmitting(true);
 
     const noOfGuarantors = newHireData.noOfGuarantors ?? 1;
 
@@ -49,10 +54,6 @@ export function NewHire() {
     deptTasks.forEach(dt => {
       if (!combinedTasks.find(bt => bt.title === dt.title)) combinedTasks.push(dt);
     });
-
-    if (combinedTasks.length === 0) {
-      toast.warning('No onboarding tasks configured for this department or the ALL default. Proceeding without tasks.');
-    }
 
     const start = new Date(newHireData.tentativeStartDate as string);
     const newTasks: OnboardingTask[] = combinedTasks.map((task, index) => {
@@ -109,8 +110,7 @@ export function NewHire() {
             recipientIds: [user.id],
             createdBy: user.id,
             isActive: true,
-            sendEmail: false,
-            mainTaskId: onboardingMainTaskId
+            sendEmail: false
           });
         }
       } catch (err) {
@@ -143,16 +143,18 @@ export function NewHire() {
       probationPeriod: newHireData.probationPeriod,
       noOfGuarantors,
       onboardingChecklist: {
-        emailFormsSent: false,
-        emailFormsAcknowledged: false,
-        formsReturned: false,
-        guarantorFormsReturned: false,
+        employeeFormsSent: false,
+        guarantorFormsSent: false,
+        formsAcknowledged: false,
+        guarantorFormReturned: false,
+        guarantorFormWithPassport: false,
         personalEmployeeFormReturned: false,
-        passportReturned: false,
+        personalEmployeeFormWithPassport: false,
+        educationCredentialSubmitted: false,
         guarantors: guarantorSlots,
-        passportPhotos: false,
+        passportPhotosVerified: false,
         addressVerification: false,
-        educationalCredentials: false,
+        educationCredentialVerified: false,
         bankName: '',
         accountNo: '',
         accountDetailsVerified: false,
@@ -161,9 +163,16 @@ export function NewHire() {
         payeVerified: false,
         payeNumberInput: '',
         verifiedStartDate: '',
-        employmentLettersIssued: false,
-        orientationDone: false,
-        ppeHandbookIssued: false,
+        employmentLetterPrinted: false,
+        employmentLetterSigned: false,
+        employmentLetterReturned: false,
+        hrOrientation: false,
+        departmentOrientation: false,
+        siteOrientation: false,
+        hseOrientation: false,
+        ppeIssued: false,
+        handbookProvided: false,
+        otherRequirementsSupplied: false,
       },
     };
 
@@ -202,31 +211,36 @@ export function NewHire() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Department <span className="text-rose-500">*</span></label>
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Position <span className="text-rose-500">*</span></label>
               <select className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-indigo-500/20"
-                value={newHireData.department} onChange={(e) => setNewHireData({ ...newHireData, department: e.target.value })}>
-                <option value="" disabled>Select Department</option>
-                {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                value={newHireData.position} onChange={(e) => {
+                  const newPos = e.target.value;
+                  const posObj = positions.find(p => p.title === newPos);
+                  let deptObj = null;
+                  if (posObj?.departmentId) {
+                    deptObj = departments.find(d => d.id === posObj.departmentId);
+                  }
+                  setNewHireData({ 
+                    ...newHireData, 
+                    position: newPos,
+                    department: deptObj ? deptObj.name : '',
+                    staffType: deptObj ? deptObj.staffType : 'INTERNAL'
+                  });
+                }}>
+                <option value="" disabled>Select Position</option>
+                {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
               </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Department <span className="text-rose-500">*</span></label>
+              <Input value={newHireData.department || ''} disabled className="h-11 bg-slate-100/50 text-slate-500 cursor-not-allowed" placeholder="Auto-filled from position" />
               <p className="text-[11px] text-slate-400 mt-1">Dictates which specific task template is activated.</p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Position <span className="text-rose-500">*</span></label>
-              <select className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-indigo-500/20"
-                value={newHireData.position} onChange={(e) => setNewHireData({ ...newHireData, position: e.target.value })}>
-                <option value="" disabled>Select Position</option>
-                {positions.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
-
-            <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Staff Type</label>
-              <select className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-indigo-500/20"
-                value={newHireData.staffType} onChange={(e) => setNewHireData({ ...newHireData, staffType: e.target.value as 'INTERNAL' | 'EXTERNAL' })}>
-                <option value="INTERNAL">Internal</option>
-                <option value="EXTERNAL">External</option>
-              </select>
+              <Input value={newHireData.staffType || 'INTERNAL'} disabled className="h-11 bg-slate-100/50 text-slate-500 cursor-not-allowed font-bold text-xs" />
             </div>
 
             <div className="space-y-2">
@@ -284,9 +298,9 @@ export function NewHire() {
           </div>
 
           <div className="flex justify-end gap-3 mt-8">
-            <Button variant="ghost" className="text-slate-500 hover:text-slate-700 font-medium" onClick={() => navigate('/onboarding')}>Cancel</Button>
-            <Button onClick={handleStartNewHire} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-2 h-10 px-6 shadow-md shadow-indigo-200">
-              <ArrowRight className="h-4 w-4" /> Save Pending Hire
+            <Button variant="ghost" className="text-slate-500 hover:text-slate-700 font-medium" onClick={() => navigate('/onboarding')} disabled={isSubmitting}>Cancel</Button>
+            <Button onClick={handleStartNewHire} disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-2 h-10 px-6 shadow-md shadow-indigo-200">
+              <ArrowRight className="h-4 w-4" /> {isSubmitting ? 'Saving...' : 'Save Pending Hire'}
             </Button>
           </div>
         </CardContent>

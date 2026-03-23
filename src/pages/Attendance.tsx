@@ -96,7 +96,9 @@ export function Attendance() {
   const filteredEmployees = employees.filter(emp => {
     const matchesSearch = emp.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.firstname.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDept = departmentFilter === 'All' || emp.department === departmentFilter;
+    const matchesDept = departmentFilter === 'All' 
+      ? emp.staffType === 'INTERNAL' 
+      : emp.department === departmentFilter;
     return matchesSearch && matchesDept;
   }).sort((a, b) => {
     const posA = a.position || '';
@@ -111,7 +113,11 @@ export function Attendance() {
 
   const filteredDbRecords = attendanceRecords.filter(r => {
     const emp = employees.find(e => e.id === r.staffId);
-    if (dbDepartmentFilter !== 'All' && emp?.department !== dbDepartmentFilter) return false;
+    if (dbDepartmentFilter !== 'All') {
+      if (emp?.department !== dbDepartmentFilter) return false;
+    } else {
+      if (emp?.staffType !== 'INTERNAL') return false;
+    }
     if (dbSearchTerm) {
       const matchName = r.staffName.toLowerCase().includes(dbSearchTerm.toLowerCase());
       if (!matchName) return false;
@@ -528,8 +534,8 @@ export function Attendance() {
                 className="h-8 pl-7 pr-3 text-xs rounded-lg border border-slate-200 bg-white shadow-sm appearance-none cursor-pointer focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none"
               >
                 <option value="All">All Departments</option>
-                {departments.map(d => (
-                  <option key={d} value={d}>{d}</option>
+                {departments.filter(d => d.staffType === 'INTERNAL').map(d => (
+                  <option key={d.id} value={d.name}>{d.name}</option>
                 ))}
               </select>
               <Filter className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
@@ -729,8 +735,8 @@ export function Attendance() {
                 className="h-8 pl-7 pr-3 text-xs rounded-lg border border-slate-200 bg-white shadow-sm appearance-none cursor-pointer focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none"
               >
                 <option value="All">All Departs.</option>
-                {departments.map(d => (
-                  <option key={d} value={d}>{d}</option>
+                {departments.filter(d => d.staffType === 'INTERNAL').map(d => (
+                  <option key={d.id} value={d.name}>{d.name}</option>
                 ))}
               </select>
               <Filter className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />

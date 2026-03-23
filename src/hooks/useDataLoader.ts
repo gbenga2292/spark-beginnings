@@ -188,7 +188,9 @@ export function useRealtimeData(isAuthenticated: boolean) {
             case 'employees': {
               const current = appState.employees;
               if (eventType === 'INSERT') {
-                useAppStore.setState({ employees: [...current, dbToEmployee(newRow)] });
+                if (!current.some(e => e.id === newRow.id)) {
+                  useAppStore.setState({ employees: [...current, dbToEmployee(newRow)] });
+                }
               } else if (eventType === 'UPDATE') {
                 const updated = dbToEmployee(newRow);
                 useAppStore.setState({ employees: current.map(e => e.id === updated.id ? updated : e) });
@@ -200,7 +202,9 @@ export function useRealtimeData(isAuthenticated: boolean) {
             case 'attendance_records': {
               const current = appState.attendanceRecords;
               if (eventType === 'INSERT') {
-                useAppStore.setState({ attendanceRecords: [...current, dbToAttendance(newRow)] });
+                if (!current.some(a => a.id === newRow.id)) {
+                  useAppStore.setState({ attendanceRecords: [...current, dbToAttendance(newRow)] });
+                }
               } else if (eventType === 'UPDATE') {
                 const updated = dbToAttendance(newRow);
                 useAppStore.setState({ attendanceRecords: current.map(a => a.id === updated.id ? updated : a) });
@@ -212,7 +216,9 @@ export function useRealtimeData(isAuthenticated: boolean) {
             case 'invoices': {
               const current = appState.invoices;
               if (eventType === 'INSERT') {
-                useAppStore.setState({ invoices: [...current, dbToInvoice(newRow)] });
+                if (!current.some(i => i.id === newRow.id)) {
+                  useAppStore.setState({ invoices: [...current, dbToInvoice(newRow)] });
+                }
               } else if (eventType === 'UPDATE') {
                 const updated = dbToInvoice(newRow);
                 useAppStore.setState({ invoices: current.map(i => i.id === updated.id ? updated : i) });
@@ -224,7 +230,9 @@ export function useRealtimeData(isAuthenticated: boolean) {
             case 'pending_invoices': {
               const current = appState.pendingInvoices;
               if (eventType === 'INSERT') {
-                useAppStore.setState({ pendingInvoices: [...current, dbToPendingInvoice(newRow)] });
+                if (!current.some(i => i.id === newRow.id)) {
+                  useAppStore.setState({ pendingInvoices: [...current, dbToPendingInvoice(newRow)] });
+                }
               } else if (eventType === 'UPDATE') {
                 const updated = dbToPendingInvoice(newRow);
                 useAppStore.setState({ pendingInvoices: current.map(i => i.id === updated.id ? updated : i) });
@@ -236,7 +244,9 @@ export function useRealtimeData(isAuthenticated: boolean) {
             case 'salary_advances': {
               const current = appState.salaryAdvances;
               if (eventType === 'INSERT') {
-                useAppStore.setState({ salaryAdvances: [...current, dbToSalaryAdvance(newRow)] });
+                if (!current.some(a => a.id === newRow.id)) {
+                  useAppStore.setState({ salaryAdvances: [...current, dbToSalaryAdvance(newRow)] });
+                }
               } else if (eventType === 'UPDATE') {
                 const updated = dbToSalaryAdvance(newRow);
                 useAppStore.setState({ salaryAdvances: current.map(a => a.id === updated.id ? updated : a) });
@@ -248,7 +258,9 @@ export function useRealtimeData(isAuthenticated: boolean) {
             case 'loans': {
               const current = appState.loans;
               if (eventType === 'INSERT') {
-                useAppStore.setState({ loans: [...current, dbToLoan(newRow)] });
+                if (!current.some(l => l.id === newRow.id)) {
+                  useAppStore.setState({ loans: [...current, dbToLoan(newRow)] });
+                }
               } else if (eventType === 'UPDATE') {
                 const updated = dbToLoan(newRow);
                 useAppStore.setState({ loans: current.map(l => l.id === updated.id ? updated : l) });
@@ -260,7 +272,9 @@ export function useRealtimeData(isAuthenticated: boolean) {
             case 'leaves': {
               const current = appState.leaves;
               if (eventType === 'INSERT') {
-                useAppStore.setState({ leaves: [...current, dbToLeave(newRow)] });
+                if (!current.some(l => l.id === newRow.id)) {
+                  useAppStore.setState({ leaves: [...current, dbToLeave(newRow)] });
+                }
               } else if (eventType === 'UPDATE') {
                 const updated = dbToLeave(newRow);
                 useAppStore.setState({ leaves: current.map(l => l.id === updated.id ? updated : l) });
@@ -272,7 +286,9 @@ export function useRealtimeData(isAuthenticated: boolean) {
             case 'disciplinary_records': {
               const current = appState.disciplinaryRecords;
               if (eventType === 'INSERT') {
-                useAppStore.setState({ disciplinaryRecords: [...current, dbToDisciplinary(newRow)] });
+                if (!current.some(r => r.id === newRow.id)) {
+                  useAppStore.setState({ disciplinaryRecords: [...current, dbToDisciplinary(newRow)] });
+                }
               } else if (eventType === 'UPDATE') {
                 const updated = dbToDisciplinary(newRow);
                 useAppStore.setState({ disciplinaryRecords: current.map(r => r.id === updated.id ? updated : r) });
@@ -284,7 +300,9 @@ export function useRealtimeData(isAuthenticated: boolean) {
             case 'evaluations': {
               const current = appState.evaluations;
               if (eventType === 'INSERT') {
-                useAppStore.setState({ evaluations: [...current, dbToEvaluation(newRow)] });
+                if (!current.some(e => e.id === newRow.id)) {
+                  useAppStore.setState({ evaluations: [...current, dbToEvaluation(newRow)] });
+                }
               } else if (eventType === 'UPDATE') {
                 const updated = dbToEvaluation(newRow);
                 useAppStore.setState({ evaluations: current.map(e => e.id === updated.id ? updated : e) });
@@ -296,7 +314,9 @@ export function useRealtimeData(isAuthenticated: boolean) {
             case 'sites': {
               const current = appState.sites;
               if (eventType === 'INSERT') {
-                useAppStore.setState({ sites: [...current, dbToSite(newRow)] });
+                if (!current.some(s => s.id === newRow.id)) {
+                  useAppStore.setState({ sites: [...current, dbToSite(newRow)] });
+                }
               } else if (eventType === 'UPDATE') {
                 const updated = dbToSite(newRow);
                 useAppStore.setState({ sites: current.map(s => s.id === updated.id ? updated : s) });
@@ -309,7 +329,9 @@ export function useRealtimeData(isAuthenticated: boolean) {
               const userStoreState = useUserStore.getState();
               const currentUsers = userStoreState.users;
               if (eventType === 'INSERT') {
-                useUserStore.setState({ users: [...currentUsers, dbToProfile(newRow)] });
+                if (!currentUsers.some(u => u.id === newRow.id)) {
+                  useUserStore.setState({ users: [...currentUsers, dbToProfile(newRow)] });
+                }
               } else if (eventType === 'UPDATE') {
                 const updated = dbToProfile(newRow);
                 useUserStore.setState({ users: currentUsers.map(u => u.id === updated.id ? updated : u) });
@@ -321,7 +343,9 @@ export function useRealtimeData(isAuthenticated: boolean) {
             case 'payments': {
               const current = appState.payments;
               if (eventType === 'INSERT') {
-                useAppStore.setState({ payments: [...current, dbToPayment(newRow)] });
+                if (!current.some(p => p.id === newRow.id)) {
+                  useAppStore.setState({ payments: [...current, dbToPayment(newRow)] });
+                }
               } else if (eventType === 'UPDATE') {
                 const updated = dbToPayment(newRow);
                 useAppStore.setState({ payments: current.map(p => p.id === updated.id ? updated : p) });
@@ -333,7 +357,9 @@ export function useRealtimeData(isAuthenticated: boolean) {
             case 'vat_payments': {
               const current = appState.vatPayments;
               if (eventType === 'INSERT') {
-                useAppStore.setState({ vatPayments: [...current, dbToVatPayment(newRow)] });
+                if (!current.some(p => p.id === newRow.id)) {
+                  useAppStore.setState({ vatPayments: [...current, dbToVatPayment(newRow)] });
+                }
               } else if (eventType === 'UPDATE') {
                 const updated = dbToVatPayment(newRow);
                 useAppStore.setState({ vatPayments: current.map(p => p.id === updated.id ? updated : p) });

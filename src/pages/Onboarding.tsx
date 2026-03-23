@@ -629,39 +629,6 @@ export function Onboarding() {
             {isOnboarding && selectedEmployee && (
               <div className="space-y-3">
 
-                {/* ─ Dynamic Auto-Tasks ─ */}
-                {selectedEmployee.onboardingMainTaskId && (
-                  <Section icon={Activity} label="Auto-Generated Workflow Tasks" color="bg-blue-50 text-blue-700" defaultOpen={true}>
-                    <div className="space-y-2">
-                      {subtasks
-                        .filter(s => s.main_task_id === selectedEmployee.onboardingMainTaskId || s.mainTaskId === selectedEmployee.onboardingMainTaskId)
-                        .map(task => (
-                        <div key={task.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-lg bg-slate-50 hover:bg-slate-100/50 transition-colors">
-                            <div className="flex flex-col gap-1">
-                              <span className={`text-sm font-semibold ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{task.title}</span>
-                              <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                                <Clock className="h-3 w-3" /> Due: {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'N/A'}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <Badge variant="outline" className={`text-[10px] font-bold ${task.status === 'completed' ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : task.priority === 'high' ? 'border-rose-200 text-rose-600 bg-rose-50' : 'border-amber-200 text-amber-600 bg-amber-50'}`}>
-                                {task.status === 'completed' ? 'Completed' : task.priority === 'high' ? 'High Priority' : 'Pending'}
-                              </Badge>
-                              {task.status !== 'completed' ? (
-                                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 h-7 text-xs px-3" onClick={() => updateSubtaskStatus && updateSubtaskStatus(task.id, 'completed')}>
-                                  Mark Done
-                                </Button>
-                              ) : (
-                                <Button size="sm" variant="outline" className="h-7 text-[10px] px-2 border-slate-200 text-slate-500" onClick={() => updateSubtaskStatus && updateSubtaskStatus(task.id, 'in_progress')}>
-                                  Undo
-                                </Button>
-                              )}
-                            </div>
-                        </div>
-                      ))}
-                    </div>
-                  </Section>
-                )}
 
                 {/* ─ Task 1 ─ */}
                 <Section icon={Mail} label="1. Send Necessary Information (Forms)" color="bg-indigo-50 text-indigo-700"

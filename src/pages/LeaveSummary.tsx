@@ -75,7 +75,7 @@ export function LeaveSummary() {
               >
                 <option value="All">All Departments</option>
                 {departments.map((dept, i) => (
-                  <option key={i} value={dept}>{dept}</option>
+                  <option key={dept.id} value={dept.name}>{dept.name}</option>
                 ))}
               </select>
             </div>

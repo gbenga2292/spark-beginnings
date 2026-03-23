@@ -173,7 +173,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     : 0;
 
   return (
-    <header className={`flex h-14 items-center justify-between border-b px-4 md:px-6 gap-4 transition-colors duration-200 relative z-[100] ${
+    <header className={`flex h-14 items-center justify-between border-b px-4 md:px-6 gap-4 transition-colors duration-200 relative z-40 ${
       isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-slate-200'
     }`}>
       {/* Left: Menu + Search */}
