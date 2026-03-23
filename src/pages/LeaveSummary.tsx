@@ -6,9 +6,14 @@ import { Search, ListFilter } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
 
 export function LeaveSummary() {
-  const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
+  const allEmployees = useAppStore((state) => state.employees);
   const leaves = useAppStore((state) => state.leaves);
   const departments = useAppStore((state) => state.departments);
+
+  const employees = useMemo(() => {
+    const internalDeptNames = departments.filter(d => d.staffType === 'INTERNAL').map(d => d.name);
+    return allEmployees.filter(e => e.status !== 'Terminated' && internalDeptNames.includes(e.department));
+  }, [allEmployees, departments]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDept, setFilterDept] = useState('All');

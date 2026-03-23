@@ -1269,43 +1269,49 @@ export function Variables() {
                 </select>
               </div>
 
-              {/* System default tasks — read-only */}
-              <div className="rounded-xl border border-indigo-100 bg-indigo-50/30 overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-100/60 border-b border-indigo-100">
-                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-700">System Default Tasks (All Departments)</span>
-                  <span className="text-[10px] text-indigo-500 bg-indigo-100 rounded px-2 py-0.5 font-semibold">READ-ONLY</span>
-                </div>
-                <div className="p-3 space-y-1.5 max-h-[300px] overflow-y-auto">
-                  {[
-                    { step: '1', label: 'Send Necessary Information (Forms)', sub: ['Sent', 'Acknowledgement received'] },
-                    { step: '2', label: 'Return of Forms', sub: ['2.1 Guarantor Forms', '2.2 Personal Employee Form', '2.3 Passport Copy'] },
-                    { step: '3', label: 'Verification of Documents', sub: ['3.1 Guarantor Info (name, phone, verified each)', '3.2 Documents (passport photos, address, edu)', '3.2 Account details (bank + account no + verified)', '3.2 Pension Number (input + verified)', '3.2 PAYE Number (input + verified)'] },
-                    { step: '4', label: 'Resumption — Verified Start Date', sub: ['Official start date confirmed'] },
-                    { step: '5', label: 'Employment Letters (Print, Sign & Return)', sub: [] },
-                    { step: '6', label: 'Orientation (HR, Department, Site, HSE)', sub: ['Post-activation'] },
-                    { step: '8', label: 'Provision of PPE, Handbook & Requirements', sub: ['Post-activation'] },
-                  ].map(item => (
-                    <div key={item.step} className="flex gap-2 p-2 rounded-lg bg-white/70 border border-indigo-100/50">
-                      <span className="h-6 w-6 rounded-full bg-indigo-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">{item.step}</span>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-700">{item.label}</p>
-                        {item.sub.length > 0 && <ul className="mt-0.5 space-y-0.5">{item.sub.map((s, i) => <li key={i} className="text-[11px] text-slate-500 flex gap-1"><span className="shrink-0">&#8594;</span>{s}</li>)}</ul>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Custom onboarding tasks */}
-              <div className="rounded-xl border border-amber-200 bg-amber-50/20 overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2.5 bg-amber-100/60 border-b border-amber-200">
-                  <span className="text-xs font-bold uppercase tracking-wider text-amber-700">Custom Onboarding Tasks{taskDeptFilter !== 'ALL' ? ` — ${taskDeptFilter}` : ''}</span>
-                  <span className="text-[10px] text-amber-600 bg-amber-100 rounded px-2 py-0.5 font-semibold">{currentTaskView.onboardingTasks.length} task{currentTaskView.onboardingTasks.length !== 1 ? 's' : ''}</span>
+              {/* Unified Onboarding Tasks */}
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50/20 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-100/60 border-b border-indigo-200">
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-800">Onboarding Tasks{taskDeptFilter !== 'ALL' ? ` — ${taskDeptFilter}` : ' (All Departments)'}</span>
+                  <span className="text-[10px] text-indigo-600 bg-indigo-100 rounded px-2 py-0.5 font-semibold">{taskDeptFilter === 'ALL' ? 7 + currentTaskView.onboardingTasks.length : currentTaskView.onboardingTasks.length} tasks</span>
                 </div>
                 <div className="p-3 space-y-3">
+                  
+                  {/* System Base Tasks (Only shown in ALL DEPARTMENTS) */}
+                  {taskDeptFilter === 'ALL' && (
+                    <div className="space-y-1.5 mb-4">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Core System Stages (Hardcoded Flow)</p>
+                      {[
+                        { step: '1', key: '1', defaultLabel: 'Send Necessary Information (Forms)' },
+                        { step: '2', key: '2', defaultLabel: 'Return of Forms' },
+                        { step: '3', key: '3', defaultLabel: 'Verification of Documents' },
+                        { step: '4', key: '4', defaultLabel: 'Resumption — Verified Start Date' },
+                        { step: '5', key: '5', defaultLabel: 'Employment Letters' },
+                        { step: '6', key: '6', defaultLabel: 'Orientation (HR, Department, Site, HSE)' },
+                        { step: '7', key: '7', defaultLabel: 'Provision of PPE, Handbook & Requirements' },
+                      ].map(item => (
+                        <div key={item.step} className="flex gap-2 p-2 rounded-lg bg-white border border-indigo-100 items-center">
+                          <span className="h-6 w-6 rounded-full bg-indigo-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0">{item.step}</span>
+                          <div className="flex-1">
+                            {priv.canEdit ? (
+                               <input 
+                                 className="text-sm font-semibold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 outline-none w-full transition-colors"
+                                 value={localHrVars.onboardingStageLabels?.[item.key] ?? item.defaultLabel}
+                                 onChange={(e) => updateLocalHrVariables({ onboardingStageLabels: { ...(localHrVars.onboardingStageLabels || {}), [item.key]: e.target.value } })}
+                               />
+                            ) : (
+                               <p className="text-sm font-semibold text-slate-700">{localHrVars.onboardingStageLabels?.[item.key] ?? item.defaultLabel}</p>
+                            )}
+                          </div>
+                          <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase">System Flow</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {priv.canEdit && (
-                    <div className="space-y-2 p-3 bg-white rounded-lg border border-amber-100">
-                      <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">Add Custom Task</p>
+                    <div className="space-y-2 p-3 bg-white rounded-lg border border-indigo-100">
+                      <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Add Custom Onboarding Task</p>
                       <Input placeholder="Task title (e.g. Provide Laptop)" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} className="text-sm h-9" />
                       <div className="grid grid-cols-2 gap-2">
                         <select className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)}>
@@ -1330,23 +1336,23 @@ export function Variables() {
                           ))}
                         </select>
                       </div>
-                      <Button variant="outline" onClick={handleAddTask} className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50 w-full h-9" disabled={!newTaskTitle || !newTaskAssignee}>
-                        <Plus className="h-4 w-4" /> Add Custom Onboarding Task
+                      <Button variant="outline" onClick={handleAddTask} className="gap-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50 w-full h-9" disabled={!newTaskTitle || !newTaskAssignee}>
+                        <Plus className="h-4 w-4" /> Add Task
                       </Button>
                     </div>
                   )}
                   {currentTaskView.onboardingTasks.length === 0
-                    ? <p className="text-xs text-slate-400 text-center py-4 italic">No custom tasks yet.</p>
+                    ? <p className="text-xs text-slate-400 text-center py-4 italic">No custom tasks added for this department context.</p>
                     : <div className="space-y-1.5">{currentTaskView.onboardingTasks.map((t, idx) => (
-                        <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-amber-100 group hover:border-amber-300 transition-colors">
+                        <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 group hover:border-indigo-300 transition-colors">
                           <div className="flex flex-col gap-0.5">
                             <button className="h-5 w-5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center disabled:opacity-30 text-[10px]" onClick={() => handleMoveTask(idx, 'up')} disabled={idx === 0}>&#9650;</button>
                             <button className="h-5 w-5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center disabled:opacity-30 text-[10px]" onClick={() => handleMoveTask(idx, 'down')} disabled={idx === currentTaskView.onboardingTasks.length - 1}>&#9660;</button>
                           </div>
-                          <span className="h-6 w-6 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold flex items-center justify-center shrink-0">+</span>
+                          <span className="h-6 w-6 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold flex items-center justify-center shrink-0">+</span>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-slate-700 truncate">{t.title}</p>
-                            <p className="text-[11px] text-slate-400">Assignee: {t.assignee}</p>
+                            <p className="text-[11px] text-slate-500">Assignee: {t.assignee}</p>
                           </div>
                           {priv.canEdit && (
                             <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-red-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleRemoveTask(t.title, 'onboarding')}>

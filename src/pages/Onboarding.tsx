@@ -78,9 +78,9 @@ const task32AccDone = (cl: OnboardingChecklist) => cl.bankName.trim() !== '' && 
 const task32PensionDone = (cl: OnboardingChecklist) => cl.pensionNumberInput.trim() !== '';
 const task32PayeDone = (cl: OnboardingChecklist) => cl.payeNumberInput.trim() !== '';
 const task3Done = (cl: OnboardingChecklist) => task31Done(cl) && task32DocsDone(cl);
-// task4 = all 3 employment letter steps done; task5 = official start date confirmed
-const task4Done = (cl: OnboardingChecklist) => !!(cl.employmentLetterPrinted && cl.employmentLetterSigned && cl.employmentLetterFiled);
-const task5Done = (cl: OnboardingChecklist) => cl.verifiedStartDate.trim() !== '';
+// task4 = Resumption (official start date confirmed); task5 = all 3 employment letter steps done
+const task4Done = (cl: OnboardingChecklist) => cl.verifiedStartDate.trim() !== '';
+const task5Done = (cl: OnboardingChecklist) => !!(cl.employmentLetterPrinted && cl.employmentLetterSigned && cl.employmentLetterFiled);
 const allCriticalDone = (cl: OnboardingChecklist) =>
   task1Done(cl) && task2Done(cl) && task3Done(cl) && task4Done(cl) && task5Done(cl);
 
@@ -219,6 +219,8 @@ export function Onboarding() {
   const navigate = useNavigate();
   const { createMainTask, subtasks, updateSubtaskStatus, addReminder } = useAppData();
   const { user } = useAuth();
+  const hrVariables = useAppStore(s => s.hrVariables);
+  const l = hrVariables.onboardingStageLabels || {};
 
   const [leftTab, setLeftTab] = useState<'Active' | 'Pending' | 'Terminated'>('Active');
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
@@ -335,10 +337,10 @@ export function Onboarding() {
   const t32PensionDone = task32PensionDone(cl);
   const t32PayeDone = task32PayeDone(cl);
   const t3Done = task3Done(cl);
-  const t4Unlocked = t3Done;   // Employment Letters unlock after Task 3
-  const t4Done = task4Done(cl); // all 3 letter steps done
-  const t5Unlocked = t4Done;   // Resumption unlocks after letters
-  const t5Done = task5Done(cl); // official start date confirmed
+  const t4Unlocked = t3Done;   // Resumption unlocks after Task 3
+  const t4Done = task4Done(cl); // Resumption done
+  const t5Unlocked = t4Done;   // Employment Letters unlock after Resumption
+  const t5Done = task5Done(cl); // Employment Letters done
   // Advisory verified flags
   const allGuarantorsVerified = task31FullyVerified(cl);
   const accVerified = task32AccVerified(cl);
@@ -673,7 +675,7 @@ export function Onboarding() {
 
                 <div className={`space-y-3 transition-opacity duration-300 ${isHistory && !checklistEditMode ? 'opacity-60 pointer-events-none grayscale-[15%]' : ''}`}>
                   {/* ─ Task 1 ─ */}
-                <Section icon={Mail} label="1. Send Necessary Information (Forms)" color="bg-indigo-50 text-indigo-700"
+                <Section icon={Mail} label={l['1'] || "1. Send Necessary Information (Forms)"} color="bg-indigo-50 text-indigo-700"
                   defaultOpen={!t1Done}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs text-slate-500">All forms must be sent and acknowledged before Task 2 unlocks.</span>
@@ -700,7 +702,7 @@ export function Onboarding() {
                 </Section>
 
                 {/* ─ Task 2 ─ */}
-                <Section icon={RotateCcw} label="2. Return of Forms" color="bg-violet-50 text-violet-700"
+                <Section icon={RotateCcw} label={l['2'] || "2. Return of Forms"} color="bg-violet-50 text-violet-700"
                   locked={!t2Unlocked} lockMsg="Complete Task 1 first" defaultOpen={t1Done && !t2FullDone}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs text-slate-500">Tick when each form and passport photo has been received.</span>
@@ -759,7 +761,7 @@ export function Onboarding() {
                 </Section>
 
                 {/* ─ Task 3 ─ */}
-                <Section icon={ShieldCheck} label="3. Verification of Documents" color="bg-sky-50 text-sky-700"
+                <Section icon={ShieldCheck} label={l['3'] || "3. Verification of Documents"} color="bg-sky-50 text-sky-700"
                   locked={!t3Unlocked} lockMsg="Complete all of Task 2 first" defaultOpen={t3Unlocked && !t3Done}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs text-slate-500">Complete Document Verification. Account Details, Pension, and PAYE are optional inputs.</span>
@@ -913,10 +915,10 @@ export function Onboarding() {
                 </Section>
 
                 {/* ─ Task 4 ─ */}
-                <Section icon={CalendarCheck2} label="4. Resumption — Verified Start Date" color="bg-amber-50 text-amber-700"
+                <Section icon={CalendarCheck2} label={l['4'] || "4. Resumption — Verified Start Date"} color="bg-amber-50 text-amber-700"
                   locked={!t4Unlocked} lockMsg="Complete all of Task 3 first" defaultOpen={t4Unlocked && !t4Done}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-amber-700">Tentative date: <strong>{selectedEmployee.tentativeStartDate || selectedEmployee.startDate}</strong></span>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-lg font-bold text-amber-800">Tentative date: <strong>{selectedEmployee.tentativeStartDate || selectedEmployee.startDate}</strong></span>
                     <DoneBadge done={t4Done} />
                   </div>
                   <p className="text-[11px] text-slate-500">Enter the confirmed official start date. This replaces the tentative date and becomes the employee's official start date on activation.</p>
@@ -930,7 +932,7 @@ export function Onboarding() {
                 </Section>
 
                 {/* ─ Task 5 ─ */}
-                <Section icon={FileSignature} label="5. Employment Letters" color="bg-teal-50 text-teal-700"
+                <Section icon={FileSignature} label={l['5'] || "5. Employment Letters"} color="bg-teal-50 text-teal-700"
                   locked={!t5Unlocked} lockMsg="Set verified start date first" defaultOpen={t5Unlocked && !t5Done}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs text-slate-500">All three steps required before activation.</span>
@@ -984,7 +986,7 @@ export function Onboarding() {
                       <CheckRow label="Site orientation" checked={cl.siteOrientation} onChange={v => { updateCL({ siteOrientation: v, orientationDone: cl.hrOrientation && cl.departmentOrientation && v && cl.hseOrientation }); }} />
                       <CheckRow label="HSE orientation" checked={cl.hseOrientation} onChange={v => { updateCL({ hseOrientation: v, orientationDone: cl.hrOrientation && cl.departmentOrientation && cl.siteOrientation && v }); }} />
                     </Section>
-                    <Section icon={Package} label="7. Provision of PPE, Handbook & Requirements" color="bg-orange-50 text-orange-700" defaultOpen={!cl.ppeHandbookIssued}>
+                    <Section icon={Package} label={l['7'] || "7. Provision of PPE, Handbook & Requirements"} color="bg-orange-50 text-orange-700" defaultOpen={!cl.ppeHandbookIssued}>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs text-slate-500">Provide all required items to employee.</span>
                         <DoneBadge done={!!(cl.ppeIssued && cl.handbookProvided && cl.otherRequirementsSupplied)} />
@@ -997,12 +999,44 @@ export function Onboarding() {
                 ) : (
                   <div className="space-y-2 opacity-50 pointer-events-none mt-6">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2"><Siren className="h-3.5 w-3.5" />Post-Activation Tasks (Available after employee is activated)</p>
-                    <Section icon={GraduationCap} label="6. Orientation" color="bg-purple-50 text-purple-700" defaultOpen={false}>
+                    <Section icon={GraduationCap} label={l['6'] || "6. Orientation"} color="bg-purple-50 text-purple-700" defaultOpen={false}>
                       <p className="text-xs text-purple-600">Unlocks after activation. Includes HR, Department, Site, and HSE orientations.</p>
                     </Section>
-                    <Section icon={Package} label="7. Provision of PPE, Handbook & Requirements" color="bg-orange-50 text-orange-700" defaultOpen={false}>
+                    <Section icon={Package} label={l['7'] || "7. Provision of PPE, Handbook & Requirements"} color="bg-orange-50 text-orange-700" defaultOpen={false}>
                       <p className="text-xs text-orange-600">Unlocks after activation. Includes PPE issuance, handbook, and other requirements.</p>
                     </Section>
+                  </div>
+                )}
+
+                {/* Additional / Custom Department Tasks */}
+                {selectedEmployee.onboardingTasks && selectedEmployee.onboardingTasks.length > 0 && (
+                  <div className="mt-8 pt-6 border-t border-slate-200">
+                    <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <Package className="h-4 w-4 text-slate-500" /> Additional Tasks ({selectedEmployee.department})
+                    </h3>
+                    {selectedEmployee.onboardingTasks.map(task => (
+                      <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg bg-white border border-slate-200 shadow-sm transition-shadow mb-2">
+                        <button
+                          className={`h-5 w-5 rounded border-[1.5px] p-0 flex items-center justify-center shrink-0 transition-colors ${
+                            task.status === 'Completed' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 hover:border-emerald-400'
+                          }`}
+                          disabled={isHistory && !checklistEditMode}
+                          onClick={() => {
+                            const newTasks = selectedEmployee.onboardingTasks!.map(t =>
+                              (t.id === task.id ? { ...t, status: t.status === 'Completed' ? 'Pending' : 'Completed' } : t) as OnboardingTask
+                            );
+                            updateEmployee(selectedEmployee.id, { onboardingTasks: newTasks });
+                            toast.success(task.status === 'Completed' ? 'Task marked pending' : 'Task completed');
+                          }}
+                        >
+                          {task.status === 'Completed' && <Check className="h-3.5 w-3.5 text-white" />}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium truncate ${task.status === 'Completed' ? 'text-emerald-700' : 'text-slate-700'}`}>{task.title}</p>
+                          <p className="text-[11px] text-slate-500">Assignee: {task.assignee}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

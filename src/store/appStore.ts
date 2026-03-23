@@ -505,6 +505,7 @@ interface AppState {
     defaultProbationDays: number;
     investigationPeriodDays: number;
     appealPeriodDays: number;
+    onboardingStageLabels?: Record<string, string>;
   };
   updateHrVariables: (variables: Partial<AppState['hrVariables']>) => void;
   saveAllSettings: (payroll: AppState['payrollVariables'], paye: AppState['payeTaxVariables'], months: AppState['monthValues'], hr: AppState['hrVariables']) => void;
