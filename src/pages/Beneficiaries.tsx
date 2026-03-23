@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -36,7 +36,7 @@ const POSITION_HIERARCHY = [
   'Sponsored Student'
 ];
 
-export function Employees() {
+export function Beneficiaries() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'Active' | 'Delisted'>('Active');
   const [detailTab, setDetailTab] = useState<'Overview' | 'Attendance' | 'Leaves' | 'Disciplinary' | 'Evaluations' | 'Reminders'>('Overview');
@@ -47,7 +47,7 @@ export function Employees() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
   const [viewingEmployee, setViewingEmployee] = useState<Employee | null>(null);
-  const [viewingNarrative, setViewingNarrative] = useState<{type: 'Disciplinary' | 'Evaluation', data: any} | null>(null);
+  const [viewingNarrative, setViewingNarrative] = useState<{ type: 'Disciplinary' | 'Evaluation', data: any } | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const employees = useAppStore((state) => state.employees);
@@ -70,14 +70,14 @@ export function Employees() {
 
   const [sortBy, setSortBy] = useState<'name' | 'position' | 'startDate' | 'dateAdded'>('position');
 
-  const filteredEmployees = employees.filter(emp => {
+  const filteredBeneficiaries = employees.filter(emp => {
     const searchLow = searchTerm.toLowerCase();
     const matchesSearch = emp.surname.toLowerCase().includes(searchLow) ||
       emp.firstname.toLowerCase().includes(searchLow) ||
       emp.department.toLowerCase().includes(searchLow) ||
       (emp.employeeCode?.toLowerCase() || '').includes(searchLow);
     const matchesTab = activeTab === 'Delisted' ? emp.status === 'Terminated' : (emp.status === 'Active' || emp.status === 'On Leave');
-    return matchesSearch && matchesTab && emp.staffType !== 'BENEFICIARY';
+    return matchesSearch && matchesTab && emp.staffType === 'BENEFICIARY';
   }).sort((a, b) => {
     if (sortBy === 'name') return (a.surname + a.firstname).localeCompare(b.surname + b.firstname);
     if (sortBy === 'position') {
@@ -95,7 +95,7 @@ export function Employees() {
   });
 
   const [formData, setFormData] = useState<Partial<Employee>>({
-    staffType: 'INTERNAL',
+    staffType: 'BENEFICIARY',
     status: 'Active',
     payeTax: false,
     withholdingTax: false,
@@ -104,6 +104,18 @@ export function Employees() {
       jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0
     }
   });
+
+  useEffect(() => {
+    if (formData.endDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const eDate = new Date(formData.endDate);
+      const autoStatus = today < eDate ? 'Active' : 'Terminated';
+      if (formData.status !== autoStatus) {
+        setFormData(prev => ({ ...prev, status: autoStatus as any }));
+      }
+    }
+  }, [formData.endDate, formData.status]);
 
   const handleSave = () => {
     if (!formData.surname || !formData.firstname) {
@@ -119,29 +131,29 @@ export function Employees() {
       employeeCode,
       surname: formData.surname || '',
       firstname: formData.firstname || '',
-      department: formData.department || '',
-      staffType: formData.staffType as 'INTERNAL' | 'EXTERNAL',
-      position: formData.position || '',
+      department: 'Beneficiary',
+      staffType: 'BENEFICIARY',
+      position: 'Stipend Beneficiary',
       startDate: formData.startDate || '',
       endDate: formData.endDate || '',
       yearlyLeave: formData.yearlyLeave || 0,
       bankName: formData.bankName || '',
       accountNo: formData.accountNo || '',
-      payeTax: formData.payeTax || false,
-      withholdingTax: formData.withholdingTax || false,
-      taxId: formData.taxId || '',
-      pensionNumber: formData.pensionNumber || '',
+      payeTax: false,
+      withholdingTax: false,
+      taxId: '',
+      pensionNumber: '',
       status: formData.status as 'Active' | 'On Leave' | 'Terminated',
       monthlySalaries: formData.monthlySalaries as MonthlySalary,
       avatar: formData.avatar || '',
-      excludeFromOnboarding: formData.excludeFromOnboarding || false,
-      rent: formData.rent || 0,
+      excludeFromOnboarding: true,
+      rent: 0,
     };
 
     addEmployee(newEmployee);
     setIsAdding(false);
     setFormData({
-      staffType: 'INTERNAL',
+      staffType: 'BENEFICIARY',
       status: 'Active',
       payeTax: false,
       withholdingTax: false,
@@ -165,12 +177,19 @@ export function Employees() {
       toast.error('Surname and Firstname are required.');
       return;
     }
-    updateEmployee(editingEmployeeId, formData);
+    const updateData = { 
+      ...formData, 
+      department: 'Beneficiary', 
+      position: 'Stipend Beneficiary', 
+      staffType: 'BENEFICIARY' as 'BENEFICIARY',
+      excludeFromOnboarding: true
+    };
+    updateEmployee(editingEmployeeId, updateData);
     setIsEditing(false);
     setEditingEmployeeId(null);
     toast.success('Employee updated successfully.');
     setFormData({
-      staffType: 'INTERNAL',
+      staffType: 'BENEFICIARY',
       status: 'Active',
       payeTax: false,
       withholdingTax: false,
@@ -204,23 +223,24 @@ export function Employees() {
 
   const handleExportCSV = () => {
     try {
-      if (employees.length === 0) {
-        toast.info('No employees to export');
+      const beneficiaries = employees.filter(e => e.staffType === 'BENEFICIARY');
+      if (beneficiaries.length === 0) {
+        toast.info('No beneficiaries to export');
         return;
       }
-      const headers = ['id', 'employeeCode', 'surname', 'firstname', 'department', 'staffType', 'position', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'taxId', 'pensionNumber', 'payeTax', 'withholdingTax', 'excludeFromOnboarding', 'rent', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-      const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
+      const headers = ['id', 'beneficiaryCode', 'surname', 'firstname', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      const extractCSV = (str: any) => `"${String(str ?? '').replace(/"/g, '""')}"`;
 
-      const rows = employees.map(emp => {
+      const rows = beneficiaries.map(emp => {
         const data = [
-          emp.id, emp.employeeCode || '', emp.surname, emp.firstname, emp.department, emp.staffType,
-          emp.position, emp.status, emp.yearlyLeave, emp.startDate || '',
-          emp.endDate || '', emp.bankName || '', emp.accountNo || '', emp.taxId || '',
-          emp.pensionNumber || '', emp.payeTax, emp.withholdingTax, emp.excludeFromOnboarding || false, emp.rent || 0,
-          canSeeSalary ? emp.monthlySalaries.jan : '***', canSeeSalary ? emp.monthlySalaries.feb : '***', canSeeSalary ? emp.monthlySalaries.mar : '***',
-          canSeeSalary ? emp.monthlySalaries.apr : '***', canSeeSalary ? emp.monthlySalaries.may : '***', canSeeSalary ? emp.monthlySalaries.jun : '***',
-          canSeeSalary ? emp.monthlySalaries.jul : '***', canSeeSalary ? emp.monthlySalaries.aug : '***', canSeeSalary ? emp.monthlySalaries.sep : '***',
-          canSeeSalary ? emp.monthlySalaries.oct : '***', canSeeSalary ? emp.monthlySalaries.nov : '***', canSeeSalary ? emp.monthlySalaries.dec : '***'
+          emp.id, emp.employeeCode || '', emp.surname, emp.firstname, emp.status, emp.yearlyLeave, 
+          emp.startDate || '', emp.endDate || '', emp.bankName || '', emp.accountNo || '', 
+          canSeeSalary ? emp.monthlySalaries.jan : '***', canSeeSalary ? emp.monthlySalaries.feb : '***', 
+          canSeeSalary ? emp.monthlySalaries.mar : '***', canSeeSalary ? emp.monthlySalaries.apr : '***', 
+          canSeeSalary ? emp.monthlySalaries.may : '***', canSeeSalary ? emp.monthlySalaries.jun : '***', 
+          canSeeSalary ? emp.monthlySalaries.jul : '***', canSeeSalary ? emp.monthlySalaries.aug : '***', 
+          canSeeSalary ? emp.monthlySalaries.sep : '***', canSeeSalary ? emp.monthlySalaries.oct : '***', 
+          canSeeSalary ? emp.monthlySalaries.nov : '***', canSeeSalary ? emp.monthlySalaries.dec : '***'
         ];
         return data.map(extractCSV).join(',');
       });
@@ -229,11 +249,11 @@ export function Employees() {
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `employees_export_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.setAttribute("download", `beneficiaries_export_${new Date().toISOString().slice(0, 10)}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success(`Successfully exported ${employees.length} employees`);
+      toast.success(`Successfully exported ${beneficiaries.length} beneficiaries`);
     } catch (e) {
       toast.error('Export failed');
     }
@@ -278,84 +298,72 @@ export function Employees() {
         let importedCount = 0;
         let updatedCount = 0;
         let deletedCount = 0;
-        const newDepartments = new Set<string>();
-        const newPositions = new Set<string>();
         const csvProcessedIds = new Set<string>();
 
-        // Check if the current CSV has employeeCode as header index 1
+        // headers: ['id', 'beneficiaryCode', 'surname', 'firstname', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'jan', ...]
         const headerRow = parseCSVRow(lines[0]);
-        const hasEmployeeCode = headerRow[1]?.toLowerCase() === 'employeecode';
+        const hasCode = headerRow[1]?.toLowerCase().includes('code');
 
         for (let i = 1; i < lines.length; i++) {
           const vals = parseCSVRow(lines[i]);
           
-          // Adjust index offsets dynamically depending on whether employeeCode existed in the file
-          const offset = hasEmployeeCode ? 1 : 0;
-          if (vals.length >= 17 + offset) {
-            const importedDept = vals[3 + offset]?.trim();
-            const importedPosition = vals[5 + offset]?.trim();
-            
-            if (importedDept && !departments.some(d => d.name === importedDept)) newDepartments.add(importedDept);
-            if (importedPosition && !positions.some(p => p.title === importedPosition)) newPositions.add(importedPosition);
-
+          const offset = hasCode ? 1 : 0;
+          if (vals.length >= 8 + offset) {
             const providedId = vals[0]?.trim() || '';
             const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(providedId);
-            const employeeCodeValue = hasEmployeeCode ? vals[1]?.trim() : '';
-            // Only preserve original ID if we aren't appending everything as new
+            const employeeCodeValue = hasCode ? vals[1]?.trim() : '';
             const idToUse = (mode !== 'append' && isValidUUID) ? providedId : crypto.randomUUID();
-            
-            if (idToUse) csvProcessedIds.add(idToUse); // Track for 'replace' mode
+
+            if (idToUse) csvProcessedIds.add(idToUse);
 
             const parsedEmp: Employee = {
               id: idToUse,
               employeeCode: mode === 'append' ? '' : (employeeCodeValue || (isValidUUID ? '' : providedId)),
-              surname: vals[1 + offset], firstname: vals[2 + offset], department: vals[3 + offset], staffType: vals[4 + offset] as any,
-              position: vals[5 + offset], status: vals[6 + offset] as any, yearlyLeave: parseInt(vals[7 + offset]) || 0,
-              startDate: vals[8 + offset] || '', endDate: vals[9 + offset] || '', bankName: vals[10 + offset] || '',
-              accountNo: vals[11 + offset] || '', taxId: vals[12 + offset] || '', pensionNumber: vals[13 + offset] || '',
-              payeTax: ['true', 'yes', '1'].includes(vals[14 + offset]?.trim().toLowerCase() || ''),
-              withholdingTax: ['true', 'yes', '1'].includes(vals[15 + offset]?.trim().toLowerCase() || ''),
-              excludeFromOnboarding: ['true', 'yes', '1'].includes(vals[16 + offset]?.trim().toLowerCase() || ''),
-              rent: parseFloat(vals[17 + offset]) || 0,
+              surname: vals[1 + offset], 
+              firstname: vals[2 + offset], 
+              department: 'Beneficiary', 
+              staffType: 'BENEFICIARY',
+              position: 'Stipend Beneficiary', 
+              status: vals[3 + offset] as 'Active' | 'On Leave' | 'Terminated', 
+              yearlyLeave: parseInt(vals[4 + offset]) || 0,
+              startDate: vals[5 + offset] || '', 
+              endDate: vals[6 + offset] || '', 
+              bankName: vals[7 + offset] || '',
+              accountNo: vals[8 + offset] || '', 
+              taxId: '', 
+              pensionNumber: '',
+              payeTax: false,
+              withholdingTax: false,
+              excludeFromOnboarding: true,
+              rent: 0,
               monthlySalaries: {
-                jan: parseFloat(vals[18 + offset]) || 0, feb: parseFloat(vals[19 + offset]) || 0, mar: parseFloat(vals[20 + offset]) || 0,
-                apr: parseFloat(vals[21 + offset]) || 0, may: parseFloat(vals[22 + offset]) || 0, jun: parseFloat(vals[23 + offset]) || 0,
-                jul: parseFloat(vals[24 + offset]) || 0, aug: parseFloat(vals[25 + offset]) || 0, sep: parseFloat(vals[26 + offset]) || 0,
-                oct: parseFloat(vals[27 + offset]) || 0, nov: parseFloat(vals[28 + offset]) || 0, dec: parseFloat(vals[29 + offset]) || 0
-              }
+                jan: parseFloat(vals[9 + offset]) || 0, feb: parseFloat(vals[10 + offset]) || 0, mar: parseFloat(vals[11 + offset]) || 0,
+                apr: parseFloat(vals[12 + offset]) || 0, may: parseFloat(vals[13 + offset]) || 0, jun: parseFloat(vals[14 + offset]) || 0,
+                jul: parseFloat(vals[15 + offset]) || 0, aug: parseFloat(vals[16 + offset]) || 0, sep: parseFloat(vals[17 + offset]) || 0,
+                oct: parseFloat(vals[18 + offset]) || 0, nov: parseFloat(vals[19 + offset]) || 0, dec: parseFloat(vals[20 + offset]) || 0
+              },
+              avatar: ''
             };
             const existing = employees.find(e => e.id === parsedEmp.id);
-            if (existing && mode !== 'append') { 
-              updateEmployee(existing.id, parsedEmp); 
-              updatedCount++; 
-            } else { 
-              addEmployee(parsedEmp); 
-              importedCount++; 
+            if (existing && mode !== 'append') {
+              updateEmployee(existing.id, parsedEmp);
+              updatedCount++;
+            } else {
+              addEmployee(parsedEmp);
+              importedCount++;
             }
           }
         }
 
-        // If mode is replace, delete all employees NOT found in this CSV
         if (mode === 'replace') {
           employees.forEach(emp => {
-            if (!csvProcessedIds.has(emp.id)) {
+            if (emp.staffType === 'BENEFICIARY' && !csvProcessedIds.has(emp.id)) {
               deleteEmployee(emp.id);
               deletedCount++;
             }
           });
         }
 
-        // Auto-add new departments and positions to the store
-        let addedDeptCount = 0;
-        let addedPosCount = 0;
-        newDepartments.forEach(dept => {
-          addDepartment({ id: crypto.randomUUID(), name: dept, staffType: 'INTERNAL', workDaysPerWeek: 5 });
-          addedDeptCount++;
-        });
-        newPositions.forEach(pos => {
-          addPosition({ id: crypto.randomUUID(), title: pos, departmentId: '' });
-          addedPosCount++;
-        });
 
         let message = `Import complete: ${importedCount} Added | ${updatedCount} Updated`;
         if (deletedCount > 0) message += ` | ${deletedCount} Removed`;
@@ -380,13 +388,13 @@ export function Employees() {
           </Button>
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">
-              {isEdit ? 'Edit Employee Record' : 'Add New Employee'}
+              {isEdit ? 'Edit Beneficiary Record' : 'Add New Beneficiary / Sponsored'}
             </h1>
             <p className="text-sm font-medium text-slate-500 mt-1">Configure profile details, compensation, and system access.</p>
           </div>
         </div>
         <Button onClick={isEdit ? handleUpdate : handleSave} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition-all font-semibold w-full sm:w-auto">
-          <Save className="h-4 w-4" /> {isEdit ? 'Save Changes' : 'Create Employee'}
+          <Save className="h-4 w-4" /> {isEdit ? 'Save Changes' : 'Create Beneficiary'}
         </Button>
       </div>
 
@@ -408,67 +416,21 @@ export function Employees() {
                   <Input value={formData.firstname || ''} onChange={e => setFormData({ ...formData, firstname: e.target.value })} placeholder="e.g. HUBERT" className="bg-slate-50 focus:bg-white" />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Employee Code</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Beneficiary Code</label>
                   <Input value={formData.employeeCode || ''} onChange={e => setFormData({ ...formData, employeeCode: e.target.value })} placeholder="e.g. EMP-001 (Auto-generated if empty)" className="bg-slate-50 focus:bg-white font-mono" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Position</label>
-                  <select className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" 
-                    value={formData.position || ''} 
-                    onChange={e => {
-                      const newPos = e.target.value;
-                      const posObj = positions.find(p => p.title === newPos);
-                      let deptObj = null;
-                      if (posObj?.departmentId) {
-                        deptObj = departments.find(d => d.id === posObj.departmentId);
-                      }
-                      setFormData({ 
-                        ...formData, 
-                        position: newPos,
-                        department: deptObj ? deptObj.name : '',
-                        staffType: deptObj ? deptObj.staffType : 'INTERNAL'
-                      });
-                    }}>
-                    <option value="" disabled>Select Position</option>
-                    {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Department</label>
-                  <Input value={formData.department || ''} disabled className="bg-slate-100/50 text-slate-500 cursor-not-allowed" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Staff Type</label>
-                  <Input value={formData.staffType || 'INTERNAL'} disabled className="bg-slate-100/50 text-slate-500 cursor-not-allowed uppercase font-bold text-xs" />
-                </div>
-                {formData.staffType === 'INTERNAL' && (
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Line Manager</label>
-                    <select 
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" 
-                      value={formData.lineManager || ''} 
-                      onChange={e => setFormData({ ...formData, lineManager: e.target.value || undefined })}
-                    >
-                      <option value="">None / Top Executive</option>
-                      {employees
-                        .filter(emp => emp.staffType === 'INTERNAL' && emp.id !== formData.id && emp.status === 'Active')
-                        .map(emp => (
-                          <option key={emp.id} value={emp.id}>{emp.firstname} {emp.surname} ({emp.position})</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
-                  <select className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}>
+                  <select 
+                    className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none ${formData.endDate ? 'opacity-70 cursor-not-allowed' : ''}`} 
+                    value={formData.status} 
+                    onChange={e => setFormData({ ...formData, status: e.target.value as any })}
+                    disabled={!!formData.endDate}
+                  >
                     <option value="Active">Active</option>
                     <option value="On Leave">On Leave</option>
                     <option value="Terminated">Terminated</option>
                   </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Yearly Leave (Days)</label>
-                  <Input type="number" value={formData.yearlyLeave || ''} onChange={e => setFormData({ ...formData, yearlyLeave: parseInt(e.target.value) || 0 })} className="bg-slate-50 focus:bg-white" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Date</label>
@@ -486,8 +448,8 @@ export function Employees() {
             <Card className="shadow-sm border-slate-200">
               <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100 flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="text-slate-800">Monthly Salary Matrix (₦)</CardTitle>
-                  <CardDescription className="mt-1">Define gross monthly salary dynamically. Subject to revision.</CardDescription>
+                  <CardTitle className="text-slate-800">Stipend Matrix (₦)</CardTitle>
+                  <CardDescription className="mt-1">Define gross monthly stipend dynamically. Subject to revision.</CardDescription>
                 </div>
                 <Button variant="outline" size="sm" className="bg-white shadow-sm" onClick={() => {
                   const janVal = formData.monthlySalaries?.jan || 0;
@@ -563,47 +525,11 @@ export function Employees() {
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Account No.</label>
                   <Input value={formData.accountNo || ''} onChange={e => setFormData({ ...formData, accountNo: e.target.value })} className="font-mono bg-slate-50 focus:bg-white" />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Tax ID</label>
-                  <Input value={formData.taxId || ''} onChange={e => setFormData({ ...formData, taxId: e.target.value })} className="font-mono bg-slate-50 focus:bg-white" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Pension Number</label>
-                  <Input value={formData.pensionNumber || ''} onChange={e => setFormData({ ...formData, pensionNumber: e.target.value })} className="font-mono bg-slate-50 focus:bg-white" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Rent (₦)</label>
-                  <Input type="number" value={formData.rent || 0} onChange={e => setFormData({ ...formData, rent: Number(e.target.value) })} className="font-mono bg-slate-50 focus:bg-white" />
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-slate-100 space-y-3">
-                <label className="flex items-center gap-3 text-sm font-medium cursor-pointer p-2 rounded-lg hover:bg-slate-50 transition-colors">
-                  <input type="checkbox" checked={formData.payeTax} onChange={e => setFormData({ ...formData, payeTax: e.target.checked })} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4" />
-                  Subject to PAYE Tax
-                </label>
-                <label className="flex items-center gap-3 text-sm font-medium cursor-pointer p-2 rounded-lg hover:bg-slate-50 transition-colors">
-                  <input type="checkbox" checked={formData.withholdingTax} onChange={e => setFormData({ ...formData, withholdingTax: e.target.checked })} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4" />
-                  Subject to Withholding Tax
-                </label>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-slate-200 border-t-4 border-t-indigo-500">
-            <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
-              <CardTitle className="text-slate-800">System Preferences</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <label className="flex items-start gap-3 text-sm font-medium cursor-pointer p-3 rounded-lg border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors">
-                <input type="checkbox" id="excludeFromOnboarding" checked={formData.excludeFromOnboarding || false} onChange={e => setFormData({ ...formData, excludeFromOnboarding: e.target.checked })} className="mt-1 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4 shrink-0" />
-                <span className="text-slate-700 leading-snug">
-                  Exclude from Onboarding & Offboarding workflows
-                  <span className="block text-xs text-slate-500 font-normal mt-0.5">Useful for Management, Directors, or Owners.</span>
-                </span>
-              </label>
-            </CardContent>
-          </Card>
+
         </div>
       </div>
     </div>
@@ -654,7 +580,7 @@ export function Employees() {
                   </button>
                 ))}
               </div>
-              
+
               {(detailTab === 'Attendance' || detailTab === 'Leaves' || detailTab === 'Disciplinary' || detailTab === 'Evaluations') && (
                 <div className="flex gap-2 shrink-0 ml-auto">
                   <select
@@ -688,30 +614,24 @@ export function Employees() {
                   <div>
                     <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Personal Info</h4>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-slate-500">Emp Code:</span><span className="font-mono">{emp.employeeCode || emp.id.substring(0,8)}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Staff Type:</span><span>{emp.staffType}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Beneficiary Code:</span><span className="font-mono">{emp.employeeCode || emp.id.substring(0, 8)}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Start Date:</span><span>{emp.startDate || 'N/A'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">End Date:</span><span>{emp.endDate || 'N/A'}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Yearly Leave:</span><span>{emp.yearlyLeave} days</span></div>
                     </div>
                   </div>
 
                   <div>
-                    <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Bank & Tax</h4>
+                    <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Bank Info</h4>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between"><span className="text-slate-500">Bank:</span><span>{emp.bankName || 'N/A'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Account:</span><span className="font-mono">{emp.accountNo || 'N/A'}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Tax ID:</span><span className="font-mono">{emp.taxId || 'N/A'}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Pension:</span><span className="font-mono">{emp.pensionNumber || 'N/A'}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">PAYE Tax:</span><span>{emp.payeTax ? 'Yes' : 'No'}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">WHT Tax:</span><span>{emp.withholdingTax ? 'Yes' : 'No'}</span></div>
                     </div>
                   </div>
                 </div>
 
                 {canSeeSalary && (
                   <div className="mt-6">
-                    <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Salary Information</h4>
+                    <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Stipend Information</h4>
                     <div className="bg-slate-50 rounded-lg p-4">
                       <div className="grid grid-cols-4 gap-2 text-sm mb-3">
                         {Object.entries(emp.monthlySalaries).map(([month, amount]) => (
@@ -732,44 +652,44 @@ export function Employees() {
             )}
 
             {detailTab === 'Reminders' && (() => {
-               const empReminders = reminders.filter(r => r.title.includes(emp.firstname) && r.title.includes(emp.surname));
-               return (
-                 <div className="space-y-4">
-                   {empReminders.length === 0 ? (
-                     <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
-                        <p className="text-slate-500 font-medium">No system reminders tied to this employee.</p>
-                     </div>
-                   ) : (
-                     <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
-                       <Table>
-                         <TableHeader>
-                           <TableRow className="bg-slate-50/50">
-                             <TableHead>Reminder Title</TableHead>
-                             <TableHead>Trigger Date</TableHead>
-                             <TableHead>Status</TableHead>
-                           </TableRow>
-                         </TableHeader>
-                         <TableBody>
-                           {empReminders.map(r => {
-                             const isPast = new Date(r.remindAt) < new Date();
-                             return (
-                               <TableRow key={r.id} className="hover:bg-slate-50/80">
-                                 <TableCell className="font-semibold text-slate-800 text-xs">{r.title}</TableCell>
-                                 <TableCell className="font-mono text-[11px] text-slate-500">{new Date(r.remindAt).toLocaleString()}</TableCell>
-                                 <TableCell>
-                                   <Badge variant="outline" className={`text-[10px] ${r.isActive ? (isPast ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-indigo-50 text-indigo-600 border-indigo-200') : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                                     {!r.isActive ? 'Dismissed' : (isPast ? 'Overdue' : 'Pending')}
-                                   </Badge>
-                                 </TableCell>
-                               </TableRow>
-                             );
-                           })}
-                         </TableBody>
-                       </Table>
-                     </div>
-                   )}
-                 </div>
-               );
+              const empReminders = reminders.filter(r => r.title.includes(emp.firstname) && r.title.includes(emp.surname));
+              return (
+                <div className="space-y-4">
+                  {empReminders.length === 0 ? (
+                    <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                      <p className="text-slate-500 font-medium">No system reminders tied to this employee.</p>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-slate-50/50">
+                            <TableHead>Reminder Title</TableHead>
+                            <TableHead>Trigger Date</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {empReminders.map(r => {
+                            const isPast = new Date(r.remindAt) < new Date();
+                            return (
+                              <TableRow key={r.id} className="hover:bg-slate-50/80">
+                                <TableCell className="font-semibold text-slate-800 text-xs">{r.title}</TableCell>
+                                <TableCell className="font-mono text-[11px] text-slate-500">{new Date(r.remindAt).toLocaleString()}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className={`text-[10px] ${r.isActive ? (isPast ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-indigo-50 text-indigo-600 border-indigo-200') : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                    {!r.isActive ? 'Dismissed' : (isPast ? 'Overdue' : 'Pending')}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              );
             })()}
 
             {detailTab === 'Attendance' && (() => {
@@ -777,8 +697,8 @@ export function Employees() {
                 .filter(r => r.staffId === emp.id)
                 .filter(r => activeTabYear === 'All' ? true : r.date?.startsWith(activeTabYear))
                 .filter(r => activeTabMonth === 'All' ? true : new Date(r.date || '').getMonth() + 1 === parseInt(activeTabMonth))
-                .sort((a,b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-              
+                .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+
               const actualWorkdays = empAtt.reduce((sum, r) => sum + ((Number(r.dayWk) || 0) + (Number(r.nightWk) || 0)), 0);
               const absentDays = empAtt.filter(r => r.isPresent === 'No').length;
               const overtimeHours = empAtt.reduce((sum, r) => sum + (Number(r.ot) || 0), 0);
@@ -786,11 +706,11 @@ export function Employees() {
               return (
                 <div className="space-y-4">
                   <div className="text-sm font-bold text-slate-700">
-                     <span>Actual Workdays: {actualWorkdays}</span>
-                     <span className="mx-2 text-slate-300">|</span>
-                     <span>Absent: {absentDays}</span>
-                     <span className="mx-2 text-slate-300">|</span>
-                     <span>Overtime: {overtimeHours} hrs</span>
+                    <span>Actual Workdays: {actualWorkdays}</span>
+                    <span className="mx-2 text-slate-300">|</span>
+                    <span>Absent: {absentDays}</span>
+                    <span className="mx-2 text-slate-300">|</span>
+                    <span>Overtime: {overtimeHours} hrs</span>
                   </div>
                   {empAtt.length === 0 ? (
                     <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
@@ -833,8 +753,8 @@ export function Employees() {
                 .filter(l => l.employeeId === emp.id)
                 .filter(l => activeTabYear === 'All' ? true : l.startDate?.startsWith(activeTabYear))
                 .filter(l => activeTabMonth === 'All' ? true : new Date(l.startDate || '').getMonth() + 1 === parseInt(activeTabMonth))
-                .sort((a,b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime());
-              
+                .sort((a, b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime());
+
               const totalTaken = empLeaves.filter(l => l.status !== 'Cancelled').reduce((acc, l) => acc + l.duration, 0);
               const entitlement = emp.yearlyLeave || 20;
               const remaining = entitlement - totalTaken;
@@ -842,11 +762,11 @@ export function Employees() {
               return (
                 <div className="space-y-4">
                   <div className="text-sm font-bold text-slate-700">
-                     <span>Entitled: {entitlement}</span>
-                     <span className="mx-2 text-slate-300">|</span>
-                     <span>Taken: {totalTaken}</span>
-                     <span className="mx-2 text-slate-300">|</span>
-                     <span>Remaining: {remaining}</span>
+                    <span>Entitled: {entitlement}</span>
+                    <span className="mx-2 text-slate-300">|</span>
+                    <span>Taken: {totalTaken}</span>
+                    <span className="mx-2 text-slate-300">|</span>
+                    <span>Remaining: {remaining}</span>
                   </div>
                   {empLeaves.length === 0 ? (
                     <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
@@ -885,99 +805,99 @@ export function Employees() {
             })()}
 
             {detailTab === 'Disciplinary' && (() => {
-               const empDiscip = disciplinaryRecords
-                 .filter(r => r.employeeId === emp.id)
-                 .filter(r => activeTabYear === 'All' ? true : r.date?.startsWith(activeTabYear))
-                 .filter(r => activeTabMonth === 'All' ? true : new Date(r.date || '').getMonth() + 1 === parseInt(activeTabMonth))
-                 .sort((a,b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-               return (
-                 <div className="space-y-4">
-                   {empDiscip.length === 0 ? (
-                     <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
-                        <p className="text-slate-500 font-medium">No active disciplinary events for selected period.</p>
-                        <p className="text-xs text-slate-400 mt-1">Good standing.</p>
-                     </div>
-                   ) : (
-                     <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
-                       <Table>
-                         <TableHeader>
-                           <TableRow className="bg-slate-50/50">
-                             <TableHead className="w-24">Date</TableHead>
-                             <TableHead>Type</TableHead>
-                             <TableHead>Severity</TableHead>
-                             <TableHead className="text-right">Actions</TableHead>
-                           </TableRow>
-                         </TableHeader>
-                         <TableBody>
-                           {empDiscip.map(d => (
-                             <TableRow key={d.id} className="hover:bg-slate-50/80">
-                               <TableCell className="font-mono text-[11px] text-slate-500">{d.date}</TableCell>
-                               <TableCell className="font-semibold text-slate-800 text-xs">{d.type}</TableCell>
-                               <TableCell>
-                                 <Badge variant={d.severity.includes('Warning') ? 'warning' : 'destructive'} className="text-[10px]">{d.severity}</Badge>
-                               </TableCell>
-                               <TableCell className="text-right">
-                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => setViewingNarrative({ type: 'Disciplinary', data: d })}>
-                                   <Eye className="h-4 w-4" />
-                                 </Button>
-                               </TableCell>
-                             </TableRow>
-                           ))}
-                         </TableBody>
-                       </Table>
-                     </div>
-                   )}
-                 </div>
-               );
+              const empDiscip = disciplinaryRecords
+                .filter(r => r.employeeId === emp.id)
+                .filter(r => activeTabYear === 'All' ? true : r.date?.startsWith(activeTabYear))
+                .filter(r => activeTabMonth === 'All' ? true : new Date(r.date || '').getMonth() + 1 === parseInt(activeTabMonth))
+                .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+              return (
+                <div className="space-y-4">
+                  {empDiscip.length === 0 ? (
+                    <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                      <p className="text-slate-500 font-medium">No active disciplinary events for selected period.</p>
+                      <p className="text-xs text-slate-400 mt-1">Good standing.</p>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-slate-50/50">
+                            <TableHead className="w-24">Date</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Severity</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {empDiscip.map(d => (
+                            <TableRow key={d.id} className="hover:bg-slate-50/80">
+                              <TableCell className="font-mono text-[11px] text-slate-500">{d.date}</TableCell>
+                              <TableCell className="font-semibold text-slate-800 text-xs">{d.type}</TableCell>
+                              <TableCell>
+                                <Badge variant={d.severity.includes('Warning') ? 'warning' : 'destructive'} className="text-[10px]">{d.severity}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => setViewingNarrative({ type: 'Disciplinary', data: d })}>
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              );
             })()}
 
             {detailTab === 'Evaluations' && (() => {
-               const empEvals = evaluations
-                 .filter(e => e.employeeId === emp.id)
-                 .filter(e => activeTabYear === 'All' ? true : e.date?.startsWith(activeTabYear))
-                 .filter(e => activeTabMonth === 'All' ? true : new Date(e.date || '').getMonth() + 1 === parseInt(activeTabMonth))
-                 .sort((a,b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-               return (
-                 <div className="space-y-4">
-                   {empEvals.length === 0 ? (
-                     <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
-                        <p className="text-slate-500 font-medium">No evaluation records found for selected period.</p>
-                        <p className="text-xs text-slate-400 mt-1">Schedule a review to get started.</p>
-                     </div>
-                   ) : (
-                     <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
-                       <Table>
-                         <TableHeader>
-                           <TableRow className="bg-slate-50/50">
-                             <TableHead className="w-24">Date</TableHead>
-                             <TableHead>Type</TableHead>
-                             <TableHead>Score</TableHead>
-                             <TableHead className="text-right">Actions</TableHead>
-                           </TableRow>
-                         </TableHeader>
-                         <TableBody>
-                           {empEvals.map(e => (
-                             <TableRow key={e.id} className="hover:bg-slate-50/80">
-                               <TableCell className="font-mono text-[11px] text-slate-500">{e.date}</TableCell>
-                               <TableCell className="font-semibold text-slate-800 text-xs">{e.type}</TableCell>
-                               <TableCell>
-                                 <span className={`text-xs font-bold ${e.overallScore >= 70 ? 'text-emerald-600' : e.overallScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}>
-                                   {e.overallScore}%
-                                 </span>
-                               </TableCell>
-                               <TableCell className="text-right">
-                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => setViewingNarrative({ type: 'Evaluation', data: e })}>
-                                   <Eye className="h-4 w-4" />
-                                 </Button>
-                               </TableCell>
-                             </TableRow>
-                           ))}
-                         </TableBody>
-                       </Table>
-                     </div>
-                   )}
-                 </div>
-               );
+              const empEvals = evaluations
+                .filter(e => e.employeeId === emp.id)
+                .filter(e => activeTabYear === 'All' ? true : e.date?.startsWith(activeTabYear))
+                .filter(e => activeTabMonth === 'All' ? true : new Date(e.date || '').getMonth() + 1 === parseInt(activeTabMonth))
+                .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+              return (
+                <div className="space-y-4">
+                  {empEvals.length === 0 ? (
+                    <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                      <p className="text-slate-500 font-medium">No evaluation records found for selected period.</p>
+                      <p className="text-xs text-slate-400 mt-1">Schedule a review to get started.</p>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-slate-50/50">
+                            <TableHead className="w-24">Date</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Score</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {empEvals.map(e => (
+                            <TableRow key={e.id} className="hover:bg-slate-50/80">
+                              <TableCell className="font-mono text-[11px] text-slate-500">{e.date}</TableCell>
+                              <TableCell className="font-semibold text-slate-800 text-xs">{e.type}</TableCell>
+                              <TableCell>
+                                <span className={`text-xs font-bold ${e.overallScore >= 70 ? 'text-emerald-600' : e.overallScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}>
+                                  {e.overallScore}%
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => setViewingNarrative({ type: 'Evaluation', data: e })}>
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              );
             })()}
           </div>
         </div>
@@ -1055,9 +975,9 @@ export function Employees() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">
-            Employee Directory
+            Beneficiary Directory
           </h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">Manage personnel records, roles, and compensation details.</p>
+          <p className="text-sm font-medium text-slate-500 mt-1">Manage beneficiary records and stipend details.</p>
         </div>
         <div className="flex items-center gap-3">
           {priv.canExport && (
@@ -1071,12 +991,9 @@ export function Employees() {
               <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
             </label>
           )}
-          <Button variant="outline" className="gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 shadow-sm" onClick={() => navigate('/organogram')}>
-            <Network className="h-4 w-4" /> Organogram
-          </Button>
           {priv.canAdd && (
-            <Button className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md mx-2 transition-all" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'INTERNAL', status: 'Active', payeTax: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
-              <Plus className="h-4 w-4" /> Add Employee
+            <Button className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md mx-2 transition-all" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'BENEFICIARY', status: 'Active', payeTax: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
+              <Plus className="h-4 w-4" /> Add Beneficiary
             </Button>
           )}
         </div>
@@ -1120,17 +1037,16 @@ export function Employees() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Employee</TableHead>
+              <TableHead>Beneficiary</TableHead>
               <TableHead>Department</TableHead>
               <TableHead>Staff Type</TableHead>
               <TableHead>Position</TableHead>
               <TableHead>Bank Info</TableHead>
-              <TableHead>Taxes</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredEmployees.map((employee) => (
+            {filteredBeneficiaries.map((employee) => (
               <TableRow key={employee.id} className="hover:bg-slate-50/50 transition-colors">
                 <TableCell>
                   <div className="flex items-center gap-3">
@@ -1159,13 +1075,6 @@ export function Employees() {
                     <span className="text-xs text-slate-500 font-mono">{employee.accountNo}</span>
                   </div>
                 </TableCell>
-                <TableCell>
-                  <div className="flex gap-1 flex-col text-xs">
-                    {employee.payeTax && <span className="text-emerald-600 font-medium">PAYE: YES</span>}
-                    {employee.withholdingTax && <span className="text-amber-600 font-medium">WHT: YES</span>}
-                    {!employee.payeTax && !employee.withholdingTax && <span className="text-slate-400">None</span>}
-                  </div>
-                </TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -1189,7 +1098,7 @@ export function Employees() {
                             className="text-red-600 cursor-pointer focus:text-red-700 focus:bg-red-50 gap-2 font-medium"
                             onClick={async () => {
                               const ok = await showConfirm(`Are you sure you want to delete ${employee.surname} ${employee.firstname}?`, { variant: 'danger', confirmLabel: 'Delete' });
-                              if (ok) { deleteEmployee(employee.id); toast.success('Employee record deleted'); }
+                              if (ok) { deleteEmployee(employee.id); toast.success('Record deleted'); }
                             }}
                           >
                             <Trash2 className="h-4 w-4" /> Delete

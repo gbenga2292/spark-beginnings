@@ -19,7 +19,7 @@ interface PayrollRecord {
   firstname: string;
   position: string;
   department: string;
-  staffType: 'INTERNAL' | 'EXTERNAL';
+  staffType: 'INTERNAL' | 'EXTERNAL' | 'BENEFICIARY';
   bankName: string;
   accountNo: string;
   salary: number;

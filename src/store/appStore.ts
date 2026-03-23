@@ -38,7 +38,7 @@ export interface DepartmentTasks {
 export interface Department {
   id: string;
   name: string;
-  staffType: 'INTERNAL' | 'EXTERNAL';
+  staffType: 'INTERNAL' | 'EXTERNAL' | 'BENEFICIARY';
   workDaysPerWeek: number;
   parentDepartmentId?: string | null;
 }
@@ -175,7 +175,7 @@ export interface Employee {
   surname: string;
   firstname: string;
   department: string;
-  staffType: 'INTERNAL' | 'EXTERNAL';
+  staffType: 'INTERNAL' | 'EXTERNAL' | 'BENEFICIARY';
   position: string;
   startDate: string;
   endDate: string;

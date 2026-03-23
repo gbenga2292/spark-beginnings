@@ -223,7 +223,10 @@ export const useUserStore = create<UserStore>()(
       currentUserId: null,
 
       addUser: (user) => {
-        set((s) => ({ users: [...s.users, user] }));
+        set((s) => {
+          if (s.users.some(u => u.id === user.id)) return s;
+          return { users: [...s.users, user] };
+        });
         // Profile is created via Supabase auth trigger; just update privileges
         db.updateProfile(user.id, { name: user.name, privileges: user.privileges, is_active: user.isActive });
       },
