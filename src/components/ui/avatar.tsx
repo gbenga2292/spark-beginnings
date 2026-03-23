@@ -30,15 +30,31 @@ const AvatarImage = React.forwardRef<HTMLImageElement, React.ImgHTMLAttributes<H
     }
   }, [src, onImageLoadingStatusChange]);
 
+  const handleLoad = React.useCallback(
+    (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+      onImageLoadingStatusChange('loaded');
+      if (props.onLoad) props.onLoad(e);
+    },
+    [onImageLoadingStatusChange, props.onLoad]
+  );
+
+  const handleError = React.useCallback(
+    (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+      onImageLoadingStatusChange('error');
+      if (props.onError) props.onError(e);
+    },
+    [onImageLoadingStatusChange, props.onError]
+  );
+
   if (!src || imageLoadingStatus === 'error') return null;
 
   return (
     <img 
       ref={ref} 
       src={src}
-      className={cn("aspect-square h-full w-full object-cover", className)} 
-      onLoad={() => onImageLoadingStatusChange('loaded')}
-      onError={() => onImageLoadingStatusChange('error')}
+      className={cn("aspect-square h-full w-full object-cover", imageLoadingStatus !== 'loaded' && 'hidden', className)} 
+      onLoad={handleLoad}
+      onError={handleError}
       {...props} 
     />
   )

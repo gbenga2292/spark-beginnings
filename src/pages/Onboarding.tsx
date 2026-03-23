@@ -72,12 +72,12 @@ const task2Done = (cl: OnboardingChecklist) => task21Done(cl) && task22Done(cl);
 // 3.1: name+phone filled for every guarantor (verified is advisory, not blocking)
 const task31Done = (cl: OnboardingChecklist) => cl.guarantors.length > 0 && cl.guarantors.every(g => g.name.trim() && g.phone.trim());
 const task32DocsDone = (cl: OnboardingChecklist) => cl.passportPhotos && cl.addressVerification && cl.educationalCredentials;
-// Account: bank + account no filled (verified is advisory)
+// Account: bank + account no filled (optional for progress)
 const task32AccDone = (cl: OnboardingChecklist) => cl.bankName.trim() !== '' && cl.accountNo.trim() !== '';
-// Pension/PAYE: number filled (verified is advisory)
+// Pension/PAYE: number filled (optional for progress)
 const task32PensionDone = (cl: OnboardingChecklist) => cl.pensionNumberInput.trim() !== '';
 const task32PayeDone = (cl: OnboardingChecklist) => cl.payeNumberInput.trim() !== '';
-const task3Done = (cl: OnboardingChecklist) => task31Done(cl) && task32DocsDone(cl) && task32AccDone(cl) && task32PensionDone(cl) && task32PayeDone(cl);
+const task3Done = (cl: OnboardingChecklist) => task31Done(cl) && task32DocsDone(cl);
 // task4 = all 3 employment letter steps done; task5 = official start date confirmed
 const task4Done = (cl: OnboardingChecklist) => !!(cl.employmentLetterPrinted && cl.employmentLetterSigned && cl.employmentLetterFiled);
 const task5Done = (cl: OnboardingChecklist) => cl.verifiedStartDate.trim() !== '';
@@ -331,11 +331,8 @@ export function Onboarding() {
   // Within task 3 — unlock by compulsory fields only
   const t31Done = task31Done(cl);
   const t32DocsDone = task32DocsDone(cl);
-  const t32Docs2Unlocked = t32DocsDone;  // account details unlock only after docs checklist done
   const t32AccDone = task32AccDone(cl);
-  const t32PensionUnlocked = t32Docs2Unlocked && t32AccDone;
   const t32PensionDone = task32PensionDone(cl);
-  const t32PayeUnlocked = t32PensionUnlocked && t32PensionDone;
   const t32PayeDone = task32PayeDone(cl);
   const t3Done = task3Done(cl);
   const t4Unlocked = t3Done;   // Employment Letters unlock after Task 3
@@ -765,7 +762,7 @@ export function Onboarding() {
                 <Section icon={ShieldCheck} label="3. Verification of Documents" color="bg-sky-50 text-sky-700"
                   locked={!t3Unlocked} lockMsg="Complete all of Task 2 first" defaultOpen={t3Unlocked && !t3Done}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-slate-500">All verification steps must be completed in sequence.</span>
+                    <span className="text-xs text-slate-500">Complete Document Verification. Account Details, Pension, and PAYE are optional inputs.</span>
                     <DoneBadge done={t3Done} />
                   </div>
 
@@ -844,8 +841,8 @@ export function Onboarding() {
                     <CheckRow label="Educational Qualification Credentials submitted" checked={cl.educationalCredentials} onChange={v => updateCL({ educationalCredentials: v })} />
                   </SubSection>
 
-                  {/* 3.2 — Account Details (unlocked after docs) */}
-                  <SubSection label="3.2 — Account Details" locked={!t32Docs2Unlocked} lockMsg="Complete 3.1 first" done={t32AccDone}>
+                  {/* 3.2 — Account Details (optional) */}
+                  <SubSection label="3.2 — Account Details" done={t32AccDone}>
                     <p className="text-[11px] text-slate-500">Enter bank details — these will be saved to the employee record on activation. Verified checkbox is advisory.</p>
                     <div className={`p-3 rounded-lg border grid grid-cols-2 gap-3 transition-colors ${cl.bankName.trim() && cl.accountNo.trim() ? 'border-sky-200 bg-sky-50/20' : 'border-slate-200'}`}>
                       <LabeledInput label="Bank Name *" value={cl.bankName} onChange={v => updateCL({ bankName: v })} placeholder="e.g. First Bank" />
@@ -878,8 +875,8 @@ export function Onboarding() {
                     )}
                   </SubSection>
 
-                  {/* 3.2 — Pension (unlocked after account done) */}
-                  <SubSection label="3.2 — Pension Number" locked={!t32PensionUnlocked} lockMsg="Complete account details first" done={t32PensionDone}>
+                  {/* 3.2 — Pension */}
+                  <SubSection label="3.2 — Pension Number" done={t32PensionDone}>
                     <LabeledInput label="Enter Pension Number *" value={cl.pensionNumberInput}
                       onChange={v => updateCL({ pensionNumberInput: v, pensionVerified: cl.pensionVerified && v.trim() !== '' })}
                       placeholder="e.g. PEN/123456" />
@@ -896,8 +893,8 @@ export function Onboarding() {
                     )}
                   </SubSection>
 
-                  {/* 3.2 — PAYE (unlocked after pension done) */}
-                  <SubSection label="3.2 — PAYE Number" locked={!t32PayeUnlocked} lockMsg="Complete pension number first" done={t32PayeDone}>
+                  {/* 3.2 — PAYE */}
+                  <SubSection label="3.2 — PAYE Number" done={t32PayeDone}>
                     <LabeledInput label="Enter PAYE Number *" value={cl.payeNumberInput}
                       onChange={v => updateCL({ payeNumberInput: v, payeVerified: cl.payeVerified && v.trim() !== '' })}
                       placeholder="e.g. PAYE/654321" />
