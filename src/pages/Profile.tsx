@@ -7,7 +7,7 @@ import { Input } from '@/src/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
 import { supabase } from '@/src/integrations/supabase/client';
-import { useTheme, ALL_COLOR_THEMES, type ColorTheme } from '@/src/hooks/useTheme';
+import { useTheme, ALL_COLOR_THEMES, ALL_UI_THEMES, type ColorTheme, type UITheme } from '@/src/hooks/useTheme';
 import { 
   User, 
   Mail, 
@@ -23,7 +23,8 @@ import {
   Palette,
   Sun,
   Moon,
-  Check
+  Check,
+  LayoutTemplate
 } from 'lucide-react';
 
 
@@ -37,11 +38,21 @@ const THEME_OPTIONS: { id: ColorTheme; label: string; swatches: string[] }[] = [
   { id: 'slate',   label: 'Slate',   swatches: ['#475569', '#64748b', '#94a3b8'] },
 ];
 
+const UI_THEME_OPTIONS: { id: UITheme; label: string; description: string }[] = [
+  { id: 'default', label: 'Classic', description: 'Standard layout' },
+  { id: 'modern', label: 'Modern', description: 'Soft corners, clean look' },
+  { id: 'glass', label: 'Glassmorphism', description: 'Frosted glass effects' },
+  { id: 'brutalism', label: 'Neo-Brutalism', description: 'Bold, high-contrast' },
+  { id: 'minimalist', label: 'Minimalist', description: 'Sleek, borderless' },
+  { id: 'burgundy', label: 'Burgundy IDE', description: 'Deep dark red editor mode' },
+  { id: 'midnight', label: 'Midnight IDE', description: 'Deep navy blue editor mode' },
+];
+
 export function Profile() {
   const navigate = useNavigate();
   const { user, login } = useAuthStore();
   const { updateUser, getCurrentUser } = useUserStore();
-  const { isDark, toggle, colorTheme, setColorTheme } = useTheme();
+  const { isDark, toggle, colorTheme, setColorTheme, uiTheme, setUITheme } = useTheme();
   const currentUser = getCurrentUser();
   
   const [isEditing, setIsEditing] = useState(false);
@@ -631,6 +642,35 @@ export function Profile() {
                         ))}
                       </div>
                       <span className="text-xs font-medium text-slate-700">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* UI structure themes */}
+              <div>
+                <label className="text-sm font-medium text-slate-700 mb-3 block">App Layout Theme</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {UI_THEME_OPTIONS.map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => setUITheme(opt.id)}
+                      className={`relative flex flex-col items-start text-left gap-1 p-4 rounded-xl border-2 transition-all ${
+                        uiTheme === opt.id
+                          ? 'border-indigo-500 bg-indigo-50/60 shadow-sm'
+                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      {uiTheme === opt.id && (
+                        <div className="absolute top-2 right-2">
+                          <Check className="h-4 w-4 text-indigo-600" />
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 mb-1">
+                        <LayoutTemplate className={`h-4 w-4 ${uiTheme === opt.id ? 'text-indigo-600' : 'text-slate-500'}`} />
+                        <span className="text-sm font-semibold text-slate-900">{opt.label}</span>
+                      </div>
+                      <span className="text-xs text-slate-500">{opt.description}</span>
                     </button>
                   ))}
                 </div>

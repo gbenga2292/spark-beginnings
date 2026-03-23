@@ -341,3 +341,168 @@
 .dark .text-muted-foreground { color: rgb(100 116 139) !important; }
 .dark .border-border    { border-color: rgb(51 65 85)  !important; }
 
+/* ══════════════════════════════════════════════════════════════════════
+   UI Layout Theme Systems
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Modern ──────────────────────────────────────────────────────────── */
+.ui-modern .bg-card, .ui-modern [data-radix-popper-content-wrapper] {
+  border-radius: 1.5rem !important;
+  border: 1px solid rgb(0 0 0 / 0.05) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01) !important;
+}
+.dark.ui-modern .bg-card, .dark.ui-modern [data-radix-popper-content-wrapper] {
+  border: 1px solid rgb(255 255 255 / 0.05) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3) !important;
+}
+.ui-modern button, .ui-modern input, .ui-modern select, .ui-modern .rounded-lg, .ui-modern .rounded-xl {
+  border-radius: 1rem !important;
+}
+
+/* ── Glassmorphism ────────────────────────────────────────────────────── */
+html.ui-glass body {
+  background: radial-gradient(circle at top left, #f3f4f6, #e5e7eb) !important;
+}
+html.dark.ui-glass body {
+  background: radial-gradient(circle at top left, #1e293b, #0f172a) !important;
+}
+.ui-glass .bg-card, .ui-glass [data-radix-popper-content-wrapper], .ui-glass table th {
+  background: rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05) !important;
+}
+.dark.ui-glass .bg-card, .dark.ui-glass [data-radix-popper-content-wrapper], .dark.ui-glass table th {
+  background: rgba(15, 23, 42, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ── Neo-Brutalism ────────────────────────────────────────────────────── */
+html.ui-brutalism {
+  --color-border: 0 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+}
+html.dark.ui-brutalism {
+  --color-border: 255 255 255;
+}
+.ui-brutalism * {
+  border-radius: 0 !important;
+}
+.ui-brutalism .bg-card, .ui-brutalism [data-radix-popper-content-wrapper] {
+  border-width: 3px !important;
+  border-color: #000 !important;
+  box-shadow: 6px 6px 0px 0px #000 !important;
+}
+.dark.ui-brutalism .bg-card, .dark.ui-brutalism [data-radix-popper-content-wrapper] {
+  border-color: #fff !important;
+  box-shadow: 6px 6px 0px 0px #fff !important;
+}
+.ui-brutalism input, .ui-brutalism select, .ui-brutalism button {
+  border-width: 2px !important;
+  border-color: #000 !important;
+}
+.ui-brutalism a.bg-indigo-600, .ui-brutalism button.bg-indigo-600, .ui-brutalism button.bg-emerald-600, .ui-brutalism button[class*="bg-"] {
+  box-shadow: 4px 4px 0px 0px #000 !important;
+  transition: all 0.1s;
+}
+.ui-brutalism a.bg-indigo-600:active, .ui-brutalism button[class*="bg-"]:active {
+  box-shadow: 0px 0px 0px 0px #000 !important;
+  transform: translate(4px, 4px) !important;
+}
+.dark.ui-brutalism a.bg-indigo-600, .dark.ui-brutalism button[class*="bg-"] {
+  box-shadow: 4px 4px 0px 0px #fff !important;
+  border-color: #fff !important;
+}
+.dark.ui-brutalism a.bg-indigo-600:active, .dark.ui-brutalism button[class*="bg-"]:active {
+  box-shadow: 0px 0px 0px 0px #fff !important;
+}
+.dark.ui-brutalism input, .dark.ui-brutalism select, .dark.ui-brutalism button {
+  border-color: #fff !important;
+}
+
+/* ── Minimalist ──────────────────────────────────────────────────────── */
+.ui-minimalist .bg-card, .ui-minimalist [data-radix-popper-content-wrapper] {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+.ui-minimalist .shadow, .ui-minimalist .shadow-sm, .ui-minimalist .shadow-md, .ui-minimalist .shadow-lg, .ui-minimalist [class*="shadow"] {
+  box-shadow: none !important;
+}
+.ui-minimalist input, .ui-minimalist select, .ui-minimalist button, .ui-minimalist .rounded-lg, .ui-minimalist .rounded-xl, .ui-minimalist .rounded-full {
+  border-radius: 0px !important;
+}
+
+/* ── Burgundy IDE (VS Code Red) ──────────────────────────────────────── */
+html.ui-burgundy {
+  --color-background:      38  0  0 !important;   /* Main background #260000 */
+  --color-foreground:     255 220 220 !important; /* Text */
+  --color-card:            58  0  0 !important;   /* Cards #3A0000 */
+  --color-card-foreground: 255 220 220 !important; 
+  --color-muted:           80  0  0 !important;   
+  --color-muted-foreground: 255 180 180 !important;
+  --color-border:         100  0  0 !important; 
+  --color-input:          100  0  0 !important;   
+}
+html.ui-burgundy body, html.ui-burgundy .bg-slate-50, html.ui-burgundy .bg-white {
+  background-color: rgb(var(--color-background)) !important;
+  color: rgb(var(--color-foreground)) !important;
+}
+html.ui-burgundy .bg-card, html.ui-burgundy [data-radix-popper-content-wrapper], html.ui-burgundy .bg-slate-100 {
+  background-color: rgb(var(--color-card)) !important;
+  border-color: rgb(var(--color-border)) !important;
+  color: rgb(var(--color-foreground)) !important;
+}
+html.ui-burgundy input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), html.ui-burgundy select, html.ui-burgundy textarea {
+  background-color: rgb(var(--color-card)) !important; 
+  border-color: rgb(var(--color-border)) !important; 
+  color: rgb(var(--color-foreground)) !important;
+}
+html.ui-burgundy .border-slate-200, html.ui-burgundy .border-slate-100 { 
+  border-color: rgb(var(--color-border)) !important; 
+}
+html.ui-burgundy .text-slate-900 { color: #fff !important; }
+html.ui-burgundy .text-slate-800, html.ui-burgundy .text-slate-700 { color: rgb(255 220 220) !important; }
+html.ui-burgundy .text-slate-600, html.ui-burgundy .text-slate-500 { color: rgb(255 180 180) !important; }
+html.ui-burgundy table { color: rgb(var(--color-foreground)) !important; }
+html.ui-burgundy thead tr { background-color: rgb(var(--color-background)) !important; }
+html.ui-burgundy tbody tr:hover { background-color: rgb(var(--color-muted)) !important; }
+
+/* ── Midnight IDE (VS Code Navy) ─────────────────────────────────────── */
+html.ui-midnight {
+  --color-background:       0  20  40 !important;   /* Main background #001428 */
+  --color-foreground:     220 235 255 !important;   /* Text */
+  --color-card:             0  35  65 !important;   /* Cards #002341 */
+  --color-card-foreground: 220 235 255 !important;
+  --color-muted:            0  50  90 !important;
+  --color-muted-foreground: 180 210 255 !important;
+  --color-border:           0  70 120 !important; 
+  --color-input:            0  70 120 !important;   
+}
+
+html.ui-midnight body, html.ui-midnight .bg-slate-50, html.ui-midnight .bg-white {
+  background-color: rgb(var(--color-background)) !important;
+  color: rgb(var(--color-foreground)) !important;
+}
+html.ui-midnight .bg-card, html.ui-midnight [data-radix-popper-content-wrapper], html.ui-midnight .bg-slate-100 {
+  background-color: rgb(var(--color-card)) !important;
+  border-color: rgb(var(--color-border)) !important;
+  color: rgb(var(--color-foreground)) !important;
+}
+html.ui-midnight input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), html.ui-midnight select, html.ui-midnight textarea {
+  background-color: rgb(var(--color-card)) !important; 
+  border-color: rgb(var(--color-border)) !important; 
+  color: rgb(var(--color-foreground)) !important;
+}
+html.ui-midnight .border-slate-200, html.ui-midnight .border-slate-100 { 
+  border-color: rgb(var(--color-border)) !important; 
+}
+html.ui-midnight .text-slate-900 { color: #fff !important; }
+html.ui-midnight .text-slate-800, html.ui-midnight .text-slate-700 { color: rgb(220 235 255) !important; }
+html.ui-midnight .text-slate-600, html.ui-midnight .text-slate-500 { color: rgb(180 210 255) !important; }
+html.ui-midnight table { color: rgb(var(--color-foreground)) !important; }
+html.ui-midnight thead tr { background-color: rgb(var(--color-background)) !important; }
+html.ui-midnight tbody tr:hover { background-color: rgb(var(--color-muted)) !important; }

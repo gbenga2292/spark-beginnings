@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react';
 
 type Mode = 'light' | 'dark';
 export type ColorTheme = 'default' | 'ocean' | 'forest' | 'sunset' | 'rose' | 'violet' | 'slate';
+export type UITheme = 'default' | 'modern' | 'glass' | 'brutalism' | 'minimalist' | 'burgundy' | 'midnight';
 
 const MODE_KEY = 'dcel-theme';
 const COLOR_KEY = 'dcel-color-theme';
+const UI_KEY = 'dcel-ui-theme';
 
 const ALL_COLOR_THEMES: ColorTheme[] = ['default', 'ocean', 'forest', 'sunset', 'rose', 'violet', 'slate'];
+const ALL_UI_THEMES: UITheme[] = ['default', 'modern', 'glass', 'brutalism', 'minimalist', 'burgundy', 'midnight'];
 
 function getInitialMode(): Mode {
   try {
@@ -24,9 +27,18 @@ function getInitialColor(): ColorTheme {
   return 'default';
 }
 
+function getInitialUI(): UITheme {
+  try {
+    const stored = localStorage.getItem(UI_KEY) as UITheme;
+    if (ALL_UI_THEMES.includes(stored)) return stored;
+  } catch {}
+  return 'default';
+}
+
 // Singleton state shared across components
 let _mode: Mode = getInitialMode();
 let _color: ColorTheme = getInitialColor();
+let _ui: UITheme = getInitialUI();
 const _listeners = new Set<() => void>();
 
 function applyMode(m: Mode) {
@@ -51,9 +63,20 @@ function applyColor(c: ColorTheme) {
   _listeners.forEach(fn => fn());
 }
 
+function applyUI(u: UITheme) {
+  _ui = u;
+  try { localStorage.setItem(UI_KEY, u); } catch {}
+  ALL_UI_THEMES.forEach(t => document.documentElement.classList.remove(`ui-${t}`));
+  if (u !== 'default') {
+    document.documentElement.classList.add(`ui-${u}`);
+  }
+  _listeners.forEach(fn => fn());
+}
+
 // Apply immediately on load
 applyMode(_mode);
 applyColor(_color);
+applyUI(_ui);
 
 export function useTheme() {
   const [, rerender] = useState(0);
@@ -68,16 +91,19 @@ export function useTheme() {
   const setLight = () => applyMode('light');
   const setDark = () => applyMode('dark');
   const setColorTheme = (c: ColorTheme) => applyColor(c);
+  const setUITheme = (u: UITheme) => applyUI(u);
 
   return {
     theme: _mode,
     colorTheme: _color,
+    uiTheme: _ui,
     toggle,
     setLight,
     setDark,
     setColorTheme,
+    setUITheme,
     isDark: _mode === 'dark',
   };
 }
 
-export { ALL_COLOR_THEMES };
+export { ALL_COLOR_THEMES, ALL_UI_THEMES };
