@@ -19,15 +19,20 @@ import { useAuth } from '@/src/hooks/useAuth';
 // ─── Default blank checklist ──────────────────────────────────
 function makeDefaultChecklist(noOfGuarantors: number): OnboardingChecklist {
   return {
+    // 1. Send Necessary Information
     emailFormsSent: false,
     emailFormsAcknowledged: false,
+    // 2. Return of Forms
     formsReturned: false,
     guarantorFormsReturned: false,
+    guarantorPassportReturned: false,
     personalEmployeeFormReturned: false,
-    passportReturned: false,
+    personalEmployeePassportReturned: false,
+    // 3. Verification of Documents
     guarantors: Array.from({ length: noOfGuarantors }, () => ({ name: '', phone: '', verified: false })),
     passportPhotos: false,
     addressVerification: false,
+    verifiedAddress: '',
     educationalCredentials: false,
     bankName: '',
     accountNo: '',
@@ -36,20 +41,34 @@ function makeDefaultChecklist(noOfGuarantors: number): OnboardingChecklist {
     pensionNumberInput: '',
     payeVerified: false,
     payeNumberInput: '',
-    verifiedStartDate: '',
+    // 4. Employment Letters
+    employmentLetterPrinted: false,
+    employmentLetterSigned: false,
+    employmentLetterFiled: false,
     employmentLettersIssued: false,
+    // 5. Resumption
+    verifiedStartDate: '',
+    // 6. Post Onboarding - Orientation
     orientationDone: false,
+    hrOrientation: false,
+    departmentOrientation: false,
+    siteOrientation: false,
+    hseOrientation: false,
+    // 7. PPE, Handbook & Requirements
     ppeHandbookIssued: false,
+    ppeIssued: false,
+    handbookProvided: false,
+    otherRequirementsSupplied: false,
   };
 }
 
 // ─── Completion predicates ────────────────────────────────────
 // ── "Done" = compulsory fields complete (verified checks are optional/advisory)
 const task1Done = (cl: OnboardingChecklist) => cl.emailFormsSent && cl.emailFormsAcknowledged;
-const task21Done = (cl: OnboardingChecklist) => cl.guarantorFormsReturned;
-const task22Done = (cl: OnboardingChecklist) => cl.personalEmployeeFormReturned;
-const task23Done = (cl: OnboardingChecklist) => cl.passportReturned;
-const task2Done = (cl: OnboardingChecklist) => cl.formsReturned && task21Done(cl) && task22Done(cl) && task23Done(cl);
+const task21Done = (cl: OnboardingChecklist) => cl.guarantorFormsReturned && cl.guarantorPassportReturned;
+const task22Done = (cl: OnboardingChecklist) => cl.personalEmployeeFormReturned && cl.personalEmployeePassportReturned;
+// task2Done: both guarantor form + personal employee form (and passport photos) returned
+const task2Done = (cl: OnboardingChecklist) => task21Done(cl) && task22Done(cl);
 // 3.1: name+phone filled for every guarantor (verified is advisory, not blocking)
 const task31Done = (cl: OnboardingChecklist) => cl.guarantors.length > 0 && cl.guarantors.every(g => g.name.trim() && g.phone.trim());
 const task32DocsDone = (cl: OnboardingChecklist) => cl.passportPhotos && cl.addressVerification && cl.educationalCredentials;
@@ -59,8 +78,9 @@ const task32AccDone = (cl: OnboardingChecklist) => cl.bankName.trim() !== '' && 
 const task32PensionDone = (cl: OnboardingChecklist) => cl.pensionNumberInput.trim() !== '';
 const task32PayeDone = (cl: OnboardingChecklist) => cl.payeNumberInput.trim() !== '';
 const task3Done = (cl: OnboardingChecklist) => task31Done(cl) && task32DocsDone(cl) && task32AccDone(cl) && task32PensionDone(cl) && task32PayeDone(cl);
-const task4Done = (cl: OnboardingChecklist) => cl.verifiedStartDate.trim() !== '';
-const task5Done = (cl: OnboardingChecklist) => cl.employmentLettersIssued;
+// task4 = all 3 employment letter steps done; task5 = official start date confirmed
+const task4Done = (cl: OnboardingChecklist) => !!(cl.employmentLetterPrinted && cl.employmentLetterSigned && cl.employmentLetterFiled);
+const task5Done = (cl: OnboardingChecklist) => cl.verifiedStartDate.trim() !== '';
 const allCriticalDone = (cl: OnboardingChecklist) =>
   task1Done(cl) && task2Done(cl) && task3Done(cl) && task4Done(cl) && task5Done(cl);
 
@@ -203,6 +223,8 @@ export function Onboarding() {
   const [leftTab, setLeftTab] = useState<'Active' | 'Pending' | 'Terminated'>('Active');
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  // Tracks whether the active-employee checklist is in edit vs. view-only mode
+  const [checklistEditMode, setChecklistEditMode] = useState(false);
 
   // ── Edit pending employee modal ───────────────────────────
   const [editEmp, setEditEmp] = useState<Employee | null>(null);
@@ -274,6 +296,7 @@ export function Onboarding() {
 
   const handleSelectEmployee = (emp: Employee) => {
     setSelectedEmployeeId(emp.id);
+    setChecklistEditMode(false);
     if (emp.status === 'Onboarding') setActiveTaskType('Onboarding');
     else if (emp.status === 'Active') setActiveTaskType(emp.onboardingTasks?.some(t => t.status !== 'Completed') ? 'Onboarding' : 'History');
     else if (emp.status === 'Terminated') setActiveTaskType('Offboarding');
@@ -302,26 +325,23 @@ export function Onboarding() {
   const t1Done = task1Done(cl);
   const t2Unlocked = t1Done;
   const t21Done = task21Done(cl);
-  const t22Unlocked = t2Unlocked && t21Done;
   const t22Done = task22Done(cl);
-  const t23Unlocked = t22Unlocked && t22Done;
-  const t23Done = task23Done(cl);
-  const t2FullDone = cl.formsReturned && t21Done && t22Done && t23Done;
+  const t2FullDone = t21Done && t22Done;  // no formsReturned gate
   const t3Unlocked = t1Done && t2FullDone;
-  // Within task 3 — unlock by compulsory fields only, verified badges are advisory
-  const t31Done = task31Done(cl);        // name+phone filled
+  // Within task 3 — unlock by compulsory fields only
+  const t31Done = task31Done(cl);
   const t32DocsDone = task32DocsDone(cl);
-  const t32Docs2Unlocked = t31Done;      // docs section after guarantors filled
-  const t32AccDone = task32AccDone(cl);  // bank+account filled
+  const t32Docs2Unlocked = t32DocsDone;  // account details unlock only after docs checklist done
+  const t32AccDone = task32AccDone(cl);
   const t32PensionUnlocked = t32Docs2Unlocked && t32AccDone;
   const t32PensionDone = task32PensionDone(cl);
   const t32PayeUnlocked = t32PensionUnlocked && t32PensionDone;
   const t32PayeDone = task32PayeDone(cl);
   const t3Done = task3Done(cl);
-  const t4Unlocked = t3Done;
-  const t4Done = task4Done(cl);
-  const t5Unlocked = t4Done;
-  const t5Done = task5Done(cl);
+  const t4Unlocked = t3Done;   // Employment Letters unlock after Task 3
+  const t4Done = task4Done(cl); // all 3 letter steps done
+  const t5Unlocked = t4Done;   // Resumption unlocks after letters
+  const t5Done = task5Done(cl); // official start date confirmed
   // Advisory verified flags
   const allGuarantorsVerified = task31FullyVerified(cl);
   const accVerified = task32AccVerified(cl);
@@ -625,57 +645,120 @@ export function Onboarding() {
 
           <CardContent className="p-5 flex-1 bg-slate-50/30 overflow-y-auto custom-scrollbar">
 
-            {/* â•â• ONBOARDING CHECKLIST â•â• */}
-            {isOnboarding && selectedEmployee && (
+            {/* â• â•  ONBOARDING CHECKLIST (Pending or Active History) â• â•  */}
+            {(isOnboarding || isHistory) && selectedEmployee && (
               <div className="space-y-3">
+                {isHistory && (
+                  <div className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-100 rounded-xl mb-4 shadow-sm">
+                    <div>
+                      <p className="text-sm font-bold text-emerald-700 flex items-center gap-2">
+                        Onboarding Completed <Check className="h-4 w-4" />
+                      </p>
+                      <div className="text-[11px] text-emerald-700 font-medium mt-1 space-x-4">
+                        <span>Verified Start: <strong>{selectedEmployee.verifiedStartDate || selectedEmployee.startDate}</strong></span>
+                        {selectedEmployee.probationPeriod && <span>Probation: <strong>{selectedEmployee.probationPeriod} days</strong></span>}
+                        {selectedEmployee.bankName && <span>Bank: <strong>{selectedEmployee.bankName}</strong></span>}
+                      </div>
+                    </div>
+                    {priv.canEdit && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setChecklistEditMode(!checklistEditMode)} 
+                        className={`gap-1.5 transition-colors h-8 text-xs font-semibold shadow-sm ${checklistEditMode ? 'bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200 hover:text-amber-900 focus:bg-amber-200' : 'bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}
+                      >
+                        {checklistEditMode ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
+                        {checklistEditMode ? 'Done Editing' : 'Edit Checklist'}
+                      </Button>
+                    )}
+                  </div>
+                )}
 
-
-                {/* ─ Task 1 ─ */}
+                <div className={`space-y-3 transition-opacity duration-300 ${isHistory && !checklistEditMode ? 'opacity-60 pointer-events-none grayscale-[15%]' : ''}`}>
+                  {/* ─ Task 1 ─ */}
                 <Section icon={Mail} label="1. Send Necessary Information (Forms)" color="bg-indigo-50 text-indigo-700"
                   defaultOpen={!t1Done}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-slate-500">Both checkboxes required before Task 2 unlocks.</span>
+                    <span className="text-xs text-slate-500">All forms must be sent and acknowledged before Task 2 unlocks.</span>
                     <DoneBadge done={t1Done} />
                   </div>
-                  <CheckRow
-                    label="Sent out all necessary information and forms"
-                    checked={cl.emailFormsSent}
-                    onChange={v => updateCL({ emailFormsSent: v, emailFormsAcknowledged: cl.emailFormsAcknowledged && v })}
-                  />
-                  <CheckRow
-                    label={cl.emailFormsSent ? 'Recipient acknowledged receipt of forms' : 'Mark sent first to unlock acknowledgement'}
-                    checked={cl.emailFormsAcknowledged}
-                    onChange={v => updateCL({ emailFormsAcknowledged: v })}
-                    disabled={!cl.emailFormsSent}
-                    hint={!cl.emailFormsSent ? 'Tick "Sent" above before marking acknowledgement' : undefined}
-                  />
+                  <p className="text-[11px] text-slate-500 mb-2">Tick after sending all necessary forms to the employee.</p>
+                  <div className="ml-2 space-y-2 border-l-2 border-indigo-100 pl-3">
+                    <p className="text-xs font-semibold text-indigo-600">Employee Forms</p>
+                    <CheckRow
+                      label="All necessary forms sent to employee (Employee Forms + Guarantor Forms)"
+                      checked={cl.emailFormsSent}
+                      onChange={v => updateCL({ emailFormsSent: v, emailFormsAcknowledged: cl.emailFormsAcknowledged && v })}
+                    />
+                  </div>
+                  <div className="mt-3">
+                    <CheckRow
+                      label={cl.emailFormsSent ? 'Acknowledgement received from employee' : 'Mark forms sent first to unlock acknowledgement'}
+                      checked={cl.emailFormsAcknowledged}
+                      onChange={v => updateCL({ emailFormsAcknowledged: v })}
+                      disabled={!cl.emailFormsSent}
+                      hint={!cl.emailFormsSent ? 'Tick "All forms sent" above before marking acknowledgement' : undefined}
+                    />
+                  </div>
                 </Section>
 
                 {/* ─ Task 2 ─ */}
                 <Section icon={RotateCcw} label="2. Return of Forms" color="bg-violet-50 text-violet-700"
                   locked={!t2Unlocked} lockMsg="Complete Task 1 first" defaultOpen={t1Done && !t2FullDone}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-slate-500">All sub-steps must be completed in sequence.</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-slate-500">Tick when each form and passport photo has been received.</span>
                     <DoneBadge done={t2FullDone} />
                   </div>
 
-                  {/* 2 — main */}
-                  <CheckRow label="Employee returned completed forms" checked={cl.formsReturned} onChange={v => updateCL({ formsReturned: v })} />
+                  {/* Guarantor Form block */}
+                  <div className="rounded-lg border border-violet-100 bg-violet-50/30 p-3 space-y-2">
+                    <p className="text-xs font-bold text-violet-700">Guarantor Form</p>
+                    <CheckRow
+                      label="Guarantor form(s) returned"
+                      checked={cl.guarantorFormsReturned}
+                      onChange={v => updateCL({ guarantorFormsReturned: v, guarantorPassportReturned: cl.guarantorPassportReturned && v })}
+                    />
+                    <div className="ml-6 space-y-1 border-l-2 border-violet-100 pl-3">
+                      <CheckRow
+                        label="With passport photograph"
+                        checked={cl.guarantorPassportReturned}
+                        onChange={v => updateCL({ guarantorPassportReturned: v })}
+                        disabled={!cl.guarantorFormsReturned}
+                        hint="Tick guarantor form returned first"
+                      />
+                      {!cl.guarantorPassportReturned && cl.guarantorFormsReturned && (
+                        <p className="text-[11px] text-amber-600 flex items-center gap-1 mt-0.5">
+                          <AlertCircle className="h-3 w-3" />
+                          Pending — HR receives a daily reminder to collect guarantor passport photograph.
+                        </p>
+                      )}
+                    </div>
+                  </div>
 
-                  {/* 2.1 — Guarantor forms */}
-                  <SubSection label="2.1 — Guarantor Forms" locked={!cl.formsReturned} lockMsg="Mark main form return first" done={t21Done}>
-                    <CheckRow label="Guarantor forms have been returned" checked={cl.guarantorFormsReturned} onChange={v => updateCL({ guarantorFormsReturned: v })} />
-                  </SubSection>
-
-                  {/* 2.2 — Personal Employee Form */}
-                  <SubSection label="2.2 — Personal Employee Form" locked={!t22Unlocked} lockMsg="Complete 2.1 first" done={t22Done}>
-                    <CheckRow label="Personal employee form has been returned" checked={cl.personalEmployeeFormReturned} onChange={v => updateCL({ personalEmployeeFormReturned: v })} />
-                  </SubSection>
-
-                  {/* 2.3 — Passport */}
-                  <SubSection label="2.3 — Passport (Copy)" locked={!t23Unlocked} lockMsg="Complete 2.2 first" done={t23Done}>
-                    <CheckRow label="Passport copy has been submitted" checked={cl.passportReturned} onChange={v => updateCL({ passportReturned: v })} />
-                  </SubSection>
+                  {/* Personal Employee Form block */}
+                  <div className="rounded-lg border border-violet-100 bg-violet-50/30 p-3 space-y-2 mt-2">
+                    <p className="text-xs font-bold text-violet-700">Personal Employee Form</p>
+                    <CheckRow
+                      label="Personal employee form returned"
+                      checked={cl.personalEmployeeFormReturned}
+                      onChange={v => updateCL({ personalEmployeeFormReturned: v, personalEmployeePassportReturned: cl.personalEmployeePassportReturned && v })}
+                    />
+                    <div className="ml-6 space-y-1 border-l-2 border-violet-100 pl-3">
+                      <CheckRow
+                        label="With passport photograph"
+                        checked={cl.personalEmployeePassportReturned}
+                        onChange={v => updateCL({ personalEmployeePassportReturned: v })}
+                        disabled={!cl.personalEmployeeFormReturned}
+                        hint="Tick personal employee form returned first"
+                      />
+                      {!cl.personalEmployeePassportReturned && cl.personalEmployeeFormReturned && (
+                        <p className="text-[11px] text-amber-600 flex items-center gap-1 mt-0.5">
+                          <AlertCircle className="h-3 w-3" />
+                          Pending — HR receives a daily reminder to collect employee passport photograph.
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </Section>
 
                 {/* ─ Task 3 ─ */}
@@ -850,82 +933,85 @@ export function Onboarding() {
                 </Section>
 
                 {/* ─ Task 5 ─ */}
-                <Section icon={FileSignature} label="5. Giving Out Employment Letters (Print, Sign & Return)" color="bg-teal-50 text-teal-700"
+                <Section icon={FileSignature} label="5. Employment Letters" color="bg-teal-50 text-teal-700"
                   locked={!t5Unlocked} lockMsg="Set verified start date first" defaultOpen={t5Unlocked && !t5Done}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-slate-500">Confirm both parties have signed and a copy returned.</span>
+                    <span className="text-xs text-slate-500">All three steps required before activation.</span>
                     <DoneBadge done={t5Done} />
                   </div>
-                  <CheckRow label="Employment letters printed, signed, and returned ✓" checked={cl.employmentLettersIssued} onChange={v => updateCL({ employmentLettersIssued: v })} />
-                  {!cl.employmentLettersIssued && <p className="text-[11px] text-amber-600 flex items-center gap-1"><Lock className="h-3 w-3" />Must be ticked before activation is allowed.</p>}
+                  <CheckRow label="Employment letter printed" checked={!!cl.employmentLetterPrinted} onChange={v => updateCL({ employmentLetterPrinted: v, employmentLettersIssued: v && cl.employmentLetterSigned && cl.employmentLetterFiled })} />
+                  <CheckRow label="Signed by HR and employee" checked={!!cl.employmentLetterSigned} onChange={v => updateCL({ employmentLetterSigned: v, employmentLettersIssued: cl.employmentLetterPrinted && v && cl.employmentLetterFiled })} disabled={!cl.employmentLetterPrinted} hint={!cl.employmentLetterPrinted ? "Print letter first" : ""} />
+                  <CheckRow label="Returned and filed" checked={!!cl.employmentLetterFiled} onChange={v => updateCL({ employmentLetterFiled: v, employmentLettersIssued: cl.employmentLetterPrinted && cl.employmentLetterSigned && v })} disabled={!cl.employmentLetterSigned} hint={!cl.employmentLetterSigned ? "Sign letter first" : ""} />
                 </Section>
 
+                </div>
                 {/* ─ Activation Gate ─ */}
-                <div className={`p-5 rounded-xl border-2 transition-all ${criticalDone ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div>
-                      <p className={`font-bold text-sm ${criticalDone ? 'text-emerald-700' : 'text-slate-500'}`}>
-                        {criticalDone ? '✅ All critical tasks complete — ready to activate!' : '🔒 Complete tasks 1–5 in sequence to unlock activation'}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-1">Tasks 6 (Orientation) and 8 (PPE &amp; Handbook) can be completed after activation.</p>
+                {!isHistory && (
+                  <div className={`p-5 rounded-xl border-2 transition-all mt-6 ${criticalDone ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div>
+                        <p className={`font-bold text-sm ${criticalDone ? 'text-emerald-700' : 'text-slate-500'}`}>
+                          {criticalDone ? '✅ All critical tasks complete — ready to activate!' : '🔒 Complete tasks 1–5 in sequence to unlock activation'}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">Tasks 6 (Orientation) and 7 (PPE & Handbook) can be completed after activation.</p>
+                      </div>
+                      {priv.canEdit && (
+                        <Button
+                          disabled={!criticalDone}
+                          onClick={handleActivate}
+                          className={`shrink-0 font-bold gap-2 transition-all ${criticalDone
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-200'
+                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                        >
+                          {criticalDone ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                          Make Employee Active
+                        </Button>
+                      )}
                     </div>
-                    {priv.canEdit && (
-                      <Button
-                        disabled={!criticalDone}
-                        onClick={handleActivate}
-                        className={`shrink-0 font-bold gap-2 transition-all ${criticalDone
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-200'
-                          : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
-                      >
-                        {criticalDone ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                        Make Employee Active
-                      </Button>
-                    )}
                   </div>
-                </div>
+                )}
 
-                {/* ─ Post-activation previews ─ */}
-                <div className="space-y-2 opacity-50 pointer-events-none">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2"><Siren className="h-3.5 w-3.5" />Post-Activation Tasks (Available after employee is activated)</p>
-                  <Section icon={GraduationCap} label="6. Orientation (HR, Department, Site Equipment, HSE)" color="bg-purple-50 text-purple-700" defaultOpen={false}>
-                    <p className="text-xs text-purple-600">Unlocks after activation.</p>
-                  </Section>
-                  <Section icon={Package} label="8. Provision of Company PPE, Handbook & Other Requirements" color="bg-orange-50 text-orange-700" defaultOpen={false}>
-                    <p className="text-xs text-orange-600">Unlocks after activation.</p>
-                  </Section>
-                </div>
+                {/* ─ Task 6 & 7 (Post-Activation) ─ */}
+                {isHistory ? (
+                  <div className="space-y-3 mt-8 pt-6 border-t border-slate-200">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-2">
+                      <Siren className="h-3.5 w-3.5 text-orange-500" /> Post-Activation Tasks
+                    </p>
+                    <Section icon={GraduationCap} label="6. Orientation" color="bg-purple-50 text-purple-700" defaultOpen={!cl.orientationDone}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-slate-500">All orientations must be completed.</span>
+                        <DoneBadge done={!!(cl.hrOrientation && cl.departmentOrientation && cl.siteOrientation && cl.hseOrientation)} />
+                      </div>
+                      <CheckRow label="HR orientation (policies, benefits, compliance)" checked={cl.hrOrientation} onChange={v => { updateCL({ hrOrientation: v, orientationDone: v && cl.departmentOrientation && cl.siteOrientation && cl.hseOrientation }); }} />
+                      <CheckRow label="Department orientation" checked={cl.departmentOrientation} onChange={v => { updateCL({ departmentOrientation: v, orientationDone: cl.hrOrientation && v && cl.siteOrientation && cl.hseOrientation }); }} />
+                      <CheckRow label="Site orientation" checked={cl.siteOrientation} onChange={v => { updateCL({ siteOrientation: v, orientationDone: cl.hrOrientation && cl.departmentOrientation && v && cl.hseOrientation }); }} />
+                      <CheckRow label="HSE orientation" checked={cl.hseOrientation} onChange={v => { updateCL({ hseOrientation: v, orientationDone: cl.hrOrientation && cl.departmentOrientation && cl.siteOrientation && v }); }} />
+                    </Section>
+                    <Section icon={Package} label="7. Provision of PPE, Handbook & Requirements" color="bg-orange-50 text-orange-700" defaultOpen={!cl.ppeHandbookIssued}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-slate-500">Provide all required items to employee.</span>
+                        <DoneBadge done={!!(cl.ppeIssued && cl.handbookProvided && cl.otherRequirementsSupplied)} />
+                      </div>
+                      <CheckRow label="PPE issued" checked={cl.ppeIssued} onChange={v => { updateCL({ ppeIssued: v, ppeHandbookIssued: v && cl.handbookProvided && cl.otherRequirementsSupplied }); }} />
+                      <CheckRow label="Employee handbook provided" checked={cl.handbookProvided} onChange={v => { updateCL({ handbookProvided: v, ppeHandbookIssued: cl.ppeIssued && v && cl.otherRequirementsSupplied }); }} />
+                      <CheckRow label="Other requirements supplied" checked={cl.otherRequirementsSupplied} onChange={v => { updateCL({ otherRequirementsSupplied: v, ppeHandbookIssued: cl.ppeIssued && cl.handbookProvided && v }); }} />
+                    </Section>
+                  </div>
+                ) : (
+                  <div className="space-y-2 opacity-50 pointer-events-none mt-6">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2"><Siren className="h-3.5 w-3.5" />Post-Activation Tasks (Available after employee is activated)</p>
+                    <Section icon={GraduationCap} label="6. Orientation" color="bg-purple-50 text-purple-700" defaultOpen={false}>
+                      <p className="text-xs text-purple-600">Unlocks after activation. Includes HR, Department, Site, and HSE orientations.</p>
+                    </Section>
+                    <Section icon={Package} label="7. Provision of PPE, Handbook & Requirements" color="bg-orange-50 text-orange-700" defaultOpen={false}>
+                      <p className="text-xs text-orange-600">Unlocks after activation. Includes PPE issuance, handbook, and other requirements.</p>
+                    </Section>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* â•â• HISTORY (Active employee) â•â• */}
-            {isHistory && selectedEmployee && (
-              <div className="space-y-4">
-                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
-                  <p className="text-sm font-bold text-emerald-700 mb-1">Onboarding Completed ✅</p>
-                  <div className="text-xs text-emerald-600 space-x-4">
-                    <span>Verified Start: <strong>{selectedEmployee.verifiedStartDate || selectedEmployee.startDate}</strong></span>
-                    {selectedEmployee.probationPeriod && <span>Probation: <strong>{selectedEmployee.probationPeriod} days</strong></span>}
-                    {selectedEmployee.bankName && <span>Bank: <strong>{selectedEmployee.bankName}</strong></span>}
-                  </div>
-                </div>
-                <Section icon={GraduationCap} label="6. Orientation" color="bg-purple-50 text-purple-700" defaultOpen={!cl.orientationDone}>
-                  {cl.orientationDone
-                    ? <p className="text-sm text-emerald-600 font-semibold flex items-center gap-2"><Check className="h-4 w-4" />Orientation completed</p>
-                    : <div className="space-y-2"><p className="text-xs text-slate-500">Mark orientation complete. HR will be notified.</p>
-                      <Button size="sm" onClick={() => handlePostActivationTask('orientation')} className="bg-purple-600 hover:bg-purple-700 text-white gap-2 text-xs"><Check className="h-3.5 w-3.5" />Mark Orientation Done</Button></div>
-                  }
-                </Section>
-                <Section icon={Package} label="8. Provision of PPE, Handbook & Requirements" color="bg-orange-50 text-orange-700" defaultOpen={!cl.ppeHandbookIssued}>
-                  {cl.ppeHandbookIssued
-                    ? <p className="text-sm text-emerald-600 font-semibold flex items-center gap-2"><Check className="h-4 w-4" />PPE &amp; Handbook issued</p>
-                    : <div className="space-y-2"><p className="text-xs text-slate-500">Mark PPE &amp; Handbook issuance complete. HR will be notified.</p>
-                      <Button size="sm" onClick={() => handlePostActivationTask('ppe')} className="bg-orange-600 hover:bg-orange-700 text-white gap-2 text-xs"><Check className="h-3.5 w-3.5" />Mark PPE &amp; Handbook Issued</Button></div>
-                  }
-                </Section>
-              </div>
-            )}
-
-            {/* â•â• OFFBOARDING â•â• */}
+            {/* ══ OFFBOARDING ══ */}
             {isOffboarding && selectedEmployee && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -933,21 +1019,47 @@ export function Onboarding() {
                   <span className="text-2xl font-black text-rose-500">{offPct}%</span>
                 </div>
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-rose-500 transition-all duration-700" style={{ width: `${offPct}%` }} /></div>
-                <div className="space-y-2 mt-3">
-                  {offTasks.length === 0
-                    ? <p className="text-sm text-slate-400 text-center py-8">No offboarding tasks configured.</p>
-                    : offTasks.map(task => (
-                      <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-100 hover:shadow-sm transition-shadow">
-                        <button className={`h-6 w-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${task.status === 'Completed' ? 'border-emerald-500 bg-emerald-500' : task.status === 'In Progress' ? 'border-rose-400' : 'border-slate-300'}`} onClick={() => priv.canEdit && toggleOffboardingTask(task.id)}>
-                          {task.status === 'Completed' && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
-                          {task.status === 'In Progress' && <div className="h-2 w-2 rounded-full bg-rose-400" />}
-                        </button>
-                        <span className={`text-sm font-medium flex-1 ${task.status === 'Completed' ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{task.title}</span>
-                        <Badge variant="outline" className={`text-[10px] ml-auto ${task.status === 'Completed' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : task.status === 'In Progress' ? 'text-rose-600 bg-rose-50 border-rose-200' : 'text-slate-400'}`}>{task.status}</Badge>
-                        {priv.canEdit && <Button variant="ghost" size="sm" className="h-7 text-xs text-slate-500 hover:text-rose-600 hover:bg-rose-50 px-2" onClick={() => toggleOffboardingTask(task.id)}>{task.status === 'Completed' ? 'Undo' : 'Mark Done'}</Button>}
-                      </div>
+                <div className="space-y-4 mt-5">
+                  {offTasks.length === 0 ? (
+                    <p className="text-sm text-slate-400 text-center py-8">No offboarding tasks configured.</p>
+                  ) : (
+                    Object.entries(
+                      offTasks.reduce((acc, task) => {
+                        const match = task.title.match(/^(\d+\.\s+[^-\n]+?)\s*-\s*(.*)/);
+                        const group = match ? match[1].trim() : 'Other Tasks';
+                        const shortTitle = match ? match[2].trim() : task.title;
+                        if (!acc[group]) acc[group] = [];
+                        acc[group].push({ ...task, shortTitle });
+                        return acc;
+                      }, {} as Record<string, (typeof offTasks[0] & { shortTitle: string })[]>)
+                    ).map(([group, groupTasks]) => (
+                      <Section key={group} label={group} color="bg-rose-50 text-rose-700" defaultOpen={true} icon={Lock}>
+                        <div className="space-y-2 mt-1">
+                          {groupTasks.map(task => (
+                            <div key={task.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-white border border-slate-100 hover:shadow-sm transition-shadow">
+                              <button
+                                className={`h-5 w-5 rounded border-[1.5px] p-0 flex items-center justify-center shrink-0 transition-colors ${
+                                  task.status === 'Completed' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 hover:border-emerald-400'
+                                }`}
+                                onClick={() => priv.canEdit && toggleOffboardingTask(task.id)}
+                                disabled={!priv.canEdit}
+                              >
+                                {task.status === 'Completed' && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+                              </button>
+                              <span className={`text-[13px] font-medium flex-1 ${task.status === 'Completed' ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                                {task.shortTitle}
+                              </span>
+                              {priv.canEdit && (
+                                <Button variant="ghost" size="sm" className="h-6 text-[10px] text-slate-500 hover:text-rose-600 hover:bg-rose-50 px-2" onClick={() => toggleOffboardingTask(task.id)}>
+                                  {task.status === 'Completed' ? 'Undo' : 'Done'}
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </Section>
                     ))
-                  }
+                  )}
                 </div>
               </div>
             )}
@@ -987,13 +1099,13 @@ export function Onboarding() {
                 <div className="space-y-1">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Department</label>
                   <select className="w-full h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" value={editEmp.department} onChange={e => setEditEmp(p => p ? { ...p, department: e.target.value } : p)}>
-                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                    {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Position</label>
                   <select className="w-full h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" value={editEmp.position} onChange={e => setEditEmp(p => p ? { ...p, position: e.target.value } : p)}>
-                    {positions.map(pos => <option key={pos} value={pos}>{pos}</option>)}
+                    {positions.map(pos => <option key={pos.id} value={pos.title}>{pos.title}</option>)}
                   </select>
                 </div>
               </div>

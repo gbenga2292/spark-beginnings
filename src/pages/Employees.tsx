@@ -4,7 +4,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/src/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
 import { Search, Plus, MoreHorizontal, Download, Upload, ArrowLeft, Save, Pencil, Trash2, Eye, X, Network } from 'lucide-react';
 import { useAppStore, Employee, MonthlySalary } from '@/src/store/appStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
@@ -530,7 +530,7 @@ export function Employees() {
                 <AvatarFallback className="bg-indigo-50 text-indigo-700 font-bold text-4xl">
                   {formData.firstname?.charAt(0) || ''}{formData.surname?.charAt(0) || ''}
                 </AvatarFallback>
-                {formData.avatar && <img src={formData.avatar} alt="Avatar" className="object-cover" />}
+                {formData.avatar && <AvatarImage src={formData.avatar} alt="Avatar" className="object-cover" />}
               </Avatar>
               <div className="flex gap-2 w-full justify-center">
                 <label className="cursor-pointer">
@@ -630,6 +630,7 @@ export function Employees() {
                 <AvatarFallback className="bg-indigo-100 text-indigo-700 font-bold text-xl">
                   {emp.firstname.charAt(0)}{emp.surname.charAt(0)}
                 </AvatarFallback>
+                {emp.avatar && <AvatarImage src={emp.avatar} alt="Avatar" className="object-cover" />}
               </Avatar>
               <div>
                 <h2 className="text-2xl font-bold text-slate-900">{emp.surname} {emp.firstname}</h2>
@@ -1136,7 +1137,7 @@ export function Employees() {
                       <AvatarFallback className="bg-indigo-50 text-indigo-700 font-bold text-xs">
                         {employee.firstname.charAt(0)}{employee.surname.charAt(0)}
                       </AvatarFallback>
-                      {employee.avatar && <img src={employee.avatar} alt="Avatar" className="object-cover" />}
+                      {employee.avatar && <AvatarImage src={employee.avatar} alt="Avatar" className="object-cover" />}
                     </Avatar>
                     <div className="flex flex-col">
                       <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{employee.surname} {employee.firstname}</span>

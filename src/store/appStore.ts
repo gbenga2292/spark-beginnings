@@ -122,23 +122,22 @@ export interface GuarantorInfo {
 
 export interface OnboardingChecklist {
   // 1. Send Necessary Information (Forms)
-  employeeFormsSent: boolean;
-  guarantorFormsSent: boolean;
-  formsAcknowledged: boolean;
+  emailFormsSent: boolean;           // All necessary forms sent
+  emailFormsAcknowledged: boolean;   // Acknowledgement received
 
   // 2. Return of Forms
-  guarantorFormReturned: boolean;
-  guarantorFormWithPassport: boolean;
-  personalEmployeeFormReturned: boolean;
-  personalEmployeeFormWithPassport: boolean;
-  educationCredentialSubmitted: boolean;
+  formsReturned: boolean;            // Employee returned completed forms (main gate)
+  guarantorFormsReturned: boolean;   // Guarantor forms returned
+  guarantorPassportReturned: boolean; // Guarantor form includes passport photo
+  personalEmployeeFormReturned: boolean; // Personal employee form returned
+  personalEmployeePassportReturned: boolean; // Personal employee form includes passport photo
 
   // 3. Verification of Documents
   guarantors: GuarantorInfo[];
-  passportPhotosVerified: boolean;
-  addressVerification: boolean; // meaning address input & verified
+  passportPhotos: boolean;           // Passport photos verified
+  addressVerification: boolean;      // Address input & verified
   verifiedAddress?: string;
-  educationCredentialVerified: boolean;
+  educationalCredentials: boolean;   // Education qualification doc verified
   bankName: string;
   accountNo: string;
   accountDetailsVerified: boolean;
@@ -148,20 +147,23 @@ export interface OnboardingChecklist {
   payeVerified: boolean;
 
   // 4. Employment Letters
-  employmentLetterPrinted: boolean;
-  employmentLetterSigned: boolean;
-  employmentLetterReturned: boolean;
+  employmentLetterPrinted?: boolean;  // step 1: letter printed
+  employmentLetterSigned?: boolean;   // step 2: signed by HR & employee
+  employmentLetterFiled?: boolean;    // step 3: returned & filed
+  employmentLettersIssued: boolean;   // legacy combined flag (true when all 3 done)
 
   // 5. Resumption
   verifiedStartDate: string;
 
   // Post Onboarding (6. Orientation)
+  orientationDone: boolean;          // Legacy combined orientation flag
   hrOrientation: boolean;
   departmentOrientation: boolean;
   siteOrientation: boolean;
   hseOrientation: boolean;
 
   // 7. Provision of PPE, Handbook & Requirements
+  ppeHandbookIssued: boolean;        // Legacy combined PPE/handbook flag
   ppeIssued: boolean;
   handbookProvided: boolean;
   otherRequirementsSupplied: boolean;

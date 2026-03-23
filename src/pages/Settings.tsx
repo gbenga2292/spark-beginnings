@@ -52,7 +52,7 @@ export function Settings() {
   const [activeTab, setActiveTab] = useState('general');
   const [appVersion, setAppVersion] = useState('1.0.0');
   const [isChecking, setIsChecking] = useState(false);
-  const isElectron = window.electronAPI?.isElectron;
+  const isElectron = (window.electronAPI as any)?.isElectron as boolean | undefined;
 
   /* ── Company info state ─────────────────────────────────────── */
   const [isEditing, setIsEditing] = useState(false);
@@ -80,8 +80,8 @@ export function Settings() {
   const taskState = useAppData();
 
   useEffect(() => {
-    if (isElectron && window.electronAPI?.getVersion) {
-      window.electronAPI.getVersion().then((v: string) => setAppVersion(v)).catch(console.error);
+    if (isElectron && (window.electronAPI as any)?.getVersion) {
+      (window.electronAPI as any).getVersion().then((v: string) => setAppVersion(v)).catch(console.error);
     }
   }, [isElectron]);
 
@@ -274,9 +274,9 @@ export function Settings() {
   }, [backupSettings, handleManualBackup]);
 
   const handleCheckForUpdates = () => {
-    if (isElectron && window.electronAPI?.checkForUpdates) {
+    if (isElectron && (window.electronAPI as any)?.checkForUpdates) {
       setIsChecking(true);
-      window.electronAPI.checkForUpdates();
+      (window.electronAPI as any).checkForUpdates();
       setTimeout(() => setIsChecking(false), 3000);
     }
   };

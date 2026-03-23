@@ -143,18 +143,20 @@ export function NewHire() {
       probationPeriod: newHireData.probationPeriod,
       noOfGuarantors,
       onboardingChecklist: {
-        employeeFormsSent: false,
-        guarantorFormsSent: false,
-        formsAcknowledged: false,
-        guarantorFormReturned: false,
-        guarantorFormWithPassport: false,
+        // 1. Send Necessary Information
+        emailFormsSent: false,
+        emailFormsAcknowledged: false,
+        // 2. Return of Forms
+        formsReturned: false,
+        guarantorFormsReturned: false,
+        guarantorPassportReturned: false,
         personalEmployeeFormReturned: false,
-        personalEmployeeFormWithPassport: false,
-        educationCredentialSubmitted: false,
+        personalEmployeePassportReturned: false,
+        // 3. Verification of Documents
         guarantors: guarantorSlots,
-        passportPhotosVerified: false,
+        passportPhotos: false,
         addressVerification: false,
-        educationCredentialVerified: false,
+        educationalCredentials: false,
         bankName: '',
         accountNo: '',
         accountDetailsVerified: false,
@@ -162,14 +164,21 @@ export function NewHire() {
         pensionNumberInput: '',
         payeVerified: false,
         payeNumberInput: '',
-        verifiedStartDate: '',
+        // 4. Employment Letters
         employmentLetterPrinted: false,
         employmentLetterSigned: false,
-        employmentLetterReturned: false,
+        employmentLetterFiled: false,
+        employmentLettersIssued: false,
+        // 5. Resumption
+        verifiedStartDate: '',
+        // 6. Post Onboarding - Orientation
+        orientationDone: false,
         hrOrientation: false,
         departmentOrientation: false,
         siteOrientation: false,
         hseOrientation: false,
+        // 7. PPE, Handbook & Requirements
+        ppeHandbookIssued: false,
         ppeIssued: false,
         handbookProvided: false,
         otherRequirementsSupplied: false,
