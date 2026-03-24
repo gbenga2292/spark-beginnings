@@ -11,7 +11,8 @@ export interface SiteQuestionnaire {
     isNewClient: boolean;
     whatIsBeingBuilt: string;
     excavationDepthMeters: string;
-    footprintSize: string;
+    siteLength: string;
+    siteWidth: string;
     timelineStartDate: string;
     geotechnicalReportAvailable: boolean;
     hydrogeologicalDataAvailable: boolean;

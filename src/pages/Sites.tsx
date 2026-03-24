@@ -197,7 +197,7 @@ export function Sites() {
       const p1 = q.phase1;
       if (p1.whatIsBeingBuilt) lines.push(`The project involves ${p1.whatIsBeingBuilt.toLowerCase()}.`);
       if (p1.excavationDepthMeters) lines.push(`Excavation is planned to a depth of ${p1.excavationDepthMeters} metres.`);
-      if (p1.footprintSize) lines.push(`The site footprint covers approximately ${p1.footprintSize} square metres.`);
+      if (p1.siteLength && p1.siteWidth) lines.push(`The site measures approximately ${p1.siteLength}m by ${p1.siteWidth}m.`);
       if (p1.timelineStartDate) lines.push(`Works are scheduled to commence on ${p1.timelineStartDate}.`);
       const dataAvail = [p1.geotechnicalReportAvailable && 'geotechnical report', p1.hydrogeologicalDataAvailable && 'hydrogeological data'].filter(Boolean);
       if (dataAvail.length) lines.push(`Background data available at inquiry: ${dataAvail.join(' and ')}.`);
@@ -381,7 +381,8 @@ export function Sites() {
         
         "Service": q?.phase1?.whatIsBeingBuilt || '',
         "Excavation Depth": q?.phase1?.excavationDepthMeters || '',
-        "Footprint Size": q?.phase1?.footprintSize || '',
+        "Site Length": q?.phase1?.siteLength || '',
+        "Site Width": q?.phase1?.siteWidth || '',
         
         "Known Obstacles": q?.phase2?.knownObstacles || '',
         "Discharge Location": q?.phase2?.dischargeLocation || '',
@@ -492,7 +493,8 @@ export function Sites() {
                phase1: {
                   isNewSite: true, isNewClient: false, 
                   whatIsBeingBuilt: service, excavationDepthMeters: depth,
-                  footprintSize: (importedSite["Footprint Size"] || '').toString(),
+                  siteLength: (importedSite["Site Length"] || '').toString(),
+                  siteWidth: (importedSite["Site Width"] || '').toString(),
                   timelineStartDate: '', geotechnicalReportAvailable: false, hydrogeologicalDataAvailable: false,
                   completed: !!service && !!depth
                },

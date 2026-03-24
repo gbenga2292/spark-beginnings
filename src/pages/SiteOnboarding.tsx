@@ -79,7 +79,7 @@ const blankForm = (): SiteQuestionnaire => ({
   updatedAt: new Date().toISOString(),
   phase1: {
     isNewSite: true, isNewClient: true,
-    whatIsBeingBuilt: '', excavationDepthMeters: '', footprintSize: '',
+    whatIsBeingBuilt: '', excavationDepthMeters: '', siteLength: '', siteWidth: '',
     timelineStartDate: '', geotechnicalReportAvailable: false,
     hydrogeologicalDataAvailable: false, completed: false
   },
@@ -490,10 +490,27 @@ export function SiteOnboarding() {
                     type="number" placeholder="e.g. 8"
                   />
                   <PhaseTextField
-                    label="Footprint size (sq m)"
-                    value={form.phase1.footprintSize}
-                    onChange={v => updPhase('phase1', { footprintSize: v })}
-                    type="number" placeholder="e.g. 1200"
+                    label="Length (m)"
+                    value={form.phase1.siteLength}
+                    onChange={v => updPhase('phase1', { siteLength: v })}
+                    type="number" placeholder="e.g. 40"
+                  />
+                  <PhaseTextField
+                    label="Width (m)"
+                    value={form.phase1.siteWidth}
+                    onChange={v => updPhase('phase1', { siteWidth: v })}
+                    type="number" placeholder="e.g. 30"
+                  />
+                  <PhaseTextField
+                    label="Perimeter (m) (Auto-calculated)"
+                    value={
+                      form.phase1.siteLength && form.phase1.siteWidth
+                        ? String(2 * (Number(form.phase1.siteLength) + Number(form.phase1.siteWidth)))
+                        : ''
+                    }
+                    onChange={() => {}}
+                    readOnly={true}
+                    placeholder="Auto-calculated"
                   />
                   <PhaseTextField
                     label="Timeline start date"
