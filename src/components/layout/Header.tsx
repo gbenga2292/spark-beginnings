@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/src/store/auth';
+import { useAuth } from '@/src/hooks/useAuth';
 import { useUserStore, UserPrivileges } from '@/src/store/userStore';
 import { useAppStore } from '@/src/store/appStore';
 import { useAppData } from '@/src/contexts/AppDataContext';
@@ -103,6 +104,7 @@ function useNotifications() {
 
 export function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuthStore();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { setCurrentUser } = useUserStore();
@@ -138,8 +140,11 @@ export function Header({ onMenuClick }: HeaderProps) {
     setSearchQuery('');
   }, [location.pathname]);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    try {
+      await signOut(); // clears the Supabase session from localStorage
+    } catch (_) {/* ignore */}
+    logout();          // reset legacy Zustand auth store
     setCurrentUser(null);
     navigate('/login');
   };

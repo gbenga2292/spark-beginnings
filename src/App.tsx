@@ -103,14 +103,6 @@ function AppContent() {
     return () => window.removeEventListener('electron-navigate', handler);
   }, [navigate]);
 
-  // Disable window close button if logged in
-  useEffect(() => {
-    const electronAPI = (window as any).electronAPI;
-    if (electronAPI?.setClosable) {
-      electronAPI.setClosable(!user);
-    }
-  }, [user]);
-
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>

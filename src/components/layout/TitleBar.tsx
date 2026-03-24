@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sun, Moon, Monitor, ChevronDown } from 'lucide-react';
 import { useTheme } from '@/src/hooks/useTheme';
 import { useUserStore } from '@/src/store/userStore';
+import { useAuth } from '@/src/hooks/useAuth';
 import { useNavigate as useRRNavigate } from 'react-router-dom';
 
 const getElectronAPI = () => (window as any).electronAPI;
@@ -19,6 +20,8 @@ export function TitleBar() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const { isDark, toggle } = useTheme();
   const currentUser = useUserStore((s) => s.getCurrentUser());
+  const { user: authUser } = useAuth();
+  const isLoggedIn = !!authUser;
 
   // React Router navigate is unavailable here (TitleBar is outside BrowserRouter)
   // So we post a custom DOM event that Layout/App listens for instead.
@@ -44,30 +47,6 @@ export function TitleBar() {
     window.addEventListener('electron-navigate', handler as EventListener);
     return () => window.removeEventListener('electron-navigate', handler as EventListener);
   }, []);
-
-  // Sync the native Windows close/min/max button strip with the current theme and zoom scale
-  useEffect(() => {
-    if (!getElectronAPI()?.setTitleBarOverlay) return;
-
-    const updateControls = () => {
-      // Approximate browser zoom level so the native controls scale with the CSS h-10 container
-      let zoom = window.innerWidth ? window.outerWidth / window.innerWidth : 1;
-      zoom = Math.round(zoom * 20) / 20; // Snap to nearest 0.05 to ignore OS window borders
-      if (zoom < 0.2 || zoom > 5) zoom = 1;
-
-      const height = Math.round(40 * zoom);
-
-      if (isDark) {
-        getElectronAPI().setTitleBarOverlay({ color: '#0f172a', symbolColor: '#94a3b8', height });
-      } else {
-        getElectronAPI().setTitleBarOverlay({ color: '#ffffff', symbolColor: '#475569', height });
-      }
-    };
-
-    updateControls();
-    window.addEventListener('resize', updateControls);
-    return () => window.removeEventListener('resize', updateControls);
-  }, [isDark]);
 
   if (!isElectron) return null;
 
@@ -204,7 +183,7 @@ export function TitleBar() {
           >
             <svg width="10" height="10" viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" strokeWidth="1"/></svg>
           </button>
-          {!currentUser && (
+          {!isLoggedIn && (
             <button
               onClick={() => getElectronAPI()?.windowClose()}
               className={`h-full w-12 flex justify-center items-center transition-colors hover:bg-red-500 hover:text-white ${isDark ? 'text-slate-400' : 'text-slate-500'}`}

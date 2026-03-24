@@ -18,9 +18,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   windowMinimize: () => ipcRenderer.send('window-minimize'),
   windowMaximize: () => ipcRenderer.send('window-maximize'),
   windowClose: () => ipcRenderer.send('window-close'),
-  
-  // Enable/disable closing permission
-  setClosable: (closable) => ipcRenderer.send('set-closable', closable),
 
   // Push current user privilege snapshot so main can filter nav menus
   updateMenuPrivileges: (privs) => ipcRenderer.send('update-menu-privileges', privs),

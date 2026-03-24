@@ -60,7 +60,6 @@ function initAutoUpdater() {
 
 /* ─── Current user privileges (updated via IPC from renderer) ─── */
 let currentPrivileges = null; // null = super admin (no user record)
-global.isAppClosable = true; // window close allowed by default
 
 /* ─── Privilege helper ─────────────────────────────────────────── */
 function can(page, field) {
@@ -279,10 +278,6 @@ function initIPC() {
     if (mainWindow) mainWindow.minimize();
   });
 
-  ipcMain.on('set-closable', (event, closable) => {
-    global.isAppClosable = closable;
-  });
-
   ipcMain.on('window-maximize', () => {
     if (mainWindow) {
       if (mainWindow.isMaximized()) {
@@ -294,18 +289,7 @@ function initIPC() {
   });
 
   ipcMain.on('window-close', () => {
-    if (mainWindow) {
-      if (!global.isAppClosable) {
-        dialog.showMessageBox(mainWindow, {
-          type: 'warning',
-          title: 'Action Restricted',
-          message: 'You must log out of your account before closing the application.',
-          buttons: ['OK']
-        });
-      } else {
-        mainWindow.close();
-      }
-    }
+    if (mainWindow) mainWindow.close();
   });
 }
 
@@ -340,18 +324,6 @@ function createWindow() {
     // In production, load the built files
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
-
-  mainWindow.on('close', (e) => {
-    if (!global.isAppClosable) {
-      e.preventDefault();
-      dialog.showMessageBox(mainWindow, {
-        type: 'warning',
-        title: 'Action Restricted',
-        message: 'You must log out of your account before closing the application.',
-        buttons: ['OK']
-      });
-    }
-  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
