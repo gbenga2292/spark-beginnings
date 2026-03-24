@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/ta
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { useUserStore } from '@/src/store/userStore';
+import { useAppData } from '@/src/contexts/AppDataContext';
 
 const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive', startDate: new Date().toISOString().split('T')[0], endDate: '' };
 
@@ -265,6 +266,9 @@ export function Sites() {
   const setSites = useAppStore((s) => s.setSites);
   const updateSite = useAppStore((s) => s.updateSite);
   const deleteSite = useAppStore((s) => s.deleteSite);
+  const addPendingSite = useAppStore((s) => s.addPendingSite);
+  const setPendingSites = useAppStore((s) => s.setPendingSites);
+  const { createMainTask } = useAppData();
 
   const filteredSites = sites.filter(site =>
     site.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -365,7 +369,37 @@ export function Sites() {
       toast.error('No sites to export');
       return;
     }
-    const ws = XLSX.utils.json_to_sheet(filteredSites);
+    const exportData = filteredSites.map(site => {
+      const q = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
+      return {
+        "Site Name": site.name,
+        "Client": site.client,
+        "Start Date": site.startDate || '',
+        "End Date": site.endDate || '',
+        "VAT": site.vat,
+        "Status": site.status,
+        
+        "Service": q?.phase1?.whatIsBeingBuilt || '',
+        "Excavation Depth": q?.phase1?.excavationDepthMeters || '',
+        "Footprint Size": q?.phase1?.footprintSize || '',
+        
+        "Known Obstacles": q?.phase2?.knownObstacles || '',
+        "Discharge Location": q?.phase2?.dischargeLocation || '',
+        "Diesel Strategy": q?.phase2?.dieselSupplyStrategy || '',
+        
+        "Dewatering Methods": q?.phase3?.dewateringMethods ? q?.phase3?.dewateringMethods.join(', ') : '',
+        "Total Wellpoints": q?.phase3?.totalWellpointsRequired || '',
+        "Total Headers": q?.phase3?.totalHeadersRequired || '',
+        "Total Pumps": q?.phase3?.totalPumpsRequired || '',
+        "Expected Daily Diesel": q?.phase3?.expectedDailyDieselUsage || '',
+        
+        "Client Tax Status": q?.phase4?.clientTaxStatus || '',
+        "Scope of Work": q?.phase4?.scopeOfWorkSummary || '',
+        "Scope Exclusions": q?.phase4?.scopeExclusionsSummary || ''
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sites");
     XLSX.writeFile(wb, `Sites_Export_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
@@ -400,13 +434,15 @@ export function Sites() {
           let count = 0;
           let skippedCount = 0;
           const validNewSites: Site[] = [];
+          const validNewPendingSites: SiteQuestionnaire[] = [];
+          const missingTasks: any[] = [];
 
           const importedPairs = new Set<string>();
           const importedIds = new Set<string>(!isClear ? sites.map(s => s.id) : []);
 
-          data.forEach(importedSite => {
-            const name = (importedSite.name || '').toString().trim();
-            const client = (importedSite.client || '').toString().trim();
+          data.forEach((importedSite: any) => {
+            const name = (importedSite["Site Name"] || importedSite.name || '').toString().trim();
+            const client = (importedSite["Client"] || importedSite.client || '').toString().trim();
 
             if (!name || !client) {
               skippedCount++;
@@ -421,8 +457,8 @@ export function Sites() {
               return;
             }
 
-            let newId = importedSite.id ? importedSite.id.toString().trim() : '';
-            if (!newId || importedIds.has(newId) || sites.some(s => s.id === newId)) {
+            let newId = importedSite.id ? importedSite.id.toString().trim() : crypto.randomUUID();
+            if (importedIds.has(newId) || sites.some(s => s.id === newId)) {
               newId = crypto.randomUUID();
             }
 
@@ -436,15 +472,70 @@ export function Sites() {
               vat: importedSite.vat === 'Yes' ? 'Yes' : (importedSite.vat === 'Add' ? 'Add' : 'No'),
               status: importedSite.status === 'Inactive' ? 'Inactive' : 'Active'
             });
+            
+            // Map onboarding details
+            const service = (importedSite["Service"] || '').toString();
+            const depth = (importedSite["Excavation Depth"] || '').toString();
+            const diesel = (importedSite["Expected Daily Diesel"] || '').toString();
+            
+            const missingInfo: string[] = [];
+            if (!service) missingInfo.push("Service / What Is Being Built");
+            if (!depth) missingInfo.push("Excavation Depth");
+            if (!diesel) missingInfo.push("Expected Daily Diesel Usage");
+            
+            validNewPendingSites.push({
+               id: crypto.randomUUID(),
+               siteId: newId,
+               clientName: client,
+               siteName: name,
+               status: missingInfo.length > 0 ? 'Pending' : 'Active',
+               phase1: {
+                  isNewSite: true, isNewClient: false, 
+                  whatIsBeingBuilt: service, excavationDepthMeters: depth,
+                  footprintSize: (importedSite["Footprint Size"] || '').toString(),
+                  timelineStartDate: '', geotechnicalReportAvailable: false, hydrogeologicalDataAvailable: false,
+                  completed: !!service && !!depth
+               },
+               phase2: { siteVisited: false, walkthroughCompleted: false, knownObstacles: (importedSite["Known Obstacles"] || '').toString(), dischargeLocation: (importedSite["Discharge Location"] || '').toString(), dieselSupplyStrategy: '', completed: false },
+               phase3: { dewateringMethods: [], totalWellpointsRequired: (importedSite["Total Wellpoints"] || '').toString(), totalHeadersRequired: (importedSite["Total Headers"] || '').toString(), totalPumpsRequired: (importedSite["Total Pumps"] || '').toString(), expectedDailyDieselUsage: diesel, completed: !!diesel },
+               phase4: { quotationSent: false, clientFeedbackReceived: false, proposalAccepted: false, clientTaxStatus: '', scopeOfWorkSummary: (importedSite["Scope of Work"] || '').toString(), scopeExclusionsSummary: (importedSite["Scope Exclusions"] || '').toString(), timelineConfirmed: false, permittingResponsibilityOutlined: false, tinProvided: false, completed: false },
+               phase5: { safetyPlanIntegrated: false, stage1AdvanceReceived: false, stage2InstallationComplete: false, stage2FirstInvoiceIssued: false, stage3TimelyBilling: false, stage4DemobilizationComplete: false, stage4FinalInvoiceIssued: false, actualEndDate: '', completed: false },
+               createdAt: new Date().toISOString(),
+               updatedAt: new Date().toISOString()
+            } as SiteQuestionnaire);
+            
+            if (missingInfo.length > 0) {
+               missingTasks.push({
+                  task: {
+                     title: `Complete Site Onboarding: ${name}`,
+                     description: `Please fill out missing fields for the newly imported site: ${name}.`,
+                     priority: 'high'
+                  },
+                  subs: missingInfo.map(info => ({
+                     title: `Provide Missing Field: ${info}`,
+                     priority: 'high'
+                  }))
+               });
+            }
+
             count++;
           });
 
           if (isClear) {
             setSites(validNewSites);
+            setPendingSites(validNewPendingSites);
             toast.success(`Replaced database with ${count} sites! (${skippedCount} duplicates/invalid rows skipped)`);
           } else {
             validNewSites.forEach(s => addSite(s));
+            validNewPendingSites.forEach(ps => addPendingSite(ps));
             toast.success(`Appended ${count} new sites! (${skippedCount} duplicates/invalid rows skipped)`);
+          }
+          
+          if (missingTasks.length > 0) {
+             missingTasks.forEach(async (t) => {
+                await createMainTask(t.task, t.subs);
+             });
+             toast.success(`Created ${missingTasks.length} onboarding tasks for missing info.`);
           }
         } else {
           toast.error('The file appears to be empty or improperly formatted.');

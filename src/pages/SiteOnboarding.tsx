@@ -125,6 +125,7 @@ export function SiteOnboarding() {
   const addSite    = useAppStore(s => s.addSite);
   const updateSite = useAppStore(s => s.updateSite);
   const addClient  = useAppStore(s => s.addClient);
+  const getServiceTemplates = useAppStore(s => s.getServiceTemplates);
 
   const [form, setForm] = useState<SiteQuestionnaire>(blankForm());
   const [initialForm, setInitialForm] = useState<SiteQuestionnaire>(blankForm());
@@ -469,12 +470,19 @@ export function SiteOnboarding() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-5">
-                  <PhaseTextField
-                    label="What is being built?"
-                    value={form.phase1.whatIsBeingBuilt}
-                    onChange={v => updPhase('phase1', { whatIsBeingBuilt: v })}
-                    placeholder="e.g. Basement for 6-storey building"
-                  />
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700">Project Service</label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                      value={form.phase1.whatIsBeingBuilt || ''}
+                      onChange={e => updPhase('phase1', { whatIsBeingBuilt: e.target.value })}
+                    >
+                      <option value="" disabled>-- Select Service --</option>
+                      {getServiceTemplates().map(t => (
+                        <option key={t.serviceName} value={t.serviceName}>{t.serviceName}</option>
+                      ))}
+                    </select>
+                  </div>
                   <PhaseTextField
                     label="Depth of excavation (m)"
                     value={form.phase1.excavationDepthMeters}

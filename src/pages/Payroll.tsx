@@ -726,7 +726,7 @@ export function Payroll() {
                       onChange={(e) => setFilterDept(e.target.value)}
                     >
                       <option value="">All Departments</option>
-                      {[...new Set(employees.map(e => e.department).filter(Boolean))].sort().map(d => (
+                      {[...new Set([...employees.map(e => e.department).filter(Boolean), 'Beneficiary'])].sort().map(d => (
                         <option key={d} value={d}>{d}</option>
                       ))}
                     </select>
@@ -1098,7 +1098,7 @@ export function Payroll() {
                       Filter by Department
                       <div className="flex gap-2">
                         <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => {
-                          const all = [...new Set(employees.filter(e => e.status === 'Active').map(e => e.department).filter(Boolean))].sort();
+                          const all = [...new Set([...employees.filter(e => e.status === 'Active').map(e => e.department).filter(Boolean), 'Beneficiary'])].sort();
                           setPrintSelectedDepts(all);
                           setPrintSelectedEmployees(employees.filter(e => e.status === 'Active' && all.includes(e.department)).map(e => e.id));
                         }}>All</button>
@@ -1107,7 +1107,7 @@ export function Payroll() {
                       </div>
                     </h4>
                     <div className="space-y-1 mt-2 max-h-[110px] overflow-y-auto">
-                      {[...new Set(employees.filter(e => e.status === 'Active').map(e => e.department).filter(Boolean))].sort().map(dept => (
+                      {[...new Set([...employees.filter(e => e.status === 'Active').map(e => e.department).filter(Boolean), 'Beneficiary'])].sort().map(dept => (
                         <label key={dept} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                           <input
                             type="checkbox"

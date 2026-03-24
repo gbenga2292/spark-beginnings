@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useAuthStore } from '@/src/store/auth';
@@ -16,10 +16,32 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [savedEmails, setSavedEmails] = useState<string[]>([]);
+
   const { signIn } = useAuth();
   const login = useAuthStore((state) => state.login);
   const { setCurrentUser } = useUserStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Load saved emails for autocomplete memory
+    try {
+      const emails = JSON.parse(localStorage.getItem('savedLoginEmails') || '[]');
+      if (Array.isArray(emails)) {
+        setSavedEmails(emails);
+      }
+    } catch (e) {
+      console.error('Could not parse saved emails');
+    }
+
+    // Load remembered email if 'Remember me' was checked
+    const lastRemembered = localStorage.getItem('lastRememberedEmail');
+    if (lastRemembered) {
+      setEmail(lastRemembered);
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +91,23 @@ export function Login() {
         avatar: profile?.avatar,
       });
       setCurrentUser(user.id);
+      
+      // Save email for memory (autocomplete)
+      try {
+        const currentEmails = JSON.parse(localStorage.getItem('savedLoginEmails') || '[]');
+        const updatedEmails = [email, ...currentEmails.filter((e: string) => e !== email)].slice(0, 5); // Keep up to 5 unique emails
+        localStorage.setItem('savedLoginEmails', JSON.stringify(updatedEmails));
+      } catch (e) {
+        console.error('Error saving email memory');
+      }
+
+      // Handle remember me
+      if (rememberMe) {
+        localStorage.setItem('lastRememberedEmail', email);
+      } else {
+        localStorage.removeItem('lastRememberedEmail'); // Clear if not checked
+      }
+
       setIsLoading(false);
       navigate('/');
     } catch (err: any) {
@@ -177,12 +216,20 @@ export function Login() {
                 <Input
                   id="email"
                   type="email"
+                  name="email"
+                  autoComplete="email"
+                  list="saved-emails-list"
                   placeholder="admin@dcel.ng"
                   className="h-11 pl-10 bg-slate-50 border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20 rounded-lg text-sm"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
+                <datalist id="saved-emails-list">
+                  {savedEmails.map((e, idx) => (
+                    <option key={idx} value={e} />
+                  ))}
+                </datalist>
               </div>
             </div>
 
@@ -206,7 +253,12 @@ export function Login() {
 
             <div className="flex items-center justify-between pt-1">
               <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20" />
+                <input 
+                  type="checkbox" 
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20" 
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
                 <span className="text-sm text-slate-500">Remember me</span>
               </label>
             </div>

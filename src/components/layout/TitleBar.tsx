@@ -178,16 +178,40 @@ export function TitleBar() {
 
       {/* Right Controls */}
       <div
-        className="flex items-center gap-1 pr-[140px]" /* Safe spacing to prevent window controls overlay on Windows */
+        className="flex items-center"
         style={{ WebkitAppRegion: 'no-drag' } as any}
       >
 
         {/* Status indicator */}
-        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium ${
+        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium mr-2 ${
           isDark ? 'text-slate-500' : 'text-slate-400'
         }`}>
           <Monitor className="h-3 w-3" />
           <span className="hidden md:inline">Desktop</span>
+        </div>
+
+        {/* Custom Window Controls */}
+        <div className="flex h-10 items-center">
+          <button
+            onClick={() => getElectronAPI()?.windowMinimize()}
+            className={`h-full w-11 flex justify-center items-center transition-colors hover:bg-slate-500/20 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0" y="5" width="10" height="1" fill="currentColor"/></svg>
+          </button>
+          <button
+            onClick={() => getElectronAPI()?.windowMaximize()}
+            className={`h-full w-11 flex justify-center items-center transition-colors hover:bg-slate-500/20 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" strokeWidth="1"/></svg>
+          </button>
+          {!currentUser && (
+            <button
+              onClick={() => getElectronAPI()?.windowClose()}
+              className={`h-full w-12 flex justify-center items-center transition-colors hover:bg-red-500 hover:text-white ${isDark ? 'text-slate-400' : 'text-slate-500'}`}
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1,1 L9,9 M9,1 L1,9" stroke="currentColor" strokeWidth="1.2"/></svg>
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -7,7 +7,7 @@ import {
   CheckCircle2, AlertTriangle, TrendingUp, ArrowRight,
   Circle, Loader2, Calendar, Clock, Users, BarChart2,
   Flame, Zap, Award, Flag, Lock, Target, ListTodo, Activity,
-  CheckCheck, Layers, ArrowUpRight, Sparkles, ChevronRight,
+  CheckCheck, Layers, ArrowUpRight, Sparkles, ChevronRight, ChevronDown,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, isToday, isTomorrow, isPast, differenceInHours } from "date-fns";
@@ -551,6 +551,7 @@ function UserDashboard() {
   const { wsTasks, wsMembers } = useWorkspace();
   const navigate = useNavigate();
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
+  const [taskFilter, setTaskFilter] = useState<'my_tasks' | 'urgent' | 'all' | 'completed' | 'under_review'>('my_tasks');
 
   const wsTaskIds = new Set(wsTasks.map(mt => mt.id));
   const teamSubs = subtasks.filter(s => wsTaskIds.has(s.mainTaskId!));
@@ -563,7 +564,21 @@ function UserDashboard() {
   const myRate = mySubs.length > 0 ? Math.round(myDone / mySubs.length * 100) : 0;
   const myPendingApproval = mySubs.filter(s => s.status === 'pending_approval').length;
 
-  const myUrgent = [...mySubs].filter(s => s.status !== 'completed').sort((a, b) => urgencyScore(a) - urgencyScore(b)).slice(0, 10);
+  const displayedTasks = (() => {
+    switch (taskFilter) {
+      case 'urgent':
+        return [...mySubs].filter(s => s.status !== 'completed').sort((a, b) => urgencyScore(a) - urgencyScore(b)).slice(0, 10);
+      case 'completed':
+        return [...mySubs].filter(s => s.status === 'completed').sort((a, b) => urgencyScore(a) - urgencyScore(b));
+      case 'under_review':
+        return [...mySubs].filter(s => s.status === 'pending_approval').sort((a, b) => urgencyScore(a) - urgencyScore(b));
+      case 'all':
+        return [...teamSubs].sort((a, b) => urgencyScore(a) - urgencyScore(b)).slice(0, 50);
+      case 'my_tasks':
+      default:
+        return [...mySubs].filter(s => s.status !== 'completed').sort((a, b) => urgencyScore(a) - urgencyScore(b));
+    }
+  })();
   const getUser = (id: string | null) => users.find(u => u.id === id);
 
   const name = ((currentUser as any)?.user_metadata?.name || currentUser?.email || 'User').split(' ')[0].split('@')[0];
@@ -649,25 +664,40 @@ function UserDashboard() {
                 <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-foreground">My Urgent Tasks</h3>
-                <p className="text-[11px] text-muted-foreground">Sorted by deadline</p>
+                <div className="relative flex items-center">
+                  <select
+                    value={taskFilter}
+                    onChange={(e) => setTaskFilter(e.target.value as any)}
+                    className="text-sm font-semibold text-foreground bg-transparent border-none py-0 pl-0 pr-5 focus:ring-0 cursor-pointer appearance-none outline-none z-10"
+                  >
+                    <option className="bg-card text-foreground" value="my_tasks">My Tasks</option>
+                    <option className="bg-card text-foreground" value="urgent">Urgent Tasks</option>
+                    <option className="bg-card text-foreground" value="all">All Tasks</option>
+                    <option className="bg-card text-foreground" value="completed">Completed Tasks</option>
+                    <option className="bg-card text-foreground" value="under_review">Under Review Tasks</option>
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground absolute right-0 pointer-events-none" />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {taskFilter === 'urgent' ? 'Sorted by deadline' : 'Sorted by urgency'}
+                </p>
               </div>
             </div>
             <button onClick={() => navigate('/tasks')} className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
               View all <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </div>
-          {myUrgent.length === 0 ? (
+          {displayedTasks.length === 0 ? (
             <div className="px-5 py-14 text-center">
               <div className="w-12 h-12 rounded-2xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-3">
                 <CheckCircle2 className="w-6 h-6 text-green-600" />
               </div>
               <p className="text-sm font-semibold text-foreground">You're all caught up!</p>
-              <p className="text-xs text-muted-foreground mt-1">No pending tasks assigned to you.</p>
+              <p className="text-xs text-muted-foreground mt-1">No pending tasks found for this filter.</p>
             </div>
           ) : (
             <div className="divide-y divide-border/40">
-              {myUrgent.map((sub, i) => {
+              {displayedTasks.map((sub, i) => {
                 const mt = wsTasks.find(m => m.id === sub.mainTaskId);
                 const sc = (statusConfig as Record<string, typeof statusConfig['completed']>)[sub.status] ?? statusConfig.not_started;
                 const StatusIcon = sc.icon;

@@ -19,16 +19,27 @@ const Avatar = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElem
 })
 Avatar.displayName = "Avatar"
 
-const AvatarImage = React.forwardRef<HTMLImageElement, React.ImgHTMLAttributes<HTMLImageElement>>(({ className, src, ...props }, ref) => {
+const AvatarImage = React.forwardRef<HTMLImageElement, React.ImgHTMLAttributes<HTMLImageElement>>(({ className, src, ...props }, forwardedRef) => {
   const { imageLoadingStatus, onImageLoadingStatusChange } = React.useContext(AvatarContext);
+  const internalRef = React.useRef<HTMLImageElement>(null);
+  const ref = forwardedRef || internalRef;
   
   React.useEffect(() => {
     if (!src) {
       onImageLoadingStatusChange('error');
     } else {
       onImageLoadingStatusChange('loading');
+      // Handle the case where the image is already in browser cache
+      // We must use a timeout to give the ref a chance to be attached if it's the first render
+      const timer = setTimeout(() => {
+        const imgNode = (ref as React.RefObject<HTMLImageElement>)?.current || internalRef.current;
+        if (imgNode?.complete && imgNode?.naturalWidth > 0) {
+          onImageLoadingStatusChange('loaded');
+        }
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [src, onImageLoadingStatusChange]);
+  }, [src, onImageLoadingStatusChange, ref]);
 
   const handleLoad = React.useCallback(
     (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
@@ -50,7 +61,15 @@ const AvatarImage = React.forwardRef<HTMLImageElement, React.ImgHTMLAttributes<H
 
   return (
     <img 
-      ref={ref} 
+      // Handle both forwardedRef and internalRef
+      ref={(node) => {
+        internalRef.current = node;
+        if (typeof forwardedRef === 'function') {
+          forwardedRef(node);
+        } else if (forwardedRef) {
+          forwardedRef.current = node;
+        }
+      }}
       src={src}
       className={cn("aspect-square h-full w-full object-cover", imageLoadingStatus !== 'loaded' && 'hidden', className)} 
       onLoad={handleLoad}

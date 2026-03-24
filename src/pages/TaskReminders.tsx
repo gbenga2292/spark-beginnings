@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format, parseISO, isPast, isToday, isTomorrow, differenceInHours } from 'date-fns';
+import {
+  format, parseISO, isPast, isToday, isTomorrow, differenceInHours,
+  startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
+  isSameMonth, isSameDay, addMonths, subMonths, getHours
+} from 'date-fns';
 import {
   Bell, Plus, Trash2, Edit3, Clock, Mail, Users, X, Check,
   AlertCircle, RefreshCw, ToggleLeft, ToggleRight,
   Calendar, CheckCircle2, Link2, ChevronDown, Eye, BellOff,
-  Zap, Search,
+  Zap, Search, LayoutList, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useAppData } from '@/src/contexts/AppDataContext';
@@ -86,6 +90,11 @@ export default function Reminders() {
   const [tab, setTab]               = useState<'all' | 'mine' | 'shared'>('all');
   const [selected, setSelected]     = useState<Reminder | null>(null);
 
+  /* Calendar state */
+  const [viewMode, setViewMode]     = useState<'calendar' | 'list'>('calendar');
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
   /* Derived lists */
   const myReminders     = reminders.filter(r => r.createdBy === currentUser?.id);
   const sharedWithMe    = reminders.filter(r =>
@@ -154,6 +163,137 @@ export default function Reminders() {
   const toggleRecipient = (id: string) =>
     setForm(p => ({ ...p, recipientIds: p.recipientIds.includes(id) ? p.recipientIds.filter(x => x !== id) : [...p.recipientIds, id] }));
 
+  const TimeBlock = ({ title, reminders }: { title: string, reminders: Reminder[] }) => {
+    if (reminders.length === 0) return null;
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</h4>
+          <div className="h-px bg-border flex-1"></div>
+        </div>
+        <div className="space-y-2">
+          {reminders.map(rem => (
+            <div key={rem.id} className={`p-2.5 rounded-xl border transition-all group ${rem.isActive ? 'bg-card border-border hover:border-violet-200 hover:shadow-sm' : 'bg-muted/30 border-border/50 opacity-70'}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className={`w-1.5 h-1.5 rounded-full ${rem.isActive ? 'bg-violet-500' : 'bg-muted-foreground'}`} />
+                  <span className="text-xs font-semibold text-foreground truncate">{format(parseISO(rem.remindAt), 'h:mm a')}</span>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => openEdit(rem)} className="p-1 hover:bg-muted rounded text-muted-foreground"><Edit3 className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => deleteReminder(rem.id)} className="p-1 hover:bg-red-50 rounded text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                </div>
+              </div>
+              <p className="text-xs font-medium text-foreground mt-1.5 line-clamp-2 leading-tight">{rem.title}</p>
+              {rem.body && <p className="text-[10px] text-muted-foreground mt-1 line-clamp-1">{rem.body}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderCalendarView = () => {
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+    const startDate = startOfWeek(monthStart);
+    const endDate = endOfWeek(monthEnd);
+    const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
+
+    const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
+    const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
+
+    const remindersByDay = (day: Date) => filtered.filter(r => isSameDay(parseISO(r.remindAt), day));
+    const selectedReminders = filtered.filter(r => isSameDay(parseISO(r.remindAt), selectedDate));
+    
+    selectedReminders.sort((a,b) => new Date(a.remindAt).getTime() - new Date(b.remindAt).getTime());
+
+    const morningReminders = selectedReminders.filter(r => getHours(parseISO(r.remindAt)) < 12);
+    const afternoonReminders = selectedReminders.filter(r => { const h = getHours(parseISO(r.remindAt)); return h >= 12 && h < 17; });
+    const eveningReminders = selectedReminders.filter(r => { const h = getHours(parseISO(r.remindAt)); return h >= 17; });
+
+    return (
+      <div className="flex h-full min-h-0 gap-4">
+        {/* Calendar Grid */}
+        <div className="flex-1 flex flex-col bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-border bg-muted/10">
+            <h2 className="text-lg font-bold text-foreground">{format(currentDate, 'MMMM yyyy')}</h2>
+            <div className="flex items-center gap-1.5 bg-background border border-border rounded-lg p-0.5 shadow-sm">
+              <button onClick={prevMonth} className="px-2 py-1.5 rounded-md hover:bg-muted text-muted-foreground transition-colors"><ChevronLeft className="w-4 h-4" /></button>
+              <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1 text-xs font-bold rounded-md hover:bg-muted text-foreground transition-colors">Today</button>
+              <button onClick={nextMonth} className="px-2 py-1.5 rounded-md hover:bg-muted text-muted-foreground transition-colors"><ChevronRight className="w-4 h-4" /></button>
+            </div>
+          </div>
+          {/* Weekdays */}
+          <div className="grid grid-cols-7 border-b border-border bg-muted/20">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+              <div key={day} className="py-2.5 text-center text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{day}</div>
+            ))}
+          </div>
+          {/* Days */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="grid grid-cols-7 auto-rows-[minmax(120px,1fr)] h-full">
+              {calendarDays.map((day, idx) => {
+                const dayReminders = remindersByDay(day);
+                const isSelected = isSameDay(day, selectedDate);
+                const isCurrentMonth = isSameMonth(day, monthStart);
+                return (
+                  <div key={day.toString()} onClick={() => setSelectedDate(day)}
+                    className={`p-2 border-b border-border/60 cursor-pointer transition-all hover:bg-muted/40 flex flex-col gap-1.5 ${!isCurrentMonth ? 'opacity-40 bg-muted/5' : ''} ${isSelected ? 'bg-violet-50/50 dark:bg-violet-900/10 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.5)] z-10' : ''} ${idx % 7 !== 6 ? 'border-r' : ''}`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${isToday(day) ? 'bg-violet-600 text-white shadow-sm' : isSelected ? 'bg-violet-200 text-violet-900 dark:bg-violet-800 dark:text-violet-100' : 'text-foreground'}`}>
+                        {format(day, 'd')}
+                      </span>
+                    </div>
+                    <div className="flex-1 overflow-y-auto space-y-1 mt-0.5 pr-1 no-scrollbar">
+                      {dayReminders.slice(0, 4).map(r => (
+                        <div key={r.id} className={`text-[10px] font-medium px-1.5 py-1 rounded truncate flex items-center gap-1 border border-transparent ${r.isActive ? 'bg-violet-100/60 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 hover:border-violet-200' : 'bg-muted/50 text-muted-foreground'}`}>
+                          <div className={`w-1 h-1 rounded-full flex-shrink-0 ${r.isActive ? 'bg-violet-500' : 'bg-muted-foreground'}`} />
+                          <span className="truncate">{format(parseISO(r.remindAt), 'h:mma')} - {r.title}</span>
+                        </div>
+                      ))}
+                      {dayReminders.length > 4 && (
+                        <div className="text-[10px] font-bold text-muted-foreground pl-1 mt-1">
+                          + {dayReminders.length - 4} more
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="w-[300px] flex flex-col bg-card border border-border rounded-xl overflow-hidden shadow-sm flex-shrink-0">
+          <div className="p-4 border-b border-border flex flex-col gap-1 bg-muted/10">
+            <h3 className="font-bold text-base text-foreground">{format(selectedDate, 'EEEE, MMMM d')}</h3>
+            <div className="text-xs font-medium text-muted-foreground flex items-center justify-between">
+              <span>{selectedReminders.length} reminder{selectedReminders.length !== 1 ? 's' : ''}</span>
+              <button onClick={() => setViewMode('list')} className="hover:text-foreground underline decoration-muted-foreground/30 underline-offset-2">View List</button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <TimeBlock title="Morning" reminders={morningReminders} />
+            <TimeBlock title="Afternoon" reminders={afternoonReminders} />
+            <TimeBlock title="Evening" reminders={eveningReminders} />
+            {selectedReminders.length === 0 && (
+              <div className="text-center py-12 flex flex-col items-center">
+                <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-3 text-muted-foreground">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <p className="text-sm font-semibold text-foreground">No Reminders</p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-[200px] mx-auto">You're all clear for this day.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   /* ─── Render ─────────────────────────────────────────────────────────── */
   return (
     <div className="h-full flex flex-col min-h-0">
@@ -169,10 +309,20 @@ export default function Reminders() {
             {' '}· {pool.length} total
           </p>
         </div>
-        <button onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-all shadow-sm">
-          <Plus className="w-4 h-4" /> New Reminder
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-border/40">
+            <button onClick={() => setViewMode('calendar')} className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${viewMode === 'calendar' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+              <Calendar className="w-3.5 h-3.5" /> Calendar
+            </button>
+            <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${viewMode === 'list' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+              <LayoutList className="w-3.5 h-3.5" /> List
+            </button>
+          </div>
+          <button onClick={openCreate}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-all shadow-sm">
+            <Plus className="w-4 h-4" /> New Reminder
+          </button>
+        </div>
       </div>
 
       {/* ── Filter bar ── */}
@@ -209,7 +359,8 @@ export default function Reminders() {
       </div>
 
       {/* ── Main content ── */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
+      {viewMode === 'list' ? (
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="w-16 h-16 rounded-2xl bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center mb-4">
@@ -398,7 +549,12 @@ export default function Reminders() {
             })}
           </div>
         )}
-      </div>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 px-6 pb-5 pt-2">
+          {renderCalendarView()}
+        </div>
+      )}
 
       {/* ── Modal ── */}
       <AnimatePresence>

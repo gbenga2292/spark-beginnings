@@ -100,17 +100,34 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 if (mtRes.data) setMainTasks(mtRes.data);
                 if (stRes.data) setSubtasks(stRes.data);
                 if (pRes.data) setUsers(pRes.data);
+                let loadedProjects: any[] = [];
                 if (projRes.data) {
-                    setProjects(projRes.data.map((p: any) => ({
+                    loadedProjects = projRes.data.map((p: any) => ({
                         ...p,
                         workspaceId: 'dcel-team', // Or derive appropriately
                         templateId: '',
                         serviceType: p.client || 'General',
                         startDate: p.start_date || p.created_at,
                         durationDays: parseInt(p.vat) || 30, // Fallback
-                        // Note: If old sites don't have a linked mainTaskId, they won't be clickable into tasks
-                    })));
+                    }));
                 }
+                if (mtRes.data) {
+                    const genericProjects = mtRes.data
+                        .filter((t: any) => t.is_project)
+                        .map((t: any) => ({
+                             id: `mt-proj-${t.id}`,
+                             workspaceId: t.workspaceId || t.teamId || 'dcel-team',
+                             templateId: '',
+                             name: t.title,
+                             serviceType: 'Internal Project',
+                             startDate: t.created_at,
+                             durationDays: 30, // Fallback
+                             mainTaskId: t.id,
+                             status: 'Active'
+                        }));
+                    loadedProjects = [...loadedProjects, ...genericProjects];
+                }
+                setProjects(loadedProjects);
                 if (commRes.data) setComments(commRes.data);
                 if (remRes.data) setReminders(remRes.data.map(mapReminderToCamel));
             } catch (err) {
@@ -507,10 +524,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         createProject: async (projectData: any) => {
             const taskPayload = {
                 title: projectData.name,
-                description: `Project for ${projectData.serviceType}`,
+                description: `Project for ${projectData.serviceType || 'Internal Project'}`,
                 createdBy: projectData.createdBy,
                 teamId: projectData.teamId,
                 workspaceId: projectData.workspaceId,
+                is_project: true,
             };
             const { data: mainTask, error } = await supabase.from('main_tasks').insert(taskPayload).select().single();
             if (error || !mainTask) {
@@ -518,29 +536,18 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
             
-            const sitePayload = {
-                name: projectData.name,
-                client: projectData.serviceType || 'General',
-                start_date: projectData.startDate,
-                end_date: projectData.startDate, // fallback, duration handled in UI
-                status: 'active',
-                vat: projectData.durationDays?.toString() || '30' 
+            const adaptedProject = {
+                 id: `mt-proj-${mainTask.id}`,
+                 workspaceId: projectData.workspaceId,
+                 templateId: '',
+                 name: mainTask.title,
+                 serviceType: projectData.serviceType || 'Internal Project',
+                 startDate: mainTask.created_at,
+                 durationDays: projectData.durationDays || 30,
+                 status: 'Active',
+                 mainTaskId: mainTask.id,
             };
-            const { data: site, error: siteErr } = await supabase.from('sites').insert(sitePayload).select().single();
-            if (siteErr) {
-                 toast.error('Project created, but site link failed.');
-            } else if (site) {
-                 const adaptedProject = {
-                     ...site,
-                     workspaceId: projectData.workspaceId,
-                     templateId: '',
-                     serviceType: projectData.serviceType,
-                     startDate: projectData.startDate,
-                     durationDays: projectData.durationDays,
-                     mainTaskId: mainTask.id,
-                 };
-                 setProjects(prev => [...prev, adaptedProject]);
-            }
+            setProjects(prev => [...prev, adaptedProject]);
             
             // Insert passed subtasks if any
             if (projectData.subtasks && projectData.subtasks.length > 0) {

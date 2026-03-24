@@ -60,6 +60,7 @@ function initAutoUpdater() {
 
 /* ─── Current user privileges (updated via IPC from renderer) ─── */
 let currentPrivileges = null; // null = super admin (no user record)
+global.isAppClosable = true; // window close allowed by default
 
 /* ─── Privilege helper ─────────────────────────────────────────── */
 function can(page, field) {
@@ -274,13 +275,36 @@ function initIPC() {
     }
   });
 
-  ipcMain.on('set-title-bar-overlay', (event, opts) => {
-    try {
-      if (mainWindow && process.platform === 'win32') {
-        mainWindow.setTitleBarOverlay(opts);
+  ipcMain.on('window-minimize', () => {
+    if (mainWindow) mainWindow.minimize();
+  });
+
+  ipcMain.on('set-closable', (event, closable) => {
+    global.isAppClosable = closable;
+  });
+
+  ipcMain.on('window-maximize', () => {
+    if (mainWindow) {
+      if (mainWindow.isMaximized()) {
+        mainWindow.unmaximize();
+      } else {
+        mainWindow.maximize();
       }
-    } catch (e) {
-      // ignore — not critical
+    }
+  });
+
+  ipcMain.on('window-close', () => {
+    if (mainWindow) {
+      if (!global.isAppClosable) {
+        dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: 'Action Restricted',
+          message: 'You must log out of your account before closing the application.',
+          buttons: ['OK']
+        });
+      } else {
+        mainWindow.close();
+      }
     }
   });
 }
@@ -294,13 +318,8 @@ function createWindow() {
     minHeight: 700,
     title: 'DCEL Office Suite',
     icon: path.join(__dirname, '..', 'logo', 'logo-1.png'),
-    // Hidden title bar but keep native Windows controls overlaid
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#0f172a',        // slate-900 — matches dark titlebar
-      symbolColor: '#94a3b8',  // slate-400 — soft but visible
-      height: 40,
-    },
+    // Frameless window to allow complete custom titlebar
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -321,6 +340,18 @@ function createWindow() {
     // In production, load the built files
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
+
+  mainWindow.on('close', (e) => {
+    if (!global.isAppClosable) {
+      e.preventDefault();
+      dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title: 'Action Restricted',
+        message: 'You must log out of your account before closing the application.',
+        buttons: ['OK']
+      });
+    }
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;

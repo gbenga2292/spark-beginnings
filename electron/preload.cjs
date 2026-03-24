@@ -14,8 +14,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Custom Application Menu trigger
   showMenu: (menuId, x, y) => ipcRenderer.send('show-menu', { id: menuId, x, y }),
 
-  // Dynamic title-bar overlay (Windows close/min/max buttons)
-  setTitleBarOverlay: (opts) => ipcRenderer.send('set-title-bar-overlay', opts),
+  // Window custom controls
+  windowMinimize: () => ipcRenderer.send('window-minimize'),
+  windowMaximize: () => ipcRenderer.send('window-maximize'),
+  windowClose: () => ipcRenderer.send('window-close'),
+  
+  // Enable/disable closing permission
+  setClosable: (closable) => ipcRenderer.send('set-closable', closable),
 
   // Push current user privilege snapshot so main can filter nav menus
   updateMenuPrivileges: (privs) => ipcRenderer.send('update-menu-privileges', privs),

@@ -93,6 +93,7 @@ export interface MainTask {
     assignedTo?: string;
     priority?: TaskPriority;
     isDeleted?: boolean;
+    is_project?: boolean;
     createdAt: string;
     updatedAt: string;
     deadline?: string;
