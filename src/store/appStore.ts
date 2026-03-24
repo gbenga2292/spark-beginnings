@@ -3,6 +3,26 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { db } from '@/src/lib/supabaseService';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 
+export interface CommLog {
+  id: string;
+  date: string;
+  time?: string;
+  direction: 'Incoming' | 'Outgoing';
+  channel: 'Call' | 'Email' | 'WhatsApp' | 'Meeting' | 'SMS' | 'Visit' | 'Other';
+  contactType: 'Client' | 'Site' | 'Both' | 'Potential Client';
+  client?: string;
+  siteId?: string;
+  siteName?: string;
+  contactPerson?: string;
+  subject?: string;
+  notes: string;
+  outcome?: string;
+  followUpDate?: string;
+  followUpDone: boolean;
+  loggedBy: string;
+  createdAt: string;
+}
+
 export interface LedgerCategory { id: string; name: string; }
 export interface LedgerVendor { id: string; name: string; tinNumber?: string; }
 export interface LedgerBank { id: string; name: string; }
@@ -383,6 +403,11 @@ export interface MonthValue {
 }
 
 interface AppState {
+  commLogs: CommLog[];
+  addCommLog: (log: CommLog) => void;
+  updateCommLog: (id: string, log: Partial<CommLog>) => void;
+  deleteCommLog: (id: string) => void;
+
   sites: Site[];
   pendingSites: SiteQuestionnaire[];
   clients: string[];
@@ -530,6 +555,7 @@ export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       // ── Default state (empty - data comes from Supabase) ──
+      commLogs: [],
       leaves: [],
       sites: [],
       pendingSites: [],
@@ -588,6 +614,11 @@ export const useAppStore = create<AppState>()(
       },
 
       // ── Actions with Supabase sync ──
+
+      // Communication Logs
+      addCommLog: (log) => { set((s) => ({ commLogs: [...s.commLogs, log] })); db.insertCommLog(log); },
+      updateCommLog: (id, log) => { set((s) => ({ commLogs: s.commLogs.map(l => l.id === id ? { ...l, ...log } : l) })); db.updateCommLog(id, log); },
+      deleteCommLog: (id) => { set((s) => ({ commLogs: s.commLogs.filter(l => l.id !== id) })); db.deleteCommLog(id); },
 
       // Leaves
       addLeave: (leave) => { set((s) => ({ leaves: [...s.leaves, leave] })); db.insertLeave(leave); },

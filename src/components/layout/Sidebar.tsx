@@ -32,6 +32,7 @@ import {
   BarChart2,
   Bell,
   History,
+  MessageSquare,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -101,6 +102,7 @@ const navigation: NavCategory[] = [
     icon: Building2,
     items: [
       { name: 'Sites & Clients', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView' },
+      { name: 'Comms Log', href: '/comm-log', icon: MessageSquare, privKey: 'sites', privField: 'canView' },
     ],
   },
   // ── Account ───────────────────────────────────────────────────────────────

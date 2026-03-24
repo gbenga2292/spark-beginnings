@@ -3,6 +3,9 @@ export interface SiteQuestionnaire {
   siteId?: string; // Links to an existing site, or will be generated once approved
   clientName: string;
   siteName: string; // The proposed site name
+  address?: string; // Site/client address
+  contactPersonName?: string; // Initial contact person name
+  contactPersonPhone?: string; // Contact person phone (numbers only)
   status: 'Pending' | 'Active' | 'Rejected'; // 'Pending' means it hasn't passed phases 1-4
   
   // Phase 1 – Initial Inquiry (Head of Operations)

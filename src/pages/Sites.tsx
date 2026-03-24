@@ -6,7 +6,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText } from 'lucide-react';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical } from 'lucide-react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
@@ -269,6 +269,10 @@ export function Sites() {
   const addPendingSite = useAppStore((s) => s.addPendingSite);
   const setPendingSites = useAppStore((s) => s.setPendingSites);
   const { createMainTask } = useAppData();
+
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const closeMenu = () => setOpenMenuId(null);
+  const toggleMenu = (id: string) => setOpenMenuId(prev => prev === id ? null : id);
 
   const filteredSites = sites.filter(site =>
     site.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -749,43 +753,63 @@ export function Sites() {
                             </Button>
                           </div>
                         ) : (
-                          <div className="flex justify-end gap-2">
-                            {(() => {
-                              const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
-                              return (
-                                <>
-                                  <Button
-                                    variant="ghost" size="sm" className="text-slate-600"
-                                    onClick={() => setNarrativeSite({ site, q: linkedQ || null })}
-                                    title="Site Info Summary"
+                          <div className="relative flex justify-end">
+                            <Button
+                              variant="ghost" size="sm"
+                              className="text-slate-400 hover:text-slate-700 h-8 w-8 p-0"
+                              onClick={() => toggleMenu(site.id)}
+                              title="Actions"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                            {openMenuId === site.id && (
+                              <>
+                                {/* Backdrop */}
+                                <div className="fixed inset-0 z-20" onClick={closeMenu} />
+                                {/* Dropdown */}
+                                <div className="absolute right-0 top-8 z-30 min-w-[150px] rounded-lg border border-slate-200 bg-white shadow-lg py-1">
+                                  {/* Info Summary — always visible */}
+                                  <button
+                                    onClick={() => { closeMenu(); setNarrativeSite({ site, q: pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client) || null }); }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                   >
-                                    <FileText className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost" size="sm" className="text-slate-600"
+                                    <FileText className="h-4 w-4 text-slate-400" /> Site Summary
+                                  </button>
+                                  {/* Onboarding — always visible */}
+                                  <button
                                     onClick={() => {
-                                      if (linkedQ) {
-                                        navigate(`/sites/onboarding/${linkedQ.id}`);
-                                      } else {
-                                        navigate('/sites/onboarding/new', { state: { linkedSite: site } });
-                                      }
+                                      closeMenu();
+                                      const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
+                                      if (linkedQ) navigate(`/sites/onboarding/${linkedQ.id}`);
+                                      else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
                                     }}
-                                    title="View Site Onboarding"
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                   >
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                </>
-                              );
-                            })()}
-                            {canEditSite && (
-                              <Button variant="ghost" size="sm" className="text-indigo-600" onClick={() => handleEditStart(site)}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {canDeleteSite && (
-                              <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDelete(site.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                                    <Eye className="h-4 w-4 text-slate-400" /> View Onboarding
+                                  </button>
+                                  {/* Edit */}
+                                  {canEditSite && (
+                                    <button
+                                      onClick={() => { closeMenu(); handleEditStart(site); }}
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-indigo-700 hover:bg-indigo-50"
+                                    >
+                                      <Pencil className="h-4 w-4" /> Edit Site
+                                    </button>
+                                  )}
+                                  {/* Delete */}
+                                  {canDeleteSite && (
+                                    <>
+                                      <div className="my-1 border-t border-slate-100" />
+                                      <button
+                                        onClick={() => { closeMenu(); handleDelete(site.id); }}
+                                        className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="h-4 w-4" /> Delete
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </>
                             )}
                           </div>
                         )}

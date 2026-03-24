@@ -74,6 +74,9 @@ const blankForm = (): SiteQuestionnaire => ({
   id: '',
   siteName: '',
   clientName: '',
+  address: '',
+  contactPersonName: '',
+  contactPersonPhone: '',
   status: 'Pending',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
@@ -355,6 +358,14 @@ export function SiteOnboarding() {
               <InfoField label="Client Tax Status" value={form.phase4.clientTaxStatus} />
             </div>
           </div>
+          {/* Address + Contact row */}
+          {(form.address || form.contactPersonName || form.contactPersonPhone) && (
+            <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-3 gap-6">
+              {form.address && <InfoField label="Address" value={form.address} />}
+              {form.contactPersonName && <InfoField label="Contact Person" value={form.contactPersonName} />}
+              {form.contactPersonPhone && <InfoField label="Contact Phone" value={form.contactPersonPhone} />}
+            </div>
+          )}
           {/* Phase progress bar */}
           <div className="mt-5 pt-4 border-t border-slate-100">
             <div className="flex items-center justify-between mb-2">
@@ -403,6 +414,38 @@ export function SiteOnboarding() {
                 value={form.siteName}
                 onChange={e => upd({ siteName: e.target.value })}
               />
+            </div>
+            {/* Address */}
+            <div className="space-y-1 col-span-2">
+              <label className="text-sm font-medium text-slate-700">Site / Client Address</label>
+              <Input
+                placeholder="e.g. 12 Allen Avenue, Ikeja, Lagos"
+                value={form.address || ''}
+                onChange={e => upd({ address: e.target.value })}
+              />
+            </div>
+            {/* Initial Contact Person */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Initial Contact Person</label>
+              <Input
+                placeholder="e.g. Mr. Adeyemi"
+                value={form.contactPersonName || ''}
+                onChange={e => upd({ contactPersonName: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Contact Phone</label>
+              <Input
+                placeholder="e.g. 08012345678"
+                value={form.contactPersonPhone || ''}
+                inputMode="numeric"
+                onChange={e => {
+                  // numbers only
+                  const digits = e.target.value.replace(/[^0-9+\-\s]/g, '');
+                  upd({ contactPersonPhone: digits });
+                }}
+              />
+              <p className="text-xs text-slate-400">Numbers only</p>
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">

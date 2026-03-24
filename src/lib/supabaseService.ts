@@ -7,7 +7,7 @@ import type {
   Site, Employee, AttendanceRecord, Invoice, PendingInvoice,
   SalaryAdvance, Loan, Payment, VatPayment, LeaveRecord, DepartmentTasks,
   DisciplinaryRecord, EvaluationRecord, Department, Position,
-  LedgerCategory, LedgerVendor, LedgerBank, LedgerEntry
+  LedgerCategory, LedgerVendor, LedgerBank, LedgerEntry, CommLog
 } from '@/src/store/appStore';
 import type { AppUser, PrivilegePreset } from '@/src/store/userStore';
 
@@ -173,6 +173,28 @@ export function dbToLedgerEntry(r: any): LedgerEntry {
   };
 }
 
+export function dbToCommLog(r: any): CommLog {
+  return {
+    id: r.id,
+    date: r.date,
+    time: r.time ?? undefined,
+    direction: r.direction,
+    channel: r.channel,
+    contactType: r.contact_type,
+    client: r.client ?? undefined,
+    siteId: r.site_id ?? undefined,
+    siteName: r.site_name ?? undefined,
+    contactPerson: r.contact_person ?? undefined,
+    subject: r.subject ?? undefined,
+    notes: r.notes ?? '',
+    outcome: r.outcome ?? undefined,
+    followUpDate: r.follow_up_date ?? undefined,
+    followUpDone: r.follow_up_done ?? false,
+    loggedBy: r.logged_by ?? '',
+    createdAt: r.created_at ?? new Date().toISOString(),
+  };
+}
+
 export function dbToProfile(r: any): AppUser {
   return {
     id: r.id, name: r.name, email: r.email, avatar: r.avatar,
@@ -333,6 +355,28 @@ function ledgerEntryToDb(e: LedgerEntry) {
   };
 }
 
+function commLogToDb(l: CommLog) {
+  return {
+    id: l.id,
+    date: l.date,
+    time: l.time ?? null,
+    direction: l.direction,
+    channel: l.channel,
+    contact_type: l.contactType,
+    client: l.client ?? null,
+    site_id: l.siteId ?? null,
+    site_name: l.siteName ?? null,
+    contact_person: l.contactPerson ?? null,
+    subject: l.subject ?? null,
+    notes: l.notes,
+    outcome: l.outcome ?? null,
+    follow_up_date: l.followUpDate ?? null,
+    follow_up_done: l.followUpDone,
+    logged_by: l.loggedBy,
+    created_at: l.createdAt,
+  };
+}
+
 // ─── FETCH ALL ───────────────────────────────────────────────
 
 export async function fetchAllAppData(privs?: any) {
@@ -347,6 +391,7 @@ export async function fetchAllAppData(privs?: any) {
     positionsRes, departmentsRes,
     disciplinaryRes, evaluationsRes,
     lCatRes, lVenRes, lBankRes, lEntRes,
+    commLogsRes,
   ] = await Promise.all([
     canView('sites') ? supabase.from('sites').select('*').order('created_at') : Promise.resolve({ data: [] }),
     canView('sites') ? supabase.from('clients').select('*').order('name') : Promise.resolve({ data: [] }),
@@ -371,11 +416,13 @@ export async function fetchAllAppData(privs?: any) {
     canView('ledger') ? supabase.from('ledger_vendors').select('*').order('name') : Promise.resolve({ data: [] }),
     canView('ledger') ? supabase.from('ledger_banks').select('*').order('name') : Promise.resolve({ data: [] }),
     canView('ledger') ? supabase.from('ledger_entries').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
+    supabase.from('comm_logs').select('*').order('date', { ascending: false }),
   ]);
 
   const settings = settingsRes.data;
 
   return {
+    commLogs: (commLogsRes.data || []).map(dbToCommLog),
     sites: (sitesRes.data || []).map(dbToSite),
     clients: (clientsRes.data || []).map((c: any) => c.name),
     employees: (employeesRes.data || []).map(dbToEmployee),
@@ -968,5 +1015,35 @@ export const db = {
     if (error) {
       console.error('deleteLedgerEntry:', error.message, error.details, error.hint);
     }
+  },
+
+  // Communication Logs
+  async insertCommLog(l: CommLog) {
+    const { error } = await supabase.from('comm_logs').insert(commLogToDb(l));
+    if (error) console.error('insertCommLog:', error);
+  },
+  async updateCommLog(id: string, l: Partial<CommLog>) {
+    const update: any = {};
+    if (l.date !== undefined) update.date = l.date;
+    if (l.time !== undefined) update.time = l.time ?? null;
+    if (l.direction !== undefined) update.direction = l.direction;
+    if (l.channel !== undefined) update.channel = l.channel;
+    if (l.contactType !== undefined) update.contact_type = l.contactType;
+    if (l.client !== undefined) update.client = l.client ?? null;
+    if (l.siteId !== undefined) update.site_id = l.siteId ?? null;
+    if (l.siteName !== undefined) update.site_name = l.siteName ?? null;
+    if (l.contactPerson !== undefined) update.contact_person = l.contactPerson ?? null;
+    if (l.subject !== undefined) update.subject = l.subject ?? null;
+    if (l.notes !== undefined) update.notes = l.notes;
+    if (l.outcome !== undefined) update.outcome = l.outcome ?? null;
+    if (l.followUpDate !== undefined) update.follow_up_date = l.followUpDate ?? null;
+    if (l.followUpDone !== undefined) update.follow_up_done = l.followUpDone;
+    update.updated_at = new Date().toISOString();
+    const { error } = await supabase.from('comm_logs').update(update).eq('id', id);
+    if (error) console.error('updateCommLog:', error);
+  },
+  async deleteCommLog(id: string) {
+    const { error } = await supabase.from('comm_logs').delete().eq('id', id);
+    if (error) console.error('deleteCommLog:', error);
   },
 };

@@ -3,7 +3,7 @@ import { useAppStore, DEFAULT_OFFBOARDING_TASKS } from '@/src/store/appStore';
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog } from '@/src/lib/supabaseService';
 
 /** Fills in any missing privilege sections using NO_ACCESS defaults. */
 function backfillPrivileges(
@@ -50,12 +50,15 @@ export function useDataLoader(isAuthenticated: boolean) {
           fetchPresets(),
         ]);
 
-        // Auto-initialize standard client & site
-        if (!appData.clients.includes('DCEL')) {
+        // Auto-initialize standard client & site — only if not already in the fetched data
+        if (!appData.clients.some((c: string) => c.toLowerCase() === 'dcel')) {
           appData.clients.push('DCEL');
           db.insertClient('DCEL');
         }
-        if (!appData.sites.some(s => s.name.toLowerCase() === 'office' && s.client.toLowerCase() === 'dcel')) {
+        const hasDcelOffice = appData.sites.some(
+          (s: any) => s.name.toLowerCase().trim() === 'office' && s.client.toLowerCase().trim() === 'dcel'
+        );
+        if (!hasDcelOffice) {
           const officeSite = { id: crypto.randomUUID(), name: 'Office', client: 'DCEL', status: 'Active' as const, vat: 'No' as const };
           appData.sites.push(officeSite);
           db.insertSite(officeSite);
@@ -82,6 +85,7 @@ export function useDataLoader(isAuthenticated: boolean) {
 
         // Hydrate appStore
         useAppStore.setState({
+          commLogs: appData.commLogs || [],
           sites: appData.sites,
           clients: appData.clients,
           employees: appData.employees,
@@ -365,6 +369,20 @@ export function useRealtimeData(isAuthenticated: boolean) {
                 useAppStore.setState({ vatPayments: current.map(p => p.id === updated.id ? updated : p) });
               } else if (eventType === 'DELETE') {
                 useAppStore.setState({ vatPayments: current.filter(p => p.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'comm_logs': {
+              const current = appState.commLogs;
+              if (eventType === 'INSERT') {
+                if (!current.some(l => l.id === newRow.id)) {
+                  useAppStore.setState({ commLogs: [...current, dbToCommLog(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToCommLog(newRow);
+                useAppStore.setState({ commLogs: current.map(l => l.id === updated.id ? updated : l) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ commLogs: current.filter(l => l.id !== oldRow.id) });
               }
               break;
             }
