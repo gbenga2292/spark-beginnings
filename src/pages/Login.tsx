@@ -91,7 +91,7 @@ export function Login() {
         avatar: profile?.avatar,
       });
       setCurrentUser(user.id);
-      
+
       // Save email for memory (autocomplete)
       try {
         const currentEmails = JSON.parse(localStorage.getItem('savedLoginEmails') || '[]');
@@ -159,8 +159,8 @@ export function Login() {
           <div className="space-y-4">
             {[
               { icon: ShieldCheck, title: 'Enterprise-Grade Security', desc: 'Role-based access control for every team member' },
-              { icon: Users,       title: 'HR & Payroll Management',  desc: 'Employees, attendance, leaves and salary in one system' },
-              { icon: BarChart3,   title: 'Financial Reporting',      desc: 'Invoices, payments, VAT and account reports at a glance' },
+              { icon: Users, title: 'HR & Payroll Management', desc: 'Employees, attendance, leaves and salary in one system' },
+              { icon: BarChart3, title: 'Financial Reporting', desc: 'Invoices, payments, VAT and account reports at a glance' },
             ].map(({ icon: Icon, title, desc }) => (
               <div key={title} className="flex items-start gap-4">
                 <div className="flex-shrink-0 w-9 h-9 bg-indigo-500/20 border border-indigo-500/30 rounded-lg flex items-center justify-center mt-0.5">
@@ -219,7 +219,7 @@ export function Login() {
                   name="email"
                   autoComplete="email"
                   list="saved-emails-list"
-                  placeholder="admin@dcel.ng"
+                  placeholder="admin@dewaterconstruct.com"
                   className="h-11 pl-10 bg-slate-50 border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20 rounded-lg text-sm"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -253,9 +253,9 @@ export function Login() {
 
             <div className="flex items-center justify-between pt-1">
               <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input 
-                  type="checkbox" 
-                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20" 
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                 />

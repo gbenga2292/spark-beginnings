@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { List, LayoutGrid, Target, AlignJustify, ChevronDown, CalendarRange } from "lucide-react";
+import { List, LayoutGrid, Target, AlignJustify, ChevronDown, CalendarRange, Inbox } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-export type TaskViewMode = "list" | "compact" | "board" | "focus" | "gantt";
+export type TaskViewMode = "list" | "compact" | "board" | "focus" | "gantt" | "inbox";
 
 interface ViewToggleProps {
   value: TaskViewMode;
@@ -15,6 +15,7 @@ const VIEWS: { mode: TaskViewMode; icon: React.ElementType; label: string }[] = 
   { mode: "board", icon: LayoutGrid, label: "Board" },
   { mode: "focus", icon: Target, label: "Focus" },
   { mode: "gantt", icon: CalendarRange, label: "Gantt Chart" },
+  { mode: "inbox", icon: Inbox, label: "Inbox" },
 ];
 
 export function ViewToggle({ value, onChange }: ViewToggleProps) {

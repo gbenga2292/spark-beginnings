@@ -32,6 +32,18 @@ export interface LedgerEntry {
   vendor: string; bank: string; enteredBy: string;
 }
 
+export interface CompanyExpense {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  paidFrom: string;
+  paidToBankName: string;
+  paidToAccountNo: string;
+  enteredBy: string;
+  createdAt: string;
+}
+
 export interface Site {
   id: string;
   name: string;
@@ -427,6 +439,7 @@ interface AppState {
   ledgerVendors: LedgerVendor[];
   ledgerBanks: LedgerBank[];
   ledgerEntries: LedgerEntry[];
+  companyExpenses: CompanyExpense[];
   addSite: (site: Site) => void;
   setSites: (sites: Site[]) => void;
   updateSite: (id: string, site: Partial<Site>) => void;
@@ -494,6 +507,10 @@ interface AppState {
   addLedgerEntry: (entry: LedgerEntry) => void;
   updateLedgerEntry: (id: string, entry: Partial<LedgerEntry>) => void;
   deleteLedgerEntry: (id: string) => void;
+
+  addCompanyExpense: (expense: CompanyExpense) => void;
+  updateCompanyExpense: (id: string, expense: Partial<CompanyExpense>) => void;
+  deleteCompanyExpense: (id: string) => void;
 
   payrollVariables: {
     basic: number;
@@ -579,6 +596,7 @@ export const useAppStore = create<AppState>()(
       ledgerVendors: [],
       ledgerBanks: [],
       ledgerEntries: [],
+      companyExpenses: [],
 
       payrollVariables: {
         basic: 40, housing: 30, transport: 20, otherAllowances: 10,
@@ -708,6 +726,11 @@ export const useAppStore = create<AppState>()(
       addLedgerEntry: (e) => { set(s => ({ ledgerEntries: [...s.ledgerEntries, e] })); db.insertLedgerEntry(e); },
       updateLedgerEntry: (id, e) => { set(s => ({ ledgerEntries: s.ledgerEntries.map(c => c.id === id ? { ...c, ...e } : c) })); db.updateLedgerEntry(id, e); },
       deleteLedgerEntry: (id) => { set(s => ({ ledgerEntries: s.ledgerEntries.filter(c => c.id !== id) })); db.deleteLedgerEntry(id); },
+
+      // Company Expenses
+      addCompanyExpense: (e) => { set(s => ({ companyExpenses: [...s.companyExpenses, e] })); db.insertCompanyExpense(e); },
+      updateCompanyExpense: (id, e) => { set(s => ({ companyExpenses: s.companyExpenses.map(c => c.id === id ? { ...c, ...e } : c) })); db.updateCompanyExpense(id, e); },
+      deleteCompanyExpense: (id) => { set(s => ({ companyExpenses: s.companyExpenses.filter(c => c.id !== id) })); db.deleteCompanyExpense(id); },
 
       // Payroll Variables
       updatePayrollVariables: (variables) => {

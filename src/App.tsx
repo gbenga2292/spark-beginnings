@@ -45,6 +45,7 @@ const SalaryLoans = lazy(() => import('./pages/SalaryLoans').then(m => ({ defaul
 const Disciplinary = lazy(() => import('./pages/Disciplinary').then(m => ({ default: m.Disciplinary })));
 const Evaluations = lazy(() => import('./pages/Evaluations').then(m => ({ default: m.Evaluations })));
 const Ledger = lazy(() => import('./pages/Ledger').then(m => ({ default: m.Ledger })));
+const CompanyExpenses = lazy(() => import('./pages/CompanyExpenses').then(m => ({ default: m.CompanyExpenses })));
 const TaskDashboard = lazy(() => import('./pages/TaskDashboard'));
 const TaskReminders = lazy(() => import('./pages/TaskReminders'));
 const Tasks = lazy(() => import('./pages/Tasks'));
@@ -141,6 +142,7 @@ function AppContent() {
           <Route path="disciplinary" element={<ProtectedRoute requiredModule="disciplinary"><Disciplinary /></ProtectedRoute>} />
           <Route path="evaluations" element={<ProtectedRoute requiredModule="evaluations"><Evaluations /></ProtectedRoute>} />
           <Route path="ledger" element={<ProtectedRoute requiredModule="ledger"><Ledger /></ProtectedRoute>} />
+          <Route path="company-expenses" element={<ProtectedRoute requiredModule="ledger"><CompanyExpenses /></ProtectedRoute>} />
           
           {/* Task Manager Module */}
           <Route path="tasks" element={<ProtectedRoute requiredModule="tasks"><Tasks /></ProtectedRoute>} />

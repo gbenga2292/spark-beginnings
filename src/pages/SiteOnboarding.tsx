@@ -6,7 +6,7 @@ import { Badge } from '@/src/components/ui/badge';
 import { useAppStore } from '@/src/store/appStore';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import { toast } from '@/src/components/ui/toast';
-import { Save, ArrowLeft, CheckCircle2, Building2, MapPin, Calendar, User } from 'lucide-react';
+import { Save, ArrowLeft, CheckCircle2, Building2, MapPin, Calendar, User, LayoutGrid } from 'lucide-react';
 import { CreateProjectDialog } from '@/src/components/tasks/CreateProjectDialog';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -134,8 +134,7 @@ export function SiteOnboarding() {
   const [initialForm, setInitialForm] = useState<SiteQuestionnaire>(blankForm());
   const [activePhase, setActivePhase] = useState<1|2|3|4|5>(1);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
-  
-  const { createProject, users } = useAppData();
+  const { createProject, users, projects } = useAppData();
   const { user } = useAuth();
   
   const [wantsProject, setWantsProject] = useState(true);
@@ -317,6 +316,17 @@ export function SiteOnboarding() {
         {/* Save always visible for existing records */}
         {!isNew && (
           <div className="flex gap-2 flex-shrink-0">
+            {form.status === 'Active' && projects.some(p => p.name === form.siteName || p.id === form.siteName || p.title === form.siteName) ? (
+              <Button onClick={() => navigate(`/tasks?scope=projects&openProject=${encodeURIComponent(form.siteName)}`)} 
+                 className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border-indigo-200 gap-2 font-medium shadow-none">
+                <LayoutGrid className="h-4 w-4" /> View Workspace
+              </Button>
+            ) : form.status === 'Active' ? (
+              <Button onClick={() => setShowProjectDialog(true)} 
+                 className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border-indigo-200 gap-2 font-medium shadow-none">
+                <LayoutGrid className="h-4 w-4" /> Create Workspace
+              </Button>
+            ) : null}
             <Button variant="outline" onClick={handleSave} className="gap-2">
               <Save className="h-4 w-4" /> Save
             </Button>
@@ -865,6 +875,7 @@ export function SiteOnboarding() {
       {showProjectDialog && (
          <CreateProjectDialog
            initialProjectName={form.siteName}
+           initialStatus={form.status === 'Active' ? 'Active' : 'Pending'}
            onClose={() => setShowProjectDialog(false)}
            onSubmit={handleProjectSubmit}
            users={users}

@@ -177,10 +177,10 @@ export function Beneficiaries() {
       toast.error('Surname and Firstname are required.');
       return;
     }
-    const updateData = { 
-      ...formData, 
-      department: 'Beneficiary', 
-      position: 'Stipend Beneficiary', 
+    const updateData = {
+      ...formData,
+      department: 'Beneficiary',
+      position: 'Stipend Beneficiary',
       staffType: 'BENEFICIARY' as 'BENEFICIARY',
       excludeFromOnboarding: true
     };
@@ -233,13 +233,13 @@ export function Beneficiaries() {
 
       const rows = beneficiaries.map(emp => {
         const data = [
-          emp.id, emp.employeeCode || '', emp.surname, emp.firstname, emp.status, emp.yearlyLeave, 
-          emp.startDate || '', emp.endDate || '', emp.bankName || '', emp.accountNo || '', 
-          canSeeSalary ? emp.monthlySalaries.jan : '***', canSeeSalary ? emp.monthlySalaries.feb : '***', 
-          canSeeSalary ? emp.monthlySalaries.mar : '***', canSeeSalary ? emp.monthlySalaries.apr : '***', 
-          canSeeSalary ? emp.monthlySalaries.may : '***', canSeeSalary ? emp.monthlySalaries.jun : '***', 
-          canSeeSalary ? emp.monthlySalaries.jul : '***', canSeeSalary ? emp.monthlySalaries.aug : '***', 
-          canSeeSalary ? emp.monthlySalaries.sep : '***', canSeeSalary ? emp.monthlySalaries.oct : '***', 
+          emp.id, emp.employeeCode || '', emp.surname, emp.firstname, emp.status, emp.yearlyLeave,
+          emp.startDate || '', emp.endDate || '', emp.bankName || '', emp.accountNo || '',
+          canSeeSalary ? emp.monthlySalaries.jan : '***', canSeeSalary ? emp.monthlySalaries.feb : '***',
+          canSeeSalary ? emp.monthlySalaries.mar : '***', canSeeSalary ? emp.monthlySalaries.apr : '***',
+          canSeeSalary ? emp.monthlySalaries.may : '***', canSeeSalary ? emp.monthlySalaries.jun : '***',
+          canSeeSalary ? emp.monthlySalaries.jul : '***', canSeeSalary ? emp.monthlySalaries.aug : '***',
+          canSeeSalary ? emp.monthlySalaries.sep : '***', canSeeSalary ? emp.monthlySalaries.oct : '***',
           canSeeSalary ? emp.monthlySalaries.nov : '***', canSeeSalary ? emp.monthlySalaries.dec : '***'
         ];
         return data.map(extractCSV).join(',');
@@ -306,7 +306,7 @@ export function Beneficiaries() {
 
         for (let i = 1; i < lines.length; i++) {
           const vals = parseCSVRow(lines[i]);
-          
+
           const offset = hasCode ? 1 : 0;
           if (vals.length >= 8 + offset) {
             const providedId = vals[0]?.trim() || '';
@@ -319,18 +319,18 @@ export function Beneficiaries() {
             const parsedEmp: Employee = {
               id: idToUse,
               employeeCode: mode === 'append' ? '' : (employeeCodeValue || (isValidUUID ? '' : providedId)),
-              surname: vals[1 + offset], 
-              firstname: vals[2 + offset], 
-              department: 'Beneficiary', 
+              surname: vals[1 + offset],
+              firstname: vals[2 + offset],
+              department: 'Beneficiary',
               staffType: 'BENEFICIARY',
-              position: 'Stipend Beneficiary', 
-              status: vals[3 + offset] as 'Active' | 'On Leave' | 'Terminated', 
+              position: 'Stipend Beneficiary',
+              status: vals[3 + offset] as 'Active' | 'On Leave' | 'Terminated',
               yearlyLeave: parseInt(vals[4 + offset]) || 0,
-              startDate: vals[5 + offset] || '', 
-              endDate: vals[6 + offset] || '', 
+              startDate: vals[5 + offset] || '',
+              endDate: vals[6 + offset] || '',
               bankName: vals[7 + offset] || '',
-              accountNo: vals[8 + offset] || '', 
-              taxId: '', 
+              accountNo: vals[8 + offset] || '',
+              taxId: '',
               pensionNumber: '',
               payeTax: false,
               withholdingTax: false,
@@ -367,9 +367,6 @@ export function Beneficiaries() {
 
         let message = `Import complete: ${importedCount} Added | ${updatedCount} Updated`;
         if (deletedCount > 0) message += ` | ${deletedCount} Removed`;
-        if (addedDeptCount > 0 || addedPosCount > 0) {
-          message += `. ${addedDeptCount} new department(s) and ${addedPosCount} new position(s) added to Variables.`;
-        }
         toast.success(message);
       } catch (err) {
         toast.error('Failed to parse CSV file');
@@ -409,21 +406,21 @@ export function Beneficiaries() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Surname</label>
-                  <Input value={formData.surname || ''} onChange={e => setFormData({ ...formData, surname: e.target.value })} placeholder="e.g. DAVIES" className="bg-slate-50 focus:bg-white" />
+                  <Input value={formData.surname || ''} onChange={e => setFormData({ ...formData, surname: e.target.value })} placeholder="e.g. John" className="bg-slate-50 focus:bg-white" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Firstname</label>
-                  <Input value={formData.firstname || ''} onChange={e => setFormData({ ...formData, firstname: e.target.value })} placeholder="e.g. HUBERT" className="bg-slate-50 focus:bg-white" />
+                  <Input value={formData.firstname || ''} onChange={e => setFormData({ ...formData, firstname: e.target.value })} placeholder="e.g. Doe" className="bg-slate-50 focus:bg-white" />
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Beneficiary Code</label>
-                  <Input value={formData.employeeCode || ''} onChange={e => setFormData({ ...formData, employeeCode: e.target.value })} placeholder="e.g. EMP-001 (Auto-generated if empty)" className="bg-slate-50 focus:bg-white font-mono" />
+                  <Input value={formData.employeeCode || ''} onChange={e => setFormData({ ...formData, employeeCode: e.target.value })} placeholder="e.g. BEN-001 (Auto-generated if empty)" className="bg-slate-50 focus:bg-white font-mono" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
-                  <select 
-                    className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none ${formData.endDate ? 'opacity-70 cursor-not-allowed' : ''}`} 
-                    value={formData.status} 
+                  <select
+                    className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none ${formData.endDate ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    value={formData.status}
                     onChange={e => setFormData({ ...formData, status: e.target.value as any })}
                     disabled={!!formData.endDate}
                   >

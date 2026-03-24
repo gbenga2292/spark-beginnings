@@ -3,8 +3,10 @@ import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from '@/src/hooks/useAuth';
+import { toast } from '@/src/components/ui/toast';
 import { useAppData, deriveMainTaskStatus, getMainTaskProgress } from '@/src/contexts/AppDataContext';
 import { useWorkspace } from '@/src/hooks/use-workspace';
+import { useAppStore } from '@/src/store/appStore';
 import type { SubTask, SubTaskStatus, MainTask, AppUser } from "@/src/types/tasks";
 import type { TaskPriority } from "@/src/types/tasks";
 import {
@@ -20,6 +22,7 @@ import { ViewToggle, type TaskViewMode } from "@/src/components/tasks/ViewToggle
 import { SubtaskKanbanView, MainTaskKanbanView } from "@/src/components/tasks/TaskKanbanView";
 import { TaskFocusView } from "@/src/components/tasks/TaskFocusView";
 import { TaskGanttView } from "@/src/components/tasks/TaskGanttView";
+import { TaskInboxView } from "@/src/components/tasks/TaskInboxView";
 
 import type { Project } from "@/src/types/tasks/project";
 import { CreateProjectDialog } from "@/src/components/tasks/CreateProjectDialog";
@@ -229,6 +232,19 @@ function PersonalTasksView() {
         </motion.div>
       )}
 
+      {/* ── INBOX VIEW ── */}
+      {viewMode === 'inbox' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+          <TaskInboxView
+            subtasks={wsSubs}
+            mainTasks={wsTasks}
+            users={[]}
+            activeSubtaskId={openSubtaskId}
+            onSelectSubtask={id => setOpenSubtaskId(id)}
+          />
+        </motion.div>
+      )}
+
       {/* ── LIST VIEW ── */}
       {viewMode === 'list' && (
         <>
@@ -390,12 +406,36 @@ function PersonalTasksView() {
         />
       )}
 
-      {editingTask && (
+      {editingTask && !editingTask.is_project && (
         <EditTaskDialog
           task={editingTask}
           users={[]}
           onClose={() => setEditingTask(null)}
           onSave={(patch) => { updateMainTask(editingTask.id, patch); setEditingTask(null); }}
+        />
+      )}
+
+      {editingTask && editingTask.is_project && (
+        <CreateProjectDialog
+          isEditing={true}
+          initialData={{
+             name: editingTask.title,
+             serviceType: "",
+             status: "Active",
+             endDate: editingTask.deadline,
+          }}
+          onClose={() => setEditingTask(null)}
+          onSubmit={(payload) => {
+             updateMainTask(editingTask.id, {
+                 title: payload.name,
+                 deadline: payload.endDate || undefined,
+             });
+             setEditingTask(null);
+          }}
+          users={[]}
+          currentUserId={currentUser?.id ?? ""}
+          teamId={workspace?.id ?? ""}
+          workspaceId={workspace?.id ?? ""}
         />
       )}
     </motion.div>
@@ -410,6 +450,7 @@ function AdminTasksView() {
     updateSubtask, deleteSubtask, updateSubtaskStatus, deleteMainTask, updateMainTask,
     postComment, getMainTaskComments, projects, createProject, reminders } = useAppData();
   const { user: currentUser } = useAuth();
+  const sites = useAppStore(s => s.sites);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -457,16 +498,43 @@ function AdminTasksView() {
       setTimeout(() => document.getElementById(`task-row-${openTaskId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
     }
     
-    // Clear 'open' and 'openTask' params
-    if (openId || openTaskId) {
+    // Process scope
+    const paramScope = searchParams.get("scope");
+    if (paramScope === 'projects') {
+      setScope('projects');
+    }
+
+    const openProjectName = searchParams.get("openProject");
+    if (openProjectName && projects.length > 0) {
+      const proj = projects.find(p => p.name === openProjectName);
+      if (proj) {
+        const mt = mainTasks.find(m => m.id === proj.mainTaskId || (m.is_project && m.title === proj.name));
+        if (mt) {
+           setExpanded(prev => new Set([...prev, mt.id]));
+        }
+        setTimeout(() => {
+           const el = document.getElementById(`proj-card-${proj.id}`);
+           if (el) {
+             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+             el.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'transition-all', 'duration-500');
+             setTimeout(() => el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2'), 1500);
+           }
+        }, 300);
+      }
+    }
+
+    // Clear params
+    if (openId || openTaskId || paramScope || openProjectName) {
        setSearchParams(prev => {
          const next = new URLSearchParams(prev);
          next.delete("open");
          next.delete("openTask");
+         next.delete("scope");
+         next.delete("openProject");
          return next;
        }, { replace: true });
     }
-  }, [searchParams, setSearchParams, subtasks]);
+  }, [searchParams, setSearchParams, subtasks, projects, mainTasks]);
 
   const { wsTasks: teamTasks, wsMembers, workspace: teamWs } = useWorkspace();
   const activeUsers = wsMembers;
@@ -613,10 +681,10 @@ function AdminTasksView() {
       </motion.div>
 
       {/* ── BOARD VIEW ── */}
-      {viewMode === 'board' && scope === 'all' && (
+      {viewMode === 'board' && (scope === 'all' || scope === 'projects') && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <MainTaskKanbanView
-            mainTasks={tabFiltered}
+            mainTasks={scope === 'projects' ? tabFiltered.filter(m => m.is_project) : tabFiltered}
             allSubtasks={teamSubtasks}
             users={activeUsers}
             onClickTask={id => { toggle(id); setViewMode('list'); }}
@@ -637,10 +705,10 @@ function AdminTasksView() {
       )}
 
       {/* ── GANTT VIEW ── */}
-      {viewMode === 'gantt' && scope !== 'projects' && (
+      {viewMode === 'gantt' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <TaskGanttView
-            mainTasks={scope === 'mine' ? mainTasks.filter(m => filteredMySubs.some(s => s.mainTaskId === m.id)) : tabFiltered}
+            mainTasks={scope === 'projects' ? tabFiltered.filter(m => m.is_project) : scope === 'mine' ? mainTasks.filter(m => filteredMySubs.some(s => s.mainTaskId === m.id)) : tabFiltered}
             subtasks={scope === 'mine' ? filteredMySubs as SubTask[] : teamSubtasks}
             users={activeUsers}
             onOpenSubtask={id => setOpenSubtaskId(id)}
@@ -653,23 +721,36 @@ function AdminTasksView() {
       )}
 
       {/* ── FOCUS VIEW ── */}
-      {viewMode === 'focus' && scope !== 'projects' && (
+      {viewMode === 'focus' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <TaskFocusView
-            subtasks={scope === 'mine' ? mySubs : teamSubtasks}
-            mainTasks={mainTasks}
+            subtasks={scope === 'mine' ? mySubs : scope === 'projects' ? teamSubtasks.filter(s => tabFiltered.find(m => m.is_project && m.id === s.mainTaskId)) : teamSubtasks}
+            mainTasks={scope === 'projects' ? tabFiltered.filter(m => m.is_project) : mainTasks}
             users={activeUsers}
             onClickSubtask={id => setOpenSubtaskId(id)}
           />
         </motion.div>
       )}
 
+      {/* ── INBOX VIEW ── */}
+      {viewMode === 'inbox' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+          <TaskInboxView
+            subtasks={scope === 'mine' ? mySubs : scope === 'projects' ? teamSubtasks.filter(s => tabFiltered.find(m => m.is_project && m.id === s.mainTaskId)) : teamSubtasks}
+            mainTasks={scope === 'projects' ? tabFiltered.filter(m => m.is_project) : mainTasks}
+            users={activeUsers}
+            activeSubtaskId={openSubtaskId}
+            onSelectSubtask={id => setOpenSubtaskId(id)}
+          />
+        </motion.div>
+      )}
+
       {/* ── COMPACT VIEW ── */}
-      {viewMode === 'compact' && scope !== 'projects' && (
+      {viewMode === 'compact' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           {(() => {
             const compactPool = scope === 'mine' ? filteredMySubs : scope === 'pending_review' ? pendingApprovalSubs : (() => {
-              const allSubs = tabFiltered.flatMap(mt => teamSubtasks.filter(s => s.mainTaskId === mt.id));
+              const allSubs = scope === 'projects' ? tabFiltered.filter(m => m.is_project).flatMap(mt => teamSubtasks.filter(s => s.mainTaskId === mt.id)) : tabFiltered.flatMap(mt => teamSubtasks.filter(s => s.mainTaskId === mt.id));
               return applySortToSubs(allSubs, sortBy);
             })();
             if (compactPool.length === 0) return (
@@ -734,8 +815,8 @@ function AdminTasksView() {
         </motion.div>
       )}
 
-      {/* ── PROJECTS VIEW ── */}
-      {scope === 'projects' && (
+      {/* ── PROJECTS LIST VIEW ── */}
+      {viewMode === 'list' && scope === 'projects' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           {(() => {
             const wsProjects = projects.filter(p => p.workspaceId === teamWs?.id);
@@ -749,41 +830,168 @@ function AdminTasksView() {
             return (
               <div className="space-y-3">
                 {wsProjects.map(proj => {
-                  const mt = mainTasks.find(m => m.id === proj.mainTaskId);
-                  const projSubs = mt ? subtasks.filter(s => s.mainTaskId === mt.id) : [];
+                  let mt = mainTasks.find(m => m.id === proj.mainTaskId);
+                  if (!mt) {
+                      // fallback for site objects
+                      mt = mainTasks.find(m => m.is_project && m.title === proj.name);
+                  }
+                  
+                  const projSubs = mt ? subtasks.filter(s => s.mainTaskId === mt.id || s.main_task_id === mt.id) : [];
                   const completed = projSubs.filter(s => s.status === 'completed').length;
                   const total = projSubs.length;
                   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
                   const endDate = addDays(new Date(proj.startDate), proj.durationDays);
                   const isOverdue = isPast(endDate) && pct < 100;
+                  const isExpanded = mt ? expanded.has(mt.id) : false;
                   return (
-                    <div key={proj.id}
-                      onClick={() => { if (mt) { setScope('all'); setExpanded(prev => new Set([...prev, mt.id])); } }}
-                      className="bg-card border border-border rounded-xl p-4 hover:bg-muted/30 cursor-pointer transition-colors">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="text-sm font-semibold text-foreground truncate">{proj.name}</h4>
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase">{proj.serviceType}</span>
+                    <div key={proj.id} id={`proj-card-${proj.id}`} className="bg-card border border-border rounded-xl flex flex-col overflow-hidden transition-colors hover:shadow-sm">
+                      <div
+                        onClick={async () => {
+                          if (mt) {
+                            toggle(mt.id);
+                          } else {
+                            try {
+                              const newMt = await createMainTask({
+                                title: proj.name,
+                                description: `Workspace for Site: ${proj.name}`,
+                                is_project: true,
+                                teamId: proj.workspaceId || 'dcel-team',
+                                workspaceId: proj.workspaceId || 'dcel-team',
+                                priority: 'medium'
+                              });
+                              if (newMt) {
+                                toast.success('Project workspace initialized!');
+                                toggle(newMt.id);
+                              }
+                            } catch (e) {
+                              toast.error('Failed to initialize workspace for this site.');
+                            }
+                          }
+                        }}
+                        className="p-4 hover:bg-muted/30 cursor-pointer transition-colors relative group">
+                        
+                        {mt && currentUser?.id === mt.createdBy && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setEditingTask(mt); }}
+                            className="absolute top-4 right-4 p-1.5 opacity-0 group-hover:opacity-100 rounded-md hover:bg-muted text-muted-foreground hover:text-primary transition-all z-10"
+                            title="Edit underlying Main Task"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        <div className="flex items-start justify-between gap-3 pr-8">
+                          <div className="min-w-0 flex-1 flex items-start gap-2">
+                             <div className="text-muted-foreground flex-shrink-0 mt-0.5">
+                               {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                             </div>
+                             <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="text-sm font-semibold text-foreground truncate">{proj.name}</h4>
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase">{proj.serviceType}</span>
+                              </div>
+                              <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
+                                <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{(() => { try { return format(new Date(proj.startDate), 'MMM d'); } catch { return ''; } })()} → {(() => { try { return format(endDate, 'MMM d'); } catch { return ''; } })()}</span>
+                                <span>{proj.durationDays}d</span>
+                                <span>{completed}/{total} done</span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{(() => { try { return format(new Date(proj.startDate), 'MMM d'); } catch { return ''; } })()} → {(() => { try { return format(endDate, 'MMM d'); } catch { return ''; } })()}</span>
-                            <span>{proj.durationDays}d</span>
-                            <span>{completed}/{total} done</span>
+                          <div className="flex items-center gap-2">
+                            {isOverdue && <span className="text-[10px] font-bold text-destructive hidden sm:inline-block">Overdue</span>}
+                            <div className="w-10 h-10 rounded-full border-2 border-border flex items-center justify-center">
+                              <span className={`text-xs font-bold ${pct === 100 ? 'text-green-600' : 'text-foreground'}`}>{pct}%</span>
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {isOverdue && <span className="text-[10px] font-bold text-destructive">Overdue</span>}
-                          <div className="w-10 h-10 rounded-full border-2 border-border flex items-center justify-center">
-                            <span className={`text-xs font-bold ${pct === 100 ? 'text-green-600' : 'text-foreground'}`}>{pct}%</span>
-                          </div>
+                        {/* Progress bar */}
+                        <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden ml-6">
+                          <div className={`h-full rounded-full transition-all ${pct === 100 ? 'bg-green-500' : 'bg-primary'}`}
+                            style={{ width: `${pct}%` }} />
                         </div>
                       </div>
-                      {/* Progress bar */}
-                      <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full transition-all ${pct === 100 ? 'bg-green-500' : 'bg-primary'}`}
-                          style={{ width: `${pct}%` }} />
-                      </div>
+
+                      {/* Subtasks View */}
+                      <AnimatePresence>
+                        {isExpanded && mt && (
+                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden bg-card/50">
+                            <div className="border-t border-border">
+                              {projSubs.length === 0 && (
+                                <p className="px-5 py-4 text-xs text-muted-foreground italic">No subtasks yet.</p>
+                              )}
+                              <div className="divide-y divide-border/50">
+                                {projSubs.map((sub, i) => {
+                                  const sc2 = statusConfig[sub.status];
+                                  const assignee = users.find(u => u.id === sub.assignedTo);
+                                  const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
+                                  return (
+                                    <motion.div key={sub.id} id={`subtask-row-${sub.id}`}
+                                      initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+                                      transition={{ delay: i * 0.03, duration: 0.25 }}
+                                      onClick={() => setOpenSubtaskId(sub.id)}
+                                      className="flex items-center gap-3 px-5 py-3 hover:bg-primary/5 transition-colors cursor-pointer group">
+                                      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc2.dot}`} />
+                                      <div className="min-w-0 flex-1">
+                                        <p className={`text-sm font-medium truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                                          {sub.title}
+                                        </p>
+                                      </div>
+                                      {/* Assignee */}
+                                      <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
+                                        {assignee ? (
+                                          <>
+                                            <div className={`w-5 h-5 rounded-full ${assignee.avatarColor} flex items-center justify-center text-white text-[9px] font-bold`}>
+                                              {assignee.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                                            </div>
+                                            <span className="text-xs text-muted-foreground whitespace-nowrap">{assignee.name.split(" ")[0]}</span>
+                                          </>
+                                        ) : (
+                                          <button onClick={(e) => { e.stopPropagation(); setAssignDialog({ subtaskId: sub.id, current: null }); }}
+                                            className="text-xs text-muted-foreground italic hover:text-primary transition-colors flex items-center gap-1">
+                                            <UserCheck className="w-3 h-3" />Assign
+                                          </button>
+                                        )}
+                                      </div>
+                                      {sub.priority && <PriorityBadge priority={sub.priority} size="xs" />}
+                                      {sub.deadline && (
+                                        <span className={`text-[11px] flex items-center gap-1 flex-shrink-0 hidden md:flex ${isOverdue ? "text-red-500" : "text-muted-foreground"}`}>
+                                          <Clock className="w-3 h-3" />{formatDueDate(sub.deadline)}
+                                        </span>
+                                      )}
+                                      <div onClick={e => e.stopPropagation()} className="flex items-center gap-1 flex-shrink-0">
+                                        {currentUser?.id === mt.createdBy && (
+                                          <>
+                                            <button
+                                              onClick={() => setEditingSubtask(sub)}
+                                              className="p-1 rounded-lg text-muted-foreground/30 hover:text-primary hover:bg-primary/10 transition-all"
+                                              title="Edit subtask">
+                                              <Pencil className="w-3 h-3" />
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                      <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${sc2.pillClass}`}>
+                                        {sc2.label}
+                                      </span>
+                                    </motion.div>
+                                  );
+                                })}
+                              </div>
+                              <div className="px-5 py-3 border-t border-border flex items-center justify-between gap-2">
+                                <AddSubtaskInline mainTaskId={mt.id} users={activeUsers} onAdd={sub => addSubtask(sub)} />
+                                <div className="flex items-center gap-2">
+                                  <button onClick={() => setChatTaskId(mt.id)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-primary hover:border-primary/30 transition-all">
+                                    <MessageSquare className="w-3 h-3" /> Chat
+                                  </button>
+                                  <DeleteTaskButton onConfirm={() => deleteMainTask(mt.id)} />
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   );
                 })}
@@ -1145,12 +1353,55 @@ function AdminTasksView() {
         />
       )}
 
-      {editingTask && (
+      {editingTask && !editingTask.is_project && (
         <EditTaskDialog
           task={editingTask}
           users={activeUsers}
           onClose={() => setEditingTask(null)}
           onSave={(patch) => { updateMainTask(editingTask.id, patch); setEditingTask(null); }}
+        />
+      )}
+
+      {editingTask && editingTask.is_project && (
+        <CreateProjectDialog
+          isEditing={true}
+          initialData={{
+             name: editingTask.title,
+             serviceType: "",
+             status: "Active",
+             endDate: editingTask.deadline,
+             linkedSite: sites.find(s => s.name === editingTask.title)?.name || null,
+             subtasks: teamSubtasks.filter(s => s.mainTaskId === editingTask.id).map(s => ({
+                id: s.id,
+                title: s.title,
+                assignee: s.assignedTo || '',
+                deadline: s.deadline || '',
+                hasUpdate: comments.some(c => c.subtaskId === s.id)
+             }))
+          }}
+          onClose={() => setEditingTask(null)}
+          onSubmit={(payload) => {
+             updateMainTask(editingTask.id, {
+                 title: payload.name,
+                 deadline: payload.endDate || undefined,
+             });
+             if (payload.subtasks) {
+                 payload.subtasks.forEach((s: any) => {
+                     if (s.id) {
+                         const patch: any = { title: s.title };
+                         if (s.deadline !== undefined) patch.deadline = s.deadline || null;
+                         updateSubtask(s.id, patch);
+                     } else {
+                         addSubtask({ title: s.title, mainTaskId: editingTask.id, assignedTo: s.assignee });
+                     }
+                 });
+             }
+             setEditingTask(null);
+          }}
+          users={activeUsers}
+          currentUserId={currentUser?.id ?? ""}
+          teamId={teamWs?.id ?? ""}
+          workspaceId={teamWs?.id ?? ""}
         />
       )}
 
@@ -1736,6 +1987,9 @@ function EditTaskDialog({ task, users, onClose, onSave }: {
   const [deadline, setDeadline] = useState(task.deadline ?? "");
   const [priority, setPriority] = useState<TaskPriority | undefined>(task.priority);
 
+  const isProj = !!task.is_project;
+  const label = isProj ? "Project" : "Task";
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
@@ -1753,7 +2007,7 @@ function EditTaskDialog({ task, users, onClose, onSave }: {
               <Pencil className="w-4.5 h-4.5 text-primary" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-foreground">Edit Task</h2>
+              <h2 className="text-base font-semibold text-foreground">Edit {label}</h2>
               <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[280px]">{task.title}</p>
             </div>
           </div>
@@ -1764,7 +2018,7 @@ function EditTaskDialog({ task, users, onClose, onSave }: {
 
         <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Task Title <span className="text-red-400">*</span></label>
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">{label} Title <span className="text-red-400">*</span></label>
             <input required autoFocus value={title} onChange={e => setTitle(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm" />
           </div>

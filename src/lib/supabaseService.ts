@@ -7,7 +7,8 @@ import type {
   Site, Employee, AttendanceRecord, Invoice, PendingInvoice,
   SalaryAdvance, Loan, Payment, VatPayment, LeaveRecord, DepartmentTasks,
   DisciplinaryRecord, EvaluationRecord, Department, Position,
-  LedgerCategory, LedgerVendor, LedgerBank, LedgerEntry, CommLog
+  LedgerCategory, LedgerVendor, LedgerBank, LedgerEntry, CommLog,
+  CompanyExpense
 } from '@/src/store/appStore';
 import type { AppUser, PrivilegePreset } from '@/src/store/userStore';
 
@@ -170,6 +171,20 @@ export function dbToLedgerEntry(r: any): LedgerEntry {
     id: r.id, voucherNo: r.voucher_no, date: r.date, description: r.description,
     category: r.category, amount: Number(r.amount), client: r.client, site: r.site,
     vendor: r.vendor, bank: r.bank, enteredBy: r.entered_by
+  };
+}
+
+export function dbToCompanyExpense(r: any): CompanyExpense {
+  return {
+    id: r.id,
+    date: r.date,
+    description: r.description,
+    amount: Number(r.amount),
+    paidFrom: r.paid_from,
+    paidToBankName: r.paid_to_bank_name,
+    paidToAccountNo: r.paid_to_account_no,
+    enteredBy: r.entered_by,
+    createdAt: r.created_at
   };
 }
 
@@ -355,6 +370,20 @@ function ledgerEntryToDb(e: LedgerEntry) {
   };
 }
 
+function companyExpenseToDb(e: CompanyExpense) {
+  const safeDate = e.date && e.date.trim() !== '' ? e.date : new Date().toISOString().split('T')[0];
+  return {
+    id: e.id,
+    date: safeDate,
+    description: e.description,
+    amount: e.amount,
+    paid_from: e.paidFrom,
+    paid_to_bank_name: e.paidToBankName,
+    paid_to_account_no: e.paidToAccountNo,
+    entered_by: e.enteredBy
+  };
+}
+
 function commLogToDb(l: CommLog) {
   return {
     id: l.id,
@@ -391,6 +420,7 @@ export async function fetchAllAppData(privs?: any) {
     positionsRes, departmentsRes,
     disciplinaryRes, evaluationsRes,
     lCatRes, lVenRes, lBankRes, lEntRes,
+    compExpRes,
     commLogsRes,
   ] = await Promise.all([
     canView('sites') ? supabase.from('sites').select('*').order('created_at') : Promise.resolve({ data: [] }),
@@ -408,7 +438,7 @@ export async function fetchAllAppData(privs?: any) {
     canView('leaves') ? supabase.from('leaves').select('*').order('start_date', { ascending: false }) : Promise.resolve({ data: [] }),
     supabase.from('leave_types').select('*').order('name'),
     supabase.from('app_settings').select('*').limit(1).maybeSingle(),
-    supabase.from('positions').select('*').order('name'),
+    supabase.from('positions').select('*').order('title'),
     supabase.from('departments').select('*').order('name'),
     canView('disciplinary') ? supabase.from('disciplinary_records').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     canView('evaluations') ? supabase.from('evaluations').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
@@ -416,6 +446,7 @@ export async function fetchAllAppData(privs?: any) {
     canView('ledger') ? supabase.from('ledger_vendors').select('*').order('name') : Promise.resolve({ data: [] }),
     canView('ledger') ? supabase.from('ledger_banks').select('*').order('name') : Promise.resolve({ data: [] }),
     canView('ledger') ? supabase.from('ledger_entries').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
+    canView('ledger') ? supabase.from('company_expenses').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     supabase.from('comm_logs').select('*').order('date', { ascending: false }),
   ]);
 
@@ -447,6 +478,7 @@ export async function fetchAllAppData(privs?: any) {
     ledgerVendors: (lVenRes.data || []).map(dbToLedgerVendor),
     ledgerBanks: (lBankRes.data || []).map(dbToLedgerBank),
     ledgerEntries: (lEntRes.data || []).map(dbToLedgerEntry),
+    companyExpenses: (compExpRes.data || []).map(dbToCompanyExpense),
     positions: (positionsRes.data || []).map((p: any) => ({
       id: p.id,
       title: p.title || p.name,
@@ -1015,6 +1047,29 @@ export const db = {
     if (error) {
       console.error('deleteLedgerEntry:', error.message, error.details, error.hint);
     }
+  },
+
+  // Company Expenses
+  async insertCompanyExpense(e: CompanyExpense) {
+    const { error } = await supabase.from('company_expenses').insert(companyExpenseToDb(e));
+    if (error) console.error('insertCompanyExpense:', error);
+  },
+  async updateCompanyExpense(id: string, e: Partial<CompanyExpense>) {
+    const update: any = {};
+    Object.entries(e).forEach(([k, v]) => {
+      const map: Record<string, string> = {
+        paidFrom: 'paid_from', paidToBankName: 'paid_to_bank_name',
+        paidToAccountNo: 'paid_to_account_no', enteredBy: 'entered_by',
+        createdAt: 'created_at'
+      };
+      update[map[k] || k] = v;
+    });
+    const { error } = await supabase.from('company_expenses').update(update).eq('id', id);
+    if (error) console.error('updateCompanyExpense:', error);
+  },
+  async deleteCompanyExpense(id: string) {
+    const { error } = await supabase.from('company_expenses').delete().eq('id', id);
+    if (error) console.error('deleteCompanyExpense:', error);
   },
 
   // Communication Logs

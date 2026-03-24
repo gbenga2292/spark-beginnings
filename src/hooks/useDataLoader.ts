@@ -3,7 +3,7 @@ import { useAppStore, DEFAULT_OFFBOARDING_TASKS } from '@/src/store/appStore';
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense } from '@/src/lib/supabaseService';
 
 /** Fills in any missing privilege sections using NO_ACCESS defaults. */
 function backfillPrivileges(
@@ -102,6 +102,7 @@ export function useDataLoader(isAuthenticated: boolean) {
           leaveTypes: appData.leaveTypes.length > 0 ? appData.leaveTypes : useAppStore.getState().leaveTypes,
           disciplinaryRecords: appData.disciplinaryRecords,
           evaluations: appData.evaluations,
+          companyExpenses: appData.companyExpenses,
           positions: appData.positions.length > 0 ? appData.positions : useAppStore.getState().positions,
           departments: appData.departments.length > 0 ? appData.departments : useAppStore.getState().departments,
           // Always preserve pendingSites from localStorage — not synced to Supabase
@@ -383,6 +384,20 @@ export function useRealtimeData(isAuthenticated: boolean) {
                 useAppStore.setState({ commLogs: current.map(l => l.id === updated.id ? updated : l) });
               } else if (eventType === 'DELETE') {
                 useAppStore.setState({ commLogs: current.filter(l => l.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'company_expenses': {
+              const current = appState.companyExpenses;
+              if (eventType === 'INSERT') {
+                if (!current.some(e => e.id === newRow.id)) {
+                  useAppStore.setState({ companyExpenses: [...current, dbToCompanyExpense(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToCompanyExpense(newRow);
+                useAppStore.setState({ companyExpenses: current.map(e => e.id === updated.id ? updated : e) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ companyExpenses: current.filter(e => e.id !== oldRow.id) });
               }
               break;
             }

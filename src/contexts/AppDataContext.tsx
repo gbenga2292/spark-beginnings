@@ -101,6 +101,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 if (stRes.data) setSubtasks(stRes.data);
                 if (pRes.data) setUsers(pRes.data);
                 let loadedProjects: any[] = [];
+                // Only explicitly created projects (is_project = true) should be displayed in the Projects tab.
+                // Removing dynamic injection of sites here based on user feedback.
+                /*
                 if (projRes.data) {
                     loadedProjects = projRes.data.map((p: any) => ({
                         ...p,
@@ -111,6 +114,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                         durationDays: parseInt(p.vat) || 30, // Fallback
                     }));
                 }
+                */
                 if (mtRes.data) {
                     const genericProjects = mtRes.data
                         .filter((t: any) => t.is_project)
@@ -223,6 +227,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             assignedTo: task.assignedTo || null,
             deadline: task.deadline || null,
             priority: task.priority || null,
+            is_project: task.is_project || false,
         };
         const { data, error } = await supabase.from('main_tasks').insert(payload).select().single();
         if (error) {
