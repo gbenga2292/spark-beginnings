@@ -290,17 +290,22 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                     </span>
                   )}
 
-                  {/* Status pill — clickable buttons for status change */}
+                  {/* Status pills — only admins, co-admins, and the task creator can change status */}
                   {(['not_started', 'in_progress', 'completed'] as SubTaskStatus[]).map(s => {
                     const sc = statusConfig[s];
                     const SIcon = sc.icon;
                     const isActive = activeSubtask.status === s;
+                    const canChangeStatus = currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || activeMainTask?.createdBy === currentUser?.id;
                     return (
                       <button
                         key={s}
-                        onClick={() => currentUser && updateSubtaskStatus(activeSubtask.id!, s, currentUser.id)}
+                        onClick={() => canChangeStatus && currentUser && updateSubtaskStatus(activeSubtask.id!, s, currentUser.id)}
+                        disabled={!canChangeStatus}
+                        title={!canChangeStatus ? 'Only admins and the task creator can change status' : undefined}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                          isActive ? sc.pillClass + ' ring-2 ring-offset-1 ring-primary/30' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                          isActive ? sc.pillClass + ' ring-2 ring-offset-1 ring-primary/30' :
+                          !canChangeStatus ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' :
+                          'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
                         }`}
                       >
                         <SIcon className="w-3.5 h-3.5" /> {sc.label}
@@ -308,37 +313,17 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                     );
                   })}
 
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 transition-colors">
-                        <User className="w-3.5 h-3.5" /> Assign <ChevronDown className="w-3 h-3 opacity-50" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-64 max-h-[300px] overflow-y-auto">
-                      <div className="p-2 text-xs text-slate-500 bg-slate-50 border-b mb-1">
-                        Select an assignee for this subtask:
-                      </div>
-                      <DropdownMenuItem onClick={() => assignSubtask(activeSubtask.id!, "")} className="cursor-pointer text-slate-500 font-medium italic">
-                        Unassigned
-                      </DropdownMenuItem>
-                      {users.filter(u => !u.isDeleted && !u.isSuspended).map(u => (
-                        <DropdownMenuItem
-                          key={u.id}
-                          className="flex items-center gap-2 cursor-pointer"
-                          onClick={() => assignSubtask(activeSubtask.id!, u.id)}
-                        >
-                          <Avatar className="w-5 h-5 flex-shrink-0">
-                            <AvatarImage src={u.avatarUrl} />
-                            <AvatarFallback className={`text-[8px] text-white ${u.avatarColor || 'bg-slate-400'}`}>
-                              {u.name.substring(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className={`${activeSubtask.assignedTo === u.id ? 'font-bold text-primary' : 'font-medium'}`}>{u.name}</span>
-                          {activeSubtask.assignedTo === u.id && <CheckCircle2 className="w-3 h-3 text-primary ml-auto" />}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {/* Assign button — only admins, co-admins or the task creator can reassign — supports multiple */}
+                  {(currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || activeMainTask?.createdBy === currentUser?.id) && (
+                    <AssignMultiDropdown
+                      activeSubtask={activeSubtask}
+                      activeMainTask={activeMainTask}
+                      users={users.filter(u => !u.isDeleted && !u.isSuspended)}
+                      currentUser={currentUser}
+                      assignSubtask={assignSubtask}
+                      addSubtask={addSubtask}
+                    />
+                  )}
                 </div>
 
                 {/* Status Stepper */}
@@ -357,7 +342,10 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                                 isPastPhase ? 'text-primary' :
                                 'text-slate-400'
                               }`}
-                            onClick={() => currentUser && updateSubtaskStatus(activeSubtask.id!, status, currentUser.id)}
+                          onClick={() => {
+                              const canChangeStatus = currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || activeMainTask?.createdBy === currentUser?.id;
+                              if (canChangeStatus && currentUser) updateSubtaskStatus(activeSubtask.id!, status, currentUser.id);
+                            }}
                           >
                             {STATUS_LABELS[status]}
                           </div>
@@ -416,7 +404,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
           </div>
 
           {/* RIGHT: Updates Panel */}
-          <div className="w-[340px] flex-shrink-0 bg-white border-l border-border flex flex-col">
+          <div className="w-[520px] flex-shrink-0 bg-white border-l border-border flex flex-col">
             {/* Tabs */}
             <div className="flex border-b border-border flex-shrink-0">
               {(['updates', 'workflow', 'files'] as const).map(tab => (
@@ -577,5 +565,238 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
         <p className="text-[10px] text-slate-400 mt-2 px-1">Enter to send · Shift+Enter for new line · @mention · #subtask</p>
       </div>
     </div>
+  );
+}
+
+// ── Workflow Feed ────────────────────────────────────────────────────────────
+function WorkflowFeed({ mainTask, users, getMainTaskWorkflow }: { mainTask: any; users: any[]; getMainTaskWorkflow: any }) {
+  const events = mainTask ? getMainTaskWorkflow(mainTask.id) : [];
+
+  // Map the event `type` field from getMainTaskWorkflow to icon/color config
+  const eventConfig: Record<string, { color: string; icon: any; bg: string; label: string }> = {
+    task_created:          { color: "text-blue-600",   icon: Plus,          bg: "bg-blue-100",   label: "Task Created" },
+    subtask_created:       { color: "text-indigo-600", icon: Plus,          bg: "bg-indigo-100", label: "Subtask Added" },
+    subtask_assigned:      { color: "text-purple-600", icon: User,          bg: "bg-purple-100", label: "Task Delegated" },
+    comment_posted:        { color: "text-slate-600",  icon: MessageSquare, bg: "bg-slate-100",  label: "Update Posted" },
+    user_mentioned:        { color: "text-primary",    icon: MessageSquare, bg: "bg-primary/10", label: "User Mentioned" },
+    subtask_status_changed:{ color: "text-green-600",  icon: CheckCircle2,  bg: "bg-green-100",  label: "Status Changed" },
+    urgent_request:        { color: "text-red-600",    icon: AlertTriangle, bg: "bg-red-100",    label: "Urgent Request" },
+    file_attached:         { color: "text-yellow-700", icon: Paperclip,     bg: "bg-yellow-100", label: "File Attached" },
+  };
+
+  return (
+    <div className="flex-1 overflow-y-auto p-5 space-y-3">
+      {events.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+          <CheckCircle2 className="w-10 h-10 mb-3 text-slate-200" />
+          <p className="text-sm font-medium">No workflow history yet.</p>
+          <p className="text-xs mt-1">Activity will appear here as tasks progress.</p>
+        </div>
+      ) : (
+        events.map((e: any, i: number) => {
+          // getMainTaskWorkflow returns: { type, actorId, label, createdAt, ... }
+          const actorId = e.actorId || e.userId || e.user_id;
+          const actor = users.find((x: any) => x.id === actorId);
+          const type = e.type || e.eventType || e.event_type || 'comment_posted';
+          const config = eventConfig[type] || { color: "text-slate-600", icon: Circle, bg: "bg-slate-100", label: "Activity" };
+          const EIcon = config.icon;
+          const displayLabel = e.label || config.label;
+          const createdAt = e.createdAt || e.created_at || new Date().toISOString();
+
+          // For assignments, show the target user's name
+          const targetUser = e.targetUserIds?.length > 0
+            ? users.find((x: any) => x.id === e.targetUserIds[0])
+            : null;
+
+          return (
+            <div key={i} className="flex gap-3.5 p-4 bg-slate-50 border border-slate-100 rounded-2xl hover:border-slate-200 transition-colors">
+              {/* Icon */}
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${config.bg} ${config.color}`}>
+                <EIcon className="w-4 h-4" />
+              </div>
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800 leading-tight">{displayLabel}</p>
+                    {actor && (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <div className={`w-4 h-4 rounded-full ${actor.avatarColor || 'bg-slate-400'} flex items-center justify-center`}>
+                          <span className="text-[7px] font-bold text-white">{actor.name?.substring(0, 2).toUpperCase()}</span>
+                        </div>
+                        <span className="text-xs text-slate-500">{actor.name}</span>
+                        {targetUser && (
+                          <>
+                            <span className="text-xs text-slate-400">→</span>
+                            <div className={`w-4 h-4 rounded-full ${targetUser.avatarColor || 'bg-primary'} flex items-center justify-center`}>
+                              <span className="text-[7px] font-bold text-white">{targetUser.name?.substring(0, 2).toUpperCase()}</span>
+                            </div>
+                            <span className="text-xs font-semibold text-slate-700">{targetUser.name}</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-slate-400 shrink-0 mt-0.5">
+                    {format(new Date(createdAt), "MMM d, h:mm a")}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+// ── Files Feed ───────────────────────────────────────────────────────────────
+function FilesFeed({ subtask, getSubtaskComments, users }: { subtask: any; getSubtaskComments: any; users: any[] }) {
+  const comments = getSubtaskComments(subtask.id);
+  const files: any[] = [];
+  comments.forEach((c: any) => {
+    if (c.attachments) c.attachments.forEach((a: any) => files.push({ ...a, comment: c, type: 'attachment' }));
+    if (c.fileLinks) c.fileLinks.forEach((f: any) => files.push({ link: f, comment: c, type: 'link' }));
+    // Normalize snake_case
+    if (c.file_links) c.file_links.forEach((f: any) => files.push({ link: f, comment: c, type: 'link' }));
+  });
+
+  const handleOpenFilePath = (filePath: string) => {
+    const api = (window as any).electronAPI;
+    if (api?.showInFolder) api.showInFolder(filePath);
+    else { navigator.clipboard.writeText(filePath).catch(() => {}); alert(`Path copied to clipboard:\n${filePath}`); }
+  };
+
+  return (
+    <div className="flex-1 overflow-y-auto p-5 space-y-4">
+      {files.length === 0 ? (
+        <p className="text-sm text-center text-slate-400 py-10">No files attached to this task yet.</p>
+      ) : (
+        files.map((f, i) => {
+          const authorId = f.comment.authorId || f.comment.author_id;
+          const author = users.find(u => u.id === authorId);
+          if (f.type === 'link') {
+            return (
+              <div key={i} className="flex flex-col p-4 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 transition-colors shadow-sm group">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                      <FolderOpen className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 truncate pr-2" title={f.link}>{f.link.split('\\').pop() || f.link}</p>
+                      <p className="text-[10px] text-slate-400">Shared by {author?.name || 'Unknown'}</p>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleOpenFilePath(f.link)}
+                  className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 text-[11px] font-bold rounded-xl transition-colors shrink-0"
+                >
+                  Open Path
+                </button>
+              </div>
+            );
+          }
+          return (
+             <div key={i} className="flex flex-col p-4 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 transition-colors shadow-sm">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                      <Paperclip className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 truncate pr-2" title={f.name}>{f.name}</p>
+                      <p className="text-[10px] text-slate-400">Attached by {author?.name || 'Unknown'}</p>
+                    </div>
+                  </div>
+                </div>
+                <a
+                  href={f.base64}
+                  download={f.name}
+                  className="w-full py-2 flex items-center justify-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 text-[11px] font-bold rounded-xl transition-colors shrink-0"
+                >
+                  Download File
+                </a>
+             </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+// ── Multi-Assign Dropdown ───────────────────────────────────────────────────
+function AssignMultiDropdown({ activeSubtask, activeMainTask, users, currentUser, assignSubtask, addSubtask }: any) {
+  const { subtasks } = useAppData();
+  
+  // Find all sibling subtasks within this main task that have the exact same title
+  const siblingAssignees = subtasks
+     .filter((s: any) => s.mainTaskId === activeMainTask?.id && s.title === activeSubtask.title)
+     .map((s: any) => s.assignedTo)
+     .filter(Boolean);
+
+  const toggleAssignee = (uid: string) => {
+      if (activeSubtask.assignedTo === uid) {
+          // Unassign the current active task
+          assignSubtask(activeSubtask.id, "");
+      } else if (!activeSubtask.assignedTo) {
+          // It's empty, so just fill it
+          assignSubtask(activeSubtask.id, uid);
+      } else {
+          // Already belongs to someone else. Duplicate it if they aren't already among the siblings.
+          if (!siblingAssignees.includes(uid)) {
+              addSubtask({
+                  title: activeSubtask.title,
+                  description: activeSubtask.description || "",
+                  mainTaskId: activeMainTask.id,
+                  assignedTo: uid,
+                  status: 'not_started',
+                  priority: activeSubtask.priority
+              });
+          }
+      }
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 transition-colors">
+          <User className="w-3.5 h-3.5" /> Assign <ChevronDown className="w-3 h-3 opacity-50" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-64 max-h-[400px] overflow-y-auto">
+        <div className="p-2 text-[11px] font-medium text-slate-400 bg-slate-50 border-b mb-1 uppercase tracking-wider">
+          Assign Team Members
+        </div>
+        <DropdownMenuItem onClick={() => assignSubtask(activeSubtask.id, "")} className="cursor-pointer text-slate-500 font-medium italic mb-1">
+          Unassigned
+        </DropdownMenuItem>
+        {users.map((u: any) => {
+          const isSelected = activeSubtask.assignedTo === u.id;
+          const isSiblingSelected = siblingAssignees.includes(u.id);
+          const isAnySelected = isSelected || isSiblingSelected;
+          
+          return (
+            <DropdownMenuItem
+              key={u.id}
+              className="flex items-center gap-2 cursor-pointer py-2"
+              onClick={(e) => { e.preventDefault(); toggleAssignee(u.id); }}
+            >
+              <div className="flex items-center justify-center w-4 h-4 border border-slate-200 rounded shadow-sm mr-1">
+                 {isAnySelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary" />}
+              </div>
+              <Avatar className="w-6 h-6 flex-shrink-0">
+                <AvatarImage src={u.avatarUrl} />
+                <AvatarFallback className={`text-[9px] font-bold text-white ${u.avatarColor || 'bg-slate-400'}`}>
+                  {u.name.substring(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <span className={`${isAnySelected ? 'font-bold text-primary' : 'font-medium text-slate-600'} text-sm`}>{u.name}</span>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

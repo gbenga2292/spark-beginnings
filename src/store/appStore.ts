@@ -650,10 +650,10 @@ export const useAppStore = create<AppState>()(
       deleteSite: (id) => { set((s) => ({ sites: s.sites.filter(site => site.id !== id) })); db.deleteSite(id); },
 
       // Pending Sites
-      addPendingSite: (site) => { set((s) => ({ pendingSites: [...s.pendingSites, site] })); },
+      addPendingSite: (site) => { set((s) => ({ pendingSites: [...s.pendingSites, site] })); db.insertPendingSite(site); },
       setPendingSites: (pendingSites) => { set({ pendingSites }); },
-      updatePendingSite: (id, updatedSite) => { set((s) => ({ pendingSites: s.pendingSites.map(site => site.id === id ? { ...site, ...updatedSite } : site) })); },
-      deletePendingSite: (id) => { set((s) => ({ pendingSites: s.pendingSites.filter(site => site.id !== id) })); },
+      updatePendingSite: (id, updatedSite) => { set((s) => ({ pendingSites: s.pendingSites.map(site => site.id === id ? { ...site, ...updatedSite } : site) })); db.updatePendingSite(id, updatedSite); },
+      deletePendingSite: (id) => { set((s) => ({ pendingSites: s.pendingSites.filter(site => site.id !== id) })); db.deletePendingSite(id); },
 
       // Clients
       addClient: (client) => { set((s) => ({ clients: s.clients.includes(client) ? s.clients : [...s.clients, client] })); db.insertClient(client); },

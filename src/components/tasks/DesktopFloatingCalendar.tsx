@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar as CalendarIcon, X } from 'lucide-react';
 import CalendarPage from '@/src/pages/TaskCalendar';
@@ -7,6 +7,7 @@ import { useTheme } from '@/src/hooks/useTheme';
 export function DesktopFloatingCalendar() {
   const [open, setOpen] = useState(false);
   const { isDark } = useTheme();
+  const isDragging = useRef(false);
   
   const isMac = (window as any).electronAPI?.platform === 'darwin';
 
@@ -46,13 +47,32 @@ export function DesktopFloatingCalendar() {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-[150] w-14 h-14 md:w-16 md:h-16 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-600/30 flex items-center justify-center hover:bg-indigo-500 transition-all active:scale-95 hover:scale-105"
-        title="Open Calendar"
+      <motion.div
+        drag
+        dragMomentum={false}
+        onDragStart={() => {
+          isDragging.current = true;
+        }}
+        onDragEnd={() => {
+          setTimeout(() => {
+            isDragging.current = false;
+          }, 150);
+        }}
+        onClick={(e) => {
+          if (isDragging.current) {
+            e.preventDefault();
+            return;
+          }
+          setOpen(true);
+        }}
+        className="fixed bottom-6 right-6 z-[150] w-14 h-14 md:w-16 md:h-16 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-600/30 flex items-center justify-center hover:bg-indigo-500 transition-colors cursor-grab active:cursor-grabbing"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        title="Drag to move, click to open Calendar"
+        style={{ touchAction: 'none' }}
       >
-        <CalendarIcon className="w-6 h-6 md:w-7 md:h-7" />
-      </button>
+        <CalendarIcon className="w-6 h-6 md:w-7 md:h-7 pointer-events-none" />
+      </motion.div>
 
       <AnimatePresence>
         {open && (

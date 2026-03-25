@@ -11,6 +11,7 @@ import type {
   CompanyExpense
 } from '@/src/store/appStore';
 import type { AppUser, PrivilegePreset } from '@/src/store/userStore';
+import type { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 
 // ─── Mappers: DB → App ──────────────────────────────────────
 
@@ -210,6 +211,18 @@ export function dbToCommLog(r: any): CommLog {
   };
 }
 
+export function dbToPendingSite(r: any): SiteQuestionnaire {
+  return {
+    id: r.id,
+    clientName: r.client_name,
+    siteName: r.site_name,
+    status: r.status,
+    ...r.data,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
 export function dbToProfile(r: any): AppUser {
   return {
     id: r.id, name: r.name, email: r.email, avatar: r.avatar,
@@ -406,6 +419,19 @@ function commLogToDb(l: CommLog) {
   };
 }
 
+function pendingSiteToDb(p: SiteQuestionnaire) {
+  const { id, clientName, siteName, status, createdAt, updatedAt, ...restData } = p;
+  return {
+    id,
+    client_name: clientName,
+    site_name: siteName,
+    status,
+    data: restData,
+    created_at: createdAt || new Date().toISOString(),
+    updated_at: updatedAt || new Date().toISOString(),
+  };
+}
+
 // ─── FETCH ALL ───────────────────────────────────────────────
 
 export async function fetchAllAppData(privs?: any) {
@@ -422,6 +448,7 @@ export async function fetchAllAppData(privs?: any) {
     lCatRes, lVenRes, lBankRes, lEntRes,
     compExpRes,
     commLogsRes,
+    pendingSitesRes,
   ] = await Promise.all([
     canView('sites') ? supabase.from('sites').select('*').order('created_at') : Promise.resolve({ data: [] }),
     canView('sites') ? supabase.from('clients').select('*').order('name') : Promise.resolve({ data: [] }),
@@ -448,12 +475,14 @@ export async function fetchAllAppData(privs?: any) {
     canView('ledger') ? supabase.from('ledger_entries').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     canView('ledger') ? supabase.from('company_expenses').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     supabase.from('comm_logs').select('*').order('date', { ascending: false }),
+    canView('sites') ? supabase.from('pending_sites').select('*').order('created_at') : Promise.resolve({ data: [] }),
   ]);
 
   const settings = settingsRes.data;
 
   return {
     commLogs: (commLogsRes.data || []).map(dbToCommLog),
+    pendingSites: (pendingSitesRes.data || []).map(dbToPendingSite),
     sites: (sitesRes.data || []).map(dbToSite),
     clients: (clientsRes.data || []).map((c: any) => c.name),
     employees: (employeesRes.data || []).map(dbToEmployee),
@@ -551,6 +580,24 @@ export const db = {
       const { error } = await supabase.from('sites').insert(sites.map(siteToDb));
       if (error) console.error('setSites:', error);
     }
+  },
+
+  // Pending Sites
+  async insertPendingSite(p: SiteQuestionnaire) {
+    const { error } = await supabase.from('pending_sites').insert(pendingSiteToDb(p));
+    if (error) console.error('insertPendingSite:', error);
+  },
+  async updatePendingSite(id: string, p: Partial<SiteQuestionnaire>) {
+    // For pending sites, we overwrite the whole object as we're saving all phases.
+    if (p.id) {
+       const mapped = pendingSiteToDb(p as SiteQuestionnaire);
+       const { error } = await supabase.from('pending_sites').update(mapped).eq('id', id);
+       if (error) console.error('updatePendingSite:', error);
+    }
+  },
+  async deletePendingSite(id: string) {
+    const { error } = await supabase.from('pending_sites').delete().eq('id', id);
+    if (error) console.error('deletePendingSite:', error);
   },
 
   // Clients

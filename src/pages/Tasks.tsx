@@ -1747,16 +1747,19 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
 }) {
   const [title, setTitle] = useState("");
   const [description, setDesc] = useState("");
-  const [assignedTo, setAssignedTo] = useState("");
+  const [assignedTo, setAssignedTo] = useState<string[]>([]);
   const [deadline, setDeadline] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("");
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
   const [showSubs, setShowSubs] = useState(true);
-  const [subtasks, setSubs] = useState<{ title: string; assignedTo: string; deadline: string; deadlineTime: string; priority: TaskPriority | undefined }[]>([]);
+  const [subtasks, setSubs] = useState<{ title: string; assignedTo: string[]; deadline: string; deadlineTime: string; priority: TaskPriority | undefined }[]>([]);
 
-  const addRow = () => setSubs(p => [...p, { title: "", assignedTo: "", deadline: "", deadlineTime: "", priority: undefined }]);
+  const [openMainDropdown, setOpenMainDropdown] = useState(false);
+  const [openSubDropdown, setOpenSubDropdown] = useState<number | null>(null);
+
+  const addRow = () => setSubs(p => [...p, { title: "", assignedTo: [], deadline: "", deadlineTime: "", priority: undefined }]);
   const removeRow = (i: number) => setSubs(p => p.filter((_, idx) => idx !== i));
-  const updateRow = (i: number, k: string, v: string) =>
+  const updateRow = (i: number, k: string, v: any) =>
     setSubs(p => p.map((r, idx) => idx === i ? { ...r, [k]: v } : r));
 
   const toggleSubs = () => {
@@ -1773,17 +1776,29 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
     const combinedDeadline = deadline
       ? deadlineTime ? `${deadline}T${deadlineTime}` : deadline
       : undefined;
-    onSubmit(
-      { title: title.trim(), description: description.trim(), createdBy: currentUserId, teamId, workspaceId: workspaceId ?? teamId, assignedTo: assignedTo || undefined, deadline: combinedDeadline, priority },
-      validSubs.map(s => ({
-        title: s.title.trim(),
-        description: "",
-        assignedTo: s.assignedTo || null,
-        status: "not_started" as SubTaskStatus,
-        deadline: s.deadline ? (s.deadlineTime ? `${s.deadline}T${s.deadlineTime}` : s.deadline) : undefined,
-        priority: s.priority,
-      }))
-    );
+
+    const finalSubs: any[] = [];
+    validSubs.forEach(s => {
+      const uids = s.assignedTo.length > 0 ? s.assignedTo : [null];
+      uids.forEach(uid => {
+        finalSubs.push({
+          title: s.title.trim(),
+          description: "",
+          assignedTo: uid,
+          status: "not_started" as SubTaskStatus,
+          deadline: s.deadline ? (s.deadlineTime ? `${s.deadline}T${s.deadlineTime}` : s.deadline) : undefined,
+          priority: s.priority,
+        });
+      });
+    });
+
+    const mainTaskUids = assignedTo.length > 0 ? assignedTo : [undefined];
+    mainTaskUids.forEach(uid => {
+      onSubmit(
+        { title: title.trim(), description: description.trim(), createdBy: currentUserId, teamId, workspaceId: workspaceId ?? teamId, assignedTo: uid, deadline: combinedDeadline, priority },
+        finalSubs
+      );
+    });
     onClose();
   };
 
@@ -1828,13 +1843,33 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-            <div>
+            <div className="relative">
               <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Assigned To</label>
-              <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm cursor-pointer">
-                <option value="">Unassigned</option>
-                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
+              <button type="button" onClick={() => setOpenMainDropdown(!openMainDropdown)}
+                className="w-full px-3.5 py-2.5 flex items-center justify-between rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm cursor-pointer whitespace-nowrap overflow-hidden">
+                <span className="truncate">{assignedTo.length > 0 ? `${assignedTo.length} assignee(s)` : "Unassigned"}</span>
+                <ChevronDown className="w-4 h-4 text-muted-foreground opacity-50 shrink-0" />
+              </button>
+              {openMainDropdown && (
+                <>
+                  <div className="fixed inset-0 z-[100]" onClick={() => setOpenMainDropdown(false)} />
+                  <div className="absolute top-full left-0 mt-2 w-full max-h-[220px] overflow-y-auto bg-card border border-border rounded-xl shadow-xl z-[101] py-1 hide-scrollbar">
+                    {users.map(u => (
+                      <label key={u.id} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted transition-colors w-full">
+                        <input type="checkbox"
+                          checked={assignedTo.includes(u.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setAssignedTo(prev => [...prev, u.id]);
+                            else setAssignedTo(prev => prev.filter(id => id !== u.id));
+                          }}
+                          className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/20"
+                        />
+                        <span className="text-sm text-foreground truncate">{u.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
             <div>
               <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Due Date</label>
@@ -1892,11 +1927,35 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
                           </button>
                         </div>
                         <div className="flex items-center gap-2 ml-6 flex-wrap">
-                          <select value={sub.assignedTo} onChange={e => updateRow(i, "assignedTo", e.target.value)}
-                            className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/20 max-w-[120px] shadow-sm cursor-pointer">
-                            <option value="">Assign…</option>
-                            {users.map(u => <option key={u.id} value={u.id}>{u.name.split(" ")[0]}</option>)}
-                          </select>
+                          <div className="relative">
+                            <button type="button" onClick={() => setOpenSubDropdown(openSubDropdown === i ? null : i)}
+                              className="px-2.5 py-1.5 flex items-center justify-between gap-2 min-w-[120px] rounded-lg border border-border text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/20 shadow-sm cursor-pointer">
+                              <span className="truncate">{sub.assignedTo.length > 0 ? `${sub.assignedTo.length} selected` : 'Assign...'}</span>
+                              <ChevronDown className="w-3 h-3 text-muted-foreground opacity-50 shrink-0" />
+                            </button>
+                            {openSubDropdown === i && (
+                              <>
+                                <div className="fixed inset-0 z-[100]" onClick={() => setOpenSubDropdown(null)} />
+                                <div className="absolute top-full left-0 mt-1 w-[200px] max-h-[200px] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[101] py-1 hide-scrollbar">
+                                  {users.map(u => (
+                                    <label key={u.id} className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-muted transition-colors w-full">
+                                      <input type="checkbox"
+                                        checked={sub.assignedTo.includes(u.id)}
+                                        onChange={(e) => {
+                                          const newArr = e.target.checked
+                                            ? [...sub.assignedTo, u.id]
+                                            : sub.assignedTo.filter(id => id !== u.id);
+                                          updateRow(i, "assignedTo", newArr);
+                                        }}
+                                        className="w-3 h-3 rounded border-border text-primary focus:ring-primary/20"
+                                      />
+                                      <span className="text-xs text-foreground truncate">{u.name}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
                           <input type="date" value={sub.deadline} onChange={e => updateRow(i, "deadline", e.target.value)}
                             className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/20 w-[120px] shadow-sm" />
                           <input type="time" value={sub.deadlineTime ?? ''} onChange={e => updateRow(i, "deadlineTime", e.target.value)}

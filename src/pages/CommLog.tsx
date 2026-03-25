@@ -10,18 +10,26 @@ import {
   Phone, Mail, MessageSquare, Users, MessageCircle, Car,
   ArrowDownLeft, ArrowUpRight, Plus, Search, Filter,
   Trash2, Pencil, X, Save, ChevronDown, ChevronUp,
-  Bell, BellOff, CheckCircle2, Circle, MapPin, Building2,
-  UserCheck, MoreVertical, CalendarDays, AlertCircle,
+  Bell, BellOff, CheckCircle2, MapPin, Building2,
+  UserCheck, AlertCircle, ClipboardList, ListPlus,
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
+import type { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
+import { useAppData } from '@/src/contexts/AppDataContext';
+import { useAuth } from '@/src/hooks/useAuth';
 
 // ────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────
 const CHANNELS = ['Call', 'Email', 'WhatsApp', 'Meeting', 'SMS', 'Visit', 'Other'] as const;
-const CONTACT_TYPES = ['Client', 'Site', 'Both', 'Potential Client'] as const;
+
+// Only two link-to options shown in the form
+const LINK_TO_OPTIONS = ['Existing Client', 'Potential Client'] as const;
+
+// Legacy filter options (keeps backward compat with stored logs)
+const ALL_CONTACT_TYPES = ['Client', 'Site', 'Both', 'Potential Client'] as const;
 
 const channelIcon = (ch: string) => {
   if (ch === 'Call') return <Phone className="w-4 h-4" />;
@@ -70,7 +78,7 @@ function emptyForm() {
     time: '',
     direction: 'Incoming' as 'Incoming' | 'Outgoing',
     channel: 'Call' as typeof CHANNELS[number],
-    contactType: 'Client' as typeof CONTACT_TYPES[number],
+    contactType: 'Client' as 'Client' | 'Site' | 'Both' | 'Potential Client',
     client: '',
     siteId: '',
     siteName: '',
@@ -80,6 +88,84 @@ function emptyForm() {
     outcome: '',
     followUpDate: '',
     followUpDone: false,
+    createTask: false,
+  };
+}
+
+// ────────────────────────────────────────────────────────────
+// Helper: build a narrative description from log data
+// ────────────────────────────────────────────────────────────
+function buildTaskDescription(form: ReturnType<typeof emptyForm>): string {
+  const lines: string[] = [];
+  const dir = form.direction === 'Incoming' ? 'Received' : 'Made';
+  const date = form.date ? format(parseISO(form.date), 'dd MMM yyyy') : '';
+  const time = form.time ? ` at ${form.time}` : '';
+  const who = form.contactPerson ? ` with ${form.contactPerson}` : '';
+  const via = form.channel;
+  const clientPart = form.client
+    ? (form.contactType === 'Potential Client' ? ` (Prospect: ${form.client})` : ` — ${form.client}`)
+    : '';
+  const sitePart = form.siteName ? ` / ${form.siteName}` : '';
+
+  lines.push(
+    `${dir} a ${via} communication${clientPart}${sitePart}${who} on ${date}${time}.`,
+    '',
+  );
+
+  if (form.notes) {
+    lines.push('📋 Notes:', form.notes, '');
+  }
+  if (form.outcome) {
+    lines.push('✅ Outcome / Next Steps:', form.outcome, '');
+  }
+  if (form.followUpDate) {
+    lines.push(`🔔 Follow-up scheduled: ${format(parseISO(form.followUpDate), 'dd MMM yyyy')}`);
+  }
+
+  return lines.join('\n').trim();
+}
+
+// ────────────────────────────────────────────────────────────
+// Blank SiteQuestionnaire factory (mirrors SiteOnboarding.tsx)
+// ────────────────────────────────────────────────────────────
+function blankSiteQuestionnaire(overrides: Partial<SiteQuestionnaire> = {}): SiteQuestionnaire {
+  return {
+    id: crypto.randomUUID(),
+    siteName: '',
+    clientName: '',
+    address: '',
+    contactPersonName: '',
+    contactPersonPhone: '',
+    status: 'Pending',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    phase1: {
+      isNewSite: true, isNewClient: true,
+      whatIsBeingBuilt: '', excavationDepthMeters: '', siteLength: '', siteWidth: '',
+      timelineStartDate: '', geotechnicalReportAvailable: false,
+      hydrogeologicalDataAvailable: false, completed: false,
+    },
+    phase2: {
+      siteVisited: false, walkthroughCompleted: false, knownObstacles: '',
+      dischargeLocation: '', dieselSupplyStrategy: '', completed: false,
+    },
+    phase3: {
+      dewateringMethods: [], totalWellpointsRequired: '', totalHeadersRequired: '',
+      totalPumpsRequired: '', expectedDailyDieselUsage: '', completed: false,
+    },
+    phase4: {
+      quotationSent: false, clientFeedbackReceived: false, proposalAccepted: false,
+      clientTaxStatus: '', scopeOfWorkSummary: '', scopeExclusionsSummary: '',
+      timelineConfirmed: false, permittingResponsibilityOutlined: false,
+      tinProvided: false, completed: false,
+    },
+    phase5: {
+      safetyPlanIntegrated: false, stage1AdvanceReceived: false,
+      stage2InstallationComplete: false, stage2FirstInvoiceIssued: false,
+      stage3TimelyBilling: false, stage4DemobilizationComplete: false,
+      stage4FinalInvoiceIssued: false, actualEndDate: '', completed: false,
+    },
+    ...overrides,
   };
 }
 
@@ -98,6 +184,18 @@ interface LogFormProps {
 function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormProps) {
   const sites = useAppStore(s => s.sites);
   const clients = useAppStore(s => s.clients);
+  const pendingSites = useAppStore(s => s.pendingSites);
+  const addPendingSite = useAppStore(s => s.addPendingSite);
+
+  const allClients = Array.from(new Set([...clients, ...pendingSites.map(s => s.clientName)])).sort();
+
+  // Onboard-in-background wizard state
+  const [onboardBannerFor, setOnboardBannerFor] = useState<string | null>(null);
+  const [onboardAddress, setOnboardAddress] = useState('');
+  const [onboardPhone, setOnboardPhone] = useState('');
+  const [useContactPerson, setUseContactPerson] = useState(false);
+  // track sites the user has already decided on (to avoid re-prompting)
+  const [processedKeys, setProcessedKeys] = useState<Set<string>>(new Set());
 
   const inputCls = cn(
     'flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors',
@@ -106,16 +204,74 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
       ? 'bg-slate-800 border-slate-600 text-slate-100 placeholder:text-slate-500'
       : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
   );
-
   const selectCls = cn(inputCls, 'cursor-pointer');
   const labelCls = cn('text-xs font-semibold mb-1', isDark ? 'text-slate-400' : 'text-slate-500');
 
-  const showClient = form.contactType === 'Client' || form.contactType === 'Both';
-  const showSite = form.contactType === 'Site' || form.contactType === 'Both';
+  const isExistingClient = form.contactType === 'Client';
   const isPotential = form.contactType === 'Potential Client';
+
+  // Sites list filtered by selected client
+  const filteredSites = [
+    ...sites,
+    ...pendingSites.map(ps => ({
+      id: ps.id,
+      name: ps.siteName,
+      client: ps.clientName,
+      isPending: true
+    }))
+  ].filter(s => !form.client || s.client === form.client);
+
+  // Check if the typed site name is genuinely new
+  const isSiteNew = (name: string) => {
+    const n = name.trim().toLowerCase();
+    if (!n) return false;
+    return !sites.some(s => s.name.toLowerCase() === n)
+      && !pendingSites.some(s => s.siteName.toLowerCase() === n);
+  };
+
+  const triggerOnboardCheck = (name: string) => {
+    const key = name.trim().toLowerCase();
+    if (!key || processedKeys.has(key)) return;
+    if (isSiteNew(name)) {
+      setOnboardBannerFor(name.trim());
+      setOnboardAddress('');
+      setOnboardPhone('');
+      setUseContactPerson(!!form.contactPerson.trim());
+    }
+  };
+
+  const handleSiteInputBlur = () => triggerOnboardCheck(form.siteName);
+
+  const handleOnboardYes = () => {
+    const siteName = onboardBannerFor!;
+    const newSite = blankSiteQuestionnaire({
+      siteName,
+      clientName: form.client || '',
+      address: onboardAddress,
+      contactPersonName: useContactPerson ? form.contactPerson : '',
+      contactPersonPhone: onboardPhone,
+      phase1: {
+        isNewSite: true,
+        isNewClient: !clients.includes(form.client || ''),
+        whatIsBeingBuilt: '', excavationDepthMeters: '', siteLength: '', siteWidth: '',
+        timelineStartDate: '', geotechnicalReportAvailable: false,
+        hydrogeologicalDataAvailable: false, completed: false,
+      },
+    });
+    addPendingSite(newSite);
+    setProcessedKeys(prev => new Set([...prev, siteName.toLowerCase()]));
+    setOnboardBannerFor(null);
+    toast.success(`"${siteName}" added to Pending Sites for onboarding.`);
+  };
+
+  const handleOnboardNo = () => {
+    if (onboardBannerFor) setProcessedKeys(prev => new Set([...prev, onboardBannerFor.toLowerCase()]));
+    setOnboardBannerFor(null);
+  };
 
   return (
     <div className={cn('rounded-xl border p-5 shadow-lg space-y-4', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200')}>
+
       {/* Row 1: date, time, direction, channel */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div>
@@ -141,64 +297,193 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
         </div>
       </div>
 
-      {/* Row 2: contact type */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Row 2: Linked To + Client + Site */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        {/* Linked To */}
         <div>
           <div className={labelCls}>Linked To *</div>
-          <select value={form.contactType} onChange={e => onChange({ contactType: e.target.value as any, client: '', siteId: '', siteName: '' })} className={selectCls}>
-            {CONTACT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          <select
+            value={form.contactType === 'Client' ? 'Existing Client' : 'Potential Client'}
+            onChange={e => {
+              const isPot = e.target.value === 'Potential Client';
+              onChange({ contactType: isPot ? 'Potential Client' : 'Client', client: '', siteId: '', siteName: '' });
+              setOnboardBannerFor(null);
+              setProcessedKeys(new Set());
+            }}
+            className={selectCls}
+          >
+            <option value="Existing Client">🏢 Existing Client</option>
+            <option value="Potential Client">🔮 Potential Client</option>
           </select>
         </div>
 
-        {(showClient || isPotential) && (
-          <div className={isPotential ? 'md:col-span-3' : ''}>
-            <div className={labelCls}>{isPotential ? 'Potential Client Name *' : 'Client'}</div>
-            {isPotential ? (
-              <input
-                type="text"
-                placeholder="Enter prospect / company name"
-                value={form.client}
-                onChange={e => onChange({ client: e.target.value })}
-                className={inputCls}
-              />
-            ) : (
-              <select value={form.client} onChange={e => onChange({ client: e.target.value })} className={selectCls}>
-                <option value="">Select Client</option>
-                {clients.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            )}
-          </div>
-        )}
-
-        {showSite && (
-          <div>
-            <div className={labelCls}>Site</div>
+        {/* Client field */}
+        <div>
+          <div className={labelCls}>{isPotential ? 'Prospect / Company Name *' : 'Client *'}</div>
+          {isPotential ? (
+            <input
+              type="text"
+              placeholder="Enter prospect or company name"
+              value={form.client}
+              onChange={e => onChange({ client: e.target.value })}
+              className={inputCls}
+            />
+          ) : (
             <select
-              value={form.siteId}
+              value={form.client}
               onChange={e => {
-                const site = sites.find(s => s.id === e.target.value);
-                onChange({ siteId: e.target.value, siteName: site?.name || '', client: form.client || site?.client || '' });
+                onChange({ client: e.target.value, siteId: '', siteName: '' });
+                setOnboardBannerFor(null);
               }}
               className={selectCls}
             >
-              <option value="">Select Site</option>
-              {sites.filter(s => !form.client || s.client === form.client).map(s => (
-                <option key={s.id} value={s.id}>{s.name} — {s.client}</option>
-              ))}
+              <option value="">Select Client</option>
+              {allClients.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+          )}
+        </div>
+
+        {/* Site combo — shown for both types */}
+        <div className="md:col-span-2">
+          <div className={labelCls}>
+            Site Name
+            <span className={cn('ml-1 font-normal', isDark ? 'text-slate-500' : 'text-slate-400')}>
+              — select existing or type a new one
+            </span>
           </div>
-        )}
+          <input
+            type="text"
+            list={isPotential ? undefined : "comm-log-site-list"}
+            placeholder={isExistingClient && form.client ? `Sites for ${form.client}…` : 'Type or select site name'}
+            value={form.siteName}
+            onChange={e => {
+              const val = e.target.value;
+              const match = !isPotential ? filteredSites.find(s => s.name.toLowerCase() === val.toLowerCase()) : undefined;
+              if (match) {
+                onChange({ siteName: match.name, siteId: match.id, client: form.client || match.client });
+              } else {
+                onChange({ siteName: val, siteId: '' });
+              }
+              // reset banner when user is actively typing
+              if (onboardBannerFor && val.toLowerCase() !== onboardBannerFor.toLowerCase()) {
+                setOnboardBannerFor(null);
+              }
+            }}
+            onBlur={handleSiteInputBlur}
+            className={inputCls}
+          />
+          {!isPotential && (
+            <datalist id="comm-log-site-list">
+              {filteredSites.map(s => (
+                <option key={s.id} value={s.name}>{s.name} — {s.client}</option>
+              ))}
+            </datalist>
+          )}
+          {/* "New site" indicator tag */}
+          {form.siteName.trim() && isSiteNew(form.siteName) && !onboardBannerFor && (
+            <p className="mt-1 text-xs text-amber-500 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" /> New site — leave field or click away to get onboarding prompt.
+            </p>
+          )}
+        </div>
       </div>
+
+      {/* ── Onboard-in-Background Banner ── */}
+      {onboardBannerFor && (
+        <div className={cn(
+          'rounded-xl border-2 p-4 space-y-3 animate-in fade-in duration-200',
+          isDark ? 'bg-amber-950/30 border-amber-700' : 'bg-amber-50 border-amber-300'
+        )}>
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className={cn('text-sm font-semibold', isDark ? 'text-amber-300' : 'text-amber-800')}>
+                "{onboardBannerFor}" is not in your site records
+              </p>
+              <p className={cn('text-xs mt-0.5', isDark ? 'text-amber-400' : 'text-amber-600')}>
+                Register this site in the background? It will be added to the <strong>Pending Sites</strong> tab in Sites &amp; Clients — you can still finish and submit this communication log.
+              </p>
+            </div>
+          </div>
+
+          {/* Address */}
+          <div>
+            <div className={labelCls}>Site Address <span className="font-normal">(for onboarding record)</span></div>
+            <input
+              type="text"
+              placeholder="e.g. 12 Allen Avenue, Ikeja, Lagos"
+              value={onboardAddress}
+              onChange={e => setOnboardAddress(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+
+          {/* Contact phone */}
+          <div>
+            <div className={labelCls}>Contact Phone <span className="font-normal">(for onboarding record)</span></div>
+            <input
+              type="text"
+              placeholder="e.g. 08012345678"
+              value={onboardPhone}
+              onChange={e => setOnboardPhone(e.target.value.replace(/[^0-9+\-\s]/g, ''))}
+              className={inputCls}
+            />
+          </div>
+
+          {/* Use contact person? */}
+          {form.contactPerson.trim() && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={useContactPerson}
+                onChange={e => setUseContactPerson(e.target.checked)}
+                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+              />
+              <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>
+                Use <strong>"{form.contactPerson}"</strong> as the contact person for this site
+              </span>
+            </label>
+          )}
+
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              onClick={handleOnboardYes}
+              className="bg-amber-600 hover:bg-amber-700 text-white gap-2 text-sm h-8"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" /> Yes, Register Site
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleOnboardNo}
+              className="gap-2 text-sm h-8"
+            >
+              <X className="w-3.5 h-3.5" /> No, Skip
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Row 3: contact person, subject */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <div className={labelCls}>Contact Person</div>
-          <input type="text" placeholder="e.g. Mr. Adeyemi, Site Manager" value={form.contactPerson} onChange={e => onChange({ contactPerson: e.target.value })} className={inputCls} />
+          <input
+            type="text"
+            placeholder="e.g. Mr. Adeyemi, Site Manager"
+            value={form.contactPerson}
+            onChange={e => onChange({ contactPerson: e.target.value })}
+            className={inputCls}
+          />
         </div>
         <div>
           <div className={labelCls}>Subject</div>
-          <input type="text" placeholder="Brief topic of communication" value={form.subject} onChange={e => onChange({ subject: e.target.value })} className={inputCls} />
+          <input
+            type="text"
+            placeholder="Brief topic of communication"
+            value={form.subject}
+            onChange={e => onChange({ subject: e.target.value })}
+            className={inputCls}
+          />
         </div>
       </div>
 
@@ -217,7 +502,13 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
       {/* Outcome */}
       <div>
         <div className={labelCls}>Outcome / Next Steps</div>
-        <input type="text" placeholder="e.g. Client will revert by Friday, Proposal to be sent, Awaiting approval..." value={form.outcome} onChange={e => onChange({ outcome: e.target.value })} className={inputCls} />
+        <input
+          type="text"
+          placeholder="e.g. Client will revert by Friday, Proposal to be sent..."
+          value={form.outcome}
+          onChange={e => onChange({ outcome: e.target.value })}
+          className={inputCls}
+        />
       </div>
 
       {/* Follow-up */}
@@ -242,6 +533,30 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
         )}
       </div>
 
+      {/* Create Task checkbox */}
+      {!isEdit && (
+        <label className={cn(
+          'flex items-center gap-2.5 text-sm cursor-pointer select-none px-3 py-2 rounded-lg border transition-colors',
+          form.createTask
+            ? (isDark ? 'bg-indigo-900/40 border-indigo-600 text-indigo-300' : 'bg-indigo-50 border-indigo-300 text-indigo-700')
+            : (isDark ? 'border-slate-700 text-slate-400 hover:border-slate-600' : 'border-slate-200 text-slate-500 hover:border-slate-300')
+        )}>
+          <input
+            type="checkbox"
+            checked={form.createTask}
+            onChange={e => onChange({ createTask: e.target.checked })}
+            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+          />
+          <ClipboardList className="w-4 h-4 flex-shrink-0" />
+          <span className="font-medium">Create a task from this communication log</span>
+          {form.createTask && (
+            <span className={cn('text-xs ml-1', isDark ? 'text-indigo-400' : 'text-indigo-500')}>
+              — a task dialog will open after saving
+            </span>
+          )}
+        </label>
+      )}
+
       {/* Actions */}
       <div className="flex gap-2 pt-2 border-t border-slate-100">
         <Button onClick={onSave} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
@@ -250,6 +565,214 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
         <Button variant="outline" onClick={onCancel} className="gap-2">
           <X className="w-4 h-4" /> Cancel
         </Button>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// CommLogTaskDialog — pre-filled task creator from a comm log
+// ────────────────────────────────────────────────────────────
+interface CommLogTaskDialogProps {
+  open: boolean;
+  onClose: () => void;
+  initialTitle: string;
+  initialDescription: string;
+  isDark: boolean;
+}
+
+function CommLogTaskDialog({ open, onClose, initialTitle, initialDescription, isDark }: CommLogTaskDialogProps) {
+  const { createMainTask, users } = useAppData();
+  const { user } = useAuth();
+
+  const [title, setTitle] = useState(initialTitle);
+  const [description, setDescription] = useState(initialDescription);
+  const [assignee, setAssignee] = useState('');
+  const [deadline, setDeadline] = useState('');
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [subtasks, setSubtasks] = useState<{ id: string; title: string }[]>([]);
+  const [newSubtask, setNewSubtask] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // reset when dialog opens with fresh data
+  const [didInit, setDidInit] = useState(false);
+  if (open && !didInit) {
+    setTitle(initialTitle);
+    setDescription(initialDescription);
+    setSubtasks([]);
+    setNewSubtask('');
+    setAssignee('');
+    setDeadline('');
+    setPriority('medium');
+    setDidInit(true);
+  }
+  if (!open && didInit) setDidInit(false);
+
+  if (!open) return null;
+
+  const addSubtask = () => {
+    const t = newSubtask.trim();
+    if (!t) return;
+    setSubtasks(prev => [...prev, { id: crypto.randomUUID(), title: t }]);
+    setNewSubtask('');
+  };
+
+  const removeSubtask = (id: string) => setSubtasks(prev => prev.filter(s => s.id !== id));
+
+  const handleSubmit = async () => {
+    if (!title.trim()) { toast.error('Task title is required'); return; }
+    setSaving(true);
+    const subs = subtasks.map(s => ({ title: s.title, status: 'not_started' }));
+    await createMainTask({
+      title: title.trim(),
+      description: description.trim(),
+      createdBy: user?.id,
+      teamId: 'dcel-team',
+      workspaceId: 'dcel-team',
+      assignedTo: assignee || null,
+      deadline: deadline || null,
+      priority,
+      is_project: false,
+    }, subs);
+    setSaving(false);
+    onClose();
+  };
+
+  const inputCls = cn(
+    'flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500',
+    isDark
+      ? 'bg-slate-800 border-slate-600 text-slate-100 placeholder:text-slate-500'
+      : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
+  );
+  const labelCls = cn('text-xs font-semibold mb-1', isDark ? 'text-slate-400' : 'text-slate-500');
+  const overlayBg = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4';
+  const cardCls = cn(
+    'relative w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]',
+    isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
+  );
+
+  const priorityStyles = {
+    low: { on: 'bg-slate-200 text-slate-700 border-slate-400', off: isDark ? 'border-slate-700 text-slate-500 hover:bg-slate-800' : 'border-slate-200 text-slate-400 hover:bg-slate-50' },
+    medium: { on: 'bg-amber-100 text-amber-700 border-amber-400', off: isDark ? 'border-slate-700 text-slate-500 hover:bg-slate-800' : 'border-slate-200 text-slate-400 hover:bg-slate-50' },
+    high: { on: 'bg-red-100 text-red-700 border-red-400', off: isDark ? 'border-slate-700 text-slate-500 hover:bg-slate-800' : 'border-slate-200 text-slate-400 hover:bg-slate-50' },
+  };
+
+  return (
+    <div className={overlayBg} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className={cardCls}>
+        {/* Header */}
+        <div className={cn('flex items-center justify-between px-5 py-4 border-b flex-shrink-0', isDark ? 'border-slate-700' : 'border-slate-100')}>
+          <div className="flex items-center gap-2">
+            <ClipboardList className={cn('w-5 h-5', isDark ? 'text-indigo-400' : 'text-indigo-600')} />
+            <h2 className={cn('text-base font-semibold', isDark ? 'text-slate-100' : 'text-slate-900')}>Create Task from Communication Log</h2>
+          </div>
+          <button onClick={onClose} className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-500 hover:bg-slate-800' : 'text-slate-400 hover:bg-slate-100')}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {/* Title */}
+          <div>
+            <div className={labelCls}>Task Title *</div>
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} className={inputCls} placeholder="What needs to be done?" />
+          </div>
+
+          {/* Description (narrative) */}
+          <div>
+            <div className={labelCls}>Description <span className="font-normal text-indigo-500">(auto-generated from log — editable)</span></div>
+            <textarea
+              rows={6}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              className={cn(inputCls, 'h-auto resize-none font-mono text-xs leading-relaxed')}
+            />
+          </div>
+
+          {/* Assignee + Deadline */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className={labelCls}>Assign To</div>
+              <select value={assignee} onChange={e => setAssignee(e.target.value)} className={cn(inputCls, 'cursor-pointer')}>
+                <option value="">— Unassigned —</option>
+                {users.map((u: any) => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+              </select>
+            </div>
+            <div>
+              <div className={labelCls}>Due Date</div>
+              <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className={inputCls} />
+            </div>
+          </div>
+
+          {/* Priority */}
+          <div>
+            <div className={labelCls}>Priority</div>
+            <div className="flex gap-2">
+              {(['low', 'medium', 'high'] as const).map(p => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPriority(p)}
+                  className={cn(
+                    'flex-1 py-1.5 rounded-lg text-xs font-semibold capitalize border transition-all',
+                    priority === p ? priorityStyles[p].on : priorityStyles[p].off
+                  )}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Subtasks */}
+          <div>
+            <div className={cn('text-xs font-semibold mb-2 flex items-center gap-1.5', isDark ? 'text-slate-400' : 'text-slate-500')}>
+              <ListPlus className="w-3.5 h-3.5" /> Subtasks <span className="font-normal">(optional)</span>
+            </div>
+            {subtasks.length > 0 && (
+              <ul className="space-y-1.5 mb-2">
+                {subtasks.map((s, i) => (
+                  <li key={s.id} className={cn('flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg border', isDark ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-100 text-slate-700')}>
+                    <span className={cn('text-xs', isDark ? 'text-slate-500' : 'text-slate-400')}>{i + 1}.</span>
+                    <span className="flex-1">{s.title}</span>
+                    <button onClick={() => removeSubtask(s.id)} className={cn('transition-colors', isDark ? 'text-slate-600 hover:text-red-400' : 'text-slate-300 hover:text-red-500')}>
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Add a subtask…"
+                value={newSubtask}
+                onChange={e => setNewSubtask(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSubtask(); } }}
+                className={cn(inputCls, 'flex-1')}
+              />
+              <Button onClick={addSubtask} variant="outline" className="h-9 px-3 gap-1 text-xs">
+                <Plus className="w-3.5 h-3.5" /> Add
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className={cn('flex gap-2 px-5 py-4 border-t flex-shrink-0', isDark ? 'border-slate-700' : 'border-slate-100')}>
+          <Button
+            onClick={handleSubmit}
+            disabled={saving || !title.trim()}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 flex-1 disabled:opacity-50"
+          >
+            <ClipboardList className="w-4 h-4" />
+            {saving ? 'Creating…' : `Create Task${subtasks.length > 0 ? ` + ${subtasks.length} subtask${subtasks.length > 1 ? 's' : ''}` : ''}`}
+          </Button>
+          <Button variant="outline" onClick={onClose} className="gap-2">
+            <X className="w-4 h-4" /> Skip
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -277,43 +800,36 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, isDark, expanded, on
       isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200',
       'hover:shadow-md'
     )}>
-      {/* Header strip: direction color */}
       <div className={cn('h-1', log.direction === 'Incoming' ? 'bg-emerald-500' : 'bg-blue-500')} />
 
       <div className="p-4">
-        {/* Top row */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
-            {/* Direction + channel icon bubble */}
             <div className={cn(
               'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
               log.direction === 'Incoming' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
             )}>
-              {log.direction === 'Incoming'
-                ? <ArrowDownLeft className="w-5 h-5" />
-                : <ArrowUpRight className="w-5 h-5" />}
+              {log.direction === 'Incoming' ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
             </div>
 
             <div className="flex-1 min-w-0">
-              {/* Date / time / subject */}
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <span className={cn('text-sm font-bold', isDark ? 'text-slate-100' : 'text-slate-900')}>
                   {format(parseISO(log.date), 'dd MMM yyyy')}
                   {log.time && <span className={cn('ml-1 text-xs font-normal', isDark ? 'text-slate-400' : 'text-slate-500')}> at {log.time}</span>}
                 </span>
-                {/* Badges */}
                 <span className={cn('inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium', channelColor(log.channel))}>
                   {channelIcon(log.channel)} {log.channel}
                 </span>
                 <span className={cn('inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium', contactTypeColor(log.contactType))}>
-                  {contactTypeIcon(log.contactType)} {log.contactType}
+                  {contactTypeIcon(log.contactType)}
+                  {log.contactType === 'Client' ? 'Existing Client' : log.contactType}
                 </span>
                 <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', log.direction === 'Incoming' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700')}>
                   {log.direction}
                 </span>
               </div>
 
-              {/* Who + subject */}
               <div className={cn('text-sm', isDark ? 'text-slate-200' : 'text-slate-800')}>
                 {log.subject && <span className="font-semibold">{log.subject}</span>}
                 {log.client && (
@@ -331,7 +847,6 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, isDark, expanded, on
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-1 flex-shrink-0">
             {log.followUpDate && (
               <button
@@ -357,14 +872,12 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, isDark, expanded, on
           </div>
         </div>
 
-        {/* Notes preview */}
         {!expanded && log.notes && (
           <p onClick={onToggleExpand} className={cn('mt-2 text-sm line-clamp-2 cursor-pointer', isDark ? 'text-slate-400' : 'text-slate-600')}>
             {log.notes}
           </p>
         )}
 
-        {/* Expanded content */}
         {expanded && (
           <div className={cn('mt-3 space-y-2 pt-3 border-t', isDark ? 'border-slate-700' : 'border-slate-100')}>
             {log.notes && (
@@ -406,8 +919,6 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, isDark, expanded, on
 export function CommLog() {
   const { isDark } = useTheme();
   const currentUser = useUserStore(s => s.getCurrentUser());
-  const sites = useAppStore(s => s.sites);
-  const clients = useAppStore(s => s.clients);
   const commLogs = useAppStore(s => s.commLogs);
   const addCommLog = useAppStore(s => s.addCommLog);
   const updateCommLog = useAppStore(s => s.updateCommLog);
@@ -417,6 +928,11 @@ export function CommLog() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  // Task-from-log dialog state
+  const [taskDialog, setTaskDialog] = useState<{ open: boolean; title: string; description: string }>(
+    { open: false, title: '', description: '' }
+  );
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -476,7 +992,6 @@ export function CommLog() {
       });
   }, [commLogs, filterDirection, filterChannel, filterContactType, filterClient, filterFollowUp, searchTerm, dateFrom, dateTo]);
 
-  // Unique clients in logs (including potential)
   const allLogClients = useMemo(() => {
     return [...new Set(commLogs.map(l => l.client).filter(Boolean))].sort();
   }, [commLogs]);
@@ -484,8 +999,9 @@ export function CommLog() {
   const handleSave = () => {
     if (!form.date) { toast.error('Date is required'); return; }
     if (!form.notes.trim()) { toast.error('Notes are required'); return; }
-    if (form.contactType === 'Potential Client' && !form.client.trim()) {
-      toast.error('Please enter the potential client name'); return;
+    if (!form.client.trim()) {
+      toast.error(form.contactType === 'Potential Client' ? 'Please enter the prospect name' : 'Please select a client');
+      return;
     }
 
     const loggedBy = currentUser?.name || 'Admin';
@@ -530,6 +1046,14 @@ export function CommLog() {
         createdAt: new Date().toISOString(),
       });
       toast.success('Communication logged');
+      // If user ticked "create task", open the pre-filled task dialog
+      if (form.createTask) {
+        setTaskDialog({
+          open: true,
+          title: form.subject.trim() || `Follow-up: ${form.channel} with ${form.client || 'contact'}`,
+          description: buildTaskDescription(form),
+        });
+      }
     }
 
     setForm(emptyForm());
@@ -552,6 +1076,7 @@ export function CommLog() {
       outcome: log.outcome || '',
       followUpDate: log.followUpDate || '',
       followUpDone: log.followUpDone,
+      createTask: false,
     });
     setEditingId(log.id);
     setShowForm(true);
@@ -572,9 +1097,16 @@ export function CommLog() {
   };
 
   const panelBg = isDark ? 'bg-slate-950' : 'bg-slate-50';
-  const cardBg = isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200';
 
   return (
+    <>
+    <CommLogTaskDialog
+      open={taskDialog.open}
+      onClose={() => setTaskDialog(d => ({ ...d, open: false }))}
+      initialTitle={taskDialog.title}
+      initialDescription={taskDialog.description}
+      isDark={isDark}
+    />
     <div className={cn('flex flex-col gap-6 min-h-full', panelBg)}>
       {/* ── Header ── */}
       <div className="flex items-start justify-between flex-wrap gap-4">
@@ -626,7 +1158,6 @@ export function CommLog() {
       {/* ── Filters ── */}
       <div className={cn('rounded-xl border p-4 space-y-3', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200')}>
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Search */}
           <div className="relative flex-1 min-w-52">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
@@ -651,7 +1182,10 @@ export function CommLog() {
 
           <select value={filterContactType} onChange={e => setFilterContactType(e.target.value)} className={selectCls}>
             <option value="All">All Types</option>
-            {CONTACT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            <option value="Client">Existing Client</option>
+            <option value="Potential Client">Potential Client</option>
+            <option value="Site">Site</option>
+            <option value="Both">Both</option>
           </select>
 
           <select value={filterFollowUp} onChange={e => setFilterFollowUp(e.target.value)} className={selectCls}>
@@ -729,5 +1263,6 @@ export function CommLog() {
         </div>
       )}
     </div>
+    </>
   );
 }
