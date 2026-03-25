@@ -126,7 +126,7 @@ function AnalyticsDashboard() {
     // ── 1. Bottleneck Analysis (uses ALL subtasks — not date-filtered) ────────
     const bottleneckData = useMemo(() =>
         teamUsers.map(user => {
-            const userSubs    = allSubs.filter(s => s.assignedTo === user.id);
+            const userSubs    = allSubs.filter(s => s.assignedTo?.includes(user.id));
             const overdue     = userSubs.filter(s => s.deadline && isPast(parseISO(s.deadline)) && s.status !== 'completed').length;
             const stuckInProg = userSubs.filter(s => s.status === 'in_progress').length;
             const completed   = userSubs.filter(s => s.status === 'completed').length;
@@ -201,7 +201,7 @@ function AnalyticsDashboard() {
             'Task ID':  s.id ?? '',
             'Title':    s.title,
             'Status':   s.status,
-            'Assignee': teamUsers.find(u => u.id === s.assignedTo)?.name ?? 'Unassigned',
+            'Assignee': teamUsers.find(u => u.id === s.assignedTo?.split(',')[0])?.name + (s.assignedTo?.includes(',') ? ' + others' : '') || 'Unassigned',
             'Deadline': s.deadline ? format(parseISO(s.deadline), 'yyyy-MM-dd') : 'No Deadline',
             'Overdue':  s.deadline && isPast(parseISO(s.deadline)) && s.status !== 'completed' ? 'YES' : 'NO',
         }));

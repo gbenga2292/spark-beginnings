@@ -267,7 +267,7 @@ export function UserForm() {
 
   const handleSavePreset = () => {
     if (!presetName.trim()) return;
-    addPreset({ id: `preset-${Date.now()}`, name: presetName.trim(), privileges: JSON.parse(JSON.stringify(privileges)) });
+    addPreset({ id: crypto.randomUUID(), name: presetName.trim(), privileges: JSON.parse(JSON.stringify(privileges)) });
     setPresetName(''); setShowPresetSave(false);
   };
 

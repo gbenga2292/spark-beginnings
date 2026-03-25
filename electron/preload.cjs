@@ -25,4 +25,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Platform info
   platform: process.platform,
   isElectron: true,
+
+  // Native file / folder picker
+  openPathDialog: (opts) => ipcRenderer.invoke('dialog:open-path', opts),
 });

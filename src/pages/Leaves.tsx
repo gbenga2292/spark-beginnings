@@ -185,7 +185,7 @@ export function Leaves() {
       }
 
       const newLeave: LeaveRecord = {
-        id: `LV-${Date.now()}`,
+        id: crypto.randomUUID(),
         employeeId: staffId,
         employeeName: empName,
         leaveType, startDate, duration: parseInt(duration),

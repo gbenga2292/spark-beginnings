@@ -108,7 +108,7 @@ export function Payments() {
             updatePayment(selectedId, data);
             toast.success('Payment updated successfully!');
         } else {
-            addPayment({ ...data, id: `PAY-${Date.now()}` });
+            addPayment({ ...data, id: crypto.randomUUID() });
             toast.success('Payment submitted successfully!');
         }
         setIsModalOpen(false);

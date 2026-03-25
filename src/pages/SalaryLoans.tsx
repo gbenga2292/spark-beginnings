@@ -69,7 +69,7 @@ export function SalaryLoans() {
 
     if (requestType === 'Salary Advance') {
       const newAdvance: SalaryAdvance = {
-        id: `SA-${Date.now()}`,
+        id: crypto.randomUUID(),
         employeeId: staffId,
         employeeName: empName,
         amount: Number(amount),
@@ -119,7 +119,7 @@ export function SalaryLoans() {
       const mths = Number(duration);
 
       const newLoan: Loan = {
-        id: `LN-${Date.now()}`,
+        id: crypto.randomUUID(),
         employeeId: staffId,
         employeeName: empName,
         loanType: requestType,

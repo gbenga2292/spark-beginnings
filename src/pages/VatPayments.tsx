@@ -72,7 +72,7 @@ export function VatPayments() {
             updateVatPayment(selectedId, data);
             toast.success('VAT payment updated successfully!');
         } else {
-            addVatPayment({ ...data, id: `VAT-${Date.now()}` });
+            addVatPayment({ ...data, id: crypto.randomUUID() });
             toast.success('VAT submitted successfully!');
         }
         setIsModalOpen(false);

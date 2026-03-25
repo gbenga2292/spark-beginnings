@@ -596,7 +596,8 @@ function CommLogTaskDialog({ open, onClose, initialTitle, initialDescription, is
 
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
-  const [assignee, setAssignee] = useState('');
+  const [assignee, setAssignee] = useState<string[]>([]);
+  const [openDropdown, setOpenDropdown] = useState(false);
   const [deadline, setDeadline] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [subtasks, setSubtasks] = useState<{ id: string; title: string }[]>([]);
@@ -610,7 +611,8 @@ function CommLogTaskDialog({ open, onClose, initialTitle, initialDescription, is
     setDescription(initialDescription);
     setSubtasks([]);
     setNewSubtask('');
-    setAssignee('');
+    setAssignee([]);
+    setOpenDropdown(false);
     setDeadline('');
     setPriority('medium');
     setDidInit(true);
@@ -638,7 +640,7 @@ function CommLogTaskDialog({ open, onClose, initialTitle, initialDescription, is
       createdBy: user?.id,
       teamId: 'dcel-team',
       workspaceId: 'dcel-team',
-      assignedTo: assignee || null,
+      assignedTo: assignee.length > 0 ? assignee.join(',') : null,
       deadline: deadline || null,
       priority,
       is_project: false,
@@ -700,13 +702,44 @@ function CommLogTaskDialog({ open, onClose, initialTitle, initialDescription, is
           </div>
 
           {/* Assignee + Deadline */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
+          <div className="grid grid-cols-2 gap-3 relative">
+            <div className="relative">
               <div className={labelCls}>Assign To</div>
-              <select value={assignee} onChange={e => setAssignee(e.target.value)} className={cn(inputCls, 'cursor-pointer')}>
-                <option value="">— Unassigned —</option>
-                {users.map((u: any) => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
-              </select>
+              <div
+                onClick={() => setOpenDropdown(!openDropdown)}
+                className={cn(inputCls, 'cursor-pointer flex items-center justify-between')}
+              >
+                <span className="truncate pr-2">
+                  {assignee.length === 0 ? '— Unassigned —' : `${assignee.length} selected`}
+                </span>
+                <ChevronDown className="w-4 h-4 flex-shrink-0" />
+              </div>
+              
+              {openDropdown && (
+                <div className={cn('absolute top-full left-0 mt-1 w-full max-h-[200px] overflow-y-auto rounded-lg border shadow-xl z-50', isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200')}>
+                  <div 
+                    onClick={() => { setAssignee([]); setOpenDropdown(false); }}
+                    className={cn('flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors border-b', isDark ? 'hover:bg-slate-700 border-slate-700' : 'hover:bg-slate-50 border-slate-100')}
+                  >
+                    <span className={cn('text-sm italic', isDark ? 'text-slate-400' : 'text-slate-500')}>— Clear Selection —</span>
+                  </div>
+                  {users.map((u: any) => {
+                    const isSelected = assignee.includes(u.id);
+                    return (
+                      <div
+                        key={u.id}
+                        onClick={() => setAssignee(p => isSelected ? p.filter(id => id !== u.id) : [...p, u.id])}
+                        className={cn('flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors', isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-50')}
+                      >
+                        <div className={cn('w-4 h-4 rounded border flex items-center justify-center flex-shrink-0', isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : isDark ? 'border-slate-500' : 'border-slate-300')}>
+                          {isSelected && <CheckCircle2 className="w-3 h-3" />}
+                        </div>
+                        <span className={cn('text-sm truncate font-medium', isDark ? 'text-slate-200' : 'text-slate-700')}>{u.name || u.email}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <div>
               <div className={labelCls}>Due Date</div>

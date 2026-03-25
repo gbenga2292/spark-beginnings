@@ -183,7 +183,7 @@ export function Billing() {
     if (form.destination === 'Active') {
       // Create an Active Invoice directly
       const newInvoice: Invoice = {
-        id: `INV-${Date.now()}`,
+        id: crypto.randomUUID(),
         invoiceNumber: data.invoiceNo,
         client: data.client,
         project: 'Billed',
@@ -231,7 +231,7 @@ export function Billing() {
         updatePendingInvoice(selectedId, data);
         toast.success('Pending Invoice updated successfully');
       } else {
-        addPendingInvoice({ ...data, id: `PI-${Date.now()}` });
+        addPendingInvoice({ ...data, id: crypto.randomUUID() });
         toast.success('Pending Invoice created successfully');
       }
     }
@@ -297,7 +297,7 @@ export function Billing() {
     const ok = await showConfirm('Do you want to add this to the Active Invoices?', { confirmLabel: "Yes", cancelLabel: "No" });
     if (ok) {
       addInvoice({
-        id: `INV-${Date.now()}`,
+        id: crypto.randomUUID(),
         invoiceNumber: inv.invoiceNo,
         client: inv.client,
         project: 'Billed',

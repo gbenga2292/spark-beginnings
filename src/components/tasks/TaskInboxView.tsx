@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { format, isPast } from "date-fns";
 import { useAuth } from '@/src/hooks/useAuth';
@@ -576,10 +577,26 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
     e.target.value = ''; // reset so the same file can be selected again
   };
 
-  const handleAttachLink = () => {
-     const path = window.prompt("Enter a network folder or file path:");
-     if (path && path.trim()) {
-         setPendingFileLinks(prev => [...prev, path.trim()]);
+  const handleAttachLink = async () => {
+     // In Electron, open a native folder picker — else fall back to a text input overlay workaround
+     const electronAPI = (window as any).electronAPI;
+     if (electronAPI?.openPathDialog) {
+         const result = await electronAPI.openPathDialog({ folder: true, title: 'Select a folder to link' });
+         if (result) setPendingFileLinks(prev => [...prev, result]);
+     } else {
+         // Web fallback: show a second hidden file input in 'directory' mode
+         const inp = document.createElement('input');
+         inp.type = 'file';
+         (inp as any).webkitdirectory = true;
+         inp.onchange = () => {
+             const f = inp.files?.[0];
+             if (f) {
+                 // Extract directory path from webkitRelativePath
+                 const dir = f.webkitRelativePath.split('/')[0] || f.name;
+                 setPendingFileLinks(prev => [...prev, dir]);
+             }
+         };
+         inp.click();
      }
   };
 
@@ -603,24 +620,45 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
     }
 
     // Capture "#" to create a linked subtask
-    // Expected format: "#subtask title. anything after is description"
-    const hashMatch = content.match(/#([^\.]+)(?:\.(.*))?/is);
+    // Extended syntax: #TaskTitle@AssigneeName!YYYY-MM-DD description text
+    // Example: #Fix login bug@Tunde!2026-04-01 check the auth flow
+    const hashMatch = content.match(/#([^@!\n.]+)(?:@(\S+))?(?:!(\S+))?(?:[.\s]+(.*))?/is);
     if (hashMatch) {
-      const subtaskTitle = hashMatch[1].trim();
-      let subtaskDesc = hashMatch[2] ? hashMatch[2].trim() : '';
+      const rawTitle = hashMatch[1].trim();
+      const rawAssignee = hashMatch[2]?.trim();
+      const rawDate = hashMatch[3]?.trim();
+      let subtaskDesc = hashMatch[4] ? hashMatch[4].trim() : '';
+
+      // Resolve assignee by first name match
+      let assignedTo: string | null = null;
+      if (rawAssignee) {
+        const match = users.find(u => u.name?.split(' ')[0].toLowerCase() === rawAssignee.toLowerCase());
+        if (match) assignedTo = match.id;
+      }
+
+      // Validate and parse date token
+      let dueDate: string | null = null;
+      if (rawDate) {
+        const parsed = new Date(rawDate);
+        if (!isNaN(parsed.getTime())) dueDate = parsed.toISOString();
+      }
       
       if (replyingTo) {
           subtaskDesc = subtaskDesc || `Context:\n${finalContent}`;
       }
 
-      if (subtaskTitle) {
+      if (rawTitle) {
         addSubtask({
-          title: subtaskTitle,
+          title: rawTitle,
           description: subtaskDesc,
           mainTaskId: mainId,
-          assignedTo: null,
+          assignedTo,
+          dueDate,
           status: 'not_started'
         });
+        if (assignedTo) {
+          toast.success(`Subtask "${rawTitle}" created${rawAssignee ? ` · assigned to ${rawAssignee}` : ''}${dueDate ? ` · due ${rawDate}` : ''}`);
+        }
       }
     }
 
@@ -734,7 +772,38 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{renderText(c.text)}</p>
+                  <>
+                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{renderText(c.text)}</p>
+                    {/* Attachments */}
+                    {Array.isArray(c.attachments) && c.attachments.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {c.attachments.map((att: any, ai: number) => {
+                          const isImg = att.type?.startsWith('image/');
+                          return isImg ? (
+                            <a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="block rounded-xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                              <img src={att.url} alt={att.name} className="max-w-[200px] max-h-[150px] object-cover" />
+                            </a>
+                          ) : (
+                            <a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors">
+                              <FileText className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                              <span className="truncate max-w-[150px]">{att.name}</span>
+                            </a>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {/* File path links */}
+                    {Array.isArray(c.file_links) && c.file_links.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {c.file_links.map((lnk: string, li: number) => (
+                          <div key={li} className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 border border-emerald-100 rounded-lg text-xs font-medium text-emerald-700">
+                            <FolderOpen className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                            <span className="truncate max-w-[180px]" title={lnk}>{lnk.split(/[/\\]/).pop() || lnk}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             );
@@ -1079,32 +1148,18 @@ function FilesFeed({ subtask, getSubtaskComments, users }: { subtask: any; getSu
 function AssignMultiDropdown({ activeSubtask, activeMainTask, users, currentUser, assignSubtask, addSubtask }: any) {
   const { subtasks } = useAppData();
   
-  // Find all sibling subtasks within this main task that have the exact same title
-  const siblingAssignees = subtasks
-     .filter((s: any) => s.mainTaskId === activeMainTask?.id && s.title === activeSubtask.title)
-     .map((s: any) => s.assignedTo)
-     .filter(Boolean);
+  const currentAssignees = activeSubtask.assignedTo ? activeSubtask.assignedTo.split(',') : [];
 
   const toggleAssignee = (uid: string) => {
-      if (activeSubtask.assignedTo === uid) {
-          // Unassign the current active task
-          assignSubtask(activeSubtask.id, "");
-      } else if (!activeSubtask.assignedTo) {
-          // It's empty, so just fill it
-          assignSubtask(activeSubtask.id, uid);
+      let newAssignees = [...currentAssignees];
+      if (newAssignees.includes(uid)) {
+          // Unassign
+          newAssignees = newAssignees.filter(id => id !== uid);
       } else {
-          // Already belongs to someone else. Duplicate it if they aren't already among the siblings.
-          if (!siblingAssignees.includes(uid)) {
-              addSubtask({
-                  title: activeSubtask.title,
-                  description: activeSubtask.description || "",
-                  mainTaskId: activeMainTask.id,
-                  assignedTo: uid,
-                  status: 'not_started',
-                  priority: activeSubtask.priority
-              });
-          }
+          // Assign
+          newAssignees.push(uid);
       }
+      assignSubtask(activeSubtask.id, newAssignees.length > 0 ? newAssignees.join(',') : null);
   };
 
   return (
@@ -1122,9 +1177,7 @@ function AssignMultiDropdown({ activeSubtask, activeMainTask, users, currentUser
           Unassigned
         </DropdownMenuItem>
         {users.map((u: any) => {
-          const isSelected = activeSubtask.assignedTo === u.id;
-          const isSiblingSelected = siblingAssignees.includes(u.id);
-          const isAnySelected = isSelected || isSiblingSelected;
+          const isSelected = currentAssignees.includes(u.id);
           
           return (
             <DropdownMenuItem
@@ -1133,7 +1186,7 @@ function AssignMultiDropdown({ activeSubtask, activeMainTask, users, currentUser
               onClick={(e) => { e.preventDefault(); toggleAssignee(u.id); }}
             >
               <div className="flex items-center justify-center w-4 h-4 border border-slate-200 rounded shadow-sm mr-1">
-                 {isAnySelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary" />}
+                 {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary" />}
               </div>
               <Avatar className="w-6 h-6 flex-shrink-0">
                 <AvatarImage src={u.avatarUrl} />
@@ -1141,7 +1194,7 @@ function AssignMultiDropdown({ activeSubtask, activeMainTask, users, currentUser
                   {u.name.substring(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <span className={`${isAnySelected ? 'font-bold text-primary' : 'font-medium text-slate-600'} text-sm`}>{u.name}</span>
+              <span className={`${isSelected ? 'font-bold text-primary' : 'font-medium text-slate-600'} text-sm`}>{u.name}</span>
             </DropdownMenuItem>
           );
         })}

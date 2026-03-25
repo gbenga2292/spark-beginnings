@@ -456,10 +456,40 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         toast.info('Request rejected');
     }, [user?.id, mainTasks, users]);
 
-    const postComment = useCallback(async (subId: string, mainId: string, authorId: string, text: string, _attachments?: CommentAttachment[], _fileLinks?: string[]) => {
-        // task_updates columns: id, task_id (legacy), subtask_id, main_task_id, text, author_id, created_at, attachments, file_links
-        const payload: any = { subtask_id: subId || null, main_task_id: mainId, text, author_id: authorId };
-        if (_attachments && _attachments.length > 0) payload.attachments = _attachments;
+    const postComment = useCallback(async (subId: string, mainId: string, authorId: string, text: string, _attachments?: any[], _fileLinks?: string[]) => {
+        // Upload any file attachments to Supabase Storage and collect their public URLs
+        const uploadedAttachments: { name: string; url: string; type: string }[] = [];
+        if (_attachments && _attachments.length > 0) {
+            for (const att of _attachments) {
+                // att.base64 is a data URL like "data:image/png;base64,..."
+                const base64Data = att.base64?.split(',')[1];
+                if (!base64Data) continue;
+                const mimeMatch = att.base64?.match(/data:(.*?);base64/);
+                const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+                const ext = att.name.split('.').pop() || 'bin';
+                const filePath = `${authorId}/${Date.now()}_${att.name}`;
+
+                // Convert base64 to Uint8Array
+                const byteChars = atob(base64Data);
+                const byteArr = new Uint8Array(byteChars.length);
+                for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+                const blob = new Blob([byteArr], { type: mime });
+
+                const { error: upErr } = await supabase.storage
+                    .from('task-attachments')
+                    .upload(filePath, blob, { contentType: mime, upsert: true });
+                if (upErr) {
+                    console.error('File upload error:', upErr);
+                    toast.error(`Failed to upload ${att.name}`);
+                    continue;
+                }
+                const { data: urlData } = supabase.storage.from('task-attachments').getPublicUrl(filePath);
+                uploadedAttachments.push({ name: att.name, url: urlData.publicUrl, type: mime });
+            }
+        }
+
+        const payload: any = { subtask_id: subId || null, main_task_id: mainId, text: text || '', author_id: authorId };
+        if (uploadedAttachments.length > 0) payload.attachments = uploadedAttachments;
         if (_fileLinks && _fileLinks.length > 0) payload.file_links = _fileLinks;
 
         const { data, error } = await supabase
@@ -566,9 +596,12 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             is_active: rem.isActive ?? true,
             created_by: rem.createdBy || user?.id,
             main_task_id: rem.mainTaskId || null,
+            subtask_id: rem.subtaskId || null,
         };
         const { data, error } = await supabase.from('reminders').insert(payload).select().single();
         if (error) {
+            // 409 = duplicate / conflict — silently ignore to prevent toast spam on @mentions
+            if ((error as any).code === '23505' || (error as any).status === 409) return;
             console.error('addReminder error:', error);
             toast.error('Failed to add reminder.');
             return;

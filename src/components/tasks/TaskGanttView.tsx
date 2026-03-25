@@ -180,7 +180,7 @@ export function TaskGanttView({ mainTasks, subtasks, users, onOpenSubtask, onOpe
                   <AnimatePresence>
                     {isOpen && mt.subs.map((sub: any) => {
                       const isSubOverdue = sub.deadline && isPastDay(sub.deadline) && sub.status !== 'completed';
-                      const assignee = users.find(u => u.id === sub.assignedTo);
+                      const assignee = users.find(u => u.id === sub.assignedTo?.split(',')[0]);
                       return (
                           <motion.div
                             key={sub.id}

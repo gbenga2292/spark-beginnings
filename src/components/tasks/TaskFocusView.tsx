@@ -65,7 +65,7 @@ export function TaskFocusView({ subtasks, mainTasks, users, onClickSubtask }: Ta
           <div className="grid gap-2 sm:grid-cols-2">
             {section.items.map(sub => {
               const mt = mainTasks.find(m => m.id === sub.mainTaskId);
-              const assignee = sub.assignedTo ? users.find(u => u.id === sub.assignedTo) : undefined;
+              const assignee = sub.assignedTo ? users.find(u => u.id === sub.assignedTo?.split(',')[0]) : undefined;
               return (
                 <SubtaskCard key={sub.id} subtask={sub} mainTask={mt} assignee={assignee} onClick={() => onClickSubtask(sub.id)} />
               );
@@ -87,7 +87,7 @@ export function TaskFocusView({ subtasks, mainTasks, users, onClickSubtask }: Ta
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {rest.map(sub => {
               const mt = mainTasks.find(m => m.id === sub.mainTaskId);
-              const assignee = sub.assignedTo ? users.find(u => u.id === sub.assignedTo) : undefined;
+              const assignee = sub.assignedTo ? users.find(u => u.id === sub.assignedTo?.split(',')[0]) : undefined;
               return (
                 <SubtaskCard key={sub.id} subtask={sub} mainTask={mt} assignee={assignee} onClick={() => onClickSubtask(sub.id)} compact />
               );

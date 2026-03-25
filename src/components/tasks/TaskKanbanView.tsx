@@ -74,7 +74,7 @@ export function SubtaskKanbanView({ subtasks, mainTasks, users, onClickSubtask, 
               <AnimatePresence mode="popLayout">
                 {items.map(sub => {
                   const mt = mainTasks.find(m => m.id === sub.mainTaskId);
-                  const assignee = sub.assignedTo ? users.find(u => u.id === sub.assignedTo) : undefined;
+                  const assignee = sub.assignedTo ? users.find(u => u.id === sub.assignedTo?.split(',')[0]) : undefined;
                   return (
                     <SubtaskCard
                       key={sub.id}

@@ -471,7 +471,7 @@ function AdminDashboard() {
             <div className="divide-y divide-border/40">
               {urgentTasks.map((sub, i) => {
                 const mt = getMainTask(sub.mainTaskId!);
-                const assignee = getUser(sub.assignedTo ?? null);
+                const assignee = getUser(sub.assignedTo?.split(',')[0] ?? null);
                 const sc = statusConfig[sub.status as keyof typeof statusConfig] ?? statusConfig.not_started;
                 const StatusIcon = sc.icon;
                 const isOverdue = sub.deadline && isPast(new Date(sub.deadline));
@@ -486,7 +486,7 @@ function AdminDashboard() {
                         {mt?.priority && <PriorityPill priority={mt.priority} />}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1"><Users className="w-3 h-3" />{assignee?.name ?? "Unassigned"}</span>
+                        <span className="flex items-center gap-1"><Users className="w-3 h-3" />{assignee?.name ?? "Unassigned"}{sub.assignedTo?.includes(',') && ' +'}</span>
                         <span>·</span>
                         <span className="truncate">{mt?.title ?? ""}</span>
                       </div>
@@ -555,7 +555,7 @@ function UserDashboard() {
 
   const wsTaskIds = new Set(wsTasks.map(mt => mt.id));
   const teamSubs = subtasks.filter(s => wsTaskIds.has(s.mainTaskId!));
-  const mySubs = teamSubs.filter(s => s.assignedTo === currentUser?.id);
+  const mySubs = teamSubs.filter(s => s.assignedTo?.includes(currentUser?.id as string));
   const myCreatedTasks = wsTasks.filter(mt => mt.createdBy === currentUser?.id);
 
   const myDone = mySubs.filter(s => s.status === 'completed').length;
@@ -781,7 +781,7 @@ function ProductivityScore() {
   const { wsTasks } = useWorkspace();
 
   const wsTaskIds = new Set(wsTasks.map(mt => mt.id));
-  const mySubs = subtasks.filter(s => wsTaskIds.has(s.mainTaskId!) && s.assignedTo === currentUser?.id);
+  const mySubs = subtasks.filter(s => wsTaskIds.has(s.mainTaskId!) && s.assignedTo?.includes(currentUser?.id as string));
 
   const total = mySubs.length;
   const completed = mySubs.filter(s => s.status === 'completed').length;

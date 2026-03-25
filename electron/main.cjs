@@ -291,6 +291,24 @@ function initIPC() {
   ipcMain.on('window-close', () => {
     if (mainWindow) mainWindow.close();
   });
+
+  // Native folder / file picker – returns selected path or null
+  ipcMain.handle('dialog:open-path', async (_event, opts = {}) => {
+    const properties = opts.folder
+      ? ['openDirectory']
+      : ['openFile', 'multiSelections'];
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: opts.title || 'Select file or folder',
+      properties,
+      filters: opts.filters || [
+        { name: 'All Files', extensions: ['*'] },
+        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] },
+        { name: 'Documents', extensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'] },
+      ],
+    });
+    if (canceled || !filePaths.length) return null;
+    return opts.folder ? filePaths[0] : filePaths;
+  });
 }
 
 /* ─── Main Window ──────────────────────────────────────────────── */

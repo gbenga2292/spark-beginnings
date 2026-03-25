@@ -316,7 +316,7 @@ function PersonalTasksView() {
                           <div className="flex items-center gap-2 mt-1.5 min-h-[20px]">
                             {(() => {
                               const creator = mt.createdBy ? users.find(u => u.id === mt.createdBy) : null;
-                              const assignee = mt.assignedTo ? users.find(u => u.id === mt.assignedTo) : null;
+                              const assignee = mt.assignedTo ? users.find(u => u.id === mt.assignedTo?.split(',')[0]) : null;
                               return (
                                 <>
                                   {creator && (
@@ -950,7 +950,7 @@ function AdminTasksView() {
                               <div className="divide-y divide-border/50">
                                 {projSubs.map((sub, i) => {
                                   const sc2 = statusConfig[sub.status];
-                                  const assignee = users.find(u => u.id === sub.assignedTo);
+                                  const assignee = users.find(u => u.id === sub.assignedTo?.split(',')[0]);
                                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
                                   return (
                                     <motion.div key={sub.id} id={`subtask-row-${sub.id}`}
@@ -1109,7 +1109,7 @@ function AdminTasksView() {
           ) : (
             <div className="space-y-2">
               {[...pendingApprovalSubs].sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()).map((sub, i) => {
-                const submitter = users.find(u => u.id === sub.assignedTo);
+                const submitter = users.find(u => u.id === sub.assignedTo?.split(',')[0]);
                 const parentTask = mainTasks.find(mt => mt.id === sub.mainTaskId);
                 const isOverdue = sub.deadline && isPast(new Date(sub.deadline));
                 return (
@@ -1222,7 +1222,7 @@ function AdminTasksView() {
                           <span className="font-medium hidden sm:inline">{pct}%</span>
                           {(() => {
                             const creator = mt.createdBy ? users.find(u => u.id === mt.createdBy) : null;
-                            const assignee = mt.assignedTo ? users.find(u => u.id === mt.assignedTo) : null;
+                            const assignee = mt.assignedTo ? users.find(u => u.id === mt.assignedTo?.split(',')[0]) : null;
                             return (
                               <div className="flex items-center gap-2 ml-1">
                                 {creator && (
@@ -1284,7 +1284,7 @@ function AdminTasksView() {
                             <div className="divide-y divide-border/50">
                               {subs.map((sub, i) => {
                                 const sc2 = statusConfig[sub.status];
-                                const assignee = users.find(u => u.id === sub.assignedTo);
+                                const assignee = users.find(u => u.id === sub.assignedTo?.split(',')[0]);
                                 const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
                                 return (
                                   <motion.div key={sub.id} id={`subtask-row-${sub.id}`}
@@ -1818,26 +1818,22 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
 
     const finalSubs: any[] = [];
     validSubs.forEach(s => {
-      const uids = s.assignedTo.length > 0 ? s.assignedTo : [null];
-      uids.forEach(uid => {
-        finalSubs.push({
-          title: s.title.trim(),
-          description: "",
-          assignedTo: uid,
-          status: "not_started" as SubTaskStatus,
-          deadline: s.deadline ? (s.deadlineTime ? `${s.deadline}T${s.deadlineTime}` : s.deadline) : undefined,
-          priority: s.priority,
-        });
+      finalSubs.push({
+        title: s.title.trim(),
+        description: "",
+        assignedTo: s.assignedTo.length > 0 ? s.assignedTo.join(',') : null,
+        status: "not_started" as SubTaskStatus,
+        deadline: s.deadline ? (s.deadlineTime ? `${s.deadline}T${s.deadlineTime}` : s.deadline) : undefined,
+        priority: s.priority,
       });
     });
 
-    const mainTaskUids = assignedTo.length > 0 ? assignedTo : [undefined];
-    mainTaskUids.forEach(uid => {
-      onSubmit(
-        { title: title.trim(), description: description.trim(), createdBy: currentUserId, teamId, workspaceId: workspaceId ?? teamId, assignedTo: uid, deadline: combinedDeadline, priority },
-        finalSubs
-      );
-    });
+    const mainAssignedToStr = assignedTo.length > 0 ? assignedTo.join(',') : undefined;
+    
+    onSubmit(
+      { title: title.trim(), description: description.trim(), createdBy: currentUserId, teamId, workspaceId: workspaceId ?? teamId, assignedTo: mainAssignedToStr, deadline: combinedDeadline, priority },
+      finalSubs
+    );
     onClose();
   };
 

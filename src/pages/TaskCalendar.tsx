@@ -63,7 +63,7 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
     // Subtasks
     const relevantSubtasks = filterMode === 'all'
       ? subtasks.filter(s => s.deadline)
-      : subtasks.filter(s => s.deadline && s.assignedTo === currentUser?.id);
+      : subtasks.filter(s => s.deadline && s.assignedTo?.includes(currentUser?.id as string));
 
     relevantSubtasks.forEach(s => {
       events.push({
@@ -75,7 +75,7 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
     // Main tasks
     const relevantMainTasks = filterMode === 'all'
       ? mainTasks.filter(m => m.deadline)
-      : mainTasks.filter(m => m.deadline && (m.assignedTo === currentUser?.id || m.createdBy === currentUser?.id));
+      : mainTasks.filter(m => m.deadline && (m.assignedTo?.includes(currentUser?.id as string) || m.createdBy === currentUser?.id));
 
     relevantMainTasks.forEach(m => {
       events.push({
