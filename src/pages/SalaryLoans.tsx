@@ -82,6 +82,9 @@ export function SalaryLoans() {
 
       // Create approval task
       try {
+        const today430 = new Date();
+        today430.setHours(16, 30, 0, 0);
+
         const taskTitle = `Approve Salary Advance for ${empName}`;
         const mainTask = await createMainTask({
           title: taskTitle,
@@ -90,6 +93,7 @@ export function SalaryLoans() {
           teamId: 'dcel-team',
           workspaceId: 'dcel-team',
           assignedTo: approverId,
+          deadline: today430.toISOString(),
         });
         if (mainTask?.id) {
           const subtaskDesc = JSON.stringify({ refType: 'salary_advance', refId: newAdvance.id, amount: Number(amount), employeeName: empName });
@@ -100,6 +104,7 @@ export function SalaryLoans() {
             assignedTo: approverId,
             status: 'not_started',
             priority: 'high',
+            deadline: today430.toISOString(),
           });
           // Store subtask id back on the advance record
           if ((sub as any)?.id) {
@@ -137,6 +142,9 @@ export function SalaryLoans() {
 
       // Create approval task
       try {
+        const today430 = new Date();
+        today430.setHours(16, 30, 0, 0);
+
         const taskTitle = `Approve ${requestType} for ${empName}`;
         const mainTask = await createMainTask({
           title: taskTitle,
@@ -145,6 +153,7 @@ export function SalaryLoans() {
           teamId: 'dcel-team',
           workspaceId: 'dcel-team',
           assignedTo: approverId,
+          deadline: today430.toISOString(),
         });
         if (mainTask?.id) {
           const subtaskDesc = JSON.stringify({ refType: 'loan', refId: newLoan.id, amount: principal, employeeName: empName });
@@ -155,6 +164,7 @@ export function SalaryLoans() {
             assignedTo: approverId,
             status: 'not_started',
             priority: 'high',
+            deadline: today430.toISOString(),
           });
           if ((sub as any)?.id) {
             updateLoan(newLoan.id, { approvalTaskId: (sub as any).id });

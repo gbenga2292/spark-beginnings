@@ -201,6 +201,9 @@ export function Leaves() {
 
       // Create approval task for the selected approver
       try {
+        const today430 = new Date();
+        today430.setHours(16, 30, 0, 0);
+
         const mainTask = await createMainTask({
           title: `Approve Leave Request for ${empName}`,
           description: `${leaveType} leave (${duration} days from ${startDate}) — submitted by ${currentUser?.user_metadata?.name || 'HR'}.`,
@@ -208,6 +211,7 @@ export function Leaves() {
           teamId: 'dcel-team',
           workspaceId: 'dcel-team',
           assignedTo: approverId,
+          deadline: today430.toISOString(),
         });
         if (mainTask?.id) {
           const subtaskDesc = JSON.stringify({ refType: 'leave', refId: newLeave.id, employeeName: empName, leaveType, duration });
@@ -218,6 +222,7 @@ export function Leaves() {
             assignedTo: approverId,
             status: 'not_started',
             priority: 'high',
+            deadline: today430.toISOString(),
           });
           if ((sub as any)?.id) {
             updateLeave(newLeave.id, { approvalTaskId: (sub as any).id });
