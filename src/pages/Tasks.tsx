@@ -13,7 +13,7 @@ import {
   Plus, Search, Circle, Loader2,
   CheckCircle2, Calendar, X, Users, Clock, ChevronDown,
   ChevronRight, UserCheck, Trash2, ArrowUpDown, Flag, MessageSquare, Send, Pencil,
-  Lock, User, FolderOpen, LayoutGrid, List
+  Lock, User, FolderOpen, LayoutGrid, List, Bell, RefreshCw
 } from "lucide-react";
 import { differenceInHours, addDays } from "date-fns";
 import { format, isToday, isTomorrow, isPast } from "date-fns";
@@ -1784,6 +1784,8 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
   workspaceId?: string;
   isPersonal?: boolean;
 }) {
+  const { addReminder, createMainTask } = useAppData();
+
   const [title, setTitle] = useState("");
   const [description, setDesc] = useState("");
   const [assignedTo, setAssignedTo] = useState<string[]>([]);
@@ -1792,6 +1794,19 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
   const [showSubs, setShowSubs] = useState(true);
   const [subtasks, setSubs] = useState<{ title: string; assignedTo: string[]; deadline: string; deadlineTime: string; priority: TaskPriority | undefined }[]>([]);
+
+  // ── Reminder state ────────────────────────────────────────────────────────
+  const [enableReminder, setEnableReminder] = useState(false);
+  const [reminderAt, setReminderAt] = useState("");
+  const [reminderFreq, setReminderFreq] = useState<'once'|'hourly'|'every_6_hours'|'daily'|'weekly'|'monthly'>('once');
+
+  const FREQ_LABELS: Record<string, string> = {
+    once: 'Once', hourly: 'Hourly', every_6_hours: 'Every 6h',
+    daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly',
+  };
+
+  // Recipients = assignees; fall back to current user (personal tasks)
+  const reminderRecipients = assignedTo.length > 0 ? assignedTo : [currentUserId];
 
   const [openMainDropdown, setOpenMainDropdown] = useState(false);
   const [openSubDropdown, setOpenSubDropdown] = useState<number | null>(null);
@@ -1808,7 +1823,7 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
     const validSubs = subtasks.filter(s => s.title.trim());
@@ -1829,11 +1844,28 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
     });
 
     const mainAssignedToStr = assignedTo.length > 0 ? assignedTo.join(',') : undefined;
-    
-    onSubmit(
+
+    // Create task and capture the returned ID for reminder linking
+    const createdTask = await createMainTask(
       { title: title.trim(), description: description.trim(), createdBy: currentUserId, teamId, workspaceId: workspaceId ?? teamId, assignedTo: mainAssignedToStr, deadline: combinedDeadline, priority },
       finalSubs
     );
+
+    // If reminder is enabled and we have valid date + created task, save the reminder
+    if (enableReminder && reminderAt && createdTask?.id) {
+      await addReminder({
+        title: `Reminder: ${title.trim()}`,
+        body: description.trim() || undefined,
+        remindAt: new Date(reminderAt).toISOString(),
+        frequency: reminderFreq,
+        recipientIds: reminderRecipients,
+        sendEmail: false,
+        isActive: true,
+        createdBy: currentUserId,
+        mainTaskId: createdTask.id,
+      });
+    }
+
     onClose();
   };
 
@@ -2014,10 +2046,105 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
             </AnimatePresence>
           </div>
 
+          {/* ── Time & Reminder accordion ── */}
+          <div className="rounded-xl border border-border overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setEnableReminder(s => !s)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted transition-colors text-left"
+            >
+              <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <Bell className={`w-3.5 h-3.5 ${enableReminder ? 'text-violet-500' : 'text-muted-foreground'}`} />
+                Time &amp; Reminder
+                {enableReminder && <span className="text-[11px] bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full font-semibold">On</span>}
+              </span>
+              <span className="text-xs text-muted-foreground">{enableReminder ? 'Hide' : 'Optional'}</span>
+            </button>
+
+            <AnimatePresence>
+              {enableReminder && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-4 pb-4 pt-3 space-y-4 border-t border-border">
+
+                    {/* Remind At */}
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> Remind At <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={reminderAt}
+                        onChange={e => setReminderAt(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                      />
+                    </div>
+
+                    {/* Repeat */}
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3" /> Repeat
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(Object.keys(FREQ_LABELS) as (keyof typeof FREQ_LABELS)[]).map(f => (
+                          <button
+                            key={f}
+                            type="button"
+                            onClick={() => setReminderFreq(f as any)}
+                            className={`py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${
+                              reminderFreq === f
+                                ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700'
+                                : 'border-border text-muted-foreground hover:border-violet-300 hover:text-foreground'
+                            }`}
+                          >
+                            {FREQ_LABELS[f]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Recipients preview */}
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                        <Users className="w-3 h-3" /> Recipients
+                        <span className="normal-case font-normal text-muted-foreground/60 ml-1">(auto from assignees)</span>
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {reminderRecipients.length > 0 ? reminderRecipients.map(id => {
+                          const u = users.find(u => u.id === id);
+                          const name = u?.name ?? (id === currentUserId ? 'You' : id);
+                          return (
+                            <span
+                              key={id}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800"
+                            >
+                              <div className={`w-3.5 h-3.5 rounded-full ${u?.avatarColor || 'bg-slate-400'} flex items-center justify-center text-white text-[7px] font-bold`}>
+                                {name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                              </div>
+                              {name.split(' ')[0]}
+                            </span>
+                          );
+                        }) : (
+                          <span className="text-xs text-muted-foreground italic">No assignees yet — reminder will go to you</span>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           <div className="flex justify-end gap-3 pt-1">
             <button type="button" onClick={onClose}
               className="px-5 py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</button>
-            <button type="submit" disabled={!title.trim()}
+            <button type="submit" disabled={!title.trim() || (enableReminder && !reminderAt)}
               className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
               Create Task
             </button>
@@ -2077,9 +2204,13 @@ function EditTaskDialog({ task, users, onClose, onSave }: {
 }) {
   const [title, setTitle] = useState(task.title);
   const [description, setDesc] = useState(task.description ?? "");
-  const [assignedTo, setAssignedTo] = useState(task.assignedTo ?? "");
+  // Parse existing comma-separated string into an array
+  const [assignedTo, setAssignedTo] = useState<string[]>(
+    task.assignedTo ? task.assignedTo.split(',').filter(Boolean) : []
+  );
   const [deadline, setDeadline] = useState(task.deadline ?? "");
   const [priority, setPriority] = useState<TaskPriority | undefined>(task.priority);
+  const [openDropdown, setOpenDropdown] = useState(false);
 
   const isProj = !!task.is_project;
   const label = isProj ? "Project" : "Task";
@@ -2087,14 +2218,15 @@ function EditTaskDialog({ task, users, onClose, onSave }: {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onSave({ title: title.trim(), description: description.trim(), assignedTo: assignedTo || undefined, deadline: deadline || undefined, priority });
+    const assignedToStr = assignedTo.length > 0 ? assignedTo.join(',') : undefined;
+    onSave({ title: title.trim(), description: description.trim(), assignedTo: assignedToStr, deadline: deadline || undefined, priority });
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
       <motion.div initial={{ opacity: 0, scale: 0.96, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.18 }}
-        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md">
+        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md overflow-y-auto max-h-[90vh]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -2122,14 +2254,64 @@ function EditTaskDialog({ task, users, onClose, onSave }: {
               placeholder="Optional notes…"
               className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all shadow-sm" />
           </div>
+
+          {/* ── Assigned To (multi-select) + Deadline ── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Assigned To</label>
-              <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm cursor-pointer">
-                <option value="">Unassigned</option>
-                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setOpenDropdown(d => !d)}
+                  className="w-full px-3.5 py-2.5 flex items-center justify-between rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm cursor-pointer whitespace-nowrap overflow-hidden"
+                >
+                  <span className="truncate text-sm">
+                    {assignedTo.length > 0 ? `${assignedTo.length} assignee(s)` : 'Unassigned'}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground opacity-50 shrink-0" />
+                </button>
+                {openDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-[100]" onClick={() => setOpenDropdown(false)} />
+                    <div className="absolute top-full left-0 mt-2 w-full max-h-[220px] overflow-y-auto bg-card border border-border rounded-xl shadow-xl z-[101] py-1 hide-scrollbar">
+                      {users.map(u => (
+                        <label key={u.id} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted transition-colors w-full">
+                          <input
+                            type="checkbox"
+                            checked={assignedTo.includes(u.id)}
+                            onChange={e => {
+                              if (e.target.checked) setAssignedTo(prev => [...prev, u.id]);
+                              else setAssignedTo(prev => prev.filter(id => id !== u.id));
+                            }}
+                            className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/20"
+                          />
+                          <div className={`w-5 h-5 rounded-full ${u.avatarColor} flex items-center justify-center text-white text-[8px] font-bold shrink-0`}>
+                            {u.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                          </div>
+                          <span className="text-xs text-foreground truncate">{u.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+              {/* Selected chips */}
+              {assignedTo.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {assignedTo.map(id => {
+                    const u = users.find(u => u.id === id);
+                    if (!u) return null;
+                    return (
+                      <span key={id} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
+                        {u.name.split(' ')[0]}
+                        <button type="button" onClick={() => setAssignedTo(prev => prev.filter(x => x !== id))} className="hover:text-red-500 transition-colors">
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5">Deadline</label>
@@ -2137,6 +2319,7 @@ function EditTaskDialog({ task, users, onClose, onSave }: {
                 className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm" />
             </div>
           </div>
+
           <div>
             <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-2">Priority</label>
             <div className="grid grid-cols-5 gap-2 bg-muted/30 p-1.5 rounded-xl border border-border/50">
@@ -2159,6 +2342,9 @@ function EditTaskDialog({ task, users, onClose, onSave }: {
               ))}
             </div>
           </div>
+
+          <EditTaskReminderSection taskId={task.id} assignedTo={assignedTo.join(',')} users={users} />
+
           <div className="flex justify-end gap-3 pt-1">
             <button type="button" onClick={onClose}
               className="px-5 py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</button>
@@ -2169,6 +2355,158 @@ function EditTaskDialog({ task, users, onClose, onSave }: {
           </div>
         </form>
       </motion.div>
+    </div>
+  );
+}
+
+
+
+/* ─── Reminder accordion inside EditTaskDialog ───────────────────────────── */
+function EditTaskReminderSection({ taskId, assignedTo, users }: { taskId: string; assignedTo: string; users: AppUser[] }) {
+  const { addReminder } = useAppData();
+  const { user: currentUser } = useAuth();
+
+  const FREQ_LABELS: Record<string, string> = {
+    once: 'Once', hourly: 'Hourly', every_6_hours: 'Every 6h',
+    daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly',
+  };
+
+  const [enableReminder, setEnableReminder] = useState(false);
+  const [reminderAt, setReminderAt] = useState('');
+  const [reminderFreq, setReminderFreq] = useState<'once'|'hourly'|'every_6_hours'|'daily'|'weekly'|'monthly'>('once');
+  const [saved, setSaved] = useState(false);
+
+  // Recipients = the current assignee(s), or fall back to current user
+  const recipientIds = assignedTo
+    ? assignedTo.split(',').filter(Boolean)
+    : currentUser?.id ? [currentUser.id] : [];
+
+  const handleSaveReminder = async () => {
+    if (!reminderAt || !currentUser) return;
+    await addReminder({
+      title: 'Task Reminder',
+      remindAt: new Date(reminderAt).toISOString(),
+      frequency: reminderFreq,
+      recipientIds,
+      sendEmail: false,
+      isActive: true,
+      createdBy: currentUser.id,
+      mainTaskId: taskId,
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  return (
+    <div className="rounded-xl border border-border overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setEnableReminder(s => !s)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted transition-colors text-left"
+      >
+        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <Bell className={`w-3.5 h-3.5 ${enableReminder ? 'text-violet-500' : 'text-muted-foreground'}`} />
+          Time &amp; Reminder
+          {enableReminder && <span className="text-[11px] bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full font-semibold">On</span>}
+        </span>
+        <span className="text-xs text-muted-foreground">{enableReminder ? 'Hide' : 'Optional'}</span>
+      </button>
+
+      <AnimatePresence>
+        {enableReminder && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 pt-3 space-y-4 border-t border-border">
+
+              {/* Remind At */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> Remind At <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  value={reminderAt}
+                  onChange={e => { setReminderAt(e.target.value); setSaved(false); }}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                />
+              </div>
+
+              {/* Repeat */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3" /> Repeat
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(Object.keys(FREQ_LABELS) as Array<keyof typeof FREQ_LABELS>).map(f => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => { setReminderFreq(f as any); setSaved(false); }}
+                      className={`py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${
+                        reminderFreq === f
+                          ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700'
+                          : 'border-border text-muted-foreground hover:border-violet-300 hover:text-foreground'
+                      }`}
+                    >
+                      {FREQ_LABELS[f]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recipients preview */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                  <Users className="w-3 h-3" /> Recipients
+                  <span className="normal-case font-normal text-muted-foreground/60 ml-1">(auto from assignee)</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {recipientIds.length > 0 ? recipientIds.map(id => {
+                    const u = users.find(u => u.id === id);
+                    const name = u?.name ?? 'You';
+                    return (
+                      <span
+                        key={id}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800"
+                      >
+                        <div className={`w-3.5 h-3.5 rounded-full ${u?.avatarColor || 'bg-slate-400'} flex items-center justify-center text-white text-[7px] font-bold`}>
+                          {name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                        </div>
+                        {name.split(' ')[0]}
+                      </span>
+                    );
+                  }) : (
+                    <span className="text-xs text-muted-foreground italic">No assignee — reminder will go to you</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Add Reminder button (independent of main Save Changes) */}
+              <button
+                type="button"
+                disabled={!reminderAt || saved}
+                onClick={handleSaveReminder}
+                className={`w-full py-2 rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-2 ${
+                  saved
+                    ? 'bg-green-500 text-white border border-green-500'
+                    : !reminderAt
+                    ? 'bg-muted text-muted-foreground border border-border cursor-not-allowed opacity-50'
+                    : 'bg-violet-600 hover:bg-violet-700 text-white border border-violet-600'
+                }`}
+              >
+                <Bell className="w-3.5 h-3.5" />
+                {saved ? 'Reminder Added ✓' : 'Add Reminder to this Task'}
+              </button>
+
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
