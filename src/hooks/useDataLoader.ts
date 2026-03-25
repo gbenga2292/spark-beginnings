@@ -3,7 +3,7 @@ import { useAppStore, DEFAULT_OFFBOARDING_TASKS } from '@/src/store/appStore';
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite } from '@/src/lib/supabaseService';
 
 /** Fills in any missing privilege sections using NO_ACCESS defaults. */
 function backfillPrivileges(
@@ -64,7 +64,7 @@ export function useDataLoader(isAuthenticated: boolean) {
           db.insertSite(officeSite);
         }
 
-        // Preserve pendingSites from localStorage — they have no Supabase table yet
+        // Get pendingSites from localStorage as a fallback
         const localPendingSites = useAppStore.getState().pendingSites;
 
         // Auto-seed default general offboarding tasks if missing
@@ -105,8 +105,8 @@ export function useDataLoader(isAuthenticated: boolean) {
           companyExpenses: appData.companyExpenses,
           positions: appData.positions.length > 0 ? appData.positions : useAppStore.getState().positions,
           departments: appData.departments.length > 0 ? appData.departments : useAppStore.getState().departments,
-          // Always preserve pendingSites from localStorage — not synced to Supabase
-          pendingSites: localPendingSites,
+          // Only load pending sites from the Supabase database to avoid ghost records
+          pendingSites: appData.pendingSites || [],
           ...(appData.payrollVariables ? { payrollVariables: appData.payrollVariables as any } : {}),
           ...(appData.payeTaxVariables ? { payeTaxVariables: appData.payeTaxVariables as any } : {}),
           ...(appData.monthValues && Object.keys(appData.monthValues as any).length > 0 ? { monthValues: appData.monthValues as any } : {}),
@@ -398,6 +398,20 @@ export function useRealtimeData(isAuthenticated: boolean) {
                 useAppStore.setState({ companyExpenses: current.map(e => e.id === updated.id ? updated : e) });
               } else if (eventType === 'DELETE') {
                 useAppStore.setState({ companyExpenses: current.filter(e => e.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'pending_sites': {
+              const current = appState.pendingSites;
+              if (eventType === 'INSERT') {
+                if (!current.some((s: any) => s.id === newRow.id)) {
+                  useAppStore.setState({ pendingSites: [...current, dbToPendingSite(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToPendingSite(newRow);
+                useAppStore.setState({ pendingSites: current.map((s: any) => s.id === updated.id ? updated : s) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ pendingSites: current.filter((s: any) => s.id !== oldRow.id) });
               }
               break;
             }

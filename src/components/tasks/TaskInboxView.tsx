@@ -7,7 +7,8 @@ import {
   Search, Circle, Loader2, CheckCircle2, AlertTriangle,
   User, Calendar, Clock, ChevronDown, ChevronRight,
   MessageSquare, Hash, Paperclip, Send, FolderOpen, X,
-  ArrowRight, ArrowLeft, Plus, Hourglass, FileText, FileSpreadsheet, Presentation
+  ArrowRight, ArrowLeft, Plus, Hourglass, FileText, FileSpreadsheet, Presentation,
+  Pencil, Reply
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/src/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
@@ -41,7 +42,7 @@ interface TaskInboxViewProps {
 
 export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onSelectSubtask, className, onClose }: TaskInboxViewProps) {
   const { user: currentUser } = useAuth();
-  const { updateSubtaskStatus, postComment, getSubtaskComments, addSubtask, assignSubtask, getMainTaskWorkflow } = useAppData();
+  const { updateSubtaskStatus, postComment, getSubtaskComments, addSubtask, assignSubtask, getMainTaskWorkflow, approveSubtask, rejectSubtask, addReminder } = useAppData();
 
   const [search, setSearch] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -72,12 +73,16 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
       .sort((a, b) => new Date(b.mainTask!.createdAt || 0).getTime() - new Date(a.mainTask!.createdAt || 0).getTime());
   }, [subtasks, mainTasks, search]);
 
-  // Expand all groups on first load
+  const activeSubtask = subtasks.find(s => s.id === activeSubtaskId) ?? null;
+  // Normalize mainTaskId for Supabase snake_case
+  const activeMainTaskId = activeSubtask ? ((activeSubtask as any).main_task_id || activeSubtask.mainTaskId) : null;
+
+  // Expand only active group on load to keep others closed by default
   useEffect(() => {
-    if (expandedGroups.size === 0 && groupedTasks.length > 0) {
-      setExpandedGroups(new Set(groupedTasks.map(g => g.mainTask!.id)));
+    if (activeMainTaskId) {
+      setExpandedGroups(new Set([activeMainTaskId]));
     }
-  }, [groupedTasks]);
+  }, [activeMainTaskId]);
 
   // Flatten EVERYTHING bypassing search filter for Prev/Next navigation strictly structurally
   const allFlatSubtasks = useMemo(() => {
@@ -108,9 +113,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
     });
   };
 
-  const activeSubtask = subtasks.find(s => s.id === activeSubtaskId) ?? null;
-  // Normalize mainTaskId for Supabase snake_case
-  const activeMainTaskId = activeSubtask ? ((activeSubtask as any).main_task_id || activeSubtask.mainTaskId) : null;
+
   const activeMainTask = activeMainTaskId ? mainTasks.find(m => m.id === activeMainTaskId) ?? null : null;
   const activeAssignee = activeSubtask?.assignedTo ? users.find(u => u.id === activeSubtask.assignedTo) ?? null : null;
 
@@ -163,8 +166,27 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
           {groupedTasks.length === 0 ? (
             <div className="text-center py-10 text-slate-400 text-sm">No tasks found</div>
           ) : (
-            groupedTasks.map(({ mainTask, subs }) => (
-              <div key={mainTask!.id} className="mb-1">
+            groupedTasks.map(({ mainTask, subs }) => {
+                // Derive main task status for color coding
+                const allDone = subs.length > 0 && subs.every(s => s.status === 'completed');
+                const anyOverdue = subs.some(s => s.deadline && isPast(new Date(s.deadline)) && s.status !== 'completed');
+                const anyInProgress = subs.some(s => s.status === 'in_progress' || s.status === 'pending_approval');
+                const mtStatusColor = allDone
+                  ? 'bg-green-500'
+                  : anyOverdue
+                  ? 'bg-red-500'
+                  : anyInProgress
+                  ? 'bg-amber-400'
+                  : 'bg-blue-400';
+                const mtBorderColor = allDone
+                  ? 'border-l-green-400'
+                  : anyOverdue
+                  ? 'border-l-red-400'
+                  : anyInProgress
+                  ? 'border-l-amber-400'
+                  : 'border-l-blue-300';
+              return (
+              <div key={mainTask!.id} className={`mb-1 border-l-2 ${mtBorderColor} ml-1 rounded-sm`}>
                 {/* Group Header */}
                 <button
                   onClick={() => toggleGroup(mainTask!.id)}
@@ -174,6 +196,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                     <ChevronDown
                       className={`w-3.5 h-3.5 text-slate-400 flex-shrink-0 transition-transform ${expandedGroups.has(mainTask!.id) ? '' : '-rotate-90'}`}
                     />
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${mtStatusColor}`} title={allDone ? 'Completed' : anyOverdue ? 'Overdue' : anyInProgress ? 'In Progress' : 'Not Started'} />
                     <span className="text-[13px] font-semibold text-slate-700 truncate">{mainTask!.title}</span>
                   </div>
                   <span className="text-[11px] font-medium text-slate-400 flex-shrink-0 ml-1">({subs.length})</span>
@@ -224,18 +247,11 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                         </button>
                       );
                     })}
-
-                    {/* Add Task */}
-                    <button
-                      onClick={() => addSubtask({ title: "New Task", mainTaskId: mainTask!.id, description: "" })}
-                      className="w-full flex items-center gap-2 pl-7 pr-3 py-2 text-[12px] font-medium text-slate-400 hover:text-primary transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Add Task
-                    </button>
                   </div>
                 )}
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -290,28 +306,75 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                     </span>
                   )}
 
-                  {/* Status pills — only admins, co-admins, and the task creator can change status */}
-                  {(['not_started', 'in_progress', 'completed'] as SubTaskStatus[]).map(s => {
-                    const sc = statusConfig[s];
-                    const SIcon = sc.icon;
-                    const isActive = activeSubtask.status === s;
-                    const canChangeStatus = currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || activeMainTask?.createdBy === currentUser?.id;
-                    return (
-                      <button
-                        key={s}
-                        onClick={() => canChangeStatus && currentUser && updateSubtaskStatus(activeSubtask.id!, s, currentUser.id)}
-                        disabled={!canChangeStatus}
-                        title={!canChangeStatus ? 'Only admins and the task creator can change status' : undefined}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                          isActive ? sc.pillClass + ' ring-2 ring-offset-1 ring-primary/30' :
-                          !canChangeStatus ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' :
-                          'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        <SIcon className="w-3.5 h-3.5" /> {sc.label}
-                      </button>
-                    );
-                  })}
+                  {(() => {
+                    // Check if this is an approval workflow task
+                    let isApprovalTask = false;
+                    try {
+                      const meta = JSON.parse(activeSubtask.description || '{}');
+                      if (meta.refType) isApprovalTask = true;
+                    } catch (e) {
+                      // Normal text description
+                    }
+
+                    if (isApprovalTask) {
+                      const isApprover = currentUser?.id === activeSubtask.assignedTo;
+                      const hasActed = activeSubtask.status === 'completed' || !!(activeSubtask as any).rejectedAt;
+                      
+                      return (
+                        <>
+                          <button
+                            onClick={() => isApprover && !hasActed && approveSubtask(activeSubtask.id!, currentUser?.id)}
+                            disabled={!isApprover || hasActed}
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold border transition-all ${
+                              hasActed ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed' :
+                              !isApprover ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' :
+                              'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 shadow-sm'
+                            }`}
+                          >
+                            <CheckCircle2 className="w-4 h-4" /> Approve Request
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (!isApprover || hasActed) return;
+                              const reason = window.prompt("Rejection reason (optional):");
+                              if (reason !== null) rejectSubtask(activeSubtask.id!, currentUser?.id, reason);
+                            }}
+                            disabled={!isApprover || hasActed}
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold border transition-all ${
+                              hasActed ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed hidden' :
+                              !isApprover ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed hidden' :
+                              'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 shadow-sm'
+                            }`}
+                          >
+                            <X className="w-4 h-4" /> Reject Request
+                          </button>
+                        </>
+                      );
+                    }
+
+                    // Otherwise, render normal standard task status pills
+                    return (['not_started', 'in_progress', 'completed'] as SubTaskStatus[]).map(s => {
+                      const sc = statusConfig[s];
+                      const SIcon = sc.icon;
+                      const isActive = activeSubtask.status === s;
+                      const canChangeStatus = currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || activeMainTask?.createdBy === currentUser?.id;
+                      return (
+                        <button
+                          key={s}
+                          onClick={() => canChangeStatus && currentUser && updateSubtaskStatus(activeSubtask.id!, s, currentUser.id)}
+                          disabled={!canChangeStatus}
+                          title={!canChangeStatus ? 'Only admins and the task creator can change status' : undefined}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                            isActive ? sc.pillClass + ' ring-2 ring-offset-1 ring-primary/30' :
+                            !canChangeStatus ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' :
+                            'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <SIcon className="w-3.5 h-3.5" /> {sc.label}
+                        </button>
+                      );
+                    });
+                  })()}
 
                   {/* Assign button — only admins, co-admins or the task creator can reassign — supports multiple */}
                   {(currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || activeMainTask?.createdBy === currentUser?.id) && (
@@ -404,39 +467,47 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
           </div>
 
           {/* RIGHT: Updates Panel */}
-          <div className="w-[520px] flex-shrink-0 bg-white border-l border-border flex flex-col">
-            {/* Tabs */}
-            <div className="flex border-b border-border flex-shrink-0">
+          <div className="w-[520px] flex-shrink-0 bg-white border-l border-border flex flex-col overflow-hidden">
+            <div className="flex bg-slate-50 border-b border-border" style={{ flexShrink: 0 }}>
               {(['updates', 'workflow', 'files'] as const).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setRightTab(tab)}
-                  className={`flex-1 py-4 text-xs font-bold capitalize tracking-wide relative transition-colors ${
-                    rightTab === tab ? 'text-primary' : 'text-slate-400 hover:text-slate-700'
+                  className={`flex-1 w-full flex items-center justify-center py-4 text-sm font-bold capitalize tracking-wide transition-all border-b-2 cursor-pointer ${
+                    rightTab === tab
+                      ? 'bg-white text-primary border-primary shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100 border-transparent'
                   }`}
                 >
-                  {tab}
-                  {rightTab === tab && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />}
+                  {tab === 'updates' ? '💬 Updates' : tab === 'workflow' ? '⚡ Workflow' : '📎 Files'}
                 </button>
               ))}
             </div>
 
-            {rightTab === 'updates' && (
-              <UpdatesFeed
-                subtask={activeSubtask}
-                mainTask={activeMainTask}
-                users={users}
-                currentUser={currentUser}
-                postComment={postComment}
-                getSubtaskComments={getSubtaskComments}
-              />
-            )}
-            {rightTab === 'workflow' && (
-              <WorkflowFeed mainTask={activeMainTask} users={users} getMainTaskWorkflow={getMainTaskWorkflow} />
-            )}
-            {rightTab === 'files' && (
-              <FilesFeed subtask={activeSubtask} getSubtaskComments={getSubtaskComments} users={users} />
-            )}
+            {/* Tab Content — constrained below tabs, cannot overflow upward */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {rightTab === 'updates' && (
+                <UpdatesFeed
+                  subtask={activeSubtask}
+                  mainTask={activeMainTask}
+                  users={users}
+                  currentUser={currentUser}
+                  postComment={postComment}
+                  getSubtaskComments={getSubtaskComments}
+                  updateSubtaskStatus={updateSubtaskStatus}
+                  addSubtask={addSubtask}
+                  addReminder={addReminder}
+                  subtasks={subtasks}
+                  onSelectSubtask={onSelectSubtask}
+                />
+              )}
+              {rightTab === 'workflow' && (
+                <WorkflowFeed mainTask={activeMainTask} users={users} getMainTaskWorkflow={getMainTaskWorkflow} />
+              )}
+              {rightTab === 'files' && (
+                <FilesFeed subtask={activeSubtask} getSubtaskComments={getSubtaskComments} users={users} />
+              )}
+            </div>
           </div>
         </div>
       ) : (
@@ -454,28 +525,131 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
 }
 
 // ── Updates Feed ─────────────────────────────────────────────────────────────
-function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSubtaskComments }: {
+function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSubtaskComments, updateSubtaskStatus, addSubtask, addReminder, subtasks, onSelectSubtask }: {
   subtask: SubTask;
   mainTask: MainTask;
   users: AppUser[];
   currentUser: any;
   postComment: any;
   getSubtaskComments: any;
+  updateSubtaskStatus: any;
+  addSubtask: any;
+  addReminder: any;
+  subtasks?: SubTask[];
+  onSelectSubtask?: (id: string | null) => void;
 }) {
+  const { updateComment } = useAppData();
   const [text, setText] = useState("");
   const comments = getSubtaskComments(subtask.id);
   const endRef = useRef<HTMLDivElement>(null);
+
+  // Mention State
+  const [showMention, setShowMention] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionIndex, setMentionIndex] = useState(0);
+  
+  // Edit & Reply State
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTextContent, setEditTextContent] = useState("");
+  const [replyingTo, setReplyingTo] = useState<any>(null);
+
+  // Attachments State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<{name: string, base64: string}[]>([]);
+  const [pendingFileLinks, setPendingFileLinks] = useState<string[]>([]);
+
+  const filteredUsers = users.filter(u => u.id !== currentUser?.id && u.name?.toLowerCase().includes(mentionQuery.toLowerCase()));
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [comments.length]);
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    Array.from(e.target.files).forEach(file => {
+       const reader = new FileReader();
+       reader.onloadend = () => {
+         setPendingAttachments(prev => [...prev, { name: file.name, base64: reader.result as string }]);
+       };
+       reader.readAsDataURL(file);
+    });
+    e.target.value = ''; // reset so the same file can be selected again
+  };
+
+  const handleAttachLink = () => {
+     const path = window.prompt("Enter a network folder or file path:");
+     if (path && path.trim()) {
+         setPendingFileLinks(prev => [...prev, path.trim()]);
+     }
+  };
+
   const handleSend = () => {
-    if (!text.trim() || !currentUser) return;
+    if ((!text.trim() && pendingAttachments.length === 0 && pendingFileLinks.length === 0) || !currentUser) return;
     // Support both main_task_id (Supabase snake_case) and mainTaskId
     const mainId = (mainTask as any).id || mainTask.id;
-    postComment(subtask.id, mainId, currentUser.id, text.trim(), [], undefined);
+    const content = text.trim();
+
+    // Auto status update on first update from "Not Started" to "In Progress"
+    if (subtask.status === 'not_started' && comments.length === 0) {
+      updateSubtaskStatus(subtask.id, 'in_progress', currentUser.id);
+    }
+
+    let finalContent = content;
+    if (replyingTo) {
+        const repliedText = replyingTo.text ? replyingTo.text.split('\n').map((l: string) => `> ${l}`).join('\n') : "";
+        const replyAuthor = users.find(u => u.id === (replyingTo.author_id || replyingTo.authorId));
+        const authorMention = replyAuthor ? `@${replyAuthor.name.split(' ')[0]}` : "@someone";
+        finalContent = `> Replying to ${authorMention}:\n${repliedText}\n\n${content}`;
+    }
+
+    // Capture "#" to create a linked subtask
+    // Expected format: "#subtask title. anything after is description"
+    const hashMatch = content.match(/#([^\.]+)(?:\.(.*))?/is);
+    if (hashMatch) {
+      const subtaskTitle = hashMatch[1].trim();
+      let subtaskDesc = hashMatch[2] ? hashMatch[2].trim() : '';
+      
+      if (replyingTo) {
+          subtaskDesc = subtaskDesc || `Context:\n${finalContent}`;
+      }
+
+      if (subtaskTitle) {
+        addSubtask({
+          title: subtaskTitle,
+          description: subtaskDesc,
+          mainTaskId: mainId,
+          assignedTo: null,
+          status: 'not_started'
+        });
+      }
+    }
+
+    // Capture "@" mentions to send notifications via the reminders system
+    const mentions = Array.from(finalContent.matchAll(/@(\w+)/g)).map(m => m[1].toLowerCase());
+    if (mentions.length > 0) {
+      users.forEach(u => {
+        const fname = (u.name || "").split(' ')[0].toLowerCase();
+        if (mentions.includes(fname) && u.id !== currentUser.id) {
+           addReminder({
+             title: `Mentioned in Task: ${mainTask.title}`,
+             body: `${currentUser.name} mentioned you: "${finalContent.substring(0, 50)}..."`,
+             remindAt: new Date().toISOString(),
+             recipientIds: [u.id],
+             createdBy: currentUser.id,
+             mainTaskId: mainId,
+             subtaskId: subtask.id,
+             isActive: true
+           });
+        }
+      });
+    }
+
+    // Pass the attachments directly
+    postComment(subtask.id, mainId, currentUser.id, finalContent, pendingAttachments, pendingFileLinks);
     setText("");
+    setReplyingTo(null);
+    setPendingAttachments([]);
+    setPendingFileLinks([]);
   };
 
   return (
@@ -491,15 +665,37 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
             const authorId = c.authorId || c.author_id;
             const createdAt = c.createdAt || c.created_at || new Date().toISOString();
             const author = users.find((u: any) => u.id === authorId);
+            const isAuthor = authorId === currentUser?.id;
             const renderText = (t: string) => {
               return t.split(/(@\w+|#\S+)/g).map((part: string, i: number) => {
-                if (part.startsWith('@')) return <span key={i} className="font-semibold text-primary">{part}</span>;
-                if (part.startsWith('#')) return <span key={i} className="font-semibold text-emerald-600">{part}</span>;
+                if (part.startsWith('@')) return <span key={i} className="font-semibold text-primary bg-primary/10 px-1 rounded">{part}</span>;
+                if (part.startsWith('#')) {
+                  const tag = part.slice(1).toLowerCase();
+                  // Find the subtask whose title matches this tag (within same main task)
+                  const mainTaskId = (subtask as any).main_task_id || subtask.mainTaskId;
+                  const linked = subtasks?.find(s => {
+                    const sMainId = (s as any).main_task_id || s.mainTaskId;
+                    return sMainId === mainTaskId && s.title?.toLowerCase().includes(tag);
+                  });
+                  if (linked && onSelectSubtask) {
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => onSelectSubtask(linked.id!)}
+                        className="font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded hover:bg-emerald-100 transition-colors text-xs cursor-pointer underline-offset-2 hover:underline"
+                        title={`Go to subtask: ${linked.title}`}
+                      >
+                        {part}
+                      </button>
+                    );
+                  }
+                  return <span key={i} className="font-semibold text-emerald-600 bg-emerald-50 px-1 rounded">{part}</span>;
+                }
                 return <span key={i}>{part}</span>;
               });
             };
             return (
-              <div key={c.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              <div key={c.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 relative z-0 group">
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2.5">
                     <Avatar className="w-9 h-9 flex-shrink-0">
@@ -513,11 +709,33 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
                       <p className="text-[11px] text-slate-400">@{author?.name?.split(' ')[0] || 'user'}</p>
                     </div>
                   </div>
-                  <span className="text-[11px] text-slate-400 flex-shrink-0">
-                    {format(new Date(createdAt), "h:mm a")}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {/* Actions show on hover */}
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                      <button onClick={() => setReplyingTo(c)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Reply"><Reply className="w-3.5 h-3.5" /></button>
+                      {isAuthor && <button onClick={() => { setEditingId(c.id); setEditTextContent(c.text); }} className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>}
+                    </div>
+                    <span className="text-[11px] text-slate-400 flex-shrink-0">
+                      {format(new Date(createdAt), "h:mm a")}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-sm text-slate-700 leading-relaxed">{renderText(c.text)}</p>
+                {editingId === c.id ? (
+                  <div className="mt-2">
+                    <textarea 
+                      value={editTextContent} 
+                      onChange={e => setEditTextContent(e.target.value)} 
+                      className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary/20" 
+                      rows={3} 
+                    />
+                    <div className="flex gap-2 mt-2 justify-end">
+                      <button onClick={() => setEditingId(null)} className="text-xs font-semibold text-slate-500 hover:bg-slate-100 px-3 py-1.5 rounded-lg transition-colors">Cancel</button>
+                      <button onClick={() => { updateComment(c.id, editTextContent); setEditingId(null); }} className="text-xs font-bold bg-primary text-white px-4 py-1.5 rounded-lg hover:bg-primary/90 transition-colors shadow-sm">Save Changes</button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{renderText(c.text)}</p>
+                )}
               </div>
             );
           })
@@ -526,13 +744,132 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
       </div>
 
       {/* Compose */}
-      <div className="p-4 border-t border-border bg-white flex-shrink-0">
-        <div className="relative border border-slate-200 rounded-2xl bg-white overflow-hidden focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+      <div className="p-4 border-t border-border bg-white flex-shrink-0 relative z-20">
+        {replyingTo && (
+           <div className="mb-3 px-4 py-2 bg-blue-50/50 rounded-xl border border-blue-100 flex items-start justify-between">
+              <div className="min-w-0 pr-4">
+                 <p className="text-[11px] font-bold text-blue-800 mb-0.5 flex items-center gap-1.5"><Reply className="w-3.5 h-3.5" /> Replying to {users.find(u => u.id === (replyingTo.author_id || replyingTo.authorId))?.name}</p>
+                 <p className="text-xs text-blue-700 truncate opacity-80">{replyingTo.text}</p>
+              </div>
+              <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-blue-100 rounded-lg text-blue-500 transition-colors"><X className="w-3.5 h-3.5"/></button>
+           </div>
+        )}
+
+        <div className="relative border border-slate-200 rounded-2xl bg-white focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+          
+          <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" multiple />
+
+          {(pendingAttachments.length > 0 || pendingFileLinks.length > 0) && (
+             <div className="flex flex-wrap gap-2 pt-3 px-4 pb-0">
+               {pendingAttachments.map((a, i) => (
+                  <div key={`att-${i}`} className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700">
+                     <Paperclip className="w-3 h-3 text-slate-400" />
+                     <span className="truncate max-w-[120px]" title={a.name}>{a.name}</span>
+                     <button onClick={() => setPendingAttachments(prev => prev.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-red-500 ml-1"><X className="w-3 h-3" /></button>
+                  </div>
+               ))}
+               {pendingFileLinks.map((l, i) => (
+                  <div key={`lnk-${i}`} className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 border border-emerald-100 rounded-lg text-xs font-medium text-emerald-700">
+                     <FolderOpen className="w-3 h-3 text-emerald-400" />
+                     <span className="truncate max-w-[120px]" title={l}>{l.split('\\').pop() || l}</span>
+                     <button onClick={() => setPendingFileLinks(prev => prev.filter((_, idx) => idx !== i))} className="text-emerald-500 hover:text-red-500 ml-1"><X className="w-3 h-3" /></button>
+                  </div>
+               ))}
+             </div>
+          )}
+
+          {/* Mention Popover */}
+          {showMention && filteredUsers.length > 0 && (
+            <div className="absolute bottom-full left-4 mb-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-50 flex flex-col py-1">
+              {filteredUsers.slice(0, 5).map((u, idx) => (
+                <button
+                  key={u.id}
+                  onClick={() => {
+                     const textarea = document.getElementById(`updates-textarea-${subtask.id}`) as HTMLTextAreaElement;
+                     const cursor = textarea?.selectionStart || text.length;
+                     const textBefore = text.substring(0, cursor);
+                     const match = textBefore.match(/(?:^|\s)@(\w*)$/);
+                     if (match) {
+                         const mentionStr = `@${u.name.split(" ")[0]}`;
+                         const beforeMention = textBefore.substring(0, textBefore.length - match[1].length - 1 + (match[0].startsWith(' ') ? 1 : 0));
+                         const afterCursor = text.substring(cursor);
+                         setText(beforeMention + mentionStr + " " + afterCursor);
+                         setShowMention(false);
+                     }
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors text-left ${idx === mentionIndex ? 'bg-primary/10 text-primary' : 'hover:bg-slate-50 text-slate-700'}`}
+                >
+                   <Avatar className="w-6 h-6 flex-shrink-0">
+                     <AvatarImage src={u.avatarUrl} />
+                     <AvatarFallback className={`text-[9px] font-bold text-white ${u.avatarColor || 'bg-slate-400'}`}>
+                       {u.name.substring(0, 2).toUpperCase()}
+                     </AvatarFallback>
+                   </Avatar>
+                   <div className="flex flex-col min-w-0">
+                     <span className="font-semibold truncate leading-tight">{u.name}</span>
+                     <span className="text-[10px] opacity-60 truncate leading-tight">@{u.name.split(' ')[0].toLowerCase()}</span>
+                   </div>
+                </button>
+              ))}
+            </div>
+          )}
+
           <textarea
+            id={`updates-textarea-${subtask.id}`}
             value={text}
-            onChange={e => setText(e.target.value)}
+            onChange={e => {
+              const val = e.target.value;
+              setText(val);
+              const cursor = e.target.selectionStart;
+              const textBefore = val.substring(0, cursor);
+              const match = textBefore.match(/(?:^|\s)@(\w*)$/);
+              if (match) {
+                  setShowMention(true);
+                  setMentionQuery(match[1]);
+                  setMentionIndex(0);
+              } else {
+                  setShowMention(false);
+              }
+            }}
             onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+              if (showMention && filteredUsers.length > 0) {
+                if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setMentionIndex(prev => (prev + 1) % Math.min(filteredUsers.length, 5));
+                    return;
+                }
+                if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setMentionIndex(prev => (prev - 1 + Math.min(filteredUsers.length, 5)) % Math.min(filteredUsers.length, 5));
+                    return;
+                }
+                if (e.key === "Enter" || e.key === "Tab") {
+                    e.preventDefault();
+                    const u = filteredUsers[mentionIndex];
+                    if (u) {
+                       const textarea = e.target as HTMLTextAreaElement;
+                       const cursor = textarea.selectionStart;
+                       const textBefore = text.substring(0, cursor);
+                       const match = textBefore.match(/(?:^|\s)@(\w*)$/);
+                       if (match) {
+                           const mentionStr = `@${u.name.split(" ")[0]}`;
+                           const beforeMention = textBefore.substring(0, textBefore.length - match[1].length - 1 + (match[0].startsWith(' ') ? 1 : 0));
+                           const afterCursor = text.substring(cursor);
+                           setText(beforeMention + mentionStr + " " + afterCursor);
+                           setShowMention(false);
+                       }
+                    }
+                    return;
+                }
+                if (e.key === "Escape") {
+                    setShowMention(false);
+                    return;
+                }
+              }
+              if (e.key === 'Enter' && !e.shiftKey) { 
+                e.preventDefault(); 
+                handleSend(); 
+              }
             }}
             placeholder="Write an update..."
             rows={2}
@@ -540,21 +877,33 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
           />
           <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100">
             <div className="flex items-center gap-0.5">
-              <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-yellow-600 transition-colors" title="Attach file">
+              <button onClick={() => fileInputRef.current?.click()} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-yellow-600 transition-colors" title="Attach file">
                 <Paperclip className="w-3.5 h-3.5" />
               </button>
-              <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary transition-colors" title="Mention user">
+              <button onClick={() => {
+                 const textarea = document.getElementById(`updates-textarea-${subtask.id}`) as HTMLTextAreaElement;
+                 if (textarea) {
+                     setText(text + (text.endsWith(' ') || text === '' ? '@' : ' @'));
+                     textarea.focus();
+                 }
+              }} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary transition-colors" title="Mention user">
                 <span className="text-sm font-bold">@</span>
               </button>
-              <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-600 transition-colors" title="Create subtask">
+              <button onClick={() => {
+                 const textarea = document.getElementById(`updates-textarea-${subtask.id}`) as HTMLTextAreaElement;
+                 if (textarea) {
+                     setText(text + (text.endsWith(' ') || text === '' ? '#' : ' #'));
+                     textarea.focus();
+                 }
+              }} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-600 transition-colors" title="Create subtask">
                 <Hash className="w-3.5 h-3.5" />
               </button>
-              <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-600 transition-colors" title="File path">
+              <button onClick={handleAttachLink} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-600 transition-colors" title="File path">
                 <FolderOpen className="w-3.5 h-3.5" />
               </button>
             </div>
             <button
-              disabled={!text.trim()}
+              disabled={(!text.trim() && pendingAttachments.length === 0 && pendingFileLinks.length === 0)}
               onClick={handleSend}
               className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
             >
@@ -585,7 +934,7 @@ function WorkflowFeed({ mainTask, users, getMainTaskWorkflow }: { mainTask: any;
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-5 space-y-3">
+    <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-3">
       {events.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-slate-400">
           <CheckCircle2 className="w-10 h-10 mb-3 text-slate-200" />
@@ -668,7 +1017,7 @@ function FilesFeed({ subtask, getSubtaskComments, users }: { subtask: any; getSu
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-5 space-y-4">
+    <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
       {files.length === 0 ? (
         <p className="text-sm text-center text-slate-400 py-10">No files attached to this task yet.</p>
       ) : (

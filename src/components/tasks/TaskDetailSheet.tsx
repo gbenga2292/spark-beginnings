@@ -24,9 +24,12 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
   const activeUsers = users.filter((u: any) => !u.isDeleted && !u.isSuspended) as AppUser[];
 
   return (
-    <Sheet open={!!subtaskId} onOpenChange={(open) => !open && onClose()}>
-      {/* !w-screen and !max-w-[100vw] forcefully override Shadcn's internal sm:max-w-sm side sheet class */}
-      <SheetContent side="right" className="!w-screen !max-w-[100vw] h-screen p-0 border-0 bg-white">
+    <Sheet open={!!subtaskId} onOpenChange={(open) => !open && onClose()} modal={false}>
+      <SheetContent 
+        side="right" 
+        className="!w-screen !max-w-[100vw] h-screen p-0 border-0 bg-white"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <TaskInboxView
           subtasks={subtasks}
           mainTasks={mainTasks}

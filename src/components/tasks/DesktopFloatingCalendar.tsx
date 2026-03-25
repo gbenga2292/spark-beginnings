@@ -65,7 +65,7 @@ export function DesktopFloatingCalendar() {
           }
           setOpen(true);
         }}
-        className="fixed bottom-6 right-6 z-[150] w-14 h-14 md:w-16 md:h-16 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-600/30 flex items-center justify-center hover:bg-indigo-500 transition-colors cursor-grab active:cursor-grabbing"
+        className="pointer-events-auto fixed bottom-6 right-6 z-[150] w-14 h-14 md:w-16 md:h-16 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-600/30 flex items-center justify-center hover:bg-indigo-500 transition-colors cursor-grab active:cursor-grabbing"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         title="Drag to move, click to open Calendar"
@@ -89,7 +89,7 @@ export function DesktopFloatingCalendar() {
               onClick={e => e.stopPropagation()}
             >
               {/* Header */}
-              <div className={`flex items-center justify-between py-4 flex-shrink-0 bg-[#0f111a] border-b border-white/5 ${isMac ? 'pl-[90px] pr-4 sm:pr-6' : 'pl-4 sm:pl-6 pr-[200px]'}`}>
+              <div className={`relative flex items-center justify-between py-4 flex-shrink-0 bg-[#0f111a] border-b border-white/5 ${isMac ? 'pl-[90px] pr-16' : 'pl-4 sm:pl-6 pr-16'}`}>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-indigo-500/20 backdrop-blur-sm flex items-center justify-center">
                     <CalendarIcon className="w-5 h-5 text-indigo-400" />
@@ -99,9 +99,18 @@ export function DesktopFloatingCalendar() {
                     <p className="text-[11px] sm:text-xs text-white/50">Your tasks, deadlines, and reminders at a glance</p>
                   </div>
                 </div>
-                <button onClick={() => setOpen(false)} className="p-2.5 rounded-full hover:bg-white/10 transition-all text-white/60 hover:text-white">
-                  <X className="w-5 h-5" />
-                </button>
+                
+                {/* Close Window-like Button */}
+                <div className="absolute top-0 right-0 h-full flex items-center">
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="h-full w-12 flex justify-center items-center transition-colors hover:bg-red-500 hover:text-white text-white/60"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10">
+                      <path d="M1,1 L9,9 M9,1 L1,9" stroke="currentColor" strokeWidth="1.2" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               {/* Body */}

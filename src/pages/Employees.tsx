@@ -459,6 +459,14 @@ export function Employees() {
                   </div>
                 )}
                 <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Phone</label>
+                  <Input value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="e.g. +234 801 234 5678" className="bg-slate-50 focus:bg-white" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Email Address</label>
+                  <Input type="email" value={formData.email || ''} onChange={e => setFormData({ ...formData, email: e.target.value })} placeholder="e.g. john@company.com" className="bg-slate-50 focus:bg-white" />
+                </div>
+                <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
                   <select className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}>
                     <option value="Active">Active</option>
@@ -693,6 +701,8 @@ export function Employees() {
                       <div className="flex justify-between"><span className="text-slate-500">Start Date:</span><span>{emp.startDate || 'N/A'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">End Date:</span><span>{emp.endDate || 'N/A'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Yearly Leave:</span><span>{emp.yearlyLeave} days</span></div>
+                      {emp.phone && <div className="flex justify-between"><span className="text-slate-500">Phone:</span><span className="font-mono">{emp.phone}</span></div>}
+                      {emp.email && <div className="flex justify-between"><span className="text-slate-500">Email:</span><span className="text-indigo-600">{emp.email}</span></div>}
                     </div>
                   </div>
 

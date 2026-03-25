@@ -312,6 +312,33 @@ function PersonalTasksView() {
                             </div>
                             <span className="font-medium">{pct}%</span>
                           </div>
+                          {/* Creator / Assignee info */}
+                          <div className="flex items-center gap-2 mt-1.5 min-h-[20px]">
+                            {(() => {
+                              const creator = mt.createdBy ? users.find(u => u.id === mt.createdBy) : null;
+                              const assignee = mt.assignedTo ? users.find(u => u.id === mt.assignedTo) : null;
+                              return (
+                                <>
+                                  {creator && (
+                                    <span className="flex items-center gap-1 bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground" title="Created by">
+                                      <div className={`w-3.5 h-3.5 rounded-full ${creator.avatarColor || 'bg-slate-400'} flex items-center justify-center text-white text-[7px] font-bold`}>
+                                        {creator.name?.split(" ").map(n => n[0]).join("").slice(0, 2) || 'U'}
+                                      </div>
+                                      <span className="text-[10px]">{creator.name?.split(" ")[0]}</span>
+                                    </span>
+                                  )}
+                                  {assignee && (
+                                    <span className="flex items-center gap-1 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 px-1.5 py-0.5 rounded-full" title="Assigned to">
+                                      <div className={`w-3.5 h-3.5 rounded-full ${assignee.avatarColor} flex items-center justify-center text-white text-[7px] font-bold`}>
+                                        {assignee.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                                      </div>
+                                      <span className="text-[10px]">{assignee.name.split(" ")[0]}</span>
+                                    </span>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
                         </div>
                         {mt.deadline && (
                           <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
@@ -1194,16 +1221,28 @@ function AdminTasksView() {
                           </div>
                           <span className="font-medium hidden sm:inline">{pct}%</span>
                           {(() => {
+                            const creator = mt.createdBy ? users.find(u => u.id === mt.createdBy) : null;
                             const assignee = mt.assignedTo ? users.find(u => u.id === mt.assignedTo) : null;
-                            return assignee ? (
-                              <span className="flex items-center gap-1 ml-1">
-                                <span className="text-border">·</span>
-                                <div className={`w-3.5 h-3.5 rounded-full ${assignee.avatarColor} flex items-center justify-center text-white text-[7px] font-bold`}>
-                                  {assignee.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                                </div>
-                                <span>{assignee.name.split(" ")[0]}</span>
-                              </span>
-                            ) : null;
+                            return (
+                              <div className="flex items-center gap-2 ml-1">
+                                {creator && (
+                                  <span className="flex items-center gap-1 bg-muted px-1.5 py-0.5 rounded-full" title="Created by">
+                                    <div className={`w-3.5 h-3.5 rounded-full ${creator.avatarColor || 'bg-slate-400'} flex items-center justify-center text-white text-[7px] font-bold`}>
+                                      {creator.name?.split(" ").map(n => n[0]).join("").slice(0, 2) || 'U'}
+                                    </div>
+                                    <span className="text-[10px]">{creator.name?.split(" ")[0]}</span>
+                                  </span>
+                                )}
+                                {assignee && (
+                                  <span className="flex items-center gap-1 bg-primary/10 px-1.5 py-0.5 rounded-full" title="Assigned to">
+                                    <div className={`w-3.5 h-3.5 rounded-full ${assignee.avatarColor} flex items-center justify-center text-white text-[7px] font-bold`}>
+                                      {assignee.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                                    </div>
+                                    <span className="text-[10px]">{assignee.name.split(" ")[0]}</span>
+                                  </span>
+                                )}
+                              </div>
+                            );
                           })()}
                         </div>
                       </div>

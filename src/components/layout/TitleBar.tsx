@@ -20,7 +20,7 @@ export function TitleBar() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const { isDark, toggle } = useTheme();
   const currentUser = useUserStore((s) => s.getCurrentUser());
-  const { user: authUser } = useAuth();
+  const { user: authUser, signOut } = useAuth();
   const isLoggedIn = !!authUser;
 
   // React Router navigate is unavailable here (TitleBar is outside BrowserRouter)
@@ -171,6 +171,20 @@ export function TitleBar() {
 
         {/* Custom Window Controls */}
         <div className="flex h-10 items-center">
+          {/* Sign Out Button */}
+          {isLoggedIn && (
+            <button
+              onClick={() => {
+                if (window.confirm('Are you sure you want to sign out?')) {
+                  signOut();
+                }
+              }}
+              className={`h-full px-3 flex justify-center items-center transition-colors text-[11px] font-medium hover:bg-slate-500/20 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}
+              title="Sign Out"
+            >
+              Sign Out
+            </button>
+          )}
           <button
             onClick={() => getElectronAPI()?.windowMinimize()}
             className={`h-full w-11 flex justify-center items-center transition-colors hover:bg-slate-500/20 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}

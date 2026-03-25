@@ -4,12 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
-import { CalendarDays, Filter, ChevronDown, CheckCircle2, UserCheck, Mail, Phone, Download, Printer, Eye, X, Upload, Plus, Edit, Trash2, Ban, Search, ListFilter, CalendarClock, FileText } from 'lucide-react';
+import { CalendarDays, Filter, ChevronDown, CheckCircle2, UserCheck, Mail, Phone, Download, Printer, Eye, X, Upload, Plus, Edit, Trash2, Ban, Search, ListFilter, CalendarClock, FileText, ShieldCheck, Clock, XCircle } from 'lucide-react';
 import { useAppStore, LeaveRecord } from '@/src/store/appStore';
 import { useNavigate } from 'react-router-dom';
 import { usePriv } from '@/src/hooks/usePriv';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { addDays, parseISO, format, isWithinInterval } from 'date-fns';
+import { useAppData } from '@/src/contexts/AppDataContext';
+import { useAuth } from '@/src/hooks/useAuth';
 
 /* ─────────────────────────────────── helpers ─── */
 function calcExpectedEnd(startDate: string, duration: number): string {
@@ -30,10 +32,15 @@ function isOnLeave(leave: LeaveRecord, date: Date): boolean {
 /* ─────────────────────────────────── component ─ */
 export function Leaves() {
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
+  const { users, createMainTask, addSubtask } = useAppData();
   const {
     employees, leaves, addLeave, updateLeave, deleteLeave,
     leaveTypes, updateEmployee, departments,
   } = useAppStore();
+
+  // Approver options — all active system users except current user
+  const approverOptions = users.filter((u: any) => u.id !== currentUser?.id && !u.isDeleted);
 
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('leaves');
@@ -64,9 +71,9 @@ export function Leaves() {
   const [dateReturned, setDateReturned] = useState('');
   const [canBeContacted, setCanBeContacted] = useState<'Yes' | 'No'>('No');
   const [supervisor, setSupervisor] = useState('');
-  const [management, setManagement] = useState('');
   const [uploadedFile, setUploadedFile] = useState<string | undefined>(undefined);
   const [uploadedFileName, setUploadedFileName] = useState<string | undefined>(undefined);
+  const [approverId, setApproverId] = useState('');
 
   /* ── print / preview state ── */
   const [showPrintPreview, setShowPrintPreview] = useState(false);
@@ -115,7 +122,7 @@ export function Leaves() {
   const resetForm = () => {
     setFormId(null); setStaffId(''); setLeaveType(''); setStartDate('');
     setDuration(''); setReason(''); setDateReturned(''); setCanBeContacted('No');
-    setSupervisor(''); setManagement('');
+    setSupervisor(''); setApproverId('');
     setUploadedFile(undefined); setUploadedFileName(undefined);
   };
 
@@ -129,7 +136,7 @@ export function Leaves() {
     setDateReturned(leave.dateReturned || '');
     setCanBeContacted(leave.canBeContacted);
     setSupervisor(leave.supervisor || '');
-    setManagement(leave.management || '');
+    setApproverId(leave.approvedById || '');
     setUploadedFile(leave.uploadedFile);
     setUploadedFileName(leave.uploadedFileName);
     setShowForm(true);
@@ -148,7 +155,7 @@ export function Leaves() {
     if (!shouldBeOnLeave && emp.status === 'On Leave') updateEmployee(empId, { status: 'Active' });
   };
 
-  const handleCreateOrUpdate = () => {
+  const handleCreateOrUpdate = async () => {
     if (!staffId || !startDate || !duration || !reason || !leaveType) {
       toast.error('Please fill in all required fields (Staff, Type, Start Date, Duration, Reason).');
       return;
@@ -158,32 +165,73 @@ export function Leaves() {
 
     const endDate = expectedEndDate;
 
+    const approver = approverId ? approverOptions.find((u: any) => u.id === approverId) : null;
+    const approverName = approver?.name || 'Unknown';
+    const empName = `${emp.surname} ${emp.firstname}`;
+
     if (formId) {
+      // Editing: don't change approval workflow
       updateLeave(formId, {
         leaveType, startDate, duration: parseInt(duration),
         expectedEndDate: endDate, reason, dateReturned, canBeContacted,
-        uploadedFile, uploadedFileName, supervisor, management,
+        uploadedFile, uploadedFileName, supervisor, management: approverName,
       });
       toast.success('Leave entry updated!');
       setTimeout(() => syncEmployeeStatus(staffId), 100);
     } else {
+      if (!approverId) {
+        toast.error('Please select an approver before submitting.');
+        return;
+      }
+
       const newLeave: LeaveRecord = {
         id: `LV-${Date.now()}`,
         employeeId: staffId,
-        employeeName: `${emp.surname} ${emp.firstname}`,
+        employeeName: empName,
         leaveType, startDate, duration: parseInt(duration),
         expectedEndDate: endDate, reason, dateReturned,
         canBeContacted, status: 'Active',
-        uploadedFile, uploadedFileName, supervisor, management,
+        uploadedFile, uploadedFileName, supervisor, management: approverName,
+        approvedById: approverId,
+        approvedByName: approverName,
+        approvalStatus: 'Pending',
       };
       addLeave(newLeave);
-      toast.success('Leave filed successfully!');
       setTimeout(() => syncEmployeeStatus(staffId), 100);
+
+      // Create approval task for the selected approver
+      try {
+        const mainTask = await createMainTask({
+          title: `Approve Leave Request for ${empName}`,
+          description: `${leaveType} leave (${duration} days from ${startDate}) — submitted by ${currentUser?.user_metadata?.name || 'HR'}.`,
+          createdBy: currentUser?.id,
+          teamId: 'dcel-team',
+          workspaceId: 'dcel-team',
+          assignedTo: approverId,
+        });
+        if (mainTask?.id) {
+          const subtaskDesc = JSON.stringify({ refType: 'leave', refId: newLeave.id, employeeName: empName, leaveType, duration });
+          const sub = await addSubtask({
+            title: `Approve: ${empName} — ${duration}-day ${leaveType} Leave`,
+            description: subtaskDesc,
+            mainTaskId: mainTask.id,
+            assignedTo: approverId,
+            status: 'not_started',
+            priority: 'high',
+          });
+          if ((sub as any)?.id) {
+            updateLeave(newLeave.id, { approvalTaskId: (sub as any).id });
+          }
+        }
+      } catch (e) {
+        console.error('Failed to create leave approval task:', e);
+      }
+
+      toast.success(`Leave filed! Pending approval from ${approverName}.`);
       // Offer immediate print preview
       setPreviewLeave(newLeave);
       setShowPrintPreview(true);
     }
-    setShowForm(false);
     setShowForm(false);
     resetForm();
   };
@@ -208,7 +256,7 @@ export function Leaves() {
       dateReturned: dateReturned || '',
       canBeContacted: canBeContacted || 'Yes',
       status: 'Active',
-      supervisor, management,
+      supervisor, management: approverId ? approverOptions.find((u: any) => u.id === approverId)?.name || '' : '',
     };
     
     setPreviewLeave(tempLeave);
@@ -385,37 +433,44 @@ export function Leaves() {
                 </select>
               </div>
 
-              {/* Supervisor / Line Manager */}
+              {/* Supervisor / Line Manager - auto-filled from employee record */}
               <div className="sm:col-span-2 space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Supervisor / Line Manager</label>
-                {formId && supervisor ? (
-                  <div className="flex h-11 w-full items-center rounded-md border border-slate-200 bg-slate-100 px-3 text-sm text-slate-700 cursor-not-allowed">{supervisor}</div>
-                ) : (
-                  <select
-                    className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
-                    value={supervisor} onChange={e => setSupervisor(e.target.value)} disabled={!!formId}
-                  >
-                    <option value="">— Select Supervisor —</option>
-                    {internalEmployees.filter(e => e.id !== staffId).map(emp => (
-                      <option key={emp.id} value={`${emp.surname} ${emp.firstname}`}>{emp.surname} {emp.firstname} ({emp.position})</option>
-                    ))}
-                  </select>
-                )}
+                {(() => {
+                  const selectedEmp = internalEmployees.find(e => e.id === staffId);
+                  const lineManagerEmp = selectedEmp?.lineManager
+                    ? internalEmployees.find(e => e.id === selectedEmp.lineManager)
+                    : null;
+                  const lineManagerName = lineManagerEmp
+                    ? `${lineManagerEmp.surname} ${lineManagerEmp.firstname} (${lineManagerEmp.position})`
+                    : '';
+                  return (
+                    <div className={`flex h-11 w-full items-center rounded-md border px-3 text-sm ${
+                      lineManagerName
+                        ? 'border-slate-200 bg-slate-100 text-slate-700 cursor-not-allowed'
+                        : 'border-dashed border-slate-200 bg-slate-50 text-slate-400'
+                    }`}>
+                      {lineManagerName || (staffId ? 'No line manager set for this employee' : '— Select staff first —')}
+                    </div>
+                  );
+                })()}
               </div>
 
-              {/* Management Staff */}
+              {/* Management / Approver */}
               <div className="sm:col-span-2 space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Management Staff</label>
-                {formId && management ? (
-                  <div className="flex h-11 w-full items-center rounded-md border border-slate-200 bg-slate-100 px-3 text-sm text-slate-700 cursor-not-allowed">{management}</div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Management / Approver <span className="text-rose-500">*</span></label>
+                {formId && approverId ? (
+                  <div className="flex h-11 w-full items-center rounded-md border border-slate-200 bg-slate-100 px-3 text-sm text-slate-700 cursor-not-allowed">
+                     {approverOptions.find((u: any) => u.id === approverId)?.name || 'Unknown'}
+                  </div>
                 ) : (
                   <select
                     className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
-                    value={management} onChange={e => setManagement(e.target.value)} disabled={!!formId}
+                    value={approverId} onChange={e => setApproverId(e.target.value)} disabled={!!formId}
                   >
-                    <option value="">— Select Management Staff —</option>
-                    {internalEmployees.filter(e => e.id !== staffId).map(emp => (
-                      <option key={emp.id} value={`${emp.surname} ${emp.firstname}`}>{emp.surname} {emp.firstname} ({emp.position})</option>
+                    <option value="">— Select Approver —</option>
+                    {approverOptions.map((u: any) => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
                     ))}
                   </select>
                 )}
@@ -484,7 +539,7 @@ export function Leaves() {
                 <Printer className="h-4 w-4" /> Preview Form
               </Button>
               <Button onClick={handleCreateOrUpdate} className="bg-teal-600 hover:bg-teal-700 text-white font-semibold h-11 px-8 shadow-md gap-2">
-                <FileText className="h-4 w-4" /> {formId ? 'Update Entry' : 'Submit Entry'}
+                <FileText className="h-4 w-4" /> {formId ? 'Update Entry' : 'Submit for Approval'}
               </Button>
             </div>
           </CardContent>
@@ -530,6 +585,8 @@ export function Leaves() {
                 <th className="px-5 py-4 whitespace-nowrap">Returned</th>
                 <th className="px-5 py-4 min-w-[200px]">Reason</th>
                 <th className="px-5 py-4 whitespace-nowrap text-center">Contact</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center">Approver</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center">Approval</th>
                 <th className="px-5 py-4 whitespace-nowrap text-center">Status</th>
                 <th className="px-5 py-4 whitespace-nowrap text-center">File</th>
                 <th className="px-5 py-4 whitespace-nowrap text-center">Actions</th>
@@ -569,6 +626,31 @@ export function Leaves() {
                     <td className="px-5 py-4 max-w-xs text-slate-700 text-xs">{leave.reason}</td>
                     <td className="px-5 py-4 text-center">
                       <span className={`text-xs font-bold ${leave.canBeContacted === 'Yes' ? 'text-teal-600' : 'text-slate-400'}`}>{leave.canBeContacted}</span>
+                    </td>
+                    {/* Approver column */}
+                    <td className="px-5 py-4 text-center whitespace-nowrap">
+                      {leave.approvedByName ? (
+                        <div className="flex items-center justify-center gap-1 text-xs text-slate-600">
+                          {leave.approvalStatus === 'Approved'
+                            ? <ShieldCheck className="h-3 w-3 text-emerald-500 flex-shrink-0" />
+                            : leave.approvalStatus === 'Rejected'
+                            ? <XCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
+                            : <Clock className="h-3 w-3 text-amber-500 flex-shrink-0" />}
+                          {leave.approvedByName}
+                        </div>
+                      ) : <span className="text-slate-300 text-xs">—</span>}
+                    </td>
+                    {/* Approval Status column */}
+                    <td className="px-5 py-4 text-center whitespace-nowrap">
+                      {leave.approvalStatus === 'Approved' ? (
+                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200" variant="outline">Approved</Badge>
+                      ) : leave.approvalStatus === 'Rejected' ? (
+                        <Badge className="bg-red-100 text-red-700 border-red-200" variant="outline">Rejected</Badge>
+                      ) : leave.approvalStatus === 'Pending' ? (
+                        <Badge className="bg-amber-100 text-amber-700 border-amber-200" variant="outline">Pending</Badge>
+                      ) : (
+                        <span className="text-slate-300 text-xs">—</span>
+                      )}
                     </td>
                     <td className="px-5 py-4 text-center whitespace-nowrap">
                       <Badge className={

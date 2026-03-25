@@ -218,7 +218,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
               if (visibleItems.length === 0) return null;
 
               const isAnyItemActive = visibleItems.some(
-                (item) => location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href))
+                (item) => location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href + '/'))
               );
               const isDashboardActive = category.standalone && (location.pathname === category.standaloneHref);
 
@@ -270,9 +270,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                   {isExpanded && (
                     <div className={cn('mt-1 space-y-1', isCollapsed ? 'pl-0' : 'pl-4')}>
                       {visibleItems.map((item) => {
-                        const isActive =
-                          location.pathname === item.href ||
-                          (item.href !== '/' && location.pathname.startsWith(item.href));
+                        const isActive = location.pathname === item.href;
                         return (
                           <Link
                             key={item.name}

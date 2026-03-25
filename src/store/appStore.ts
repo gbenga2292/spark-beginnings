@@ -130,6 +130,12 @@ export interface LeaveRecord {
   uploadedFileName?: string;
   supervisor?: string;
   management?: string;
+  approvedById?: string;
+  approvedByName?: string;
+  approvalTaskId?: string;
+  approvedAt?: string;
+  rejectionNote?: string;
+  approvalStatus?: 'Pending' | 'Approved' | 'Rejected';
 }
 
 export interface MonthlySalary {
@@ -235,6 +241,8 @@ export interface Employee {
   onboardingMainTaskId?: string;
   onboardingSuspended?: boolean;   // suspend/resume onboarding without deleting
   lineManager?: string;            // ID of the line manager (typically CEO or Head of Dept)
+  phone?: string;
+  email?: string;
 }
 
 export interface DisciplinaryRecord {
@@ -372,6 +380,11 @@ export interface SalaryAdvance {
   amount: number;
   requestDate: string;
   status: 'Pending' | 'Approved' | 'Rejected' | 'Deducted';
+  approvedById?: string;
+  approvedByName?: string;
+  approvalTaskId?: string;
+  approvedAt?: string;
+  rejectionNote?: string;
 }
 
 export interface Loan {
@@ -386,6 +399,11 @@ export interface Loan {
   paymentStartDate: string;
   remainingBalance: number;
   status: 'Pending' | 'Approved' | 'Rejected' | 'Active' | 'Completed';
+  approvedById?: string;
+  approvedByName?: string;
+  approvalTaskId?: string;
+  approvedAt?: string;
+  rejectionNote?: string;
 }
 
 export interface Payment {

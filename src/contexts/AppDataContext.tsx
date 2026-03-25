@@ -29,6 +29,7 @@ interface AppDataContextType {
     approveSubtask: (id: string, userId?: string, note?: string) => Promise<void>;
     rejectSubtask: (id: string, userId?: string, note?: string) => Promise<void>;
     postComment: (subId: string, mainId: string, authorId: string, text: string, attachments?: CommentAttachment[], fileLinks?: string[]) => Promise<void>;
+    updateComment: (id: string, text: string) => Promise<void>;
     getMainTaskComments: (id: string) => any[];
     getSubtaskComments: (subtaskId: string) => any[];
     getMainTaskWorkflow: (mainTaskId: string) => any[];
@@ -350,32 +351,120 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const approveSubtask = useCallback(async (id: string, userId?: string, note?: string) => {
+        // Update task itself
         const { data, error } = await supabase.from('subtasks').update({ status: 'completed', approvedBy: userId || user?.id, approval_note: note }).eq('id', id).select().single();
         if (error) {
             console.error('approveSubtask error:', error);
-            toast.error('Failed to approve subtask.');
+            toast.error('Failed to approve task.');
             return;
         }
+
+        // Check if this task is an approval workflow task
+        try {
+            if (data?.description) {
+                const meta = JSON.parse(data.description);
+                if (meta.refType && meta.refId) {
+                    // This was an approval task. Post a comment to notify the creator.
+                    const mainTask = mainTasks.find(m => m.id === data.mainTaskId || m.id === data.main_task_id);
+                    if (mainTask) {
+                        const creator = users.find(u => u.id === mainTask.createdBy);
+                        const mention = creator?.name ? `@${creator.name.split(' ')[0].toLowerCase()}` : '';
+                        const text = `**Decision: Approved** ✅\n${mention} Your request has been approved.`;
+                        
+                        const { data: cData, error: cErr } = await supabase.from('task_updates').insert({
+                            subtask_id: id,
+                            main_task_id: mainTask.id,
+                            text,
+                            author_id: userId || user?.id
+                        }).select().single();
+                        if (cData && !cErr) setComments(prev => [...prev, cData]);
+                    }
+
+                    const updatePayload = {
+                        status: 'Approved',
+                        approval_status: meta.refType === 'leave' ? 'Approved' : undefined,
+                        approved_at: new Date().toISOString()
+                    };
+                    
+                    if (meta.refType === 'salary_advance') {
+                        const { error: saErr } = await supabase.from('salary_advances').update({ status: 'Approved', approved_at: new Date().toISOString() }).eq('id', meta.refId);
+                        if (saErr) console.error('Failed to update salary advance status:', saErr);
+                    } else if (meta.refType === 'loan') {
+                        const { error: loanErr } = await supabase.from('loans').update({ status: 'Approved', approved_at: new Date().toISOString() }).eq('id', meta.refId);
+                        if (loanErr) console.error('Failed to update loan status:', loanErr);
+                    } else if (meta.refType === 'leave') {
+                        const { error: leaveErr } = await supabase.from('leaves').update({ approval_status: 'Approved', approved_at: new Date().toISOString() }).eq('id', meta.refId);
+                        if (leaveErr) console.error('Failed to update leave status:', leaveErr);
+                    }
+                }
+            }
+        } catch (e) {
+            // Ignore parse errors (normal task descriptions)
+        }
+
         if (data) setSubtasks(prev => prev.map(s => s.id === id ? data : s));
-        toast.success('Subtask approved');
-    }, [user?.id]);
+        toast.success('Approval processed successfully');
+    }, [user?.id, mainTasks, users]);
 
     const rejectSubtask = useCallback(async (id: string, _userId?: string, note?: string) => {
+        // Update task itself
         const { data, error } = await supabase.from('subtasks').update({ status: 'in_progress', rejectedAt: new Date().toISOString(), approval_note: note }).eq('id', id).select().single();
         if (error) {
             console.error('rejectSubtask error:', error);
-            toast.error('Failed to reject subtask.');
+            toast.error('Failed to reject task.');
             return;
         }
+
+        // Check if this task is an approval workflow task
+        try {
+            if (data?.description) {
+                const meta = JSON.parse(data.description);
+                if (meta.refType && meta.refId) {
+                    // This was an approval task. Post a comment to notify the creator.
+                    const mainTask = mainTasks.find(m => m.id === data.mainTaskId || m.id === data.main_task_id);
+                    if (mainTask) {
+                        const creator = users.find(u => u.id === mainTask.createdBy);
+                        const mention = creator?.name ? `@${creator.name.split(' ')[0].toLowerCase()}` : '';
+                        const text = `**Decision: Rejected** ❌\n${mention} Your request was rejected.\n\n${note ? `Reason: "${note}"` : ''}`;
+                        
+                        const { data: cData, error: cErr } = await supabase.from('task_updates').insert({
+                            subtask_id: id,
+                            main_task_id: mainTask.id,
+                            text,
+                            author_id: _userId || user?.id
+                        }).select().single();
+                        if (cData && !cErr) setComments(prev => [...prev, cData]);
+                    }
+
+                    if (meta.refType === 'salary_advance') {
+                        const { error: saErr } = await supabase.from('salary_advances').update({ status: 'Rejected', rejection_note: note }).eq('id', meta.refId);
+                        if (saErr) console.error('Failed to update salary advance status:', saErr);
+                    } else if (meta.refType === 'loan') {
+                        const { error: loanErr } = await supabase.from('loans').update({ status: 'Rejected', rejection_note: note }).eq('id', meta.refId);
+                        if (loanErr) console.error('Failed to update loan status:', loanErr);
+                    } else if (meta.refType === 'leave') {
+                        const { error: leaveErr } = await supabase.from('leaves').update({ approval_status: 'Rejected', rejection_note: note }).eq('id', meta.refId);
+                        if (leaveErr) console.error('Failed to update leave status:', leaveErr);
+                    }
+                }
+            }
+        } catch (e) {
+            // Ignore parse errors
+        }
+
         if (data) setSubtasks(prev => prev.map(s => s.id === id ? data : s));
-        toast.info('Subtask sent back for revision');
-    }, []);
+        toast.info('Request rejected');
+    }, [user?.id, mainTasks, users]);
 
     const postComment = useCallback(async (subId: string, mainId: string, authorId: string, text: string, _attachments?: CommentAttachment[], _fileLinks?: string[]) => {
-        // task_updates columns: id, task_id (legacy), subtask_id, main_task_id, text, author_id, created_at
+        // task_updates columns: id, task_id (legacy), subtask_id, main_task_id, text, author_id, created_at, attachments, file_links
+        const payload: any = { subtask_id: subId || null, main_task_id: mainId, text, author_id: authorId };
+        if (_attachments && _attachments.length > 0) payload.attachments = _attachments;
+        if (_fileLinks && _fileLinks.length > 0) payload.file_links = _fileLinks;
+
         const { data, error } = await supabase
             .from('task_updates')
-            .insert({ subtask_id: subId || null, main_task_id: mainId, text, author_id: authorId })
+            .insert(payload)
             .select()
             .single();
         if (error) {
@@ -387,6 +476,21 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             if (prev.some(c => c.id === data.id)) return prev;
             return [...prev, data];
         });
+    }, []);
+
+    const updateComment = useCallback(async (id: string, text: string) => {
+        const { data, error } = await supabase
+            .from('task_updates')
+            .update({ text })
+            .eq('id', id)
+            .select()
+            .single();
+        if (error) {
+            console.error('updateComment error:', error);
+            toast.error('Failed to update comment.');
+            return;
+        }
+        if (data) setComments(prev => prev.map(c => c.id === id ? data : c));
     }, []);
 
     const getMainTaskComments = useCallback((id: string) => comments.filter(c => c.task_id === id || c.main_task_id === id), [comments]);
@@ -424,8 +528,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             });
             const mtComms = comments.filter(c => c.main_task_id === mainTaskId || c.task_id === mainTaskId);
             mtComms.forEach(c => {
-                const text = c.text || "";
-                const mentions = Array.from(text.matchAll(/@(\w+)/g)).map(m => m[1].toLowerCase());
+                const textStr = typeof c.text === 'string' ? c.text : String(c.text || "");
+                const mentions = Array.from(textStr.matchAll(/@(\w+)/g)).map(m => m[1].toLowerCase());
                 const targetIds: string[] = [];
                 if (mentions.length > 0) {
                     users.forEach(u => {
@@ -585,6 +689,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         approveSubtask,
         rejectSubtask,
         postComment,
+        updateComment,
         getMainTaskComments,
         getSubtaskComments,
         getMainTaskWorkflow,
@@ -592,7 +697,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         createMainTask, updateMainTask, deleteMainTask,
         addSubtask, updateSubtask, deleteSubtask, assignSubtask,
         updateSubtaskStatus, approveSubtask, rejectSubtask,
-        postComment, getMainTaskComments, getSubtaskComments, getMainTaskWorkflow,
+        postComment, updateComment, getMainTaskComments, getSubtaskComments, getMainTaskWorkflow,
         addReminder, updateReminder, deleteReminder, toggleReminderActive]);
 
     return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;

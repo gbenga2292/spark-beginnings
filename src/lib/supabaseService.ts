@@ -37,6 +37,8 @@ export function dbToEmployee(r: any): Employee {
     verifiedStartDate: r.verified_start_date || undefined,
     onboardingChecklist: r.onboarding_checklist || undefined,
     lineManager: r.line_manager || undefined,
+    phone: r.phone || undefined,
+    email: r.email || undefined,
   };
 }
 
@@ -89,6 +91,11 @@ export function dbToSalaryAdvance(r: any): SalaryAdvance {
   return {
     id: r.id, employeeId: r.employee_id, employeeName: r.employee_name,
     amount: Number(r.amount), requestDate: r.request_date, status: r.status,
+    approvedById: r.approved_by_id || undefined,
+    approvedByName: r.approved_by_name || undefined,
+    approvalTaskId: r.approval_task_id || undefined,
+    approvedAt: r.approved_at || undefined,
+    rejectionNote: r.rejection_note || undefined,
   };
 }
 
@@ -99,6 +106,11 @@ export function dbToLoan(r: any): Loan {
     monthlyDeduction: Number(r.monthly_deduction), duration: r.duration,
     startDate: r.start_date, paymentStartDate: r.payment_start_date,
     remainingBalance: Number(r.remaining_balance), status: r.status,
+    approvedById: r.approved_by_id || undefined,
+    approvedByName: r.approved_by_name || undefined,
+    approvalTaskId: r.approval_task_id || undefined,
+    approvedAt: r.approved_at || undefined,
+    rejectionNote: r.rejection_note || undefined,
   };
 }
 
@@ -123,6 +135,12 @@ export function dbToLeave(r: any): LeaveRecord {
     dateReturned: r.date_returned, canBeContacted: r.can_be_contacted,
     status: r.status, uploadedFile: r.uploaded_file, uploadedFileName: r.uploaded_file_name,
     supervisor: r.supervisor, management: r.management,
+    approvedById: r.approved_by_id || undefined,
+    approvedByName: r.approved_by_name || undefined,
+    approvalTaskId: r.approval_task_id || undefined,
+    approvedAt: r.approved_at || undefined,
+    rejectionNote: r.rejection_note || undefined,
+    approvalStatus: r.approval_status || 'Pending',
   };
 }
 
@@ -307,6 +325,11 @@ function salaryAdvanceToDb(a: SalaryAdvance) {
   return {
     id: a.id, employee_id: a.employeeId, employee_name: a.employeeName,
     amount: a.amount, request_date: a.requestDate, status: a.status,
+    approved_by_id: a.approvedById || null,
+    approved_by_name: a.approvedByName || null,
+    approval_task_id: a.approvalTaskId || null,
+    approved_at: a.approvedAt || null,
+    rejection_note: a.rejectionNote || null,
   };
 }
 
@@ -317,6 +340,11 @@ function loanToDb(l: Loan) {
     monthly_deduction: l.monthlyDeduction, duration: l.duration,
     start_date: l.startDate, payment_start_date: l.paymentStartDate,
     remaining_balance: l.remainingBalance, status: l.status,
+    approved_by_id: l.approvedById || null,
+    approved_by_name: l.approvedByName || null,
+    approval_task_id: l.approvalTaskId || null,
+    approved_at: l.approvedAt || null,
+    rejection_note: l.rejectionNote || null,
   };
 }
 
@@ -341,6 +369,12 @@ function leaveToDb(l: LeaveRecord) {
     date_returned: l.dateReturned, can_be_contacted: l.canBeContacted,
     status: l.status, uploaded_file: l.uploadedFile, uploaded_file_name: l.uploadedFileName,
     supervisor: l.supervisor, management: l.management,
+    approved_by_id: l.approvedById || null,
+    approved_by_name: l.approvedByName || null,
+    approval_task_id: l.approvalTaskId || null,
+    approved_at: l.approvedAt || null,
+    rejection_note: l.rejectionNote || null,
+    approval_status: l.approvalStatus || 'Pending',
   };
 }
 
@@ -682,6 +716,8 @@ export const db = {
     if (e.onboardingChecklist !== undefined) update.onboarding_checklist = e.onboardingChecklist;
     if (e.payeNumber !== undefined) update.paye_number = e.payeNumber;
     if (e.lineManager !== undefined) update.line_manager = e.lineManager;
+    if (e.phone !== undefined) update.phone = e.phone;
+    if (e.email !== undefined) update.email = e.email;
     const { error } = await supabase.from('employees').update(update).eq('id', id);
     if (error) console.error('updateEmployee:', error);
   },
@@ -774,6 +810,11 @@ export const db = {
     if (a.amount !== undefined) update.amount = a.amount;
     if (a.requestDate !== undefined) update.request_date = a.requestDate;
     if (a.status !== undefined) update.status = a.status;
+    if (a.approvedById !== undefined) update.approved_by_id = a.approvedById;
+    if (a.approvedByName !== undefined) update.approved_by_name = a.approvedByName;
+    if (a.approvalTaskId !== undefined) update.approval_task_id = a.approvalTaskId;
+    if (a.approvedAt !== undefined) update.approved_at = a.approvedAt;
+    if (a.rejectionNote !== undefined) update.rejection_note = a.rejectionNote;
     const { error } = await supabase.from('salary_advances').update(update).eq('id', id);
     if (error) console.error('updateSalaryAdvance:', error);
   },
@@ -799,6 +840,11 @@ export const db = {
     if (l.paymentStartDate !== undefined) update.payment_start_date = l.paymentStartDate;
     if (l.remainingBalance !== undefined) update.remaining_balance = l.remainingBalance;
     if (l.status !== undefined) update.status = l.status;
+    if (l.approvedById !== undefined) update.approved_by_id = l.approvedById;
+    if (l.approvedByName !== undefined) update.approved_by_name = l.approvedByName;
+    if (l.approvalTaskId !== undefined) update.approval_task_id = l.approvalTaskId;
+    if (l.approvedAt !== undefined) update.approved_at = l.approvedAt;
+    if (l.rejectionNote !== undefined) update.rejection_note = l.rejectionNote;
     const { error } = await supabase.from('loans').update(update).eq('id', id);
     if (error) console.error('updateLoan:', error);
   },
@@ -949,6 +995,12 @@ export const db = {
     if (l.status !== undefined) update.status = l.status;
     if (l.uploadedFile !== undefined) update.uploaded_file = l.uploadedFile;
     if (l.uploadedFileName !== undefined) update.uploaded_file_name = l.uploadedFileName;
+    if (l.approvedById !== undefined) update.approved_by_id = l.approvedById;
+    if (l.approvedByName !== undefined) update.approved_by_name = l.approvedByName;
+    if (l.approvalTaskId !== undefined) update.approval_task_id = l.approvalTaskId;
+    if (l.approvedAt !== undefined) update.approved_at = l.approvedAt;
+    if (l.rejectionNote !== undefined) update.rejection_note = l.rejectionNote;
+    if (l.approvalStatus !== undefined) update.approval_status = l.approvalStatus;
     const { error } = await supabase.from('leaves').update(update).eq('id', id);
     if (error) console.error('updateLeave:', error);
   },
