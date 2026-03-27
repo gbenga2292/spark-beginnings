@@ -4,11 +4,14 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useTheme } from '@/src/hooks/useTheme';
+import { useUserStore } from '@/src/store/userStore';
+import { DesktopFloatingCalendar } from '../tasks/DesktopFloatingCalendar';
 
 export function Layout() {
   const { user, loading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { isDark } = useTheme();
+  const currentUser = useUserStore((s) => s.getCurrentUser());
 
   // Still loading the Supabase session — don't redirect yet
   if (loading) return null;
@@ -16,6 +19,9 @@ export function Layout() {
   if (!user) {
     return <Navigate to="/login" replace />;
   }
+
+  // Only show floating calendar if user has task view privilege
+  const canViewCalendar = !currentUser || (currentUser.privileges?.tasks?.canView);
 
   return (
     <div className={`flex h-full w-full overflow-hidden font-sans transition-colors duration-200 ${
@@ -28,6 +34,9 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
+      
+      {/* Global Features */}
+      {canViewCalendar && <DesktopFloatingCalendar />}
     </div>
   );
 }

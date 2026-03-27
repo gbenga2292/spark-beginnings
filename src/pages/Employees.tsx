@@ -15,6 +15,7 @@ import { Dialog } from '@/src/components/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/src/components/ui/dropdown-menu';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { Checkbox } from '@/src/components/ui/checkbox';
+import { normalizeDate } from '@/src/lib/dateUtils';
 
 const POSITION_HIERARCHY = [
   'CEO',
@@ -609,11 +610,11 @@ export function Employees() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Date</label>
-                  <Input type="date" value={formData.startDate || ''} onChange={e => setFormData({ ...formData, startDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
+                  <Input type="date" value={normalizeDate(formData.startDate)} onChange={e => setFormData({ ...formData, startDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">End Date</label>
-                  <Input type="date" value={formData.endDate || ''} onChange={e => setFormData({ ...formData, endDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
+                  <Input type="date" value={normalizeDate(formData.endDate)} onChange={e => setFormData({ ...formData, endDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
                 </div>
               </div>
             </CardContent>
@@ -716,11 +717,11 @@ export function Employees() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-500">LASHMA Registration Date</label>
-                      <Input type="date" value={formData.lashmaRegistrationDate || ''} onChange={e => setFormData({ ...formData, lashmaRegistrationDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
+                      <Input type="date" value={normalizeDate(formData.lashmaRegistrationDate)} onChange={e => setFormData({ ...formData, lashmaRegistrationDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-500">LASHMA Expiry Date</label>
-                      <Input type="date" value={formData.lashmaExpiryDate || ''} onChange={e => setFormData({ ...formData, lashmaExpiryDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
+                      <Input type="date" value={normalizeDate(formData.lashmaExpiryDate)} onChange={e => setFormData({ ...formData, lashmaExpiryDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
                     </div>
                   </div>
                 </div>

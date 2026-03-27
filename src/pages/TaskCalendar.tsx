@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import {
   format, parseISO, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval,
   startOfWeek, endOfWeek, addMonths, subMonths, isToday, isSameMonth,
+  isBefore, startOfDay
 } from 'date-fns';
 import {
   Bell, ChevronLeft, ChevronRight, ArrowLeft, CheckSquare,
@@ -15,21 +16,31 @@ import { Button } from '@/src/components/ui/button';
 const WEEKDAYS_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
-const EVENT_TYPE_STYLES = {
+const STATUS_STYLES: Record<string, { bg: string, label: string, icon: any }> = {
+  completed: {
+    bg: 'bg-emerald-600',
+    label: 'Completed',
+    icon: CheckSquare,
+  },
+  overdue: {
+    bg: 'bg-rose-600',
+    label: 'Overdue',
+    icon: CheckSquare,
+  },
+  in_progress: {
+    bg: 'bg-amber-500',
+    label: 'Ongoing',
+    icon: CheckSquare,
+  },
+  not_started: {
+    bg: 'bg-indigo-500', // Blue
+    label: 'Not Started',
+    icon: CheckSquare,
+  },
   reminder: {
-    bg: 'bg-[hsl(270,50%,55%)]',
+    bg: 'bg-purple-600',
     label: 'Reminders',
     icon: Bell,
-  },
-  task: {
-    bg: 'bg-[hsl(217,89%,51%)]',
-    label: 'Tasks (Subtasks)',
-    icon: CheckSquare,
-  },
-  main: {
-    bg: 'bg-[hsl(148,72%,37%)]',
-    label: 'Main Tasks',
-    icon: CheckSquare,
   },
 };
 
@@ -43,7 +54,8 @@ interface CalendarEvent {
   type: 'task' | 'reminder';
   status?: string;
   body?: string;
-  colorKey: 'reminder' | 'task' | 'main';
+  colorClass: string;
+  isMain?: boolean;
 }
 
 export default function CalendarPage({ onNavigate }: { onNavigate?: () => void } = {}) {
@@ -59,6 +71,8 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
 
   const allEvents = useMemo(() => {
     const events: CalendarEvent[] = [];
+    const now = new Date();
+    const today = startOfDay(now);
 
     // Subtasks
     const relevantSubtasks = filterMode === 'all'
@@ -66,9 +80,18 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
       : subtasks.filter(s => s.deadline && s.assignedTo?.includes(currentUser?.id as string));
 
     relevantSubtasks.forEach(s => {
+      const deadline = new Date(s.deadline!);
+      const isOverdue = s.status !== 'completed' && isBefore(deadline, today);
+      let statusKey = s.status === 'completed' ? 'completed' : (isOverdue ? 'overdue' : (s.status || 'not_started'));
+      // Normalize 'pending_approval' to 'in_progress' (Ongoing)
+      if (statusKey === 'pending_approval') statusKey = 'in_progress';
+      
+      const style = STATUS_STYLES[statusKey] || STATUS_STYLES.not_started;
+
       events.push({
-        id: s.id || 'unknown', title: s.title, time: new Date(s.deadline!),
-        type: 'task', status: s.status, colorKey: 'task',
+        id: s.id || 'unknown', title: s.title, time: deadline,
+        type: 'task', status: s.status, colorClass: style.bg,
+        isMain: false,
       });
     });
 
@@ -78,9 +101,25 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
       : mainTasks.filter(m => m.deadline && (m.assignedTo?.includes(currentUser?.id as string) || m.createdBy === currentUser?.id));
 
     relevantMainTasks.forEach(m => {
+      const deadline = new Date(m.deadline!);
+      
+      // Calculate main task status based on subtasks
+      const taskSubs = subtasks.filter(s => s.main_task_id === m.id || s.mainTaskId === m.id);
+      let mStatus = 'not_started';
+      if (taskSubs.length > 0) {
+        if (taskSubs.every(s => s.status === 'completed')) mStatus = 'completed';
+        else if (taskSubs.some(s => s.status === 'in_progress' || s.status === 'completed' || s.status === 'pending_approval')) mStatus = 'in_progress';
+      }
+
+      const isOverdue = mStatus !== 'completed' && isBefore(deadline, today);
+      const statusKey = mStatus === 'completed' ? 'completed' : (isOverdue ? 'overdue' : mStatus);
+      
+      const style = STATUS_STYLES[statusKey] || STATUS_STYLES.not_started;
+
       events.push({
-        id: m.id, title: m.title, time: new Date(m.deadline!),
-        type: 'task', status: 'main', colorKey: 'main',
+        id: m.id, title: m.title, time: deadline,
+        type: 'task', status: mStatus, colorClass: style.bg,
+        isMain: true,
       });
     });
 
@@ -95,7 +134,7 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
     relevantReminders.forEach(r => {
       events.push({
         id: r.id, title: r.title, time: parseISO(r.remindAt),
-        type: 'reminder', body: r.body, colorKey: 'reminder',
+        type: 'reminder', body: r.body, colorClass: STATUS_STYLES.reminder.bg,
       });
     });
 
@@ -205,7 +244,7 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
 
       {/* ─── Legend ─── */}
       <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-5 py-2 border-b border-white/10 flex-shrink-0 flex-wrap">
-        {Object.entries(EVENT_TYPE_STYLES).map(([key, style]) => (
+        {Object.entries(STATUS_STYLES).map(([key, style]) => (
           <div key={key} className="flex items-center gap-1.5">
             <span className={`w-2.5 h-2.5 rounded-full ${style.bg}`} />
             <span className="text-[10px] sm:text-xs text-white/70 font-medium">{style.label}</span>
@@ -257,14 +296,14 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
                           e.stopPropagation();
                           if (evt.type === 'reminder') {
                             navigate(`/tasks/reminders?view=${evt.id}`);
-                          } else if (evt.colorKey === 'main') {
+                          } else if (evt.isMain) {
                             navigate(`/tasks?openTask=${evt.id}`);
                           } else {
                             navigate(`/tasks?open=${evt.id}`);
                           }
                           onNavigate?.();
                         }}
-                        className={`${EVENT_TYPE_STYLES[evt.colorKey].bg} text-white text-[8px] sm:text-[10px] leading-tight font-medium px-1 sm:px-1.5 py-0.5 rounded truncate hover:brightness-110 transition-all`}
+                        className={`${evt.colorClass} text-white text-[8px] sm:text-[10px] leading-tight font-medium px-1 sm:px-1.5 py-0.5 rounded truncate hover:brightness-110 transition-all`}
                       >
                         <span className="hidden sm:inline">{format(evt.time, 'h:mm ')} </span>
                         {evt.type === 'reminder' ? 'ðŸ”” ' : ''}
@@ -361,14 +400,14 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
                           onClick={() => {
                             if (evt.type === 'reminder') {
                               navigate(`/tasks/reminders?view=${evt.id}`);
-                            } else if (evt.colorKey === 'main') {
+                            } else if (evt.isMain) {
                               navigate(`/tasks?openTask=${evt.id}`);
                             } else {
                               navigate(`/tasks?open=${evt.id}`);
                             }
                             onNavigate?.();
                           }}
-                          className={`${EVENT_TYPE_STYLES[evt.colorKey].bg} text-white rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 mb-1 cursor-pointer hover:brightness-110 transition-all`}
+                          className={`${evt.colorClass} text-white rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 mb-1 cursor-pointer hover:brightness-110 transition-all`}
                         >
                           <p className="text-xs sm:text-sm font-medium truncate">
                             {evt.type === 'reminder' ? 'ðŸ”” ' : ''}{evt.title}
@@ -408,7 +447,7 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
             if (!previewEvent) return;
             if (previewEvent.type === 'reminder') {
                navigate(`/tasks/reminders?view=${previewEvent.id}`);
-            } else if (previewEvent.colorKey === 'main') {
+            } else if (previewEvent.isMain) {
                navigate(`/tasks?openTask=${previewEvent.id}`);
             } else {
                navigate(`/tasks?open=${previewEvent.id}`);

@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
+import { normalizeDate } from '@/src/lib/dateUtils';
 import { Input } from '@/src/components/ui/input';
 import {
   Clock, FileText, UserPlus, UserMinus, Users, Building, Activity,
@@ -199,7 +200,7 @@ function LabeledInput({ label, value, onChange, placeholder, type = 'text', disa
         type={type}
         className="h-9 text-sm bg-slate-50 border-slate-200 focus:bg-white"
         placeholder={placeholder}
-        value={value}
+        value={value ?? ''}
         onChange={e => onChange(e.target.value)}
         disabled={disabled}
       />
@@ -311,8 +312,11 @@ export function Onboarding() {
 
   // ── Active checklist ──────────────────────────────────────
   const cl: OnboardingChecklist = useMemo(() => {
-    if (!selectedEmployee) return makeDefaultChecklist(1);
-    return selectedEmployee.onboardingChecklist ?? makeDefaultChecklist(selectedEmployee.noOfGuarantors ?? 1);
+    const defaultCl = makeDefaultChecklist(selectedEmployee?.noOfGuarantors ?? 1);
+    if (!selectedEmployee) return defaultCl;
+    const storedCl = selectedEmployee.onboardingChecklist || {};
+    // Merge stored checklist with defaults to handle versioning (new fields)
+    return { ...defaultCl, ...storedCl };
   }, [selectedEmployee]);
 
   const updateCL = (patch: Partial<OnboardingChecklist>) => {
@@ -1060,11 +1064,11 @@ export function Onboarding() {
                           />
                         </div>
                         <CheckRow 
-                          label={cl.lashmaPolicyNumber.trim() ? "Mark LASHMA as verified" : "Enter policy number first"} 
+                          label={(cl.lashmaPolicyNumber || '').trim() ? "Mark LASHMA as verified" : "Enter policy number first"} 
                           checked={cl.lashmaVerified} 
                           onChange={v => updateCL({ lashmaVerified: v })} 
-                          disabled={!cl.lashmaPolicyNumber.trim()} 
-                          hint={!cl.lashmaPolicyNumber.trim() ? "Policy number required" : ""}
+                          disabled={!(cl.lashmaPolicyNumber || '').trim()} 
+                          hint={!(cl.lashmaPolicyNumber || '').trim() ? "Policy number required" : ""}
                         />
                       </div>
                     </Section>
@@ -1225,7 +1229,7 @@ export function Onboarding() {
               </div>
               <div className="space-y-1">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Tentative Start Date</label>
-                <Input type="date" className="h-9 text-sm" value={editEmp.tentativeStartDate ?? ''} onChange={e => setEditEmp(p => p ? { ...p, tentativeStartDate: e.target.value } : p)} />
+                <Input type="date" className="h-9 text-sm" value={normalizeDate(editEmp.tentativeStartDate)} onChange={e => setEditEmp(p => p ? { ...p, tentativeStartDate: e.target.value } : p)} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">

@@ -336,7 +336,7 @@ export function Dashboard() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-6">
-                        <div className="h-[280px] w-full" style={{ minWidth: 0 }}>
+                        <div className="h-[280px] w-full" style={{ minWidth: 0, minHeight: '280px' }}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={attendanceTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -412,7 +412,7 @@ export function Dashboard() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-6">
-                        <div className="h-[220px] w-full" style={{ minWidth: 0 }}>
+                        <div className="h-[220px] w-full" style={{ minWidth: 0, minHeight: '220px' }}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={headcountChartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                                     <defs>
@@ -442,7 +442,7 @@ export function Dashboard() {
                     </CardHeader>
                     <CardContent className="pt-4">
                         {deptData.length > 0 ? (
-                            <div className="h-[220px] w-full" style={{ minWidth: 0 }}>
+                            <div className="h-[220px] w-full" style={{ minWidth: 0, minHeight: '220px' }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie data={deptData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={40} paddingAngle={3} label={({ name, value }) => `${name}: ${value}`} fontSize={10}>
@@ -494,7 +494,7 @@ export function Dashboard() {
                     </CardHeader>
                     <CardContent className="pt-6">
                         {siteStaffing.length > 0 ? (
-                            <div className="h-[200px] w-full" style={{ minWidth: 0 }}>
+                            <div className="h-[200px] w-full" style={{ minWidth: 0, minHeight: '200px' }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={siteStaffing} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />

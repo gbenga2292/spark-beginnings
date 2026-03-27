@@ -15,6 +15,7 @@ import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { useUserStore } from '@/src/store/userStore';
 import { useAppData } from '@/src/contexts/AppDataContext';
+import { normalizeDate } from '@/src/lib/dateUtils';
 
 const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive', startDate: new Date().toISOString().split('T')[0], endDate: '' };
 
@@ -29,7 +30,8 @@ function ClientSummary() {
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   const currentMonthKey = monthsMap[selectedMonth - 1];
-  const { workDays, overtimeRate } = monthValues[currentMonthKey];
+  const monthData = monthValues[currentMonthKey] || { workDays: 0, overtimeRate: 0.5 };
+  const { workDays, overtimeRate } = monthData;
 
   const results: { name: string; client: string; cost: number; teamSize: number }[] = [];
   let grandTotal = 0;
@@ -313,8 +315,8 @@ export function Sites() {
       client: addForm.client.trim(),
       vat: addForm.vat,
       status: calcStatus,
-      startDate: addForm.startDate,
-      endDate: addForm.endDate,
+      startDate: normalizeDate(addForm.startDate),
+      endDate: normalizeDate(addForm.endDate),
     });
     setAddForm({ ...EMPTY_FORM });
     setAddError('');
