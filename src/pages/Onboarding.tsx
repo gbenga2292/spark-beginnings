@@ -61,6 +61,8 @@ function makeDefaultChecklist(noOfGuarantors: number): OnboardingChecklist {
     otherRequirementsSupplied: false,
     // 8. Health insurance (LASHMA)
     lashmaPolicyNumber: '',
+    lashmaRegistrationDate: '',
+    lashmaExpiryDate: '',
     lashmaVerified: false,
   };
 }
@@ -220,7 +222,7 @@ export function Onboarding() {
   const positions = useAppStore(s => s.positions);
   const priv = usePriv('onboarding');
   const navigate = useNavigate();
-  const { createMainTask, subtasks, updateSubtaskStatus, addReminder } = useAppData();
+  const { createMainTask, subtasks, updateSubtaskStatus, addReminder, reminders } = useAppData();
   const { user } = useAuth();
   const hrVariables = useAppStore(s => s.hrVariables);
   const l = hrVariables.onboardingStageLabels || {};
@@ -316,10 +318,36 @@ export function Onboarding() {
   const updateCL = (patch: Partial<OnboardingChecklist>) => {
     if (!selectedEmployee) return;
     const newCL = { ...cl, ...patch };
-    updateEmployee(selectedEmployee.id, { 
-      onboardingChecklist: newCL,
-      ...(patch.lashmaPolicyNumber !== undefined ? { lashmaPolicyNumber: patch.lashmaPolicyNumber } : {})
-    });
+    
+    // Sync LASHMA fields to the main employee record if they are being updated
+    const syncPatch: any = { onboardingChecklist: newCL };
+    if (patch.lashmaPolicyNumber !== undefined) syncPatch.lashmaPolicyNumber = patch.lashmaPolicyNumber;
+    if (patch.lashmaRegistrationDate !== undefined) syncPatch.lashmaRegistrationDate = patch.lashmaRegistrationDate;
+    if (patch.lashmaExpiryDate !== undefined) syncPatch.lashmaExpiryDate = patch.lashmaExpiryDate;
+
+    updateEmployee(selectedEmployee.id, syncPatch);
+
+    // Manage LASHMA Renewal Reminder if expiry date is updated
+    if (patch.lashmaExpiryDate) {
+      const expiry = new Date(patch.lashmaExpiryDate);
+      const remindAt = new Date(expiry);
+      remindAt.setDate(remindAt.getDate() - 7);
+      
+      const title = `LASHMA Renewal: ${selectedEmployee.firstname} ${selectedEmployee.surname}`;
+      // Basic check to avoid duplicates: find existing active reminder with same title
+      const existing = reminders.find(r => r.title === title && r.isActive);
+      
+      if (!existing || existing.remindAt !== remindAt.toISOString()) {
+        addReminder({
+          title,
+          body: `Health insurance (LASHMA) for ${selectedEmployee.firstname} ${selectedEmployee.surname} expires on ${patch.lashmaExpiryDate}. Please initiate renewal.`,
+          remindAt: remindAt.toISOString(),
+          recipientIds: [], 
+          frequency: 'once', 
+          isActive: true
+        });
+      }
+    }
   };
 
   const updateGuarantor = (i: number, field: keyof GuarantorInfo, value: string | boolean) => {
@@ -396,6 +424,8 @@ export function Onboarding() {
       pensionNumber: cl.pensionNumberInput || selectedEmployee.pensionNumber,
       payeNumber: cl.payeNumberInput || selectedEmployee.payeNumber,
       lashmaPolicyNumber: cl.lashmaPolicyNumber || selectedEmployee.lashmaPolicyNumber,
+      lashmaRegistrationDate: cl.lashmaRegistrationDate || selectedEmployee.lashmaRegistrationDate,
+      lashmaExpiryDate: cl.lashmaExpiryDate || selectedEmployee.lashmaExpiryDate,
       onboardingChecklist: cl,
     });
     toast.success(`${selectedEmployee.firstname} ${selectedEmployee.surname} is now ACTIVE! ðŸŽ‰`);
@@ -1005,7 +1035,7 @@ export function Onboarding() {
                     </Section>
                     <Section icon={Activity} label="8. Health insurance (LASHMA)" color="bg-emerald-50 text-emerald-700" defaultOpen={!cl.lashmaVerified}>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-slate-500">Enter and verify health insurance policy number.</span>
+                        <span className="text-xs text-slate-500">Enter and verify health insurance policy details.</span>
                         <DoneBadge done={cl.lashmaVerified} />
                       </div>
                       <div className="space-y-3">
@@ -1015,6 +1045,20 @@ export function Onboarding() {
                           onChange={v => updateCL({ lashmaPolicyNumber: v })} 
                           placeholder="Enter policy number" 
                         />
+                        <div className="grid grid-cols-2 gap-3">
+                          <LabeledInput 
+                            label="Registration Date" 
+                            type="date"
+                            value={cl.lashmaRegistrationDate || ''} 
+                            onChange={v => updateCL({ lashmaRegistrationDate: v })} 
+                          />
+                          <LabeledInput 
+                            label="Expiry Date" 
+                            type="date"
+                            value={cl.lashmaExpiryDate || ''} 
+                            onChange={v => updateCL({ lashmaExpiryDate: v })} 
+                          />
+                        </div>
                         <CheckRow 
                           label={cl.lashmaPolicyNumber.trim() ? "Mark LASHMA as verified" : "Enter policy number first"} 
                           checked={cl.lashmaVerified} 
@@ -1035,7 +1079,7 @@ export function Onboarding() {
                       <p className="text-xs text-orange-600">Unlocks after activation. Includes PPE issuance, handbook, and other requirements.</p>
                     </Section>
                     <Section icon={Activity} label="8. Health insurance (LASHMA)" color="bg-emerald-50 text-emerald-700" defaultOpen={false}>
-                      <p className="text-xs text-emerald-600">Unlocks after activation. Requires entry of LASHMA policy number.</p>
+                      <p className="text-xs text-emerald-600">Unlocks after activation. Requires entry of LASHMA policy number, registration date, and expiry date.</p>
                     </Section>
                   </div>
                 )}

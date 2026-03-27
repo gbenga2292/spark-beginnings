@@ -121,23 +121,23 @@ export function SiteOnboarding() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const pendingSites  = useAppStore(s => s.pendingSites);
-  const sites         = useAppStore(s => s.sites);
-  const clients       = useMemo(() => Array.from(new Set(sites.map(s => s.client))).sort(), [sites]);
-  const addPendingSite   = useAppStore(s => s.addPendingSite);
+  const pendingSites = useAppStore(s => s.pendingSites);
+  const sites = useAppStore(s => s.sites);
+  const clients = useMemo(() => Array.from(new Set(sites.map(s => s.client))).sort(), [sites]);
+  const addPendingSite = useAppStore(s => s.addPendingSite);
   const updatePendingSite = useAppStore(s => s.updatePendingSite);
-  const addSite    = useAppStore(s => s.addSite);
+  const addSite = useAppStore(s => s.addSite);
   const updateSite = useAppStore(s => s.updateSite);
-  const addClient  = useAppStore(s => s.addClient);
+  const addClient = useAppStore(s => s.addClient);
   const getServiceTemplates = useAppStore(s => s.getServiceTemplates);
 
   const [form, setForm] = useState<SiteQuestionnaire>(blankForm());
   const [initialForm, setInitialForm] = useState<SiteQuestionnaire>(blankForm());
-  const [activePhase, setActivePhase] = useState<1|2|3|4|5>(1);
+  const [activePhase, setActivePhase] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const { createProject, users, projects } = useAppData();
   const { user } = useAuth();
-  
+
   const [wantsProject, setWantsProject] = useState(true);
   const [showProjectDialog, setShowProjectDialog] = useState(false);
 
@@ -165,7 +165,7 @@ export function SiteOnboarding() {
         setForm(existing);
         setInitialForm(existing);
         if (existing.status === 'Pending') {
-          const next = [1,2,3,4,5].find(p => !(existing as any)[`phase${p}`].completed) as any ?? 5;
+          const next = [1, 2, 3, 4, 5].find(p => !(existing as any)[`phase${p}`].completed) as any ?? 5;
           setActivePhase(next);
         }
       } else {
@@ -195,11 +195,11 @@ export function SiteOnboarding() {
 
   // ─── Updaters ──────────────────────────────────────────────────────────────
   const upd = (patch: Partial<SiteQuestionnaire>) => setForm(p => ({ ...p, ...patch }));
-  const updPhase = <K extends 'phase1'|'phase2'|'phase3'|'phase4'|'phase5'>(
+  const updPhase = <K extends 'phase1' | 'phase2' | 'phase3' | 'phase4' | 'phase5'>(
     key: K, patch: Partial<SiteQuestionnaire[K]>
   ) => setForm(p => ({ ...p, [key]: { ...p[key], ...(patch as any) } }));
 
-  const markDone = (phase: 1|2|3|4|5) => {
+  const markDone = (phase: 1 | 2 | 3 | 4 | 5) => {
     updPhase(`phase${phase}` as any, { completed: true });
     if (phase < 5) setActivePhase((phase + 1) as any);
   };
@@ -210,11 +210,11 @@ export function SiteOnboarding() {
       toast.error('Client Name and Site Name are required.');
       return;
     }
-    
+
     if (isNew && wantsProject) {
-        // If it's a new site and user checked the "create project" button
-        setShowProjectDialog(true);
-        return;
+      // If it's a new site and user checked the "create project" button
+      setShowProjectDialog(true);
+      return;
     }
 
     executeSave();
@@ -238,11 +238,11 @@ export function SiteOnboarding() {
       toast.success('Progress saved.');
     }
   };
-  
+
   const handleProjectSubmit = async (payload: any) => {
-     await createProject(payload);
-     setShowProjectDialog(false);
-     executeSave();
+    await createProject(payload);
+    setShowProjectDialog(false);
+    executeSave();
   };
 
   // ─── Activation ──────────────────────────────────────────────────────────
@@ -288,7 +288,7 @@ export function SiteOnboarding() {
     navigate('/sites');
   };
 
-  const completedCount = [1,2,3,4,5].filter(p => (form as any)[`phase${p}`].completed).length;
+  const completedCount = [1, 2, 3, 4, 5].filter(p => (form as any)[`phase${p}`].completed).length;
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -318,13 +318,13 @@ export function SiteOnboarding() {
         {!isNew && (
           <div className="flex gap-2 flex-shrink-0">
             {form.status === 'Active' && projects.some(p => p.name === form.siteName || p.id === form.siteName || p.title === form.siteName) ? (
-              <Button onClick={() => navigate(`/tasks?scope=projects&openProject=${encodeURIComponent(form.siteName)}`)} 
-                 className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border-indigo-200 gap-2 font-medium shadow-none">
+              <Button onClick={() => navigate(`/tasks?scope=projects&openProject=${encodeURIComponent(form.siteName)}`)}
+                className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border-indigo-200 gap-2 font-medium shadow-none">
                 <LayoutGrid className="h-4 w-4" /> View Workspace
               </Button>
             ) : form.status === 'Active' ? (
-              <Button onClick={() => setShowProjectDialog(true)} 
-                 className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border-indigo-200 gap-2 font-medium shadow-none">
+              <Button onClick={() => setShowProjectDialog(true)}
+                className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border-indigo-200 gap-2 font-medium shadow-none">
                 <LayoutGrid className="h-4 w-4" /> Create Workspace
               </Button>
             ) : null}
@@ -384,7 +384,7 @@ export function SiteOnboarding() {
               <p className="text-xs font-semibold text-slate-700">{completedCount} / 5 phases complete</p>
             </div>
             <div className="flex gap-1.5">
-              {[1,2,3,4,5].map(p => {
+              {[1, 2, 3, 4, 5].map(p => {
                 const done = (form as any)[`phase${p}`].completed;
                 return (
                   <div
@@ -461,9 +461,9 @@ export function SiteOnboarding() {
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
             <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
-              <input 
-                type="checkbox" 
-                checked={wantsProject} 
+              <input
+                type="checkbox"
+                checked={wantsProject}
                 onChange={e => setWantsProject(e.target.checked)}
                 className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
               />
@@ -482,7 +482,7 @@ export function SiteOnboarding() {
 
           {/* Tabs */}
           <div className="flex border-b border-slate-200 overflow-x-auto flex-shrink-0">
-            {[1,2,3,4,5].map(phase => {
+            {[1, 2, 3, 4, 5].map(phase => {
               const done = (form as any)[`phase${phase}`].completed;
               return (
                 <button
@@ -562,7 +562,7 @@ export function SiteOnboarding() {
                         ? String(2 * (Number(form.phase1.siteLength) + Number(form.phase1.siteWidth)))
                         : ''
                     }
-                    onChange={() => {}}
+                    onChange={() => { }}
                     readOnly={true}
                     placeholder="Auto-calculated"
                   />
@@ -609,7 +609,7 @@ export function SiteOnboarding() {
                   <div className="flex flex-col gap-3">
                     <PhaseCheck label="Site Visited" checked={form.phase2.siteVisited} onChange={v => updPhase('phase2', { siteVisited: v })} />
                     <PhaseCheck label="Walkthrough Completed" checked={form.phase2.walkthroughCompleted} onChange={v => updPhase('phase2', { walkthroughCompleted: v })} />
-                    
+
                     <div className="space-y-1 mt-2">
                       <label className="text-sm font-medium text-slate-700">Diesel Supply Strategy</label>
                       <select
@@ -623,7 +623,7 @@ export function SiteOnboarding() {
                       </select>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-4">
                     <PhaseTextField
                       label="Known Obstacles"
@@ -836,16 +836,16 @@ export function SiteOnboarding() {
                 </div>
                 <div className="grid grid-cols-2 gap-y-4 gap-x-6">
                   <PhaseCheck label="Pre-requisite: Site-Specific Safety Plan Integrated" checked={form.phase5.safetyPlanIntegrated} onChange={v => updPhase('phase5', { safetyPlanIntegrated: v })} />
-                  <div/>
+                  <div />
 
                   <PhaseCheck label="Stage 1: 50% Advance Received (Mobilization)" checked={form.phase5.stage1AdvanceReceived} onChange={v => updPhase('phase5', { stage1AdvanceReceived: v })} />
-                  <div/>
+                  <div />
 
                   <PhaseCheck label="Stage 2: Installation Complete & System Started Up" checked={form.phase5.stage2InstallationComplete} onChange={v => updPhase('phase5', { stage2InstallationComplete: v })} />
                   <PhaseCheck label="Stage 2: Remaining 50% & First Hire Invoice Issued" checked={form.phase5.stage2FirstInvoiceIssued} onChange={v => updPhase('phase5', { stage2FirstInvoiceIssued: v })} />
-                  
+
                   <PhaseCheck label="Stage 3: Timely Weekly Hire Invoicing Ongoing" checked={form.phase5.stage3TimelyBilling} onChange={v => updPhase('phase5', { stage3TimelyBilling: v })} />
-                  <div/>
+                  <div />
 
                   <PhaseCheck label="Stage 4: Demobilization Complete" checked={form.phase5.stage4DemobilizationComplete} onChange={v => updPhase('phase5', { stage4DemobilizationComplete: v })} />
                   <PhaseCheck label="Stage 4: Final Invoice Issued & WHT Credit Requested" checked={form.phase5.stage4FinalInvoiceIssued} onChange={v => updPhase('phase5', { stage4FinalInvoiceIssued: v })} />
@@ -874,16 +874,16 @@ export function SiteOnboarding() {
       )}
 
       {showProjectDialog && (
-         <CreateProjectDialog
-           initialProjectName={form.siteName}
-           initialStatus={form.status === 'Active' ? 'Active' : 'Pending'}
-           onClose={() => setShowProjectDialog(false)}
-           onSubmit={handleProjectSubmit}
-           users={users}
-           currentUserId={user?.id || ''}
-           teamId="dcel-team"
-           workspaceId="dcel-team"
-         />
+        <CreateProjectDialog
+          initialProjectName={form.siteName}
+          initialStatus={form.status === 'Active' ? 'Active' : 'Pending'}
+          onClose={() => setShowProjectDialog(false)}
+          onSubmit={handleProjectSubmit}
+          users={users}
+          currentUserId={user?.id || ''}
+          teamId="dcel-team"
+          workspaceId="dcel-team"
+        />
       )}
 
       {showUnsavedModal && (

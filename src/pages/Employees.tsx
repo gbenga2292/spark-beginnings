@@ -67,7 +67,7 @@ export function Employees() {
   const addDepartment = useAppStore((state) => state.addDepartment);
   const disciplinaryRecords = useAppStore((state) => state.disciplinaryRecords);
   const evaluations = useAppStore((state) => state.evaluations);
-  const { reminders } = useAppData();
+  const { reminders, addReminder } = useAppData();
 
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('employees');
@@ -162,9 +162,33 @@ export function Employees() {
       excludeFromOnboarding: formData.excludeFromOnboarding || false,
       rent: formData.rent || 0,
       lashmaPolicyNumber: formData.lashmaPolicyNumber || '',
+      lashmaRegistrationDate: formData.lashmaRegistrationDate || '',
+      lashmaExpiryDate: formData.lashmaExpiryDate || '',
     };
 
     addEmployee(newEmployee);
+    
+    // Manage LASHMA Renewal Reminder
+    if (newEmployee.lashmaExpiryDate) {
+      const expiry = new Date(newEmployee.lashmaExpiryDate);
+      const remindAt = new Date(expiry);
+      remindAt.setDate(remindAt.getDate() - 7);
+      
+      const title = `LASHMA Renewal: ${newEmployee.firstname} ${newEmployee.surname}`;
+      // Basic check to avoid duplicates: find existing reminder with same title
+      const existing = reminders.find(r => r.title === title && r.isActive);
+      
+      if (!existing || existing.remindAt !== remindAt.toISOString()) {
+        addReminder({
+          title,
+          body: `Health insurance (LASHMA) for ${newEmployee.firstname} ${newEmployee.surname} expires on ${newEmployee.lashmaExpiryDate}. Please initiate renewal.`,
+          remindAt: remindAt.toISOString(),
+          recipientIds: [], // HR/Admin usually get notifications by default if left empty or if they created it
+          frequency: 'once',
+          isActive: true
+        });
+      }
+    }
     setIsAdding(false);
     setFormData({
       staffType: 'OFFICE',
@@ -210,6 +234,29 @@ export function Employees() {
     }
 
     updateEmployee(editingEmployeeId, formData);
+    
+    // Manage LASHMA Renewal Reminder
+    if (formData.lashmaExpiryDate) {
+      const expiry = new Date(formData.lashmaExpiryDate);
+      const remindAt = new Date(expiry);
+      remindAt.setDate(remindAt.getDate() - 7);
+      
+      const title = `LASHMA Renewal: ${formData.firstname} ${formData.surname}`;
+      // Basic check to avoid duplicates: find existing reminder with same title
+      const existing = reminders.find(r => r.title === title && r.isActive);
+      
+      if (!existing || existing.remindAt !== remindAt.toISOString()) {
+        addReminder({
+          title,
+          body: `Health insurance (LASHMA) for ${formData.firstname} ${formData.surname} expires on ${formData.lashmaExpiryDate}. Please initiate renewal.`,
+          remindAt: remindAt.toISOString(),
+          recipientIds: [], 
+          frequency: 'once',
+          isActive: true
+        });
+      }
+    }
+
     setIsEditing(false);
     setEditingEmployeeId(null);
     toast.success('Employee updated successfully.');
@@ -253,7 +300,7 @@ export function Employees() {
         toast.info('No employees to export');
         return;
       }
-      const headers = ['id', 'employeeCode', 'surname', 'firstname', 'department', 'staffType', 'level', 'position', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'taxId', 'pensionNumber', 'lashmaPolicyNumber', 'payeTax', 'withholdingTax', 'excludeFromOnboarding', 'rent', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      const headers = ['id', 'employeeCode', 'surname', 'firstname', 'department', 'staffType', 'level', 'position', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'taxId', 'pensionNumber', 'lashmaPolicyNumber', 'lashmaRegistrationDate', 'lashmaExpiryDate', 'payeTax', 'withholdingTax', 'excludeFromOnboarding', 'rent', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
       const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
 
       const rows = employees.map(emp => {
@@ -261,7 +308,7 @@ export function Employees() {
           emp.id, emp.employeeCode || '', emp.surname, emp.firstname, emp.department, emp.staffType, emp.level || 10,
           emp.position, emp.status, emp.yearlyLeave, emp.startDate || '',
           emp.endDate || '', emp.bankName || '', emp.accountNo || '', emp.taxId || '',
-          emp.pensionNumber || '', emp.lashmaPolicyNumber || '', emp.payeTax, emp.withholdingTax, emp.excludeFromOnboarding || false, emp.rent || 0,
+          emp.pensionNumber || '', emp.lashmaPolicyNumber || '', emp.lashmaRegistrationDate || '', emp.lashmaExpiryDate || '', emp.payeTax, emp.withholdingTax, emp.excludeFromOnboarding || false, emp.rent || 0,
           canSeeSalary ? emp.monthlySalaries.jan : '***', canSeeSalary ? emp.monthlySalaries.feb : '***', canSeeSalary ? emp.monthlySalaries.mar : '***',
           canSeeSalary ? emp.monthlySalaries.apr : '***', canSeeSalary ? emp.monthlySalaries.may : '***', canSeeSalary ? emp.monthlySalaries.jun : '***',
           canSeeSalary ? emp.monthlySalaries.jul : '***', canSeeSalary ? emp.monthlySalaries.aug : '***', canSeeSalary ? emp.monthlySalaries.sep : '***',
@@ -364,23 +411,27 @@ export function Employees() {
               department: vals[3 + offset], 
               staffType: vals[4 + offset] as any,
               level: hasLevel ? (parseInt(vals[levelIdx]) || 10) : 10,
-              position: vals[5 + offset], status: vals[6 + offset] as any, yearlyLeave: parseInt(vals[7 + offset]) || 0,
-              startDate: vals[8 + offset] || '', 
-              endDate: vals[9 + offset] || '', 
-              bankName: vals[10 + offset] || '',
-              accountNo: vals[11 + offset] || '', 
-              taxId: vals[12 + offset] || '', 
-              pensionNumber: vals[13 + offset] || '',
-              lashmaPolicyNumber: vals[14 + offset] || '',
-              payeTax: ['true', 'yes', '1'].includes(vals[15 + offset]?.trim().toLowerCase() || ''),
-              withholdingTax: ['true', 'yes', '1'].includes(vals[16 + offset]?.trim().toLowerCase() || ''),
-              excludeFromOnboarding: ['true', 'yes', '1'].includes(vals[17 + offset]?.trim().toLowerCase() || ''),
-              rent: parseFloat(vals[18 + offset]) || 0,
+              position: vals[6 + offset], 
+              status: vals[7 + offset] as any, 
+              yearlyLeave: parseInt(vals[8 + offset]) || 0,
+              startDate: vals[9 + offset] || '', 
+              endDate: vals[10 + offset] || '', 
+              bankName: vals[11 + offset] || '',
+              accountNo: vals[12 + offset] || '', 
+              taxId: vals[13 + offset] || '', 
+              pensionNumber: vals[14 + offset] || '',
+              lashmaPolicyNumber: vals[15 + offset] || '',
+              lashmaRegistrationDate: vals[16 + offset] || '',
+              lashmaExpiryDate: vals[17 + offset] || '',
+              payeTax: ['true', 'yes', '1'].includes(vals[18 + offset]?.trim().toLowerCase() || ''),
+              withholdingTax: ['true', 'yes', '1'].includes(vals[19 + offset]?.trim().toLowerCase() || ''),
+              excludeFromOnboarding: ['true', 'yes', '1'].includes(vals[20 + offset]?.trim().toLowerCase() || ''),
+              rent: parseFloat(vals[21 + offset]) || 0,
               monthlySalaries: {
-                jan: parseFloat(vals[19 + offset]) || 0, feb: parseFloat(vals[20 + offset]) || 0, mar: parseFloat(vals[21 + offset]) || 0,
-                apr: parseFloat(vals[22 + offset]) || 0, may: parseFloat(vals[23 + offset]) || 0, jun: parseFloat(vals[24 + offset]) || 0,
-                jul: parseFloat(vals[25 + offset]) || 0, aug: parseFloat(vals[26 + offset]) || 0, sep: parseFloat(vals[27 + offset]) || 0,
-                oct: parseFloat(vals[28 + offset]) || 0, nov: parseFloat(vals[29 + offset]) || 0, dec: parseFloat(vals[30 + offset]) || 0
+                jan: parseFloat(vals[22 + offset]) || 0, feb: parseFloat(vals[23 + offset]) || 0, mar: parseFloat(vals[24 + offset]) || 0,
+                apr: parseFloat(vals[25 + offset]) || 0, may: parseFloat(vals[26 + offset]) || 0, jun: parseFloat(vals[27 + offset]) || 0,
+                jul: parseFloat(vals[28 + offset]) || 0, aug: parseFloat(vals[29 + offset]) || 0, sep: parseFloat(vals[30 + offset]) || 0,
+                oct: parseFloat(vals[31 + offset]) || 0, nov: parseFloat(vals[32 + offset]) || 0, dec: parseFloat(vals[33 + offset]) || 0
               }
             };
             const existing = employees.find(e => e.id === parsedEmp.id);
@@ -657,9 +708,21 @@ export function Employees() {
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Pension Number</label>
                   <Input value={formData.pensionNumber || ''} onChange={e => setFormData({ ...formData, pensionNumber: e.target.value })} className="font-mono bg-slate-50 focus:bg-white" />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">LASHMA Policy Number</label>
-                  <Input value={formData.lashmaPolicyNumber || ''} onChange={e => setFormData({ ...formData, lashmaPolicyNumber: e.target.value })} placeholder="Enter policy number" className="bg-slate-50 focus:bg-white font-mono" />
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">LASHMA Policy Number</label>
+                    <Input value={formData.lashmaPolicyNumber || ''} onChange={e => setFormData({ ...formData, lashmaPolicyNumber: e.target.value })} placeholder="Enter policy number" className="bg-slate-50 focus:bg-white font-mono" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500">LASHMA Registration Date</label>
+                      <Input type="date" value={formData.lashmaRegistrationDate || ''} onChange={e => setFormData({ ...formData, lashmaRegistrationDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500">LASHMA Expiry Date</label>
+                      <Input type="date" value={formData.lashmaExpiryDate || ''} onChange={e => setFormData({ ...formData, lashmaExpiryDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Rent (₦)</label>
@@ -795,7 +858,9 @@ export function Employees() {
                       <div className="flex justify-between"><span className="text-slate-500">Account:</span><span className="font-mono">{emp.accountNo || 'N/A'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Tax ID:</span><span className="font-mono">{emp.taxId || 'N/A'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Pension:</span><span className="font-mono">{emp.pensionNumber || 'N/A'}</span></div>
-                      {emp.lashmaPolicyNumber && <div className="flex justify-between font-bold text-emerald-600"><span className="text-emerald-500">LASHMA:</span><span className="font-mono">{emp.lashmaPolicyNumber}</span></div>}
+                      <div className="flex justify-between font-bold text-emerald-600"><span className="text-emerald-500">LASHMA:</span><span className="font-mono">{emp.lashmaPolicyNumber}</span></div>
+                      {emp.lashmaRegistrationDate && <div className="flex justify-between text-xs"><span className="text-slate-500">Reg. Date:</span><span>{emp.lashmaRegistrationDate}</span></div>}
+                      {emp.lashmaExpiryDate && <div className="flex justify-between text-xs text-rose-500 font-semibold"><span className="text-slate-500">Expiry Date:</span><span>{emp.lashmaExpiryDate}</span></div>}
                       <div className="flex justify-between"><span className="text-slate-500">PAYE Tax:</span><span>{emp.payeTax ? 'Yes' : 'No'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">WHT Tax:</span><span>{emp.withholdingTax ? 'Yes' : 'No'}</span></div>
                     </div>

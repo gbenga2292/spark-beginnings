@@ -1256,4 +1256,81 @@ export const db = {
     const { error } = await supabase.from('comm_logs').delete().eq('id', id);
     if (error) console.error('deleteCommLog:', error);
   },
+  async setPositions(positions: Position[]) {
+    await supabase.from('positions').delete().neq('id', '');
+    if (positions.length > 0) {
+      const { error } = await supabase.from('positions').insert(positions.map(p => ({ id: p.id, title: p.title, department_id: p.departmentId })));
+      if (error) console.error('setPositions:', error);
+    }
+  },
+  async setDepartments(departments: Department[]) {
+    await supabase.from('departments').delete().neq('id', '');
+    if (departments.length > 0) {
+      const { error } = await supabase.from('departments').insert(departments.map(d => ({ 
+        id: d.id, name: d.name, staff_type: d.staffType, 
+        work_days_per_week: d.workDaysPerWeek, parent_department_id: d.parentDepartmentId || null 
+      })));
+      if (error) console.error('setDepartments:', error);
+    }
+  },
+  async setClients(clientsNames: string[]) {
+    await supabase.from('clients').delete().neq('name', '');
+    if (clientsNames.length > 0) {
+      const { error } = await supabase.from('clients').insert(clientsNames.map(name => ({ name })));
+      if (error) console.error('setClients:', error);
+    }
+  },
+  async setPublicHolidays(holidays: { id: string, date: string, name: string }[]) {
+    await supabase.from('public_holidays').delete().neq('id', '');
+    if (holidays.length > 0) {
+      const { error } = await supabase.from('public_holidays').insert(holidays.map(h => ({ id: h.id, date: h.date, name: h.name })));
+      if (error) console.error('setPublicHolidays:', error);
+    }
+  },
+  async setLeaveTypes(types: string[]) {
+    await supabase.from('leave_types').delete().neq('name', '');
+    if (types.length > 0) {
+      const { error } = await supabase.from('leave_types').insert(types.map(name => ({ name })));
+      if (error) console.error('setLeaveTypes:', error);
+    }
+  },
+  async setLedgerCategories(cats: LedgerCategory[]) {
+    await supabase.from('ledger_categories').delete().neq('id', '');
+    if (cats.length > 0) {
+      const { error } = await supabase.from('ledger_categories').insert(cats.map(c => ({ id: c.id, name: c.name })));
+      if (error) console.error('setLedgerCategories:', error);
+    }
+  },
+  async setLedgerVendors(vendors: LedgerVendor[]) {
+    await supabase.from('ledger_vendors').delete().neq('id', '');
+    if (vendors.length > 0) {
+      const { error } = await supabase.from('ledger_vendors').insert(vendors.map(v => ({ id: v.id, name: v.name, tin_number: v.tinNumber })));
+      if (error) console.error('setLedgerVendors:', error);
+    }
+  },
+  async setLedgerBanks(banks: LedgerBank[]) {
+    await supabase.from('ledger_banks').delete().neq('id', '');
+    if (banks.length > 0) {
+      const { error } = await supabase.from('ledger_banks').insert(banks.map(b => ({ id: b.id, name: b.name })));
+      if (error) console.error('setLedgerBanks:', error);
+    }
+  },
+  async setLedgerBeneficiaryBanks(banks: LedgerBeneficiaryBank[]) {
+    await supabase.from('ledger_beneficiary_banks').delete().neq('id', '');
+    if (banks.length > 0) {
+      const { error } = await supabase.from('ledger_beneficiary_banks').insert(banks.map(b => ({ id: b.id, name: b.name, account_no: b.accountNo })));
+      if (error) console.error('setLedgerBeneficiaryBank:', error);
+    }
+  },
+  async setDepartmentTasksList(list: DepartmentTasks[]) {
+    await supabase.from('department_tasks').delete().neq('department', '');
+    if (list.length > 0) {
+      const { error } = await supabase.from('department_tasks').insert(list.map(d => ({
+        department: d.department,
+        onboarding_tasks: d.onboardingTasks,
+        offboarding_tasks: d.offboardingTasks
+      })));
+      if (error) console.error('setDepartmentTasksList:', error);
+    }
+  }
 };

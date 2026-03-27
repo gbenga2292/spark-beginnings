@@ -34,6 +34,12 @@ export function Variables() {
   const storeHrVariables = useAppStore((state) => state.hrVariables);
   const saveAllSettingsStore = useAppStore((state) => state.saveAllSettings);
 
+  const {
+    setPositions, setDepartments, setClients, setPublicHolidays,
+    setLeaveTypes, setLedgerCategories, setLedgerVendors,
+    setLedgerBanks, setLedgerBeneficiaryBanks, setDepartmentTasksList
+  } = useAppStore();
+
   const [localPayrollVars, setLocalPayrollVars] = useState(storePayrollVariables);
   const [localPayeVars, setLocalPayeVars] = useState(storePayeTaxVariables);
   const [localMonthVals, setLocalMonthVals] = useState(storeMonthValues);
@@ -215,7 +221,10 @@ export function Variables() {
     setIsDirty(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    const ok = await showConfirm('Are you sure you want to save all changes to the database? This will update global system parameters.', { title: 'Save Changes' });
+    if (!ok) return;
+
     saveAllSettingsStore(localPayrollVars, localPayeVars, localMonthVals, localHrVars);
     setIsDirty(false);
     toast.success('Variables saved successfully!');
@@ -373,6 +382,46 @@ export function Variables() {
       });
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taskData), 'Task_Templates');
 
+      // Ledger Variables
+      const lCatData = ledgerCategories.map(c => ({ Category: c.name }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lCatData), 'Ledger_Categories');
+
+      const lVenData = ledgerVendors.map(v => ({ Vendor: v.name, TIN: v.tinNumber }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lVenData), 'Ledger_Vendors');
+
+      const lBankData = ledgerBanks.map(b => ({ Bank: b.name }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lBankData), 'Ledger_Banks');
+
+      const lBenData = ledgerBeneficiaryBanks.map(b => ({ Bank: b.name, AccountNo: b.accountNo }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lBenData), 'Ledger_Beneficiary_Banks');
+
+      // Service Templates
+      const srvData: any[] = [];
+      serviceTemplates.forEach(s => {
+        s.subtasks.forEach(t => srvData.push({
+          ServiceName: s.serviceName,
+          TaskTitle: t.title,
+          Assignee: t.assignee
+        }));
+      });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(srvData), 'Service_Templates');
+
+      // HR & Month Variables
+      const hrData = [
+        { Key: 'Absence Threshold', Value: localHrVars.flaggedAbsenceThreshold },
+        { Key: 'Disciplinary Exp. (Months)', Value: localHrVars.disciplinaryExpirationMonths },
+        { Key: 'Probation Days', Value: localHrVars.defaultProbationDays },
+        { Key: 'Investigation Days', Value: localHrVars.investigationPeriodDays },
+        { Key: 'Appeal Days', Value: localHrVars.appealPeriodDays },
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(hrData), 'HR_Variables');
+
+      const stageLabels = Object.entries(localHrVars.onboardingStageLabels || {}).map(([k, v]) => ({ Step: k, Label: v }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stageLabels), 'Onboarding_Labels');
+
+      const monthData = Object.entries(localMonthVals).map(([k, v]) => ({ Month: k, WorkDays: v.workDays, OTRate: v.overtimeRate }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(monthData), 'Month_Variables');
+
       XLSX.writeFile(wb, 'System_Variables.xlsx');
       toast.success('System variables exported successfully.');
     } catch (error) {
@@ -385,176 +434,281 @@ export function Variables() {
     if (!file) return;
 
     showConfirm(
-      'This will add new entries to your variables (Positions, Departments, Clients, Leave Types, etc). Existing entries remain intact. Continue?',
-      { title: 'Import Variables' }
-    ).then((ok) => {
-      if (ok) {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          try {
-            const data = evt.target?.result;
-            const wb = XLSX.read(data, { type: 'binary' });
-
-            if (wb.SheetNames.includes('Departments')) {
-              const deptData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Departments']);
-              deptData.forEach(row => {
-                const depName = String(row.Department || '').trim();
-                if (depName && !departments.some(d => d.name.toLowerCase() === depName.toLowerCase())) {
-                  addDepartment({
-                    id: crypto.randomUUID(),
-                    name: depName,
-                    staffType: 'OFFICE',
-                    workDaysPerWeek: Number(row['Work Days/Week']) || 5
-                  });
-                }
-              });
-            }
-
-            if (wb.SheetNames.includes('Positions')) {
-              const posData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Positions']);
-              posData.forEach(row => {
-                const posName = String(row.Position || '').trim();
-                const depName = String(row.Department || '').trim();
-                let deptId = null;
-                if (depName) {
-                  const existingDept = useAppStore.getState().departments.find(d => d.name.toLowerCase() === depName.toLowerCase());
-                  if (existingDept) deptId = existingDept.id;
-                }
-                if (posName && !positions.some(p => p.title.toLowerCase() === posName.toLowerCase() && p.departmentId === deptId)) {
-                   addPosition({ id: crypto.randomUUID(), title: posName, departmentId: deptId });
-                }
-              });
-            }
-
-            if (wb.SheetNames.includes('Clients')) {
-              const clientData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Clients']);
-              clientData.forEach(row => {
-                if (row.Client && row.Client.toLowerCase() !== 'dcel' && !clients.includes(row.Client)) addClient(String(row.Client));
-              });
-            }
-
-            if (wb.SheetNames.includes('Leave_Types')) {
-              const leaveData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Leave_Types']);
-              leaveData.forEach(row => {
-                const lt = row.LeaveType || row.Leave_Type;
-                if (lt && !leaveTypes.includes(lt)) addLeaveType(String(lt));
-              });
-            }
-
-            if (wb.SheetNames.includes('Public_Holidays')) {
-              const phData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Public_Holidays']);
-              phData.forEach(row => {
-                if (row.Date && row.Name) {
-                  // Basic check to see if it already exists to avoid duplicates
-                  const exists = publicHolidays.some(ph => ph.date === row.Date && ph.name === row.Name);
-                  if (!exists) {
-                    addPublicHoliday({ id: Math.random().toString(36).slice(2), date: String(row.Date), name: String(row.Name) });
-                  }
-                }
-              });
-            }
-
-            if (wb.SheetNames.includes('Payroll_Variables')) {
-              const pvData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Payroll_Variables']);
-              const newPv = { ...localPayrollVars };
-              pvData.forEach(row => {
-                const val = parseFloat(row.Value);
-                if (!isNaN(val)) {
-                  if (row.Key.includes('Basic')) newPv.basic = val;
-                  if (row.Key.includes('Housing')) newPv.housing = val;
-                  if (row.Key.includes('Transport')) newPv.transport = val;
-                  if (row.Key.includes('Other')) newPv.otherAllowances = val;
-                  if (row.Key.includes('Employee Pension')) newPv.employeePensionRate = val;
-                  if (row.Key.includes('Employer Pension')) newPv.employerPensionRate = val;
-                  if (row.Key.includes('NSITF')) newPv.nsitfRate = val;
-                  if (row.Key.includes('Withholding')) newPv.withholdingTaxRate = val;
-                }
-              });
-              updateLocalPayrollVariables(newPv);
-            }
-
-            if (wb.SheetNames.includes('PAYE_Variables')) {
-              const payeData = XLSX.utils.sheet_to_json<any>(wb.Sheets['PAYE_Variables']);
-              const newPayeVar = { ...localPayeVars };
-              payeData.forEach(row => {
-                const val = parseFloat(row.Value);
-                if (!isNaN(val)) {
-                  if (row.Key.includes('CRA Base')) newPayeVar.craBase = val;
-                  if (row.Key.includes('Rent Relief Rate')) newPayeVar.rentReliefRate = val / 100;
-                }
-              });
-              
-              if (wb.SheetNames.includes('PAYE_Tax_Brackets')) {
-                const tbData = XLSX.utils.sheet_to_json<any>(wb.Sheets['PAYE_Tax_Brackets']);
-                if (tbData.length > 0) {
-                  newPayeVar.taxBrackets = tbData.map(row => ({
-                    id: Math.random().toString(36).slice(2),
-                    label: String(row.Label || ''),
-                    rate: parseFloat(row['Rate (%)'] || 0) / 100,
-                    upTo: row['UpTo (₦)'] === 'INFINITY' ? null : parseFloat(row['UpTo (₦)'] || 0)
-                  }));
-                }
-              }
-
-              if (wb.SheetNames.includes('PAYE_Extra_Conditions')) {
-                const ecData = XLSX.utils.sheet_to_json<any>(wb.Sheets['PAYE_Extra_Conditions']);
-                if (ecData.length > 0) {
-                  newPayeVar.extraConditions = ecData.map(row => ({
-                    id: Math.random().toString(36).slice(2),
-                    label: String(row.Label || ''),
-                    amount: parseFloat(row['Amount (₦)'] || 0),
-                    enabled: row.Enabled === true || row.Enabled === 'true' || row.Enabled === 'Yes',
-                  }));
-                }
-              }
-
-              updateLocalPayeVars(newPayeVar);
-            }
-
-            if (wb.SheetNames.includes('Task_Templates')) {
-              const tasksData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Task_Templates']);
-              // Group by department
-              const deptsMap: Record<string, { onboardingTasks: any[], offboardingTasks: any[] }> = {};
-              tasksData.forEach(row => {
-                const d = row.Department;
-                if (!d) return;
-                if (!deptsMap[d]) deptsMap[d] = { onboardingTasks: [], offboardingTasks: [] };
-                
-                const task = { title: String(row.Title || ''), assignee: String(row.Assignee || '') };
-                if (String(row.Type || '').toLowerCase() === 'onboarding') {
-                  deptsMap[d].onboardingTasks.push(task);
-                } else if (String(row.Type || '').toLowerCase() === 'offboarding') {
-                  deptsMap[d].offboardingTasks.push(task);
-                }
-              });
-
-              Object.keys(deptsMap).forEach(deptName => {
-                // merge with existing
-                const existing = departmentTasksList.find(d => d.department === deptName);
-                if (existing) {
-                  updateDepartmentTasks({
-                    department: deptName,
-                    onboardingTasks: deptsMap[deptName].onboardingTasks,
-                    offboardingTasks: deptsMap[deptName].offboardingTasks
-                  });
-                } else {
-                  // Wait, no direct addDepartmentTasks? 
-                  // If it doesn't exist, updateDepartmentTasks will just replace or we can add it by using update which append missing?
-                  // `updateDepartmentTasks` actually filters and maps, wait let me check appStore implementation for updateDepartmentTasks.
-                  updateDepartmentTasks({ department: deptName, ...deptsMap[deptName] });
-                }
-              });
-            }
-
-            toast.success('Variables imported successfully.');
-          } catch (error) {
-            toast.error('Failed to parse the file.');
-          } finally {
-            if (e.target) e.target.value = '';
-          }
-        };
-        reader.readAsBinaryString(file);
+      'Ready to import variables. Would you like to OVERWRITE existing data? (No will APPEND new entries instead)',
+      { 
+        title: 'Import Variables',
+        confirmLabel: 'Overwrite All',
+        cancelLabel: 'Append New'
       }
+    ).then((isOverwrite) => {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const data = evt.target?.result;
+          const wb = XLSX.read(data, { type: 'binary' });
+
+          // Local collections for bulk updates if overwrite
+          const newDepts: any[] = isOverwrite ? [] : [...departments];
+          const newPositions: any[] = isOverwrite ? [] : [...positions];
+          const newClients: string[] = isOverwrite ? [] : [...clients];
+          const newLeaveTypes: string[] = isOverwrite ? [] : [...leaveTypes];
+          const newHolidays: any[] = isOverwrite ? [] : [...publicHolidays];
+          const newLCats: any[] = isOverwrite ? [] : [...ledgerCategories];
+          const newLVendors: any[] = isOverwrite ? [] : [...ledgerVendors];
+          const newLBanks: any[] = isOverwrite ? [] : [...ledgerBanks];
+          const newLBenBanks: any[] = isOverwrite ? [] : [...ledgerBeneficiaryBanks];
+          const newTaskLists: any[] = isOverwrite ? [] : [...departmentTasksList];
+
+          if (wb.SheetNames.includes('Departments')) {
+            const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Departments']);
+            data.forEach(row => {
+              const name = String(row.Department || row.name || '').trim();
+              if (name && (isOverwrite || !newDepts.some(d => d.name.toLowerCase() === name.toLowerCase()))) {
+                newDepts.push({
+                  id: crypto.randomUUID(),
+                  name,
+                  staffType: row.staffType || 'OFFICE',
+                  workDaysPerWeek: Number(row['Work Days/Week'] || row.workDaysPerWeek) || 5
+                });
+              }
+            });
+            setDepartments(newDepts);
+          }
+
+          if (wb.SheetNames.includes('Positions')) {
+            const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Positions']);
+            data.forEach(row => {
+              const title = String(row.Position || row.title || '').trim();
+              const dName = String(row.Department || '').trim();
+              let deptId = null;
+              if (dName) {
+                const d = newDepts.find(d => d.name.toLowerCase() === dName.toLowerCase());
+                if (d) deptId = d.id;
+              }
+              if (title && (isOverwrite || !newPositions.some(p => p.title.toLowerCase() === title.toLowerCase() && p.departmentId === deptId))) {
+                newPositions.push({ id: crypto.randomUUID(), title, departmentId: deptId });
+              }
+            });
+            setPositions(newPositions);
+          }
+
+          if (wb.SheetNames.includes('Clients')) {
+            const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Clients']);
+            data.forEach(row => {
+              const c = String(row.Client || row.name || '').trim();
+              if (c && c.toLowerCase() !== 'dcel' && (isOverwrite || !newClients.includes(c))) {
+                newClients.push(c);
+              }
+            });
+            setClients(newClients);
+          }
+
+          if (wb.SheetNames.includes('Leave_Types')) {
+            const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Leave_Types']);
+            data.forEach(row => {
+              const lt = String(row.LeaveType || row.Leave_Type || '').trim();
+              if (lt && (isOverwrite || !newLeaveTypes.includes(lt))) {
+                newLeaveTypes.push(lt);
+              }
+            });
+            setLeaveTypes(newLeaveTypes);
+          }
+
+          if (wb.SheetNames.includes('Public_Holidays')) {
+            const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Public_Holidays']);
+            data.forEach(row => {
+              const date = String(row.Date || '');
+              const name = String(row.Name || '');
+              if (date && name && (isOverwrite || !newHolidays.some(h => h.date === date && h.name === name))) {
+                newHolidays.push({ id: Math.random().toString(36).slice(2), date, name });
+              }
+            });
+            setPublicHolidays(newHolidays);
+          }
+
+          if (wb.SheetNames.includes('Ledger_Categories')) {
+            const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Ledger_Categories']);
+            data.forEach(row => {
+              const name = String(row.Category || '').trim();
+              if (name && (isOverwrite || !newLCats.some(c => c.name.toLowerCase() === name.toLowerCase()))) {
+                newLCats.push({ id: crypto.randomUUID(), name });
+              }
+            });
+            setLedgerCategories(newLCats);
+          }
+
+          if (wb.SheetNames.includes('Ledger_Vendors')) {
+            const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Ledger_Vendors']);
+            data.forEach(row => {
+              const name = String(row.Vendor || '').trim();
+              if (name && (isOverwrite || !newLVendors.some(v => v.name.toLowerCase() === name.toLowerCase()))) {
+                newLVendors.push({ id: crypto.randomUUID(), name, tinNumber: String(row.TIN || '') });
+              }
+            });
+            setLedgerVendors(newLVendors);
+          }
+
+          if (wb.SheetNames.includes('Ledger_Banks')) {
+            const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Ledger_Banks']);
+            data.forEach(row => {
+              const name = String(row.Bank || '').trim();
+              if (name && (isOverwrite || !newLBanks.some(b => b.name.toLowerCase() === name.toLowerCase()))) {
+                newLBanks.push({ id: crypto.randomUUID(), name });
+              }
+            });
+            setLedgerBanks(newLBanks);
+          }
+
+          if (wb.SheetNames.includes('Ledger_Beneficiary_Banks')) {
+            const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Ledger_Beneficiary_Banks']);
+            data.forEach(row => {
+              const name = String(row.Bank || '').trim();
+              const acc = String(row.AccountNo || '').trim();
+              if (name && acc && (isOverwrite || !newLBenBanks.some(b => b.name.toLowerCase() === name.toLowerCase() && b.accountNo === acc))) {
+                newLBenBanks.push({ id: crypto.randomUUID(), name, accountNo: acc });
+              }
+            });
+            setLedgerBeneficiaryBanks(newLBenBanks);
+          }
+
+          if (wb.SheetNames.includes('Payroll_Variables')) {
+            const pvData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Payroll_Variables']);
+            const newPv = { ...localPayrollVars };
+            pvData.forEach(row => {
+              const val = parseFloat(row.Value);
+              if (!isNaN(val)) {
+                if (row.Key.includes('Basic')) newPv.basic = val;
+                if (row.Key.includes('Housing')) newPv.housing = val;
+                if (row.Key.includes('Transport')) newPv.transport = val;
+                if (row.Key.includes('Other')) newPv.otherAllowances = val;
+                if (row.Key.includes('Employee Pension')) newPv.employeePensionRate = val;
+                if (row.Key.includes('Employer Pension')) newPv.employerPensionRate = val;
+                if (row.Key.includes('NSITF')) newPv.nsitfRate = val;
+                if (row.Key.includes('Withholding')) newPv.withholdingTaxRate = val / (row.Key.includes('%') ? 100 : 1);
+                if (row.Key.includes('VAT')) newPv.vatRate = val;
+              }
+            });
+            updateLocalPayrollVariables(newPv);
+          }
+
+          if (wb.SheetNames.includes('PAYE_Variables')) {
+            const payeData = XLSX.utils.sheet_to_json<any>(wb.Sheets['PAYE_Variables']);
+            const newPayeVar = { ...localPayeVars };
+            payeData.forEach(row => {
+              const val = parseFloat(row.Value);
+              if (!isNaN(val)) {
+                if (row.Key.includes('CRA Base')) newPayeVar.craBase = val;
+                if (row.Key.includes('Rent Relief Rate')) newPayeVar.rentReliefRate = val / 100;
+              }
+            });
+            
+            if (wb.SheetNames.includes('PAYE_Tax_Brackets')) {
+              const tbData = XLSX.utils.sheet_to_json<any>(wb.Sheets['PAYE_Tax_Brackets']);
+              if (tbData.length > 0) {
+                newPayeVar.taxBrackets = tbData.map(row => ({
+                  id: Math.random().toString(36).slice(2),
+                  label: String(row.Label || ''),
+                  rate: parseFloat(row['Rate (%)'] || 0) / 100,
+                  upTo: row['UpTo (₦)'] === 'INFINITY' ? null : parseFloat(row['UpTo (₦)'] || 0)
+                }));
+              }
+            }
+
+            if (wb.SheetNames.includes('PAYE_Extra_Conditions')) {
+              const ecData = XLSX.utils.sheet_to_json<any>(wb.Sheets['PAYE_Extra_Conditions']);
+              if (ecData.length > 0) {
+                newPayeVar.extraConditions = ecData.map(row => ({
+                  id: Math.random().toString(36).slice(2),
+                  label: String(row.Label || ''),
+                  amount: parseFloat(row['Amount (₦)'] || 0),
+                  enabled: row.Enabled === true || row.Enabled === 'true' || row.Enabled === 'Yes',
+                }));
+              }
+            }
+            updateLocalPayeVars(newPayeVar);
+          }
+
+          if (wb.SheetNames.includes('HR_Variables')) {
+            const hrData = XLSX.utils.sheet_to_json<any>(wb.Sheets['HR_Variables']);
+            const newHr = { ...localHrVars };
+            hrData.forEach(row => {
+              const val = parseInt(row.Value, 10);
+              if (!isNaN(val)) {
+                if (row.Key.includes('Absence')) newHr.flaggedAbsenceThreshold = val;
+                if (row.Key.includes('Disciplinary')) newHr.disciplinaryExpirationMonths = val;
+                if (row.Key.includes('Probation')) newHr.defaultProbationDays = val;
+                if (row.Key.includes('Investigation')) newHr.investigationPeriodDays = val;
+                if (row.Key.includes('Appeal')) newHr.appealPeriodDays = val;
+              }
+            });
+
+            if (wb.SheetNames.includes('Onboarding_Labels')) {
+              const labelData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Onboarding_Labels']);
+              const labels: Record<string, string> = isOverwrite ? {} : { ...(newHr.onboardingStageLabels || {}) };
+              labelData.forEach(row => {
+                if (row.Step && row.Label) labels[String(row.Step)] = String(row.Label);
+              });
+              newHr.onboardingStageLabels = labels;
+            }
+            updateLocalHrVariables(newHr);
+          }
+
+          if (wb.SheetNames.includes('Month_Variables')) {
+            const mData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Month_Variables']);
+            const newMonths = { ...localMonthVals };
+            mData.forEach(row => {
+              if (row.Month) {
+                newMonths[row.Month] = {
+                  workDays: Number(row.WorkDays) || 22,
+                  overtimeRate: Number(row.OTRate) || 0.5
+                };
+              }
+            });
+            setLocalMonthVals(newMonths);
+          }
+
+          if (wb.SheetNames.includes('Task_Templates')) {
+            const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Task_Templates']);
+            data.forEach(row => {
+              const deptName = row.Department;
+              if (!deptName) return;
+              let list = newTaskLists.find(d => d.department === deptName);
+              if (!list) {
+                list = { department: deptName, onboardingTasks: [], offboardingTasks: [] };
+                newTaskLists.push(list);
+              }
+              const task = { title: String(row.Title || ''), assignee: String(row.Assignee || '') };
+              if (String(row.Type).toLowerCase() === 'onboarding') list.onboardingTasks.push(task);
+              else list.offboardingTasks.push(task);
+            });
+          }
+
+          if (wb.SheetNames.includes('Service_Templates')) {
+            const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Service_Templates']);
+            data.forEach(row => {
+              const sName = `__SERVICE__${row.ServiceName}`;
+              let list = newTaskLists.find(d => d.department === sName);
+              if (!list) {
+                list = { department: sName, onboardingTasks: [], offboardingTasks: [] };
+                newTaskLists.push(list);
+              }
+              list.onboardingTasks.push({ title: String(row.TaskTitle), assignee: String(row.Assignee) });
+            });
+          }
+          
+          if (wb.SheetNames.includes('Task_Templates') || wb.SheetNames.includes('Service_Templates')) {
+            setDepartmentTasksList(newTaskLists);
+          }
+
+          toast.success('Variables imported successfully.');
+        } catch (error) {
+          console.error(error);
+          toast.error('Failed to parse the file.');
+        } finally {
+          if (e.target) e.target.value = '';
+        }
+      };
+      reader.readAsBinaryString(file);
     });
   };
 
