@@ -39,6 +39,9 @@ export function dbToEmployee(r: any): Employee {
     lineManager: r.line_manager || undefined,
     phone: r.phone || undefined,
     email: r.email || undefined,
+    payeeType: r.payee_type || undefined,
+    typeOfPay: r.type_of_pay || undefined,
+    startMonthOfPay: r.start_month_of_pay || undefined,
   };
 }
 
@@ -274,6 +277,9 @@ function employeeToDb(e: Employee) {
     verified_start_date: e.verifiedStartDate ?? null,
     onboarding_checklist: e.onboardingChecklist ?? null,
     line_manager: e.lineManager ?? null,
+    payee_type: e.payeeType ?? null,
+    type_of_pay: e.typeOfPay ?? null,
+    start_month_of_pay: e.startMonthOfPay ?? null,
   };
 }
 
@@ -718,6 +724,9 @@ export const db = {
     if (e.lineManager !== undefined) update.line_manager = e.lineManager;
     if (e.phone !== undefined) update.phone = e.phone;
     if (e.email !== undefined) update.email = e.email;
+    if (e.payeeType !== undefined) update.payee_type = e.payeeType;
+    if (e.typeOfPay !== undefined) update.type_of_pay = e.typeOfPay;
+    if (e.startMonthOfPay !== undefined) update.start_month_of_pay = e.startMonthOfPay;
     const { error } = await supabase.from('employees').update(update).eq('id', id);
     if (error) console.error('updateEmployee:', error);
   },

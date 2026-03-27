@@ -51,7 +51,14 @@ const TaskReminders = lazy(() => import('./pages/TaskReminders'));
 const Tasks = lazy(() => import('./pages/Tasks'));
 const TaskReports = lazy(() => import('./pages/TaskReports'));
 const CommLog = lazy(() => import('./pages/CommLog').then(m => ({ default: m.CommLog })));
-const OperationsShell = lazy(() => import('./operations/pages/OperationsShell').then(m => ({ default: m.OperationsShell })));
+const OperationsDashboard = lazy(() => import('./operations/components/Dashboard').then(m => ({ default: m.Dashboard })));
+const AssetManager = lazy(() => import('./operations/components/AssetManager').then(m => ({ default: m.AssetManager })));
+const WaybillManager = lazy(() => import('./operations/components/WaybillManager').then(m => ({ default: m.WaybillManager })));
+const SiteManager = lazy(() => import('./operations/components/SiteManager').then(m => ({ default: m.SiteManager })));
+const QuickCheckout = lazy(() => import('./operations/components/QuickCheckout').then(m => ({ default: m.QuickCheckout })));
+const MaintenanceManager = lazy(() => import('./operations/components/MaintenanceManager').then(m => ({ default: m.MaintenanceManager })));
+const EmployeeAnalytics = lazy(() => import('./operations/components/EmployeeAnalytics').then(m => ({ default: m.EmployeeAnalytics })));
+import { OperationsProvider } from './operations/contexts/OperationsContext';
 
 // ── Suspense fallback ─────────────────────────────────────────────────────────
 function PageLoader() {
@@ -153,8 +160,22 @@ function AppContent() {
 
           <Route path="comm-log" element={<ProtectedRoute requiredModule="sites"><CommLog /></ProtectedRoute>} />
 
-          {/* Operations Module */}
-          <Route path="operations/*" element={<ProtectedRoute requiredModule="operations"><OperationsShell /></ProtectedRoute>} />
+          {/* Operations Module - Direct Routes */}
+          <Route path="operations/*" element={
+            <ProtectedRoute requiredModule="operations">
+              <OperationsProvider>
+                <Routes>
+                  <Route index element={<OperationsDashboard />} />
+                  <Route path="assets" element={<AssetManager />} />
+                  <Route path="waybills" element={<WaybillManager />} />
+                  <Route path="checkout" element={<QuickCheckout />} />
+                  <Route path="maintenance" element={<MaintenanceManager />} />
+                  <Route path="sites" element={<SiteManager />} />
+                  <Route path="*" element={<Navigate to="/operations" replace />} />
+                </Routes>
+              </OperationsProvider>
+            </ProtectedRoute>
+          } />
 
           <Route path="activity-log" element={<ProtectedRoute requiredModule="variables"><ActivityLog /></ProtectedRoute>} />
           

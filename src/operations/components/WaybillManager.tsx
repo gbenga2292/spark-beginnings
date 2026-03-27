@@ -3,205 +3,275 @@ import { useOperations } from '../contexts/OperationsContext';
 import { 
   Plus, 
   Search, 
-  Filter, 
-  MoreVertical, 
-  Truck, 
-  ArrowRightLeft,
+  Eye,
+  Edit2,
+  Trash2,
+  Send,
   Calendar,
   User,
   Package,
-  FileCheck,
+  Truck,
+  ArrowRightLeft,
   ChevronRight,
-  Printer,
-  FileSearch,
-  CheckCircle2,
-  Clock
+  MoreHorizontal
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 import { Waybill, WaybillStatus, WaybillType } from '../types';
+import { WaybillDetailView } from './WaybillDetailView';
+
+import { Card, CardContent } from '@/src/components/ui/card';
+import { Button } from '@/src/components/ui/button';
+import { Badge } from '@/src/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
+import { Input } from '@/src/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs"
 
 export function WaybillManager() {
-  const { waybills, updateWaybillStatus } = useOperations();
+  const { waybills, updateWaybillStatus, deleteWaybill } = useOperations();
   const { isDark } = useTheme();
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | WaybillType>('all');
+  const [waybillSearch, setWaybillSearch] = useState('');
+  const [returnSearch, setReturnSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [viewingWaybill, setViewingWaybill] = useState<Waybill | null>(null);
+  const [activeTab, setActiveTab] = useState<'waybill' | 'return'>('waybill');
 
-  const filteredWaybills = waybills.filter(w => {
-    const matchesSearch = w.siteName?.toLowerCase().includes(search.toLowerCase()) || 
-                         w.driverName?.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter = filter === 'all' || w.type === filter;
-    return matchesSearch && matchesFilter;
-  });
+  const outgoingWaybills = waybills.filter(w => w.type === 'waybill');
+  const incomingReturns = waybills.filter(w => w.type === 'return');
 
-  const getStatusInfo = (status: WaybillStatus) => {
+  const filteredOutgoing = outgoingWaybills.filter(w => 
+    w.id.toLowerCase().includes(waybillSearch.toLowerCase()) ||
+    w.driverName?.toLowerCase().includes(waybillSearch.toLowerCase()) ||
+    w.vehicle?.toLowerCase().includes(waybillSearch.toLowerCase())
+  );
+
+  const filteredIncoming = incomingReturns.filter(w => 
+    w.id.toLowerCase().includes(returnSearch.toLowerCase()) ||
+    w.driverName?.toLowerCase().includes(returnSearch.toLowerCase()) ||
+    w.vehicle?.toLowerCase().includes(returnSearch.toLowerCase())
+  );
+
+  const getStatusBadge = (status: WaybillStatus) => {
     switch (status) {
-      case 'outstanding': return { color: 'text-amber-600 bg-amber-50 border-amber-200', icon: Clock };
-      case 'sent_to_site': return { color: 'text-blue-600 bg-blue-50 border-blue-200', icon: Truck };
-      case 'partial_returned': return { color: 'text-orange-600 bg-orange-50 border-orange-200', icon: ArrowRightLeft };
-      case 'return_completed': return { color: 'text-green-600 bg-green-50 border-green-200', icon: CheckCircle2 };
-      case 'open': return { color: 'text-slate-600 bg-slate-50 border-slate-200', icon: FileCheck };
-      default: return { color: 'text-slate-600 bg-slate-50 border-slate-200', icon: Clock };
+      case 'outstanding': return <Badge className="bg-amber-400 hover:bg-amber-500 text-white border-0 font-bold px-4 py-1 rounded-full">Outstanding</Badge>;
+      case 'sent_to_site': return <Badge className="bg-blue-500 hover:bg-blue-600 text-white border-0 font-bold px-4 py-1 rounded-full">Sent to Site</Badge>;
+      case 'return_completed': return <Badge className="bg-green-500 hover:bg-green-600 text-white border-0 font-bold px-4 py-1 rounded-full">Completed</Badge>;
+      default: return <Badge className="bg-slate-400 text-white border-0 font-bold px-4 py-1 rounded-full">{status}</Badge>;
     }
   };
 
   return (
-    <div className="p-6 space-y-6 animate-in slide-in-from-bottom-2 duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Logistics & Waybills</h2>
-          <p className="text-sm text-slate-500">Track and manage asset movement between inventory and sites.</p>
-        </div>
-        <div className="flex items-center gap-3">
-           <button 
-             onClick={() => setShowCreateModal(true)}
-             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all shadow-sm font-semibold text-sm"
-           >
-             <Plus className="h-4 w-4" />
-             Create Waybill
-           </button>
-        </div>
-      </div>
-
-       {/* Stats Overview */}
-       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { label: 'Pending Logistics', count: waybills.filter(w => w.status === 'outstanding').length, color: 'text-amber-600' },
-            { label: 'Assets on Site', count: waybills.filter(w => w.status === 'sent_to_site').length, color: 'text-blue-600' },
-            { label: 'Returns in Progress', count: waybills.filter(w => w.status === 'partial_returned').length, color: 'text-orange-600' },
-            { label: 'Today\'s Movements', count: waybills.filter(w => new Date(w.issueDate).toDateString() === new Date().toDateString()).length, color: 'text-indigo-600' },
-          ].map((stat, i) => (
-            <div key={i} className={cn(
-              "px-6 py-4 rounded-xl border flex items-center justify-between",
-              isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 hover:border-slate-300"
-            )}>
-               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{stat.label}</span>
-               <span className={cn("text-xl font-black", stat.color)}>{stat.count}</span>
-            </div>
-          ))}
-       </div>
-
-      {/* Filters Bar */}
-      <div className={cn(
-        "flex flex-col md:flex-row items-center gap-4 p-4 rounded-xl border",
-        isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-      )}>
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search site, driver or vehicle..." 
+    <div className="flex flex-col gap-10 pb-20 px-8 mt-4 animate-in fade-in duration-500">
+      {viewingWaybill && (
+        <WaybillDetailView 
+          waybill={viewingWaybill} 
+          onClose={() => setViewingWaybill(null)} 
+        />
+      )}
+      
+      <Tabs className="w-full">
+        <TabsList className="bg-slate-50 border border-slate-100 p-1.5 rounded-2xl h-16 w-fit mb-12 shadow-sm">
+          <TabsTrigger 
+            active={activeTab === 'waybill'} 
+            onClick={() => setActiveTab('waybill')}
             className={cn(
-              "w-full pl-10 pr-4 py-2 text-sm rounded-lg border transition-all focus:ring-1 focus:ring-indigo-500",
-              isDark ? "bg-slate-950 border-slate-700 text-slate-200" : "bg-white border-slate-200"
+               "rounded-xl px-14 h-full font-black uppercase text-[11px] tracking-widest transition-all duration-300",
+               activeTab === 'waybill' ? "bg-blue-600 text-white shadow-xl shadow-blue-500/20" : "text-slate-400 hover:text-slate-600"
             )}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-           <Filter className="h-4 w-4 text-slate-400" />
-           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-              <button 
-                onClick={() => setFilter('all')}
-                className={cn("px-3 py-1 text-xs rounded-md font-semibold font-medium transition-all", filter === 'all' ? "bg-white dark:bg-slate-700 shadow-xs text-indigo-600" : "text-slate-500")}
-              >
-                All
-              </button>
-              <button 
-                onClick={() => setFilter('waybill')}
-                className={cn("px-3 py-1 text-xs rounded-md font-semibold font-medium transition-all", filter === 'waybill' ? "bg-white dark:bg-slate-700 shadow-xs text-indigo-600" : "text-slate-500")}
-              >
-                Waybills
-              </button>
-              <button 
-                onClick={() => setFilter('return')}
-                className={cn("px-3 py-1 text-xs rounded-md font-semibold font-medium transition-all", filter === 'return' ? "bg-white dark:bg-slate-700 shadow-xs text-indigo-600" : "text-slate-500")}
-              >
-                Returns
-              </button>
-           </div>
-        </div>
-      </div>
+          >
+            Waybills
+          </TabsTrigger>
+          <TabsTrigger 
+            active={activeTab === 'return'} 
+            onClick={() => setActiveTab('return')}
+            className={cn(
+               "rounded-xl px-14 h-full font-black uppercase text-[11px] tracking-widest transition-all duration-300",
+               activeTab === 'return' ? "bg-blue-600 text-white shadow-xl shadow-blue-500/20" : "text-slate-400 hover:text-slate-600"
+            )}
+          >
+            Returns
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Waybills List */}
-      <div className="space-y-4">
-         {filteredWaybills.map((wb) => {
-           const status = getStatusInfo(wb.status);
-           return (
-             <div key={wb.id} className={cn(
-               "group rounded-2xl border p-5 transition-all hover:shadow-md relative overflow-hidden",
-               isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-             )}>
-                {/* Accent bar for type */}
-                <div className={cn(
-                  "absolute top-0 left-0 bottom-0 w-1",
-                  wb.type === 'waybill' ? "bg-green-500" : "bg-blue-500"
-                )} />
+        <TabsContent active={activeTab === 'waybill'} className="space-y-8 animate-in slide-in-from-left-4 duration-300">
+          <div className="flex flex-col gap-4">
+            <Button 
+              onClick={() => setShowCreateModal(true)}
+              className="w-fit bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20 font-bold flex items-center gap-2 px-6 h-12 rounded-xl"
+            >
+              <Plus className="h-5 w-5" />
+              Create Waybill
+            </Button>
+            
+            <div>
+              <h1 className="text-4xl font-black tracking-tight text-blue-600">Waybill Management</h1>
+              <p className="text-slate-400 font-medium mt-1">Track and manage asset deliveries and returns</p>
+            </div>
+          </div>
 
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                   <div className="flex items-start gap-5">
-                      <div className={cn(
-                        "p-3 rounded-xl",
-                        wb.type === 'waybill' ? "bg-green-50 dark:bg-green-900/20 text-green-600" : "bg-blue-50 dark:bg-blue-900/20 text-blue-600"
-                      )}>
-                         {wb.type === 'waybill' ? <Truck className="h-6 w-6" /> : <ArrowRightLeft className="h-6 w-6" />}
-                      </div>
-                      <div className="space-y-1">
-                         <div className="flex items-center gap-3">
-                            <h3 className="font-bold text-lg">{wb.id}</h3>
-                            <span className={cn(
-                              "px-2.5 py-0.5 rounded-lg text-[10px] font-black border uppercase tracking-widest",
-                              status.color
-                            )}>
-                               <status.icon className="inline h-3 w-3 mr-1" />
-                               {wb.status.replace('_', ' ')}
-                            </span>
-                         </div>
-                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500">
-                            <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 underline decoration-indigo-300 decoration-2 underline-offset-2 tracking-tight">
-                               {wb.siteName}
-                            </span>
-                            <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> {new Date(wb.issueDate).toLocaleDateString()}</span>
-                            <span className="flex items-center gap-1.5"><User className="h-3.5 w-3.5" /> {wb.driverName}</span>
-                         </div>
-                      </div>
-                   </div>
+          <Card className="shadow-none border border-slate-100 bg-white p-4 rounded-2xl">
+            <div className="relative w-full max-w-2xl">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
+                <Input 
+                  value={waybillSearch}
+                  onChange={(e) => setWaybillSearch(e.target.value)}
+                  placeholder="Search waybills by ID, driver, or vehicle..." 
+                  className="pl-12 bg-slate-50/50 border-transparent focus-visible:ring-blue-500 font-medium text-sm h-14 rounded-2xl"
+                />
+            </div>
+          </Card>
 
-                   <div className="flex flex-col sm:flex-row items-center gap-4">
-                      <div className="flex items-center gap-2 p-2 px-4 rounded-xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
-                         <Package className="h-4 w-4 text-slate-400" />
-                         <span className="text-sm font-black text-slate-600 dark:text-slate-400 underline decoration-slate-300 underline-offset-4">{wb.items.length} Items Listed</span>
+          <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-slate-50/50 hover:bg-slate-50/50 border-b-slate-100 h-14">
+                  <TableHead className="font-bold text-xs uppercase text-slate-400 pl-8">Waybill ID</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400">Driver</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400">From</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400">Vehicle</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400">Created On</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400">To</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400">Status</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400">Items</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400 text-right pr-8">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredOutgoing.map((wb) => (
+                  <TableRow key={wb.id} className="hover:bg-slate-50/30 border-b-slate-50 h-20">
+                    <TableCell className="pl-8">
+                      <span className="font-black text-slate-900">{wb.id}</span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-bold text-slate-700">{wb.driverName}</span>
                       </div>
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                         <button className="flex items-center gap-2 p-2 px-3 rounded-lg border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 text-xs font-bold transition-all hover:border-indigo-300">
-                            <FileSearch className="h-3.5 w-3.5 text-indigo-500" />
-                            Details
-                         </button>
-                         <button className="flex items-center gap-2 p-2 px-3 rounded-lg border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 text-xs font-bold transition-all hover:border-indigo-300">
-                            <Printer className="h-3.5 w-3.5 text-slate-500" />
-                            Print
-                         </button>
-                         <button className="p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800">
-                            <MoreVertical className="h-4 w-4 text-slate-400" />
-                         </button>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-bold text-slate-500 text-xs uppercase">DCEL Warehouse</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-bold text-slate-700">{wb.vehicle || 'L200'}</span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col text-[11px]">
+                        <span className="font-bold text-slate-800">{new Date(wb.issueDate).toLocaleDateString()}</span>
+                        <span className="text-slate-400 font-medium whitespace-nowrap">by Hubert Davies</span>
                       </div>
-                   </div>
-                </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-bold text-slate-700">{wb.siteName}</span>
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(wb.status)}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs font-bold text-slate-600 truncate block max-w-[120px]">
+                        {wb.items.map(i => `${i.quantity}x ${i.assetName}`).join(', ')}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right pr-8">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-slate-400 hover:text-blue-600"
+                          onClick={() => setViewingWaybill(wb)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600"><Edit2 className="h-4 w-4" /></Button>
+                        <Button className="bg-blue-500 hover:bg-blue-600 text-white font-bold text-[11px] h-8 px-4 rounded-lg flex items-center gap-2">
+                            <Send className="h-3 w-3" />
+                            Send
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600" onClick={() => deleteWaybill(wb.id)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
 
-                {/* Quick breakdown of items on hover/expanded */}
-                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex gap-4 overflow-x-auto no-scrollbar">
-                   {wb.items.map((item, idx) => (
-                      <div key={idx} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/20 border border-slate-100 dark:border-slate-800 shrink-0">
-                         <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-1.5 rounded">{item.quantity}</span>
-                         <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 capitalize">{item.assetName}</span>
+        <TabsContent active={activeTab === 'return'} className="space-y-8 animate-in slide-in-from-right-4 duration-300">
+          <div>
+            <h1 className="text-4xl font-black tracking-tight text-blue-600">Returns Management</h1>
+            <p className="text-slate-400 font-medium mt-1">Track and manage asset returns</p>
+          </div>
+
+          <Card className="shadow-none border border-slate-100 bg-white p-4 rounded-2xl">
+            <div className="relative w-full max-w-2xl">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
+                <Input 
+                  value={returnSearch}
+                  onChange={(e) => setReturnSearch(e.target.value)}
+                  placeholder="Search returns by ID, driver, or vehicle..." 
+                  className="pl-12 bg-slate-50/50 border-transparent focus-visible:ring-blue-500 font-medium text-sm h-14 rounded-2xl"
+                />
+            </div>
+          </Card>
+
+          <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-slate-50/50 hover:bg-slate-50/50 border-b-slate-100 h-14">
+                  <TableHead className="font-bold text-xs uppercase text-slate-400 pl-8">Return ID</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400">Driver</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400">To</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400">Vehicle</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400">Created On</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400">Return From</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400">Status</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400">Items</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-slate-400 text-right pr-8">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredIncoming.map((rb) => (
+                  <TableRow key={rb.id} className="hover:bg-slate-50/30 border-b-slate-50 h-20">
+                    <TableCell className="pl-8">
+                      <span className="font-black text-slate-900">{rb.id}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-bold text-slate-700">{rb.driverName}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-bold text-slate-500 text-xs uppercase">DCEL Warehouse</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-bold text-slate-700 uppercase">{rb.vehicle || 'SIENNA'}</span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col text-[11px]">
+                        <span className="font-bold text-slate-800">{new Date(rb.issueDate).toLocaleDateString()}</span>
+                        <span className="text-slate-400 font-medium whitespace-nowrap">Alonge Olatunde</span>
                       </div>
-                   ))}
-                </div>
-             </div>
-           );
-         })}
-      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-bold text-slate-700">{rb.siteName}</span>
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(rb.status)}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs font-bold text-slate-600 truncate block max-w-[120px]">
+                        {rb.items.map(i => `${i.quantity}x ${i.assetName}`).join(', ')}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right pr-8">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={() => setViewingWaybill(rb)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -189,62 +189,17 @@ export function Header({ onMenuClick }: HeaderProps) {
           </Button>
         )}
 
-        {/* Global Search */}
-        <div ref={searchRef} className="relative w-full max-w-sm">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search pages, features..."
-              className={`w-full h-8 rounded-lg border pl-8 pr-8 text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all ${
-                isDark
-                  ? 'bg-slate-800 border-slate-600 text-slate-100 placeholder:text-slate-500'
-                  : 'bg-slate-50 border-slate-200 text-slate-700'
-              }`}
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
-              onFocus={() => searchQuery && setSearchOpen(true)}
-            />
-            {searchQuery && (
-              <button onClick={() => { setSearchQuery(''); setSearchOpen(false); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-600">
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Search Results Dropdown */}
-          {searchOpen && searchQuery.trim() && (
-            <div className={`absolute top-full left-0 right-0 mt-1 border rounded-lg shadow-xl z-50 overflow-hidden max-h-80 overflow-y-auto ${
-              isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-            }`}>
-              {filteredSearch.length === 0 ? (
-                <div className="px-4 py-6 text-center text-xs text-slate-400">
-                  <Search className="h-5 w-5 mx-auto mb-2 opacity-30" />
-                  No results for "{searchQuery}"
-                </div>
-              ) : (
-                filteredSearch.map((item) => (
-                  <button
-                    key={item.href}
-                    onClick={() => { navigate(item.href); setSearchOpen(false); setSearchQuery(''); }}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b last:border-0 ${
-                      isDark ? 'hover:bg-slate-700 border-slate-700/50 text-slate-200' : 'hover:bg-slate-50 border-slate-50 text-slate-800'
-                    }`}
-                  >
-                    <div className="h-8 w-8 rounded-md bg-indigo-50 flex items-center justify-center flex-shrink-0">
-                      <item.icon className="h-4 w-4 text-indigo-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-slate-800">{item.label}</p>
-                      <p className="text-[10px] text-slate-400">{item.description}</p>
-                    </div>
-                    <ChevronRight className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
-                  </button>
-                ))
-              )}
-            </div>
-          )}
-        </div>
+        {/* Page Title — Bold Blue (Reference Style) */}
+        {!onMenuClick && (
+          <h1 className="text-xl font-black text-blue-600 tracking-tight ml-2">
+            {(() => {
+              const path = location.pathname.split('/').filter(Boolean);
+              if (path.length === 0) return 'Dashboard';
+              const segment = path[path.length - 1];
+              return segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ');
+            })()}
+          </h1>
+        )}
       </div>
 
       {/* Right: Notifications + Profile */}

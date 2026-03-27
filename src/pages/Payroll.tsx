@@ -191,7 +191,27 @@ export function Payroll() {
       let snCounter = 1;
 
       return employees
-        .filter(e => e.status === 'Active')
+        .filter(e => {
+          if (e.status !== 'Active') return false;
+
+          // Frequency logic for Non-Employees (BENEFICIARY)
+          if (e.staffType === 'BENEFICIARY') {
+            const cycle = e.typeOfPay || 'Monthly';
+            const startMonthLabel = e.startMonthOfPay || 'January';
+            const startIdx = months.findIndex(m => m.label === startMonthLabel);
+            const currentIdx = months.findIndex(m => m.key === monthKey);
+
+            if (startIdx !== -1 && currentIdx !== -1) {
+              const diff = currentIdx - startIdx;
+              if (diff < 0) return false; // Not yet started in this year cycle
+
+              if (cycle === 'Quarterly') return diff % 3 === 0;
+              if (cycle === 'Half Year') return diff % 6 === 0;
+              if (cycle === 'Yearly') return diff % 12 === 0;
+            }
+          }
+          return true;
+        })
         .sort((a, b) => {
           const posA = a.position || '';
           const posB = b.position || '';

@@ -104,6 +104,44 @@ export function Beneficiaries() {
       jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0
     }
   });
+  
+  const MONTHS_LIST = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const MONTH_KEYS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+  useEffect(() => {
+    if ((isAdding || isEditing) && formData.staffType === 'BENEFICIARY') {
+      const cycle = formData.typeOfPay || 'Monthly';
+      const startMonth = formData.startMonthOfPay || 'January';
+      const startIdx = MONTHS_LIST.indexOf(startMonth);
+      
+      if (startIdx !== -1) {
+        const newSalaries = { ...formData.monthlySalaries };
+        let changed = false;
+        
+        MONTH_KEYS.forEach((key, currentIdx) => {
+          const diff = currentIdx - startIdx;
+          let isPayMonth = true;
+          
+          if (diff < 0) {
+            isPayMonth = false;
+          } else {
+            if (cycle === 'Quarterly') isPayMonth = diff % 3 === 0;
+            else if (cycle === 'Half Year') isPayMonth = diff % 6 === 0;
+            else if (cycle === 'Yearly') isPayMonth = diff % 12 === 0;
+          }
+          
+          if (!isPayMonth && newSalaries[key as keyof MonthlySalary] !== 0) {
+            newSalaries[key as keyof MonthlySalary] = 0;
+            changed = true;
+          }
+        });
+        
+        if (changed) {
+          setFormData(prev => ({ ...prev, monthlySalaries: newSalaries as MonthlySalary }));
+        }
+      }
+    }
+  }, [formData.typeOfPay, formData.startMonthOfPay, isAdding, isEditing]);
 
   useEffect(() => {
     if (formData.endDate) {
@@ -131,17 +169,20 @@ export function Beneficiaries() {
       employeeCode,
       surname: formData.surname || '',
       firstname: formData.firstname || '',
-      department: 'Beneficiary',
+      department: formData.department || 'Non-Employee',
       staffType: 'BENEFICIARY',
-      position: 'Stipend Beneficiary',
+      position: formData.payeeType || 'Stipend Payee',
       startDate: formData.startDate || '',
       endDate: formData.endDate || '',
       yearlyLeave: formData.yearlyLeave || 0,
       bankName: formData.bankName || '',
       accountNo: formData.accountNo || '',
+      payeeType: formData.payeeType || '',
+      typeOfPay: formData.typeOfPay || '',
+      startMonthOfPay: formData.startMonthOfPay || '',
       payeTax: false,
-      withholdingTax: false,
-      taxId: '',
+      withholdingTax: formData.withholdingTax || false,
+      taxId: formData.taxId || '',
       pensionNumber: '',
       status: formData.status as 'Active' | 'On Leave' | 'Terminated',
       monthlySalaries: formData.monthlySalaries as MonthlySalary,
@@ -179,8 +220,8 @@ export function Beneficiaries() {
     }
     const updateData = {
       ...formData,
-      department: 'Beneficiary',
-      position: 'Stipend Beneficiary',
+      department: formData.department || 'Non-Employee',
+      position: formData.payeeType || 'Stipend Payee',
       staffType: 'BENEFICIARY' as 'BENEFICIARY',
       excludeFromOnboarding: true
     };
@@ -385,13 +426,13 @@ export function Beneficiaries() {
           </Button>
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">
-              {isEdit ? 'Edit Beneficiary Record' : 'Add New Beneficiary / Sponsored'}
+              {isEdit ? 'Edit Non-Employee Record' : 'Add New Non-Employee (Contractor / Welfare)'}
             </h1>
-            <p className="text-sm font-medium text-slate-500 mt-1">Configure profile details, compensation, and system access.</p>
+            <p className="text-sm font-medium text-slate-500 mt-1">Configure profile details, compensation, and payment terms.</p>
           </div>
         </div>
         <Button onClick={isEdit ? handleUpdate : handleSave} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition-all font-semibold w-full sm:w-auto">
-          <Save className="h-4 w-4" /> {isEdit ? 'Save Changes' : 'Create Beneficiary'}
+          <Save className="h-4 w-4" /> {isEdit ? 'Save Changes' : 'Create Record'}
         </Button>
       </div>
 
@@ -412,9 +453,21 @@ export function Beneficiaries() {
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Firstname</label>
                   <Input value={formData.firstname || ''} onChange={e => setFormData({ ...formData, firstname: e.target.value })} placeholder="e.g. Doe" className="bg-slate-50 focus:bg-white" />
                 </div>
-                <div className="space-y-2 md:col-span-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Beneficiary Code</label>
-                  <Input value={formData.employeeCode || ''} onChange={e => setFormData({ ...formData, employeeCode: e.target.value })} placeholder="e.g. BEN-001 (Auto-generated if empty)" className="bg-slate-50 focus:bg-white font-mono" />
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Payee Type</label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    value={formData.payeeType || ''}
+                    onChange={e => setFormData({ ...formData, payeeType: e.target.value })}
+                  >
+                    <option value="">Select Type</option>
+                    <option value="Contractor">Contractor</option>
+                    <option value="Welfare Staff">Welfare Staff</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Non-Employee ID</label>
+                  <Input value={formData.employeeCode || ''} onChange={e => setFormData({ ...formData, employeeCode: e.target.value })} placeholder="e.g. NE-001" className="bg-slate-50 focus:bg-white font-mono" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
@@ -428,6 +481,37 @@ export function Beneficiaries() {
                     <option value="On Leave">On Leave</option>
                     <option value="Terminated">Terminated</option>
                   </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Type of Pay</label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    value={formData.typeOfPay || ''}
+                    onChange={e => setFormData({ ...formData, typeOfPay: e.target.value })}
+                  >
+                    <option value="">Select Cycle</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="Half Year">Half Year</option>
+                    <option value="Yearly">Yearly</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Month of Payment</label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    value={formData.startMonthOfPay || ''}
+                    onChange={e => setFormData({ ...formData, startMonthOfPay: e.target.value })}
+                  >
+                    <option value="">Select Month</option>
+                    {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Category / Entity</label>
+                  <Input value={formData.department || ''} onChange={e => setFormData({ ...formData, department: e.target.value })} placeholder="e.g. Welfare" className="bg-slate-50 focus:bg-white" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Date</label>
@@ -464,15 +548,62 @@ export function Beneficiaries() {
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].map((month) => (
-                    <div key={month} className="space-y-1">
-                      <label className="text-xs font-bold uppercase text-slate-500">{month}</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2 text-slate-400 font-medium">₦</span>
-                        <Input type="number" value={formData.monthlySalaries?.[month as keyof MonthlySalary] || ''} onChange={e => setFormData({ ...formData, monthlySalaries: { ...formData.monthlySalaries!, [month]: parseFloat(e.target.value) || 0 } })} className="font-mono text-sm pl-7 bg-slate-50 focus:bg-white" />
+                  {MONTH_KEYS.map((month, idx) => {
+                    const startIdx = MONTHS_LIST.indexOf(formData.startMonthOfPay || 'January');
+                    const diff = idx - startIdx;
+                    let isPayMonth = true;
+                    if (startIdx !== -1) {
+                      if (diff < 0) isPayMonth = false;
+                      else {
+                        const cycle = formData.typeOfPay || 'Monthly';
+                        if (cycle === 'Quarterly') isPayMonth = diff % 3 === 0;
+                        else if (cycle === 'Half Year') isPayMonth = diff % 6 === 0;
+                        else if (cycle === 'Yearly') isPayMonth = diff % 12 === 0;
+                      }
+                    }
+
+                    return (
+                      <div key={month} className={`space-y-1 transition-all duration-200 ${!isPayMonth ? 'opacity-40 grayscale-[0.5]' : 'opacity-100'}`}>
+                        <label className="text-xs font-bold uppercase text-slate-500">{month}</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-slate-400 font-medium">₦</span>
+                          <Input 
+                            type="number" 
+                            disabled={!isPayMonth}
+                            value={formData.monthlySalaries?.[month as keyof MonthlySalary] || ''} 
+                            onChange={e => setFormData({ ...formData, monthlySalaries: { ...formData.monthlySalaries!, [month]: parseFloat(e.target.value) || 0 } })} 
+                            className={`font-mono text-sm pl-7 ${!isPayMonth ? 'bg-slate-100 cursor-not-allowed border-dashed' : 'bg-slate-50 focus:bg-white'}`} 
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
+                </div>
+                
+                <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center px-2">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Annual Payout</span>
+                    <span className="text-sm text-slate-500 italic">Based on {formData.typeOfPay || 'Monthly'} cycle starting {formData.startMonthOfPay || 'January'}</span>
+                  </div>
+                  <div className="text-2xl font-black text-indigo-600 font-mono">
+                    ₦{(() => {
+                      const startIdx = MONTHS_LIST.indexOf(formData.startMonthOfPay || 'January');
+                      const cycle = formData.typeOfPay || 'Monthly';
+                      return MONTH_KEYS.reduce((sum, key, idx) => {
+                        const diff = idx - startIdx;
+                        let isPayMonth = true;
+                        if (startIdx !== -1) {
+                          if (diff < 0) isPayMonth = false;
+                          else {
+                            if (cycle === 'Quarterly') isPayMonth = diff % 3 === 0;
+                            else if (cycle === 'Half Year') isPayMonth = diff % 6 === 0;
+                            else if (cycle === 'Yearly') isPayMonth = diff % 12 === 0;
+                          }
+                        }
+                        return sum + (isPayMonth ? (formData.monthlySalaries?.[key as keyof MonthlySalary] || 0) : 0);
+                      }, 0).toLocaleString();
+                    })()}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -522,6 +653,25 @@ export function Beneficiaries() {
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Account No.</label>
                   <Input value={formData.accountNo || ''} onChange={e => setFormData({ ...formData, accountNo: e.target.value })} className="font-mono bg-slate-50 focus:bg-white" />
                 </div>
+                <div className="pt-2 space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Withholding Tax (5%)</label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      value={formData.withholdingTax ? 'Yes' : 'No'}
+                      onChange={e => setFormData({ ...formData, withholdingTax: e.target.value === 'Yes' })}
+                    >
+                      <option value="No">No</option>
+                      <option value="Yes">Yes</option>
+                    </select>
+                  </div>
+                  {formData.withholdingTax && (
+                    <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Tax Identification Number (TIN)</label>
+                      <Input value={formData.taxId || ''} onChange={e => setFormData({ ...formData, taxId: e.target.value })} placeholder="e.g. 12345678-0001" className="bg-slate-50 focus:bg-white font-mono" />
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -536,13 +686,27 @@ export function Beneficiaries() {
   const renderViewModal = () => {
     if (!viewingEmployee) return null;
     const emp = viewingEmployee;
-    const totalSalary = Object.values(emp.monthlySalaries).reduce((a: number, b: number) => a + b, 0);
+    const totalSalary = MONTH_KEYS.reduce((sum, key, idx) => {
+      const startIdx = MONTHS_LIST.indexOf(emp.startMonthOfPay || 'January');
+      const diff = idx - startIdx;
+      let isPayMonth = true;
+      if (startIdx !== -1) {
+        if (diff < 0) isPayMonth = false;
+        else {
+          const cycle = emp.typeOfPay || 'Monthly';
+          if (cycle === 'Quarterly') isPayMonth = diff % 3 === 0;
+          else if (cycle === 'Half Year') isPayMonth = diff % 6 === 0;
+          else if (cycle === 'Yearly') isPayMonth = diff % 12 === 0;
+        }
+      }
+      return sum + (isPayMonth ? (emp.monthlySalaries[key as keyof MonthlySalary] || 0) : 0);
+    }, 0);
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           <div className="sticky top-0 bg-indigo-600 p-4 flex justify-between items-center rounded-t-lg">
-            <h3 className="text-white font-bold text-lg">Employee Details</h3>
+            <h3 className="text-white font-bold text-lg">Non-Employee Details</h3>
             <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={closeViewModal}>
               <X className="h-5 w-5" />
             </Button>
@@ -558,7 +722,7 @@ export function Beneficiaries() {
               </Avatar>
               <div>
                 <h2 className="text-2xl font-bold text-slate-900">{emp.surname} {emp.firstname}</h2>
-                <p className="text-slate-500">{emp.position} - {emp.department}</p>
+                <p className="text-slate-500 font-medium">{emp.payeeType || 'N/A'} - Non-Employee</p>
                 <Badge variant={emp.status === 'Active' ? 'success' : emp.status === 'On Leave' ? 'warning' : 'destructive'} className="mt-1">
                   {emp.status}
                 </Badge>
@@ -567,7 +731,7 @@ export function Beneficiaries() {
 
             <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
               <div className="flex bg-slate-100 rounded-lg p-1 grow md:grow-0 overflow-x-auto whitespace-nowrap scrollbar-hide">
-                {['Overview', 'Attendance', 'Leaves', 'Disciplinary', 'Evaluations', 'Reminders'].map(tab => (
+                {['Overview', 'Reminders'].map(tab => (
                   <button
                     key={tab}
                     className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-md transition-all ${detailTab === tab ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -609,19 +773,25 @@ export function Beneficiaries() {
               <>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Personal Info</h4>
+                    <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Non-Employee Info</h4>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-slate-500">Beneficiary Code:</span><span className="font-mono">{emp.employeeCode || emp.id.substring(0, 8)}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Start Date:</span><span>{emp.startDate || 'N/A'}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">End Date:</span><span>{emp.endDate || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">ID Code:</span><span className="font-mono text-xs">{emp.employeeCode || emp.id.substring(0, 8)}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Payee Type:</span><span className="font-semibold text-indigo-600">{emp.payeeType || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Payment Cycle:</span><span>{emp.typeOfPay || 'Monthly'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Start Month:</span><span>{emp.startMonthOfPay || 'N/A'}</span></div>
+                      {emp.withholdingTax && (
+                        <div className="flex justify-between"><span className="text-slate-500">TIN:</span><span className="font-mono text-xs">{emp.taxId || 'N/A'}</span></div>
+                      )}
                     </div>
                   </div>
 
                   <div>
-                    <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Bank Info</h4>
+                    <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Bank & Timeline</h4>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between"><span className="text-slate-500">Bank:</span><span>{emp.bankName || 'N/A'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Account:</span><span className="font-mono">{emp.accountNo || 'N/A'}</span></div>
+                      <div className="flex justify-between pt-2 border-t border-slate-100"><span className="text-slate-500">Start Date:</span><span>{emp.startDate || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">End Date:</span><span>{emp.endDate || 'N/A'}</span></div>
                     </div>
                   </div>
                 </div>
@@ -630,13 +800,31 @@ export function Beneficiaries() {
                   <div className="mt-6">
                     <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Stipend Information</h4>
                     <div className="bg-slate-50 rounded-lg p-4">
-                      <div className="grid grid-cols-4 gap-2 text-sm mb-3">
-                        {Object.entries(emp.monthlySalaries).map(([month, amount]) => (
-                          <div key={month} className="flex justify-between">
-                            <span className="text-slate-500 uppercase text-xs">{month}:</span>
-                            <span className="font-mono">₦{amount.toLocaleString()}</span>
-                          </div>
-                        ))}
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-6 gap-y-2 text-sm mb-3">
+                        {MONTH_KEYS.map((key, idx) => {
+                          const amount = emp.monthlySalaries[key as keyof MonthlySalary] || 0;
+                          const startIdx = MONTHS_LIST.indexOf(emp.startMonthOfPay || 'January');
+                          const diff = idx - startIdx;
+                          let isPayMonth = true;
+                          if (startIdx !== -1) {
+                            if (diff < 0) isPayMonth = false;
+                            else {
+                              const cycle = emp.typeOfPay || 'Monthly';
+                              if (cycle === 'Quarterly') isPayMonth = diff % 3 === 0;
+                              else if (cycle === 'Half Year') isPayMonth = diff % 6 === 0;
+                              else if (cycle === 'Yearly') isPayMonth = diff % 12 === 0;
+                            }
+                          }
+
+                          return (
+                            <div key={key} className={`flex justify-between items-center border-b border-slate-100 pb-1 ${!isPayMonth ? 'opacity-20 grayscale' : ''}`}>
+                              <span className="text-slate-400 uppercase text-[10px] font-bold">{key}</span>
+                              <span className={`font-mono text-xs ${amount > 0 ? 'text-slate-700 font-bold' : 'text-slate-300'}`}>
+                                ₦{amount.toLocaleString()}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                       <div className="border-t border-slate-200 pt-3 flex justify-between items-center">
                         <span className="font-semibold">Annual Total:</span>
@@ -972,9 +1160,9 @@ export function Beneficiaries() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">
-            Beneficiary Directory
+            Non-Employee Directory
           </h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">Manage beneficiary records and stipend details.</p>
+          <p className="text-sm font-medium text-slate-500 mt-1">Manage contractors, welfare staff, and payment cycles.</p>
         </div>
         <div className="flex items-center gap-3">
           {priv.canExport && (
@@ -989,8 +1177,8 @@ export function Beneficiaries() {
             </label>
           )}
           {priv.canAdd && (
-            <Button className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md mx-2 transition-all" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'BENEFICIARY', status: 'Active', payeTax: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
-              <Plus className="h-4 w-4" /> Add Beneficiary
+            <Button className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md mx-2 transition-all" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'BENEFICIARY', status: 'Active', payeTax: false, withholdingTax: false, payeeType: '', typeOfPay: 'Monthly', monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
+              <Plus className="h-4 w-4" /> Add Record
             </Button>
           )}
         </div>
@@ -1034,10 +1222,10 @@ export function Beneficiaries() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Beneficiary</TableHead>
-              <TableHead>Department</TableHead>
-              <TableHead>Staff Type</TableHead>
-              <TableHead>Position</TableHead>
+              <TableHead>Non-Employee</TableHead>
+              <TableHead>Category / Entity</TableHead>
+              <TableHead>Payee Type</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Bank Info</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -1059,13 +1247,17 @@ export function Beneficiaries() {
                     </div>
                   </div>
                 </TableCell>
-                <TableCell>{employee.department}</TableCell>
+                <TableCell>{employee.department || 'N/A'}</TableCell>
                 <TableCell>
-                  <Badge variant={employee.staffType === 'INTERNAL' ? 'default' : 'outline'}>
-                    {employee.staffType}
+                  <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-100">
+                    {employee.payeeType || employee.staffType}
                   </Badge>
                 </TableCell>
-                <TableCell>{employee.position}</TableCell>
+                <TableCell>
+                  <Badge variant={employee.status === 'Active' ? 'success' : 'outline'}>
+                    {employee.status}
+                  </Badge>
+                </TableCell>
                 <TableCell>
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">{employee.bankName}</span>

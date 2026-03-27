@@ -243,6 +243,9 @@ export interface Employee {
   lineManager?: string;            // ID of the line manager (typically CEO or Head of Dept)
   phone?: string;
   email?: string;
+  payeeType?: string;
+  typeOfPay?: string;
+  startMonthOfPay?: string;
 }
 
 export interface DisciplinaryRecord {

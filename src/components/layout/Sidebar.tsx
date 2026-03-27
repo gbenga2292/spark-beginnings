@@ -37,6 +37,9 @@ import {
   Truck,
   ArrowRightLeft,
   PieChart,
+  Undo2,
+  ShoppingCart,
+  Activity,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -117,13 +120,12 @@ const navigation: NavCategory[] = [
     name: 'Operations',
     icon: Package,
     items: [
-      { name: 'Overview', href: '/operations', icon: PieChart, privKey: 'operations', privField: 'canView' },
-      { name: 'Assets & Inventory', href: '/operations/assets', icon: Package, privKey: 'operations', privField: 'canManageAssets' },
-      { name: 'Waybills & Logistics', href: '/operations/waybills', icon: Truck, privKey: 'operations', privField: 'canManageWaybills' },
-      { name: 'Site Operations', href: '/operations/sites', icon: MapPin, privKey: 'operations', privField: 'canView' },
-      { name: 'Checkout System', href: '/operations/checkout', icon: ArrowRightLeft, privKey: 'operations', privField: 'canManageLogistics' },
-      { name: 'Maintenance Log', href: '/operations/maintenance', icon: ClipboardList, privKey: 'operations', privField: 'canManageAssets' },
-      { name: 'Reports & Analytics', href: '/operations/analytics', icon: BarChart3, privKey: 'operations', privField: 'canViewAnalytics' },
+      { name: 'Overview', href: '/operations', icon: LayoutDashboard, privKey: 'operations', privField: 'canView' },
+      { name: 'Inventory', href: '/operations/assets', icon: Package, privKey: 'operations', privField: 'canManageAssets' },
+      { name: 'Waybills', href: '/operations/waybills', icon: FileText, privKey: 'operations', privField: 'canManageWaybills' },
+      { name: 'Quick Checkout', href: '/operations/checkout', icon: ShoppingCart, privKey: 'operations', privField: 'canManageLogistics' },
+      { name: 'Maintenance', href: '/operations/maintenance', icon: Activity, privKey: 'operations', privField: 'canManageAssets' },
+      { name: 'Sites', href: '/operations/sites', icon: MapPin, privKey: 'operations', privField: 'canView' },
     ],
   },
   // ── Admin ─────────────────────────────────────────────────────────────────
@@ -141,21 +143,25 @@ const navigation: NavCategory[] = [
     items: [
       { name: 'Client Accounts', href: '/client-accounts', icon: Receipt, privKey: 'custom', privField: '', visible: (user: any) => user?.privileges?.billing?.canView || user?.privileges?.payments?.canView || user?.privileges?.payments?.canViewVat },
       { name: 'Payroll', href: '/payroll', icon: Wallet, privKey: 'payroll', privField: 'canView' },
-      { name: 'Beneficiaries & Stipends', href: '/beneficiaries', icon: Users, privKey: 'payroll', privField: 'canView' },
+      { name: 'Non-Employee Directory', href: '/beneficiaries', icon: Users, privKey: 'payroll', privField: 'canView' },
       { name: 'Ledger', href: '/ledger', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
       { name: 'Company Expenses', href: '/company-expenses', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
       { name: 'Account Reports', href: '/financial-reports', icon: BarChart3, privKey: 'financialReports', privField: 'canView' },
     ],
   },
-  // ── Settings ──────────────────────────────────────────────────────────────
   {
     name: 'Settings',
     icon: Settings,
-    items: [
-      { name: 'Settings', href: '/settings', icon: Settings, privKey: 'variables', privField: 'canView' },
-      { name: 'Users', href: '/users', icon: ShieldCheck, privKey: 'users', privField: 'canView' },
-      { name: 'Activity Log', href: '/activity-log', icon: History, privKey: 'variables', privField: 'canView' },
-    ],
+    standalone: true,
+    standaloneHref: '/settings',
+    items: [{ name: 'Settings', href: '/settings', icon: Settings, privKey: 'variables', privField: 'canView' }],
+  },
+  {
+    name: 'Activity Log',
+    icon: History,
+    standalone: true,
+    standaloneHref: '/activity-log',
+    items: [{ name: 'Activity Log', href: '/activity-log', icon: History, privKey: 'variables', privField: 'canView' }],
   },
 ];
 
@@ -197,13 +203,13 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   };
 
   // ── Theme tokens (shared across all categories) ────────────────────────────
-  const sidebarBg   = isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-slate-50 border-slate-200';
-  const catBtnBase  = isDark ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-slate-700 hover:bg-slate-100';
-  const catBtnActive = isDark ? 'bg-indigo-900/50 text-indigo-300' : 'bg-indigo-50 text-indigo-700';
+  const sidebarBg   = isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-slate-200';
+  const catBtnBase  = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900';
+  const catBtnActive = isDark ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-600 text-white shadow-md';
   const itemBase    = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900';
-  const itemActive  = isDark ? 'bg-slate-800 text-indigo-400 border-l-2 border-indigo-500' : 'bg-white text-indigo-600 shadow-sm border-l-2 border-indigo-600';
+  const itemActive  = isDark ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-600 text-white shadow-md';
   const iconBase    = isDark ? 'text-slate-500 group-hover:text-slate-300' : 'text-slate-400 group-hover:text-slate-500';
-  const iconActive  = isDark ? 'text-indigo-400' : 'text-indigo-600';
+  const iconActive  = isDark ? 'text-white' : 'text-white';
 
   return (
     <>
@@ -226,7 +232,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       >
         {/* Logo Area */}
         <div className={cn('flex h-16 shrink-0 items-center border-b border-transparent transition-all', isCollapsed ? 'px-0 justify-center' : 'px-6 justify-between')}>
-          <div className={cn('flex items-center gap-2 font-bold text-xl text-indigo-600 overflow-hidden transition-all duration-300', isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100')}>
+          <div className={cn('flex items-center gap-2 font-bold text-xl text-blue-600 overflow-hidden transition-all duration-300', isCollapsed ? 'w-0 opacity-0 hidden' : 'w-auto opacity-100')}>
             <img
               src={logoSrc}
               alt="HR System"

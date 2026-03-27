@@ -45,7 +45,7 @@ const MONTHS = [
     { label: 'December', value: 12, key: 'dec' },
 ];
 
-const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
 export function Dashboard() {
     const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');

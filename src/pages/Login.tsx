@@ -147,7 +147,7 @@ export function Login() {
           <div className="mb-10">
             <h1 className="text-4xl xl:text-[2.75rem] font-extrabold text-white leading-tight tracking-tight mb-4">
               Office Management Tool<br />
-              <span className="text-indigo-300">For Dewatering Construction</span><br />
+              <span className="text-blue-300">For Dewatering Construction</span><br />
               <span className="text-slate-300 text-3xl xl:text-4xl">Etc Limited</span>
             </h1>
             <p className="text-slate-400 text-base xl:text-lg max-w-sm leading-relaxed">
@@ -163,8 +163,8 @@ export function Login() {
               { icon: BarChart3, title: 'Financial Reporting', desc: 'Invoices, payments, VAT and account reports at a glance' },
             ].map(({ icon: Icon, title, desc }) => (
               <div key={title} className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-9 h-9 bg-indigo-500/20 border border-indigo-500/30 rounded-lg flex items-center justify-center mt-0.5">
-                  <Icon className="w-4 h-4 text-indigo-400" />
+                <div className="flex-shrink-0 w-9 h-9 bg-blue-500/20 border border-blue-500/30 rounded-lg flex items-center justify-center mt-0.5">
+                  <Icon className="w-4 h-4 text-blue-400" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-white">{title}</p>
@@ -176,7 +176,7 @@ export function Login() {
         </div>
 
         {/* Bottom gradient line */}
-        <div className="relative z-10 h-1 bg-gradient-to-r from-indigo-500 via-purple-400 to-blue-500" />
+        <div className="relative z-10 h-1 bg-gradient-to-r from-blue-500 via-purple-400 to-blue-500" />
       </div>
 
       {/* ── Right Panel (Form) ──────────────────────────────────── */}
@@ -190,7 +190,7 @@ export function Login() {
 
           {/* Heading */}
           <div className="mb-8">
-            <p className="text-[11px] font-semibold text-indigo-600 uppercase tracking-widest mb-2">
+            <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-widest mb-2">
               Dewatering Construction Etc Limited
             </p>
             <h2 className="text-2xl font-bold text-slate-900">Welcome Back</h2>
@@ -220,7 +220,7 @@ export function Login() {
                   autoComplete="email"
                   list="saved-emails-list"
                   placeholder="admin@dewaterconstruct.com"
-                  className="h-11 pl-10 bg-slate-50 border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20 rounded-lg text-sm"
+                  className="h-11 pl-10 bg-slate-50 border-slate-200 focus:border-blue-500 focus:ring-blue-500/20 rounded-lg text-sm"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -243,7 +243,7 @@ export function Login() {
                   id="password"
                   type="password"
                   placeholder="Enter your password"
-                  className="h-11 pl-10 bg-slate-50 border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20 rounded-lg text-sm"
+                  className="h-11 pl-10 bg-slate-50 border-slate-200 focus:border-blue-500 focus:ring-blue-500/20 rounded-lg text-sm"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -255,7 +255,7 @@ export function Login() {
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
-                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20"
+                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                 />
@@ -266,7 +266,7 @@ export function Login() {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+              className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
