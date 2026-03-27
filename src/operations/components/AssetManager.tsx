@@ -12,15 +12,23 @@ import {
   List,
   Edit2,
   Trash2,
-  FileText
+  FileText,
+  Tag, 
+  AlertCircle, 
+  MapPin, 
+  Truck, 
+  ArrowRightLeft,
+  Wrench
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 import { Asset, AssetCategory, AssetCondition } from '../types';
+import { AssetForm } from './AssetForm';
 
 export function AssetManager() {
   const { assets, updateAsset, deleteAsset } = useOperations();
   const { isDark } = useTheme();
+  const [showAddForm, setShowAddForm] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<AssetCategory | 'all'>('all');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
@@ -44,6 +52,9 @@ export function AssetManager() {
 
   return (
     <div className="p-6 space-y-6 animate-in slide-in-from-bottom-2 duration-500">
+      {/* Modals */}
+      {showAddForm && <AssetForm onClose={() => setShowAddForm(false)} />}
+
       {/* Header & Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -52,13 +63,13 @@ export function AssetManager() {
         </div>
         <div className="flex items-center gap-3">
            <div className="flex bg-slate-200/50 dark:bg-slate-800 rounded-lg p-1 shrink-0">
-             <button 
+             <button
                onClick={() => setViewMode('table')}
                className={cn("p-1.5 rounded-md transition-all", viewMode === 'table' ? "bg-white dark:bg-slate-700 shadow-sm text-indigo-600 font-bold" : "text-slate-500 hover:text-slate-700")}
              >
                <List className="h-4 w-4" />
              </button>
-             <button 
+             <button
                onClick={() => setViewMode('grid')}
                className={cn("p-1.5 rounded-md transition-all", viewMode === 'grid' ? "bg-white dark:bg-slate-700 shadow-sm text-indigo-600 font-bold" : "text-slate-500 hover:text-slate-700")}
              >
