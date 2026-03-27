@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -122,7 +122,8 @@ export function SiteOnboarding() {
   const location = useLocation();
 
   const pendingSites  = useAppStore(s => s.pendingSites);
-  const clients       = useAppStore(s => s.clients);
+  const sites         = useAppStore(s => s.sites);
+  const clients       = useMemo(() => Array.from(new Set(sites.map(s => s.client))).sort(), [sites]);
   const addPendingSite   = useAppStore(s => s.addPendingSite);
   const updatePendingSite = useAppStore(s => s.updatePendingSite);
   const addSite    = useAppStore(s => s.addSite);

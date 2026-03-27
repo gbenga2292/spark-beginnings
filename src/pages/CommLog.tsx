@@ -183,12 +183,11 @@ interface LogFormProps {
 
 function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormProps) {
   const sites = useAppStore(s => s.sites);
-  const clients = useAppStore(s => s.clients);
   const pendingSites = useAppStore(s => s.pendingSites);
   const addPendingSite = useAppStore(s => s.addPendingSite);
   const deletePendingSite = useAppStore(s => s.deletePendingSite);
 
-  const allClients = Array.from(new Set([...clients, ...pendingSites.map(s => s.clientName)])).sort();
+  const allClients = useMemo(() => Array.from(new Set(sites.map(s => s.client))).sort(), [sites]);
 
   // Onboard-in-background wizard state
   const [onboardBannerFor, setOnboardBannerFor] = useState<string | null>(null);
@@ -254,7 +253,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
       contactPersonPhone: onboardPhone,
       phase1: {
         isNewSite: true,
-        isNewClient: !clients.includes(form.client || ''),
+        isNewClient: !allClients.includes(form.client || ''),
         whatIsBeingBuilt: '', excavationDepthMeters: '', siteLength: '', siteWidth: '',
         timelineStartDate: '', geotechnicalReportAvailable: false,
         hydrogeologicalDataAvailable: false, completed: false,

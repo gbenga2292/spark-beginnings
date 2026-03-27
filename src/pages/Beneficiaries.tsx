@@ -1223,19 +1223,6 @@ export function Beneficiaries() {
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Move to Directory</label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                  value={bulkFormData.staffType || ''}
-                  onChange={e => setBulkFormData({ ...bulkFormData, staffType: e.target.value as any })}
-                >
-                  <option value="">No Change (Stay here)</option>
-                  <option value="OFFICE">Office Staff</option>
-                  <option value="FIELD">Field Staff</option>
-                </select>
-              </div>
-
               <div className="pt-4 border-t border-slate-100 space-y-3">
                 <label className="flex items-center gap-3 text-sm font-medium cursor-pointer p-2 rounded-lg hover:bg-slate-50 transition-colors">
                   <Checkbox

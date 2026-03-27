@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -176,8 +176,6 @@ export function Sites() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('active');
   const [isAddingSite, setIsAddingSite] = useState(searchParams.get('action') === 'add');
-  const [isAddingClient, setIsAddingClient] = useState(searchParams.get('action') === 'addClient');
-  const [newClientName, setNewClientName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addForm, setAddForm] = useState({ ...EMPTY_FORM });
   const [editForm, setEditForm] = useState({ ...EMPTY_FORM });
@@ -260,7 +258,7 @@ export function Sites() {
 
   const sites = useAppStore((s) => s.sites);
   const pendingSites = useAppStore((s) => s.pendingSites);
-  const clients = useAppStore((s) => s.clients);
+  const clients = useMemo(() => Array.from(new Set(sites.map(s => s.client))).sort(), [sites]);
   const addSite = useAppStore((s) => s.addSite);
   const addClient = useAppStore((s) => s.addClient);
   const setSites = useAppStore((s) => s.setSites);
@@ -274,10 +272,14 @@ export function Sites() {
   const closeMenu = () => setOpenMenuId(null);
   const toggleMenu = (id: string) => setOpenMenuId(prev => prev === id ? null : id);
 
-  const filteredSites = sites.filter(site =>
-    site.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    site.client.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredSites = sites.filter(site => {
+    const isHardcoded = site.client.toLowerCase() === 'dcel' && site.name.toLowerCase() === 'office';
+    if (isHardcoded) return false;
+    return (
+      site.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      site.client.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   const filteredPendingSites = pendingSites.filter(site =>
     site.status === 'Pending' &&
@@ -314,28 +316,11 @@ export function Sites() {
       startDate: addForm.startDate,
       endDate: addForm.endDate,
     });
-    if (!clients.includes(addForm.client.trim())) {
-      addClient(addForm.client.trim());
-    }
     setAddForm({ ...EMPTY_FORM });
     setAddError('');
     setIsAddingSite(false);
   };
 
-  const handleAddClient = () => {
-    if (!newClientName.trim()) {
-      toast.error('Please enter a client name');
-      return;
-    }
-    if (clients.includes(newClientName.trim())) {
-      toast.error('Client already exists');
-      return;
-    }
-    addClient(newClientName.trim());
-    setNewClientName('');
-    setIsAddingClient(false);
-    toast.success('Client added successfully');
-  };
 
   const handleEditStart = (site: Site) => {
     setEditingId(site.id);
@@ -366,7 +351,8 @@ export function Sites() {
     if (ok) { deleteSite(id); toast.success('Site deleted.'); }
   };
 
-  const uniqueClients = new Set(sites.map(s => s.client)).size;
+  const displayClients = clients.filter(c => c.toLowerCase() !== 'dcel');
+  const uniqueClients = displayClients.length;
 
   const handleExportExcel = () => {
     if (filteredSites.length === 0) {
@@ -563,22 +549,6 @@ export function Sites() {
             Manage project sites and clients. Each <strong>Client + Site</strong> combination is unique.
           </p>
         </div>
-        {(canAddSite || canAddClient) && (
-          <div className="flex items-center gap-4">
-            <div className="flex gap-2">
-              {canAddSite && (
-                <Button onClick={() => navigate('/sites/onboarding/new')} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
-                  <Plus className="h-4 w-4" /> Site Onboarding
-                </Button>
-              )}
-              {canAddClient && (
-                <Button onClick={() => setIsAddingClient(true)} variant="outline" className="gap-2">
-                  <Plus className="h-4 w-4" /> Add Client
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="flex items-center gap-2">
@@ -692,7 +662,7 @@ export function Sites() {
                           className="flex h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-sm"
                         >
                           <option value="" disabled>Select Client</option>
-                          {clients.map(c => (
+                          {displayClients.map(c => (
                             <option key={c} value={c}>{c}</option>
                           ))}
                         </select>
@@ -903,7 +873,7 @@ export function Sites() {
               onChange={e => setAddForm({ ...addForm, client: e.target.value })}
             />
             <datalist id="addClientList">
-              {clients.map(c => (
+              {displayClients.map(c => (
                 <option key={c} value={c} />
               ))}
             </datalist>
@@ -950,25 +920,7 @@ export function Sites() {
         </DialogFooter>
       </Dialog>
 
-      <Dialog open={isAddingClient} onClose={() => { setIsAddingClient(false); setNewClientName(''); navigate('/sites', { replace: true }); }} title="Add New Client">
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-slate-700">Client Name <span className="text-red-500">*</span></label>
-            <Input
-              placeholder="Enter client name"
-              value={newClientName}
-              onChange={e => setNewClientName(e.target.value)}
-            />
-            <p className="text-xs text-slate-400">A client can have multiple sites</p>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => { setIsAddingClient(false); setNewClientName(''); navigate('/sites', { replace: true }); }}>Cancel</Button>
-          <Button onClick={handleAddClient} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
-            <Save className="h-4 w-4" /> Save Client
-          </Button>
-        </DialogFooter>
-      </Dialog>
+
 
       {/* ── Site Narrative Info Modal ── */}
       {narrativeSite && (

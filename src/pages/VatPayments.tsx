@@ -218,12 +218,8 @@ export function VatPayments() {
     };
 
     const uniqueClients = useMemo(() => {
-        const allClients = new Set([
-            ...sites.map(s => s.client),
-            ...payments.map(p => p.client)
-        ]);
-        return Array.from(allClients);
-    }, [sites, payments]);
+        return Array.from(new Set(sites.map(s => s.client))).sort();
+    }, [sites]);
 
     const totalsData = useMemo(() => {
         return uniqueClients.map(client => {

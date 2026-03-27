@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -193,12 +193,8 @@ export function FinancialReports() {
   }, [rawInvoices, rawPayments, rawVatPayments]);
 
   const availableClients = useMemo(() => {
-    const clients = new Set<string>();
-    [...rawInvoices, ...rawPayments, ...rawVatPayments].forEach(item => {
-      if (item.client) clients.add(item.client);
-    });
-    return Array.from(clients).sort();
-  }, [rawInvoices, rawPayments, rawVatPayments]);
+    return Array.from(new Set(sites.map(s => s.client))).sort();
+  }, [sites]);
 
   const invoices = useMemo(() => rawInvoices.filter(i => {
     const matchY = filterYear === 'All' || (i.date && i.date.startsWith(filterYear));

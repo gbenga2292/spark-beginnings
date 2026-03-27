@@ -86,16 +86,8 @@ const navigation: NavCategory[] = [
     icon: ListTodo,
     items: [
       { name: 'Dashboard', href: '/tasks/dashboard', icon: BarChart2, privKey: 'tasks', privField: 'canViewDashboard' },
-      { 
-        name: 'Task', 
-        href: '/tasks', 
-        icon: ClipboardCheck, 
-        privKey: 'tasks', 
-        privField: 'canViewMyTasks',
-        subItems: [
-          { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'sites', privField: 'canView' },
-        ]
-      },
+      { name: 'Task', href: '/tasks', icon: ClipboardCheck, privKey: 'tasks', privField: 'canViewMyTasks' },
+      { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'sites', privField: 'canView' },
       { name: 'Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'tasks', privField: 'canViewReminders' },
       { name: 'Reports', href: '/tasks/reports', icon: BarChart3, privKey: 'tasks', privField: 'canViewReports' },
     ],
@@ -204,12 +196,13 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
 
   // ── Theme tokens (shared across all categories) ────────────────────────────
   const sidebarBg   = isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-slate-200';
-  const catBtnBase  = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900';
-  const catBtnActive = isDark ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-600 text-white shadow-md';
-  const itemBase    = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-100' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900';
-  const itemActive  = isDark ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-600 text-white shadow-md';
-  const iconBase    = isDark ? 'text-slate-500 group-hover:text-slate-300' : 'text-slate-400 group-hover:text-slate-500';
-  const iconActive  = isDark ? 'text-white' : 'text-white';
+  const navBg       = isDark ? 'bg-slate-900' : 'bg-blue-600';
+  const catBtnBase  = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-white hover:bg-white hover:text-blue-600';
+  const catBtnActive = isDark ? 'bg-blue-700 text-white shadow-md' : 'bg-white text-blue-600 shadow-md';
+  const itemBase    = isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-100' : 'text-white/95 hover:bg-white hover:text-blue-600';
+  const itemActive  = isDark ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-blue-600 shadow-md';
+  const iconBase    = isDark ? 'text-slate-500 group-hover:text-slate-300' : 'text-white/70 group-hover:text-inherit';
+  const iconActive  = isDark ? 'text-white' : 'text-blue-600';
 
   return (
     <>
@@ -256,8 +249,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
           </div>
         </div>
 
-        {/* Navigation */}
-        <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden no-scrollbar">
+        <div className={cn("flex flex-1 flex-col overflow-y-auto overflow-x-hidden no-scrollbar", navBg)}>
           <nav className={cn('flex-1 space-y-2 py-4', isCollapsed ? 'px-2' : 'px-3')}>
             {navigation.map((category) => {
               const visibleItems = getVisibleItems(category.items);
@@ -302,8 +294,9 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                       else toggleCategory(category.name);
                     }}
                     className={cn(
-                      'flex w-full items-center justify-between px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors',
-                      isCollapsed && 'justify-center cursor-default hover:text-slate-500'
+                      'flex w-full items-center justify-between px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors',
+                      isDark ? 'text-slate-500 hover:text-slate-700' : 'text-white/80 hover:text-white',
+                      isCollapsed && 'justify-center cursor-default'
                     )}
                   >
                     <span>{isCollapsed ? '•••' : category.name}</span>
@@ -343,7 +336,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
 
                             {/* Rendering sub-items if not collapsed */}
                             {!isCollapsed && visibleSubItems.length > 0 && (
-                              <div className="ml-7 flex flex-col gap-0.5 border-l border-slate-200/50 dark:border-slate-800/50 pl-2 mt-0.5">
+                              <div className={cn("ml-7 flex flex-col gap-0.5 border-l pl-2 mt-0.5", isDark ? "border-slate-800/50" : "border-white/10")}>
                                 {visibleSubItems.map((subItem) => {
                                   const isSubActive = location.pathname === subItem.href;
                                   return (

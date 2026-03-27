@@ -26,6 +26,7 @@ export interface CommLog {
 export interface LedgerCategory { id: string; name: string; }
 export interface LedgerVendor { id: string; name: string; tinNumber?: string; }
 export interface LedgerBank { id: string; name: string; }
+export interface LedgerBeneficiaryBank { id: string; name: string; accountNo: string; }
 export interface LedgerEntry {
   id: string; voucherNo: string; date: string; description: string;
   category: string; amount: number; client: string; site: string;
@@ -205,6 +206,10 @@ export interface OnboardingChecklist {
   ppeIssued: boolean;
   handbookProvided: boolean;
   otherRequirementsSupplied: boolean;
+
+  // 8. Health insurance (LASHMA)
+  lashmaPolicyNumber: string;
+  lashmaVerified: boolean;
 }
 
 export interface Employee {
@@ -247,6 +252,7 @@ export interface Employee {
   typeOfPay?: string;
   startMonthOfPay?: string;
   level?: number;
+  lashmaPolicyNumber?: string;
 }
 
 export interface DisciplinaryRecord {
@@ -460,6 +466,7 @@ interface AppState {
   ledgerCategories: LedgerCategory[];
   ledgerVendors: LedgerVendor[];
   ledgerBanks: LedgerBank[];
+  ledgerBeneficiaryBanks: LedgerBeneficiaryBank[];
   ledgerEntries: LedgerEntry[];
   companyExpenses: CompanyExpense[];
   addSite: (site: Site) => void;
@@ -526,6 +533,10 @@ interface AppState {
   addLedgerBank: (bank: LedgerBank) => void;
   updateLedgerBank: (id: string, bank: Partial<LedgerBank>) => void;
   removeLedgerBank: (id: string) => void;
+  
+  addLedgerBeneficiaryBank: (bank: LedgerBeneficiaryBank) => void;
+  updateLedgerBeneficiaryBank: (id: string, bank: Partial<LedgerBeneficiaryBank>) => void;
+  removeLedgerBeneficiaryBank: (id: string) => void;
   
   addLedgerEntry: (entry: LedgerEntry) => void;
   updateLedgerEntry: (id: string, entry: Partial<LedgerEntry>) => void;
@@ -618,6 +629,7 @@ export const useAppStore = create<AppState>()(
       ledgerCategories: [],
       ledgerVendors: [],
       ledgerBanks: [],
+      ledgerBeneficiaryBanks: [],
       ledgerEntries: [],
       companyExpenses: [],
 
@@ -745,6 +757,11 @@ export const useAppStore = create<AppState>()(
       addLedgerBank: (b) => { set(s => ({ ledgerBanks: [...s.ledgerBanks, b] })); db.insertLedgerBank(b); },
       updateLedgerBank: (id, b) => { set(s => ({ ledgerBanks: s.ledgerBanks.map(c => c.id === id ? { ...c, ...b } : c) })); db.updateLedgerBank(id, b); },
       removeLedgerBank: (id) => { set(s => ({ ledgerBanks: s.ledgerBanks.filter(c => c.id !== id) })); db.deleteLedgerBank(id); },
+
+      // Ledger Beneficiary Banks
+      addLedgerBeneficiaryBank: (b) => { set(s => ({ ledgerBeneficiaryBanks: [...s.ledgerBeneficiaryBanks, b] })); db.insertLedgerBeneficiaryBank(b); },
+      updateLedgerBeneficiaryBank: (id, b) => { set(s => ({ ledgerBeneficiaryBanks: s.ledgerBeneficiaryBanks.map(c => c.id === id ? { ...c, ...b } : c) })); db.updateLedgerBeneficiaryBank(id, b); },
+      removeLedgerBeneficiaryBank: (id) => { set(s => ({ ledgerBeneficiaryBanks: s.ledgerBeneficiaryBanks.filter(c => c.id !== id) })); db.deleteLedgerBeneficiaryBank(id); },
 
       // Ledger Entries
       addLedgerEntry: (e) => { set(s => ({ ledgerEntries: [...s.ledgerEntries, e] })); db.insertLedgerEntry(e); },

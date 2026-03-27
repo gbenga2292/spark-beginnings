@@ -25,7 +25,6 @@ export function Variables() {
   const removeDepartment = useAppStore((state) => state.removeDepartment);
   const updateDepartment = useAppStore((state) => state.updateDepartment);
   const addClient = useAppStore((state) => state.addClient);
-  const removeClient = useAppStore((state) => state.removeClient);
   const storePayrollVariables = useAppStore((state) => state.payrollVariables);
   const storeMonthValues = useAppStore((state) => state.monthValues);
   const publicHolidays = useAppStore((state) => state.publicHolidays);
@@ -44,11 +43,14 @@ export function Variables() {
   // ── Ledger variables ───────────────────────────────────────
   const ledgerCategories = useAppStore((state) => state.ledgerCategories);
   const ledgerBanks = useAppStore((state) => state.ledgerBanks);
+  const ledgerBeneficiaryBanks = useAppStore((state) => state.ledgerBeneficiaryBanks);
   const ledgerVendors = useAppStore((state) => state.ledgerVendors);
   const addLedgerCategory = useAppStore((state) => state.addLedgerCategory);
   const removeLedgerCategory = useAppStore((state) => state.removeLedgerCategory);
   const addLedgerBank = useAppStore((state) => state.addLedgerBank);
   const removeLedgerBank = useAppStore((state) => state.removeLedgerBank);
+  const addLedgerBeneficiaryBank = useAppStore((state) => state.addLedgerBeneficiaryBank);
+  const removeLedgerBeneficiaryBank = useAppStore((state) => state.removeLedgerBeneficiaryBank);
   const addLedgerVendor = useAppStore((state) => state.addLedgerVendor);
   const removeLedgerVendor = useAppStore((state) => state.removeLedgerVendor);
 
@@ -56,6 +58,8 @@ export function Variables() {
   const [newBank, setNewBank] = useState('');
   const [newVendorName, setNewVendorName] = useState('');
   const [newVendorTin, setNewVendorTin] = useState('');
+  const [newBenBankName, setNewBenBankName] = useState('');
+  const [newBenBankAccount, setNewBenBankAccount] = useState('');
 
   // Top-level section switch: 'system' | 'ledger' | 'services'
   const [varSection, setVarSection] = useState<'system' | 'ledger' | 'services'>('system');
@@ -136,7 +140,6 @@ export function Variables() {
   const [newPosition, setNewPosition] = useState('');
   const [newPosDeptId, setNewPosDeptId] = useState('');
   const [newDepartment, setNewDepartment] = useState('');
-  const [newClient, setNewClient] = useState('');
   const [newLeaveType, setNewLeaveType] = useState('');
 
   const handleAddHoliday = () => {
@@ -309,7 +312,7 @@ export function Variables() {
       const deptData = departments.map(d => ({ Department: d.name, 'Work Days/Week': d.workDaysPerWeek }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(deptData), 'Departments');
 
-      const clientData = clients.map(c => ({ Client: c }));
+      const clientData = clients.filter(c => c.toLowerCase() !== 'dcel').map(c => ({ Client: c }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(clientData), 'Clients');
 
       const leaveData = leaveTypes.map(l => ({ LeaveType: l }));
@@ -426,7 +429,7 @@ export function Variables() {
             if (wb.SheetNames.includes('Clients')) {
               const clientData = XLSX.utils.sheet_to_json<any>(wb.Sheets['Clients']);
               clientData.forEach(row => {
-                if (row.Client && !clients.includes(row.Client)) addClient(String(row.Client));
+                if (row.Client && row.Client.toLowerCase() !== 'dcel' && !clients.includes(row.Client)) addClient(String(row.Client));
               });
             }
 
@@ -900,6 +903,45 @@ export function Variables() {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
+              <CardTitle className="text-slate-800">Beneficiary Banks (Paid To)</CardTitle>
+              <CardDescription>Target banks and accounts for company expenses.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-6">
+              <div className="flex flex-col gap-2">
+                <Input value={newBenBankName} onChange={e => setNewBenBankName(e.target.value)} placeholder="Bank Name" />
+                <div className="flex gap-2">
+                  <Input value={newBenBankAccount} onChange={e => setNewBenBankAccount(e.target.value)} placeholder="Account Number" className="flex-1" />
+                  <Button disabled={!priv.canEdit} onClick={() => { if(newBenBankName && newBenBankAccount) { addLedgerBeneficiaryBank({id: crypto.randomUUID(), name: newBenBankName, accountNo: newBenBankAccount}); setNewBenBankName(''); setNewBenBankAccount(''); } }}>Add</Button>
+                </div>
+              </div>
+              <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
+                <Table>
+                  <TableHeader className="bg-slate-50"><TableRow><TableHead>Bank</TableHead><TableHead>Account No</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {ledgerBeneficiaryBanks.map(b => (
+                      <TableRow key={b.id}>
+                        <TableCell className="font-medium text-slate-700">{b.name}</TableCell>
+                        <TableCell className="text-sm text-slate-500 font-mono">{b.accountNo}</TableCell>
+                        <TableCell className="w-[50px]">
+                          {priv.canEdit && (
+                            <Button variant="ghost" size="icon" onClick={async () => { const conf = await showConfirm(`Delete beneficiary bank "${b.name}"?`, { variant: 'danger' }); if (conf) removeLedgerBeneficiaryBank(b.id); }}>
+                              <Trash2 className="h-4 w-4 text-rose-500" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {ledgerBeneficiaryBanks.length === 0 && (
+                      <TableRow><TableCell colSpan={3} className="text-slate-400 text-center text-sm py-6 italic">No beneficiary banks yet.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       ) : (
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
@@ -1151,48 +1193,7 @@ export function Variables() {
             </CardContent>
           </Card>
 
-          {/* ——— CLIENTS ——— */}
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader>
-              <CardTitle>Clients</CardTitle>
-              <CardDescription>Manage clients. These are shared with the Sites &amp; Clients page.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {priv.canEdit && (
-                <div className="flex gap-2 mb-4">
-                  <Input
-                    placeholder="New Client Name"
-                    value={newClient}
-                    onChange={(e) => setNewClient(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { if (newClient && !clients.includes(newClient)) { addClient(newClient); setNewClient(''); } } }}
-                    className="flex-1"
-                  />
-                  <Button
-                    onClick={() => { if (newClient && !clients.includes(newClient)) { addClient(newClient); setNewClient(''); } }}
-                    variant="outline"
-                    className="gap-2"
-                  >
-                    <Plus className="h-4 w-4" /> Add
-                  </Button>
-                </div>
-              )}
-              <div className="flex flex-wrap gap-2">
-                {clients.length === 0 && (
-                  <p className="text-sm text-slate-400 italic">No clients yet. Add one above or via Sites &amp; Clients.</p>
-                )}
-                {clients.map(c => (
-                  <div key={c} className="bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1 text-sm flex items-center gap-2 text-indigo-800">
-                    {c}
-                    {priv.canEdit && (
-                      <button onClick={() => removeClient(c)} className="text-indigo-300 hover:text-red-500">
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+
 
           {/* ——— LEAVE TYPES ——— */}
           <Card className="shadow-sm border-slate-200">

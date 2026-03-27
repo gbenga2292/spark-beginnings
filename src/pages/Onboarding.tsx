@@ -59,6 +59,9 @@ function makeDefaultChecklist(noOfGuarantors: number): OnboardingChecklist {
     ppeIssued: false,
     handbookProvided: false,
     otherRequirementsSupplied: false,
+    // 8. Health insurance (LASHMA)
+    lashmaPolicyNumber: '',
+    lashmaVerified: false,
   };
 }
 
@@ -312,7 +315,11 @@ export function Onboarding() {
 
   const updateCL = (patch: Partial<OnboardingChecklist>) => {
     if (!selectedEmployee) return;
-    updateEmployee(selectedEmployee.id, { onboardingChecklist: { ...cl, ...patch } });
+    const newCL = { ...cl, ...patch };
+    updateEmployee(selectedEmployee.id, { 
+      onboardingChecklist: newCL,
+      ...(patch.lashmaPolicyNumber !== undefined ? { lashmaPolicyNumber: patch.lashmaPolicyNumber } : {})
+    });
   };
 
   const updateGuarantor = (i: number, field: keyof GuarantorInfo, value: string | boolean) => {
@@ -388,6 +395,7 @@ export function Onboarding() {
       accountNo: cl.accountNo || selectedEmployee.accountNo,
       pensionNumber: cl.pensionNumberInput || selectedEmployee.pensionNumber,
       payeNumber: cl.payeNumberInput || selectedEmployee.payeNumber,
+      lashmaPolicyNumber: cl.lashmaPolicyNumber || selectedEmployee.lashmaPolicyNumber,
       onboardingChecklist: cl,
     });
     toast.success(`${selectedEmployee.firstname} ${selectedEmployee.surname} is now ACTIVE! ðŸŽ‰`);
@@ -995,6 +1003,27 @@ export function Onboarding() {
                       <CheckRow label="Employee handbook provided" checked={cl.handbookProvided} onChange={v => { updateCL({ handbookProvided: v, ppeHandbookIssued: cl.ppeIssued && v && cl.otherRequirementsSupplied }); }} />
                       <CheckRow label="Other requirements supplied" checked={cl.otherRequirementsSupplied} onChange={v => { updateCL({ otherRequirementsSupplied: v, ppeHandbookIssued: cl.ppeIssued && cl.handbookProvided && v }); }} />
                     </Section>
+                    <Section icon={Activity} label="8. Health insurance (LASHMA)" color="bg-emerald-50 text-emerald-700" defaultOpen={!cl.lashmaVerified}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-slate-500">Enter and verify health insurance policy number.</span>
+                        <DoneBadge done={cl.lashmaVerified} />
+                      </div>
+                      <div className="space-y-3">
+                        <LabeledInput 
+                          label="LASHMA Policy Number" 
+                          value={cl.lashmaPolicyNumber} 
+                          onChange={v => updateCL({ lashmaPolicyNumber: v })} 
+                          placeholder="Enter policy number" 
+                        />
+                        <CheckRow 
+                          label={cl.lashmaPolicyNumber.trim() ? "Mark LASHMA as verified" : "Enter policy number first"} 
+                          checked={cl.lashmaVerified} 
+                          onChange={v => updateCL({ lashmaVerified: v })} 
+                          disabled={!cl.lashmaPolicyNumber.trim()} 
+                          hint={!cl.lashmaPolicyNumber.trim() ? "Policy number required" : ""}
+                        />
+                      </div>
+                    </Section>
                   </div>
                 ) : (
                   <div className="space-y-2 opacity-50 pointer-events-none mt-6">
@@ -1004,6 +1033,9 @@ export function Onboarding() {
                     </Section>
                     <Section icon={Package} label={l['7'] || "7. Provision of PPE, Handbook & Requirements"} color="bg-orange-50 text-orange-700" defaultOpen={false}>
                       <p className="text-xs text-orange-600">Unlocks after activation. Includes PPE issuance, handbook, and other requirements.</p>
+                    </Section>
+                    <Section icon={Activity} label="8. Health insurance (LASHMA)" color="bg-emerald-50 text-emerald-700" defaultOpen={false}>
+                      <p className="text-xs text-emerald-600">Unlocks after activation. Requires entry of LASHMA policy number.</p>
                     </Section>
                   </div>
                 )}
@@ -1145,7 +1177,6 @@ export function Onboarding() {
                 <select className="w-full h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" value={editEmp.staffType} onChange={e => setEditEmp(p => p ? { ...p, staffType: e.target.value as any } : p)}>
                   <option value="OFFICE">Office</option>
                   <option value="FIELD">Field</option>
-                  <option value="NON-EMPLOYEE">Non-Employee</option>
                 </select>
               </div>
               <div className="space-y-1">

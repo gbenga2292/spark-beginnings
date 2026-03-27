@@ -19,6 +19,10 @@ export function CompanyExpenses() {
   const addLedgerEntry = useAppStore((s) => s.addLedgerEntry);
   
   const ledgerBanks = useAppStore((s) => s.ledgerBanks);
+  const ledgerBeneficiaryBanks = useAppStore((s) => s.ledgerBeneficiaryBanks);
+
+  const sortedBanks = useMemo(() => [...ledgerBanks].sort((a, b) => a.name.localeCompare(b.name)), [ledgerBanks]);
+  const sortedBeneficiaryBanks = useMemo(() => [...ledgerBeneficiaryBanks].sort((a, b) => a.name.localeCompare(b.name)), [ledgerBeneficiaryBanks]);
 
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [description, setDescription] = useState('');
@@ -38,6 +42,7 @@ export function CompanyExpenses() {
 
   // We can fetch ledgerCategories to allow category selection right here
   const ledgerCategories = useAppStore((s) => s.ledgerCategories);
+  const sortedCategories = useMemo(() => [...ledgerCategories].sort((a, b) => a.name.localeCompare(b.name)), [ledgerCategories]);
   
   if (!priv?.canView) {
     return (
@@ -82,6 +87,14 @@ export function CompanyExpenses() {
     setAmount('');
     setPaidToBankName('');
     setPaidToAccountNo('');
+  };
+
+  const handleBeneficiaryBankChange = (bankName: string) => {
+    setPaidToBankName(bankName);
+    const bank = ledgerBeneficiaryBanks.find(b => b.name === bankName);
+    if (bank) {
+      setPaidToAccountNo(bank.accountNo);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -202,7 +215,7 @@ export function CompanyExpenses() {
                     required
                   >
                     <option value="" disabled>Select Bank...</option>
-                    {ledgerBanks.map(b => (
+                    {sortedBanks.map(b => (
                       <option key={b.id} value={b.name}>{b.name}</option>
                     ))}
                   </select>
@@ -211,7 +224,17 @@ export function CompanyExpenses() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Paid To (Bank)</label>
-                    <Input value={paidToBankName} onChange={e => setPaidToBankName(e.target.value)} required placeholder="Bank Name" className="w-full bg-slate-50 border-slate-200 focus:bg-white" />
+                    <select 
+                      className="w-full flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      value={paidToBankName} 
+                      onChange={e => handleBeneficiaryBankChange(e.target.value)} 
+                      required
+                    >
+                      <option value="" disabled>Select Beneficiary...</option>
+                      {sortedBeneficiaryBanks.map(b => (
+                        <option key={b.id} value={b.name}>{b.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Account No</label>
@@ -385,7 +408,7 @@ export function CompanyExpenses() {
                   onChange={e => setLedgerCategory(e.target.value)}
                 >
                   <option value="Uncategorized">Uncategorized</option>
-                  {ledgerCategories.map(c => (
+                  {sortedCategories.map(c => (
                     <option key={c.id} value={c.name}>{c.name}</option>
                   ))}
                 </select>

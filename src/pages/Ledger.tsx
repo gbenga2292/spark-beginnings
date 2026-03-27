@@ -34,8 +34,12 @@ export function Ledger() {
   const ledgerCategories = useAppStore((state) => state.ledgerCategories);
   const ledgerBanks = useAppStore((state) => state.ledgerBanks);
   const ledgerVendors = useAppStore((state) => state.ledgerVendors);
-  const clients = useAppStore((state) => state.clients);
   const sites = useAppStore((state) => state.sites);
+  const clients = useMemo(() => Array.from(new Set(sites.map(s => s.client))).sort(), [sites]);
+
+  const sortedCategories = useMemo(() => [...ledgerCategories].sort((a, b) => a.name.localeCompare(b.name)), [ledgerCategories]);
+  const sortedBanks = useMemo(() => [...ledgerBanks].sort((a, b) => a.name.localeCompare(b.name)), [ledgerBanks]);
+  const sortedVendors = useMemo(() => [...ledgerVendors].sort((a, b) => a.name.localeCompare(b.name)), [ledgerVendors]);
 
   const addLedgerEntry = useAppStore((state) => state.addLedgerEntry);
   const updateLedgerEntry = useAppStore((state) => state.updateLedgerEntry);
@@ -551,7 +555,7 @@ export function Ledger() {
                 <div className="max-w-sm w-full">
                   <select className="w-full h-10 px-3 rounded-md border border-slate-300 bg-white text-sm shadow-inner" value={paidFrom} onChange={e => setPaidFrom(e.target.value)}>
                     <option value="" disabled>Select Bank...</option>
-                    {ledgerBanks.map(b => (
+                    {sortedBanks.map(b => (
                       <option key={b.id} value={b.name}>{b.name}</option>
                     ))}
                   </select>
@@ -620,7 +624,7 @@ export function Ledger() {
                     <td className={tdClass}>
                       <select className={inputClass} value={item.category} onChange={e => setItemField(idx, 'category', e.target.value)}>
                         <option value="" disabled></option>
-                        {ledgerCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                        {sortedCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                       </select>
                     </td>
                     <td className={tdClass}>
@@ -650,6 +654,7 @@ export function Ledger() {
                         <option value="none"></option>
                         {sites
                           .filter(s => !item.client || item.client === 'none' || s.client === item.client)
+                          .sort((a, b) => a.name.localeCompare(b.name))
                           .map(s => <option key={s.id} value={s.name}>{s.name}</option>)
                         }
                       </select>
@@ -657,7 +662,7 @@ export function Ledger() {
                     <td className={tdClass}>
                       <select className={inputClass} value={item.vendor} onChange={e => setItemField(idx, 'vendor', e.target.value)}>
                         <option value="none"></option>
-                        {ledgerVendors.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
+                        {sortedVendors.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
                       </select>
                     </td>
                   </tr>

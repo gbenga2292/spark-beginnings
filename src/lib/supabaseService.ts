@@ -7,7 +7,7 @@ import type {
   Site, Employee, AttendanceRecord, Invoice, PendingInvoice,
   SalaryAdvance, Loan, Payment, VatPayment, LeaveRecord, DepartmentTasks,
   DisciplinaryRecord, EvaluationRecord, Department, Position,
-  LedgerCategory, LedgerVendor, LedgerBank, LedgerEntry, CommLog,
+  LedgerCategory, LedgerVendor, LedgerBank, LedgerBeneficiaryBank, LedgerEntry, CommLog,
   CompanyExpense
 } from '@/src/store/appStore';
 import type { AppUser, PrivilegePreset } from '@/src/store/userStore';
@@ -187,6 +187,10 @@ export function dbToLedgerVendor(r: any): LedgerVendor {
 
 export function dbToLedgerBank(r: any): LedgerBank {
   return { id: r.id, name: r.name };
+}
+
+export function dbToLedgerBeneficiaryBank(r: any): LedgerBeneficiaryBank {
+  return { id: r.id, name: r.name, accountNo: r.account_no };
 }
 
 export function dbToLedgerEntry(r: any): LedgerEntry {
@@ -474,6 +478,10 @@ function pendingSiteToDb(p: SiteQuestionnaire) {
   };
 }
 
+function ledgerBeneficiaryBankToDb(b: LedgerBeneficiaryBank) {
+  return { id: b.id, name: b.name, account_no: b.accountNo };
+}
+
 // ─── FETCH ALL ───────────────────────────────────────────────
 
 export async function fetchAllAppData(privs?: any) {
@@ -489,6 +497,7 @@ export async function fetchAllAppData(privs?: any) {
     disciplinaryRes, evaluationsRes,
     lCatRes, lVenRes, lBankRes, lEntRes,
     compExpRes,
+    lBenBankRes,
     commLogsRes,
     pendingSitesRes,
   ] = await Promise.all([
@@ -514,6 +523,7 @@ export async function fetchAllAppData(privs?: any) {
     canView('ledger') ? supabase.from('ledger_categories').select('*').order('name') : Promise.resolve({ data: [] }),
     canView('ledger') ? supabase.from('ledger_vendors').select('*').order('name') : Promise.resolve({ data: [] }),
     canView('ledger') ? supabase.from('ledger_banks').select('*').order('name') : Promise.resolve({ data: [] }),
+    canView('ledger') ? supabase.from('ledger_beneficiary_banks').select('*').order('name') : Promise.resolve({ data: [] }),
     canView('ledger') ? supabase.from('ledger_entries').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     canView('ledger') ? supabase.from('company_expenses').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     supabase.from('comm_logs').select('*').order('date', { ascending: false }),
@@ -548,6 +558,7 @@ export async function fetchAllAppData(privs?: any) {
     ledgerCategories: (lCatRes.data || []).map(dbToLedgerCategory),
     ledgerVendors: (lVenRes.data || []).map(dbToLedgerVendor),
     ledgerBanks: (lBankRes.data || []).map(dbToLedgerBank),
+    ledgerBeneficiaryBanks: (lBenBankRes.data || []).map(dbToLedgerBeneficiaryBank),
     ledgerEntries: (lEntRes.data || []).map(dbToLedgerEntry),
     companyExpenses: (compExpRes.data || []).map(dbToCompanyExpense),
     positions: (positionsRes.data || []).map((p: any) => ({
@@ -1141,6 +1152,22 @@ export const db = {
   async deleteLedgerBank(id: string) {
     const { error } = await supabase.from('ledger_banks').delete().eq('id', id);
     if (error) console.error('deleteLedgerBank:', error);
+  },
+
+  async insertLedgerBeneficiaryBank(b: LedgerBeneficiaryBank) {
+    const { error } = await supabase.from('ledger_beneficiary_banks').insert(ledgerBeneficiaryBankToDb(b));
+    if (error) console.error('insertLedgerBeneficiaryBank:', error);
+  },
+  async updateLedgerBeneficiaryBank(id: string, b: Partial<LedgerBeneficiaryBank>) {
+    const update: any = {};
+    if (b.name !== undefined) update.name = b.name;
+    if (b.accountNo !== undefined) update.account_no = b.accountNo;
+    const { error } = await supabase.from('ledger_beneficiary_banks').update(update).eq('id', id);
+    if (error) console.error('updateLedgerBeneficiaryBank:', error);
+  },
+  async deleteLedgerBeneficiaryBank(id: string) {
+    const { error } = await supabase.from('ledger_beneficiary_banks').delete().eq('id', id);
+    if (error) console.error('deleteLedgerBeneficiaryBank:', error);
   },
 
   async insertLedgerEntry(e: LedgerEntry) {
