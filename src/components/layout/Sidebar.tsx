@@ -33,6 +33,10 @@ import {
   Bell,
   History,
   MessageSquare,
+  Package,
+  Truck,
+  ArrowRightLeft,
+  PieChart,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -48,6 +52,9 @@ interface NavItem {
   privKey: keyof UserPrivileges | 'custom';
   privField: string;
   visible?: (user: any) => boolean;
+  /** For tab-shell pages: auto-sets the initial tab via router state */
+  activeTab?: string;
+  subItems?: NavItem[];
 }
 
 interface NavCategory {
@@ -76,7 +83,16 @@ const navigation: NavCategory[] = [
     icon: ListTodo,
     items: [
       { name: 'Dashboard', href: '/tasks/dashboard', icon: BarChart2, privKey: 'tasks', privField: 'canViewDashboard' },
-      { name: 'My Tasks', href: '/tasks', icon: ClipboardCheck, privKey: 'tasks', privField: 'canViewMyTasks' },
+      { 
+        name: 'Task', 
+        href: '/tasks', 
+        icon: ClipboardCheck, 
+        privKey: 'tasks', 
+        privField: 'canViewMyTasks',
+        subItems: [
+          { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'sites', privField: 'canView' },
+        ]
+      },
       { name: 'Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'tasks', privField: 'canViewReminders' },
       { name: 'Reports', href: '/tasks/reports', icon: BarChart3, privKey: 'tasks', privField: 'canViewReports' },
     ],
@@ -96,13 +112,26 @@ const navigation: NavCategory[] = [
       { name: 'HR Reports', href: '/reports', icon: FileText, privKey: 'reports', privField: 'canView' },
     ],
   },
+  // ── Operations ───────────────────────────────────────────────────────────
+  {
+    name: 'Operations',
+    icon: Package,
+    items: [
+      { name: 'Overview', href: '/operations', icon: PieChart, privKey: 'operations', privField: 'canView' },
+      { name: 'Assets & Inventory', href: '/operations/assets', icon: Package, privKey: 'operations', privField: 'canManageAssets' },
+      { name: 'Waybills & Logistics', href: '/operations/waybills', icon: Truck, privKey: 'operations', privField: 'canManageWaybills' },
+      { name: 'Site Operations', href: '/operations/sites', icon: MapPin, privKey: 'operations', privField: 'canView' },
+      { name: 'Checkout System', href: '/operations/checkout', icon: ArrowRightLeft, privKey: 'operations', privField: 'canManageLogistics' },
+      { name: 'Maintenance Log', href: '/operations/maintenance', icon: ClipboardList, privKey: 'operations', privField: 'canManageAssets' },
+      { name: 'Reports & Analytics', href: '/operations/analytics', icon: BarChart3, privKey: 'operations', privField: 'canViewAnalytics' },
+    ],
+  },
   // ── Admin ─────────────────────────────────────────────────────────────────
   {
     name: 'Admin',
     icon: Building2,
     items: [
       { name: 'Sites & Clients', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView' },
-      { name: 'Comms Log', href: '/comm-log', icon: MessageSquare, privKey: 'sites', privField: 'canView' },
     ],
   },
   // ── Account ───────────────────────────────────────────────────────────────
@@ -142,7 +171,18 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       if (!currentUser) return true;
       if (item.visible) return item.visible(currentUser);
       if (item.privKey === 'custom') return false;
-      const pagePriv = (currentUser.privileges[item.privKey] as unknown) as Record<string, boolean>;
+      
+      let pagePriv = (currentUser.privileges[item.privKey] as unknown) as Record<string, boolean>;
+      
+      // Fallback for Operations module: If user has 'sites' view access, grant them full 'operations' menu visibility.
+      // This ensures existing admin sessions can see all new features immediately.
+      if (item.privKey === 'operations' && currentUser.privileges['sites']?.canView) {
+        if (!pagePriv || !pagePriv.canView || !pagePriv[item.privField]) {
+           // Allow all operations fields if they have site access
+           return true; 
+        }
+      }
+
       if (item.privField !== 'canView' && pagePriv?.['canView'] !== true) return false;
       return pagePriv?.[item.privField] === true;
     });
@@ -270,28 +310,58 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                   {isExpanded && (
                     <div className={cn('mt-1 space-y-1', isCollapsed ? 'pl-0' : 'pl-4')}>
                       {visibleItems.map((item) => {
-                        const isActive = location.pathname === item.href;
+                        const visibleSubItems = item.subItems ? getVisibleItems(item.subItems) : [];
+                        const isActive = location.pathname === item.href || visibleSubItems.some(sub => location.pathname === sub.href);
+                        
                         return (
-                          <Link
-                            key={item.name}
-                            to={item.href}
-                            title={isCollapsed ? item.name : undefined}
-                            className={cn(
-                              'group flex items-center rounded-md py-2.5 text-sm font-medium transition-colors',
-                              isCollapsed ? 'px-0 justify-center' : 'px-3',
-                              isActive ? itemActive : itemBase
-                            )}
-                          >
-                            <item.icon
+                          <div key={item.name} className="flex flex-col gap-0.5">
+                            <Link
+                              to={item.href}
+                              title={isCollapsed ? item.name : undefined}
                               className={cn(
-                                'h-[18px] w-[18px] flex-shrink-0 transition-colors',
-                                !isCollapsed && 'mr-3',
-                                isActive ? iconActive : iconBase
+                                'group flex items-center rounded-md py-2.5 text-sm font-medium transition-colors',
+                                isCollapsed ? 'px-0 justify-center' : 'px-3',
+                                isActive ? itemActive : itemBase
                               )}
-                              aria-hidden="true"
-                            />
-                            {!isCollapsed && <span className="truncate">{item.name}</span>}
-                          </Link>
+                            >
+                              <item.icon
+                                className={cn(
+                                  'h-[18px] w-[18px] flex-shrink-0 transition-colors',
+                                  !isCollapsed && 'mr-3',
+                                  isActive ? iconActive : iconBase
+                                )}
+                                aria-hidden="true"
+                              />
+                              {!isCollapsed && <span className="truncate">{item.name}</span>}
+                            </Link>
+
+                            {/* Rendering sub-items if not collapsed */}
+                            {!isCollapsed && visibleSubItems.length > 0 && (
+                              <div className="ml-7 flex flex-col gap-0.5 border-l border-slate-200/50 dark:border-slate-800/50 pl-2 mt-0.5">
+                                {visibleSubItems.map((subItem) => {
+                                  const isSubActive = location.pathname === subItem.href;
+                                  return (
+                                    <Link
+                                      key={subItem.name}
+                                      to={subItem.href}
+                                      className={cn(
+                                        'group flex items-center rounded-md py-2 px-3 text-xs font-medium transition-colors',
+                                        isSubActive ? itemActive : itemBase
+                                      )}
+                                    >
+                                      <subItem.icon
+                                        className={cn(
+                                          'h-4 w-4 mr-2.5 transition-colors',
+                                          isSubActive ? iconActive : iconBase
+                                        )}
+                                      />
+                                      <span className="truncate">{subItem.name}</span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                     </div>

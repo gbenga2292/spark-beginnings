@@ -36,6 +36,15 @@ export interface SitesPriv {
   canImport: boolean; canExport: boolean;
 }
 
+// ─── Operations ──────────────────────────────────────────────
+export interface OperationsPriv {
+  canView: boolean;
+  canManageAssets: boolean;
+  canManageWaybills: boolean;
+  canManageLogistics: boolean;
+  canViewAnalytics: boolean;
+}
+
 // ─── Account ─────────────────────────────────────────────────
 export interface BillingPriv  { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canViewAmounts: boolean; canImport: boolean; canExport: boolean; }
 export interface PaymentsPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canViewAmounts: boolean; canViewVat: boolean; canManageVat: boolean; canImport: boolean; canExport: boolean; }
@@ -73,6 +82,7 @@ export interface UserPrivileges {
   variables:         VariablesPriv;
   users:             UsersPriv;
   tasks:             TasksPriv;
+  operations:        OperationsPriv;
 }
 
 export interface AppUser {
@@ -112,6 +122,7 @@ export const FULL_ACCESS: UserPrivileges = {
   variables:        { canView: true, canEdit: true, canImport: true, canExport: true },
   users:            { canView: true, canManage: true },
   tasks:            { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: true },
+  operations:       { canView: true, canManageAssets: true, canManageWaybills: true, canManageLogistics: true, canViewAnalytics: true },
 };
 
 // ─── NO ACCESS ───────────────────────────────────────────────
@@ -134,6 +145,7 @@ export const NO_ACCESS: UserPrivileges = {
   variables:        { canView: false, canEdit: false, canImport: false, canExport: false },
   users:            { canView: false, canManage: false },
   tasks:            { canView: false, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false },
+  operations:       { canView: false, canManageAssets: false, canManageWaybills: false, canManageLogistics: false, canViewAnalytics: false },
 };
 
 // ─── DEFAULT PRESETS ─────────────────────────────────────────
@@ -278,6 +290,11 @@ export const useUserStore = create<UserStore>()(
 function deepMergePrivileges(defaults: UserPrivileges, stored: Partial<UserPrivileges>): UserPrivileges {
   const result = { ...defaults };
   for (const key of Object.keys(defaults) as (keyof UserPrivileges)[]) {
+    // If operations is missing, default it to sites privileges if they exist
+    if (key === 'operations' && !stored[key] && stored['sites']) {
+      result[key] = { ...defaults[key], ...stored['sites'] } as any;
+      continue;
+    }
     result[key] = { ...defaults[key], ...(stored[key] ?? {}) } as any;
   }
   return result;

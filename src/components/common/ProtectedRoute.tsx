@@ -25,8 +25,14 @@ export function ProtectedRoute({ children, requiredModule }: ProtectedRouteProps
   // Check privileges if a specific module is required
   if (requiredModule && appUser) {
     const privs = appUser.privileges as any;
-    // If the module's 'canView' property is explicitly false, they should not be here.
-    if (privs && privs[requiredModule] && privs[requiredModule].canView === false) {
+    // Fallback for Operations module: If user has 'sites' view access, grant them 'operations' access.
+    // This matches the Sidebar visibility logic for consistent UX.
+    let hasAccess = privs?.[requiredModule]?.canView;
+    if (requiredModule === 'operations' && !hasAccess && privs?.['sites']?.canView) {
+      hasAccess = true;
+    }
+
+    if (hasAccess === false) {
       console.warn(`Access denied to module: ${requiredModule}`);
       if (requiredModule === 'dashboard') {
          return <div className="p-10 text-center text-red-500 font-bold">Access Denied: You do not have permission to view the dashboard. Please contact an administrator.</div>;

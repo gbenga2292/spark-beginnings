@@ -51,6 +51,7 @@ const TaskReminders = lazy(() => import('./pages/TaskReminders'));
 const Tasks = lazy(() => import('./pages/Tasks'));
 const TaskReports = lazy(() => import('./pages/TaskReports'));
 const CommLog = lazy(() => import('./pages/CommLog').then(m => ({ default: m.CommLog })));
+const OperationsShell = lazy(() => import('./operations/pages/OperationsShell').then(m => ({ default: m.OperationsShell })));
 
 // ── Suspense fallback ─────────────────────────────────────────────────────────
 function PageLoader() {
@@ -151,6 +152,9 @@ function AppContent() {
           <Route path="tasks/reports" element={<ProtectedRoute requiredModule="tasks"><TaskReports /></ProtectedRoute>} />
 
           <Route path="comm-log" element={<ProtectedRoute requiredModule="sites"><CommLog /></ProtectedRoute>} />
+
+          {/* Operations Module */}
+          <Route path="operations/*" element={<ProtectedRoute requiredModule="operations"><OperationsShell /></ProtectedRoute>} />
 
           <Route path="activity-log" element={<ProtectedRoute requiredModule="variables"><ActivityLog /></ProtectedRoute>} />
           
