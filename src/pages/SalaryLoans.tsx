@@ -35,7 +35,7 @@ export function SalaryLoans() {
 
   // Compute internal employees only
   const internalEmployees = employees.filter(e => {
-    const internalDeptNames = departments.filter(d => d.staffType === 'INTERNAL').map(d => d.name);
+    const internalDeptNames = departments.filter(d => d.staffType === 'OFFICE').map(d => d.name);
     return e.position !== 'Adhoc Staff' && internalDeptNames.includes(e.department);
   });
 

@@ -19,7 +19,7 @@ interface PayrollRecord {
   firstname: string;
   position: string;
   department: string;
-  staffType: 'INTERNAL' | 'EXTERNAL' | 'BENEFICIARY';
+  staffType: 'OFFICE' | 'FIELD' | 'NON-EMPLOYEE';
   bankName: string;
   accountNo: string;
   salary: number;
@@ -62,8 +62,8 @@ const POSITION_HIERARCHY = [
   'Sponsored Student',
 ];
 
-const isPayeEligible = (r: PayrollRecord) => r.paye > 0 && r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc');
-const isPensionEligible = (r: PayrollRecord) => r.pension > 0 && r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc');
+const isPayeEligible = (r: PayrollRecord) => r.paye > 0 && r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
+const isPensionEligible = (r: PayrollRecord) => r.pension > 0 && r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
 const isNsitfEligible = (r: PayrollRecord) => r.nsitf > 0 && !r.department.trim().toLowerCase().includes('adhoc');
 
 const currentYear = new Date().getFullYear();
@@ -194,8 +194,8 @@ export function Payroll() {
         .filter(e => {
           if (e.status !== 'Active') return false;
 
-          // Frequency logic for Non-Employees (BENEFICIARY)
-          if (e.staffType === 'BENEFICIARY') {
+          // Frequency logic for Non-Employees (NON-EMPLOYEE)
+          if (e.staffType === 'NON-EMPLOYEE') {
             const cycle = e.typeOfPay || 'Monthly';
             const startMonthLabel = e.startMonthOfPay || 'January';
             const startIdx = months.findIndex(m => m.label === startMonthLabel);
@@ -291,8 +291,8 @@ export function Payroll() {
           // GROSS PAY: SALARY + OVERTIME
           const grossPay = salary + overtime;
 
-          // PENSION deduction (on pensionSum, not totalAllowances) — INTERNAL staff only
-          const pension = (emp.payeTax && emp.staffType === 'INTERNAL') ? pensionSum * (payrollVariables.employeePensionRate / 100) : 0;
+          // PENSION deduction (on pensionSum, not totalAllowances) — OFFICE/FIELD staff only
+          const pension = (emp.payeTax && emp.staffType !== 'NON-EMPLOYEE') ? pensionSum * (payrollVariables.employeePensionRate / 100) : 0;
 
           // Ã¢â€â‚¬Ã¢â€â‚¬ PAYE calculation matching Excel formula exactly: Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
           // =IF(payeTax="Yes", NIGERIATAX(salary, SUM(Basic:Transport), overtime, rentRelief),
@@ -363,7 +363,7 @@ export function Payroll() {
           // TAKE HOME PAY: GROSS PAY - (PAYE + LOAN REPAYMENT + PENSION)
           const takeHomePay = grossPay - (paye + loanRepayment + pension);
 
-          const employerPension = (emp.payeTax && emp.staffType === 'INTERNAL') ? pensionSum * (payrollVariables.employerPensionRate / 100) : 0;
+          const employerPension = (emp.payeTax && emp.staffType !== 'NON-EMPLOYEE') ? pensionSum * (payrollVariables.employerPensionRate / 100) : 0;
           const nsitf = emp.payeTax ? grossPay * (payrollVariables.nsitfRate / 100) : 0;
 
           return {
@@ -574,8 +574,8 @@ export function Payroll() {
       const fmCSV = (n: number) => n.toFixed(2);
 
       // Helpers for CSV eligibility
-      const csvPayeOk  = (r: typeof payslipsToPrint[0]['record']) => r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc');
-      const csvPenOk   = (r: typeof payslipsToPrint[0]['record']) => r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc');
+      const csvPayeOk  = (r: typeof payslipsToPrint[0]['record']) => r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
+      const csvPenOk   = (r: typeof payslipsToPrint[0]['record']) => r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
       const csvNsitfOk = (r: typeof payslipsToPrint[0]['record']) => r.nsitf > 0 && !r.department.trim().toLowerCase().includes('adhoc');
 
       if (printType === 'PAYE') {
@@ -860,7 +860,7 @@ export function Payroll() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {payrollData.filter(r => r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc')).map((r, i) => (
+                      {payrollData.filter(r => (r.staffType === 'OFFICE' || r.staffType === 'FIELD') && !r.department.trim().toLowerCase().includes('adhoc')).map((r, i) => (
                         <TableRow key={r.id} className="hover:bg-red-50/30">
                           <TableCell>{i + 1}</TableCell>
                           <TableCell className="font-medium">{r.surname}</TableCell>
@@ -874,7 +874,7 @@ export function Payroll() {
                           <TableCell className="text-right font-mono font-bold text-red-600">{fm(r.paye)}</TableCell>
                         </TableRow>
                       ))}
-                      {(() => { const pd = payrollData.filter(r => r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc')); return (
+                      {(() => { const pd = payrollData.filter(r => (r.staffType === 'OFFICE' || r.staffType === 'FIELD') && !r.department.trim().toLowerCase().includes('adhoc')); return (
                       <TableRow className="border-t-2 bg-red-50 font-bold">
                         <TableCell colSpan={4} className="text-right font-bold">TOTALS</TableCell>
                         <TableCell className="text-right font-mono">{fmT(pd.reduce((s, r) => s + r.basicSalary, 0))}</TableCell>
@@ -928,7 +928,7 @@ export function Payroll() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {payrollData.filter(r => r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc')).map((r, i) => {
+                      {payrollData.filter(r => (r.staffType === 'OFFICE' || r.staffType === 'FIELD') && !r.department.trim().toLowerCase().includes('adhoc')).map((r, i) => {
                         const penSum = r.basicSalary + r.housing + r.transport;
                         return (
                           <TableRow key={r.id} className="hover:bg-amber-50/30">
@@ -943,7 +943,7 @@ export function Payroll() {
                           </TableRow>
                         );
                       })}
-                      {(() => { const pp = payrollData.filter(r => r.staffType === 'INTERNAL' && !r.department.trim().toLowerCase().includes('adhoc')); return (
+                      {(() => { const pp = payrollData.filter(r => (r.staffType === 'OFFICE' || r.staffType === 'FIELD') && !r.department.trim().toLowerCase().includes('adhoc')); return (
                       <TableRow className="border-t-2 bg-amber-50 font-bold">
                         <TableCell colSpan={4} className="text-right font-bold">TOTALS</TableCell>
                         <TableCell className="text-right font-mono">{fmT(pp.reduce((s, r) => s + (r.basicSalary + r.housing + r.transport), 0))}</TableCell>
@@ -1342,9 +1342,9 @@ export function Payroll() {
 
                     const filteredSlips = payslipsToPrint.filter(slip =>
                       printType === 'PAYE'
-                        ? (slip.record.staffType === 'INTERNAL' && !slip.record.department.trim().toLowerCase().includes('adhoc'))
+                        ? ((slip.record.staffType === 'OFFICE' || slip.record.staffType === 'FIELD') && !slip.record.department.trim().toLowerCase().includes('adhoc'))
                         : printType === 'PENSION'
-                          ? (slip.record.staffType === 'INTERNAL' && !slip.record.department.trim().toLowerCase().includes('adhoc'))
+                          ? ((slip.record.staffType === 'OFFICE' || slip.record.staffType === 'FIELD') && !slip.record.department.trim().toLowerCase().includes('adhoc'))
                           : (slip.record.nsitf > 0 && !slip.record.department.trim().toLowerCase().includes('adhoc'))
                     );
 

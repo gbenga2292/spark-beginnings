@@ -52,7 +52,7 @@ export function Leaves() {
 
   // Internal staff only (no Adhoc) – used for Staff, Supervisor, Management dropdowns and Leave Summary
   const internalEmployees = useMemo(() => {
-    const internalDeptNames = departments.filter(d => d.staffType === 'INTERNAL').map(d => d.name);
+    const internalDeptNames = departments.filter(d => d.staffType === 'OFFICE').map(d => d.name);
     return activeEmployees.filter(e => e.position !== 'Adhoc Staff' && internalDeptNames.includes(e.department));
   }, [activeEmployees, departments]);
 

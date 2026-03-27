@@ -52,6 +52,7 @@ export function attachDragScroll(el: HTMLElement): () => void {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
     if (
+      e.ctrlKey ||
       target.closest('button, a, input, select, textarea, [role="button"], [tabindex]') || 
       target.closest('.no-drag')
     ) return;

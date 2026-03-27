@@ -70,7 +70,7 @@ export interface DepartmentTasks {
 export interface Department {
   id: string;
   name: string;
-  staffType: 'INTERNAL' | 'EXTERNAL' | 'BENEFICIARY';
+  staffType: 'OFFICE' | 'FIELD' | 'NON-EMPLOYEE';
   workDaysPerWeek: number;
   parentDepartmentId?: string | null;
 }
@@ -213,7 +213,7 @@ export interface Employee {
   surname: string;
   firstname: string;
   department: string;
-  staffType: 'INTERNAL' | 'EXTERNAL' | 'BENEFICIARY';
+  staffType: 'OFFICE' | 'FIELD' | 'NON-EMPLOYEE';
   position: string;
   startDate: string;
   endDate: string;
@@ -246,6 +246,7 @@ export interface Employee {
   payeeType?: string;
   typeOfPay?: string;
   startMonthOfPay?: string;
+  level?: number;
 }
 
 export interface DisciplinaryRecord {
@@ -475,6 +476,7 @@ interface AppState {
   removeClient: (client: string) => void;
   addEmployee: (employee: Employee) => void;
   updateEmployee: (id: string, employee: Partial<Employee>) => void;
+  bulkUpdateEmployees: (ids: string[], employee: Partial<Employee>) => void;
   deleteEmployee: (id: string) => void;
   addAttendanceRecords: (records: AttendanceRecord[]) => void;
   removeAttendanceRecordsByDate: (date: string) => void;
@@ -683,6 +685,7 @@ export const useAppStore = create<AppState>()(
       // Employees
       addEmployee: (employee) => { set((s) => ({ employees: [...s.employees, employee] })); db.insertEmployee(employee); },
       updateEmployee: (id, updatedEmployee) => { set((s) => ({ employees: s.employees.map(emp => emp.id === id ? { ...emp, ...updatedEmployee } : emp) })); db.updateEmployee(id, updatedEmployee); },
+      bulkUpdateEmployees: (ids, updates) => { set((s) => ({ employees: s.employees.map(emp => ids.includes(emp.id) ? { ...emp, ...updates } : emp) })); db.bulkUpdateEmployees(ids, updates); },
       deleteEmployee: (id) => { set((s) => ({ employees: s.employees.filter(emp => emp.id !== id) })); db.deleteEmployee(id); },
 
       // Attendance

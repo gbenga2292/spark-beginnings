@@ -30,7 +30,7 @@ export function Organogram() {
   const handleResetZoom = () => setZoom(1);
 
   const activeEmployees = useMemo(() => {
-    return employees.filter(emp => (emp.status === 'Active' || emp.status === 'On Leave') && emp.staffType !== 'BENEFICIARY');
+    return employees.filter(emp => (emp.status === 'Active' || emp.status === 'On Leave') && emp.staffType !== 'NON-EMPLOYEE');
   }, [employees]);
 
   // Recursively build the organogram tree
@@ -77,9 +77,9 @@ export function Organogram() {
     return roots;
   }, [departments, positions, activeEmployees]);
 
-  // Recursively build the reporting line tree (Internal Staff only)
+  // Recursively build the reporting line tree (Office & Field Staff only)
   const reportingRoots = useMemo(() => {
-    const internalActive = activeEmployees.filter(emp => emp.staffType === 'INTERNAL');
+    const internalActive = activeEmployees.filter(emp => emp.staffType !== 'NON-EMPLOYEE');
     const nodesMap = new Map<string, ReportingNode>();
 
     internalActive.forEach(emp => {
@@ -89,12 +89,25 @@ export function Organogram() {
     const roots: ReportingNode[] = [];
 
     Array.from(nodesMap.values()).forEach(node => {
-      if (node.lineManager && nodesMap.has(node.lineManager)) {
+      // Logic: A person is a root if they have no line manager OR if they are Level 1 (Head of Company)
+      if (node.level === 1) {
+        roots.push(node);
+      } else if (node.lineManager && nodesMap.has(node.lineManager)) {
         nodesMap.get(node.lineManager)!.directReports.push(node);
       } else {
+        // If no line manager and not Level 1, still a root unless there's a Level 1 to attach to
+        // But for now follow explicit lineManager links
         roots.push(node);
       }
     });
+
+    // If there is a Level 1, we might want to consolidate multiple null-manager roots under them?
+    // User said Level 1 is the head.
+    const level1Node = roots.find(r => r.level === 1);
+    if (level1Node) {
+      // Any other root that is not level 1 could potentially be moved under level 1
+      // but let's stick to the data for now to avoid surprises.
+    }
 
     return roots;
   }, [activeEmployees]);
@@ -113,10 +126,10 @@ export function Organogram() {
           className="w-64 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition-shadow z-10 overflow-hidden relative group"
         >
           {/* Top colored strip based on type */}
-          <div className={`h-1.5 w-full ${node.staffType === 'EXTERNAL' ? 'bg-amber-400' : 'bg-blue-500'}`}></div>
+          <div className={`h-1.5 w-full ${node.staffType === 'FIELD' ? 'bg-amber-400' : 'bg-blue-500'}`}></div>
           <div className="bg-slate-50 border-b border-slate-100 p-4 flex flex-col items-center text-center">
-            <div className={`p-2 rounded-lg mb-3 shadow-sm ${node.staffType === 'EXTERNAL' ? 'bg-amber-100' : 'bg-blue-100'}`}>
-              <Users className={`h-5 w-5 ${node.staffType === 'EXTERNAL' ? 'text-amber-600' : 'text-blue-600'}`} />
+            <div className={`p-2 rounded-lg mb-3 shadow-sm ${node.staffType === 'FIELD' ? 'bg-amber-100' : 'bg-blue-100'}`}>
+              <Users className={`h-5 w-5 ${node.staffType === 'FIELD' ? 'text-amber-600' : 'text-blue-600'}`} />
             </div>
             <h3 className="font-bold text-slate-800 line-clamp-2 leading-tight">{node.name}</h3>
             <span className="text-[10px] font-bold text-slate-500 mt-1.5 uppercase tracking-widest bg-slate-200/50 px-2 py-0.5 rounded-full">{node.staffType}</span>
@@ -133,8 +146,13 @@ export function Organogram() {
                   </div>
                   <div className="flex flex-col gap-1">
                     {pos.employees.map(emp => (
-                      <div key={emp.id} className="text-[11px] bg-white border border-indigo-100 text-indigo-700 font-medium px-2 py-1.5 rounded truncate shadow-sm text-center">
-                        {emp.firstname} {emp.surname}
+                      <div key={emp.id} className="flex flex-col gap-0.5 bg-white border border-indigo-100 rounded p-1.5 shadow-sm">
+                        <div className="text-[11px] text-indigo-700 font-bold truncate text-center">
+                          {emp.firstname} {emp.surname}
+                        </div>
+                        <div className="text-[9px] text-slate-400 font-semibold text-center uppercase tracking-tighter">
+                          Level {emp.level || 10}
+                        </div>
                       </div>
                     ))}
                     {pos.employees.length === 0 && (
@@ -203,7 +221,10 @@ export function Organogram() {
             )}
             <h3 className="font-bold text-slate-800 line-clamp-2 leading-tight">{node.firstname} {node.surname}</h3>
             <span className="text-[11px] font-semibold text-slate-500 mt-1">{node.position}</span>
-            <span className="text-[10px] font-bold text-emerald-600 mt-1.5 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">{node.department}</span>
+            <div className="flex gap-1 mt-2">
+              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">{node.department}</span>
+              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">Lvl {node.level || 10}</span>
+            </div>
           </div>
         </motion.div>
 
@@ -302,8 +323,8 @@ export function Organogram() {
               <div className={`p-3 rounded-xl mb-3 border ${viewMode === 'department' ? 'bg-indigo-500/20 border-indigo-400/30' : 'bg-emerald-500/20 border-emerald-400/30'}`}>
                 {viewMode === 'department' ? <Building2 className="h-8 w-8 text-indigo-300" /> : <Network className="h-8 w-8 text-emerald-300" />}
               </div>
-              <h2 className="text-xl font-bold tracking-wide">{viewMode === 'department' ? 'Company Executive' : 'Internal Staff Hierarchy'}</h2>
-              <span className="text-slate-400 text-sm mt-1 font-medium">{viewMode === 'department' ? activeEmployees.length : activeEmployees.filter(e => e.staffType === 'INTERNAL').length} Total Active Staff</span>
+              <h2 className="text-xl font-bold tracking-wide">{viewMode === 'department' ? 'Company Executive' : 'Staff Hierarchy'}</h2>
+              <span className="text-slate-400 text-sm mt-1 font-medium">{viewMode === 'department' ? activeEmployees.length : activeEmployees.length} Total Active Staff</span>
             </motion.div>
 
             {/* Stem dropping down */}

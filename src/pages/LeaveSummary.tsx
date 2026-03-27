@@ -11,7 +11,7 @@ export function LeaveSummary() {
   const departments = useAppStore((state) => state.departments);
 
   const employees = useMemo(() => {
-    const internalDeptNames = departments.filter(d => d.staffType === 'INTERNAL').map(d => d.name);
+    const internalDeptNames = departments.filter(d => d.staffType === 'OFFICE').map(d => d.name);
     return allEmployees.filter(e => e.status !== 'Terminated' && internalDeptNames.includes(e.department));
   }, [allEmployees, departments]);
 

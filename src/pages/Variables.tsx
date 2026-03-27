@@ -136,7 +136,6 @@ export function Variables() {
   const [newPosition, setNewPosition] = useState('');
   const [newPosDeptId, setNewPosDeptId] = useState('');
   const [newDepartment, setNewDepartment] = useState('');
-  const [newDeptStaffType, setNewDeptStaffType] = useState<'INTERNAL' | 'EXTERNAL'>('INTERNAL');
   const [newClient, setNewClient] = useState('');
   const [newLeaveType, setNewLeaveType] = useState('');
 
@@ -165,9 +164,8 @@ export function Variables() {
 
   const handleAddDepartment = () => {
     if (newDepartment && !departments.some(d => d.name.toLowerCase() === newDepartment.toLowerCase())) {
-      addDepartment({ id: crypto.randomUUID(), name: newDepartment, staffType: newDeptStaffType, workDaysPerWeek: 5 });
+      addDepartment({ id: crypto.randomUUID(), name: newDepartment, staffType: 'OFFICE', workDaysPerWeek: 5 });
       setNewDepartment('');
-      setNewDeptStaffType('INTERNAL');
     } else if (newDepartment) {
       toast.error('Department name already exists.');
     }
@@ -308,7 +306,7 @@ export function Variables() {
       });
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(posData), 'Positions');
 
-      const deptData = departments.map(d => ({ Department: d.name, 'Staff Type': d.staffType, 'Work Days/Week': d.workDaysPerWeek }));
+      const deptData = departments.map(d => ({ Department: d.name, 'Work Days/Week': d.workDaysPerWeek }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(deptData), 'Departments');
 
       const clientData = clients.map(c => ({ Client: c }));
@@ -402,7 +400,7 @@ export function Variables() {
                   addDepartment({
                     id: crypto.randomUUID(),
                     name: depName,
-                    staffType: row['Staff Type'] === 'EXTERNAL' ? 'EXTERNAL' : 'INTERNAL',
+                    staffType: 'OFFICE',
                     workDaysPerWeek: Number(row['Work Days/Week']) || 5
                   });
                 }
@@ -1065,20 +1063,12 @@ export function Variables() {
           <Card className="shadow-sm border-slate-200">
             <CardHeader>
               <CardTitle>Departments</CardTitle>
-              <CardDescription>Manage available departments and their internal/external staff classification.</CardDescription>
+              <CardDescription>Manage available departments and their hierarchy.</CardDescription>
             </CardHeader>
             <CardContent>
               {priv.canEdit && (
                 <div className="flex gap-2 mb-4">
                   <Input placeholder="New Department" value={newDepartment} onChange={(e) => setNewDepartment(e.target.value)} className="flex-1" />
-                  <select
-                    className="h-10 rounded border border-slate-200 px-3 w-40 text-sm bg-white"
-                    value={newDeptStaffType}
-                    onChange={(e) => setNewDeptStaffType(e.target.value as any)}
-                  >
-                    <option value="INTERNAL">INTERNAL</option>
-                    <option value="EXTERNAL">EXTERNAL</option>
-                  </select>
                   <Button onClick={handleAddDepartment} variant="outline" className="gap-2">
                     <Plus className="h-4 w-4" /> Add
                   </Button>
@@ -1090,7 +1080,6 @@ export function Variables() {
                     <TableRow>
                       <TableHead>Department</TableHead>
                       <TableHead>Parent Dept</TableHead>
-                      <TableHead className="w-32 text-center">Staff Type</TableHead>
                       <TableHead className="w-32 text-center">Work Days/Wk</TableHead>
                       <TableHead className="w-[80px] text-right">Action</TableHead>
                     </TableRow>
@@ -1126,22 +1115,6 @@ export function Variables() {
                               <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded-md block truncate">
                                 {departments.find(d => d.id === dep.parentDepartmentId)?.name || 'None'}
                               </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {priv.canEdit ? (
-                                <select
-                                  className="h-8 rounded border border-slate-200 text-xs px-2 w-full text-center bg-white"
-                                  value={dep.staffType}
-                                  onChange={(e) => updateDepartment(dep.id, { staffType: e.target.value as any })}
-                                >
-                                  <option value="INTERNAL">INTERNAL</option>
-                                  <option value="EXTERNAL">EXTERNAL</option>
-                                </select>
-                            ) : (
-                                <span className={`text-xs font-bold px-2 py-1 rounded-full ${dep.staffType === 'EXTERNAL' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}`}>
-                                    {dep.staffType}
-                                </span>
                             )}
                           </TableCell>
                           <TableCell className="text-center">

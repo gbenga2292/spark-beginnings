@@ -24,7 +24,8 @@ export function NewHire() {
     surname: '',
     department: '',
     position: '',
-    staffType: 'INTERNAL',
+    staffType: 'OFFICE',
+    level: 10,
     startDate: '',
     tentativeStartDate: '',
     probationPeriod: undefined,
@@ -127,7 +128,9 @@ export function NewHire() {
       surname: (newHireData.surname as string).toUpperCase(),
       firstname: (newHireData.firstname as string).toUpperCase(),
       department: newHireData.department as string,
-      staffType: newHireData.staffType as 'INTERNAL' | 'EXTERNAL',
+      staffType: (newHireData.staffType as any) || 'OFFICE',
+      level: newHireData.level || 10,
+      lineManager: '',
       position: newHireData.position as string,
       startDate: newHireData.tentativeStartDate as string, // used as the main date until verified
       tentativeStartDate: newHireData.tentativeStartDate as string,
@@ -233,7 +236,7 @@ export function NewHire() {
                     ...newHireData, 
                     position: newPos,
                     department: deptObj ? deptObj.name : '',
-                    staffType: deptObj ? deptObj.staffType : 'INTERNAL'
+                    staffType: deptObj ? (deptObj.staffType as any) : 'OFFICE'
                   });
                 }}>
                 <option value="" disabled>Select Position</option>
@@ -249,7 +252,27 @@ export function NewHire() {
 
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Staff Type</label>
-              <Input value={newHireData.staffType || 'INTERNAL'} disabled className="h-11 bg-slate-100/50 text-slate-500 cursor-not-allowed font-bold text-xs" />
+              <select 
+                className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                value={newHireData.staffType || 'OFFICE'} 
+                onChange={e => setNewHireData({ ...newHireData, staffType: e.target.value as any })}
+              >
+                <option value="OFFICE">Office</option>
+                <option value="FIELD">Field</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">Employee Level</label>
+              <select 
+                className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                value={newHireData.level || 10} 
+                onChange={e => setNewHireData({ ...newHireData, level: parseInt(e.target.value) })}
+              >
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(lv => (
+                  <option key={lv} value={lv}>Level {lv} {lv === 1 ? '(Head of Company)' : lv === 2 ? '(Head of Dept)' : ''}</option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-2">

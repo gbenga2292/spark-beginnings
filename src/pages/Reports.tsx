@@ -171,7 +171,7 @@ export function Reports() {
   const operationsInternalStaff = useMemo(() => {
     return employees.filter(emp => 
       emp.department === 'OPERATIONS' && 
-      emp.staffType === 'INTERNAL' &&
+      (emp.staffType === 'OFFICE' || emp.staffType === 'FIELD') &&
       emp.position !== 'Engineer' &&
       emp.position !== 'CEO'
     );

@@ -45,7 +45,7 @@ export function Attendance() {
   const [lastEntryDate, setLastEntryDate] = useState(format(new Date(Date.now() - 86400000), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('entry');
-  const [departmentFilter, setDepartmentFilter] = useState('OPERATIONS');
+  const [staffTypeFilter, setStaffTypeFilter] = useState<'OFFICE' | 'FIELD'>('FIELD');
 
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('attendance');
@@ -54,14 +54,14 @@ export function Attendance() {
 
   // Database filters
   const [dbSearchTerm, setDbSearchTerm] = useState('');
-  const [dbDepartmentFilter, setDbDepartmentFilter] = useState('OPERATIONS');
+  const [dbStaffTypeFilter, setDbStaffTypeFilter] = useState<'OFFICE' | 'FIELD' | 'All'>('FIELD');
   const [dbSiteFilter, setDbSiteFilter] = useState('All');
   const [dbShiftFilter, setDbShiftFilter] = useState('All');
 
   const [dbSelectedIds, setDbSelectedIds] = useState<Set<string>>(new Set());
 
-  const isOperationsDepartment = departmentFilter === 'OPERATIONS';
-  const isAllDepartments = departmentFilter === 'All';
+  const isFieldStaff = staffTypeFilter === 'FIELD';
+  const isOfficeStaff = staffTypeFilter === 'OFFICE';
   
   const departments = useAppStore((state) => state.departments);
 
@@ -94,12 +94,11 @@ export function Attendance() {
   }, [registerDate, attendanceRecords]);
 
   const filteredEmployees = employees.filter(emp => {
-    const matchesSearch = emp.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.firstname.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDept = departmentFilter === 'All' 
-      ? emp.staffType === 'INTERNAL' 
-      : emp.department === departmentFilter;
-    return matchesSearch && matchesDept;
+    const searchLow = searchTerm.toLowerCase();
+    const matchesSearch = emp.surname.toLowerCase().includes(searchLow) ||
+      emp.firstname.toLowerCase().includes(searchLow);
+    const matchesType = emp.staffType === staffTypeFilter;
+    return matchesSearch && matchesType;
   }).sort((a, b) => {
     const posA = a.position || '';
     const posB = b.position || '';
@@ -113,10 +112,10 @@ export function Attendance() {
 
   const filteredDbRecords = attendanceRecords.filter(r => {
     const emp = employees.find(e => e.id === r.staffId);
-    if (dbDepartmentFilter !== 'All') {
-      if (emp?.department !== dbDepartmentFilter) return false;
+    if (dbStaffTypeFilter !== 'All') {
+      if (emp?.staffType !== dbStaffTypeFilter) return false;
     } else {
-      if (emp?.staffType !== 'INTERNAL') return false;
+      if (emp?.staffType === 'NON-EMPLOYEE') return false;
     }
     if (dbSearchTerm) {
       const matchName = r.staffName.toLowerCase().includes(dbSearchTerm.toLowerCase());
@@ -348,7 +347,7 @@ export function Attendance() {
         day: dayShift,
         night: nightShift,
         absentStatus: absentReason,
-        overtimeDetails: (attendanceData[emp.id]?.overtime && !isOperationsDepartment) ? attendanceData[emp.id].overtimeDetails : '',
+        overtimeDetails: (attendanceData[emp.id]?.overtime && !isFieldStaff) ? attendanceData[emp.id].overtimeDetails : '',
       });
     });
 
@@ -526,17 +525,15 @@ export function Attendance() {
               />
             </div>
 
-            {/* Department filter */}
+            {/* Staff Type filter */}
             <div className="relative">
               <select
-                value={departmentFilter}
-                onChange={(e) => setDepartmentFilter(e.target.value)}
+                value={staffTypeFilter}
+                onChange={(e) => setStaffTypeFilter(e.target.value as any)}
                 className="h-8 pl-7 pr-3 text-xs rounded-lg border border-slate-200 bg-white shadow-sm appearance-none cursor-pointer focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none"
               >
-                <option value="All">All Departments</option>
-                {departments.filter(d => d.staffType === 'INTERNAL').map(d => (
-                  <option key={d.id} value={d.name}>{d.name}</option>
-                ))}
+                <option value="OFFICE">OFFICE STAFF</option>
+                <option value="FIELD">FIELD STAFF</option>
               </select>
               <Filter className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
             </div>
@@ -588,7 +585,7 @@ export function Attendance() {
                   <tr>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 w-[30%]">Staff Name</th>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">Day Site / Status</th>
-                    {isOperationsDepartment ? (
+                    {isFieldStaff ? (
                       <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">
                         Night Site / Status
                       </th>
@@ -602,7 +599,7 @@ export function Attendance() {
                 <tbody className="divide-y divide-slate-100">
                   {filteredEmployees.length === 0 ? (
                     <tr>
-                      <td colSpan={isOperationsDepartment ? 3 : 2} className="text-center py-8 text-slate-400 text-sm">No employees match your filters.</td>
+                      <td colSpan={isFieldStaff ? 3 : 2} className="text-center py-8 text-slate-400 text-sm">No employees match your filters.</td>
                     </tr>
                   ) : (
                     filteredEmployees.map((employee, idx) => {
@@ -655,7 +652,7 @@ export function Attendance() {
                               </optgroup>
                             </select>
                           </td>
-                          {isOperationsDepartment ? (
+                          {isFieldStaff ? (
                             <td className="py-1 px-2 border-l border-slate-100">
                               <select
                                 className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${nightVal && !isAbsentStatus(nightVal)
@@ -730,14 +727,13 @@ export function Attendance() {
           <div className="flex flex-wrap items-center gap-2 py-2 px-0 bg-white">
             <div className="relative">
               <select
-                value={dbDepartmentFilter}
-                onChange={(e) => setDbDepartmentFilter(e.target.value)}
+                value={dbStaffTypeFilter}
+                onChange={(e) => setDbStaffTypeFilter(e.target.value as any)}
                 className="h-8 pl-7 pr-3 text-xs rounded-lg border border-slate-200 bg-white shadow-sm appearance-none cursor-pointer focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none"
               >
-                <option value="All">All Departs.</option>
-                {departments.filter(d => d.staffType === 'INTERNAL').map(d => (
-                  <option key={d.id} value={d.name}>{d.name}</option>
-                ))}
+                <option value="All">All Types</option>
+                <option value="OFFICE">OFFICE</option>
+                <option value="FIELD">FIELD</option>
               </select>
               <Filter className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
             </div>

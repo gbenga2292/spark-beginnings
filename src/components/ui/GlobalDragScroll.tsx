@@ -75,8 +75,27 @@ export function GlobalDragScroll() {
 
     observer.observe(document.body, { childList: true, subtree: true });
 
+    // Global Ctrl key tracking for cursor switching
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Control') {
+        if (e.type === 'keydown') document.body.dataset.ctrlHeld = 'true';
+        else delete document.body.dataset.ctrlHeld;
+      }
+    };
+
+    window.addEventListener('keydown', handleKey);
+    window.addEventListener('keyup', handleKey);
+    // Safety: clear on window blur
+    const onBlur = () => delete document.body.dataset.ctrlHeld;
+    window.addEventListener('blur', onBlur);
+
     return () => {
       observer.disconnect();
+      window.removeEventListener('keydown', handleKey);
+      window.removeEventListener('keyup', handleKey);
+      window.removeEventListener('blur', onBlur);
+      delete document.body.dataset.ctrlHeld;
+      
       // Cleanup all enhanced elements
       document.querySelectorAll('.drag-scroll').forEach((el) => {
         const cleanup = cleanupMap.get(el);

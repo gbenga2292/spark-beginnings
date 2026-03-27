@@ -1143,8 +1143,9 @@ export function Onboarding() {
               <div className="space-y-1">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Staff Type</label>
                 <select className="w-full h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" value={editEmp.staffType} onChange={e => setEditEmp(p => p ? { ...p, staffType: e.target.value as any } : p)}>
-                  <option value="INTERNAL">Internal</option>
-                  <option value="EXTERNAL">External</option>
+                  <option value="OFFICE">Office</option>
+                  <option value="FIELD">Field</option>
+                  <option value="NON-EMPLOYEE">Non-Employee</option>
                 </select>
               </div>
               <div className="space-y-1">

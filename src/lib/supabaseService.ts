@@ -42,6 +42,7 @@ export function dbToEmployee(r: any): Employee {
     payeeType: r.payee_type || undefined,
     typeOfPay: r.type_of_pay || undefined,
     startMonthOfPay: r.start_month_of_pay || undefined,
+    level: r.level ?? 10,
   };
 }
 
@@ -280,6 +281,7 @@ function employeeToDb(e: Employee) {
     payee_type: e.payeeType ?? null,
     type_of_pay: e.typeOfPay ?? null,
     start_month_of_pay: e.startMonthOfPay ?? null,
+    level: e.level ?? 10,
   };
 }
 
@@ -556,7 +558,7 @@ export async function fetchAllAppData(privs?: any) {
     departments: (departmentsRes.data || []).map((d: any) => ({
       id: d.id,
       name: d.name,
-      staffType: d.staff_type || 'INTERNAL',
+      staffType: d.staff_type || 'OFFICE',
       workDaysPerWeek: d.work_days_per_week || 5,
       parentDepartmentId: d.parent_department_id || null,
     })) as Department[],
@@ -729,6 +731,24 @@ export const db = {
     if (e.startMonthOfPay !== undefined) update.start_month_of_pay = e.startMonthOfPay;
     const { error } = await supabase.from('employees').update(update).eq('id', id);
     if (error) console.error('updateEmployee:', error);
+  },
+  async bulkUpdateEmployees(ids: string[], e: Partial<Employee>) {
+    if (ids.length === 0) return;
+    const update: any = {};
+    if (e.department !== undefined) update.department = e.department;
+    if (e.staffType !== undefined) update.staff_type = e.staffType;
+    if (e.status !== undefined) update.status = e.status;
+    if (e.yearlyLeave !== undefined) update.yearly_leave = e.yearlyLeave;
+    if (e.level !== undefined) update.level = e.level;
+    if (e.payeTax !== undefined) update.paye_tax = e.payeTax;
+    if (e.withholdingTax !== undefined) update.withholding_tax = e.withholdingTax;
+    if (e.probationPeriod !== undefined) update.probation_period = e.probationPeriod;
+    if (e.payeeType !== undefined) update.payee_type = e.payeeType;
+    if (e.typeOfPay !== undefined) update.type_of_pay = e.typeOfPay;
+    if (e.startMonthOfPay !== undefined) update.start_month_of_pay = e.startMonthOfPay;
+
+    const { error } = await supabase.from('employees').update(update).in('id', ids);
+    if (error) console.error('bulkUpdateEmployees:', error);
   },
   async deleteEmployee(id: string) {
     const { error } = await supabase.from('employees').delete().eq('id', id);

@@ -5,13 +5,14 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
-import { Search, Plus, MoreHorizontal, Download, Upload, ArrowLeft, Save, Pencil, Trash2, Eye, X, Network } from 'lucide-react';
+import { Search, Plus, MoreHorizontal, Download, Upload, ArrowLeft, Save, Pencil, Trash2, Eye, X, Network, Users, Settings2 } from 'lucide-react';
 import { useAppStore, Employee, MonthlySalary } from '@/src/store/appStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useRedaction } from '@/src/hooks/useRedaction';
 import { Dialog } from '@/src/components/ui/dialog';
+import { Checkbox } from '@/src/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/src/components/ui/dropdown-menu';
 import { useAppData } from '@/src/contexts/AppDataContext';
 
@@ -62,7 +63,12 @@ export function Beneficiaries() {
   const addDepartment = useAppStore((state) => state.addDepartment);
   const disciplinaryRecords = useAppStore((state) => state.disciplinaryRecords);
   const evaluations = useAppStore((state) => state.evaluations);
+  const bulkUpdateEmployees = useAppStore(state => state.bulkUpdateEmployees);
   const { reminders } = useAppData();
+
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBulkEditing, setIsBulkEditing] = useState(false);
+  const [bulkFormData, setBulkFormData] = useState<Partial<Employee>>({});
 
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('employees');
@@ -77,7 +83,7 @@ export function Beneficiaries() {
       emp.department.toLowerCase().includes(searchLow) ||
       (emp.employeeCode?.toLowerCase() || '').includes(searchLow);
     const matchesTab = activeTab === 'Delisted' ? emp.status === 'Terminated' : (emp.status === 'Active' || emp.status === 'On Leave');
-    return matchesSearch && matchesTab && emp.staffType === 'BENEFICIARY';
+    return matchesSearch && matchesTab && emp.staffType === 'NON-EMPLOYEE';
   }).sort((a, b) => {
     if (sortBy === 'name') return (a.surname + a.firstname).localeCompare(b.surname + b.firstname);
     if (sortBy === 'position') {
@@ -95,7 +101,7 @@ export function Beneficiaries() {
   });
 
   const [formData, setFormData] = useState<Partial<Employee>>({
-    staffType: 'BENEFICIARY',
+    staffType: 'NON-EMPLOYEE',
     status: 'Active',
     payeTax: false,
     withholdingTax: false,
@@ -109,7 +115,7 @@ export function Beneficiaries() {
   const MONTH_KEYS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
   useEffect(() => {
-    if ((isAdding || isEditing) && formData.staffType === 'BENEFICIARY') {
+    if ((isAdding || isEditing) && formData.staffType === 'NON-EMPLOYEE') {
       const cycle = formData.typeOfPay || 'Monthly';
       const startMonth = formData.startMonthOfPay || 'January';
       const startIdx = MONTHS_LIST.indexOf(startMonth);
@@ -170,7 +176,7 @@ export function Beneficiaries() {
       surname: formData.surname || '',
       firstname: formData.firstname || '',
       department: formData.department || 'Non-Employee',
-      staffType: 'BENEFICIARY',
+      staffType: 'NON-EMPLOYEE',
       position: formData.payeeType || 'Stipend Payee',
       startDate: formData.startDate || '',
       endDate: formData.endDate || '',
@@ -194,7 +200,7 @@ export function Beneficiaries() {
     addEmployee(newEmployee);
     setIsAdding(false);
     setFormData({
-      staffType: 'BENEFICIARY',
+      staffType: 'NON-EMPLOYEE',
       status: 'Active',
       payeTax: false,
       withholdingTax: false,
@@ -222,7 +228,7 @@ export function Beneficiaries() {
       ...formData,
       department: formData.department || 'Non-Employee',
       position: formData.payeeType || 'Stipend Payee',
-      staffType: 'BENEFICIARY' as 'BENEFICIARY',
+      staffType: 'NON-EMPLOYEE' as 'NON-EMPLOYEE',
       excludeFromOnboarding: true
     };
     updateEmployee(editingEmployeeId, updateData);
@@ -230,7 +236,7 @@ export function Beneficiaries() {
     setEditingEmployeeId(null);
     toast.success('Employee updated successfully.');
     setFormData({
-      staffType: 'BENEFICIARY',
+      staffType: 'NON-EMPLOYEE',
       status: 'Active',
       payeTax: false,
       withholdingTax: false,
@@ -264,7 +270,7 @@ export function Beneficiaries() {
 
   const handleExportCSV = () => {
     try {
-      const beneficiaries = employees.filter(e => e.staffType === 'BENEFICIARY');
+      const beneficiaries = employees.filter(e => e.staffType === 'NON-EMPLOYEE');
       if (beneficiaries.length === 0) {
         toast.info('No beneficiaries to export');
         return;
@@ -363,7 +369,7 @@ export function Beneficiaries() {
               surname: vals[1 + offset],
               firstname: vals[2 + offset],
               department: 'Beneficiary',
-              staffType: 'BENEFICIARY',
+              staffType: 'NON-EMPLOYEE',
               position: 'Stipend Beneficiary',
               status: vals[3 + offset] as 'Active' | 'On Leave' | 'Terminated',
               yearlyLeave: parseInt(vals[4 + offset]) || 0,
@@ -398,7 +404,7 @@ export function Beneficiaries() {
 
         if (mode === 'replace') {
           employees.forEach(emp => {
-            if (emp.staffType === 'BENEFICIARY' && !csvProcessedIds.has(emp.id)) {
+            if (emp.staffType === 'NON-EMPLOYEE' && !csvProcessedIds.has(emp.id)) {
               deleteEmployee(emp.id);
               deletedCount++;
             }
@@ -1144,6 +1150,114 @@ export function Beneficiaries() {
     );
   };
 
+  const renderBulkEditModal = () => {
+    if (!isBulkEditing) return null;
+
+    const handleBulkUpdate = () => {
+      if (Object.keys(bulkFormData).length === 0) {
+        toast.info('No changes to apply.');
+        return;
+      }
+
+      bulkUpdateEmployees(selectedIds, bulkFormData);
+      toast.success(`Updated ${selectedIds.length} records.`);
+      setIsBulkEditing(false);
+      setSelectedIds([]);
+      setBulkFormData({});
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="sticky top-0 bg-indigo-600 p-4 flex justify-between items-center rounded-t-lg">
+            <h3 className="text-white font-bold text-lg">Bulk Edit Non-Employees ({selectedIds.length})</h3>
+            <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={() => setIsBulkEditing(false)}>
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+
+          <div className="p-6 space-y-5">
+            <p className="text-sm text-slate-600">Apply changes to the selected {selectedIds.length} records. Only fields you modify here will be updated.</p>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  value={bulkFormData.status || ''}
+                  onChange={e => setBulkFormData({ ...bulkFormData, status: e.target.value as any })}
+                >
+                  <option value="">No Change</option>
+                  <option value="Active">Active</option>
+                  <option value="Delisted">Delisted</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Payee Type</label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  value={bulkFormData.payeeType || ''}
+                  onChange={e => setBulkFormData({ ...bulkFormData, payeeType: e.target.value })}
+                >
+                  <option value="">No Change</option>
+                  <option value="Director">Director</option>
+                  <option value="Contractor">Contractor</option>
+                  <option value="Welfare Staff">Welfare Staff</option>
+                  <option value="Trainee">Trainee</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Payment Cycle</label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  value={bulkFormData.typeOfPay || ''}
+                  onChange={e => setBulkFormData({ ...bulkFormData, typeOfPay: e.target.value as any })}
+                >
+                  <option value="">No Change</option>
+                  <option value="Monthly">Monthly</option>
+                  <option value="Quarterly">Quarterly</option>
+                  <option value="Half Year">Half Year</option>
+                  <option value="Yearly">Yearly</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Move to Directory</label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  value={bulkFormData.staffType || ''}
+                  onChange={e => setBulkFormData({ ...bulkFormData, staffType: e.target.value as any })}
+                >
+                  <option value="">No Change (Stay here)</option>
+                  <option value="OFFICE">Office Staff</option>
+                  <option value="FIELD">Field Staff</option>
+                </select>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 space-y-3">
+                <label className="flex items-center gap-3 text-sm font-medium cursor-pointer p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                  <Checkbox
+                    checked={bulkFormData.withholdingTax}
+                    onCheckedChange={(checked) => setBulkFormData({ ...bulkFormData, withholdingTax: checked as boolean })}
+                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4"
+                  />
+                  Subject to Withholding Tax (5%)
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <Button variant="outline" onClick={() => setIsBulkEditing(false)}>Cancel</Button>
+              <Button onClick={handleBulkUpdate} className="bg-indigo-600 hover:bg-indigo-700 text-white">Apply Changes</Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // If adding new employee
   if (isAdding) {
     return renderEmployeeForm(false);
@@ -1159,12 +1273,25 @@ export function Beneficiaries() {
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+            <Users className="h-8 w-8 text-indigo-600" />
             Non-Employee Directory
           </h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">Manage contractors, welfare staff, and payment cycles.</p>
+          <p className="text-slate-500 mt-1 font-medium">Manage directors, contractors, and welfare staff compensation cycles.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap justify-center md:justify-end">
+          {selectedIds.length > 0 && (
+            <Button 
+              variant="outline" 
+              className="gap-2 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 animate-in fade-in slide-in-from-right-4"
+              onClick={() => {
+                setBulkFormData({});
+                setIsBulkEditing(true);
+              }}
+            >
+              <Settings2 className="h-4 w-4" /> Bulk Edit ({selectedIds.length})
+            </Button>
+          )}
           {priv.canExport && (
             <Button variant="outline" className="gap-2 bg-white text-slate-700 hover:bg-slate-50 shadow-sm border-slate-200" onClick={handleExportCSV}>
               <Download className="h-4 w-4 text-slate-500" /> Export CSV
@@ -1177,7 +1304,7 @@ export function Beneficiaries() {
             </label>
           )}
           {priv.canAdd && (
-            <Button className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md mx-2 transition-all" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'BENEFICIARY', status: 'Active', payeTax: false, withholdingTax: false, payeeType: '', typeOfPay: 'Monthly', monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
+            <Button className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md mx-2 transition-all" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'NON-EMPLOYEE', status: 'Active', payeTax: false, withholdingTax: false, payeeType: '', typeOfPay: 'Monthly', monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
               <Plus className="h-4 w-4" /> Add Record
             </Button>
           )}
@@ -1222,6 +1349,15 @@ export function Beneficiaries() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox 
+                  checked={selectedIds.length === filteredBeneficiaries.length && filteredBeneficiaries.length > 0}
+                  onCheckedChange={(checked) => {
+                    if (checked) setSelectedIds(filteredBeneficiaries.map(e => e.id));
+                    else setSelectedIds([]);
+                  }}
+                />
+              </TableHead>
               <TableHead>Non-Employee</TableHead>
               <TableHead>Category / Entity</TableHead>
               <TableHead>Payee Type</TableHead>
@@ -1232,7 +1368,16 @@ export function Beneficiaries() {
           </TableHeader>
           <TableBody>
             {filteredBeneficiaries.map((employee) => (
-              <TableRow key={employee.id} className="hover:bg-slate-50/50 transition-colors">
+              <TableRow key={employee.id} className={`${selectedIds.includes(employee.id) ? 'bg-indigo-50/50' : ''} hover:bg-slate-50/50 transition-colors`}>
+                <TableCell>
+                  <Checkbox 
+                    checked={selectedIds.includes(employee.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) setSelectedIds([...selectedIds, employee.id]);
+                      else setSelectedIds(selectedIds.filter(id => id !== employee.id));
+                    }}
+                  />
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10 border border-slate-200">
@@ -1302,6 +1447,7 @@ export function Beneficiaries() {
           </TableBody>
         </Table>
       </div>
+      {renderBulkEditModal()}
       {renderViewModal()}
 
       {/* Import Modal Options */}
