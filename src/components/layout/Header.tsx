@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock } from 'lucide-react';
+import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/src/store/auth';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -41,65 +41,128 @@ const ALL_SEARCH_ITEMS: SearchItem[] = [
 ];
 
 // Generate notifications from app data
+// Generate notifications from app data
 function useNotifications() {
-  const { employees, attendanceRecords, leaves, pendingInvoices } = useAppStore();
+  const { 
+    employees, attendanceRecords, leaves, pendingInvoices, invoices, 
+    salaryAdvances, loans, sites, disciplinaryRecords, evaluations, commLogs 
+  } = useAppStore();
   const { reminders } = useAppData();
 
   return useMemo(() => {
-    const notifs: { id: string; icon: any; text: string; time: string; color: string; url?: string }[] = [];
-
-    // Pending leave requests
-    const recentLeaves = leaves.slice(-3);
-    recentLeaves.forEach((l) => {
-      notifs.push({ id: `leave-${l.id}`, icon: CalendarClock, text: `${l.employeeName} requested leave (${l.duration} days)`, time: l.startDate, color: 'text-amber-500' });
-    });
-
-    // Recent attendance
-    const dates = [...new Set(attendanceRecords.map((r) => r.date))].sort().reverse();
-    if (dates.length > 0) {
-      const latestDate = dates[0];
-      const count = attendanceRecords.filter((r) => r.date === latestDate).length;
-      notifs.push({ id: `att-${latestDate}`, icon: CalendarClock, text: `${count} attendance records for ${latestDate}`, time: latestDate, color: 'text-indigo-500' });
-    }
-
-    // Pending invoices
-    if (pendingInvoices.length > 0) {
-      notifs.push({ id: 'pending-inv', icon: FileText, text: `${pendingInvoices.length} pending invoice(s) awaiting action`, time: 'Now', color: 'text-rose-500' });
-    }
-
-    // New employees
-    const recentEmps = employees.filter((e) => e.status === 'Active').slice(-2);
-    recentEmps.forEach((e) => {
-      notifs.push({ id: `emp-${e.id}`, icon: Users, text: `${e.firstname} ${e.surname} is active`, time: e.startDate, color: 'text-emerald-500' });
-    });
-
-    // Active Reminders due in next 24h or overdue
+    const notifs: { id: string; icon: any; text: string; time: string; color: string; url?: string; priority: number }[] = [];
     const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    // Helper: Is date within X days
+    const isWithinDays = (dateStr: string, days: number) => {
+      const d = new Date(dateStr);
+      const diffHrs = (d.getTime() - now.getTime()) / (1000 * 60 * 60);
+      return diffHrs >= 0 && diffHrs <= (days * 24);
+    };
+
+    // Helper: Is date past or today
+    const isPastOrToday = (dateStr: string) => {
+      return dateStr <= todayStr;
+    };
+
+    // 1. Reminders (Highest Priority: 0)
     const currentUser = useUserStore.getState().getCurrentUser();
-    const activeRems = reminders.filter(r => {
+    reminders.filter(r => {
       if (!r.isActive) return false;
       if (currentUser && r.recipientIds && r.recipientIds.length > 0 && !r.recipientIds.includes(currentUser.id)) return false;
       const remDate = new Date(r.remindAt);
       const diffHrs = (remDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-      // Show if overdue or within 24 hours
       return diffHrs <= 24;
-    });
-    activeRems.forEach((r) => {
+    }).forEach((r) => {
       const remDate = new Date(r.remindAt);
       const isPast = remDate < now;
       notifs.push({ 
         id: `rem-${r.id}`, 
-        icon: Bell, 
-        text: `${r.title}`, 
+        icon: isPast ? AlertCircle : Bell, 
+        text: `Reminder: ${r.title}`, 
         time: isPast ? 'Overdue' : r.remindAt.slice(0, 10), 
-        color: isPast ? 'text-red-500' : 'text-indigo-500',
-        url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined
+        color: isPast ? 'text-rose-500' : 'text-indigo-500',
+        url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
+        priority: isPast ? 0 : 1
       });
     });
 
-    // Sort by id to keep deterministic roughly, or just rely on current push order
-    return notifs.slice(0, 8);
-  }, [employees, attendanceRecords, leaves, pendingInvoices, reminders]);
+    // 2. Pending Approvals (Priority: 2)
+    leaves.filter(l => l.approvalStatus === 'Pending' && l.status !== 'Cancelled').forEach(l => {
+      notifs.push({ id: `leave-${l.id}`, icon: CalendarClock, text: `Leave Request: ${l.employeeName}`, time: l.startDate, color: 'text-amber-500', url: '/leaves', priority: 2 });
+    });
+    salaryAdvances.filter(s => s.status === 'Pending').forEach(s => {
+      notifs.push({ id: `adv-${s.id}`, icon: Wallet, text: `Salary Advance: ${s.employeeName}`, time: s.requestDate, color: 'text-amber-500', url: '/salary-loans', priority: 2 });
+    });
+    loans.filter(l => l.status === 'Pending').forEach(l => {
+      notifs.push({ id: `loan-${l.id}`, icon: Landmark, text: `Loan Request: ${l.employeeName}`, time: l.startDate, color: 'text-amber-500', url: '/salary-loans', priority: 2 });
+    });
+
+    // 3. Overdue Invoices (Priority: 1)
+    invoices.filter(i => i.status === 'Overdue').forEach(i => {
+      notifs.push({ id: `inv-ov-${i.id}`, icon: FileText, text: `Overdue Invoice: ${i.invoiceNumber}`, time: i.dueDate, color: 'text-rose-600', url: '/client-accounts', priority: 1 });
+    });
+
+    // 4. Pending Invoices (Priority: 3)
+    if (pendingInvoices.length > 0) {
+      notifs.push({ id: 'pending-inv', icon: FileText, text: `${pendingInvoices.length} Pending Invoices to draft`, time: 'Now', color: 'text-blue-500', url: '/client-accounts', priority: 3 });
+    }
+
+    // 5. Expiring LASHMA (Priority: 2)
+    employees.filter(e => e.status === 'Active' && e.lashmaExpiryDate && isWithinDays(e.lashmaExpiryDate, 7)).forEach(e => {
+        notifs.push({ id: `lashma-${e.id}`, icon: ShieldCheck, text: `LASHMA Expiring: ${e.firstname} ${e.surname}`, time: e.lashmaExpiryDate!, color: 'text-amber-600', url: '/employees', priority: 2 });
+    });
+
+    // 6. Comm Follow-ups (Priority: 2)
+    commLogs.filter(c => c.followUpDate && !c.followUpDone && isPastOrToday(c.followUpDate)).forEach(c => {
+        notifs.push({ id: `comm-${c.id}`, icon: Clock, text: `Follow-up: ${c.subject || 'Communication'}`, time: c.followUpDate!, color: 'text-indigo-400', url: '/sites', priority: 2 });
+    });
+
+    // 7. Site Endings (Priority: 2)
+    sites.filter(s => s.status === 'Active' && s.endDate && isWithinDays(s.endDate, 7)).forEach(s => {
+        notifs.push({ id: `site-end-${s.id}`, icon: MapPin, text: `Site Ending Soon: ${s.name}`, time: s.endDate!, color: 'text-rose-400', url: '/sites', priority: 2 });
+    });
+
+    // 8. Pending Evaluations (Priority: 3)
+    evaluations.filter(e => e.status === 'Review').forEach(e => {
+        const emp = employees.find(emp => emp.id === e.employeeId);
+        notifs.push({ id: `eval-${e.id}`, icon: Users, text: `Eval Review: ${emp ? emp.surname : 'Employee'}`, time: e.date, color: 'text-emerald-500', url: '/evaluations', priority: 3 });
+    });
+
+    // 9. Disciplinary Queries (Priority: 1)
+    disciplinaryRecords.filter(d => d.workflowState === 'Reported' || d.workflowState === 'Query Issued').forEach(d => {
+        const emp = employees.find(emp => emp.id === d.employeeId);
+        notifs.push({ id: `disc-${d.id}`, icon: ShieldCheck, text: `Disciplinary Action: ${emp ? emp.surname : 'Employee'}`, time: d.date, color: 'text-rose-500', url: '/performance-conduct', priority: 1 });
+    });
+
+    // 10. Probation Ending (Priority: 3)
+    employees.filter(e => e.status === 'Active' && e.startDate && e.probationPeriod).forEach(e => {
+        const start = new Date(e.startDate);
+        const end = new Date(start.getTime() + (e.probationPeriod! * 24 * 60 * 60 * 1000));
+        const endStr = end.toISOString().split('T')[0];
+        if (isWithinDays(endStr, 14)) { // Show 14 days before
+            notifs.push({ id: `prob-${e.id}`, icon: Users, text: `Probation Ending: ${e.firstname} ${e.surname}`, time: endStr, color: 'text-indigo-400', url: '/employees', priority: 3 });
+        }
+    });
+
+    // 11. Pending Onboarding (Priority: 4)
+    const onboardingEmps = employees.filter(e => e.status === 'Onboarding');
+    if (onboardingEmps.length > 0) {
+        notifs.push({ id: 'onboarding-counts', icon: UserPlus, text: `${onboardingEmps.length} staff currently onboarding`, time: 'Ongoing', color: 'text-emerald-500', url: '/onboarding', priority: 4 });
+    }
+
+    // 12. Recent Attendance (Info - Priority: 5)
+    const dates = [...new Set(attendanceRecords.map((r) => r.date))].sort().reverse();
+    if (dates.length > 0) {
+      const latestDate = dates[0];
+      const count = attendanceRecords.filter((r) => r.date === latestDate).length;
+      notifs.push({ id: `att-${latestDate}`, icon: CalendarClock, text: `${count} attendance records for ${latestDate}`, time: latestDate, color: 'text-slate-400', priority: 5 });
+    }
+
+    // Sort by priority then time (roughly)
+    return notifs.sort((a, b) => a.priority - b.priority).slice(0, 15);
+  }, [employees, attendanceRecords, leaves, pendingInvoices, invoices, salaryAdvances, loans, sites, disciplinaryRecords, evaluations, commLogs, reminders]);
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
@@ -214,49 +277,99 @@ export function Header({ onMenuClick }: HeaderProps) {
           >
             <Bell className="h-4 w-4" />
             {notifications.length > 0 && (
-              <span className={`absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 ring-2 ${isDark ? 'ring-slate-900' : 'ring-white'}`} />
+              <span className={`absolute top-1 right-1 h-2 w-2 rounded-full ring-2 ${isDark ? 'ring-slate-900' : 'ring-white'} ${
+                notifications.some(n => n.priority <= 1) ? 'bg-red-500 animate-pulse' : 'bg-red-400'
+              }`} />
             )}
           </button>
 
           {notifOpen && (
-            <div className={`absolute right-0 top-full mt-1 w-80 border rounded-lg shadow-xl z-50 overflow-hidden ${
+            <div className={`absolute right-0 top-full mt-1 w-80 border rounded-lg shadow-xl z-50 overflow-hidden flex flex-col ${
               isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
             }`}>
               <div className={`px-4 py-3 border-b flex items-center justify-between ${
-                isDark ? 'border-slate-700' : 'border-slate-100'
+                isDark ? 'bg-slate-900/40 border-slate-700' : 'bg-slate-50 border-slate-100'
               }`}>
-                <h3 className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>Notifications</h3>
-                <span className="text-[10px] font-medium text-indigo-400 bg-indigo-900/40 px-1.5 py-0.5 rounded-full">
-                  {notifications.length}
-                </span>
+                <div className="flex items-center gap-2">
+                  <h3 className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>Notifications</h3>
+                  <span className="text-[10px] font-bold text-white bg-indigo-600 px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                    {notifications.length}
+                  </span>
+                </div>
+                <button 
+                  onClick={() => setNotifOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
               </div>
-              <div className="max-h-72 overflow-y-auto">
+
+              <div className="max-h-[400px] overflow-y-auto scrollbar-thin">
                 {notifications.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-xs text-slate-400">
-                    <Bell className="h-5 w-5 mx-auto mb-2 opacity-20" />
-                    No notifications
+                  <div className="px-4 py-12 text-center text-xs text-slate-400">
+                    <div className="h-12 w-12 bg-slate-100 dark:bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Bell className="h-6 w-6 opacity-20" />
+                    </div>
+                    <p className="font-medium">All caught up!</p>
+                    <p className="text-[10px] mt-1 opacity-60">No new notifications to show.</p>
                   </div>
                 ) : (
-                  notifications.map((n) => (
-                    <div key={n.id} onClick={() => { if (n.url) { navigate(n.url); setNotifOpen(false); } }} 
-                      className={`flex items-start gap-3 px-4 py-3 transition-colors border-b last:border-0 ${n.url ? 'cursor-pointer' : ''} ${
-                      isDark ? 'hover:bg-slate-700/50 border-slate-700/50' : 'hover:bg-slate-50 border-slate-50'
-                    }`}>
-                      <div className={`h-7 w-7 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 ${n.color} ${
-                        isDark ? 'bg-slate-700' : 'bg-slate-50'
-                      }`}>
-                        <n.icon className="h-3.5 w-3.5" />
+                  <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                    {notifications.map((n) => (
+                      <div 
+                        key={n.id} 
+                        onClick={() => { if (n.url) { navigate(n.url); setNotifOpen(false); } }} 
+                        className={`flex items-start gap-3 px-4 py-3.5 transition-all relative group ${
+                          n.url ? 'cursor-pointer' : ''
+                        } ${
+                          isDark ? 'hover:bg-slate-700/40' : 'hover:bg-blue-50/30'
+                        }`}
+                      >
+                        {/* Priority Indicator */}
+                        {n.priority <= 1 && (
+                          <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-rose-500" />
+                        )}
+                        
+                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                          isDark ? 'bg-slate-700/50' : 'bg-slate-100/80 shadow-sm'
+                        } ${n.color}`}>
+                          <n.icon className="h-4 w-4" />
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className={`text-[11px] font-bold uppercase tracking-wider opacity-60 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                              {n.priority === 0 ? 'Urgent' : n.priority === 1 ? 'High Priority' : 'Attention'}
+                            </p>
+                            <p className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                              {n.time.includes('-') ? new Date(n.time).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : n.time}
+                            </p>
+                          </div>
+                          <p className={`text-[12px] leading-tight font-medium mt-0.5 ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                            {n.text}
+                          </p>
+                          {n.url && (
+                            <div className="mt-1.5 flex items-center gap-1 text-[10px] text-indigo-500 font-bold group-hover:translate-x-1 transition-transform">
+                              Take Action <ChevronRight className="h-2.5 w-2.5" />
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-[11px] leading-snug ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{n.text}</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
-                          <Clock className="h-2.5 w-2.5" /> {n.time}
-                        </p>
-                      </div>
-                    </div>
-                  ))
+                    ))}
+                  </div>
                 )}
               </div>
+              
+              {notifications.length > 0 && (
+                <div className={`px-4 py-2 text-center border-t ${isDark ? 'bg-slate-900/40 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                  <button 
+                    onClick={() => { navigate('/tasks'); setNotifOpen(false); }}
+                    className="text-[10px] font-bold text-slate-500 hover:text-indigo-600 transition-colors uppercase tracking-widest"
+                  >
+                    View Task Manager
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
