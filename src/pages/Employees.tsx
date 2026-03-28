@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
 import { Search, Plus, MoreHorizontal, Download, Upload, ArrowLeft, Save, Pencil, Trash2, Eye, X, Network, CheckSquare, Square, Settings2, Users } from 'lucide-react';
-import { useAppStore, Employee, MonthlySalary } from '@/src/store/appStore';
+import { useAppStore, Employee, MonthlySalary, DisciplinaryRecord } from '@/src/store/appStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
@@ -17,26 +17,7 @@ import { useAppData } from '@/src/contexts/AppDataContext';
 import { Checkbox } from '@/src/components/ui/checkbox';
 import { normalizeDate } from '@/src/lib/dateUtils';
 
-const POSITION_HIERARCHY = [
-  'CEO',
-  'Head of Admin',
-  'Head of Operations',
-  'Projects Supervisor',
-  'Logistics and Warehouse Officer',
-  'Admin/Accounts Officer',
-  'HR Officer',
-  'Foreman',
-  'Engineer',
-  'Site Supervisor',
-  'Assistant Supervisor',
-  'Mechanic Technician/Site Worker',
-  'Site Worker',
-  'Driver',
-  'Adhoc Staff',
-  'Security',
-  'Consultant',
-  'Sponsored Student'
-];
+import { getPositionIndex } from '@/src/lib/hierarchy';
 
 export function Employees() {
   const navigate = useNavigate();
@@ -44,7 +25,7 @@ export function Employees() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkEditing, setIsBulkEditing] = useState(false);
   const [bulkFormData, setBulkFormData] = useState<Partial<Employee>>({});
-  const [detailTab, setDetailTab] = useState<'Overview' | 'Attendance' | 'Leaves' | 'Disciplinary' | 'Evaluations' | 'Reminders'>('Overview');
+  const [detailTab, setDetailTab] = useState<'Overview' | 'Attendance' | 'Leaves' | 'Conduct' | 'Evaluations' | 'Reminders'>('Overview');
   const [activeTabMonth, setActiveTabMonth] = useState<string>('All');
   const [activeTabYear, setActiveTabYear] = useState<string>(new Date().getFullYear().toString());
   const [searchTerm, setSearchTerm] = useState('');
@@ -68,7 +49,17 @@ export function Employees() {
   const addDepartment = useAppStore((state) => state.addDepartment);
   const disciplinaryRecords = useAppStore((state) => state.disciplinaryRecords);
   const evaluations = useAppStore((state) => state.evaluations);
+  const hrVariables = useAppStore((state) => state.hrVariables);
+  const { addDisciplinaryRecord, deleteDisciplinaryRecord } = useAppStore();
   const { reminders, addReminder } = useAppData();
+
+  const [isLoggingPerformance, setIsLoggingPerformance] = useState(false);
+  const [performanceRecord, setPerformanceRecord] = useState<Partial<DisciplinaryRecord>>({
+    type: 'Behavioral',
+    severity: 'Verbal Warning',
+    points: 0,
+    description: '',
+  });
 
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('employees');
@@ -87,14 +78,10 @@ export function Employees() {
   }).sort((a, b) => {
     if (sortBy === 'name') return (a.surname + a.firstname).localeCompare(b.surname + b.firstname);
     if (sortBy === 'position') {
-      const posA = a.position || '';
-      const posB = b.position || '';
-      const idxA = POSITION_HIERARCHY.indexOf(posA);
-      const idxB = POSITION_HIERARCHY.indexOf(posB);
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-      return posA.localeCompare(posB);
+      const idxA = getPositionIndex(a.position);
+      const idxB = getPositionIndex(b.position);
+      if (idxA !== idxB) return idxA - idxB;
+      return (a.position || '').localeCompare(b.position || '');
     }
     if (sortBy === 'startDate') return new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime();
     return 0; // maintain default dateAdded order which matches array order
@@ -798,18 +785,18 @@ export function Employees() {
 
             <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
               <div className="flex bg-slate-100 rounded-lg p-1 grow md:grow-0 overflow-x-auto whitespace-nowrap scrollbar-hide">
-                {['Overview', 'Attendance', 'Leaves', 'Disciplinary', 'Evaluations', 'Reminders'].map(tab => (
+                {['Overview', 'Attendance', 'Leaves', 'Conduct', 'Evaluations', 'Reminders'].map(tab => (
                   <button
                     key={tab}
                     className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-md transition-all ${detailTab === tab ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     onClick={() => setDetailTab(tab as any)}
                   >
-                    {tab}
+                    {tab === 'Conduct' ? 'Merits & Incidents' : tab}
                   </button>
                 ))}
               </div>
               
-              {(detailTab === 'Attendance' || detailTab === 'Leaves' || detailTab === 'Disciplinary' || detailTab === 'Evaluations') && (
+              {(detailTab === 'Attendance' || detailTab === 'Leaves' || detailTab === 'Conduct' || detailTab === 'Evaluations') && (
                 <div className="flex gap-2 shrink-0 ml-auto">
                   <select
                     value={activeTabMonth}
@@ -1043,18 +1030,38 @@ export function Employees() {
               );
             })()}
 
-            {detailTab === 'Disciplinary' && (() => {
-               const empDiscip = disciplinaryRecords
+            {detailTab === 'Conduct' && (() => {
+               const empEvents = disciplinaryRecords
                  .filter(r => r.employeeId === emp.id)
                  .filter(r => activeTabYear === 'All' ? true : r.date?.startsWith(activeTabYear))
                  .filter(r => activeTabMonth === 'All' ? true : new Date(r.date || '').getMonth() + 1 === parseInt(activeTabMonth))
                  .sort((a,b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+               
+               const totalPoints = empEvents.reduce((sum, r) => sum + (r.points || 0), 0);
+
                return (
                  <div className="space-y-4">
-                   {empDiscip.length === 0 ? (
+                   <div className="flex items-center justify-between mb-4 bg-slate-50 p-3 rounded-lg border border-slate-100 shadow-inner">
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Lifetime Score</span>
+                          <span className={`text-xl font-black ${totalPoints > 0 ? 'text-emerald-600' : totalPoints < 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                            {totalPoints > 0 ? `+${totalPoints}` : totalPoints}
+                          </span>
+                        </div>
+                        <div className="h-8 w-px bg-slate-200"></div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Events</span>
+                          <span className="text-lg font-bold text-slate-700">{empEvents.length}</span>
+                        </div>
+                      </div>
+
+                   </div>
+
+                   {empEvents.length === 0 ? (
                      <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
-                        <p className="text-slate-500 font-medium">No active disciplinary events for selected period.</p>
-                        <p className="text-xs text-slate-400 mt-1">Good standing.</p>
+                        <p className="text-slate-500 font-medium">No professional conduct events for selected period.</p>
+                        <p className="text-xs text-slate-400 mt-1">Clean record and good standing.</p>
                      </div>
                    ) : (
                      <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -1062,23 +1069,39 @@ export function Employees() {
                          <TableHeader>
                            <TableRow className="bg-slate-50/50">
                              <TableHead className="w-24">Date</TableHead>
-                             <TableHead>Type</TableHead>
-                             <TableHead>Severity</TableHead>
+                             <TableHead>Type/Incidence</TableHead>
+                             <TableHead>Weight</TableHead>
                              <TableHead className="text-right">Actions</TableHead>
                            </TableRow>
                          </TableHeader>
                          <TableBody>
-                           {empDiscip.map(d => (
+                           {empEvents.map(d => (
                              <TableRow key={d.id} className="hover:bg-slate-50/80">
                                <TableCell className="font-mono text-[11px] text-slate-500">{d.date}</TableCell>
-                               <TableCell className="font-semibold text-slate-800 text-xs">{d.type}</TableCell>
                                <TableCell>
-                                 <Badge variant={d.severity.includes('Warning') ? 'warning' : 'destructive'} className="text-[10px]">{d.severity}</Badge>
+                                 <div className="font-semibold text-slate-800 text-xs">{d.type}</div>
+                                 <div className="text-[10px] text-slate-500">{d.severity}</div>
+                               </TableCell>
+                               <TableCell>
+                                 <Badge variant={d.points && d.points > 0 ? 'success' : d.points && d.points < 0 ? 'destructive' : 'outline'} className="text-[10px] font-black">
+                                   {d.points && d.points > 0 ? `+${d.points}` : d.points || 0}
+                                 </Badge>
                                </TableCell>
                                <TableCell className="text-right">
-                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => setViewingNarrative({ type: 'Disciplinary', data: d })}>
-                                   <Eye className="h-4 w-4" />
-                                 </Button>
+                                 <div className="flex justify-end gap-1">
+                                   <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => setViewingNarrative({ type: 'Disciplinary', data: d })}>
+                                     <Eye className="h-4 w-4" />
+                                   </Button>
+                                   <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-400 hover:text-rose-600 hover:bg-rose-50" onClick={async () => {
+                                      const ok = await showConfirm('Delete this performance event?', { variant: 'danger' });
+                                      if (ok) {
+                                        deleteDisciplinaryRecord(d.id);
+                                        toast.success('Event deleted.');
+                                      }
+                                   }}>
+                                      <Trash2 className="h-4 w-4" />
+                                   </Button>
+                                 </div>
                                </TableCell>
                              </TableRow>
                            ))}
@@ -1138,6 +1161,7 @@ export function Employees() {
                  </div>
                );
             })()}
+
           </div>
         </div>
 
@@ -1375,6 +1399,116 @@ export function Employees() {
     );
   };
 
+  const renderPerformanceLogModal = () => {
+    if (!isLoggingPerformance || !viewingEmployee) return null;
+    const emp = viewingEmployee;
+    const meritDefault = hrVariables?.meritWeight ?? 1;
+    const demeritDefault = hrVariables?.demeritWeight ?? -1;
+
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsLoggingPerformance(false)} />
+        <div className="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-lg border border-slate-200 overflow-hidden font-sans">
+          <div className={`p-6 bg-gradient-to-r ${(performanceRecord.points || 0) > 0 ? 'from-emerald-600 to-teal-600' : (performanceRecord.points || 0) < 0 ? 'from-rose-600 to-pink-600' : 'from-indigo-600 to-blue-600'}`}>
+             <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xl font-black text-white uppercase tracking-tighter">Log Professional Event</h3>
+                <button onClick={() => setIsLoggingPerformance(false)} className="text-white/70 hover:text-white transition-colors duration-200"><X className="h-6 w-6" /></button>
+             </div>
+             <p className="text-white/80 text-sm font-medium">Internal Ledger for {emp.firstname} {emp.surname}</p>
+          </div>
+
+          <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+            <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-2">
+                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Date of Event</label>
+                 <Input type="date" value={performanceRecord.date} onChange={e => setPerformanceRecord({...performanceRecord, date: e.target.value})} className="rounded-xl border-slate-100 bg-slate-50/50" />
+               </div>
+               <div className="space-y-2">
+                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Point Weight</label>
+                 <div className="flex items-center gap-3">
+                    <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl hover:bg-rose-50 hover:text-rose-600 border-slate-100" onClick={() => setPerformanceRecord({...performanceRecord, points: (performanceRecord.points || 0) - 1})}>
+                      <span className="font-bold">-</span>
+                    </Button>
+                    <Input type="number" value={performanceRecord.points} onChange={e => setPerformanceRecord({...performanceRecord, points: parseInt(e.target.value) || 0})} className="h-10 text-center font-black rounded-xl border-slate-100 bg-slate-50/50" />
+                    <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 border-slate-100" onClick={() => setPerformanceRecord({...performanceRecord, points: (performanceRecord.points || 0) + 1})}>
+                      <span className="font-bold">+</span>
+                    </Button>
+                 </div>
+                 <p className="text-[9px] text-slate-400 mt-1 italic text-center">Merit: +{meritDefault}, Demerit: {demeritDefault}</p>
+               </div>
+            </div>
+
+            <div className="space-y-2">
+               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Event Type</label>
+               <select value={performanceRecord.type} onChange={e => {
+                  const val = e.target.value;
+                  // Auto-assign weight based on type if points is 0 or neutral
+                  let pts = performanceRecord.points || 0;
+                  if (val === 'Accolade' && pts <= 0) pts = meritDefault;
+                  if (['Attendance', 'Behavioral', 'Performance', 'Safety/PPE'].includes(val) && pts >= 0) pts = demeritDefault;
+                  setPerformanceRecord({...performanceRecord, type: val as any, points: pts});
+               }} className="w-full h-11 px-4 rounded-xl border border-slate-100 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                  {hrVariables?.performanceCategories?.length ? (
+                    hrVariables.performanceCategories.map(c => <option key={c} value={c}>{c}</option>)
+                  ) : (
+                    <>
+                      <option value="Attendance">Attendance (Lateness/Absenteeism)</option>
+                      <option value="Behavioral">Behavioral (Conduct/Attitude)</option>
+                      <option value="Performance">Performance (Work Quality)</option>
+                      <option value="Safety/PPE">Safety/PPE Compliance</option>
+                      <option value="Accolade">Accolade / Special Recognition</option>
+                      <option value="Other">Other Category</option>
+                    </>
+                  )}
+               </select>
+            </div>
+
+            <div className="space-y-2">
+               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Official Severity / Action</label>
+               <select value={performanceRecord.severity} onChange={e => setPerformanceRecord({...performanceRecord, severity: e.target.value as any})} className="w-full h-11 px-4 rounded-xl border border-slate-100 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                  <option value="Neutral/Info">Neutral / Informational Only</option>
+                  {hrVariables?.actionLevels?.map(level => (
+                    <option key={level} value={level}>{level}</option>
+                  ))}
+                  <option value="Accolade - Commendation">Accolade - Commendation</option>
+                  <option value="Accolade - Outstanding">Accolade - Outstanding Performance</option>
+               </select>
+            </div>
+
+            <div className="space-y-2">
+               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Event Description & Narrative</label>
+               <textarea value={performanceRecord.description} onChange={e => setPerformanceRecord({...performanceRecord, description: e.target.value})} placeholder="Describe exactly what happened..." className="w-full h-24 px-4 py-3 rounded-2xl border border-slate-100 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none shadow-inner" />
+            </div>
+
+            <Button onClick={() => {
+              if (!performanceRecord.description) return toast.error('Add description');
+              const rec: DisciplinaryRecord = {
+                id: crypto.randomUUID(),
+                employeeId: emp.id,
+                date: performanceRecord.date || new Date().toISOString().split('T')[0],
+                type: performanceRecord.type || 'Behavioral',
+                severity: performanceRecord.severity || 'Verbal Warning',
+                description: performanceRecord.description,
+                points: performanceRecord.points || 0,
+                status: 'Active',
+                createdBy: 'HR System',
+                workspaceId: 'dcel', // Corrected mapping
+                acknowledged: false,
+                visibleToEmployee: true,
+                workflowState: 'Reported'
+              };
+              addDisciplinaryRecord(rec);
+              toast.success('Performance record updated');
+              setIsLoggingPerformance(false);
+            }} className="w-full rounded-2xl h-14 font-black uppercase tracking-widest bg-slate-900 hover:bg-black text-white shadow-lg transition-all active:scale-95 duration-300">
+              Post to Ledger
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // If adding new employee
   if (isAdding) {
     return renderEmployeeForm(false);
@@ -1575,6 +1709,7 @@ export function Employees() {
       </div>
       {renderBulkEditModal()}
       {renderViewModal()}
+      {renderPerformanceLogModal()}
       
       {/* Import Modal Options */}
       {importFile && (
@@ -1608,5 +1743,3 @@ export function Employees() {
     </div>
   );
 }
-
-

@@ -7,8 +7,10 @@ import { useUserStore } from '@/src/store/userStore';
 import { usePriv } from '@/src/hooks/usePriv';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { FileText, Plus, Trash2, Search, Filter, CheckSquare, X, Send } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export function CompanyExpenses() {
+  const navigate = useNavigate();
   const priv = usePriv('ledger'); // using ledger priv as it's an account feature
   const currentUser = useUserStore((s) => s.getCurrentUser());
 
@@ -16,7 +18,7 @@ export function CompanyExpenses() {
   const addExpense = useAppStore((s) => s.addCompanyExpense);
   const updateExpense = useAppStore((s) => s.updateCompanyExpense);
   const deleteExpense = useAppStore((s) => s.deleteCompanyExpense);
-  const addLedgerEntry = useAppStore((s) => s.addLedgerEntry);
+  const setPendingLedgerEntries = useAppStore((s) => s.setPendingLedgerEntries);
   
   const ledgerBanks = useAppStore((s) => s.ledgerBanks);
   const ledgerBeneficiaryBanks = useAppStore((s) => s.ledgerBeneficiaryBanks);
@@ -33,12 +35,8 @@ export function CompanyExpenses() {
 
   const [search, setSearch] = useState('');
   
-  // Selection and Modal State
+  // Selection State
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [showLedgerModal, setShowLedgerModal] = useState(false);
-  const [ledgerVoucherDate, setLedgerVoucherDate] = useState(new Date().toISOString().split('T')[0]);
-  const [ledgerVoucherNo, setLedgerVoucherNo] = useState('');
-  const [ledgerCategory, setLedgerCategory] = useState('Uncategorized');
 
   // We can fetch ledgerCategories to allow category selection right here
   const ledgerCategories = useAppStore((s) => s.ledgerCategories);
@@ -120,50 +118,37 @@ export function CompanyExpenses() {
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        if (next.size >= 8) {
+          toast.error('You cannot select more than 8 expenses at a time.');
+          return prev;
+        }
+        next.add(id);
+      }
       return next;
     });
   };
 
   const toggleAll = () => {
-    if (selectedIds.size === filteredExpenses.length) {
+    if (selectedIds.size === Math.min(filteredExpenses.length, 8) && filteredExpenses.length > 0) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredExpenses.map(e => e.id)));
+      setSelectedIds(new Set(filteredExpenses.slice(0, 8).map(e => e.id)));
     }
   };
 
-  const handleBulkAddToLedger = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleBulkAddToLedger = () => {
     if (selectedIds.size === 0) return;
     
-    // Create ledger entries for each selected ID
+    // Pass selected expenses to Ledger via global store
     const selectedExpenses = expenses.filter(ex => selectedIds.has(ex.id));
+    setPendingLedgerEntries(selectedExpenses);
     
-    selectedExpenses.forEach(exp => {
-      addLedgerEntry({
-        id: crypto.randomUUID(),
-        voucherNo: ledgerVoucherNo || 'PENDING',
-        date: ledgerVoucherDate,
-        description: exp.description + (exp.paidToBankName ? ` (To: ${exp.paidToBankName} ${exp.paidToAccountNo})` : ''),
-        category: ledgerCategory || 'Uncategorized',
-        amount: exp.amount,
-        client: '',
-        site: '',
-        vendor: '',
-        bank: exp.paidFrom,
-        enteredBy: currentUser?.name || 'Unknown'
-      });
-    });
-
-    toast.success(`Added ${selectedExpenses.length} expenses to the Ledger.`);
+    // Reset selection and navigate to Ledger
     setSelectedIds(new Set());
-    setShowLedgerModal(false);
-    
-    // Reset modal fields
-    setLedgerVoucherNo('');
-    setLedgerCategory('Uncategorized');
+    navigate('/ledger');
   };
 
   return (
@@ -262,15 +247,15 @@ export function CompanyExpenses() {
                   Recent Expenses
                 </h3>
                 {selectedIds.size > 0 && (
-                  <Button size="sm" onClick={() => setShowLedgerModal(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 text-xs font-semibold px-3 hidden sm:flex">
-                    <Send className="w-3 h-3 mr-1.5" /> Add {selectedIds.size} to Ledger
+                  <Button size="sm" onClick={handleBulkAddToLedger} className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 text-xs font-semibold px-3 hidden sm:flex">
+                    <Send className="w-3 h-3 mr-1.5" /> Continue to Ledger ({selectedIds.size})
                   </Button>
                 )}
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
                 {selectedIds.size > 0 && (
-                  <Button size="sm" onClick={() => setShowLedgerModal(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white w-full h-8 text-xs font-semibold px-3 sm:hidden">
-                    <Send className="w-3 h-3 mr-1.5" /> Add {selectedIds.size} to Ledger
+                  <Button size="sm" onClick={handleBulkAddToLedger} className="bg-indigo-600 hover:bg-indigo-700 text-white w-full h-8 text-xs font-semibold px-3 sm:hidden">
+                    <Send className="w-3 h-3 mr-1.5" /> Continue to Ledger ({selectedIds.size})
                   </Button>
                 )}
                 <div className="relative w-full sm:w-64">
@@ -369,64 +354,6 @@ export function CompanyExpenses() {
         </div>
       </div>
 
-      {/* Ledger Modal */}
-      {showLedgerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm fade-in">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-300">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
-              <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                <Send className="w-5 h-5 text-indigo-600" />
-                Add to Ledger
-              </h3>
-              <button onClick={() => setShowLedgerModal(false)} className="text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 p-1.5 rounded-full transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <form onSubmit={handleBulkAddToLedger} className="p-5 flex flex-col gap-5 text-left">
-              <div className="bg-indigo-50 text-indigo-800 text-sm p-3 rounded-lg border border-indigo-100 flex gap-2">
-                <FileText className="w-5 h-5 shrink-0" />
-                <p>You are adding <strong>{selectedIds.size}</strong> expense(s) to the ledger. Provide the voucher date and basic details.</p>
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Voucher Date <span className="text-red-500">*</span></label>
-                <Input type="date" value={ledgerVoucherDate} onChange={e => setLedgerVoucherDate(e.target.value)} required />
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Voucher No (Optional)</label>
-                <Input placeholder="e.g. PV-2026-001" value={ledgerVoucherNo} onChange={e => setLedgerVoucherNo(e.target.value)} />
-                <p className="text-xs text-slate-500 mt-1">Leave blank to use 'PENDING'</p>
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Category</label>
-                <select 
-                  className="w-full flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                  value={ledgerCategory} 
-                  onChange={e => setLedgerCategory(e.target.value)}
-                >
-                  <option value="Uncategorized">Uncategorized</option>
-                  {sortedCategories.map(c => (
-                    <option key={c.id} value={c.name}>{c.name}</option>
-                  ))}
-                </select>
-                <p className="text-xs text-slate-500 mt-1">You will add the remaining details later in the Ledger page.</p>
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-3 mt-2">
-                <Button type="button" variant="ghost" onClick={() => setShowLedgerModal(false)} className="text-slate-600 hover:bg-slate-100">
-                  Cancel
-                </Button>
-                <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
-                  Confirm & Add
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useUserStore } from '@/src/store/userStore';
 import { Avatar, AvatarFallback } from '@/src/components/ui/avatar';
+import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
 
 export function Evaluations() {
   const [employeeSearch, setEmployeeSearch] = useState('');
@@ -29,7 +30,9 @@ export function Evaluations() {
   const currentUser = useUserStore(s => s.getCurrentUser());
   const priv = usePriv('evaluations');
 
-  const internalEmployees = employees.filter(e => e.staffType?.toLowerCase().includes('internal'));
+  const internalEmployees = filterAndSortEmployeesExcludingCEO(
+    employees.filter(e => e.staffType?.toLowerCase().includes('internal') || ['OFFICE', 'FIELD'].includes(e.staffType))
+  );
 
   const emptyForm: Partial<EvaluationRecord> = {
     employeeId: '',

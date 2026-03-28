@@ -8,7 +8,7 @@ import type {
   SalaryAdvance, Loan, Payment, VatPayment, LeaveRecord, DepartmentTasks,
   DisciplinaryRecord, EvaluationRecord, Department, Position,
   LedgerCategory, LedgerVendor, LedgerBank, LedgerBeneficiaryBank, LedgerEntry, CommLog,
-  CompanyExpense
+  CompanyExpense, StaffMeritRecord
 } from '@/src/store/appStore';
 import type { AppUser, PrivilegePreset } from '@/src/store/userStore';
 import type { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
@@ -43,6 +43,11 @@ export function dbToEmployee(r: any): Employee {
     typeOfPay: r.type_of_pay || undefined,
     startMonthOfPay: r.start_month_of_pay || undefined,
     level: r.level ?? 10,
+    lashmaPolicyNumber: r.lashma_policy_number || undefined,
+    lashmaRegistrationDate: r.lashma_registration_date || undefined,
+    lashmaExpiryDate: r.lashma_expiry_date || undefined,
+    onboardingMainTaskId: r.onboarding_main_task_id || undefined,
+    onboardingSuspended: r.onboarding_suspended ?? false,
   };
 }
 
@@ -165,6 +170,7 @@ export function dbToDisciplinary(r: any): DisciplinaryRecord {
     finalResult: r.final_result,
     suspensionStartDate: r.suspension_start_date,
     suspensionEndDate: r.suspension_end_date,
+    points: r.points,
   };
 }
 
@@ -212,6 +218,25 @@ export function dbToCompanyExpense(r: any): CompanyExpense {
     paidToAccountNo: r.paid_to_account_no,
     enteredBy: r.entered_by,
     createdAt: r.created_at
+  };
+}
+
+export function dbToStaffMerit(r: any): StaffMeritRecord {
+  return {
+    id: r.id,
+    workspaceId: r.workspace_id,
+    employeeId: r.employee_id,
+    employeeName: r.employee_name,
+    recordType: r.record_type,
+    category: r.category,
+    description: r.description,
+    siteId: r.site_id || undefined,
+    siteName: r.site_name || undefined,
+    loggedById: r.logged_by_id || undefined,
+    loggedByName: r.logged_by_name || undefined,
+    hrNotified: r.hr_notified,
+    incidentDate: r.incident_date,
+    createdAt: r.created_at,
   };
 }
 
@@ -407,6 +432,7 @@ function disciplinaryToDb(d: DisciplinaryRecord) {
     final_result: d.finalResult,
     suspension_start_date: d.suspensionStartDate,
     suspension_end_date: d.suspensionEndDate,
+    points: d.points,
   };
 }
 
@@ -440,6 +466,25 @@ function companyExpenseToDb(e: CompanyExpense) {
     paid_to_bank_name: e.paidToBankName,
     paid_to_account_no: e.paidToAccountNo,
     entered_by: e.enteredBy
+  };
+}
+
+function staffMeritToDb(r: StaffMeritRecord) {
+  return {
+    id: r.id,
+    workspace_id: r.workspaceId,
+    employee_id: r.employeeId,
+    employee_name: r.employeeName,
+    record_type: r.recordType,
+    category: r.category,
+    description: r.description,
+    site_id: r.siteId || null,
+    site_name: r.siteName || null,
+    logged_by_id: r.loggedById || null,
+    logged_by_name: r.loggedByName || null,
+    hr_notified: r.hrNotified,
+    incident_date: r.incidentDate,
+    created_at: r.createdAt,
   };
 }
 
@@ -500,6 +545,7 @@ export async function fetchAllAppData(privs?: any) {
     lBenBankRes,
     commLogsRes,
     pendingSitesRes,
+    staffMeritRes,
   ] = await Promise.all([
     canView('sites') ? supabase.from('sites').select('*').order('created_at') : Promise.resolve({ data: [] }),
     canView('sites') ? supabase.from('clients').select('*').order('name') : Promise.resolve({ data: [] }),
@@ -528,6 +574,7 @@ export async function fetchAllAppData(privs?: any) {
     canView('ledger') ? supabase.from('company_expenses').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     supabase.from('comm_logs').select('*').order('date', { ascending: false }),
     canView('sites') ? supabase.from('pending_sites').select('*').order('created_at') : Promise.resolve({ data: [] }),
+    supabase.from('staff_merit_record').select('*').order('incident_date', { ascending: false }),
   ]);
 
   const settings = settingsRes.data;
@@ -561,6 +608,7 @@ export async function fetchAllAppData(privs?: any) {
     ledgerBeneficiaryBanks: (lBenBankRes.data || []).map(dbToLedgerBeneficiaryBank),
     ledgerEntries: (lEntRes.data || []).map(dbToLedgerEntry),
     companyExpenses: (compExpRes.data || []).map(dbToCompanyExpense),
+    staffMeritRecords: (staffMeritRes.data || []).map(dbToStaffMerit),
     positions: (positionsRes.data || []).map((p: any) => ({
       id: p.id,
       title: p.title || p.name,
@@ -721,6 +769,7 @@ export const db = {
     if (e.withholdingTax !== undefined) update.withholding_tax = e.withholdingTax;
     if (e.taxId !== undefined) update.tax_id = e.taxId;
     if (e.pensionNumber !== undefined) update.pension_number = e.pensionNumber;
+    if (e.payeNumber !== undefined) update.paye_number = e.payeNumber;
     if (e.status !== undefined) update.status = e.status;
     if (e.monthlySalaries !== undefined) update.monthly_salaries = e.monthlySalaries;
     if (e.avatar !== undefined) update.avatar = e.avatar;
@@ -733,13 +782,19 @@ export const db = {
     if (e.tentativeStartDate !== undefined) update.tentative_start_date = e.tentativeStartDate;
     if (e.verifiedStartDate !== undefined) update.verified_start_date = e.verifiedStartDate;
     if (e.onboardingChecklist !== undefined) update.onboarding_checklist = e.onboardingChecklist;
-    if (e.payeNumber !== undefined) update.paye_number = e.payeNumber;
+    if (e.onboardingMainTaskId !== undefined) update.onboarding_main_task_id = e.onboardingMainTaskId;
+    if (e.onboardingSuspended !== undefined) update.onboarding_suspended = e.onboardingSuspended;
     if (e.lineManager !== undefined) update.line_manager = e.lineManager;
     if (e.phone !== undefined) update.phone = e.phone;
     if (e.email !== undefined) update.email = e.email;
     if (e.payeeType !== undefined) update.payee_type = e.payeeType;
     if (e.typeOfPay !== undefined) update.type_of_pay = e.typeOfPay;
     if (e.startMonthOfPay !== undefined) update.start_month_of_pay = e.startMonthOfPay;
+    // ── Fields added recently that were previously not persisted ──
+    if (e.level !== undefined) update.level = e.level;
+    if (e.lashmaPolicyNumber !== undefined) update.lashma_policy_number = e.lashmaPolicyNumber;
+    if (e.lashmaRegistrationDate !== undefined) update.lashma_registration_date = e.lashmaRegistrationDate;
+    if (e.lashmaExpiryDate !== undefined) update.lashma_expiry_date = e.lashmaExpiryDate;
     const { error } = await supabase.from('employees').update(update).eq('id', id);
     if (error) console.error('updateEmployee:', error);
   },
@@ -972,6 +1027,7 @@ export const db = {
     if (d.finalResult !== undefined) update.final_result = d.finalResult;
     if (d.suspensionStartDate !== undefined) update.suspension_start_date = d.suspensionStartDate;
     if (d.suspensionEndDate !== undefined) update.suspension_end_date = d.suspensionEndDate;
+    if (d.points !== undefined) update.points = d.points;
 
     const { error } = await supabase.from('disciplinary_records').update(update).eq('id', id);
     if (error) console.error('updateDisciplinaryRecord:', error);
@@ -1255,6 +1311,33 @@ export const db = {
   async deleteCommLog(id: string) {
     const { error } = await supabase.from('comm_logs').delete().eq('id', id);
     if (error) console.error('deleteCommLog:', error);
+  },
+
+  // Staff Merit Records
+  async insertStaffMeritRecord(r: StaffMeritRecord) {
+    const { error } = await supabase.from('staff_merit_record').insert(staffMeritToDb(r));
+    if (error) console.error('insertStaffMeritRecord:', error);
+  },
+  async updateStaffMeritRecord(id: string, r: Partial<StaffMeritRecord>) {
+    const update: any = {};
+    if (r.workspaceId !== undefined) update.workspace_id = r.workspaceId;
+    if (r.employeeId !== undefined) update.employee_id = r.employeeId;
+    if (r.employeeName !== undefined) update.employee_name = r.employeeName;
+    if (r.recordType !== undefined) update.record_type = r.recordType;
+    if (r.category !== undefined) update.category = r.category;
+    if (r.description !== undefined) update.description = r.description;
+    if (r.siteId !== undefined) update.site_id = r.siteId;
+    if (r.siteName !== undefined) update.site_name = r.siteName;
+    if (r.loggedById !== undefined) update.logged_by_id = r.loggedById;
+    if (r.loggedByName !== undefined) update.logged_by_name = r.loggedByName;
+    if (r.hrNotified !== undefined) update.hr_notified = r.hrNotified;
+    if (r.incidentDate !== undefined) update.incident_date = r.incidentDate;
+    const { error } = await supabase.from('staff_merit_record').update(update).eq('id', id);
+    if (error) console.error('updateStaffMeritRecord:', error);
+  },
+  async deleteStaffMeritRecord(id: string) {
+    const { error } = await supabase.from('staff_merit_record').delete().eq('id', id);
+    if (error) console.error('deleteStaffMeritRecord:', error);
   },
   async setPositions(positions: Position[]) {
     await supabase.from('positions').delete().neq('id', '');

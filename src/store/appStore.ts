@@ -23,6 +23,23 @@ export interface CommLog {
   createdAt: string;
 }
 
+export interface StaffMeritRecord {
+  id: string;
+  workspaceId: string;
+  employeeId: string;
+  employeeName: string;
+  recordType: 'Accolade' | 'Infringement';
+  category: 'Behaviour on Site' | 'Dress Code' | 'PPE Maintenance' | 'Client Accolade' | 'Client Complaint' | 'Other';
+  description: string;
+  siteId?: string;
+  siteName?: string;
+  loggedById?: string;
+  loggedByName?: string;
+  hrNotified: boolean;
+  incidentDate: string;
+  createdAt: string;
+}
+
 export interface LedgerCategory { id: string; name: string; }
 export interface LedgerVendor { id: string; name: string; tinNumber?: string; }
 export interface LedgerBank { id: string; name: string; }
@@ -266,7 +283,7 @@ export interface DisciplinaryRecord {
   type: string;
   severity: string;
   description: string;
-  actionTaken: string;
+  actionTaken?: string;
   status: 'Active' | 'Appealed' | 'Expired' | 'Closed'; // added Closed to align with workflows
   acknowledged: boolean;
   employeeComment?: string;
@@ -286,6 +303,8 @@ export interface DisciplinaryRecord {
   finalResult?: 'Warning' | 'Suspension' | 'Termination' | 'No Consequence' | 'Pending';
   suspensionStartDate?: string;
   suspensionEndDate?: string;
+  points?: number; // 0=nothing, <0=demerit, >0=merit
+  workspaceId?: string;
 }
 
 export interface EvaluationRecord {
@@ -473,6 +492,8 @@ interface AppState {
   ledgerBeneficiaryBanks: LedgerBeneficiaryBank[];
   ledgerEntries: LedgerEntry[];
   companyExpenses: CompanyExpense[];
+  pendingLedgerEntries: CompanyExpense[];
+  staffMeritRecords: StaffMeritRecord[];
   addSite: (site: Site) => void;
   setSites: (sites: Site[]) => void;
   updateSite: (id: string, site: Partial<Site>) => void;
@@ -492,7 +513,6 @@ interface AppState {
   addAttendanceRecords: (records: AttendanceRecord[]) => void;
   removeAttendanceRecordsByDate: (date: string) => void;
   deleteAttendanceRecords: (ids: string[]) => void;
-  
   addDisciplinaryRecord: (record: DisciplinaryRecord) => void;
   updateDisciplinaryRecord: (id: string, record: Partial<DisciplinaryRecord>) => void;
   deleteDisciplinaryRecord: (id: string) => void;
@@ -560,6 +580,14 @@ interface AppState {
   updateCompanyExpense: (id: string, expense: Partial<CompanyExpense>) => void;
   deleteCompanyExpense: (id: string) => void;
 
+  setPendingLedgerEntries: (entries: CompanyExpense[]) => void;
+  clearPendingLedgerEntries: () => void;
+
+  addStaffMeritRecord: (record: StaffMeritRecord) => void;
+  updateStaffMeritRecord: (id: string, record: Partial<StaffMeritRecord>) => void;
+  deleteStaffMeritRecord: (id: string) => void;
+  setStaffMeritRecords: (records: StaffMeritRecord[]) => void;
+
   payrollVariables: {
     basic: number;
     housing: number;
@@ -596,6 +624,11 @@ interface AppState {
     investigationPeriodDays: number;
     appealPeriodDays: number;
     onboardingStageLabels?: Record<string, string>;
+    performanceCategories?: string[]; // Attendance, Behavioral, Performance, Safety, Accolade, etc.
+    meritWeight?: number; // Default +1
+    demeritWeight?: number; // Default -1
+    suspensionCapDays?: number; 
+    enableAutomaticEvaluationPenalty?: boolean; 
   };
   updateHrVariables: (variables: Partial<AppState['hrVariables']>) => void;
   saveAllSettings: (payroll: AppState['payrollVariables'], paye: AppState['payeTaxVariables'], months: AppState['monthValues'], hr: AppState['hrVariables']) => void;
@@ -646,6 +679,8 @@ export const useAppStore = create<AppState>()(
       ledgerBeneficiaryBanks: [],
       ledgerEntries: [],
       companyExpenses: [],
+      pendingLedgerEntries: [],
+      staffMeritRecords: [],
 
       payrollVariables: {
         basic: 40, housing: 30, transport: 20, otherAllowances: 10,
@@ -783,9 +818,12 @@ export const useAppStore = create<AppState>()(
       deleteLedgerEntry: (id) => { set(s => ({ ledgerEntries: s.ledgerEntries.filter(c => c.id !== id) })); db.deleteLedgerEntry(id); },
 
       // Company Expenses
-      addCompanyExpense: (e) => { set(s => ({ companyExpenses: [...s.companyExpenses, e] })); db.insertCompanyExpense(e); },
-      updateCompanyExpense: (id, e) => { set(s => ({ companyExpenses: s.companyExpenses.map(c => c.id === id ? { ...c, ...e } : c) })); db.updateCompanyExpense(id, e); },
+      addCompanyExpense: (expense) => { set(s => ({ companyExpenses: [...s.companyExpenses, expense] })); db.insertCompanyExpense(expense); },
+      updateCompanyExpense: (id, expense) => { set(s => ({ companyExpenses: s.companyExpenses.map(c => c.id === id ? { ...c, ...expense } : c) })); db.updateCompanyExpense(id, expense); },
       deleteCompanyExpense: (id) => { set(s => ({ companyExpenses: s.companyExpenses.filter(c => c.id !== id) })); db.deleteCompanyExpense(id); },
+
+      setPendingLedgerEntries: (entries) => set({ pendingLedgerEntries: entries }),
+      clearPendingLedgerEntries: () => set({ pendingLedgerEntries: [] }),
 
       // Payroll Variables
       updatePayrollVariables: (variables) => {
@@ -893,6 +931,12 @@ export const useAppStore = create<AppState>()(
       addDisciplinaryRecord: (record) => { set((s) => ({ disciplinaryRecords: [...s.disciplinaryRecords, record] })); db.insertDisciplinaryRecord(record); },
       updateDisciplinaryRecord: (id, record) => { set((s) => ({ disciplinaryRecords: s.disciplinaryRecords.map(r => r.id === id ? { ...r, ...record } : r) })); db.updateDisciplinaryRecord(id, record); },
       deleteDisciplinaryRecord: (id) => { set((s) => ({ disciplinaryRecords: s.disciplinaryRecords.filter(r => r.id !== id) })); db.deleteDisciplinaryRecord(id); },
+
+      // Staff Merit Records
+      addStaffMeritRecord: (record) => { set((s) => ({ staffMeritRecords: [...s.staffMeritRecords, record] })); db.insertStaffMeritRecord(record); },
+      updateStaffMeritRecord: (id, record) => { set((s) => ({ staffMeritRecords: s.staffMeritRecords.map(r => r.id === id ? { ...r, ...record } : r) })); db.updateStaffMeritRecord(id, record); },
+      deleteStaffMeritRecord: (id) => { set((s) => ({ staffMeritRecords: s.staffMeritRecords.filter(r => r.id !== id) })); db.deleteStaffMeritRecord(id); },
+      setStaffMeritRecords: (records) => set({ staffMeritRecords: records }),
 
       // Evaluations
       addEvaluation: (record) => { set((s) => ({ evaluations: [...s.evaluations, record] })); db.insertEvaluation(record); },

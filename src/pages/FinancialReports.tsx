@@ -4,9 +4,10 @@ import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import {
-  Download, Upload, Receipt, Wallet, TrendingUp, Landmark, Activity, AlertCircle,
-  PieChart as PieChartIcon, BarChart3, Filter, X, CheckCircle2, FileSpreadsheet, FileText, DollarSign, Backpack, CreditCard
+  Download, Upload, ReceiptText, Wallet, TrendingUp, Landmark, Activity, AlertCircle,
+  PieChart as PieChartIcon, BarChart3, Filter, X, CheckCircle2, FileSpreadsheet, FileText, Backpack, CreditCard
 } from 'lucide-react';
+import { NairaSign } from '@/src/components/ui/naira-sign';
 import { useAppStore } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
 import {
@@ -815,7 +816,7 @@ export function FinancialReports() {
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Total Billed</p>
                 <h3 className="text-2xl font-bold font-mono text-slate-800">{formatCurrCompact(globalStats.totalBilled)}</h3>
               </div>
-              <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600"><Receipt className="w-5 h-5" /></div>
+              <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600"><ReceiptText className="w-5 h-5" /></div>
             </div>
             <div className="text-[11px] font-medium text-slate-500 bg-slate-50 px-2 py-1 rounded-md inline-flex items-center gap-1 self-start">
               Across {invoices.length} invoices
@@ -875,7 +876,7 @@ export function FinancialReports() {
         <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-0 pt-4 px-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-5 pb-3">
             <div className="flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-indigo-600" />
+              <ReceiptText className="w-5 h-5 text-indigo-600" />
               <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">Financial Summary Ledger</CardTitle>
             </div>
             {priv.canExport && (
@@ -1109,7 +1110,7 @@ export function FinancialReports() {
         <Card className="hover:shadow-md transition-shadow bg-white border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-lg font-semibold text-slate-900">Invoice Report</CardTitle>
-            <Receipt className="h-5 w-5 text-indigo-600" />
+            <ReceiptText className="h-5 w-5 text-indigo-600" />
           </CardHeader>
           <CardContent>
             <p className="text-sm text-slate-500 mb-4 h-10">Full invoice listing with client, site, amounts, and status.</p>
@@ -1131,7 +1132,7 @@ export function FinancialReports() {
         <Card className="hover:shadow-md transition-shadow bg-white border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-lg font-semibold text-slate-900">Payment Report</CardTitle>
-            <DollarSign className="h-5 w-5 text-emerald-600" />
+            <NairaSign className="h-5 w-5 text-emerald-600" />
           </CardHeader>
           <CardContent>
             <p className="text-sm text-slate-500 mb-4 h-10">Payment records with WHT, VAT, and discount breakdowns.</p>
@@ -1304,7 +1305,7 @@ export function FinancialReports() {
       {/* PAYROLL EXPOSURE SECTION */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
         <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800 flex items-center gap-2">
-          <DollarSign className="w-5 h-5 text-indigo-600" /> Payroll & Statutory Overview
+          <NairaSign className="w-5 h-5 text-indigo-600" /> Payroll & Statutory Overview
         </h2>
         <div className="flex items-center gap-2">
           <select value={payrollMonth ?? ''} onChange={e => setPayrollMonth(e.target.value === '' ? null : Number(e.target.value))}
@@ -1321,7 +1322,7 @@ export function FinancialReports() {
 
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="bg-gradient-to-br from-slate-900 to-indigo-900 text-white border-0 shadow-xl overflow-hidden relative">
-          <div className="absolute right-0 top-0 opacity-10"><DollarSign className="w-32 h-32 -mt-4 -mr-4" /></div>
+          <div className="absolute right-0 top-0 opacity-10"><NairaSign className="w-32 h-32 -mt-4 -mr-4" /></div>
           <CardHeader className="pb-2 relative z-10">
             <CardTitle className="text-sm font-medium text-indigo-200 uppercase tracking-widest flex justify-between">
               Payroll Exposure <Badge variant="outline" className="text-[10px] text-white/60 border-white/20">{payrollMonth ? MONTHS_LIST.find(m => m.value === payrollMonth)?.label : 'All Months'} {payrollYear}</Badge>

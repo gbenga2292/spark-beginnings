@@ -16,26 +16,8 @@ import { Checkbox } from '@/src/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/src/components/ui/dropdown-menu';
 import { useAppData } from '@/src/contexts/AppDataContext';
 
-const POSITION_HIERARCHY = [
-  'CEO',
-  'Head of Admin',
-  'Head of Operations',
-  'Projects Supervisor',
-  'Logistics and Warehouse Officer',
-  'Admin/Accounts Officer',
-  'HR Officer',
-  'Foreman',
-  'Engineer',
-  'Site Supervisor',
-  'Assistant Supervisor',
-  'Mechanic Technician/Site Worker',
-  'Site Worker',
-  'Driver',
-  'Adhoc Staff',
-  'Security',
-  'Consultant',
-  'Sponsored Student'
-];
+import { getPositionIndex } from '@/src/lib/hierarchy';
+
 
 export function Beneficiaries() {
   const navigate = useNavigate();
@@ -87,14 +69,10 @@ export function Beneficiaries() {
   }).sort((a, b) => {
     if (sortBy === 'name') return (a.surname + a.firstname).localeCompare(b.surname + b.firstname);
     if (sortBy === 'position') {
-      const posA = a.position || '';
-      const posB = b.position || '';
-      const idxA = POSITION_HIERARCHY.indexOf(posA);
-      const idxB = POSITION_HIERARCHY.indexOf(posB);
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-      return posA.localeCompare(posB);
+      const idxA = getPositionIndex(a.position);
+      const idxB = getPositionIndex(b.position);
+      if (idxA !== idxB) return idxA - idxB;
+      return (a.position || '').localeCompare(b.position || '');
     }
     if (sortBy === 'startDate') return new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime();
     return 0; // maintain default dateAdded order which matches array order

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/ca
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Download, FileSpreadsheet, FileText, PieChart as PieChartIcon, Users, Building2, Activity, CheckCircle2, CalendarClock, LayoutGrid, BarChart2, Flame } from 'lucide-react';
-import { useAppStore } from '@/src/store/appStore';
+import { useAppStore, DisciplinaryRecord } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LabelList } from 'recharts';
 import jsPDF from 'jspdf';
@@ -28,6 +28,7 @@ export function Reports() {
   const sites = useAppStore((state) => state.sites);
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const leaves = useAppStore((state) => state.leaves);
+  const disciplinaryRecords = useAppStore((state) => state.disciplinaryRecords);
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [activeEmpBuilderTab, setActiveEmpBuilderTab] = useState<string>("Identity & Profile");
@@ -78,6 +79,23 @@ export function Reports() {
     { name: 'Active', value: activeEmployees, color: '#10b981' },
     { name: 'Inactive', value: inactiveEmployees, color: '#f43f5e' }
   ], [activeEmployees, inactiveEmployees]);
+
+  const performanceLeaderboard = useMemo(() => {
+    const scores: Record<string, number> = {};
+    disciplinaryRecords.forEach(r => {
+      scores[r.employeeId] = (scores[r.employeeId] || 0) + (r.points || 0);
+    });
+    return employees
+      .map(e => ({
+        name: `${e.surname} ${e.firstname.charAt(0)}.`,
+        points: scores[e.id] || 0
+      }))
+      .filter(p => p.points !== 0)
+      .sort((a, b) => b.points - a.points)
+      .slice(0, 5);
+  }, [employees, disciplinaryRecords]);
+
+  const netContextPoints = disciplinaryRecords.reduce((sum, r) => sum + (r.points || 0), 0);
 
   // Filter operations staff
   const operationsStaff = employees.filter(emp => emp.department === 'OPERATIONS');
@@ -551,7 +569,7 @@ export function Reports() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="hover:shadow-md transition-shadow bg-white border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-lg font-semibold text-slate-900">Total Employees</CardTitle>
@@ -576,12 +594,25 @@ export function Reports() {
 
         <Card className="hover:shadow-md transition-shadow bg-white border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-semibold text-slate-900">Attendance Records</CardTitle>
+            <CardTitle className="text-lg font-semibold text-slate-900">Attendance Log</CardTitle>
             <CalendarClock className="h-5 w-5 text-amber-500" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-slate-900">{attendanceRecords.length}</div>
-            <p className="text-sm text-slate-500 mt-1">Total daily register entries</p>
+            <p className="text-sm text-slate-500 mt-1">Daily register entries</p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow bg-white border-slate-200">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-lg font-semibold text-slate-900">Merit Balance</CardTitle>
+            <Flame className={`h-5 w-5 ${netContextPoints >= 0 ? 'text-orange-500' : 'text-rose-500'}`} />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-3xl font-bold ${netContextPoints >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+               {netContextPoints > 0 ? `+${netContextPoints}` : netContextPoints}
+            </div>
+            <p className="text-sm text-slate-500 mt-1">Net workforce performance score</p>
           </CardContent>
         </Card>
       </div>
@@ -628,6 +659,41 @@ export function Reports() {
                   <Legend verticalAlign="bottom" height={36} />
                 </PieChart>
               </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      <div className="grid gap-6 md:grid-cols-1">
+        <Card className="shadow-sm bg-white border-slate-200">
+          <CardHeader className="border-b border-slate-100 pb-4">
+            <CardTitle className="text-lg flex items-center justify-between text-slate-900 w-full">
+              <div className="flex items-center gap-2">
+                <Flame className="h-5 w-5 text-orange-500" /> Professional Merit Leaderboard
+              </div>
+              <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Top 5 Performers</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="h-[250px] w-full">
+               {performanceLeaderboard.length === 0 ? (
+                 <div className="flex items-center justify-center h-full text-slate-400 italic text-sm">No merit points recorded yet.</div>
+               ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={performanceLeaderboard} layout="vertical" margin={{ left: 40, right: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                    <XAxis type="number" hide />
+                    <YAxis dataKey="name" type="category" width={80} axisLine={false} tickLine={false} />
+                    <RechartsTooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                    <Bar dataKey="points" radius={[0, 10, 10, 0]}>
+                       {performanceLeaderboard.map((entry, index) => (
+                         <Cell key={`cell-${index}`} fill={entry.points > 0 ? '#10b981' : '#f43f5e'} />
+                       ))}
+                       <LabelList dataKey="points" position="right" style={{fontWeight: 'bold', fontSize: '12px'}} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+               )}
             </div>
           </CardContent>
         </Card>

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
-import { Plus, Trash2, Save, Download, Upload, BookOpen, Settings2, Briefcase } from 'lucide-react';
+import { Plus, Trash2, Save, Download, Upload, BookOpen, Settings2, Briefcase, X } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -1538,6 +1538,82 @@ export function Variables() {
                   }
                 </div>
               </div>
+            </CardContent>
+          </Card>
+          {/* Performance & Conduct Variables */}
+          <Card className="shadow-sm border-slate-200 border-t-4 border-t-rose-500">
+            <CardHeader className="bg-rose-50/30 rounded-t-lg border-b border-rose-100">
+              <CardTitle className="text-rose-900">Performance & Conduct Configuration</CardTitle>
+              <CardDescription>
+                Configure point weights, categories, and policy enforcement for the professional ledger.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Merit Point Weight (Default)</label>
+                  <Input 
+                    type="number" 
+                    value={localHrVars.meritWeight ?? 1} 
+                    onChange={e => updateLocalHrVariables({ meritWeight: Number(e.target.value) })}
+                    className="h-10 border-slate-200"
+                  />
+                  <p className="text-[10px] text-slate-400">Default points for positive accolades.</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Demerit Point Weight (Default)</label>
+                  <Input 
+                    type="number" 
+                    value={localHrVars.demeritWeight ?? -1} 
+                    onChange={e => updateLocalHrVariables({ demeritWeight: Number(e.target.value) })}
+                    className="h-10 border-slate-200"
+                  />
+                  <p className="text-[10px] text-slate-400">Default points for disciplinary cases.</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-slate-500 uppercase">Performance Categories</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {(localHrVars.performanceCategories || ['Attendance', 'Behavioral', 'Performance', 'Safety/PPE', 'Accolade', 'Clarity']).map((cat, i) => (
+                    <div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600">
+                      {cat}
+                      {priv.canEdit && (
+                        <button onClick={() => {
+                          const newCats = (localHrVars.performanceCategories || ['Attendance', 'Behavioral', 'Performance', 'Safety/PPE', 'Accolade', 'Clarity']).filter(c => c !== cat);
+                          updateLocalHrVariables({ performanceCategories: newCats });
+                        }} className="text-slate-300 hover:text-rose-500 transition-colors">
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {priv.canEdit && (
+                  <div className="flex gap-2">
+                    <Input id="newPerformanceCat" placeholder="Add category (e.g. HSE)" className="h-9 border-slate-100" />
+                    <Button size="sm" onClick={() => {
+                      const inp = document.getElementById('newPerformanceCat') as HTMLInputElement;
+                      if (inp.value) {
+                        const newCats = [...(localHrVars.performanceCategories || ['Attendance', 'Behavioral', 'Performance', 'Safety/PPE', 'Accolade', 'Clarity']), inp.value];
+                        updateLocalHrVariables({ performanceCategories: newCats });
+                        inp.value = '';
+                      }
+                    }} className="bg-slate-800 hover:bg-black text-white px-4">Add</Button>
+                  </div>
+                )}
+              </div>
+
+               <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Suspension Cap (Days)</label>
+                  <Input 
+                    type="number" 
+                    value={localHrVars.suspensionCapDays ?? 30} 
+                    onChange={e => updateLocalHrVariables({ suspensionCapDays: Number(e.target.value) })}
+                    className="h-10 border-slate-200"
+                  />
+                  <p className="text-[10px] text-slate-400 font-medium">Maximum allowable suspension period per violation according to policy.</p>
+                </div>
             </CardContent>
           </Card>
         </div> {/* END LEFT COLUMN */}

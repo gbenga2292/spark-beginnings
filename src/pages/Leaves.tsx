@@ -12,6 +12,7 @@ import { toast, showConfirm } from '@/src/components/ui/toast';
 import { addDays, parseISO, format, isWithinInterval } from 'date-fns';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
+import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
 
 /* ─────────────────────────────────── helpers ─── */
 function calcExpectedEnd(startDate: string, duration: number): string {
@@ -53,7 +54,8 @@ export function Leaves() {
   // Internal staff only (no Adhoc) – used for Staff, Supervisor, Management dropdowns and Leave Summary
   const internalEmployees = useMemo(() => {
     const internalDeptNames = departments.filter(d => d.staffType === 'OFFICE').map(d => d.name);
-    return activeEmployees.filter(e => e.position !== 'Adhoc Staff' && internalDeptNames.includes(e.department));
+    const filtered = activeEmployees.filter(e => e.position !== 'Adhoc Staff' && internalDeptNames.includes(e.department));
+    return filterAndSortEmployeesExcludingCEO(filtered);
   }, [activeEmployees, departments]);
 
   /* ── filter state ── */

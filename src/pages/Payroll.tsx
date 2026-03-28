@@ -41,26 +41,8 @@ interface PayrollRecord {
 
 
 
-const POSITION_HIERARCHY = [
-  'CEO',
-  'Head of Admin',
-  'Head of Operations',
-  'Projects Supervisor',
-  'Logistics and Warehouse Officer',
-  'Admin/Accounts Officer',
-  'HR Officer',
-  'Foreman',
-  'Engineer',
-  'Site Supervisor',
-  'Assistant Supervisor',
-  'Mechanic Technician/Site Worker',
-  'Site Worker',
-  'Driver',
-  'Adhoc Staff',
-  'Security',
-  'Consultant',
-  'Sponsored Student',
-];
+import { getPositionIndex } from '@/src/lib/hierarchy';
+
 
 const isPayeEligible = (r: PayrollRecord) => r.paye > 0 && r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
 const isPensionEligible = (r: PayrollRecord) => r.pension > 0 && r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
@@ -213,14 +195,10 @@ export function Payroll() {
           return true;
         })
         .sort((a, b) => {
-          const posA = a.position || '';
-          const posB = b.position || '';
-          const idxA = POSITION_HIERARCHY.indexOf(posA);
-          const idxB = POSITION_HIERARCHY.indexOf(posB);
-          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-          if (idxA !== -1) return -1;
-          if (idxB !== -1) return 1;
-          return posA.localeCompare(posB);
+          const idxA = getPositionIndex(a.position);
+          const idxB = getPositionIndex(b.position);
+          if (idxA !== idxB) return idxA - idxB;
+          return (a.position || '').localeCompare(b.position || '');
         })
         .map((emp) => {
           const standardSalary = emp.monthlySalaries[mKey] || 0;

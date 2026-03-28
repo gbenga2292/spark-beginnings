@@ -16,6 +16,7 @@ import { usePriv } from '@/src/hooks/usePriv';
 import { useNavigate } from 'react-router-dom';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
+import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
 
 // ─── Default blank checklist ──────────────────────────────────
 function makeDefaultChecklist(noOfGuarantors: number): OnboardingChecklist {
@@ -283,9 +284,9 @@ export function Onboarding() {
 
   const [activeTaskType, setActiveTaskType] = useState<'Onboarding' | 'History' | 'Offboarding' | null>(null);
 
-  const activeEmployees = useMemo(() => employees.filter(e => e.status === 'Active'), [employees]);
-  const pendingEmployees = useMemo(() => employees.filter(e => e.status === 'Onboarding'), [employees]);
-  const terminatedEmployees = useMemo(() => employees.filter(e => e.status === 'Terminated'), [employees]);
+  const activeEmployees = useMemo(() => filterAndSortEmployeesExcludingCEO(employees.filter(e => e.status === 'Active')), [employees]);
+  const pendingEmployees = useMemo(() => filterAndSortEmployeesExcludingCEO(employees.filter(e => e.status === 'Onboarding')), [employees]);
+  const terminatedEmployees = useMemo(() => filterAndSortEmployeesExcludingCEO(employees.filter(e => e.status === 'Terminated')), [employees]);
 
   const filterEmps = (list: Employee[]) => {
     if (!employeeSearchQuery) return list;

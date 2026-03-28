@@ -11,26 +11,8 @@ import { toast, showConfirm } from '@/src/components/ui/toast';
 import * as XLSX from 'xlsx';
 import { usePriv } from '@/src/hooks/usePriv';
 
-const POSITION_HIERARCHY = [
-  'CEO',
-  'Head of Admin',
-  'Head of Operations',
-  'Projects Supervisor',
-  'Logistics and Warehouse Officer',
-  'Admin/Accounts Officer',
-  'HR Officer',
-  'Foreman',
-  'Engineer',
-  'Site Supervisor',
-  'Assistant Supervisor',
-  'Mechanic Technician/Site Worker',
-  'Site Worker',
-  'Driver',
-  'Adhoc Staff',
-  'Security',
-  'Consultant',
-  'Sponsored Student'
-];
+import { getPositionIndex } from '@/src/lib/hierarchy';
+
 
 export function Attendance() {
   const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
@@ -98,16 +80,13 @@ export function Attendance() {
     const matchesSearch = emp.surname.toLowerCase().includes(searchLow) ||
       emp.firstname.toLowerCase().includes(searchLow);
     const matchesType = emp.staffType === staffTypeFilter;
-    return matchesSearch && matchesType;
+    const isNotCEO = emp.position !== 'CEO';
+    return matchesSearch && matchesType && isNotCEO;
   }).sort((a, b) => {
-    const posA = a.position || '';
-    const posB = b.position || '';
-    const idxA = POSITION_HIERARCHY.indexOf(posA);
-    const idxB = POSITION_HIERARCHY.indexOf(posB);
-    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-    if (idxA !== -1) return -1;
-    if (idxB !== -1) return 1;
-    return posA.localeCompare(posB);
+    const idxA = getPositionIndex(a.position);
+    const idxB = getPositionIndex(b.position);
+    if (idxA !== idxB) return idxA - idxB;
+    return (a.position || '').localeCompare(b.position || '');
   });
 
   const filteredDbRecords = attendanceRecords.filter(r => {
@@ -134,14 +113,10 @@ export function Attendance() {
     const dateCmp = new Date(b.date).getTime() - new Date(a.date).getTime();
     if (dateCmp !== 0) return dateCmp;
 
-    const posA = a.position || '';
-    const posB = b.position || '';
-    const idxA = POSITION_HIERARCHY.indexOf(posA);
-    const idxB = POSITION_HIERARCHY.indexOf(posB);
-    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-    if (idxA !== -1) return -1;
-    if (idxB !== -1) return 1;
-    return posA.localeCompare(posB);
+    const idxA = getPositionIndex(a.position);
+    const idxB = getPositionIndex(b.position);
+    if (idxA !== idxB) return idxA - idxB;
+    return (a.position || '').localeCompare(b.position || '');
   });
 
   // DB Actions

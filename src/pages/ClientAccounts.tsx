@@ -5,7 +5,8 @@ import { Payments } from './Payments';
 import { VatPayments } from './VatPayments';
 import { useTheme } from '../hooks/useTheme';
 import { cn } from '../lib/utils';
-import { Receipt, DollarSign, Landmark } from 'lucide-react';
+import { ReceiptText, Landmark } from 'lucide-react';
+import { NairaSign } from '@/src/components/ui/naira-sign';
 
 export function ClientAccounts() {
   const currentUser = useUserStore((s) => s.getCurrentUser());
@@ -19,8 +20,8 @@ export function ClientAccounts() {
   const canViewVat = paymentPriv?.canViewVat === true;
 
   const tabs = [];
-  if (canViewInvoice) tabs.push({ id: 'invoice', label: 'Invoice', icon: Receipt, component: <Billing /> });
-  if (canViewPayment) tabs.push({ id: 'payment', label: 'Payment', icon: DollarSign, component: <Payments /> });
+  if (canViewInvoice) tabs.push({ id: 'invoice', label: 'Invoice', icon: ReceiptText, component: <Billing /> });
+  if (canViewPayment) tabs.push({ id: 'payment', label: 'Payment', icon: NairaSign, component: <Payments /> });
   if (canViewVat) tabs.push({ id: 'vat', label: 'VAT', icon: Landmark, component: <VatPayments /> });
 
   const [activeTab, setActiveTab] = useState(tabs.length > 0 ? tabs[0].id : '');
@@ -35,7 +36,7 @@ export function ClientAccounts() {
   if (tabs.length === 0) {
     return (
         <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500 min-h-[400px]">
-            <Receipt className="w-12 h-12 text-slate-300 mb-4" />
+            <ReceiptText className="w-12 h-12 text-slate-300 mb-4" />
             <p className="text-lg font-medium text-slate-600">No Access</p>
             <p className="text-sm">You do not have permission to view Client Accounts.</p>
         </div>

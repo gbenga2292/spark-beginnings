@@ -16,8 +16,7 @@ import {
   Landmark,
   ShieldCheck,
   Building2,
-  Receipt,
-  DollarSign,
+  ReceiptText,
   BarChart3,
   ChevronDown,
   AlertTriangle,
@@ -42,6 +41,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { useState } from 'react';
+import { NairaSign } from '@/src/components/ui/naira-sign';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -101,9 +101,9 @@ const navigation: NavCategory[] = [
       { name: 'Employees', href: '/employees', icon: Users, privKey: 'employees', privField: 'canView' },
       { name: 'Onboarding', href: '/onboarding', icon: UserPlus, privKey: 'onboarding', privField: 'canView' },
       { name: 'Leaves', href: '/leaves', icon: CalendarClock, privKey: 'leaves', privField: 'canView' },
-      { name: 'Salary & Loan Advance', href: '/salary-loans', icon: DollarSign, privKey: 'salaryLoans', privField: 'canView' },
+      { name: 'Salary & Loan Advance', href: '/salary-loans', icon: NairaSign, privKey: 'salaryLoans', privField: 'canView' },
       { name: 'Evaluations', href: '/evaluations', icon: ClipboardList, privKey: 'evaluations', privField: 'canView' },
-      { name: 'Disciplinary', href: '/disciplinary', icon: AlertTriangle, privKey: 'disciplinary', privField: 'canView' },
+      { name: 'Performance & Conduct', href: '/performance-conduct', icon: AlertTriangle, privKey: 'disciplinary', privField: 'canView' },
       { name: 'HR Reports', href: '/reports', icon: FileText, privKey: 'reports', privField: 'canView' },
     ],
   },
@@ -133,7 +133,7 @@ const navigation: NavCategory[] = [
     name: 'Account',
     icon: Landmark,
     items: [
-      { name: 'Client Accounts', href: '/client-accounts', icon: Receipt, privKey: 'custom', privField: '', visible: (user: any) => user?.privileges?.billing?.canView || user?.privileges?.payments?.canView || user?.privileges?.payments?.canViewVat },
+      { name: 'Client Accounts', href: '/client-accounts', icon: ReceiptText, privKey: 'custom', privField: '', visible: (user: any) => user?.privileges?.billing?.canView || user?.privileges?.payments?.canView || user?.privileges?.payments?.canViewVat },
       { name: 'Payroll', href: '/payroll', icon: Wallet, privKey: 'payroll', privField: 'canView' },
       { name: 'Non-Employee Directory', href: '/beneficiaries', icon: Users, privKey: 'payroll', privField: 'canView' },
       { name: 'Ledger', href: '/ledger', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
