@@ -115,11 +115,18 @@ export function Employees() {
     }
 
     // Level Validation: Only one Level 2 per department
-    if (formData.level === 2 && formData.department) {
-      const existingLevel2 = employees.find(e => e.level === 2 && e.department === formData.department && e.status !== 'Terminated');
-      if (existingLevel2) {
-        toast.error(`There can only be one Level 2 (Head of Department) in ${formData.department}. Currently assigned to ${existingLevel2.firstname} ${existingLevel2.surname}.`);
-        return;
+    if (formData.level === 2) {
+      const deptsToCheck = [formData.department, ...(formData.secondaryDepartments || [])].filter(Boolean);
+      for (const deptName of deptsToCheck) {
+        const existingLevel2 = employees.find(e => 
+          e.level === 2 && 
+          (e.department === deptName || e.secondaryDepartments?.includes(deptName)) && 
+          e.status !== 'Terminated'
+        );
+        if (existingLevel2) {
+          toast.error(`There can only be one Level 2 (Head of Department) in ${deptName}. Currently: ${existingLevel2.firstname} ${existingLevel2.surname}.`);
+          return;
+        }
       }
     }
 
@@ -209,11 +216,20 @@ export function Employees() {
         return;
       }
     }
-    if (formData.level === 2 && formData.department) {
-      const existingLevel2 = employees.find(e => e.level === 2 && e.department === formData.department && e.id !== editingEmployeeId && e.status !== 'Terminated');
-      if (existingLevel2) {
-        toast.error(`There can only be one Level 2 (Head of Department) in ${formData.department}. Currently: ${existingLevel2.firstname} ${existingLevel2.surname}.`);
-        return;
+    // Level Validation for Edit
+    if (formData.level === 2) {
+      const deptsToCheck = [formData.department, ...(formData.secondaryDepartments || [])].filter(Boolean);
+      for (const deptName of deptsToCheck) {
+        const existingLevel2 = employees.find(e => 
+          e.level === 2 && 
+          (e.department === deptName || e.secondaryDepartments?.includes(deptName)) && 
+          e.id !== editingEmployeeId && 
+          e.status !== 'Terminated'
+        );
+        if (existingLevel2) {
+          toast.error(`There can only be one Level 2 (Head of Department) in ${deptName}. Currently: ${existingLevel2.firstname} ${existingLevel2.surname}.`);
+          return;
+        }
       }
     }
 
@@ -531,6 +547,31 @@ export function Employees() {
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Department</label>
                   <Input value={formData.department || ''} disabled className="bg-slate-100/50 text-slate-500 cursor-not-allowed" />
                 </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Secondary / Dual-Department (HOD Role)</label>
+                  <div className="flex flex-wrap gap-2 p-3 bg-slate-50 border border-slate-200 rounded-md min-h-12 max-h-48 overflow-y-auto">
+                    {departments
+                      .filter(d => d.name !== formData.department)
+                      .map(dept => (
+                      <label key={dept.id} className="flex items-center gap-2 bg-white px-2 py-1 rounded border border-slate-200 text-xs font-semibold cursor-pointer hover:bg-indigo-50 transition-colors">
+                        <input 
+                          type="checkbox" 
+                          checked={formData.secondaryDepartments?.includes(dept.name) || false} 
+                          onChange={e => {
+                            const current = formData.secondaryDepartments || [];
+                            const next = e.target.checked ? [...current, dept.name] : current.filter(n => n !== dept.name);
+                            setFormData({ ...formData, secondaryDepartments: next });
+                          }}
+                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-3.5 w-3.5"
+                        />
+                        {dept.name}
+                      </label>
+                    ))}
+                    {departments.filter(d => d.name !== formData.department).length === 0 && (
+                      <span className="text-[10px] text-slate-400 italic">No other departments available.</span>
+                    )}
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Staff Type</label>
                   <select 
@@ -775,7 +816,14 @@ export function Employees() {
               </Avatar>
               <div>
                 <h2 className="text-2xl font-bold text-slate-900">{emp.surname} {emp.firstname}</h2>
-                <p className="text-slate-500">{emp.position} - {emp.department}</p>
+                <p className="text-slate-500">
+                  {emp.position} - {emp.department}
+                  {emp.secondaryDepartments && emp.secondaryDepartments.length > 0 && (
+                    <span className="text-indigo-500 font-medium ml-1">
+                      (Dual: {emp.secondaryDepartments.join(', ')})
+                    </span>
+                  )}
+                </p>
                 <Badge variant={emp.status === 'Active' ? 'success' : emp.status === 'On Leave' ? 'warning' : 'destructive'} className="mt-1">
                   {emp.status}
                 </Badge>

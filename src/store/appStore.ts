@@ -274,6 +274,7 @@ export interface Employee {
   lashmaPolicyNumber?: string;
   lashmaRegistrationDate?: string;
   lashmaExpiryDate?: string;
+  secondaryDepartments?: string[];
 }
 
 export interface DisciplinaryRecord {

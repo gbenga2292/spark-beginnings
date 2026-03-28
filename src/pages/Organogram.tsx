@@ -44,7 +44,7 @@ export function Organogram() {
     // 1. Initialize all department nodes
     departments.forEach(dept => {
       const deptPositions = positions.filter(pos => pos.departmentId === dept.id);
-      const deptEmployees = activeEmployees.filter(emp => emp.department === dept.name);
+      const deptEmployees = activeEmployees.filter(emp => emp.department === dept.name || emp.secondaryDepartments?.includes(dept.name));
       
       // Separate HODs (Level 2) - Sort by hierarchy index, then by name
       const hods = deptEmployees.filter(emp => emp.level === 2).sort((a,b) => {
@@ -311,8 +311,10 @@ export function Organogram() {
               </span>
             </div>
           </div>
-          <div className="bg-white px-3 py-2 flex items-center justify-center border-t border-slate-50">
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{node.department}</span>
+          <div className="bg-white px-3 py-2 flex flex-wrap items-center justify-center gap-1 border-t border-slate-50">
+            {[node.department, ...(node.secondaryDepartments || [])].filter(Boolean).map((d, idx) => (
+              <span key={idx} className="text-[9px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50/50 px-1.5 rounded">{d}</span>
+            ))}
           </div>
         </motion.div>
 

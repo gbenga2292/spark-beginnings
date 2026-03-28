@@ -48,6 +48,7 @@ export function dbToEmployee(r: any): Employee {
     lashmaExpiryDate: r.lashma_expiry_date || undefined,
     onboardingMainTaskId: r.onboarding_main_task_id || undefined,
     onboardingSuspended: r.onboarding_suspended ?? false,
+    secondaryDepartments: r.secondary_departments || [],
   };
 }
 
@@ -311,6 +312,12 @@ function employeeToDb(e: Employee) {
     type_of_pay: e.typeOfPay ?? null,
     start_month_of_pay: e.startMonthOfPay ?? null,
     level: e.level ?? 10,
+    secondary_departments: e.secondaryDepartments || [],
+    lashma_policy_number: e.lashmaPolicyNumber || null,
+    lashma_registration_date: e.lashmaRegistrationDate || null,
+    lashma_expiry_date: e.lashmaExpiryDate || null,
+    onboarding_main_task_id: e.onboardingMainTaskId || null,
+    onboarding_suspended: e.onboardingSuspended ?? false,
   };
 }
 
@@ -795,6 +802,7 @@ export const db = {
     if (e.lashmaPolicyNumber !== undefined) update.lashma_policy_number = e.lashmaPolicyNumber;
     if (e.lashmaRegistrationDate !== undefined) update.lashma_registration_date = e.lashmaRegistrationDate;
     if (e.lashmaExpiryDate !== undefined) update.lashma_expiry_date = e.lashmaExpiryDate;
+    if (e.secondaryDepartments !== undefined) update.secondary_departments = e.secondaryDepartments;
     const { error } = await supabase.from('employees').update(update).eq('id', id);
     if (error) console.error('updateEmployee:', error);
   },
