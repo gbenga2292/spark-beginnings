@@ -4,11 +4,15 @@ import { Button } from '@/src/components/ui/button';
 import { ArrowLeft, Users, Building2, Briefcase, ZoomIn, ZoomOut, Maximize, Network, UserSquare2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { getPositionIndex } from '@/src/lib/hierarchy';
 
-// Extended Department type that contains nested children and positions
+// Updated Node type for a more hierarchical organogram
 type OrgNode = Department & {
   childrenDepts: OrgNode[];
-  positionsWithStaff: (Position & { employees: Employee[] })[];
+  hods: Employee[];
+  officeStaff: (Position & { staff: Employee[] })[];
+  fieldStaff: (Position & { staff: Employee[] })[];
+  totalStaff: number;
 };
 
 // Tree structure for Reporting Line view
@@ -35,26 +39,45 @@ export function Organogram() {
 
   // Recursively build the organogram tree
   const rootNodes = useMemo(() => {
-    // 1. Build a map of all node IDs to their populated data
     const nodesMap = new Map<string, OrgNode>();
 
+    // 1. Initialize all department nodes
     departments.forEach(dept => {
-      // Find positions for this department
       const deptPositions = positions.filter(pos => pos.departmentId === dept.id);
+      const deptEmployees = activeEmployees.filter(emp => emp.department === dept.name);
       
-      const positionsWithStaff = deptPositions.map(pos => {
-        const staffInPosition = activeEmployees.filter(
-          emp => emp.position === pos.id || emp.position === pos.title
-        );
-        return {
-          ...pos,
-          employees: staffInPosition
-        };
+      // Separate HODs (Level 2) - Sort by hierarchy index, then by name
+      const hods = deptEmployees.filter(emp => emp.level === 2).sort((a,b) => {
+        const hA = getPositionIndex(a.position);
+        const hB = getPositionIndex(b.position);
+        if (hA !== hB) return hA - hB;
+        return a.firstname.localeCompare(b.firstname);
       });
+      
+      // Group other staff by position and staff type, excluding Level 1 and Level 2
+      const otherStaff = deptEmployees.filter(emp => emp.level !== 1 && emp.level !== 2);
+      
+      const createPositionGroup = (type: 'OFFICE' | 'FIELD') => {
+        return deptPositions.map(pos => {
+          const staffInPos = otherStaff.filter(emp => 
+            (emp.position === pos.id || emp.position === pos.title) && emp.staffType === type
+          ).sort((a,b) => {
+            // Internal sort within a position: Level first, then name
+            if (a.level !== b.level) return (a.level || 10) - (b.level || 10);
+            return a.firstname.localeCompare(b.firstname);
+          });
+          
+          return staffInPos.length > 0 ? { ...pos, staff: staffInPos } : null;
+        }).filter(Boolean)
+          .sort((a, b) => getPositionIndex(a?.title) - getPositionIndex(b?.title)) as (Position & { staff: Employee[] })[];
+      };
 
       nodesMap.set(dept.id, {
         ...dept,
-        positionsWithStaff,
+        hods,
+        officeStaff: createPositionGroup('OFFICE'),
+        fieldStaff: createPositionGroup('FIELD'),
+        totalStaff: deptEmployees.length,
         childrenDepts: []
       });
     });
@@ -62,120 +85,174 @@ export function Organogram() {
     const roots: OrgNode[] = [];
 
     // 2. Link children to their parents
-    // Notice: we must convert Map values to Array before iterating if we rely on mutations forming the tree
     Array.from(nodesMap.values()).forEach(node => {
       if (node.parentDepartmentId && nodesMap.has(node.parentDepartmentId)) {
         nodesMap.get(node.parentDepartmentId)!.childrenDepts.push(node);
       } else {
-        // No parent or parent not found -> treat as root
         roots.push(node);
       }
     });
 
-    // Sort roots alphabetically
-    roots.sort((a, b) => a.name.localeCompare(b.name));
-    return roots;
+    return roots.sort((a, b) => a.name.localeCompare(b.name));
   }, [departments, positions, activeEmployees]);
 
-  // Recursively build the reporting line tree (Office & Field Staff only)
+  // Recursively build the reporting line tree
   const reportingRoots = useMemo(() => {
-    const internalActive = activeEmployees.filter(emp => emp.staffType !== 'NON-EMPLOYEE');
     const nodesMap = new Map<string, ReportingNode>();
 
-    internalActive.forEach(emp => {
+    activeEmployees.forEach(emp => {
       nodesMap.set(emp.id, { ...emp, directReports: [] });
     });
 
     const roots: ReportingNode[] = [];
 
     Array.from(nodesMap.values()).forEach(node => {
-      // Logic: A person is a root if they have no line manager OR if they are Level 1 (Head of Company)
+      // Logic: Root is Level 1, or anyone without a line manager who isn't reporting to a Level 1 elsewhere
       if (node.level === 1) {
         roots.push(node);
       } else if (node.lineManager && nodesMap.has(node.lineManager)) {
         nodesMap.get(node.lineManager)!.directReports.push(node);
       } else {
-        // If no line manager and not Level 1, still a root unless there's a Level 1 to attach to
-        // But for now follow explicit lineManager links
         roots.push(node);
       }
     });
 
-    // If there is a Level 1, we might want to consolidate multiple null-manager roots under them?
-    // User said Level 1 is the head.
-    const level1Node = roots.find(r => r.level === 1);
-    if (level1Node) {
-      // Any other root that is not level 1 could potentially be moved under level 1
-      // but let's stick to the data for now to avoid surprises.
-    }
+    // 2. Secondary Sort: Sort direct reports for each node by hierarchy
+    Array.from(nodesMap.values()).forEach(node => {
+      node.directReports.sort((a, b) => {
+        const hA = getPositionIndex(a.position);
+        const hB = getPositionIndex(b.position);
+        if (hA !== hB) return hA - hB;
+        return a.firstname.localeCompare(b.firstname);
+      });
+    });
 
-    return roots;
+    return roots.sort((a, b) => {
+      const hA = getPositionIndex(a.position);
+      const hB = getPositionIndex(b.position);
+      if (hA !== hB) return hA - hB;
+      return a.firstname.localeCompare(b.firstname);
+    });
   }, [activeEmployees]);
 
   // Render a single department node and its children recursively
   const renderNode = (node: OrgNode, level: number = 0) => {
+    const hasBothTypes = node.officeStaff.length > 0 && node.fieldStaff.length > 0;
+
     return (
-      <div key={node.id} className="flex flex-col items-center relative px-2 animate-in fade-in zoom-in duration-300">
+      <div key={node.id} className="flex flex-col items-center relative px-4 animate-in fade-in zoom-in duration-300">
         
-        {/* Vertical line connecting up to parent (except first-level nodes where the parent is the root company node) */}
-        {level > 0 && <div className="w-px h-6 bg-slate-400"></div>}
+        {/* Vertical line connecting up to parent */}
+        {level > 0 && <div className="w-px h-8 bg-slate-300"></div>}
 
         <motion.div
           initial={{ y: 15, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="w-64 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition-shadow z-10 overflow-hidden relative group"
+          className={`${hasBothTypes ? 'w-[480px]' : 'w-72'} bg-white border border-slate-200 rounded-xl shadow-md hover:shadow-lg transition-all z-10 overflow-hidden relative group`}
         >
-          {/* Top colored strip based on type */}
-          <div className={`h-1.5 w-full ${node.staffType === 'FIELD' ? 'bg-amber-400' : 'bg-blue-500'}`}></div>
-          <div className="bg-slate-50 border-b border-slate-100 p-4 flex flex-col items-center text-center">
-            <div className={`p-2 rounded-lg mb-3 shadow-sm ${node.staffType === 'FIELD' ? 'bg-amber-100' : 'bg-blue-100'}`}>
-              <Users className={`h-5 w-5 ${node.staffType === 'FIELD' ? 'text-amber-600' : 'text-blue-600'}`} />
+          {/* Header - Department Name */}
+          <div className="bg-slate-900 text-white p-3 flex flex-col items-center text-center relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+            <h3 className="font-extrabold text-sm uppercase tracking-wider mb-0.5">{node.name}</h3>
+            <div className="flex items-center gap-2 opacity-70">
+              <Users className="h-3 w-3" />
+              <span className="text-[10px] font-bold">{node.totalStaff} Total Staff</span>
             </div>
-            <h3 className="font-bold text-slate-800 line-clamp-2 leading-tight">{node.name}</h3>
-            <span className="text-[10px] font-bold text-slate-500 mt-1.5 uppercase tracking-widest bg-slate-200/50 px-2 py-0.5 rounded-full">{node.staffType}</span>
           </div>
-          
-          {/* POSITIONS & EMPLOYEES INSIDE THIS DEPT */}
-          {node.positionsWithStaff.length > 0 && (
-            <div className="p-3 bg-white flex flex-col gap-3">
-              {node.positionsWithStaff.map(pos => (
-                <div key={pos.id} className="border border-slate-100 rounded-md p-2 shadow-sm bg-slate-50/50">
-                  <div className="flex items-center justify-center gap-1.5 mb-2 pb-2 border-b border-slate-100">
-                    <Briefcase className="h-3 w-3 text-slate-400" />
-                    <h4 className="font-semibold text-xs text-slate-700 text-center">{pos.title}</h4>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    {pos.employees.map(emp => (
-                      <div key={emp.id} className="flex flex-col gap-0.5 bg-white border border-indigo-100 rounded p-1.5 shadow-sm">
-                        <div className="text-[11px] text-indigo-700 font-bold truncate text-center">
-                          {emp.firstname} {emp.surname}
-                        </div>
-                        <div className="text-[9px] text-slate-400 font-semibold text-center uppercase tracking-tighter">
-                          Level {emp.level || 10}
-                        </div>
+
+          {/* HOD SECTION (Level 2) */}
+          {node.hods.length > 0 && (
+            <div className="bg-indigo-50/50 border-b border-indigo-100 p-3">
+              <div className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] text-center mb-2">Head of Department</div>
+              <div className="flex flex-col gap-2">
+                {node.hods.map(hod => (
+                  <div key={hod.id} className="bg-white border-2 border-indigo-200 rounded-lg p-2.5 shadow-sm flex items-center gap-3">
+                    {hod.avatar ? (
+                      <img src={hod.avatar} alt="" className="w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-sm" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                        {hod.firstname.charAt(0)}{hod.surname.charAt(0)}
                       </div>
-                    ))}
-                    {pos.employees.length === 0 && (
-                      <div className="text-[10px] text-slate-400 italic text-center py-0.5">Empty Role</div>
                     )}
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="text-[11px] font-bold text-slate-900 truncate">{hod.firstname} {hod.surname}</div>
+                      <div className="text-[9px] text-indigo-600 font-bold uppercase truncate">{hod.position}</div>
+                    </div>
+                    <div className="bg-indigo-100 text-indigo-700 text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm border border-indigo-200">LVL 2</div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
+
+          {/* SPLIT BODY: OFFICE vs FIELD */}
+          <div className={`flex ${hasBothTypes ? 'divide-x divide-slate-100' : 'flex-col'} bg-white`}>
+            {/* OFFICE COLUMN */}
+            {(node.officeStaff.length > 0 || !hasBothTypes) && (
+              <div className={`flex-1 p-3 ${!hasBothTypes && node.officeStaff.length === 0 ? 'hidden' : ''}`}>
+                <div className="flex items-center justify-center gap-1.5 mb-3">
+                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Office Staff</span>
+                </div>
+                <div className="space-y-3">
+                  {node.officeStaff.map(pos => (
+                    <div key={pos.id} className="space-y-1.5">
+                      <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter text-center">{pos.title}</div>
+                      {pos.staff.map(emp => (
+                        <div key={emp.id} className="flex flex-col gap-0.5 bg-slate-50 border border-slate-100 rounded-md p-2 hover:border-blue-200 hover:bg-white transition-colors">
+                          <div className="text-[11px] text-slate-800 font-bold text-center">
+                            {emp.firstname} {emp.surname}
+                          </div>
+                          <div className="text-[8px] text-slate-400 font-bold text-center uppercase">Level {emp.level || 10}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* FIELD COLUMN */}
+            {(node.fieldStaff.length > 0) && (
+              <div className="flex-1 p-3">
+                <div className="flex items-center justify-center gap-1.5 mb-3">
+                  <div className="h-1.5 w-1.5 rounded-full bg-amber-500"></div>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Field Staff</span>
+                </div>
+                <div className="space-y-3">
+                  {node.fieldStaff.map(pos => (
+                    <div key={pos.id} className="space-y-1.5">
+                      <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter text-center">{pos.title}</div>
+                      {pos.staff.map(emp => (
+                        <div key={emp.id} className="flex flex-col gap-0.5 bg-slate-50 border border-slate-100 rounded-md p-2 hover:border-amber-200 hover:bg-white transition-colors">
+                          <div className="text-[11px] text-slate-800 font-bold text-center">
+                            {emp.firstname} {emp.surname}
+                          </div>
+                          <div className="text-[8px] text-slate-400 font-bold text-center uppercase">Level {emp.level || 10}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* If fully empty department (no office/field but might have HOD or nothing) */}
+            {node.officeStaff.length === 0 && node.fieldStaff.length === 0 && (
+              <div className="p-8 text-center text-slate-300 italic text-[10px]">No assigned staff positions</div>
+            )}
+          </div>
         </motion.div>
 
         {/* RECURSIVE CHILDREN RENDERING */}
         {node.childrenDepts.length > 0 && (
           <div className="flex flex-col items-center w-full mt-2 relative">
-            {/* Stem line down from this node */}
-            <div className="w-px h-6 bg-slate-400"></div>
+            <div className="w-px h-8 bg-slate-300"></div>
             
-            <div className="flex items-start justify-center relative pt-4">
-              {/* Horizontal connection line if multiple children */}
+            <div className="flex items-start justify-center relative pt-6">
               {node.childrenDepts.length > 1 && (
                 <div 
-                  className="absolute top-0 h-px bg-slate-400"
+                  className="absolute top-0 h-px bg-slate-300"
                   style={{
                     left: `calc(100% / ${node.childrenDepts.length} / 2)`,
                     right: `calc(100% / ${node.childrenDepts.length} / 2)`
@@ -185,8 +262,7 @@ export function Organogram() {
               
               {node.childrenDepts.sort((a,b) => a.name.localeCompare(b.name)).map(childNode => (
                 <div key={childNode.id} className="relative flex flex-col items-center px-4">
-                  {/* Vertical stub from the horizontal line up to the line */}
-                  <div className="absolute top-0 w-px h-4 bg-slate-400 -mt-4"></div>
+                  <div className="absolute top-0 w-px h-6 bg-slate-300 -mt-6"></div>
                   {renderNode(childNode, level + 1)}
                 </div>
               ))}
@@ -199,44 +275,56 @@ export function Organogram() {
 
   // Render a single reporting node (employee) and their direct reports
   const renderReportingNode = (node: ReportingNode, level: number = 0) => {
+    const isCEO = node.level === 1;
+    const isHOD = node.level === 2;
+
     return (
       <div key={node.id} className="flex flex-col items-center relative px-2 animate-in fade-in zoom-in duration-300">
         
         {/* Vertical line connecting up to parent */}
-        {level > 0 && <div className="w-px h-6 bg-slate-400"></div>}
+        {level > 0 && <div className="w-px h-6 bg-slate-300"></div>}
 
         <motion.div
           initial={{ y: 15, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="w-56 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition-shadow z-10 overflow-hidden relative group"
+          className={`w-60 bg-white border ${isCEO ? 'border-slate-800 ring-4 ring-slate-100' : isHOD ? 'border-indigo-300 shadow-indigo-100/50' : 'border-slate-200'} rounded-xl shadow-md hover:shadow-lg transition-all z-10 overflow-hidden relative group`}
         >
-          <div className="h-1.5 w-full bg-emerald-500"></div>
+          <div className={`h-1.5 w-full ${isCEO ? 'bg-slate-900' : isHOD ? 'bg-indigo-500' : node.staffType === 'FIELD' ? 'bg-amber-400' : 'bg-blue-500'}`}></div>
           <div className="bg-slate-50 border-b border-slate-100 p-4 flex flex-col items-center text-center">
             {node.avatar ? (
-              <img src={node.avatar} alt="Avatar" className="w-12 h-12 rounded-full mb-3 object-cover shadow-sm border-2 border-white" />
+              <img src={node.avatar} alt="Avatar" className={`w-14 h-14 rounded-full mb-3 object-cover shadow-md border-2 ${isCEO ? 'border-slate-800' : 'border-white'}`} />
             ) : (
-              <div className="w-12 h-12 rounded-full mb-3 bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-lg shadow-sm border-2 border-white">
+              <div className={`w-14 h-14 rounded-full mb-3 flex items-center justify-center font-bold text-xl shadow-md border-2 border-white ${isCEO ? 'bg-slate-900 text-white' : isHOD ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
                 {node.firstname.charAt(0)}{node.surname.charAt(0)}
               </div>
             )}
-            <h3 className="font-bold text-slate-800 line-clamp-2 leading-tight">{node.firstname} {node.surname}</h3>
-            <span className="text-[11px] font-semibold text-slate-500 mt-1">{node.position}</span>
-            <div className="flex gap-1 mt-2">
-              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">{node.department}</span>
-              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">Lvl {node.level || 10}</span>
+            <h4 className={`font-black tracking-tight ${isCEO ? 'text-slate-900 text-base' : 'text-slate-800 text-sm'} line-clamp-2 leading-tight`}>
+              {node.firstname} {node.surname}
+            </h4>
+            <span className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-tighter">{node.position}</span>
+            <div className="flex items-center justify-center gap-1.5 mt-3">
+              <span className={`text-[9px] font-black uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border ${isCEO ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'}`}>
+                LVL {node.level || 10}
+              </span>
+              <span className={`text-[9px] font-black uppercase tracking-[0.1em] px-2 py-0.5 rounded-full ${node.staffType === 'FIELD' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-blue-50 text-blue-700 border border-blue-100'}`}>
+                {node.staffType}
+              </span>
             </div>
+          </div>
+          <div className="bg-white px-3 py-2 flex items-center justify-center border-t border-slate-50">
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{node.department}</span>
           </div>
         </motion.div>
 
         {/* RECURSIVE DIRECT REPORTS RENDERING */}
         {node.directReports.length > 0 && (
           <div className="flex flex-col items-center w-full mt-2 relative">
-            <div className="w-px h-6 bg-slate-400"></div>
+            <div className="w-px h-6 bg-slate-300"></div>
             
-            <div className="flex items-start justify-center relative pt-4">
+            <div className="flex items-start justify-center relative pt-6">
               {node.directReports.length > 1 && (
                 <div 
-                  className="absolute top-0 h-px bg-slate-400"
+                  className="absolute top-0 h-px bg-slate-300"
                   style={{
                     left: `calc(100% / ${node.directReports.length} / 2)`,
                     right: `calc(100% / ${node.directReports.length} / 2)`
@@ -244,9 +332,9 @@ export function Organogram() {
                 ></div>
               )}
               
-              {node.directReports.sort((a,b) => a.firstname.localeCompare(b.firstname)).map(report => (
+              {node.directReports.sort((a,b) => (a.level || 10) - (b.level || 10)).map(report => (
                 <div key={report.id} className="relative flex flex-col items-center px-4">
-                  <div className="absolute top-0 w-px h-4 bg-slate-400 -mt-4"></div>
+                  <div className="absolute top-0 w-px h-6 bg-slate-300 -mt-6"></div>
                   {renderReportingNode(report, level + 1)}
                 </div>
               ))}
@@ -257,6 +345,8 @@ export function Organogram() {
     );
   };
 
+  const ceoEmployee = useMemo(() => activeEmployees.find(e => e.level === 1), [activeEmployees]);
+
   return (
     <div className="space-y-4 h-full flex flex-col min-h-[calc(100vh-8rem)]">
       {/* HEADER CONTROLS */}
@@ -266,76 +356,95 @@ export function Organogram() {
             <Network className="h-6 w-6 text-indigo-600 hidden sm:block"/>
             Organogram
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">Interactive visual hierarchy of departments and positions.</p>
+          <p className="text-slate-500 text-sm mt-0.5">Hierarchical structure with departmental splits and reporting lines.</p>
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-4">
-          <div className="flex bg-slate-100 p-1 rounded-lg">
+          <div className="flex bg-slate-100 p-1 rounded-lg shadow-inner">
             <button
               onClick={() => setViewMode('department')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'department' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 transition-all ${viewMode === 'department' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <Building2 className="h-3.5 w-3.5" /> Dept View
+              <Building2 className="h-3.5 w-3.5" /> Department View
             </button>
             <button
               onClick={() => setViewMode('reporting')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'reporting' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 transition-all ${viewMode === 'reporting' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <UserSquare2 className="h-3.5 w-3.5" /> Reporting View
+              <Users className="h-3.5 w-3.5" /> Reporting View
             </button>
           </div>
-          <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg">
-          <Button variant="ghost" size="icon" onClick={handleZoomOut} className="h-8 w-8 text-slate-600 hover:bg-white hover:text-indigo-600 hover:shadow-sm" title="Zoom Out">
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <div className="w-12 text-center text-xs font-bold text-slate-600 font-mono">
-            {Math.round(zoom * 100)}%
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg">
+            <Button variant="ghost" size="icon" onClick={handleZoomOut} className="h-8 w-8 text-slate-600 hover:bg-white hover:text-indigo-600" title="Zoom Out">
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <div className="w-12 text-center text-[10px] font-black text-slate-600 font-mono tracking-tighter">
+              {Math.round(zoom * 100)}%
+            </div>
+            <Button variant="ghost" size="icon" onClick={handleZoomIn} className="h-8 w-8 text-slate-600 hover:bg-white hover:text-indigo-600" title="Zoom In">
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <div className="w-px h-4 bg-slate-300 mx-1"></div>
+            <Button variant="ghost" size="icon" onClick={handleResetZoom} className="h-8 w-8 text-slate-600 hover:bg-white hover:text-indigo-600" title="Full Screen">
+              <Maximize className="h-4 w-4" />
+            </Button>
+            <div className="w-px h-4 bg-slate-300 mx-1"></div>
+            <Button variant="ghost" className="h-8 text-[11px] font-bold text-slate-600 hover:bg-white hover:text-indigo-600" onClick={() => navigate('/employees')}>
+              <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back
+            </Button>
           </div>
-          <Button variant="ghost" size="icon" onClick={handleZoomIn} className="h-8 w-8 text-slate-600 hover:bg-white hover:text-indigo-600 hover:shadow-sm" title="Zoom In">
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <div className="w-px h-4 bg-slate-300 mx-1"></div>
-          <Button variant="ghost" size="icon" onClick={handleResetZoom} className="h-8 w-8 text-slate-600 hover:bg-white hover:text-indigo-600 hover:shadow-sm" title="Reset Zoom">
-            <Maximize className="h-4 w-4" />
-          </Button>
-          <div className="w-px h-4 bg-slate-300 mx-1"></div>
-          <Button variant="ghost" className="h-8 text-xs font-semibold text-slate-600 hover:bg-white hover:text-indigo-600 hover:shadow-sm" onClick={() => navigate('/employees')}>
-            <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back
-          </Button>
-        </div>
         </div>
       </div>
 
       {/* CANVAS */}
-      <div className="flex-1 bg-slate-50/50 border border-slate-200 rounded-xl overflow-auto relative cursor-grab active:cursor-grabbing">
+      <div className="flex-1 bg-[#f8fafc] border border-slate-200 rounded-2xl overflow-auto relative cursor-grab active:cursor-grabbing shadow-inner">
         {/* We use an internal container that scales based on zoom. The transform-origin is top center so it grows downwards and outwards symmetrically. */}
         <div 
-          className="min-w-max min-h-full flex justify-center py-12 px-20 transition-transform duration-200 ease-out"
+          className="min-w-max min-h-full flex justify-center py-16 px-32 transition-transform duration-300 ease-out"
           style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
         >
           {/* ROOT CONTAINER */}
           <div className="flex flex-col items-center">
+            {/* BIG CEO / COMPANY HEAD CARD */}
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className={`text-white rounded-xl shadow-xl px-10 py-5 z-20 relative flex flex-col items-center border-[4px] ring-4 ${viewMode === 'department' ? 'bg-slate-900 border-slate-800 ring-indigo-50/50' : 'bg-slate-900 border-slate-800 ring-emerald-50/50'}`}
+              className={`rounded-2xl shadow-xl p-8 z-20 relative flex flex-col items-center border-[6px] ring-8 ${viewMode === 'department' ? 'bg-slate-900 border-slate-800 ring-indigo-50/30' : 'bg-slate-900 border-slate-800 ring-emerald-50/30'}`}
             >
-              <div className={`p-3 rounded-xl mb-3 border ${viewMode === 'department' ? 'bg-indigo-500/20 border-indigo-400/30' : 'bg-emerald-500/20 border-emerald-400/30'}`}>
-                {viewMode === 'department' ? <Building2 className="h-8 w-8 text-indigo-300" /> : <Network className="h-8 w-8 text-emerald-300" />}
-              </div>
-              <h2 className="text-xl font-bold tracking-wide">{viewMode === 'department' ? 'Company Executive' : 'Staff Hierarchy'}</h2>
-              <span className="text-slate-400 text-sm mt-1 font-medium">{viewMode === 'department' ? activeEmployees.length : activeEmployees.length} Total Active Staff</span>
+              {ceoEmployee ? (
+                <div className="flex flex-col items-center">
+                   {ceoEmployee.avatar ? (
+                     <img src={ceoEmployee.avatar} alt="" className="w-20 h-20 rounded-full border-4 border-white shadow-lg mb-4 object-cover" />
+                   ) : (
+                     <div className="w-20 h-20 rounded-full bg-slate-800 border-4 border-slate-700 flex items-center justify-center mb-4 shadow-lg">
+                       <Network className="h-10 w-10 text-slate-300" />
+                     </div>
+                   )}
+                   <h2 className="text-white text-2xl font-black tracking-tight">{ceoEmployee.firstname} {ceoEmployee.surname}</h2>
+                   <div className="flex items-center gap-2 mt-2">
+                     <span className="text-indigo-400 text-xs font-black uppercase tracking-[0.2em]">CEO / Head of Company</span>
+                   </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <div className="p-4 rounded-full bg-slate-800 mb-4 border-2 border-slate-700">
+                    {viewMode === 'department' ? <Building2 className="h-10 w-10 text-indigo-400" /> : <Network className="h-10 w-10 text-emerald-400" />}
+                  </div>
+                  <h2 className="text-white text-2xl font-black tracking-tight uppercase leading-none">{viewMode === 'department' ? 'Company Structure' : 'Employee Hierarchy'}</h2>
+                  <span className="text-slate-500 text-xs mt-3 font-bold uppercase tracking-[0.3em]">{activeEmployees.length} Active System Staff</span>
+                </div>
+              )}
             </motion.div>
 
             {/* Stem dropping down */}
-            <div className="w-px h-12 bg-slate-400"></div>
+            <div className="w-px h-16 bg-slate-300"></div>
 
             {/* Render top-level children depending on mode */}
             {viewMode === 'department' ? (
-              <div className="flex items-start justify-center relative pt-4">
+              <div className="flex items-start justify-center relative pt-8">
                 {rootNodes.length > 1 && (
                   <div 
-                    className="absolute top-0 h-px bg-slate-400"
+                    className="absolute top-0 h-px bg-slate-300"
                     style={{
                       left: `calc(100% / ${rootNodes.length} / 2)`,
                       right: `calc(100% / ${rootNodes.length} / 2)`
@@ -344,25 +453,24 @@ export function Organogram() {
                 )}
 
                 {rootNodes.map(node => (
-                  <div key={node.id} className="relative flex flex-col items-center px-4">
-                    <div className="absolute top-0 w-px h-4 bg-slate-400 -mt-4"></div>
+                  <div key={node.id} className="relative flex flex-col items-center">
+                    <div className="absolute top-0 w-px h-8 bg-slate-300 -mt-8"></div>
                     {renderNode(node, 0)}
                   </div>
                 ))}
 
                 {rootNodes.length === 0 && (
-                  <div className="bg-white p-8 rounded-xl border border-dashed border-slate-300 text-slate-500 text-center mx-auto shadow-sm mt-4">
-                    <Building2 className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-                    <p className="font-medium text-slate-600">No departments configured yet.</p>
-                    <p className="text-xs text-slate-400 mt-1">Head to Variables &gt; Departments to add some.</p>
+                  <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-200 text-slate-400 text-center mx-auto shadow-sm mt-8">
+                    <Building2 className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                    <p className="font-bold text-slate-500 uppercase tracking-widest text-sm">No departments defined</p>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="flex items-start justify-center relative pt-4">
+              <div className="flex items-start justify-center relative pt-8">
                 {reportingRoots.length > 1 && (
                   <div 
-                    className="absolute top-0 h-px bg-slate-400"
+                    className="absolute top-0 h-px bg-slate-300"
                     style={{
                       left: `calc(100% / ${reportingRoots.length} / 2)`,
                       right: `calc(100% / ${reportingRoots.length} / 2)`
@@ -370,17 +478,17 @@ export function Organogram() {
                   ></div>
                 )}
 
-                {reportingRoots.sort((a,b) => a.firstname.localeCompare(b.firstname)).map(node => (
-                  <div key={node.id} className="relative flex flex-col items-center px-4">
-                    <div className="absolute top-0 w-px h-4 bg-slate-400 -mt-4"></div>
+                {reportingRoots.sort((a,b) => (a.level || 10) - (b.level || 10)).map(node => (
+                  <div key={node.id} className="relative flex flex-col items-center">
+                    <div className="absolute top-0 w-px h-8 bg-slate-300 -mt-8"></div>
                     {renderReportingNode(node, 0)}
                   </div>
                 ))}
 
                 {reportingRoots.length === 0 && (
-                  <div className="bg-white p-8 rounded-xl border border-dashed border-slate-300 text-slate-500 text-center mx-auto shadow-sm mt-4">
-                    <UserSquare2 className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-                    <p className="font-medium text-slate-600">No internal staff found.</p>
+                  <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-200 text-slate-400 text-center mx-auto shadow-sm mt-8">
+                    <Users className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                    <p className="font-bold text-slate-500 uppercase tracking-widest text-sm">No reporting lines found</p>
                   </div>
                 )}
               </div>
@@ -391,4 +499,5 @@ export function Organogram() {
     </div>
   );
 }
+
 
