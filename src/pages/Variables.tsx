@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
-import { Plus, Trash2, Save, Download, Upload, BookOpen, Settings2, Briefcase, X } from 'lucide-react';
+import { Plus, Trash2, Save, Download, Upload, BookOpen, Settings2, Briefcase, X, ChevronRight } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
+import { NairaSign } from '@/src/components/ui/naira-sign';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
@@ -1604,7 +1605,7 @@ export function Variables() {
                 )}
               </div>
 
-               <div className="space-y-2">
+                <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 uppercase">Suspension Cap (Days)</label>
                   <Input 
                     type="number" 
@@ -1613,6 +1614,49 @@ export function Variables() {
                     className="h-10 border-slate-200"
                   />
                   <p className="text-[10px] text-slate-400 font-medium">Maximum allowable suspension period per violation according to policy.</p>
+                </div>
+
+                <div className="pt-4 border-t border-rose-100 flex flex-col gap-4">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Sanction Thresholds (Points based)</label>
+                  <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                    <Table>
+                      <TableHeader className="bg-slate-50/80">
+                        <TableRow>
+                          <TableHead className="text-[10px] font-bold uppercase py-2">Sanction Level</TableHead>
+                          <TableHead className="text-[10px] font-bold uppercase py-2 w-32">Points Target</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(localHrVars.sanctionThresholds || [
+                          { action: 'Verbal Warning', points: -1 },
+                          { action: 'Written Warning', points: -3 },
+                          { action: 'Final Warning', points: -5 },
+                          { action: 'Suspension', points: -8 },
+                          { action: 'Termination', points: -12 }
+                        ]).map((st, idx) => (
+                          <TableRow key={idx} className="hover:bg-slate-50/50 transition-colors">
+                            <TableCell className="text-sm font-semibold text-slate-700">{st.action}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Input 
+                                  type="number" 
+                                  value={st.points} 
+                                  onChange={e => {
+                                    const newThresholds = [...(localHrVars.sanctionThresholds || [])];
+                                    newThresholds[idx] = { ...st, points: Number(e.target.value) };
+                                    updateLocalHrVariables({ sanctionThresholds: newThresholds });
+                                  }}
+                                  className="h-8 text-sm font-mono text-center bg-slate-50"
+                                />
+                                <span className="text-[10px] font-bold text-rose-500">PTS</span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <p className="text-[10px] text-slate-400 italic">Thresholds define when HR should automatically review and issue the next level of disciplinary action.</p>
                 </div>
             </CardContent>
           </Card>
@@ -1623,7 +1667,7 @@ export function Variables() {
         <div className="flex flex-col gap-6">
           <Card className="shadow-sm border-slate-200">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
-              <CardTitle className="text-slate-800">Payroll Breakdown Variables (%)</CardTitle>
+              <CardTitle className="text-slate-800 flex items-center gap-2">Payroll Breakdown Variables (<NairaSign className="h-4 w-4" />)</CardTitle>
               <CardDescription>Adjust the percentage breakdown for components of basic salary and automated deductions.</CardDescription>
             </CardHeader>
             <CardContent>

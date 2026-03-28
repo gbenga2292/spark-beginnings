@@ -127,31 +127,27 @@ export function Employees() {
     const employeeCode = formData.employeeCode || `EMP-${String(nextCodeNumber + 1).padStart(3, '0')}`;
 
     const newEmployee: Employee = {
+      ...(formData as Employee),
       id: crypto.randomUUID(),
       employeeCode,
-      surname: formData.surname || '',
-      firstname: formData.firstname || '',
-      department: formData.department || '',
-      staffType: (formData.staffType as any) || 'OFFICE',
-      level: formData.level || 10,
-      position: formData.position || '',
-      startDate: formData.startDate || '',
-      endDate: formData.endDate || '',
-      yearlyLeave: formData.yearlyLeave || 0,
-      bankName: formData.bankName || '',
-      accountNo: formData.accountNo || '',
-      payeTax: formData.payeTax || false,
-      withholdingTax: formData.withholdingTax || false,
-      taxId: formData.taxId || '',
-      pensionNumber: formData.pensionNumber || '',
-      status: formData.status as 'Active' | 'On Leave' | 'Terminated',
-      monthlySalaries: formData.monthlySalaries as MonthlySalary,
-      avatar: formData.avatar || '',
+      status: formData.status as any || 'Active',
+      monthlySalaries: formData.monthlySalaries || {
+        jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0,
+        jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0
+      },
+      onboardingTasks: (formData as any).onboardingTasks || [],
       excludeFromOnboarding: formData.excludeFromOnboarding || false,
       rent: formData.rent || 0,
       lashmaPolicyNumber: formData.lashmaPolicyNumber || '',
       lashmaRegistrationDate: formData.lashmaRegistrationDate || '',
       lashmaExpiryDate: formData.lashmaExpiryDate || '',
+      phone: formData.phone || '',
+      email: formData.email || '',
+      lineManager: formData.lineManager || undefined,
+      payeeType: formData.payeeType || 'Staff',
+      typeOfPay: formData.typeOfPay || 'Monthly',
+      startMonthOfPay: formData.startMonthOfPay || 'jan',
+      level: formData.level || 10,
     };
 
     addEmployee(newEmployee);
@@ -712,9 +708,12 @@ export function Employees() {
                     </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Rent (₦)</label>
-                  <Input type="number" value={formData.rent || 0} onChange={e => setFormData({ ...formData, rent: Number(e.target.value) })} className="font-mono bg-slate-50 focus:bg-white" />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Rent (₦)</label>
+                    <Input type="number" value={formData.rent || 0} onChange={e => setFormData({ ...formData, rent: Number(e.target.value) })} className="font-mono bg-slate-50 focus:bg-white" />
+                  </div>
                 </div>
               </div>
 

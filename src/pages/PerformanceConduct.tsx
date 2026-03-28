@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -62,6 +62,31 @@ export default function PerformanceConduct() {
     visibleToEmployee: true,
   };
   const [formData, setFormData] = useState<Partial<DisciplinaryRecord>>(emptyForm);
+  const [showPolicyHint, setShowPolicyHint] = useState(true);
+
+  const currentPoints = useMemo(() => {
+    if (!formData.employeeId) return 0;
+    return records
+      .filter(r => r.employeeId === formData.employeeId && r.status !== 'Expired' && r.status !== 'Appealed')
+      .reduce((sum, r) => sum + (r.points || 0), 0);
+  }, [formData.employeeId, records]);
+
+  const policyRecommendation = useMemo(() => {
+    if (!hrVariables?.sanctionThresholds || !formData.employeeId || (formData.points || 0) >= 0) return null;
+    const projectedPoints = currentPoints + (formData.points || 0);
+    
+    // Sort thresholds by points (most negative first)
+    const sortedThresholds = [...hrVariables.sanctionThresholds].sort((a, b) => a.points - b.points);
+    
+    // Find the most severe sanction they have reached or exceeded
+    // (thresholds are typically negative, e.g. -3, -5, -8)
+    for (const threshold of sortedThresholds) {
+      if (projectedPoints <= threshold.points) {
+        return threshold;
+      }
+    }
+    return null;
+  }, [currentPoints, formData.points, hrVariables]);
 
   const calculateWorkflowState = (data: Partial<DisciplinaryRecord>): NonNullable<DisciplinaryRecord['workflowState']> => {
     if (data.status === 'Closed') return 'Closed';
@@ -204,9 +229,27 @@ export default function PerformanceConduct() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Record Points / Weight</label>
-              <div className="flex gap-2 items-center">
-                <Input type="number" step="1" className={formData.points && formData.points > 0 ? 'border-emerald-200 bg-emerald-50/20 text-emerald-700 font-bold' : formData.points && formData.points < 0 ? 'border-rose-200 bg-rose-50/20 text-rose-700 font-bold' : ''} value={formData.points || 0} onChange={e => setFormData({ ...formData, points: parseInt(e.target.value) || 0 })} />
-                <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">(Merit: +1, Demerit: -1)</span>
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2 items-center">
+                  <Input type="number" step="1" className={formData.points && formData.points > 0 ? 'border-emerald-200 bg-emerald-50/20 text-emerald-700 font-bold' : formData.points && formData.points < 0 ? 'border-rose-200 bg-rose-50/20 text-rose-700 font-bold' : ''} value={formData.points || 0} onChange={e => setFormData({ ...formData, points: parseInt(e.target.value) || 0 })} />
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">Current: {currentPoints > 0 ? '+' : ''}{currentPoints} PTS</span>
+                    {formData.points !== 0 && (
+                      <span className={`text-[10px] font-black uppercase whitespace-nowrap ${(currentPoints + (formData.points || 0)) < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        Projected: {currentPoints + (formData.points || 0) > 0 ? '+' : ''}{currentPoints + (formData.points || 0)} PTS
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {policyRecommendation && (
+                  <div className="bg-rose-50 border border-rose-100 p-2 rounded flex items-start gap-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <ShieldAlert className="h-3.5 w-3.5 text-rose-600 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-[10px] font-bold text-rose-800 uppercase leading-tight">Policy Recommendation</p>
+                      <p className="text-[10px] text-rose-700 font-medium">Accumulated points reach threshold for: <span className="underline decoration-rose-400 decoration-2 underline-offset-2">{policyRecommendation.action}</span></p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="space-y-2">

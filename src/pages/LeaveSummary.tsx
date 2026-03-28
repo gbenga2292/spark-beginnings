@@ -4,6 +4,7 @@ import { Badge } from '@/src/components/ui/badge';
 import { Input } from '@/src/components/ui/input';
 import { Search, ListFilter } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
+import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
 
 export function LeaveSummary() {
   const allEmployees = useAppStore((state) => state.employees);
@@ -11,9 +12,9 @@ export function LeaveSummary() {
   const departments = useAppStore((state) => state.departments);
 
   const employees = useMemo(() => {
-    const internalDeptNames = departments.filter(d => d.staffType === 'OFFICE').map(d => d.name);
-    return allEmployees.filter(e => e.status !== 'Terminated' && internalDeptNames.includes(e.department));
-  }, [allEmployees, departments]);
+    const activeEmployees = allEmployees.filter(e => e.status !== 'Terminated');
+    return filterAndSortEmployeesExcludingCEO(activeEmployees);
+  }, [allEmployees]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDept, setFilterDept] = useState('All');

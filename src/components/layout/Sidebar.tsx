@@ -1,7 +1,9 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/src/lib/utils';
 import { useUserStore, UserPrivileges } from '@/src/store/userStore';
+import { useAppStore } from '@/src/store/appStore';
 import { useTheme } from '@/src/hooks/useTheme';
+import { toast } from '@/src/components/ui/toast';
 import logoSrc from '../../../logo/logo-2.png';
 import {
   LayoutDashboard,
@@ -160,9 +162,19 @@ const navigation: NavCategory[] = [
 export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const location = useLocation();
   const currentUser = useUserStore((s) => s.getCurrentUser());
+  const pendingLedgerEntries = useAppStore((s) => s.pendingLedgerEntries);
   const { isDark } = useTheme();
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const handleLinkClick = (e: React.MouseEvent, href: string) => {
+    if (location.pathname === '/ledger' && pendingLedgerEntries.length > 0 && href !== '/ledger') {
+      e.preventDefault();
+      toast.error('You have unsaved pending ledger entries. Please save before leaving.');
+      return;
+    }
+    setIsOpen?.(false);
+  };
 
   const getVisibleItems = (items: NavItem[]) => {
     return items.filter((item) => {
@@ -266,6 +278,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                   <div key={category.name} className="mb-1">
                     <Link
                       to={category.standaloneHref!}
+                      onClick={(e) => handleLinkClick(e, category.standaloneHref!)}
                       title={isCollapsed ? category.name : undefined}
                       className={cn(
                         'flex w-full items-center rounded-md py-2 text-sm font-semibold transition-colors',
@@ -316,6 +329,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                           <div key={item.name} className="flex flex-col gap-0.5">
                             <Link
                               to={item.href}
+                              onClick={(e) => handleLinkClick(e, item.href)}
                               title={isCollapsed ? item.name : undefined}
                               className={cn(
                                 'group flex items-center rounded-md py-2.5 text-sm font-medium transition-colors',
@@ -343,6 +357,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                                     <Link
                                       key={subItem.name}
                                       to={subItem.href}
+                                      onClick={(e) => handleLinkClick(e, subItem.href)}
                                       className={cn(
                                         'group flex items-center rounded-md py-2 px-3 text-xs font-medium transition-colors',
                                         isSubActive ? itemActive : itemBase

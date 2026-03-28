@@ -1,6 +1,6 @@
-import { IconProps } from 'lucide-react';
+import { LucideProps } from 'lucide-react';
 
-export function NairaSign({ color = 'currentColor', size = 24, strokeWidth = 2, className, ...props }: IconProps) {
+export function NairaSign({ color = 'currentColor', size = 24, strokeWidth = 2, className, ...props }: LucideProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

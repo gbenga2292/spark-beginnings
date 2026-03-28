@@ -629,6 +629,7 @@ interface AppState {
     demeritWeight?: number; // Default -1
     suspensionCapDays?: number; 
     enableAutomaticEvaluationPenalty?: boolean; 
+    sanctionThresholds?: { action: string; points: number }[];
   };
   updateHrVariables: (variables: Partial<AppState['hrVariables']>) => void;
   saveAllSettings: (payroll: AppState['payrollVariables'], paye: AppState['payeTaxVariables'], months: AppState['monthValues'], hr: AppState['hrVariables']) => void;
@@ -709,10 +710,17 @@ export const useAppStore = create<AppState>()(
       hrVariables: {
         flaggedAbsenceThreshold: 3,
         disciplinaryExpirationMonths: 6,
-        actionLevels: ['Verbal Warning', 'Written Warning', 'Final Written Warning', 'Suspension'],
+        actionLevels: ['Verbal Warning', 'Written Warning', 'Final Written Warning', 'Suspension', 'Termination'],
         defaultProbationDays: 90,
         investigationPeriodDays: 5,
         appealPeriodDays: 7,
+        sanctionThresholds: [
+          { action: 'Verbal Warning', points: -1 },
+          { action: 'Written Warning', points: -3 },
+          { action: 'Final Warning', points: -5 },
+          { action: 'Suspension', points: -8 },
+          { action: 'Termination', points: -12 }
+        ]
       },
 
       // ── Actions with Supabase sync ──

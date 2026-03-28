@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -62,6 +62,12 @@ export function Ledger() {
     return Array.from(vSet).sort();
   }, [ledgerEntries]);
 
+  const pendingLedgerEntries = useAppStore((state) => state.pendingLedgerEntries);
+  const clearPendingLedgerEntries = useAppStore((state) => state.clearPendingLedgerEntries);
+  const deleteCompanyExpense = useAppStore((state) => state.deleteCompanyExpense);
+
+  const [hasUnsavedPending, setHasUnsavedPending] = useState(false);
+
   // Derived Voucher No matching "VNYY-MM-DD-SEQ" if creating new
   const generatedVoucherNo = useMemo(() => {
     if (!voucherDate) return '';
@@ -85,6 +91,45 @@ export function Ledger() {
     const newSeq = String(maxSeq + 1).padStart(2, '0');
     return `${prefix}${newSeq}`;
   }, [voucherDate, ledgerEntries]);
+
+  // Handle pending entries from CompanyExpenses
+  useEffect(() => {
+    if (pendingLedgerEntries && pendingLedgerEntries.length > 0) {
+      setHasUnsavedPending(true);
+      setTab('entry');
+      setActiveVoucherNo('');
+      setVoucherDate(new Date().toISOString().split('T')[0]);
+      
+      const firstEntry = pendingLedgerEntries[0];
+      if (firstEntry && firstEntry.paidFrom) {
+        setPaidFrom(firstEntry.paidFrom);
+      }
+
+      const newItems = Array(8).fill(null).map(() => getEmptyItem());
+      pendingLedgerEntries.slice(0, 8).forEach((exp, idx) => {
+        newItems[idx] = {
+          ...newItems[idx],
+          transactionDate: exp.date,
+          description: exp.description + (exp.paidToBankName ? ` (To: ${exp.paidToBankName} ${exp.paidToAccountNo})` : ''),
+          amount: String(exp.amount),
+        };
+      });
+      setItems(newItems);
+      
+      toast.info('Loaded pending expenses. Please assign categories and save.');
+    }
+  }, [pendingLedgerEntries]);
+
+  // Warn on tab close/reload
+  useEffect(() => {
+    if (!hasUnsavedPending) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedPending]);
 
   // Load a voucher into the form
   const loadVoucher = (vNo: string) => {
@@ -155,6 +200,10 @@ export function Ledger() {
   const handlePrevVoucher = () => navigateSequence('prev');
 
   const handleClear = () => {
+    if (hasUnsavedPending) {
+      toast.error('You cannot clear the form while you have unsaved pending expenses.');
+      return;
+    }
     setActiveVoucherNo('');
     setItems(Array(8).fill(null).map(() => getEmptyItem()));
     setPaidFrom('');
@@ -243,6 +292,16 @@ export function Ledger() {
         deleteLedgerEntry(r.id);
       }
     });
+
+    if (hasUnsavedPending) {
+      // Remove these items from company expenses
+      pendingLedgerEntries.forEach(exp => {
+        deleteCompanyExpense(exp.id);
+      });
+      clearPendingLedgerEntries();
+      setHasUnsavedPending(false);
+      toast.success('Pending expenses moved to ledger and removed from Company Expenses.');
+    }
 
     toast.success(`Saved voucher ${targetVoucherNo}.`);
     // After submit, lock into viewing this voucher
