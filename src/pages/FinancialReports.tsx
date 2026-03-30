@@ -19,6 +19,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { usePayrollCalculator } from '@/src/hooks/usePayrollCalculator';
 import { usePriv } from '@/src/hooks/usePriv';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { SiteSummary } from './SiteSummary';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
@@ -56,6 +57,31 @@ export function FinancialReports() {
   const sitesPriv = usePriv('sites');
   const [ledgerSummaryYear, setLedgerSummaryYear] = useState<string>(String(new Date().getFullYear()));
   const [ledgerSummaryView, setLedgerSummaryView] = useState<'category' | 'bank' | 'client' | 'site'>('category');
+
+  // Dynamic titles and subtitles for the header
+  const tabInfo = {
+    'client-account': {
+      title: 'Client Financial Analysis',
+      subtitle: 'Revenue insights, collection analysis, and debt tracking.'
+    },
+    'payroll-summary': {
+      title: 'Payroll Expenditure',
+      subtitle: 'Overview of payroll cycles, statutory obligations, and trends.'
+    },
+    'site-summary': {
+      title: 'Site Financial Performance',
+      subtitle: 'Site-by-site profitability and operational financial metrics.'
+    },
+    'ledger-summary': {
+      title: 'General Ledger Analysis',
+      subtitle: 'Categorized breakdown of all financial ledger transactions.'
+    }
+  };
+
+  useSetPageTitle(
+    tabInfo[mainTab].title,
+    tabInfo[mainTab].subtitle
+  );
 
   const currentYear = new Date().getFullYear();
   const years = [currentYear, currentYear - 1, currentYear - 2];
@@ -558,53 +584,43 @@ export function FinancialReports() {
   };
 
   return (
-    <div className="flex flex-col gap-6 pb-10">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
       {exportMessage && (
         <div className="fixed top-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center gap-2 animate-in slide-in-from-top-2">
           <CheckCircle2 className="h-5 w-5" />{exportMessage}
         </div>
       )}
-
-      {/* Header */}
-      <div className="flex flex-col gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">
-              Account Reports
-            </h1>
-            <p className="text-sm font-medium text-slate-500 mt-1">Revenue insights, collection analysis, and compliance reporting.</p>
+      <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
+        
+        {/* Tab switcher - compact implementation */}
+        <div className="flex bg-white p-2 rounded-xl shadow-sm border border-slate-100 items-center justify-between overflow-x-auto no-scrollbar gap-2">
+          <div className="flex gap-1">
+            {[
+              { id: 'client-account', label: 'Client Account', icon: Landmark },
+              { id: 'payroll-summary', label: 'Payroll Summary', icon: Wallet },
+              { id: 'site-summary', label: 'Site Summary', icon: Activity, priv: sitesPriv.canViewClientSummary },
+              { id: 'ledger-summary', label: 'Ledger Summary', icon: BarChart3 }
+            ].map(tab => {
+              if (tab.priv === false) return null;
+              const isActive = mainTab === tab.id;
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setMainTab(tab.id as any)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    isActive 
+                      ? 'bg-indigo-600 text-white shadow-md' 
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'
+                  }`}
+                >
+                  <Icon className={`h-4 w-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
         </div>
-        
-        <div className="flex gap-6 mt-2 overflow-x-auto">
-          <button 
-            className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${mainTab === 'client-account' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} 
-            onClick={() => setMainTab('client-account')}
-          >
-            Client Account
-          </button>
-          <button 
-            className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${mainTab === 'payroll-summary' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} 
-            onClick={() => setMainTab('payroll-summary')}
-          >
-            Payroll Summary
-          </button>
-          {sitesPriv.canViewClientSummary && (
-            <button 
-              className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${mainTab === 'site-summary' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} 
-              onClick={() => setMainTab('site-summary')}
-            >
-              Site Summary
-            </button>
-          )}
-          <button 
-            className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${mainTab === 'ledger-summary' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} 
-            onClick={() => setMainTab('ledger-summary')}
-          >
-            Ledger Summary
-          </button>
-        </div>
-      </div>
 
       {mainTab === 'site-summary' ? (
         <SiteSummary />
@@ -1913,6 +1929,7 @@ export function FinancialReports() {
       </Card>
       </>
       )}
+      </div>
     </div>
   );
 }

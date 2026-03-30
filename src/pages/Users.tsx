@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useUserStore, AppUser, UserPrivileges } from '@/src/store/userStore';
 import { supabase } from '@/src/integrations/supabase/client';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 /* ── Color map for module badges ──────────────────────────────── */
 const MODULE_COLORS: Record<string, string> = {
@@ -92,26 +93,37 @@ export function Users() {
     u.email.toLowerCase().includes(search.toLowerCase())
   );
 
+  useSetPageTitle(
+    'User Management',
+    'Configure system users and granular page privileges',
+    <div className="hidden sm:flex items-center gap-3">
+      <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 border border-slate-200 rounded-lg px-3 py-1.5 bg-white shadow-sm cursor-pointer select-none transition-all hover:border-indigo-200">
+        <button type="button" onClick={() => setSuperAdminSignupEnabled(!superAdminSignupEnabled)}
+          className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${superAdminSignupEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+          <span className={`pointer-events-none inline-block h-3 w-3 rounded-full bg-white shadow transition ${superAdminSignupEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+        </button>
+        Signup Toggle
+      </label>
+      <Button onClick={() => navigate('/users/new')} size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9">
+        <Plus className="h-4 w-4" /> New User
+      </Button>
+    </div>
+  );
+
   return (
-    <div className="flex flex-col gap-6 h-full">
-      {/* ── Header ────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">User Management</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Create users and assign granular privileges per page.</p>
-        </div>
-        <div className="flex gap-3 items-center">
-          <label className="flex items-center gap-2 text-xs text-slate-600 border border-slate-200 rounded-lg px-3 py-2 bg-white shadow-sm cursor-pointer select-none">
-            <button type="button" onClick={() => setSuperAdminSignupEnabled(!superAdminSignupEnabled)}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${superAdminSignupEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}>
-              <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition ${superAdminSignupEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
-            </button>
-            Super Admin Signup
-          </label>
-          <Button onClick={() => navigate('/users/new')} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
-            <Plus className="h-4 w-4" /> New User
-          </Button>
-        </div>
+    <div className="flex flex-col gap-6 h-full pb-10">
+      {/* ── Mobile Actions ── */}
+      <div className="sm:hidden grid grid-cols-2 gap-2 mb-2">
+        <Button 
+          variant="outline" 
+          onClick={() => setSuperAdminSignupEnabled(!superAdminSignupEnabled)}
+          className={`gap-2 h-11 text-xs font-bold uppercase tracking-wider ${superAdminSignupEnabled ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-500'}`}
+        >
+          {superAdminSignupEnabled ? 'Signup ON' : 'Signup OFF'}
+        </Button>
+        <Button onClick={() => navigate('/users/new')} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-11 text-xs font-bold uppercase tracking-wider shadow-sm">
+          <Plus className="h-4 w-4" /> New User
+        </Button>
       </div>
 
       {/* ── Search ─────────────────────────────────────────── */}

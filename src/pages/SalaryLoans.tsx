@@ -13,6 +13,7 @@ import { toast } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 export function SalaryLoans() {
   const priv = usePriv('payroll');
@@ -179,6 +180,23 @@ export function SalaryLoans() {
     handleClear();
   };
 
+  useSetPageTitle(
+    viewMode ? 'Financial Entries Database' : 'Financial Request',
+    viewMode ? 'View all recorded salary advances and loans' : 'Submit salary advances or loans for approval',
+    <Button 
+      variant={viewMode ? "default" : "outline"}
+      size="sm"
+      className={viewMode ? "bg-indigo-600 hover:bg-indigo-700 h-9" : "border-slate-200 h-9"}
+      onClick={() => setViewMode(!viewMode)}
+    >
+      {viewMode ? (
+        <><ArrowLeft className="h-4 w-4 mr-2" /> Back to Form</>
+      ) : (
+        <><List className="h-4 w-4 mr-2" /> View Database</>
+      )}
+    </Button>
+  );
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Approved':
@@ -199,15 +217,6 @@ export function SalaryLoans() {
   if (viewMode) {
     return (
       <div className="flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Financial Entries Database</h2>
-            <p className="text-slate-500 mt-1">View all recorded salary advances and loans</p>
-          </div>
-          <Button onClick={() => setViewMode(false)} className="gap-2 bg-indigo-600 hover:bg-indigo-700 rounded-xl h-10 px-5">
-            <ArrowLeft className="h-4 w-4" /> Back to Form
-          </Button>
-        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Salary Advances Table */}
@@ -329,20 +338,10 @@ export function SalaryLoans() {
             <div className="inline-flex items-center justify-center p-3 font-bold bg-white/10 backdrop-blur-md rounded-2xl mb-8 border border-white/20">
               <Wallet className="h-8 w-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight mb-3">Financial Request</h1>
+            <h1 className="text-3xl font-bold tracking-tight mb-3">Finance Portal</h1>
             <p className="text-indigo-100 text-sm leading-relaxed mb-8 opacity-90">
-              Submit salary advances or loans for approval. The selected approver will be notified via a task and must approve before processing.
+              Submit requests for advances or loans. Requests go through a multi-stage approval process.
             </p>
-          </div>
-
-          <div className="relative z-10 space-y-4">
-            <Button
-              onClick={() => setViewMode(true)}
-              variant="outline"
-              className="w-full bg-white/10 hover:bg-white/20 text-white border-white/30 backdrop-blur-sm gap-2 h-12 rounded-xl transition-all"
-            >
-              <List className="h-5 w-5" /> View Database
-            </Button>
           </div>
         </div>
 

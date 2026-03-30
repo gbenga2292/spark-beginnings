@@ -6,6 +6,7 @@ import { Save, UserMinus, Trash2, ArrowLeft } from 'lucide-react';
 import { useAppStore, OnboardingTask } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
 import { useNavigate } from 'react-router-dom';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 export function StartOffboarding() {
   const employees = useAppStore((state) => state.employees);
@@ -65,22 +66,33 @@ export function StartOffboarding() {
     navigate('/onboarding');
   };
 
+  useSetPageTitle(
+    'Initiate Offboarding',
+    "Gracefully wrap up an employee's tenure. Selecting them here will remove them from active systems",
+    <div className="flex items-center gap-2">
+      <Button variant="outline" size="sm" onClick={() => navigate('/onboarding')} className="gap-2 border-slate-200 h-9">
+        <ArrowLeft className="h-4 w-4" /> Back
+      </Button>
+      <Button onClick={handleStartOffboarding} className="bg-red-600 hover:bg-red-700 text-white font-semibold gap-2 h-9 px-4 shadow-sm">
+        <Save className="h-4 w-4" /> Terminate
+      </Button>
+    </div>
+  );
+
   return (
-    <div className="flex flex-col gap-6 max-w-3xl mx-auto pb-10">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" className="text-slate-500 hover:text-slate-700" onClick={() => navigate('/onboarding')}>
-          <ArrowLeft className="h-4 w-4 mr-2" /> Back to Dashboard
+    <div className="flex flex-col gap-6 max-w-3xl mx-auto pb-10 w-full animate-in fade-in duration-300">
+      {/* Mobile-only Action Bar */}
+      <div className="flex md:hidden items-center justify-between bg-white p-4 rounded-xl border border-slate-100 shadow-sm mb-2">
+        <Button variant="outline" size="sm" onClick={() => navigate('/onboarding')} className="gap-2 border-slate-200 h-9">
+          <ArrowLeft className="h-4 w-4" /> Back
+        </Button>
+        <Button onClick={handleStartOffboarding} size="sm" className="bg-red-600 hover:bg-red-700 text-white font-semibold gap-2 h-9 px-4">
+          <Save className="h-4 w-4" /> Terminate
         </Button>
       </div>
 
       <Card className="border-none shadow-xl ring-1 ring-black/5 bg-white relative overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-500">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-rose-400"></div>
-        <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-5 pt-8 px-8">
-          <CardTitle className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <UserMinus className="h-6 w-6 text-red-500" /> Initiate Offboarding
-          </CardTitle>
-          <CardDescription className="text-sm mt-1 pb-0">Gracefully wrap up an employee's tenure. Selecting them here will remove them from active systems.</CardDescription>
-        </CardHeader>
         <CardContent className="p-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-6">
             <div className="space-y-2">

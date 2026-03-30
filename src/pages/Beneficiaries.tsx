@@ -15,7 +15,7 @@ import { Dialog } from '@/src/components/ui/dialog';
 import { Checkbox } from '@/src/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/src/components/ui/dropdown-menu';
 import { useAppData } from '@/src/contexts/AppDataContext';
-
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { getPositionIndex } from '@/src/lib/hierarchy';
 
 
@@ -1223,42 +1223,34 @@ export function Beneficiaries() {
     );
   };
 
-  // If adding new employee
-  if (isAdding) {
-    return renderEmployeeForm(false);
-  }
-
-  // If editing existing employee
-  if (isEditing) {
-    return renderEmployeeForm(true);
-  }
-
-  // Main employee list view
-  return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
-            <Users className="h-8 w-8 text-indigo-600" />
-            Non-Employee Directory
-          </h1>
-          <p className="text-slate-500 mt-1 font-medium">Manage directors, contractors, and welfare staff compensation cycles.</p>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap justify-center md:justify-end">
+  // Dynamic header title — must be called unconditionally (hooks rules)
+  useSetPageTitle(
+    isAdding
+      ? 'Add Non-Employee Record'
+      : isEditing
+      ? 'Edit Non-Employee Record'
+      : activeTab === 'Delisted'
+      ? 'Delisted Personnel'
+      : 'Non-Employee Directory',
+    isAdding || isEditing
+      ? 'Configure profile details, compensation, and payment terms'
+      : activeTab === 'Delisted'
+      ? 'View terminated contractors and welfare staff'
+      : 'Manage directors, contractors, and welfare staff',
+    (!isAdding && !isEditing)
+      ? <div className="hidden sm:flex items-center gap-2">
           {selectedIds.length > 0 && (
-            <Button 
-              variant="outline" 
-              className="gap-2 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 animate-in fade-in slide-in-from-right-4"
-              onClick={() => {
-                setBulkFormData({});
-                setIsBulkEditing(true);
-              }}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 h-9"
+              onClick={() => { setBulkFormData({}); setIsBulkEditing(true); }}
             >
               <Settings2 className="h-4 w-4" /> Bulk Edit ({selectedIds.length})
             </Button>
           )}
           {priv.canExport && (
-            <Button variant="outline" className="gap-2 bg-white text-slate-700 hover:bg-slate-50 shadow-sm border-slate-200" onClick={handleExportCSV}>
+            <Button variant="outline" size="sm" className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 h-9" onClick={handleExportCSV}>
               <Download className="h-4 w-4 text-slate-500" /> Export CSV
             </Button>
           )}
@@ -1269,13 +1261,31 @@ export function Beneficiaries() {
             </label>
           )}
           {priv.canAdd && (
-            <Button className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md mx-2 transition-all" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'NON-EMPLOYEE', status: 'Active', payeTax: false, withholdingTax: false, payeeType: '', typeOfPay: 'Monthly', monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
+            <Button
+              size="sm"
+              className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md h-9 px-4"
+              onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'NON-EMPLOYEE', status: 'Active', payeTax: false, withholdingTax: false, payeeType: '', typeOfPay: 'Monthly', monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}
+            >
               <Plus className="h-4 w-4" /> Add Record
             </Button>
           )}
         </div>
-      </div>
+      : null
+  );
 
+  // If adding new employee
+  if (isAdding) {
+    return renderEmployeeForm(false);
+  }
+
+  // If editing existing employee
+  if (isEditing) {
+    return renderEmployeeForm(true);
+  }
+
+  // Main list view
+  return (
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-[500px]">
         <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
           <div className="flex bg-slate-200/50 p-1 rounded-lg">

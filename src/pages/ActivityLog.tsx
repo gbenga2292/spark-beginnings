@@ -5,6 +5,7 @@ import { Activity, Search, Server, FileText, Database, ShieldAlert, Settings, Ha
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
 import { useUserStore } from '@/src/store/userStore';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 export function ActivityLog() {
   const [logs, setLogs] = useState<any[]>([]);
@@ -152,21 +153,18 @@ export function ActivityLog() {
     getUserName(l.user_id).toLowerCase().includes(search.toLowerCase())
   );
 
+  useSetPageTitle(
+    'System Activity Log',
+    'Automated enterprise audit trail — who modified what and when',
+    <div className="hidden sm:flex items-center gap-2">
+      <Button variant="outline" size="sm" onClick={() => fetchLogs()} className="gap-2 h-9">
+        <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+      </Button>
+    </div>
+  );
+
   return (
     <div className="flex flex-col h-full gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <Activity className="h-6 w-6 text-indigo-500" /> System Activity Log
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5">Automated enterprise audit trail detailing who modified what and when.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => fetchLogs()} className="gap-2">
-            <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </Button>
-        </div>
-      </div>
 
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
         <div className="relative w-full max-w-sm">

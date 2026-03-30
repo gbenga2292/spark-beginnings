@@ -15,6 +15,7 @@ import { useUserStore } from '@/src/store/userStore';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { toast } from '@/src/components/ui/toast';
 import { supabase } from '@/src/integrations/supabase/client';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 interface CompanyInfo {
   name: string;
@@ -324,13 +325,10 @@ export function Settings() {
     ? new Date(backupSettings.lastBackupAt).toLocaleString()
     : 'Never';
 
+  useSetPageTitle('Settings', 'Manage company preferences, backup, integrations, and variables');
+
   return (
     <div className="flex flex-col gap-8">
-      {/* Page header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Settings</h1>
-        <p className="text-slate-500 mt-2">Manage application preferences, integrations, and security.</p>
-      </div>
 
       <Tabs className="w-full">
         <TabsList className="mb-8 bg-slate-100 flex-wrap gap-y-1">

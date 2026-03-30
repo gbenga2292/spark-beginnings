@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import * as XLSX from 'xlsx';
 import { usePriv } from '@/src/hooks/usePriv';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 import { getPositionIndex } from '@/src/lib/hierarchy';
 
@@ -446,14 +447,15 @@ export function Attendance() {
 
   const filledCount = Object.keys(attendanceData).filter(k => attendanceData[k]?.day || attendanceData[k]?.night).length;
 
+  useSetPageTitle(
+    'Daily Register',
+    'Attendance & site allocation'
+  );
+
   return (
     <div className="flex flex-col gap-3 h-full">
-      {/* Compact header bar */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Daily Register</h1>
-          <p className="text-xs text-slate-500">Attendance & site allocation</p>
-        </div>
+      {/* Compact sub-header bar */}
+      <div className="flex items-center justify-end">
         <div className="flex items-center gap-2">
           <TabsList className="bg-slate-100 h-8">
             <TabsTrigger

@@ -12,6 +12,7 @@ import { usePriv } from '@/src/hooks/usePriv';
 import { useUserStore } from '@/src/store/userStore';
 import { Avatar, AvatarFallback } from '@/src/components/ui/avatar';
 import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 export function Evaluations() {
   const [employeeSearch, setEmployeeSearch] = useState('');
@@ -152,23 +153,22 @@ export function Evaluations() {
   const empRecords = records.filter(r => r.employeeId === selectedEmployeeId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const activeCount = internalEmployees.filter(emp => records.some(r => r.employeeId === emp.id && r.status === 'Review')).length;
 
+  useSetPageTitle(
+    'Performance Center',
+    'Select an employee from the directory to review or document performance evaluations',
+    <Button 
+      variant="outline" 
+      size="sm"
+      onClick={() => setSidebarCollapsed(!sidebarCollapsed)} 
+      className="bg-white hover:bg-slate-50 px-3 h-9"
+    >
+      {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4 mr-2 text-slate-500" /> : <PanelLeftClose className="h-4 w-4 mr-2 text-slate-500" />}
+      {sidebarCollapsed ? 'Expand' : 'Collapse'}
+    </Button>
+  );
+
   return (
-    <div className="flex flex-col h-[calc(100vh-6rem)] gap-4">
-      {/* Dynamic Header */}
-      {!(isAdding || isEditing) && (
-      <div className="flex justify-between items-end">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">
-             Performance Center
-          </h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">Select an employee from the directory to review or document performance evaluations.</p>
-        </div>
-        <Button variant="outline" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="bg-white hover:bg-slate-50 px-3">
-          {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4 mr-2 text-slate-500" /> : <PanelLeftClose className="h-4 w-4 mr-2 text-slate-500" />}
-          {sidebarCollapsed ? 'Expand Directory' : 'Collapse Directory'}
-        </Button>
-      </div>
-      )}
+    <div className="flex flex-col h-[calc(100vh-8rem)] gap-4">
 
       <div className="flex flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Left Sidebar */}

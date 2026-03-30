@@ -16,6 +16,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { Checkbox } from '@/src/components/ui/checkbox';
 import { normalizeDate } from '@/src/lib/dateUtils';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 import { getPositionIndex } from '@/src/lib/hierarchy';
 
@@ -1556,6 +1557,46 @@ export function Employees() {
     );
   };
 
+  // Set page title and header buttons
+  useSetPageTitle(
+    'Personnel Directory',
+    'Manage office & field staff, hierarchy, and payroll',
+    <div className="hidden sm:flex items-center gap-2">
+      {selectedIds.length > 0 && (
+        <Button 
+          variant="outline" 
+          size="sm"
+          className="gap-2 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 h-9"
+          onClick={() => {
+            setBulkFormData({});
+            setIsBulkEditing(true);
+          }}
+        >
+          <Settings2 className="h-4 w-4" /> Bulk Edit ({selectedIds.length})
+        </Button>
+      )}
+      {priv.canExport && (
+        <Button variant="outline" size="sm" className="gap-2 h-9" onClick={handleExportCSV}>
+          <Download className="h-4 w-4" /> Export
+        </Button>
+      )}
+      {priv.canAdd && (
+        <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-sm font-medium cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
+          <Upload className="h-4 w-4" /> Import
+          <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
+        </label>
+      )}
+      <Button variant="outline" size="sm" className="gap-2 h-9" onClick={() => navigate('/organogram')}>
+        <Network className="h-4 w-4" /> Organogram
+      </Button>
+      {priv.canAdd && (
+        <Button size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'OFFICE', level: 10, status: 'Active', payeTax: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
+          <Plus className="h-4 w-4" /> Add Employee
+        </Button>
+      )}
+    </div>
+  );
+
   // If adding new employee
   if (isAdding) {
     return renderEmployeeForm(false);
@@ -1569,49 +1610,39 @@ export function Employees() {
   // Main employee list view
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 shrink-0 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
-            <Users className="h-8 w-8 text-indigo-600" />
-            Personnel Directory
-          </h1>
-          <p className="text-slate-500 mt-1 font-medium">Manage your office and field staff, hierarchy, and payroll configurations.</p>
-        </div>
-        
-        <div className="flex items-center gap-3 flex-wrap justify-center md:justify-end">
-          {selectedIds.length > 0 && (
-            <Button 
-              variant="outline" 
-              className="gap-2 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 animate-in fade-in slide-in-from-right-4"
-              onClick={() => {
-                setBulkFormData({});
-                setIsBulkEditing(true);
-              }}
-            >
-              <Settings2 className="h-4 w-4" /> Bulk Edit ({selectedIds.length})
-            </Button>
-          )}
-          {priv.canExport && (
-            <Button variant="outline" className="gap-2 bg-white text-slate-700 hover:bg-slate-50 shadow-sm border-slate-200" onClick={handleExportCSV}>
-              <Download className="h-4 w-4 text-slate-500" /> Export CSV
-            </Button>
-          )}
+      {/* ── Mobile Actions ── */}
+      <div className="flex sm:hidden flex-col gap-3 px-1">
+        <div className="flex flex-wrap gap-2">
           {priv.canAdd && (
-            <label className="flex items-center gap-2 px-4 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-sm font-medium cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
-              <Upload className="h-4 w-4 text-slate-500" />
-              Import Data
-              <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
-            </label>
-          )}
-          <Button variant="outline" className="gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 shadow-sm" onClick={() => navigate('/organogram')}>
-            <Network className="h-4 w-4" /> Organogram
-          </Button>
-          {priv.canAdd && (
-            <Button className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'OFFICE', level: 10, status: 'Active', payeTax: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
+            <Button className="flex-1 gap-2 bg-indigo-600 text-white" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'OFFICE', level: 10, status: 'Active', payeTax: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
               <Plus className="h-4 w-4" /> Add Employee
             </Button>
           )}
+          <Button variant="outline" className="flex-1 gap-2" onClick={() => navigate('/organogram')}>
+            <Network className="h-4 w-4" /> Organogram
+          </Button>
         </div>
+        <div className="flex gap-2">
+          {priv.canExport && (
+            <Button variant="outline" className="flex-1 gap-2 text-xs" onClick={handleExportCSV}>
+              <Download className="h-3 w-3" /> Export CSV
+            </Button>
+          )}
+          {priv.canAdd && (
+            <label className="flex-1 flex items-center justify-center gap-2 px-4 h-10 bg-white rounded-md border border-slate-200 text-slate-600 text-xs font-medium cursor-pointer">
+              <Upload className="h-3 w-3" /> Import
+              <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
+            </label>
+          )}
+        </div>
+        {selectedIds.length > 0 && (
+          <Button 
+            className="w-full gap-2 bg-amber-500 hover:bg-amber-600 text-white"
+            onClick={() => { setBulkFormData({}); setIsBulkEditing(true); }}
+          >
+            <Settings2 className="h-4 w-4" /> Bulk Edit Selected ({selectedIds.length})
+          </Button>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-[500px]">

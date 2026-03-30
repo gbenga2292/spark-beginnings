@@ -8,6 +8,7 @@ import { toast } from '@/src/components/ui/toast';
 import { useNavigate } from 'react-router-dom';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 export function NewHire() {
   const departments = useAppStore((state) => state.departments);
@@ -193,24 +194,33 @@ export function NewHire() {
     navigate('/onboarding');
   };
 
+  useSetPageTitle(
+    'Start New Hire',
+    'Configure basic details to generate the onboarding roadmap and save as a pending employee',
+    <div className="flex items-center gap-2">
+      <Button variant="outline" size="sm" onClick={() => navigate('/onboarding')} className="gap-2 border-slate-200 h-9">
+        <ArrowLeft className="h-4 w-4" /> Back
+      </Button>
+      <Button onClick={handleStartNewHire} disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-2 h-9 px-4 shadow-sm">
+        <ArrowRight className="h-4 w-4" /> {isSubmitting ? 'Saving...' : 'Save Pending Hire'}
+      </Button>
+    </div>
+  );
+
   return (
-    <div className="flex flex-col gap-6 max-w-4xl mx-auto pb-10 w-full animate-in fade-in duration-300 pt-6">
-      <div className="flex items-center gap-4 mb-2">
-        <Button variant="ghost" onClick={() => navigate('/onboarding')} className="gap-2 text-slate-500 hover:text-slate-800 shrink-0">
-          <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+    <div className="flex flex-col gap-6 max-w-4xl mx-auto pb-10 w-full animate-in fade-in duration-300">
+      {/* Mobile-only Action Bar */}
+      <div className="flex md:hidden items-center justify-between bg-white p-4 rounded-xl border border-slate-100 shadow-sm mb-2">
+        <Button variant="outline" size="sm" onClick={() => navigate('/onboarding')} className="gap-2 border-slate-200 h-9">
+          <ArrowLeft className="h-4 w-4" /> Back
+        </Button>
+        <Button onClick={handleStartNewHire} disabled={isSubmitting} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-2 h-9 px-4">
+          <ArrowRight className="h-4 w-4 text-[10px]" /> {isSubmitting ? '...' : 'Save'}
         </Button>
       </div>
 
       <Card className="border-none shadow-xl ring-1 ring-black/5 bg-white relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-blue-400"></div>
-        <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-5 pt-6 px-6 flex flex-row justify-between items-center">
-          <div>
-            <CardTitle className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <UserPlus className="h-6 w-6 text-indigo-500" /> Start New Hire
-            </CardTitle>
-            <CardDescription className="mt-1 pb-0">Configure basic details to generate the onboarding roadmap and save as a pending employee.</CardDescription>
-          </div>
-        </CardHeader>
         <CardContent className="p-6 md:p-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-6">
             <div className="space-y-2">

@@ -26,6 +26,7 @@ import {
   Check,
   LayoutTemplate
 } from 'lucide-react';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 
 const THEME_OPTIONS: { id: ColorTheme; label: string; swatches: string[] }[] = [
@@ -280,23 +281,10 @@ export function Profile() {
     );
   }
 
+  useSetPageTitle('My Profile', 'Account settings, appearance, and security');
+
   return (
     <div className="max-w-4xl mx-auto p-6">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-8">
-        <Button 
-          variant="ghost" 
-          size="icon"
-          onClick={() => navigate('/')}
-          className="h-10 w-10"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">My Profile</h1>
-          <p className="text-slate-500 text-sm">Manage your account settings and security</p>
-        </div>
-      </div>
 
       {/* Success/Error Messages */}
       {successMessage && (

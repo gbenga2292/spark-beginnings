@@ -4,10 +4,10 @@ import { toast, showConfirm } from '@/src/components/ui/toast';
 import { Trash2, Edit, CheckCircle, Plus, X, Upload, Download } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { usePriv } from '@/src/hooks/usePriv';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 const MONTHS = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -254,36 +254,54 @@ export function VatPayments() {
         }), { totalPaid: 0, vat: 0, vatPaid: 0, vatBalanceToPay: 0, principleOnVatDue: 0 });
     }, [totalsData]);
 
-    return (
-        <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">
-                        VAT Remittance
-                    </h1>
-                    <p className="text-sm font-medium text-slate-500 mt-1">Record VAT remittances to FIRS.</p>
-                </div>
-            </div>
-            <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
-            <div className="flex justify-end gap-3">
-                {priv.canImport && (
-                  <label className="flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 shadow-sm border border-indigo-200 rounded-md h-9 px-4 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap">
+    useSetPageTitle(
+        'VAT Remittance',
+        'Record and track VAT remittances to FIRS',
+        <div className="hidden sm:flex items-center gap-2">
+            {priv.canImport && (
+                <label className="flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 shadow-sm border border-indigo-200 rounded-md h-9 px-4 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap">
                     <Upload className="h-4 w-4" /> Import CSV
                     <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
-                  </label>
+                </label>
+            )}
+            {priv.canExport && (
+                <Button variant="outline" size="sm" className="gap-2 shrink-0 border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-9" onClick={handleExportCSV}>
+                    <Download className="h-4 w-4" /> Export CSV
+                </Button>
+            )}
+            {priv.canManageVat && (
+                <Button
+                    size="sm"
+                    className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md h-9 px-4"
+                    onClick={() => { handleClear(); setIsModalOpen(true); }}
+                >
+                    <Plus className="w-4 h-4" /> Add VAT Payment
+                </Button>
+            )}
+        </div>
+    );
+
+    return (
+        <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+            <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
+
+            {/* Mobile-only actions */}
+            <div className="flex sm:hidden justify-end gap-2">
+                {priv.canImport && (
+                    <label className="flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 shadow-sm border border-indigo-200 rounded-md h-9 px-3 text-sm font-medium cursor-pointer transition-colors">
+                        <Upload className="h-4 w-4" /> Import
+                        <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
+                    </label>
                 )}
                 {priv.canExport && (
-                    <Button variant="outline" className="gap-2 shrink-0 border-indigo-200 text-indigo-700 hover:bg-indigo-50" onClick={handleExportCSV}>
-                        <Download className="h-4 w-4" /> Export CSV
+                    <Button variant="outline" size="sm" className="gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-9" onClick={handleExportCSV}>
+                        <Download className="h-4 w-4" /> Export
                     </Button>
                 )}
                 {priv.canManageVat && (
-                  <Button
-                      className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-10 px-5"
-                      onClick={() => { handleClear(); setIsModalOpen(true); }}
-                  >
-                      <Plus className="w-5 h-5" /> Add VAT Payment
-                  </Button>
+                    <Button size="sm" className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md h-9 px-3" onClick={() => { handleClear(); setIsModalOpen(true); }}>
+                        <Plus className="w-4 h-4" /> Add
+                    </Button>
                 )}
             </div>
 
@@ -504,7 +522,7 @@ export function VatPayments() {
                     </div>
                 </div>
             )}
-        </div>
+            </div>
         </div>
     );
 }

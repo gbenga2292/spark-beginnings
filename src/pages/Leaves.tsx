@@ -13,6 +13,7 @@ import { addDays, parseISO, format, isWithinInterval } from 'date-fns';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 /* ─────────────────────────────────── helpers ─── */
 function calcExpectedEnd(startDate: string, duration: number): string {
@@ -356,37 +357,55 @@ export function Leaves() {
     setShowPrintPreview(true);
   };
 
+  useSetPageTitle(
+    'Staff Leave Management',
+    'File, track, and manage employee leave requests',
+    <div className="hidden sm:flex items-center gap-2">
+      {priv.canViewSummary && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2 h-9"
+          onClick={() => navigate('/leave-summary')}
+        >
+          <CalendarClock className="h-4 w-4" /> Summary
+        </Button>
+      )}
+      {priv.canAdd && (
+        <Button
+          size="sm"
+          className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9"
+          onClick={() => { resetForm(); setShowForm(true); }}
+        >
+          <Plus className="h-4 w-4" /> File Leave
+        </Button>
+      )}
+    </div>
+  );
+
   /* ─────────────────────────────── render ──── */
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
 
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-teal-400">
-            Staff Leave Management
-          </h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">File, track, and manage employee leave requests.</p>
-        </div>
-        <div className="flex gap-3">
-          {priv.canViewSummary && (
-            <Button
-              variant="outline"
-              className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-sm"
-              onClick={() => navigate('/leave-summary')}
-            >
-              <CalendarClock className="h-4 w-4" /> Go to Summary
-            </Button>
-          )}
-          {priv.canAdd && (
-            <Button
-              className="gap-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white shadow-md"
-              onClick={() => { resetForm(); setShowForm(true); }}
-            >
-              <Plus className="h-4 w-4" /> File Leave Entry
-            </Button>
-          )}
-        </div>
+      {/* ── Mobile Actions ── */}
+      <div className="flex sm:hidden flex-wrap gap-2 px-1">
+        {priv.canAdd && (
+          <Button
+            className="flex-1 gap-2 bg-teal-600 hover:bg-teal-700 text-white shadow-sm"
+            onClick={() => { resetForm(); setShowForm(true); }}
+          >
+            <Plus className="h-4 w-4" /> File Leave
+          </Button>
+        )}
+        {priv.canViewSummary && (
+          <Button
+            variant="outline"
+            className="flex-1 gap-2 border-slate-200 text-slate-700 bg-white shadow-sm"
+            onClick={() => navigate('/leave-summary')}
+          >
+            <CalendarClock className="h-4 w-4" /> Summary
+          </Button>
+        )}
       </div>
 
       {/* ── Leave Form Overlay ── */}

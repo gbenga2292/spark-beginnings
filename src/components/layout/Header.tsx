@@ -9,6 +9,7 @@ import { useAppData } from '@/src/contexts/AppDataContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
 import { Button } from '@/src/components/ui/button';
 import { useTheme } from '@/src/hooks/useTheme';
+import { usePage } from '@/src/contexts/PageContext';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -174,6 +175,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const notifications = useNotifications();
   const { isDark } = useTheme();
+  const { title, subtitle, headerButtons } = usePage();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -244,7 +246,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     <header className={`flex h-14 items-center justify-between border-b px-4 md:px-6 gap-4 transition-colors duration-200 relative z-40 ${
       isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-slate-200'
     }`}>
-      {/* Left: Menu + Search */}
+      {/* Left: Menu + Page Title */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {onMenuClick && (
           <Button variant="ghost" size="icon" onClick={onMenuClick} className="text-slate-500 lg:hidden h-8 w-8">
@@ -252,21 +254,27 @@ export function Header({ onMenuClick }: HeaderProps) {
           </Button>
         )}
 
-        {/* Page Title — Bold Blue (Reference Style) */}
-        {!onMenuClick && (
-          <h1 className="text-xl font-black text-blue-600 tracking-tight ml-2">
-            {(() => {
-              const path = location.pathname.split('/').filter(Boolean);
-              if (path.length === 0) return 'Dashboard';
-              const segment = path[path.length - 1];
-              return segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ');
-            })()}
+        <div className="flex flex-col min-w-0 transition-all duration-300">
+          <h1 className={`text-base md:text-lg font-bold tracking-tight truncate ${
+            isDark ? 'text-slate-100' : 'text-slate-900'
+          }`}>
+            {title || 'Dashboard'}
           </h1>
-        )}
+          {subtitle && (
+            <p className={`text-[10px] truncate font-medium mt-0.5 ${
+              isDark ? 'text-slate-400' : 'text-slate-500'
+            }`}>
+              {subtitle}
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* Right: Notifications + Profile */}
+      {/* Center/Right Actions */}
       <div className="flex items-center gap-2">
+        {headerButtons}
+        
+        <div className={`h-6 w-px hidden sm:block ${isDark ? 'bg-slate-700' : 'bg-slate-200'} mx-1`} />
         {/* Notification Bell */}
         <div ref={notifRef} className="relative">
           <button

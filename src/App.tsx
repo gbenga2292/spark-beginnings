@@ -13,6 +13,7 @@ import { GlobalDragScroll } from './components/ui/GlobalDragScroll';
 import { useTheme } from './hooks/useTheme';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { TaskProvider } from './contexts/AppDataContext';
+import { PageProvider } from './contexts/PageContext';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 
 // ── Lazy-loaded pages ─────────────────────────────────────────────────────────
@@ -191,19 +192,21 @@ export default function App() {
   return (
     <AuthProvider>
       <TaskProvider>
-        <ErrorBoundary>
-          <div className={`flex flex-col h-[100dvh] transition-colors duration-200 ${isDark ? 'dark bg-slate-950' : 'bg-slate-50'}`}>
-            <TitleBar />
-            <div className="flex-1 min-h-0 relative">
-              <GlobalDragScroll />
-              <ToastContainer />
-              <ConfirmDialog />
-              <HashRouter>
-                <AppContent />
-              </HashRouter>
+        <PageProvider>
+          <ErrorBoundary>
+            <div className={`flex flex-col h-[100dvh] transition-colors duration-200 ${isDark ? 'dark bg-slate-950' : 'bg-slate-50'}`}>
+              <TitleBar />
+              <div className="flex-1 min-h-0 relative">
+                <GlobalDragScroll />
+                <ToastContainer />
+                <ConfirmDialog />
+                <HashRouter>
+                  <AppContent />
+                </HashRouter>
+              </div>
             </div>
-          </div>
-        </ErrorBoundary>
+          </ErrorBoundary>
+        </PageProvider>
       </TaskProvider>
     </AuthProvider>
   );

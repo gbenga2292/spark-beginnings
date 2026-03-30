@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 // ─── Default blank checklist ──────────────────────────────────
 function makeDefaultChecklist(noOfGuarantors: number): OnboardingChecklist {
@@ -459,18 +460,53 @@ export function Onboarding() {
   const isHistory = activeTaskType === 'History' || (activeTaskType === 'Onboarding' && selectedEmployee?.status === 'Active');
   const isOffboarding = activeTaskType === 'Offboarding';
 
+  useSetPageTitle(
+    'Lifecycle & Flow',
+    'Manage onboarding, offboarding, and seamless employee transitions',
+    <div className="hidden sm:flex items-center gap-2">
+      {priv.canAdd && (
+        <Button 
+          variant="outline" 
+          size="sm"
+          className="gap-2 h-9" 
+          onClick={() => navigate('/onboarding/contract')}
+        >
+          <FileText className="h-4 w-4 text-indigo-500" /> Contract
+        </Button>
+      )}
+      {priv.canAdd && (
+        <Button 
+          size="sm"
+          className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9" 
+          onClick={() => navigate('/onboarding/new')}
+        >
+          <UserPlus className="h-4 w-4" /> Start New Hire
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">Lifecycle &amp; Flow</h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">Manage onboarding, offboarding, and seamless employee transitions.</p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          {priv.canAdd && <Button variant="outline" className="gap-2 shadow-sm" onClick={() => navigate('/onboarding/contract')}><FileText className="h-4 w-4 text-indigo-500" />Generate Contract</Button>}
-          {priv.canAdd && <Button className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md" onClick={() => navigate('/onboarding/new')}><UserPlus className="h-4 w-4" />Start New Hire</Button>}
-        </div>
+      {/* ── Mobile Actions ── */}
+      <div className="flex sm:hidden flex-wrap gap-2 px-1">
+        {priv.canAdd && (
+          <Button
+            className="flex-1 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+            onClick={() => navigate('/onboarding/new')}
+          >
+            <UserPlus className="h-4 w-4" /> Start New Hire
+          </Button>
+        )}
+        {priv.canAdd && (
+          <Button
+            variant="outline"
+            className="flex-1 gap-2"
+            onClick={() => navigate('/onboarding/contract')}
+          >
+            <FileText className="h-4 w-4 text-indigo-500" /> Contract
+          </Button>
+        )}
       </div>
 
       {/* Stats */}

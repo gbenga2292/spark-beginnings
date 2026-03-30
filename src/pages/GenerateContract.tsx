@@ -7,6 +7,7 @@ import { useAppStore } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
 import { useNavigate } from 'react-router-dom';
 import logoSrc from '../../logo/logo-2.png';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 export function GenerateContract() {
   const employees = useAppStore((state) => state.employees);
@@ -132,23 +133,32 @@ export function GenerateContract() {
     navigate('/onboarding');
   };
 
+  useSetPageTitle(
+    'Generate Employee Contract',
+    'Select an employee to generate a ready-to-print employment agreement',
+    <div className="flex items-center gap-2">
+      <Button variant="outline" size="sm" onClick={() => navigate('/onboarding')} className="gap-2 border-slate-200 h-9">
+        <ArrowLeft className="h-4 w-4" /> Back
+      </Button>
+      <Button onClick={handleGenerateContract} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-2 h-9 px-4 shadow-sm">
+        <FileText className="h-4 w-4" /> Download
+      </Button>
+    </div>
+  );
+
   return (
-    <div className="flex flex-col gap-6 max-w-4xl mx-auto pb-10 w-full animate-in fade-in duration-300 pt-6">
-      <div className="flex items-center gap-4 mb-2">
-        <Button variant="ghost" onClick={() => navigate('/onboarding')} className="gap-2 text-slate-500 hover:text-slate-800 shrink-0">
-          <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+    <div className="flex flex-col gap-6 max-w-4xl mx-auto pb-10 w-full animate-in fade-in duration-300">
+      {/* Mobile-only Action Bar */}
+      <div className="flex md:hidden items-center justify-between bg-white p-4 rounded-xl border border-slate-100 shadow-sm mb-2">
+        <Button variant="outline" size="sm" onClick={() => navigate('/onboarding')} className="gap-2 border-slate-200 h-9 shrink-0">
+          <ArrowLeft className="h-4 w-4" /> Back
+        </Button>
+        <Button onClick={handleGenerateContract} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-2 h-9 px-4 shadow-sm">
+          <FileText className="h-4 w-4" /> Download
         </Button>
       </div>
       <Card className="border-none shadow-xl ring-1 ring-black/5 bg-white relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-400"></div>
-        <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-5 pt-6 px-6 flex flex-row justify-between items-center">
-          <div>
-            <CardTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-500" /> Generate Employee Contract
-            </CardTitle>
-            <CardDescription className="mt-1 pb-0">Select an employee to generate a ready-to-print employment agreement.</CardDescription>
-          </div>
-        </CardHeader>
         <CardContent className="p-6 md:p-8">
           <div className="flex gap-2 p-1 bg-slate-100 rounded-lg mb-6 max-w-xs">
             <button

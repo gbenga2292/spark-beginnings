@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { useUserStore } from '@/src/store/userStore';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { normalizeDate } from '@/src/lib/dateUtils';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive', startDate: new Date().toISOString().split('T')[0], endDate: '' };
 
@@ -542,16 +543,28 @@ export function Sites() {
     reader.readAsBinaryString(file);
   };
 
+  useSetPageTitle(
+    'Sites & Clients',
+    'Manage project sites, clients, and onboarding',
+    <div className="hidden sm:flex items-center gap-2">
+      {canAddSite && (
+        <Button size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9" onClick={() => setIsAddingSite(true)}>
+          <Plus className="h-4 w-4" /> Add Site
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-6 h-full">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Sites &amp; Clients</h1>
-          <p className="text-slate-500 mt-2">
-            Manage project sites and clients. Each <strong>Client + Site</strong> combination is unique.
-          </p>
+      {/* Mobile Actions */}
+      {canAddSite && (
+        <div className="sm:hidden">
+          <Button className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-11" onClick={() => setIsAddingSite(true)}>
+            <Plus className="h-5 w-5" /> Add Site
+          </Button>
         </div>
-      </div>
+      )}
 
       <div className="flex items-center gap-2">
         <TabsList className="bg-slate-100 h-8">

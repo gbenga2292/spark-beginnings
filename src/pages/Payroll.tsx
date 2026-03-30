@@ -10,6 +10,7 @@ import { useAppStore, Employee } from '@/src/store/appStore';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import logoSrc from '../../logo/logo-2.png';
 import { usePriv } from '@/src/hooks/usePriv';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 interface PayrollRecord {
   id: string;
@@ -600,13 +601,14 @@ export function Payroll() {
     const fm = (n: number) => hideAmounts ? '***' : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     // fmTotal always shows the real value (used for TOTALS rows)
     const fmT = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  
+    useSetPageTitle(
+      'Payroll & Finance',
+      'Manage salaries, taxes, generate payslips, and handle staff advances and loans'
+    );
 
     return (
       <div className="flex flex-col gap-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Payroll & Finance</h1>
-          <p className="text-slate-500">Manage salaries, taxes, generate payslips, and handle staff advances and loans.</p>
-        </div>
 
         <Tabs>
           <TabsList className="grid w-full max-w-2xl grid-cols-4">

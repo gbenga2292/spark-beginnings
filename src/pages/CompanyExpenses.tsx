@@ -8,6 +8,7 @@ import { usePriv } from '@/src/hooks/usePriv';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { FileText, Plus, Trash2, Search, Filter, CheckSquare, X, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 export function CompanyExpenses() {
   const navigate = useNavigate();
@@ -151,19 +152,20 @@ export function CompanyExpenses() {
     navigate('/ledger');
   };
 
+  useSetPageTitle(
+    'Company Expenses',
+    'Manage and track company expenses and bank transfers',
+    <div className="flex items-center gap-2">
+      {selectedIds.size > 0 && (
+        <Button size="sm" onClick={handleBulkAddToLedger} className="bg-indigo-600 hover:bg-indigo-700 text-white h-9 text-xs font-semibold px-3 flex items-center gap-1.5 shadow-sm">
+          <Send className="w-3.5 h-3.5" /> Continue to Ledger ({selectedIds.size})
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6 fade-in">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <FileText className="h-6 w-6 text-indigo-600" />
-            </div>
-            Company Expenses
-          </h1>
-          <p className="text-slate-500 mt-1">Manage and track company expenses and bank transfers.</p>
-        </div>
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Form Column */}

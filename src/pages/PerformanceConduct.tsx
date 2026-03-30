@@ -12,6 +12,7 @@ import { usePriv } from '@/src/hooks/usePriv';
 import { useUserStore } from '@/src/store/userStore';
 import { Avatar, AvatarFallback } from '@/src/components/ui/avatar';
 import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 export default function PerformanceConduct() {
   const [employeeSearch, setEmployeeSearch] = useState('');
@@ -393,33 +394,37 @@ export default function PerformanceConduct() {
   const selectedEmp = internalEmployees.find(e => e.id === selectedEmployeeId);
   const empRecords = records.filter(r => r.employeeId === selectedEmployeeId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  // Notice logic
   const noticeRecords = records.filter(r => r.queryIssued && !r.queryReplied && r.status !== 'Closed' && r.status !== 'Expired');
   const activeCount = internalEmployees.filter(emp => records.some(r => r.employeeId === emp.id && r.status === 'Active')).length;
 
+  useSetPageTitle(
+    'Performance & Conduct',
+    'Staff Merits & Demerits • Due Process • Active Evaluation',
+    <div className="flex items-center gap-2">
+      <Button 
+        variant="outline" 
+        size="sm"
+        className={`relative h-9 ${showNotices ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white'}`} 
+        onClick={() => { setShowNotices(!showNotices); setSelectedEmployeeId(null); setIsAdding(false); setIsEditing(false); setSidebarCollapsed(false); }}
+      >
+        <BellRing className="h-4 w-4 mr-2" />
+        Notices
+        {noticeRecords.length > 0 && <span className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-rose-500 text-white text-[9px] flex items-center justify-center rounded-full font-bold shadow-sm">{noticeRecords.length}</span>}
+      </Button>
+      <Button 
+        variant="outline" 
+        size="sm"
+        onClick={() => setSidebarCollapsed(!sidebarCollapsed)} 
+        className="bg-white px-3 h-9"
+      >
+        {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4 mr-2 text-slate-500" /> : <PanelLeftClose className="h-4 w-4 mr-2 text-slate-500" />}
+        {sidebarCollapsed ? 'Expand' : 'Collapse'}
+      </Button>
+    </div>
+  );
+
   return (
-    <div className="flex flex-col h-[calc(100vh-6rem)] gap-4 relative">
-      {!(isAdding || isEditing) && (
-        <div className="flex justify-between items-end">
-          <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-400">
-              Performance & Conduct
-            </h1>
-            <p className="text-sm font-medium text-slate-500 mt-1 uppercase tracking-widest text-[10px]">Staff Merits & Demerits &bull; Due Process &bull; Active Evaluation</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" className={`relative ${showNotices ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 hover:text-amber-800' : 'bg-white hover:bg-slate-50'}`} onClick={() => { setShowNotices(!showNotices); setSelectedEmployeeId(null); setIsAdding(false); setIsEditing(false); setSidebarCollapsed(false); }}>
-              <BellRing className="h-4 w-4 mr-2" />
-              Pending Notices
-              {noticeRecords.length > 0 && <span className="absolute -top-2 -right-2 h-5 w-5 bg-rose-500 text-white text-[10px] flex items-center justify-center rounded-full font-bold">{noticeRecords.length}</span>}
-            </Button>
-            <Button variant="outline" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="bg-white hover:bg-slate-50 px-3">
-              {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4 mr-2 text-slate-500" /> : <PanelLeftClose className="h-4 w-4 mr-2 text-slate-500" />}
-              {sidebarCollapsed ? 'Expand Directory' : 'Collapse Directory'}
-            </Button>
-          </div>
-        </div>
-      )}
+    <div className="flex flex-col h-[calc(100vh-8rem)] gap-4 relative">
 
       <div className="flex flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Left Sidebar Layout */}

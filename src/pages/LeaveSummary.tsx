@@ -5,6 +5,7 @@ import { Input } from '@/src/components/ui/input';
 import { Search, ListFilter } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
 import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 export function LeaveSummary() {
   const allEmployees = useAppStore((state) => state.employees);
@@ -54,14 +55,13 @@ export function LeaveSummary() {
     });
   }, [leaveSummary, searchQuery, filterDept]);
 
+  useSetPageTitle(
+    'Leave Entitlement Summary',
+    `Overview of all employee leave balances for the year ${currentYear}`
+  );
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Leave Entitlement Summary</h1>
-          <p className="text-sm text-slate-500 mt-1">Overview of all employee leave balances for the year {currentYear}.</p>
-        </div>
-      </div>
 
       <Card className="border-none shadow-sm overflow-hidden bg-white min-h-[500px] flex flex-col">
         <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
