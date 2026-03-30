@@ -25,6 +25,8 @@ import { LogMaintenanceForm } from './maintenance/LogMaintenanceForm';
 
 type MaintenanceTab = 'dashboard' | 'machines' | 'vehicles' | 'log';
 
+import { useSetPageTitle } from '@/src/contexts/PageContext';
+
 export function MaintenanceManager() {
   const [activeTab, setActiveTab] = useState<MaintenanceTab>('dashboard');
   const { maintenanceAssets } = useOperations();
@@ -32,60 +34,67 @@ export function MaintenanceManager() {
   const machinesCount = maintenanceAssets.filter(a => a.category === 'machine').length;
   const vehiclesCount = maintenanceAssets.filter(a => a.category === 'vehicle').length;
 
+  useSetPageTitle(
+    'Equipment Maintenance',
+    'Track and manage heavy machinery and vehicle service schedules',
+    <div className="flex items-center gap-2">
+       <Button 
+         variant="outline" 
+         size="sm" 
+         className="gap-2 h-9 border-slate-200"
+       >
+         <FileDown className="h-4 w-4" /> Export
+       </Button>
+       {activeTab !== 'log' && (
+         <Button 
+           size="sm" 
+           className="gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-sm" 
+           onClick={() => setActiveTab('log')}
+         >
+           <Plus className="h-4 w-4" /> Log Service
+         </Button>
+       )}
+    </div>
+  );
+
   const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'machines', label: `Machines (${machinesCount})`, icon: Activity },
-    { id: 'vehicles', label: `Vehicles (${vehiclesCount})`, icon: Truck },
-    { id: 'log', label: 'Log Maintenance', icon: Wrench },
+    { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
+    { id: 'machines', label: 'Machines', count: machinesCount, icon: Activity },
+    { id: 'vehicles', label: 'Vehicles', count: vehiclesCount, icon: Truck },
+    { id: 'log', label: 'Service Log', icon: Wrench },
   ];
 
   return (
-    <div className="flex flex-col gap-10 pb-20 px-8 mt-4 h-full animate-in fade-in duration-500 overflow-y-auto no-scrollbar">
-      {/* Header section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h1 className="text-4xl font-black tracking-tight text-blue-600">Machine Maintenance</h1>
-          <p className="text-slate-400 font-medium mt-1">Track and manage equipment maintenance schedules</p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-           <div className="relative group">
-              <Button variant="outline" className="rounded-xl border-slate-200 font-bold text-slate-600 gap-2 px-6 h-12 shadow-sm bg-white hover:bg-slate-50">
-                 <FileDown className="h-4 w-4" /> Export Report <ChevronDown className="h-3 w-3" />
-              </Button>
-           </div>
-           {activeTab !== 'log' && (
-              <Button 
-                onClick={() => setActiveTab('log')}
-                className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest px-8 h-12 shadow-xl shadow-blue-200 gap-2"
-              >
-                 <Plus className="h-4 w-4" /> Log Service
-              </Button>
-           )}
-        </div>
-      </div>
-
-      {/* Tabs navigation */}
-      <div className="flex items-center gap-2 bg-slate-100/50 p-1.5 rounded-2xl w-fit self-start shadow-sm border border-slate-100">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10 px-4 sm:px-6 lg:px-8 animate-in fade-in duration-500">
+      {/* Compact Tabs */}
+      <div className="flex bg-white dark:bg-slate-900 p-1.5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 items-center overflow-x-auto no-scrollbar gap-1 w-fit">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as MaintenanceTab)}
             className={cn(
-              "flex items-center gap-2.5 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+              "px-6 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 uppercase tracking-wider",
               activeTab === tab.id 
-                ? "bg-white text-blue-600 shadow-xl shadow-slate-200/50 border border-slate-100" 
-                : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                ? 'bg-blue-600 text-white shadow-md' 
+                : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600'
             )}
           >
-            <tab.icon className={cn("h-4 w-4", activeTab === tab.id ? "text-blue-600" : "text-slate-300")} />
+            <tab.icon className="h-4 w-4" />
             {tab.label}
+            {tab.count !== undefined && (
+              <span className={cn(
+                "px-1.5 py-0.5 rounded-md text-[10px]",
+                activeTab === tab.id ? "bg-blue-500 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+              )}>
+                {tab.count}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1">
+      <div className="flex-1 mt-2">
         {activeTab === 'dashboard' && <MaintenanceDashboard />}
         {activeTab === 'machines' && <MaintenanceAssetGrid category="machine" />}
         {activeTab === 'vehicles' && <MaintenanceAssetGrid category="vehicle" />}
@@ -94,3 +103,4 @@ export function MaintenanceManager() {
     </div>
   );
 }
+

@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
-import { Asset, AssetCategory, AssetCondition } from '../types';
+import { Asset, AssetType, AssetCategory, AssetCondition } from '../types';
 import { AssetForm } from './AssetForm';
 import { RestockModal } from './RestockModal';
 
@@ -46,6 +46,8 @@ import {
   DropdownMenuTrigger,
 } from "@/src/components/ui/dropdown-menu"
 
+import { useSetPageTitle } from '@/src/contexts/PageContext';
+
 export function AssetManager() {
   const { assets, updateAsset, deleteAsset, bulkAddAssets } = useOperations();
   const { isDark } = useTheme();
@@ -55,6 +57,36 @@ export function AssetManager() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<AssetCategory | 'all'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useSetPageTitle(
+    'Inventory Management',
+    'Track equipment, tools, and consumables across all sites',
+    <div className="flex items-center gap-2">
+      <Button 
+        variant="outline" 
+        size="sm" 
+        className="gap-2 h-9 border-slate-200" 
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <Upload className="h-4 w-4" /> Bulk Import
+      </Button>
+      <Button 
+        variant="outline" 
+        size="sm" 
+        className="gap-2 h-9 border-slate-200" 
+        onClick={() => setShowRestockModal(true)}
+      >
+        <Package className="h-4 w-4" /> Restock
+      </Button>
+      <Button 
+        size="sm" 
+        className="gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-sm" 
+        onClick={() => setShowAddForm(true)}
+      >
+        <Plus className="h-4 w-4" /> Add Asset
+      </Button>
+    </div>
+  );
 
   const handleBulkImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -98,7 +130,7 @@ export function AssetManager() {
   });
 
   return (
-    <div className="flex flex-col gap-6 pb-10 px-6 mt-2 animate-in slide-in-from-bottom-2 duration-500">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10 px-4 sm:px-6 lg:px-8 animate-in fade-in duration-500">
       {/* Modals */}
       {(showAddForm || editingAsset) && (
         <AssetForm 
@@ -110,56 +142,17 @@ export function AssetManager() {
         />
       )}
       {showRestockModal && <RestockModal onClose={() => setShowRestockModal(false)} />}
+      
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleBulkImport} 
+        className="hidden" 
+        accept=".xlsx, .xls, .csv" 
+      />
 
-      {/* Top Utility Bar (Reference App Style) */}
-      <div className="flex items-center gap-4">
-         <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold flex items-center gap-2" onClick={() => setShowAddForm(true)}>
-            <Plus className="h-4 w-4" />
-            Add Asset
-         </Button>
-         <Button 
-            variant="ghost" 
-            className="text-slate-600 font-bold flex items-center gap-2 hover:bg-slate-100 dark:text-slate-400"
-            onClick={() => fileInputRef.current?.click()}
-         >
-            <Upload className="h-4 w-4" />
-            Bulk Import
-         </Button>
-         <input 
-           type="file" 
-           ref={fileInputRef} 
-           onChange={handleBulkImport} 
-           className="hidden" 
-           accept=".xlsx, .xls, .csv" 
-         />
-         <Button variant="ghost" className="text-slate-600 font-bold flex items-center gap-2 hover:bg-slate-100 dark:text-slate-400">
-            <FileText className="h-4 w-4" />
-            Export Report
-         </Button>
-      </div>
-
-      {/* Title Area (Reference App Style) */}
-      <div className="flex items-end justify-between">
-        <div>
-           <h1 className="text-3xl font-black tracking-tight text-blue-600 uppercase">Inventory</h1>
-           <p className="text-slate-500 mt-1 font-medium text-sm">Equipment, tools, and consumables</p>
-        </div>
-        <div className="flex items-center gap-6">
-           <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">
-             {filteredAssets.length} of {assets.length} assets
-           </span>
-           <Button 
-             className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold flex items-center gap-2 px-4 py-2 rounded-lg"
-             onClick={() => setShowRestockModal(true)}
-           >
-             <Package className="h-4 w-4" />
-             Restock
-           </Button>
-        </div>
-      </div>
-
-      {/* Search & Filter Bar (Reference App Style) */}
-      <Card className="shadow-none border border-slate-100 bg-white dark:bg-slate-900 border-0 p-4">
+      {/* Search & Filter Bar */}
+      <Card className="shadow-sm border border-slate-100 bg-white dark:bg-slate-900 p-4">
          <div className="flex flex-col md:flex-row items-center gap-4 w-full">
             <div className="relative flex-1 w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
@@ -167,28 +160,31 @@ export function AssetManager() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search assets..." 
-                className="pl-10 bg-slate-50/50 border-transparent dark:bg-slate-950 w-full focus-visible:ring-blue-500 font-medium text-sm h-11 rounded-xl"
+                className="pl-10 bg-slate-50/50 border-transparent dark:bg-slate-950 w-full focus-visible:ring-blue-500 font-medium text-sm h-10 rounded-xl"
               />
             </div>
             
-            <div className="flex items-center gap-3">
-               {[
-                 { label: 'All Categories', options: ['dewatering', 'waterproofing', 'tiling', 'ppe'] },
-                 { label: 'All Types', options: ['consumable', 'non-consumable', 'tools', 'equipment'] },
-                 { label: 'All Status', options: ['active', 'archived'] },
-               ].map((group) => (
-                 <div key={group.label} className="bg-slate-50/50 dark:bg-slate-950 rounded-xl px-4 h-11 flex items-center justify-between min-w-[160px] cursor-pointer hover:bg-slate-100 transition-colors border border-transparent">
-                    <span className="text-sm font-bold text-slate-500">{group.label}</span>
-                    <ChevronRight className="h-4 w-4 text-slate-300 rotate-90" />
-                 </div>
-               ))}
-               <Button variant="ghost" className="h-11 px-4 bg-slate-50/50 rounded-xl border-0 font-bold text-slate-600 flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full md:w-auto">
+               <select
+                 className="h-10 rounded-xl border border-transparent bg-slate-50/50 dark:bg-slate-950 px-3 text-sm font-bold text-slate-500 outline-none focus:ring-2 focus:ring-blue-500/20"
+                 value={filter}
+                 onChange={(e) => setFilter(e.target.value as any)}
+               >
+                 <option value="all">Categories</option>
+                 <option value="dewatering">Dewatering</option>
+                 <option value="waterproofing">Waterproofing</option>
+                 <option value="tiling">Tiling</option>
+                 <option value="ppe">PPE</option>
+               </select>
+
+               <Button variant="ghost" className="h-10 px-4 bg-slate-50/50 dark:bg-slate-950 rounded-xl border-0 font-bold text-slate-600 dark:text-slate-400 flex items-center gap-2">
                   <Filter className="h-4 w-4" />
-                  More
+                  <span className="hidden sm:inline">More Filters</span>
                </Button>
             </div>
          </div>
       </Card>
+
 
       {/* Table (Reference App Style) */}
       <div className="rounded-xl border border-slate-100/60 bg-white shadow-sm overflow-hidden">
