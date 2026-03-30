@@ -295,6 +295,10 @@ export function Sites() {
       s.name.trim().toLowerCase() === name.trim().toLowerCase() &&
       s.client.trim().toLowerCase() === client.trim().toLowerCase() &&
       s.id !== excludeId
+    ) || pendingSites.some(ps =>
+      ps.siteName.trim().toLowerCase() === name.trim().toLowerCase() &&
+      ps.clientName.trim().toLowerCase() === client.trim().toLowerCase() &&
+      ps.id !== excludeId
     );
 
   const handleAdd = () => {
@@ -358,19 +362,30 @@ export function Sites() {
   const uniqueClients = displayClients.length;
 
   const handleExportExcel = () => {
-    if (filteredSites.length === 0) {
-      toast.error('No sites to export');
-      return;
-    }
-    const exportData = filteredSites.map(site => {
-      const q = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
+    // Collect all unique sites from both live sites and onboarding records
+    const allSiteKeys = new Set<string>();
+    sites.forEach(s => allSiteKeys.add(`${s.client.toLowerCase().trim()}::${s.name.toLowerCase().trim()}`));
+    pendingSites.forEach(ps => allSiteKeys.add(`${ps.clientName.toLowerCase().trim()}::${ps.siteName.toLowerCase().trim()}`));
+
+    const exportData = Array.from(allSiteKeys).map(key => {
+      const [clientLow, nameLow] = key.split('::');
+      const site = sites.find(s => s.client.toLowerCase().trim() === clientLow && s.name.toLowerCase().trim() === nameLow);
+      const q = pendingSites.find(ps => ps.clientName.toLowerCase().trim() === clientLow && ps.siteName.toLowerCase().trim() === nameLow);
+
+      const name = site?.name || q?.siteName || '';
+      const client = site?.client || q?.clientName || '';
+      
+      // Category helps distinguish if it's already live or still in onboarding
+      const category = site ? "Active Site" : "Pending Onboarding";
+
       return {
-        "Site Name": site.name,
-        "Client": site.client,
-        "Start Date": site.startDate || '',
-        "End Date": site.endDate || '',
-        "VAT": site.vat,
-        "Status": site.status,
+        "Category": category,
+        "Site Name": name,
+        "Client": client,
+        "Start Date": site?.startDate || q?.phase1?.timelineStartDate || '',
+        "End Date": site?.endDate || q?.phase5?.actualEndDate || '',
+        "VAT": site?.vat || (q?.phase4?.clientTaxStatus?.includes('Add') ? 'Add' : q?.phase4?.clientTaxStatus?.includes('Yes') ? 'Yes' : 'No'),
+        "Status": site?.status || q?.status || 'Active',
         
         "Service": q?.phase1?.whatIsBeingBuilt || '',
         "Excavation Depth": q?.phase1?.excavationDepthMeters || '',
@@ -392,6 +407,11 @@ export function Sites() {
         "Scope Exclusions": q?.phase4?.scopeExclusionsSummary || ''
       };
     });
+
+    if (exportData.length === 0) {
+      toast.error('No sites to export');
+      return;
+    }
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
@@ -437,6 +457,8 @@ export function Sites() {
           data.forEach((importedSite: any) => {
             const name = (importedSite["Site Name"] || importedSite.name || '').toString().trim();
             const client = (importedSite["Client"] || importedSite.client || '').toString().trim();
+            const category = (importedSite["Category"] || '').toString().trim();
+            const isPendingOnly = category === "Pending Onboarding";
 
             if (!name || !client) {
               skippedCount++;
@@ -459,13 +481,22 @@ export function Sites() {
             importedPairs.add(pairKey);
             importedIds.add(newId);
 
-            validNewSites.push({
-              id: newId,
-              name: name,
-              client: client,
-              vat: importedSite.vat === 'Yes' ? 'Yes' : (importedSite.vat === 'Add' ? 'Add' : 'No'),
-              status: importedSite.status === 'Inactive' ? 'Inactive' : 'Active'
-            });
+            const startDate = normalizeDate(importedSite["Start Date"] || importedSite.startDate || '');
+            const endDate = normalizeDate(importedSite["End Date"] || importedSite.endDate || '');
+            const vat = (importedSite["VAT"] || importedSite.vat || 'No').toString().trim();
+            const status = (importedSite["Status"] || importedSite.status || 'Active').toString().trim();
+
+            if (!isPendingOnly) {
+              validNewSites.push({
+                id: newId,
+                name: name,
+                client: client,
+                startDate: startDate,
+                endDate: endDate,
+                vat: vat === 'Yes' ? 'Yes' : (vat === 'Add' ? 'Add' : 'No'),
+                status: status === 'Inactive' ? 'Inactive' : 'Active'
+              });
+            }
             
             // Map onboarding details
             const service = (importedSite["Service"] || '').toString();
@@ -479,22 +510,24 @@ export function Sites() {
             
             validNewPendingSites.push({
                id: crypto.randomUUID(),
-               siteId: newId,
+               siteId: isPendingOnly ? '' : newId,
                clientName: client,
                siteName: name,
-               status: missingInfo.length > 0 ? 'Pending' : 'Active',
+               status: isPendingOnly ? 'Pending' : 'Active',
                phase1: {
-                  isNewSite: true, isNewClient: false, 
+                  isNewSite: isPendingOnly, 
+                  isNewClient: !clients.includes(client), 
                   whatIsBeingBuilt: service, excavationDepthMeters: depth,
                   siteLength: (importedSite["Site Length"] || '').toString(),
                   siteWidth: (importedSite["Site Width"] || '').toString(),
-                  timelineStartDate: '', geotechnicalReportAvailable: false, hydrogeologicalDataAvailable: false,
+                  timelineStartDate: startDate, 
+                  geotechnicalReportAvailable: false, hydrogeologicalDataAvailable: false,
                   completed: !!service && !!depth
                },
                phase2: { siteVisited: false, walkthroughCompleted: false, knownObstacles: (importedSite["Known Obstacles"] || '').toString(), dischargeLocation: (importedSite["Discharge Location"] || '').toString(), dieselSupplyStrategy: '', completed: false },
                phase3: { dewateringMethods: [], totalWellpointsRequired: (importedSite["Total Wellpoints"] || '').toString(), totalHeadersRequired: (importedSite["Total Headers"] || '').toString(), totalPumpsRequired: (importedSite["Total Pumps"] || '').toString(), expectedDailyDieselUsage: diesel, completed: !!diesel },
-               phase4: { quotationSent: false, clientFeedbackReceived: false, proposalAccepted: false, clientTaxStatus: '', scopeOfWorkSummary: (importedSite["Scope of Work"] || '').toString(), scopeExclusionsSummary: (importedSite["Scope Exclusions"] || '').toString(), timelineConfirmed: false, permittingResponsibilityOutlined: false, tinProvided: false, completed: false },
-               phase5: { safetyPlanIntegrated: false, stage1AdvanceReceived: false, stage2InstallationComplete: false, stage2FirstInvoiceIssued: false, stage3TimelyBilling: false, stage4DemobilizationComplete: false, stage4FinalInvoiceIssued: false, actualEndDate: '', completed: false },
+               phase4: { quotationSent: false, clientFeedbackReceived: false, proposalAccepted: false, clientTaxStatus: (importedSite["Client Tax Status"] || '').toString(), scopeOfWorkSummary: (importedSite["Scope of Work"] || '').toString(), scopeExclusionsSummary: (importedSite["Scope Exclusions"] || '').toString(), timelineConfirmed: false, permittingResponsibilityOutlined: false, tinProvided: false, completed: false },
+               phase5: { safetyPlanIntegrated: false, stage1AdvanceReceived: false, stage2InstallationComplete: false, stage2FirstInvoiceIssued: false, stage3TimelyBilling: false, stage4DemobilizationComplete: false, stage4FinalInvoiceIssued: false, actualEndDate: endDate, completed: false },
                createdAt: new Date().toISOString(),
                updatedAt: new Date().toISOString()
             } as SiteQuestionnaire);

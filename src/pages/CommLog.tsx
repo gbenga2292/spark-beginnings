@@ -185,10 +185,19 @@ interface LogFormProps {
 function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormProps) {
   const sites = useAppStore(s => s.sites);
   const pendingSites = useAppStore(s => s.pendingSites);
+  const storeClients = useAppStore(s => s.clients);
   const addPendingSite = useAppStore(s => s.addPendingSite);
   const deletePendingSite = useAppStore(s => s.deletePendingSite);
 
-  const allClients = useMemo(() => Array.from(new Set(sites.map(s => s.client))).sort(), [sites]);
+  const allClients = useMemo(() => {
+    // Combine clients from the clients table, existing sites, and pending sites
+    const fromStore = storeClients || [];
+    const fromSites = sites.map(s => s.client);
+    const fromPending = pendingSites.map(ps => ps.clientName);
+    return Array.from(new Set([...fromStore, ...fromSites, ...fromPending]))
+      .filter(Boolean)
+      .sort();
+  }, [sites, pendingSites, storeClients]);
 
   // Onboard-in-background wizard state
   const [onboardBannerFor, setOnboardBannerFor] = useState<string | null>(null);

@@ -285,9 +285,9 @@ export function Onboarding() {
 
   const [activeTaskType, setActiveTaskType] = useState<'Onboarding' | 'History' | 'Offboarding' | null>(null);
 
-  const activeEmployees = useMemo(() => filterAndSortEmployeesExcludingCEO(employees.filter(e => e.status === 'Active')), [employees]);
-  const pendingEmployees = useMemo(() => filterAndSortEmployeesExcludingCEO(employees.filter(e => e.status === 'Onboarding')), [employees]);
-  const terminatedEmployees = useMemo(() => filterAndSortEmployeesExcludingCEO(employees.filter(e => e.status === 'Terminated')), [employees]);
+  const activeEmployees = useMemo(() => filterAndSortEmployeesExcludingCEO(employees.filter(e => e.status === 'Active' && e.staffType !== 'NON-EMPLOYEE' && !e.excludeFromOnboarding)), [employees]);
+  const pendingEmployees = useMemo(() => filterAndSortEmployeesExcludingCEO(employees.filter(e => e.status === 'Onboarding' && e.staffType !== 'NON-EMPLOYEE' && !e.excludeFromOnboarding)), [employees]);
+  const terminatedEmployees = useMemo(() => filterAndSortEmployeesExcludingCEO(employees.filter(e => e.status === 'Terminated' && e.staffType !== 'NON-EMPLOYEE' && !e.excludeFromOnboarding)), [employees]);
 
   const filterEmps = (list: Employee[]) => {
     if (!employeeSearchQuery) return list;
