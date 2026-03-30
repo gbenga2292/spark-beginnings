@@ -546,79 +546,91 @@ export function Sites() {
   useSetPageTitle(
     'Sites & Clients',
     'Manage project sites, clients, and onboarding',
-    <div className="hidden sm:flex items-center gap-2">
+    <div className="flex items-center gap-1.5 md:gap-3">
+      {/* Small Badge Toggle */}
+      <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/60 shadow-sm overflow-hidden whitespace-nowrap">
+        <button
+          onClick={() => setActiveTab('active')}
+          className={`px-2.5 py-1 rounded-md text-[9px] md:text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
+            activeTab === 'active' 
+              ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200' 
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Active <span className="hidden sm:inline">Sites</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('pending')}
+          className={`px-2.5 py-1 rounded-md text-[9px] md:text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
+            activeTab === 'pending' 
+              ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200' 
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Pending <span className="hidden sm:inline">Sites</span>
+        </button>
+
+      </div>
+
+      <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+
       {canAddSite && (
-        <Button size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9" onClick={() => setIsAddingSite(true)}>
-          <Plus className="h-4 w-4" /> Add Site
+        <Button 
+          size="sm" 
+          className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-7.5 text-[10px] md:text-[11px] px-2.5 md:px-4 font-bold shadow-md shadow-indigo-200/50" 
+          onClick={() => setIsAddingSite(true)}
+        >
+          <Plus className="h-3 md:h-3.5 w-3 md:w-3.5" /> <span className="hidden sm:inline">Add Site</span><span className="sm:hidden">Add</span>
         </Button>
       )}
-    </div>
+
+    </div>,
+    [activeTab, canAddSite]
   );
 
   return (
     <div className="flex flex-col gap-6 h-full">
-      {/* Mobile Actions */}
-      {canAddSite && (
-        <div className="sm:hidden">
-          <Button className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-11" onClick={() => setIsAddingSite(true)}>
-            <Plus className="h-5 w-5" /> Add Site
-          </Button>
-        </div>
-      )}
 
-      <div className="flex items-center gap-2">
-        <TabsList className="bg-slate-100 h-8">
-          <TabsTrigger
-            active={activeTab === 'active'}
-            onClick={() => setActiveTab('active')}
-            className="gap-1.5 text-xs h-7 px-3"
-          >
-            Active Sites
-          </TabsTrigger>
-          <TabsTrigger
-            active={activeTab === 'pending'}
-            onClick={() => setActiveTab('pending')}
-            className="gap-1.5 text-xs h-7 px-3"
-          >
-            Pending Sites
-          </TabsTrigger>
-        </TabsList>
-      </div>
 
       <Tabs className="flex flex-col flex-1 min-h-0 gap-8">
         <TabsContent active={activeTab === 'active'} className="flex-1 flex flex-col min-h-0 gap-6">
-          <div className="grid gap-6 md:grid-cols-3">
-            <Card className="border-indigo-100 bg-indigo-50/50">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-indigo-900">Total Active Sites</CardTitle>
-                <MapPin className="h-4 w-4 text-indigo-600" />
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="border-indigo-100 bg-indigo-50/50 shadow-none">
+              <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+                <CardTitle className="text-xs font-bold text-indigo-900 uppercase tracking-wider opacity-70">Total Active Sites</CardTitle>
+                <MapPin className="h-3.5 w-3.5 text-indigo-500" />
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-indigo-900">{sites.filter(s => s.status === 'Active').length}</div>
-                <p className="text-xs text-indigo-600 mt-1">Currently operational</p>
+              <CardContent className="p-3 pt-0">
+                <div className="text-2xl font-bold text-indigo-900 leading-none">
+                  {sites.filter(s => s.status === 'Active').length}
+                </div>
+                <p className="text-[10px] text-indigo-600 mt-1 opacity-80 font-medium">Currently operational</p>
               </CardContent>
             </Card>
-            <Card className="border-slate-200">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">Total Clients</CardTitle>
-                <Building2 className="h-4 w-4 text-slate-400" />
+
+            <Card className="border-slate-200 shadow-none">
+              <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+                <CardTitle className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Clients</CardTitle>
+                <Building2 className="h-3.5 w-3.5 text-slate-400" />
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-slate-900">{uniqueClients}</div>
-                <p className="text-xs text-slate-500 mt-1">Unique clients</p>
+              <CardContent className="p-3 pt-0">
+                <div className="text-2xl font-bold text-slate-900 leading-none">{uniqueClients}</div>
+                <p className="text-[10px] text-slate-500 mt-1 font-medium">Unique clients</p>
               </CardContent>
             </Card>
-            <Card className="border-emerald-100 bg-emerald-50/50">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-emerald-900">VAT Registered Sites</CardTitle>
-                <span className="text-emerald-600 font-bold text-sm">VAT</span>
+
+            <Card className="border-emerald-100 bg-emerald-50/50 shadow-none">
+              <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+                <CardTitle className="text-xs font-bold text-emerald-900 uppercase tracking-wider opacity-70">VAT Registered Sites</CardTitle>
+                <span className="text-emerald-600 font-bold text-[8px] bg-emerald-100/50 px-1 rounded uppercase tracking-wider h-[14px] flex items-center">VAT</span>
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-emerald-900">{sites.filter(s => s.vat === 'Yes' || s.vat === 'Add').length}</div>
-                <p className="text-xs text-emerald-600 mt-1">Sites with VAT enabled</p>
+              <CardContent className="p-3 pt-0">
+                <div className="text-2xl font-bold text-emerald-900 leading-none">{sites.filter(s => s.vat === 'Yes' || s.vat === 'Add').length}</div>
+                <p className="text-[10px] text-emerald-600 mt-1 opacity-80 font-medium">Sites with VAT enabled</p>
               </CardContent>
             </Card>
           </div>
+
 
           <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="p-4 border-b border-slate-200 flex items-center gap-3">
@@ -714,16 +726,29 @@ export function Sites() {
                           <option value="Add">Add</option>
                         </select>
                       ) : (
-                        <Badge variant={site.vat === 'Yes' || site.vat === 'Add' ? 'success' : 'secondary'}>
+                        <Badge 
+                          variant={site.vat === 'Yes' || site.vat === 'Add' ? 'success' : 'secondary'}
+                          className="text-[8px] px-1 py-0 h-[14px] min-w-[28px] justify-center"
+                        >
                           {site.vat}
                         </Badge>
                       )}
                     </TableCell>
                     <TableCell>
                       {editingId === site.id ? (
-                        <Badge variant={editForm.status === 'Active' ? 'success' : 'secondary'}>{editForm.status}</Badge>
+                        <Badge 
+                          variant={editForm.status === 'Active' ? 'success' : 'secondary'}
+                          className="text-[8px] px-1 py-0 h-[14px]"
+                        >
+                          {editForm.status}
+                        </Badge>
                       ) : (
-                        <Badge variant={site.status === 'Active' ? 'success' : 'secondary'}>{site.status}</Badge>
+                        <Badge 
+                          variant={site.status === 'Active' ? 'success' : 'secondary'}
+                          className="text-[8px] px-1 py-0 h-[14px]"
+                        >
+                          {site.status}
+                        </Badge>
                       )}
                     </TableCell>
                     {hasActions && (
@@ -852,7 +877,10 @@ export function Sites() {
                     <TableCell className="text-center">{site.phase4.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-green-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-300" />}</TableCell>
                     <TableCell className="text-center">{site.phase5.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-green-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-300" />}</TableCell>
                     <TableCell>
-                      <Badge variant={site.status === 'Pending' ? 'secondary' : 'success'}>
+                      <Badge 
+                        variant={site.status === 'Pending' ? 'secondary' : 'success'}
+                        className="text-[8px] px-1 py-0 h-[14px]"
+                      >
                         {site.status}
                       </Badge>
                     </TableCell>

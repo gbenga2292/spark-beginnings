@@ -36,7 +36,7 @@ export function usePage() {
  * NOTE: `buttons` must be stable (e.g. wrapped in useMemo at the call site)
  * or passed as null/undefined to avoid infinite re-render loops.
  */
-export function useSetPageTitle(title: string, subtitle: string = '', buttons: ReactNode | null = null) {
+export function useSetPageTitle(title: string, subtitle: string = '', buttons: ReactNode | null = null, deps: any[] = []) {
   const { setTitle, setSubtitle, setHeaderButtons } = usePage();
   // Use a ref to hold the latest buttons value so we never include it
   // in the dep array — JSX creates a new object reference on every render.
@@ -56,5 +56,6 @@ export function useSetPageTitle(title: string, subtitle: string = '', buttons: R
       setHeaderButtons(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, subtitle, setTitle, setSubtitle, setHeaderButtons]);
+  }, [title, subtitle, setTitle, setSubtitle, setHeaderButtons, ...deps]);
 }
+
