@@ -265,54 +265,44 @@ export function Payments() {
 
     useSetPageTitle(
         'Payment Records',
-        'Record and manage client payments',
-        <div className="hidden sm:flex items-center gap-2">
+        `Tracking ${payments.length} transactions with automated VAT and withholding tax calculations`,
+        <div className="flex items-center gap-3">
             {priv.canImport && (
-                <label className="flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 shadow-sm border border-indigo-200 rounded-md h-9 px-4 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap">
-                    <Upload className="h-4 w-4" /> Import CSV
+                <label className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 shadow-sm border border-slate-200 rounded-lg h-9 px-4 text-[10px] font-bold uppercase tracking-tight cursor-pointer transition-all whitespace-nowrap active:scale-95">
+                    <Upload className="h-4 w-4" /> <span className="hidden sm:inline">Import CSV</span>
                     <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
                 </label>
             )}
+            
             {priv.canExport && (
-                <Button variant="outline" size="sm" className="gap-2 shrink-0 border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-9" onClick={handleExportCSV}>
-                    <Download className="h-4 w-4" /> Export CSV
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-9 px-4 gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-[10px] uppercase tracking-tight shadow-sm transition-all active:scale-95" 
+                    onClick={handleExportCSV}
+                >
+                    <Download className="h-4 w-4" /> <span className="hidden sm:inline">Export CSV</span>
                 </Button>
             )}
+
+            <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
+
             {priv.canAdd && (
                 <Button
                     size="sm"
-                    className="gap-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-md h-9 px-4"
+                    className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
                     onClick={() => { handleClear(); setIsModalOpen(true); }}
                 >
                     <Plus className="w-4 h-4" /> Add Payment
                 </Button>
             )}
-        </div>
+        </div>,
+        [payments.length, priv.canImport, priv.canExport, priv.canAdd]
     );
 
     return (
-        <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-            <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
-
-            {/* Mobile-only actions */}
-            <div className="flex sm:hidden justify-end gap-2">
-                {priv.canImport && (
-                    <label className="flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 shadow-sm border border-indigo-200 rounded-md h-9 px-3 text-sm font-medium cursor-pointer transition-colors">
-                        <Upload className="h-4 w-4" /> Import
-                        <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
-                    </label>
-                )}
-                {priv.canExport && (
-                    <Button variant="outline" size="sm" className="gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-9" onClick={handleExportCSV}>
-                        <Download className="h-4 w-4" /> Export
-                    </Button>
-                )}
-                {priv.canAdd && (
-                    <Button size="sm" className="gap-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-md h-9 px-3" onClick={() => { handleClear(); setIsModalOpen(true); }}>
-                        <Plus className="w-4 h-4" /> Add
-                    </Button>
-                )}
-            </div>
+        <div className="h-full flex flex-col min-h-0 py-6">
+            <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6 px-6">
 
             <div className="flex flex-1 gap-6 items-start flex-col">
 

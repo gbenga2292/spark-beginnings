@@ -9,12 +9,18 @@ import { useWorkspace } from '@/src/hooks/use-workspace';
 import { useAppStore } from '@/src/store/appStore';
 import type { SubTask, SubTaskStatus, MainTask, AppUser } from "@/src/types/tasks";
 import type { TaskPriority } from "@/src/types/tasks";
+import { RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, Plus, Search, Circle, Loader2, Calendar, X, Users, Clock, ChevronDown, ChevronRight, UserCheck, ArrowUpDown, Flag, MessageSquare, Send, Pencil, Lock, User, FolderOpen, List, Bell, RefreshCw } from 'lucide-react';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { Button } from '@/src/components/ui/button';
+import { Input } from '@/src/components/ui/input';
+import { TabsContent } from '@/src/components/ui/tabs';
 import {
-  Plus, Search, Circle, Loader2,
-  CheckCircle2, Calendar, X, Users, Clock, ChevronDown,
-  ChevronRight, UserCheck, Trash2, ArrowUpDown, Flag, MessageSquare, Send, Pencil,
-  Lock, User, FolderOpen, LayoutGrid, List, Bell, RefreshCw
-} from "lucide-react";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/src/components/ui/dropdown-menu";
 import { differenceInHours, addDays } from "date-fns";
 import { format, isToday, isTomorrow, isPast } from "date-fns";
 import { TaskDetailSheet } from "@/src/components/tasks/TaskDetailSheet";
@@ -130,66 +136,65 @@ function PersonalTasksView() {
     (statusFilter === 'all' || deriveMainTaskStatus(mt.id, wsSubs) === statusFilter)
   );
 
+  useSetPageTitle(
+    'My Tasks',
+    'Manage your private tasks and to-do list across different view modes',
+    <div className="flex items-center gap-3">
+      <ViewToggle value={viewMode} onChange={setViewMode} />
+      
+      <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
+
+      {/* Sort */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-9 gap-2 text-slate-600 font-bold text-[11px] uppercase tracking-tight border border-slate-200 bg-white hover:bg-slate-50">
+            <ArrowUpDown className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{SORT_OPTIONS.find(o => o.value === sortBy)?.label}</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          {SORT_OPTIONS.map(opt => (
+            <DropdownMenuItem key={opt.value} onClick={() => setSortBy(opt.value)} className={sortBy === opt.value ? 'bg-indigo-50 text-indigo-700 font-bold' : ''}>
+              {opt.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Button 
+        size="sm" 
+        onClick={() => setShowCreate(true)}
+        className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
+      >
+        <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Task</span>
+      </Button>
+    </div>,
+    [viewMode, sortBy, search]
+  );
+
   const toggle = (id: string) =>
     setExpanded(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="space-y-0">
-
-      {/* Toolbar */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-2 mb-3 flex-wrap relative z-50">
-        <ViewToggle value={viewMode} onChange={setViewMode} />
-
-        {/* Sort */}
-        <div className="relative z-50">
-          <button onClick={() => setShowSortMenu(p => !p)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-muted text-xs font-medium text-muted-foreground hover:text-foreground transition-colors border border-transparent hover:border-border">
-            <ArrowUpDown className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{SORT_OPTIONS.find(o => o.value === sortBy)?.label}</span>
+    <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
+      {/* Unified Search Toolbar */}
+      <div className="relative w-full max-w-md">
+        <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+        <Input 
+          placeholder="Search tasks..." 
+          className="pl-9 h-10 text-sm border-slate-200 bg-white shadow-sm transition-all hover:bg-slate-50 focus:bg-white" 
+          value={search} 
+          onChange={e => setSearch(e.target.value)} 
+        />
+        {search && (
+          <button 
+            onClick={() => setSearch('')}
+            className="absolute right-3 top-2.5 p-1 rounded-full hover:bg-slate-100 transition-colors"
+          >
+            <X className="h-3.5 w-3.5 text-slate-400" />
           </button>
-          {showSortMenu && (
-            <div className="absolute left-0 top-full mt-1 z-30 bg-card border border-border rounded-xl shadow-lg py-1 w-52">
-              {SORT_OPTIONS.map(opt => (
-                <button key={opt.value} onClick={() => { setSortBy(opt.value); setShowSortMenu(false); }}
-                  className={`w-full text-left px-4 py-2 text-sm transition-colors ${sortBy === opt.value ? 'bg-violet-50 text-violet-600 font-medium dark:bg-violet-900/20 dark:text-violet-400' : 'text-foreground hover:bg-muted'}`}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Priority filter */}
-        {viewMode === 'list' && (
-          <div className="flex items-center gap-1">
-            {(['all', ...PRIORITY_ORDER] as PriorityFilter[]).map(p => (
-              <button key={p} onClick={() => setPriorityFilter(p)}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${priorityFilter === p
-                  ? p === 'all' ? 'bg-foreground text-background border-foreground' : PRIORITY_CONFIG[p as TaskPriority].className
-                  : 'border-border bg-muted text-muted-foreground hover:text-foreground'
-                  }`}>
-                {p === 'all' ? 'All' : PRIORITY_CONFIG[p as TaskPriority].label}
-              </button>
-            ))}
-          </div>
         )}
-        <div className="flex-1" />
-        <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-5 py-2 rounded-full bg-violet-600 text-white text-sm font-medium hover:bg-violet-500 transition-colors shadow-sm">
-          <Plus className="w-4 h-4" /><span className="hidden sm:inline">New Task</span>
-        </button>
-      </motion.div>
-
-      {/* Search */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="mb-4">
-        <div className="relative w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input type="text" placeholder="Search your tasks…" value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-muted text-sm text-foreground placeholder:text-muted-foreground
-              focus:outline-none focus:ring-2 focus:ring-violet-300 focus:bg-card transition-all border border-border focus:border-violet-300" />
-          {search && <button onClick={() => setSearch("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>}
-        </div>
-      </motion.div>
+      </div>
 
       {/* ── BOARD VIEW ── */}
       {viewMode === 'board' && (
@@ -481,6 +486,7 @@ function AdminTasksView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const [mySearch, setMySearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [editingTask, setEditingTask] = useState<MainTask | null>(null);
   const [chatTaskId, setChatTaskId] = useState<string | null>(null);
@@ -570,142 +576,121 @@ function AdminTasksView() {
   const mySubs = teamSubtasks.filter(s => s.assignedTo === currentUser?.id);
   const pendingApprovalSubs = teamSubtasks.filter(s => s.status === 'pending_approval');
 
-  const filtered = teamTasks.filter(mt => {
-    const tMatch = mt.title?.toLowerCase().includes(search.toLowerCase());
-    const dMatch = mt.description?.toLowerCase().includes(search.toLowerCase());
-    return tMatch || dMatch;
-  });
-
-  const toggle = (id: string) =>
-    setExpanded(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
-
+  // Status Tabs Definition
   const STATUS_TABS = [
     { label: "All", value: "all" },
     { label: "Not Started", value: "not_started" },
     { label: "In Progress", value: "in_progress" },
     { label: "Completed", value: "completed" },
   ] as const;
-  const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  const tabFiltered = filtered.filter(mt => {
-    if (statusFilter === "all") return true;
-    return deriveMainTaskStatus(mt.id, teamSubtasks) === statusFilter;
-  }).filter(mt => {
-    if (priorityFilter === 'all') return true;
-    return mt.priority === priorityFilter;
-  });
-
-  // My Tasks sub-view
-  const [myStatusFilter, setMyStatusFilter] = useState<SubTaskStatus | "all">("all");
-  const [mySearch, setMySearch] = useState("");
-  const MY_STATUS_TABS: { label: string; value: SubTaskStatus | "all" }[] = [
+  const MY_STATUS_TABS = [
     { label: "All", value: "all" },
     { label: "Not Started", value: "not_started" },
     { label: "In Progress", value: "in_progress" },
-    { label: "Pending Approval", value: "pending_approval" },
-    { label: "Completed", value: "completed" },
-  ];
-  const filteredMySubs = applySortToSubs(mySubs.filter(s => {
-    if (mySearch && !s.title.toLowerCase().includes(mySearch.toLowerCase())) return false;
-    if (myStatusFilter !== "all" && s.status !== myStatusFilter) return false;
-    return true;
-  }), sortBy) as SubTask[];
+    { label: "Review", value: "pending_approval" },
+    { label: "Done", value: "completed" },
+  ] as const;
+
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [myStatusFilter, setMyStatusFilter] = useState<string>("all");
+
+  const filtered = teamTasks.filter(mt => {
+    const tMatch = mt.title?.toLowerCase().includes(search.toLowerCase());
+    const dMatch = mt.description?.toLowerCase().includes(search.toLowerCase());
+    return tMatch || dMatch;
+  });
+
+  const tabFiltered = filtered.filter(mt => {
+    if (statusFilter === 'all') return true;
+    return deriveMainTaskStatus(mt.id, teamSubtasks) === statusFilter;
+  });
+
+  const filteredMySubs = mySubs.filter(sub => {
+    const mt = mainTasks.find(m => m.id === sub.mainTaskId);
+    const searchMatch = (sub.title?.toLowerCase().includes(mySearch.toLowerCase()) || 
+                         mt?.title?.toLowerCase().includes(mySearch.toLowerCase()));
+    
+    if (myStatusFilter !== 'all' && sub.status !== myStatusFilter) return false;
+    return searchMatch;
+  });
+
+  useSetPageTitle(
+    'Team Tasks',
+    'Coordinate with your team, track projects, and manage subtasks in real-time',
+    <div className="flex items-center gap-3">
+      <ViewToggle value={viewMode} onChange={setViewMode} />
+      
+      <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
+
+      <ScopePicker
+        scope={scope}
+        setScope={setScope}
+        myCount={mySubs.length}
+        pendingCount={pendingApprovalSubs.length}
+      />
+
+      <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-9 gap-2 text-slate-600 font-bold text-[11px] uppercase tracking-tight border border-slate-200 bg-white hover:bg-slate-50">
+            <ArrowUpDown className="w-3.5 h-3.5 text-indigo-500" />
+            <span className="hidden sm:inline">{SORT_OPTIONS.find(o => o.value === sortBy)?.label}</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          {SORT_OPTIONS.map(opt => (
+            <DropdownMenuItem key={opt.value} onClick={() => setSortBy(opt.value)} className={sortBy === opt.value ? 'bg-indigo-50 text-indigo-700 font-bold' : ''}>
+              {opt.label}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleSetDefault} className="text-[10px] text-indigo-600 font-bold">
+            SET AS DEFAULT SORT
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <div className="relative w-48 hidden md:block">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+        <Input 
+          placeholder="Search..." 
+          className="pl-8 h-9 text-xs border-slate-200 bg-white" 
+          value={scope === 'mine' ? mySearch : search} 
+          onChange={e => scope === 'mine' ? setMySearch(e.target.value) : setSearch(e.target.value)} 
+        />
+      </div>
+
+      <Button 
+        size="sm" 
+        onClick={() => scope === 'projects' ? setShowCreateProject(true) : setShowCreate(true)}
+        className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
+      >
+        {scope === 'projects' ? <FolderOpen className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+        <span className="hidden lg:inline">{scope === 'projects' ? 'New Project' : 'New Task'}</span>
+      </Button>
+    </div>,
+    [viewMode, scope, sortBy, search, mySearch, mySubs.length, pendingApprovalSubs.length]
+  );
+
+  const toggle = (id: string) =>
+    setExpanded(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="space-y-0">
-
-      {/* ── Toolbar — Primary Row ── */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-3 mb-3 flex-wrap relative z-50">
-        {/* View toggle */}
-        <ViewToggle value={viewMode} onChange={setViewMode} />
-
-        {/* Thin divider */}
-        <div className="w-px h-6 bg-border hidden sm:block" />
-
-        {/* Scope toggle */}
-        <ScopePicker
-          scope={scope}
-          setScope={setScope}
-          myCount={mySubs.length}
-          pendingCount={pendingApprovalSubs.length}
-        />
-
-        <div className="flex-1" />
-
-        {/* Sort */}
-        <div className="relative z-50">
-          <button onClick={() => setShowSortMenu(p => !p)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-muted/60 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors border border-border/40 hover:border-border">
-            <ArrowUpDown className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{SORT_OPTIONS.find(o => o.value === sortBy)?.label}</span>
-          </button>
-          {showSortMenu && (
-            <div className="absolute right-0 top-full mt-1 z-30 bg-card border border-border rounded-xl shadow-lg py-1 w-52">
-              {SORT_OPTIONS.map(opt => (
-                <button key={opt.value} onClick={() => { setSortBy(opt.value); setShowSortMenu(false); }}
-                  className={`w-full text-left px-4 py-2 text-sm transition-colors ${sortBy === opt.value ? 'bg-primary/10 text-primary font-medium' : 'text-foreground hover:bg-muted'}`}>
-                  {opt.label}
-                </button>
-              ))}
-              <div className="border-t border-border mt-1 pt-1 px-4 py-2">
-                <button onClick={() => { handleSetDefault(); setShowSortMenu(false); }}
-                  className="text-xs text-primary hover:text-primary/80 font-medium transition-colors">
-                  Set as default sort
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {scope === 'projects' ? (
-          <button onClick={() => setShowCreateProject(true)}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm hover:shadow-md">
-            <FolderOpen className="w-4 h-4" /><span className="hidden sm:inline">New Project</span>
-          </button>
-        ) : (
-          <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm hover:shadow-md">
-            <Plus className="w-4 h-4" /><span className="hidden sm:inline">New Task</span>
-          </button>
-        )}
-      </motion.div>
-
-      {/* ── Priority Filter Row (conditional) ── */}
-      {scope === 'all' && (viewMode === 'list' || viewMode === 'compact') && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="mb-3">
-          <div className="flex items-center gap-1.5 overflow-x-auto">
-            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mr-1 hidden sm:inline">Priority</span>
-            {(['all', ...PRIORITY_ORDER] as PriorityFilter[]).map(p => (
-              <button key={p} onClick={() => setPriorityFilter(p)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all whitespace-nowrap ${priorityFilter === p
-                  ? p === 'all' ? 'bg-foreground text-background border-foreground' : PRIORITY_CONFIG[p as TaskPriority].className
-                  : 'border-border bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}>
-                {p === 'all' ? 'All' : PRIORITY_CONFIG[p as TaskPriority].label}
-              </button>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Search */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="mb-4">
+    <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
+      {/* Mobile Search */}
+      <div className="md:hidden">
         <div className="relative w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input type="text"
-            placeholder={scope === 'mine' ? "Search my tasks…" : "Search tasks…"}
-            value={scope === 'mine' ? mySearch : search}
-            onChange={e => scope === 'mine' ? setMySearch(e.target.value) : setSearch(e.target.value)}
-            className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-muted text-sm text-foreground placeholder:text-muted-foreground
-              focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-card transition-all border border-border focus:border-primary/30" />
-          {(scope === 'mine' ? mySearch : search) && (
-            <button onClick={() => scope === 'mine' ? setMySearch("") : setSearch("")}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <Input 
+            placeholder="Search tasks..." 
+            className="pl-9 h-10 text-sm border-slate-200 bg-white" 
+            value={scope === 'mine' ? mySearch : search} 
+            onChange={e => scope === 'mine' ? setMySearch(e.target.value) : setSearch(e.target.value)} 
+          />
         </div>
-      </motion.div>
+      </div>
 
       {/* ── BOARD VIEW ── */}
       {viewMode === 'board' && (scope === 'all' || scope === 'projects') && (

@@ -449,37 +449,34 @@ export function Attendance() {
 
   useSetPageTitle(
     'Daily Register',
-    'Attendance & site allocation'
+    'Attendance & site allocation',
+    <div className="flex items-center gap-2">
+      <TabsList className="bg-slate-100 h-8">
+        <TabsTrigger
+          active={activeTab === 'entry'}
+          onClick={() => setActiveTab('entry')}
+          className="gap-1.5 text-xs h-7 px-3"
+        >
+          <CalendarIcon className="h-3 w-3" /> Entry
+        </TabsTrigger>
+        <TabsTrigger
+          active={activeTab === 'database'}
+          onClick={() => setActiveTab('database')}
+          className="gap-1.5 text-xs h-7 px-3"
+        >
+          <Database className="h-3 w-3" /> Database
+        </TabsTrigger>
+      </TabsList>
+    </div>,
+    [activeTab]
   );
 
   return (
-    <div className="flex flex-col gap-3 h-full">
-      {/* Compact sub-header bar */}
-      <div className="flex items-center justify-end">
-        <div className="flex items-center gap-2">
-          <TabsList className="bg-slate-100 h-8">
-            <TabsTrigger
-              active={activeTab === 'entry'}
-              onClick={() => setActiveTab('entry')}
-              className="gap-1.5 text-xs h-7 px-3"
-            >
-              <CalendarIcon className="h-3 w-3" /> Entry
-            </TabsTrigger>
-            <TabsTrigger
-              active={activeTab === 'database'}
-              onClick={() => setActiveTab('database')}
-              className="gap-1.5 text-xs h-7 px-3"
-            >
-              <Database className="h-3 w-3" /> Database
-            </TabsTrigger>
-          </TabsList>
-        </div>
-      </div>
-
+    <div className="flex flex-col h-full">
       <Tabs className="w-full flex-1 flex flex-col min-h-0">
-        <TabsContent active={activeTab === 'entry'} className="flex-1 flex flex-col min-h-0">
+        <TabsContent active={activeTab === 'entry'} className="flex-1 flex flex-col min-h-0 mt-0">
           {/* Toolbar: date, filters, search, actions — all in one row */}
-          <div className="flex flex-wrap items-center gap-2 py-2 px-0">
+          <div className="flex flex-wrap items-center gap-2 py-1 px-0">
             {/* Date controls */}
             <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1.5 shadow-sm">
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Last</span>
@@ -700,8 +697,8 @@ export function Attendance() {
           </div>
         </TabsContent>
 
-        <TabsContent active={activeTab === 'database'} className="flex-1 flex flex-col min-h-0">
-          <div className="flex flex-wrap items-center gap-2 py-2 px-0 bg-white">
+        <TabsContent active={activeTab === 'database'} className="flex-1 flex flex-col min-h-0 mt-0">
+          <div className="flex flex-wrap items-center gap-2 py-1 px-0 bg-white">
             <div className="relative">
               <select
                 value={dbStaffTypeFilter}

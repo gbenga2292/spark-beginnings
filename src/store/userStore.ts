@@ -50,7 +50,7 @@ export interface BillingPriv  { canView: boolean; canCreate: boolean; canEdit: b
 export interface PaymentsPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canViewAmounts: boolean; canViewVat: boolean; canManageVat: boolean; canImport: boolean; canExport: boolean; }
 export interface PayrollPriv  {
   canView: boolean; canGenerate: boolean; canViewAmounts: boolean;
-  canViewPayeSchedule: boolean; canViewPensionSchedule: boolean; canViewNsitfSchedule: boolean;
+  canViewPayeSchedule: boolean; canViewPensionSchedule: boolean; canViewNsitfSchedule: boolean; canViewWithholdingSchedule: boolean;
 }
 export interface FinancialReportsPriv {
   canView: boolean; canExport: boolean; canViewAmounts: boolean;
@@ -116,7 +116,7 @@ export const FULL_ACCESS: UserPrivileges = {
   sites:            { canView: true, canAddSite: true, canEditSite: true, canDeleteSite: true, canAddClient: true, canEditClient: true, canDeleteClient: true, canViewClientSummary: true, canImport: true, canExport: true },
   billing:          { canView: true, canCreate: true, canEdit: true, canDelete: true, canViewAmounts: true, canImport: true, canExport: true },
   payments:         { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewAmounts: true, canViewVat: true, canManageVat: true, canImport: true, canExport: true },
-  payroll:          { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true },
+  payroll:          { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true, canViewWithholdingSchedule: true },
   financialReports: { canView: true, canExport: true, canViewAmounts: true, canViewPayrollSummary: true, canViewLoansAndAdvances: true },
   ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
   variables:        { canView: true, canEdit: true, canImport: true, canExport: true },
@@ -139,7 +139,7 @@ export const NO_ACCESS: UserPrivileges = {
   sites:            { canView: false, canAddSite: false, canEditSite: false, canDeleteSite: false, canAddClient: false, canEditClient: false, canDeleteClient: false, canViewClientSummary: false, canImport: false, canExport: false },
   billing:          { canView: false, canCreate: false, canEdit: false, canDelete: false, canViewAmounts: false, canImport: false, canExport: false },
   payments:         { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewAmounts: false, canViewVat: false, canManageVat: false, canImport: false, canExport: false },
-  payroll:          { canView: false, canGenerate: false, canViewAmounts: false, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false },
+  payroll:          { canView: false, canGenerate: false, canViewAmounts: false, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false, canViewWithholdingSchedule: false },
   financialReports: { canView: false, canExport: false, canViewAmounts: false, canViewPayrollSummary: false, canViewLoansAndAdvances: false },
   ledger:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
   variables:        { canView: false, canEdit: false, canImport: false, canExport: false },
@@ -164,7 +164,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       leaves:      { canView: true, canAdd: true, canEdit: true, canDelete: false, canViewSummary: true },
       salaryLoans: { canView: true, canAdd: true, canEdit: false, canDelete: false, canViewAmounts: true },
       reports:     { canView: true, canExport: true },
-      payroll:     { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true },
+      payroll:     { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true, canViewWithholdingSchedule: true },
       tasks:       { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: false },
     },
   },
@@ -176,7 +176,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       salaryLoans:      { canView: true, canAdd: true, canEdit: false, canDelete: false, canViewAmounts: true },
       billing:          { canView: true, canCreate: true, canEdit: true, canDelete: false, canViewAmounts: true, canImport: true, canExport: true },
       payments:         { canView: true, canAdd: true, canEdit: true, canDelete: false, canViewAmounts: true, canViewVat: true, canManageVat: false, canImport: true, canExport: true },
-      payroll:          { canView: true, canGenerate: false, canViewAmounts: true, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false },
+      payroll:          { canView: true, canGenerate: false, canViewAmounts: true, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false, canViewWithholdingSchedule: false },
       financialReports: { canView: true, canExport: true, canViewAmounts: true, canViewPayrollSummary: true, canViewLoansAndAdvances: true },
       ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: false, canExport: true },
       reports:          { canView: true, canExport: true },
@@ -197,7 +197,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       sites:            { canView: true, canAddSite: false, canEditSite: false, canDeleteSite: false, canAddClient: false, canEditClient: false, canDeleteClient: false, canViewClientSummary: true, canImport: false, canExport: false },
       billing:          { canView: true, canCreate: false, canEdit: false, canDelete: false, canViewAmounts: false, canImport: false, canExport: false },
       payments:         { canView: true, canAdd: false, canEdit: false, canDelete: false, canViewAmounts: false, canViewVat: true, canManageVat: false, canImport: false, canExport: false },
-      payroll:          { canView: true, canGenerate: false, canViewAmounts: false, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false },
+      payroll:          { canView: true, canGenerate: false, canViewAmounts: false, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false, canViewWithholdingSchedule: false },
       financialReports: { canView: true, canExport: false, canViewAmounts: false, canViewPayrollSummary: false, canViewLoansAndAdvances: false },
       ledger:           { canView: true, canAdd: false, canEdit: false, canDelete: false, canExport: false },
       tasks:            { canView: true, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false },

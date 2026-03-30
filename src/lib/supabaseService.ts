@@ -25,6 +25,7 @@ export function dbToEmployee(r: any): Employee {
     staffType: r.staff_type, position: r.position, startDate: r.start_date,
     endDate: r.end_date, yearlyLeave: r.yearly_leave, bankName: r.bank_name,
     accountNo: r.account_no, payeTax: r.paye_tax, withholdingTax: r.withholding_tax,
+    withholdingTaxRate: r.withholding_tax_rate,
     taxId: r.tax_id, pensionNumber: r.pension_number, payeNumber: r.paye_number || '',
     status: r.status,
     monthlySalaries: r.monthly_salaries, avatar: r.avatar,
@@ -296,6 +297,7 @@ function employeeToDb(e: Employee) {
     staff_type: e.staffType, position: e.position, start_date: e.startDate,
     end_date: e.endDate, yearly_leave: e.yearlyLeave, bank_name: e.bankName,
     account_no: e.accountNo, paye_tax: e.payeTax, withholding_tax: e.withholdingTax,
+    withholding_tax_rate: e.withholdingTaxRate,
     tax_id: e.taxId, pension_number: e.pensionNumber, paye_number: e.payeNumber || '',
     status: e.status,
     monthly_salaries: e.monthlySalaries, avatar: e.avatar,
@@ -774,6 +776,7 @@ export const db = {
     if (e.accountNo !== undefined) update.account_no = e.accountNo;
     if (e.payeTax !== undefined) update.paye_tax = e.payeTax;
     if (e.withholdingTax !== undefined) update.withholding_tax = e.withholdingTax;
+    if (e.withholdingTaxRate !== undefined) update.withholding_tax_rate = e.withholdingTaxRate;
     if (e.taxId !== undefined) update.tax_id = e.taxId;
     if (e.pensionNumber !== undefined) update.pension_number = e.pensionNumber;
     if (e.payeNumber !== undefined) update.paye_number = e.payeNumber;
@@ -816,6 +819,7 @@ export const db = {
     if (e.level !== undefined) update.level = e.level;
     if (e.payeTax !== undefined) update.paye_tax = e.payeTax;
     if (e.withholdingTax !== undefined) update.withholding_tax = e.withholdingTax;
+    if (e.withholdingTaxRate !== undefined) update.withholding_tax_rate = e.withholdingTaxRate;
     if (e.probationPeriod !== undefined) update.probation_period = e.probationPeriod;
     if (e.payeeType !== undefined) update.payee_type = e.payeeType;
     if (e.typeOfPay !== undefined) update.type_of_pay = e.typeOfPay;

@@ -37,6 +37,9 @@ interface PayrollRecord {
   employerPension: number;
   takeHomePay: number;
   nsitf: number;
+  withholdingTaxRate?: number;
+  withholdingTax: boolean;
+  taxId: string;
   status: 'Pending' | 'Processed';
 }
 
@@ -58,7 +61,7 @@ export function Payroll() {
   const [activeTab, setActiveTab] = useState('processing');
   const [isProcessing, setIsProcessing] = useState(false);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
-  const [printType, setPrintType] = useState<'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF'>('PAYSLIPS');
+  const [printType, setPrintType] = useState<'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF' | 'WITHHOLDING'>('PAYSLIPS');
   const [printSelectedMonths, setPrintSelectedMonths] = useState<string[]>([]);
   const [printSelectedEmployees, setPrintSelectedEmployees] = useState<string[]>([]);
   const [printSelectedDepts, setPrintSelectedDepts] = useState<string[]>([]);
@@ -137,6 +140,9 @@ export function Payroll() {
     { id: 'total_pension',    label: 'Total Pension',     summable: true,  types: ['PENSION'] },
     { id: 'nsitf_rate',       label: 'NSITF Ratio',       summable: false, types: ['NSITF'] },
     { id: 'nsitf_amount',     label: 'NSITF Amount',      summable: true,  types: ['NSITF'] },
+    { id: 'withholding_rate',  label: 'WHT Rate (%)',      summable: false, types: ['WITHHOLDING'] },
+    { id: 'tin',               label: 'TIN',               summable: false, types: ['WITHHOLDING'] },
+    { id: 'withholding',      label: 'Withholding Tax',   summable: true,  types: ['WITHHOLDING', 'PAYSLIPS'] },
   ];
 
   const DEFAULT_COLUMNS: Record<string, string[]> = {
@@ -144,6 +150,7 @@ export function Payroll() {
     PAYE:    ['sn', 'employee_name', 'paye_id', 'month', 'bank_name', 'account_number', 'basic', 'housing', 'transport', 'other', 'gross', 'paye'],
     PENSION: ['sn', 'employee_name', 'pension_pin', 'month', 'bank_name', 'account_number', 'pensionable', 'employee_pension', 'employer_pension', 'total_pension'],
     NSITF:   ['sn', 'employee_name', 'month', 'bank_name', 'account_number', 'gross', 'nsitf_rate', 'nsitf_amount'],
+    WITHHOLDING: ['sn', 'employee_name', 'tin', 'month', 'bank_name', 'account_number', 'gross', 'withholding_rate', 'withholding'],
   };
 
   const months = [
@@ -207,6 +214,7 @@ export function Payroll() {
           return (a.position || '').localeCompare(b.position || '');
         })
         .map((emp) => {
+          let whtRateToStore = 0;
           const standardSalary = emp.monthlySalaries[mKey] || 0;
 
           const defaultDays = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase()) ? 6 : 5;
@@ -315,7 +323,10 @@ export function Payroll() {
 
             paye = annualTax / 12;
           } else if (emp.withholdingTax) {
-            paye = salary * (payrollVariables.withholdingTaxRate ?? 0);
+            // Use the individual consultant's tax rate, defaulting to 5%
+            const whtRate = emp.withholdingTaxRate ?? 0.05;
+            paye = salary * whtRate;
+            whtRateToStore = whtRate;
           }
 
           // LOAN REPAYMENT: Sum of Advances and Monthly Repayments
@@ -375,6 +386,9 @@ export function Payroll() {
             employerPension,
             nsitf,
             takeHomePay,
+            withholdingTaxRate: whtRateToStore,
+            withholdingTax: !!emp.withholdingTax,
+            taxId: emp.taxId || '',
             status: 'Pending' as const,
           };
         });
@@ -408,9 +422,10 @@ export function Payroll() {
       const totalPAYE = payrollData.reduce((sum, p) => sum + p.paye, 0);
       const totalLoans = payrollData.reduce((sum, p) => sum + p.loanRepayment, 0);
       const totalPension = payrollData.reduce((sum, p) => sum + p.pension, 0);
+      const totalWithholding = payrollData.filter(p => p.staffType === 'NON-EMPLOYEE').reduce((sum, p) => sum + p.paye, 0);
       const totalDeductions = totalPAYE + totalLoans + totalPension;
       const totalNet = payrollData.reduce((sum, p) => sum + p.takeHomePay, 0);
-      return { totalGross, totalPAYE, totalLoans, totalPension, totalDeductions, totalNet, employeeCount: payrollData.length };
+      return { totalGross, totalPAYE, totalLoans, totalPension, totalWithholding, totalDeductions, totalNet, employeeCount: payrollData.length };
     }, [payrollData]);
 
     const handleProcess = () => {
@@ -418,7 +433,7 @@ export function Payroll() {
       setTimeout(() => setIsProcessing(false), 2000);
     };
 
-    const handleOpenPrintDialog = (type: 'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF') => {
+    const handleOpenPrintDialog = (type: 'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF' | 'WITHHOLDING') => {
       setPrintSelectedMonths([selectedMonth]);
       // Seed with ALL active employee IDs so all checkboxes appear checked
       setPrintSelectedEmployees(employees.filter(e => e.status === 'Active').map(e => e.id));
@@ -430,7 +445,7 @@ export function Payroll() {
     const handlePrint = () => {
       if (!payslipsToPrint || payslipsToPrint.length === 0) return;
 
-      if (printType === 'PAYE' || printType === 'PENSION' || printType === 'NSITF') {
+      if (printType === 'PAYE' || printType === 'PENSION' || printType === 'NSITF' || printType === 'WITHHOLDING') {
         const el = document.getElementById('print-area-content');
         if (!el) return;
         const html = `
@@ -588,6 +603,15 @@ export function Payroll() {
             csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.monthLabel}","${fmCSV(slip.record.grossPay)}","${payrollVariables.nsitfRate}","${fmCSV(slip.record.nsitf)}"\n`;
           }
         });
+      } else if (printType === 'WITHHOLDING') {
+        csvStr = 'S/N,Employee Name,TIN,Month,Gross Pay (₦),Rate (%),Withholding Tax (₦)\n';
+        let sn = 1;
+        payslipsToPrint.forEach(slip => {
+          if (slip.record.staffType === 'NON-EMPLOYEE') {
+            const whtRate = slip.record.withholdingTaxRate ? (slip.record.withholdingTaxRate * 100).toFixed(1) + '%' : '5%';
+            csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.record.taxId || ''}","${slip.monthLabel}","${fmCSV(slip.record.grossPay)}","${whtRate}","${fmCSV(slip.record.paye)}"\n`;
+          }
+        });
       } else {
         csvStr = 'S/N,Employee Name,Bank,Account No,Expected Net Pay (₦)\n';
         let sn = 1;
@@ -611,7 +635,8 @@ export function Payroll() {
       activeTab === 'processing' ? 'Payroll Processing' :
       activeTab === 'paye' ? 'PAYE Schedule' :
       activeTab === 'pension' ? 'Pension Schedule' :
-      'NSITF Schedule';
+      activeTab === 'nsitf' ? 'NSITF Schedule' :
+      'Withholding Schedule';
 
     useSetPageTitle(
       activeTabTitle,
@@ -649,6 +674,7 @@ export function Payroll() {
             {[
               { id: 'processing', label: 'Payroll Processing' },
               { id: 'paye', label: 'PAYE', priv: priv.canViewPayeSchedule },
+              { id: 'withholding', label: 'Withholding' },
               { id: 'pension', label: 'Pension', priv: priv.canViewPensionSchedule },
               { id: 'nsitf', label: 'NSITF', priv: priv.canViewNsitfSchedule }
             ].map(tab => {
@@ -959,6 +985,57 @@ export function Payroll() {
             </TabsContent>
           )}
 
+          {/* ────────────────────────── WITHHOLDING TAB ────────────────────────────────── */}
+          <TabsContent active={activeTab === 'withholding'} className="mt-0">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
+                <CardTitle>Withholding Tax Schedule (Consultants): {selectedMonthLabel}</CardTitle>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-500 font-medium">Total Withholding: <span className="text-indigo-600 font-bold">₦{fmT(totals.totalWithholding)}</span></span>
+                </div>
+              </CardHeader>
+              <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 cursor-grab">
+                <Table className="whitespace-nowrap w-full text-xs">
+                  <TableHeader>
+                    <TableRow className="bg-indigo-50">
+                      <TableHead className="font-bold sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">S/N</TableHead>
+                      <TableHead className="font-bold sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">Surname</TableHead>
+                      <TableHead className="font-bold sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">Firstname</TableHead>
+                      <TableHead className="font-bold sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">TIN</TableHead>
+                      <TableHead className="font-bold sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">Department</TableHead>
+                      <TableHead className="font-bold text-right sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">Gross Pay (₦)</TableHead>
+                      <TableHead className="font-bold text-center sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">Rate (%)</TableHead>
+                      <TableHead className="font-bold text-right text-indigo-700 bg-indigo-50 sticky top-0 z-20 ring-1 ring-slate-200">Withholding (₦)</TableHead>
+                      <TableHead className="font-medium text-right text-slate-500 sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">Net Pay (₦)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payrollData.filter(r => r.staffType === 'NON-EMPLOYEE' && r.withholdingTax).map((r, i) => (
+                      <TableRow key={r.id} className="hover:bg-indigo-50/30">
+                        <TableCell>{i + 1}</TableCell>
+                        <TableCell className="font-medium">{r.surname}</TableCell>
+                        <TableCell>{r.firstname}</TableCell>
+                        <TableCell className="font-mono text-[10px] text-slate-500">{r.taxId || 'N/A'}</TableCell>
+                        <TableCell className="text-slate-500">{r.department}</TableCell>
+                        <TableCell className="text-right font-mono">{fm(r.grossPay)}</TableCell>
+                        <TableCell className="text-center font-mono text-slate-500">{(r.withholdingTaxRate || 0.05) * 100}%</TableCell>
+                        <TableCell className="text-right font-mono text-indigo-600 font-bold bg-indigo-50/50">{fm(r.paye)}</TableCell>
+                        <TableCell className="text-right font-mono text-slate-600">{fm(r.takeHomePay)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="border-t-2 bg-indigo-50 font-bold">
+                      <TableCell colSpan={5} className="text-right font-bold">TOTALS</TableCell>
+                      <TableCell className="text-right font-mono">{fmT(payrollData.filter(r => r.staffType === 'NON-EMPLOYEE').reduce((s, r) => s + r.grossPay, 0))}</TableCell>
+                      <TableCell />
+                      <TableCell className="text-right font-mono text-indigo-600">{fmT(totals.totalWithholding)}</TableCell>
+                      <TableCell className="text-right font-mono text-slate-600">{fmT(payrollData.filter(r => r.staffType === 'NON-EMPLOYEE').reduce((s, r) => s + r.takeHomePay, 0))}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
         </Tabs>
 
         {printDialogOpen && (
@@ -971,6 +1048,7 @@ export function Payroll() {
                   {printType === 'PAYE' && "Generate PAYE Schedule"}
                   {printType === 'PENSION' && "Generate Pension Schedule"}
                   {printType === 'NSITF' && "Generate NSITF Schedule"}
+                  {printType === 'WITHHOLDING' && "Generate Withholding Schedule"}
                 </h3>
                 <div className="flex gap-2">
                   {printType !== 'PAYSLIPS' && (
@@ -1002,6 +1080,7 @@ export function Payroll() {
                       {priv.canViewPayeSchedule && <option value="PAYE">PAYE Schedule</option>}
                       {priv.canViewPensionSchedule && <option value="PENSION">Pension Schedule</option>}
                       {priv.canViewNsitfSchedule && <option value="NSITF">NSITF Schedule</option>}
+                      <option value="WITHHOLDING">Withholding Schedule</option>
                     </select>
                   </div>
 
@@ -1274,7 +1353,7 @@ export function Payroll() {
 
                       </div>
                     ))
-                  ) : printType === 'PAYE' || printType === 'PENSION' || printType === 'NSITF' ? (() => {
+                  ) : printType === 'PAYE' || printType === 'PENSION' || printType === 'NSITF' || printType === 'WITHHOLDING' ? (() => {
                     // ── Ordered selected columns for this schedule type ──────────────
                     const relevantCols = AVAILABLE_COLUMNS.filter(c => c.types.includes('all') || c.types.includes(printType));
                     const orderedCols = printSelectedColumns
@@ -1286,11 +1365,13 @@ export function Payroll() {
                         ? ((slip.record.staffType === 'OFFICE' || slip.record.staffType === 'FIELD') && !slip.record.department.trim().toLowerCase().includes('adhoc'))
                         : printType === 'PENSION'
                           ? ((slip.record.staffType === 'OFFICE' || slip.record.staffType === 'FIELD') && !slip.record.department.trim().toLowerCase().includes('adhoc'))
-                          : (slip.record.nsitf > 0 && !slip.record.department.trim().toLowerCase().includes('adhoc'))
+                          : printType === 'WITHHOLDING'
+                            ? slip.record.staffType === 'NON-EMPLOYEE'
+                            : (slip.record.nsitf > 0 && !slip.record.department.trim().toLowerCase().includes('adhoc'))
                     );
 
-                    const accentColor = printType === 'PAYE' ? '#7c3aed' : printType === 'PENSION' ? '#0d9488' : '#2563eb';
-                    const accentLight = printType === 'PAYE' ? '#ede9fe' : printType === 'PENSION' ? '#ccfbf1' : '#dbeafe';
+                    const accentColor = printType === 'PAYE' ? '#7c3aed' : printType === 'PENSION' ? '#0d9488' : printType === 'WITHHOLDING' ? '#4f46e5' : '#2563eb';
+                    const accentLight = printType === 'PAYE' ? '#ede9fe' : printType === 'PENSION' ? '#ccfbf1' : printType === 'WITHHOLDING' ? '#e0e7ff' : '#dbeafe';
 
                     // Cell value getter
                     const getCellValue = (col: typeof orderedCols[0], slip: typeof filteredSlips[0], idx: number): React.ReactNode => {
@@ -1300,6 +1381,7 @@ export function Payroll() {
                         case 'employee_name':  return <span style={{ fontWeight: 600, color: '#0f172a' }}>{slip.record.surname} {slip.record.firstname}</span>;
                         case 'month':          return <span style={{ color: '#6366f1', fontSize: '12px', fontWeight: 500 }}>{slip.monthLabel}</span>;
                         case 'paye_id':        { const emp = employees.find(e => e.id === slip.record.id); return <span style={{ fontSize: '12px', color: '#475569' }}>{emp?.payeNumber || emp?.taxId || 'N/A'}</span>; }
+                        case 'tin':            return <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#475569' }}>{slip.record.taxId || 'N/A'}</span>;
                         case 'pension_pin':    { const emp = employees.find(e => e.id === slip.record.id); return <span style={{ fontSize: '12px', color: '#475569' }}>{emp?.pensionNumber || 'N/A'}</span>; }
                         case 'bank_name':      return <span style={{ fontSize: '12px' }}>{slip.record.bankName}</span>;
                         case 'account_number': return <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#475569' }}>{slip.record.accountNo}</span>;
@@ -1316,6 +1398,8 @@ export function Payroll() {
                         case 'total_pension':  return <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#059669' }}>{fm(slip.record.pension + slip.record.employerPension)}</span>;
                         case 'nsitf_rate':     return <span style={{ fontFamily: 'monospace', color: '#6b7280' }}>{payrollVariables.nsitfRate}%</span>;
                         case 'nsitf_amount':   return <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#059669' }}>{fm(slip.record.nsitf)}</span>;
+                        case 'withholding_rate': return <span style={{ fontFamily: 'monospace', color: '#6b7280' }}>{(slip.record.withholdingTaxRate || 0.05) * 100}%</span>;
+                        case 'withholding':    return <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#dc2626' }}>{fm(slip.record.paye)}</span>;
                         default: return null;
                       }
                     };
@@ -1329,6 +1413,7 @@ export function Payroll() {
                         case 'other':            return filteredSlips.reduce((s, x) => s + x.record.otherAllowances, 0);
                         case 'gross':            return filteredSlips.reduce((s, x) => s + x.record.grossPay, 0);
                         case 'paye':             return filteredSlips.reduce((s, x) => s + x.record.paye, 0);
+                        case 'withholding':      return filteredSlips.reduce((s, x) => s + x.record.paye, 0);
                         case 'net_pay':          return filteredSlips.reduce((s, x) => s + x.record.takeHomePay, 0);
                         case 'pensionable':      return filteredSlips.reduce((s, x) => s + x.record.basicSalary + x.record.housing + x.record.transport, 0);
                         case 'employee_pension': return filteredSlips.reduce((s, x) => s + x.record.pension, 0);
@@ -1344,7 +1429,7 @@ export function Payroll() {
                     for (const c of orderedCols) { if (!c.summable) labelSpan++; else break; }
                     if (labelSpan === 0) labelSpan = 1;
 
-                    const colIsNumeric = (id: string) => !['sn','employee_name','month','bank_name','account_number','paye_id','pension_pin'].includes(id);
+                    const colIsNumeric = (id: string) => !['sn','employee_name','month','bank_name','account_number','paye_id','pension_pin','tin'].includes(id);
 
                     return (
                       <div className="bg-white mx-auto shadow-lg max-w-5xl rounded-sm print-break" id="print-area-content"
@@ -1362,7 +1447,7 @@ export function Payroll() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                                 <div style={{ width: 4, height: 28, background: accentColor, borderRadius: 2, flexShrink: 0 }} />
                                 <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#0f172a' }}>
-                                  {printType === 'PAYE' ? 'PAYE Tax Schedule' : printType === 'PENSION' ? 'Pension Contribution Schedule' : 'NSITF Schedule'}
+                                  {printType === 'PAYE' ? 'PAYE Tax Schedule' : printType === 'PENSION' ? 'Pension Contribution Schedule' : printType === 'WITHHOLDING' ? 'Withholding Tax Schedule' : 'NSITF Schedule'}
                                 </h2>
                               </div>
                               <p style={{ margin: 0, fontSize: 13, color: '#64748b', marginLeft: 14 }}>
@@ -1393,6 +1478,7 @@ export function Payroll() {
                                 if (printType === 'PAYE') return slip.record.paye;
                                 if (printType === 'PENSION') return slip.record.pension + slip.record.employerPension;
                                 if (printType === 'NSITF') return slip.record.nsitf;
+                                if (printType === 'WITHHOLDING') return slip.record.paye;
                                 return 0;
                               };
                               const mData = empIds.map(eid => {

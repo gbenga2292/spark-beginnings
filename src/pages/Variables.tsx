@@ -340,7 +340,6 @@ export function Variables() {
         { Key: 'Employee Pension (%)', Value: localPayrollVars.employeePensionRate },
         { Key: 'Employer Pension (%)', Value: localPayrollVars.employerPensionRate },
         { Key: 'NSITF (%)', Value: localPayrollVars.nsitfRate },
-        { Key: 'Withholding Tax (%)', Value: localPayrollVars.withholdingTaxRate },
       ];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payrollData), 'Payroll_Variables');
 
@@ -585,7 +584,6 @@ export function Variables() {
                 if (row.Key.includes('Employee Pension')) newPv.employeePensionRate = val;
                 if (row.Key.includes('Employer Pension')) newPv.employerPensionRate = val;
                 if (row.Key.includes('NSITF')) newPv.nsitfRate = val;
-                if (row.Key.includes('Withholding')) newPv.withholdingTaxRate = val / (row.Key.includes('%') ? 100 : 1);
                 if (row.Key.includes('VAT')) newPv.vatRate = val;
               }
             });
@@ -1724,16 +1722,6 @@ export function Variables() {
                     onChange={e => updateLocalPayrollVariables({ employerPensionRate: Number(e.target.value) })}
                   />
                   <p className="text-xs text-slate-400">Company's contribution to pension (default 10%)</p>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-700 uppercase">Withholding Tax Rate (%)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={(localPayrollVars.withholdingTaxRate * 100).toFixed(1)}
-                    onChange={e => updateLocalPayrollVariables({ withholdingTaxRate: Number(e.target.value) / 100 })}
-                  />
-                  <p className="text-xs text-slate-400">Applied when employee has Withholding Tax</p>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-slate-700 uppercase">NSITF Rate (%)</label>

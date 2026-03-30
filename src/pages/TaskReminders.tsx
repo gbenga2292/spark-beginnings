@@ -15,6 +15,16 @@ import { useAuth } from '@/src/hooks/useAuth';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useWorkspace } from '@/src/hooks/use-workspace';
 import { useSearchParams } from 'react-router-dom';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { Button } from '@/src/components/ui/button';
+import { Input } from '@/src/components/ui/input';
+import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/src/components/ui/dropdown-menu";
 import type { Reminder, ReminderFrequency } from '@/src/types/tasks';
 
 /* ─── Constants ─────────────────────────────────────────────────────────────── */
@@ -111,37 +121,65 @@ export default function Reminders() {
   const activeCount   = pool.filter(r => r.isActive).length;
   const overdueCount  = pool.filter(r => r.isActive && isPast(parseISO(r.remindAt)) && !isToday(parseISO(r.remindAt))).length;
 
-  /* Deep-link handling */
-  useEffect(() => {
-    const viewId = searchParams.get('view');
-    const editid = searchParams.get('edit');
-    if (viewId && reminders.length > 0) {
-      const r = reminders.find(x => x.id === viewId);
-      if (r) setSelected(r);
-      const next = new URLSearchParams(searchParams); next.delete('view');
-      setSearchParams(next, { replace: true });
-    }
-    if (editid && reminders.length > 0) {
-      const r = reminders.find(x => x.id === editid);
-      if (r) openEdit(r);
-      const next = new URLSearchParams(searchParams); next.delete('edit');
-      setSearchParams(next, { replace: true });
-    }
-  }, [searchParams, reminders]);
-
   /* Form helpers */
   const openCreate = () => { setForm(emptyForm()); setEditingId(null); setFormError(''); setShowForm(true); };
-  const openEdit = (r: Reminder) => {
+  const openEdit = (rem: Reminder) => {
     setForm({
-      title: r.title, body: r.body, remindAt: r.remindAt.slice(0, 16),
-      endAt: r.endAt ? r.endAt.slice(0, 16) : '', frequency: r.frequency,
-      recipientIds: [...r.recipientIds], sendEmail: r.sendEmail, mainTaskId: r.mainTaskId ?? '',
+      title: rem.title, body: rem.body, remindAt: rem.remindAt.slice(0, 16),
+      endAt: rem.endAt ? rem.endAt.slice(0, 16) : '', frequency: rem.frequency,
+      recipientIds: [...rem.recipientIds], sendEmail: rem.sendEmail, mainTaskId: rem.mainTaskId ?? '',
     });
-    setEditingId(r.id);
+    setEditingId(rem.id);
     setFormError('');
     setShowForm(true);
     setSelected(null);
   };
+
+  useSetPageTitle(
+    'Task Reminders',
+    `${activeCount} active${overdueCount > 0 ? ` · ${overdueCount} overdue` : ''} · ${pool.length} total reminders tracked`,
+    <div className="flex items-center gap-3">
+      {/* View Mode Toggle */}
+      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+        <Button 
+          variant={viewMode === 'calendar' ? 'secondary' : 'ghost'} 
+          size="sm" 
+          onClick={() => setViewMode('calendar')}
+          className={`h-8 px-3 gap-2 font-bold text-[10px] uppercase tracking-tight ${viewMode === 'calendar' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+        >
+          <Calendar className="w-3.5 h-3.5" /> Calendar
+        </Button>
+        <Button 
+          variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
+          size="sm" 
+          onClick={() => setViewMode('list')}
+          className={`h-8 px-3 gap-2 font-bold text-[10px] uppercase tracking-tight ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+        >
+          <LayoutList className="w-3.5 h-3.5" /> List
+        </Button>
+      </div>
+
+      <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
+
+      {/* Tab Filter */}
+      <TabsList className="h-9 bg-slate-100 border border-slate-200 p-0.5 hidden md:flex">
+        <TabsTrigger active={tab === 'all'} onClick={() => setTab('all')} className="h-8 px-3 text-[10px] font-bold uppercase tracking-tight">All</TabsTrigger>
+        <TabsTrigger active={tab === 'mine'} onClick={() => setTab('mine')} className="h-8 px-3 text-[10px] font-bold uppercase tracking-tight">Mine</TabsTrigger>
+        <TabsTrigger active={tab === 'shared'} onClick={() => setTab('shared')} className="h-8 px-3 text-[10px] font-bold uppercase tracking-tight">Shared</TabsTrigger>
+      </TabsList>
+
+      <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
+
+      <Button 
+        size="sm" 
+        onClick={openCreate}
+        className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
+      >
+        <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Reminder</span>
+      </Button>
+    </div>,
+    [viewMode, tab, activeCount, overdueCount, pool.length]
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault(); setFormError('');
@@ -296,69 +334,48 @@ export default function Reminders() {
 
   /* ─── Render ─────────────────────────────────────────────────────────── */
   return (
-    <div className="h-full flex flex-col min-h-0">
-
-      {/* ── Top bar ── */}
-      <div className="flex-shrink-0 px-6 pt-5 pb-4 flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <Bell className="w-5 h-5 text-violet-500" /> Reminders
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {activeCount} active{overdueCount > 0 && <span className="text-red-500 font-semibold"> · {overdueCount} overdue</span>}
-            {' '}· {pool.length} total
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-border/40">
-            <button onClick={() => setViewMode('calendar')} className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${viewMode === 'calendar' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-              <Calendar className="w-3.5 h-3.5" /> Calendar
-            </button>
-            <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${viewMode === 'list' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-              <LayoutList className="w-3.5 h-3.5" /> List
-            </button>
+    <div className="h-full flex flex-col min-h-0 bg-slate-50 overflow-hidden">
+      <div className="flex-1 flex flex-col h-full animate-in fade-in duration-300">
+        
+        {/* Unified Controls Toolbar */}
+        <div className="px-6 py-4 bg-white border-b border-slate-200 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1 hidden sm:inline">Status:</span>
+            {(['all','active','inactive'] as const).map(f => (
+              <Button 
+                key={f} 
+                variant={filterStatus === f ? 'secondary' : 'outline'} 
+                size="sm"
+                onClick={() => setFilterStatus(f)}
+                className={`h-8 px-4 rounded-full font-bold text-[10px] uppercase tracking-tight transition-all active:scale-95 ${filterStatus === f ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' : 'text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+              >
+                {f}
+              </Button>
+            ))}
           </div>
-          <button onClick={openCreate}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-all shadow-sm">
-            <Plus className="w-4 h-4" /> New Reminder
-          </button>
-        </div>
-      </div>
 
-      {/* ── Filter bar ── */}
-      <div className="flex-shrink-0 px-6 pb-3 flex flex-wrap items-center gap-3">
-        {/* Tab pills */}
-        <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg border border-border/40">
-          {([['all','All'], ['mine','Mine'], ['shared','Shared with me']] as const).map(([k, l]) => (
-            <button key={k} onClick={() => setTab(k)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${tab === k ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-              {l}
-            </button>
-          ))}
-        </div>
-
-        {/* Status pills */}
-        <div className="flex items-center gap-1">
-          {(['all','active','inactive'] as const).map(f => (
-            <button key={f} onClick={() => setFilterStatus(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize transition-all ${filterStatus === f ? 'bg-foreground text-background border-foreground' : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
-              {f}
-            </button>
-          ))}
+          <div className="flex items-center gap-3 w-full lg:w-auto">
+            <div className="relative flex-1 lg:w-72">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input 
+                placeholder="Search reminders..." 
+                className="pl-10 h-9 text-xs border-slate-200 bg-slate-50 hover:bg-white focus:bg-white transition-all shadow-sm rounded-lg w-full" 
+                value={search} 
+                onChange={e => setSearch(e.target.value)} 
+              />
+              {search && (
+                <button 
+                  onClick={() => setSearch('')}
+                  className="absolute right-3 top-2.5 p-0.5 rounded-full hover:bg-slate-200 transition-colors"
+                >
+                  <X className="h-3 w-3 text-slate-500" />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Search */}
-        <div className="relative ml-auto">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search reminders…"
-            className="pl-8 pr-3 py-1.5 text-xs border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring w-44 transition-all" />
-        </div>
-
-        <span className="text-xs text-muted-foreground whitespace-nowrap">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
-      </div>
-
-      {/* ── Main content ── */}
+        {/* ── Main content ── */}
       {viewMode === 'list' ? (
         <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
         {filtered.length === 0 ? (
@@ -718,7 +735,7 @@ export default function Reminders() {
           </motion.div>
         )}
       </AnimatePresence>
-
     </div>
+  </div>
   );
 }

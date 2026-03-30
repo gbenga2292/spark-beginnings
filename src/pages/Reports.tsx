@@ -10,6 +10,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { usePriv } from '@/src/hooks/usePriv';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 const getBase64ImageFromUrl = async (imageUrl: string) => {
   const res = await fetch(imageUrl);
@@ -551,68 +552,81 @@ export function Reports() {
     generatePdf('Custom Employee Report', head, body, 'custom_employee_report.pdf');
   };
 
-  return (
-    <div className="flex flex-col gap-8 pb-10">
-      {exportMessage && (
-        <div className="fixed top-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center gap-2 animate-in slide-in-from-top-2">
-          <CheckCircle2 className="h-5 w-5" />{exportMessage}
+  useSetPageTitle(
+    'Reports & Analytics',
+    'Workforce insights, attendance trends, and HR compliance reports',
+    <div className="flex items-center gap-2">
+      {selectedFields.length > 0 && priv.canExport && (
+        <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-lg border border-slate-200 shadow-sm animate-in fade-in zoom-in-95">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-7 text-[10px] font-bold uppercase tracking-wider bg-white gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50 px-2" 
+            onClick={generateReport}
+          >
+            <FileSpreadsheet className="h-3 w-3" /> CSV
+          </Button>
+          <Button 
+            size="sm" 
+            className="h-7 text-[10px] font-bold uppercase tracking-wider bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 px-2" 
+            onClick={generateReportPdf}
+          >
+            <FileText className="h-3 w-3" /> PDF
+          </Button>
         </div>
       )}
+    </div>,
+    [selectedFields, priv.canExport]
+  );
 
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">
-            Employee Reports & Analytics
-          </h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">Workforce insights, attendance trends, and HR compliance reports.</p>
-        </div>
-      </div>
+  return (
+    <div className="flex flex-col gap-8 pb-10">
 
-      {/* Summary Cards */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="hover:shadow-md transition-shadow bg-white border-slate-200">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-semibold text-slate-900">Total Employees</CardTitle>
-            <Users className="h-5 w-5 text-indigo-600" />
+      {/* High-Density Summary Metrics */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-indigo-100 bg-indigo-50/50 shadow-none border">
+          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+            <CardTitle className="text-xs font-bold text-indigo-900 uppercase tracking-wider opacity-70">Total Workforce</CardTitle>
+            <Users className="h-3.5 w-3.5 text-indigo-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-slate-900">{totalEmployees}</div>
-            <p className="text-sm text-slate-500 mt-1">{activeEmployees} Active, {inactiveEmployees} Inactive</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-2xl font-bold text-indigo-900 leading-none">{totalEmployees}</div>
+            <p className="text-[10px] text-indigo-600 mt-1 opacity-80 font-medium">{activeEmployees} Active, {inactiveEmployees} Inactive</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow bg-white border-slate-200">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-semibold text-slate-900">Active Sites</CardTitle>
-            <Building2 className="h-5 w-5 text-emerald-600" />
+        <Card className="border-emerald-100 bg-emerald-50/50 shadow-none border">
+          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+            <CardTitle className="text-xs font-bold text-emerald-900 uppercase tracking-wider opacity-70">Active Operations</CardTitle>
+            <Building2 className="h-3.5 w-3.5 text-emerald-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-slate-900">{activeSites}</div>
-            <p className="text-sm text-slate-500 mt-1">of {totalSites} total sites</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-2xl font-bold text-emerald-900 leading-none">{activeSites}</div>
+            <p className="text-[10px] text-emerald-600 mt-1 opacity-80 font-medium">of {totalSites} total sites</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow bg-white border-slate-200">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-semibold text-slate-900">Attendance Log</CardTitle>
-            <CalendarClock className="h-5 w-5 text-amber-500" />
+        <Card className="border-amber-100 bg-amber-50/50 shadow-none border">
+          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+            <CardTitle className="text-xs font-bold text-amber-900 uppercase tracking-wider opacity-70">Attendance Log</CardTitle>
+            <CalendarClock className="h-3.5 w-3.5 text-amber-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-slate-900">{attendanceRecords.length}</div>
-            <p className="text-sm text-slate-500 mt-1">Daily register entries</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-2xl font-bold text-amber-900 leading-none">{attendanceRecords.length}</div>
+            <p className="text-[10px] text-amber-600 mt-1 opacity-80 font-medium">Daily register entries</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow bg-white border-slate-200">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-semibold text-slate-900">Merit Balance</CardTitle>
-            <Flame className={`h-5 w-5 ${netContextPoints >= 0 ? 'text-orange-500' : 'text-rose-500'}`} />
+        <Card className={`shadow-none border ${netContextPoints >= 0 ? 'border-emerald-100 bg-emerald-50/50' : 'border-rose-100 bg-rose-50/50'}`}>
+          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+            <CardTitle className={`text-xs font-bold uppercase tracking-wider opacity-70 ${netContextPoints >= 0 ? 'text-emerald-900' : 'text-rose-900'}`}>Personnel Score</CardTitle>
+            <Flame className={`h-3.5 w-3.5 ${netContextPoints >= 0 ? 'text-orange-500' : 'text-rose-500'}`} />
           </CardHeader>
-          <CardContent>
-            <div className={`text-3xl font-bold ${netContextPoints >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+          <CardContent className="p-3 pt-0">
+            <div className={`text-2xl font-bold leading-none ${netContextPoints >= 0 ? 'text-emerald-900' : 'text-rose-900'}`}>
                {netContextPoints > 0 ? `+${netContextPoints}` : netContextPoints}
             </div>
-            <p className="text-sm text-slate-500 mt-1">Net workforce performance score</p>
+            <p className={`text-[10px] mt-1 opacity-80 font-medium ${netContextPoints >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>Net workforce rating</p>
           </CardContent>
         </Card>
       </div>

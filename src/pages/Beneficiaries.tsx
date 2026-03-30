@@ -166,6 +166,7 @@ export function Beneficiaries() {
       startMonthOfPay: formData.startMonthOfPay || '',
       payeTax: false,
       withholdingTax: formData.withholdingTax || false,
+      withholdingTaxRate: formData.withholdingTaxRate || 0.05,
       taxId: formData.taxId || '',
       pensionNumber: '',
       status: formData.status as 'Active' | 'On Leave' | 'Terminated',
@@ -207,7 +208,8 @@ export function Beneficiaries() {
       department: formData.department || 'Non-Employee',
       position: formData.payeeType || 'Stipend Payee',
       staffType: 'NON-EMPLOYEE' as 'NON-EMPLOYEE',
-      excludeFromOnboarding: true
+      excludeFromOnboarding: true,
+      withholdingTaxRate: formData.withholdingTaxRate || 0.05
     };
     updateEmployee(editingEmployeeId, updateData);
     setIsEditing(false);
@@ -253,13 +255,14 @@ export function Beneficiaries() {
         toast.info('No beneficiaries to export');
         return;
       }
-      const headers = ['id', 'beneficiaryCode', 'surname', 'firstname', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      const headers = ['id', 'beneficiaryCode', 'surname', 'firstname', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'withholdingTax', 'withholdingTaxRate', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
       const extractCSV = (str: any) => `"${String(str ?? '').replace(/"/g, '""')}"`;
 
       const rows = beneficiaries.map(emp => {
         const data = [
           emp.id, emp.employeeCode || '', emp.surname, emp.firstname, emp.status, emp.yearlyLeave,
           emp.startDate || '', emp.endDate || '', emp.bankName || '', emp.accountNo || '',
+          emp.withholdingTax ? 'Yes' : 'No', emp.withholdingTaxRate || 0.05,
           canSeeSalary ? emp.monthlySalaries.jan : '***', canSeeSalary ? emp.monthlySalaries.feb : '***',
           canSeeSalary ? emp.monthlySalaries.mar : '***', canSeeSalary ? emp.monthlySalaries.apr : '***',
           canSeeSalary ? emp.monthlySalaries.may : '***', canSeeSalary ? emp.monthlySalaries.jun : '***',
@@ -358,14 +361,15 @@ export function Beneficiaries() {
               taxId: '',
               pensionNumber: '',
               payeTax: false,
-              withholdingTax: false,
+              withholdingTax: vals[9 + offset]?.toLowerCase() === 'yes',
+              withholdingTaxRate: parseFloat(vals[10 + offset]) || 0.05,
               excludeFromOnboarding: true,
               rent: 0,
               monthlySalaries: {
-                jan: parseFloat(vals[9 + offset]) || 0, feb: parseFloat(vals[10 + offset]) || 0, mar: parseFloat(vals[11 + offset]) || 0,
-                apr: parseFloat(vals[12 + offset]) || 0, may: parseFloat(vals[13 + offset]) || 0, jun: parseFloat(vals[14 + offset]) || 0,
-                jul: parseFloat(vals[15 + offset]) || 0, aug: parseFloat(vals[16 + offset]) || 0, sep: parseFloat(vals[17 + offset]) || 0,
-                oct: parseFloat(vals[18 + offset]) || 0, nov: parseFloat(vals[19 + offset]) || 0, dec: parseFloat(vals[20 + offset]) || 0
+                jan: parseFloat(vals[11 + offset]) || 0, feb: parseFloat(vals[12 + offset]) || 0, mar: parseFloat(vals[13 + offset]) || 0,
+                apr: parseFloat(vals[14 + offset]) || 0, may: parseFloat(vals[15 + offset]) || 0, jun: parseFloat(vals[16 + offset]) || 0,
+                jul: parseFloat(vals[17 + offset]) || 0, aug: parseFloat(vals[18 + offset]) || 0, sep: parseFloat(vals[19 + offset]) || 0,
+                oct: parseFloat(vals[20 + offset]) || 0, nov: parseFloat(vals[21 + offset]) || 0, dec: parseFloat(vals[22 + offset]) || 0
               },
               avatar: ''
             };
@@ -637,25 +641,44 @@ export function Beneficiaries() {
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Account No.</label>
                   <Input value={formData.accountNo || ''} onChange={e => setFormData({ ...formData, accountNo: e.target.value })} className="font-mono bg-slate-50 focus:bg-white" />
                 </div>
-                <div className="pt-2 space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Withholding Tax (5%)</label>
-                    <select
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                      value={formData.withholdingTax ? 'Yes' : 'No'}
-                      onChange={e => setFormData({ ...formData, withholdingTax: e.target.value === 'Yes' })}
-                    >
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                    </select>
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Withholding Tax</label>
+                      <select
+                        className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                        value={formData.withholdingTax ? 'Yes' : 'No'}
+                        onChange={e => {
+                          const isWht = e.target.value === 'Yes';
+                          setFormData({ 
+                            ...formData, 
+                            withholdingTax: isWht,
+                            withholdingTaxRate: isWht ? (formData.withholdingTaxRate || 0.05) : 0 
+                          });
+                        }}
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    </div>
+                    {formData.withholdingTax && (
+                      <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Rate (%)</label>
+                        <Input 
+                          type="number" 
+                          step="0.1"
+                          value={(formData.withholdingTaxRate || 0.05) * 100} 
+                          onChange={e => setFormData({ ...formData, withholdingTaxRate: Number(e.target.value) / 100 })} 
+                          className="bg-slate-50 focus:bg-white font-mono" 
+                        />
+                      </div>
+                    )}
                   </div>
                   {formData.withholdingTax && (
-                    <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200 pt-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Tax Identification Number (TIN)</label>
                       <Input value={formData.taxId || ''} onChange={e => setFormData({ ...formData, taxId: e.target.value })} placeholder="e.g. 12345678-0001" className="bg-slate-50 focus:bg-white font-mono" />
                     </div>
                   )}
-                </div>
               </div>
             </CardContent>
           </Card>

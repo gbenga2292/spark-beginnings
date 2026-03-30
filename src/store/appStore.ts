@@ -246,6 +246,7 @@ export interface Employee {
   accountNo: string;
   payeTax: boolean;
   withholdingTax: boolean;
+  withholdingTaxRate?: number; // per-consultant rate (e.g. 0.05 or 0.10)
   taxId: string;
   pensionNumber: string;
   payeNumber?: string;
@@ -596,7 +597,6 @@ interface AppState {
     otherAllowances: number;
     employeePensionRate: number;
     employerPensionRate: number;
-    withholdingTaxRate: number;
     nsitfRate: number;
     vatRate: number;
     departmentWorkDays?: Record<string, number>;
@@ -687,7 +687,7 @@ export const useAppStore = create<AppState>()(
       payrollVariables: {
         basic: 40, housing: 30, transport: 20, otherAllowances: 10,
         employeePensionRate: 8, employerPensionRate: 10,
-        withholdingTaxRate: 0.05, nsitfRate: 1, vatRate: 7.5,
+        nsitfRate: 1, vatRate: 7.5,
       },
       payeTaxVariables: {
         craBase: 800000, rentReliefRate: 0.20,

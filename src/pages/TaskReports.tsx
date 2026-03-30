@@ -14,6 +14,14 @@ import {
 } from 'date-fns';
 import { Download, AlertCircle, Clock, CheckCircle2, Activity, Filter, FileText, ChevronDown, CalendarDays } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { Button } from '@/src/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/src/components/ui/dropdown-menu";
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const item      = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
@@ -221,101 +229,93 @@ function AnalyticsDashboard() {
         return 'All time';
     }, [filterYear, filterMonth, rolling]);
 
+    useSetPageTitle(
+        'Performance Analytics',
+        `Showing data for ${periodLabel} across ${workspace?.name}`,
+        <div className="flex items-center gap-2">
+            {/* Year Selector */}
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-9 min-w-[110px] justify-between gap-2 px-3 text-[10px] font-bold uppercase tracking-tight border-slate-200 bg-white">
+                        {filterYear === '' ? 'All Years' : filterYear}
+                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[110px]">
+                    <DropdownMenuItem className="text-xs" onClick={() => {
+                        setFilterYear('');
+                        setFilterMonth('');
+                    }}>
+                        All Years
+                    </DropdownMenuItem>
+                    {yearList.map(y => (
+                        <DropdownMenuItem key={y} className="text-xs" onClick={() => {
+                            setFilterYear(y);
+                            setFilterMonth('');
+                            setRolling(null);
+                        }}>
+                            {y}
+                        </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Month Selector */}
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild disabled={filterYear === ''}>
+                    <Button variant="outline" size="sm" className="h-9 min-w-[130px] justify-between gap-2 px-3 text-[10px] font-bold uppercase tracking-tight border-slate-200 bg-white disabled:opacity-50">
+                        {filterMonth === '' ? 'All Months' : MONTHS[filterMonth as number]}
+                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[130px]">
+                    <DropdownMenuItem className="text-xs" onClick={() => setFilterMonth('')}>
+                        All Months
+                    </DropdownMenuItem>
+                    {MONTHS.map((m, i) => (
+                        <DropdownMenuItem key={i} className="text-xs" onClick={() => setFilterMonth(i)}>
+                            {m}
+                        </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
+
+            {/* Rolling Window */}
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild disabled={filterYear !== ''}>
+                    <Button variant="outline" size="sm" className="h-9 min-w-[140px] justify-between gap-2 px-3 text-[10px] font-bold uppercase tracking-tight border-slate-200 bg-white disabled:opacity-50">
+                        {rolling === null ? 'All Time' : `Last ${rolling} days`}
+                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[140px]">
+                    <DropdownMenuItem className="text-xs" onClick={() => setRolling(null)}>All Time</DropdownMenuItem>
+                    {[7, 14, 30, 90].map(days => (
+                        <DropdownMenuItem key={days} className="text-xs" onClick={() => setRolling(days)}>
+                            Last {days} days
+                        </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Button 
+                size="sm" 
+                onClick={handleExport}
+                className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
+            >
+                <Download className="h-4 w-4" /> <span className="hidden sm:inline">Export</span>
+            </Button>
+        </div>,
+        [filterYear, filterMonth, rolling, periodLabel, workspace?.name]
+    );
+
     function startOfDay(d: Date) { const c = new Date(d); c.setHours(0,0,0,0); return c; }
 
     /* ── RENDER ──────────────────────────────────────────────────────────── */
     return (
-        <motion.div variants={container} initial="hidden" animate="show" className="space-y-5 h-full flex flex-col min-h-0 pb-6">
-
-            {/* ── Page Header ── */}
-            <motion.div variants={item} className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                <div>
-                    <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                        <Activity className="h-5 w-5 text-indigo-500" /> Analytical Reports
-                    </h1>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                        Showing: <span className="font-semibold text-foreground">{periodLabel}</span>
-                        {' · '}{workspace?.name}
-                    </p>
-                </div>
-                <button onClick={handleExport}
-                    className="self-start flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-all">
-                    <Download className="h-4 w-4" /> Export XLSX
-                </button>
-            </motion.div>
-
-            {/* ── Filter Bar ── */}
-            <motion.div variants={item}
-                className="flex flex-wrap items-center gap-3 p-4 bg-card border border-border rounded-2xl shadow-sm">
-
-                <CalendarDays className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Filter Period</span>
-
-                {/* Year */}
-                <div className="relative">
-                    <select
-                        value={filterYear}
-                        onChange={e => {
-                            const val = e.target.value === '' ? '' : Number(e.target.value);
-                            setFilterYear(val);
-                            setFilterMonth('');  // reset month when year changes
-                            if (val !== '') setRolling(null); // year takes priority
-                        }}
-                        className="appearance-none pl-3 pr-8 py-2 bg-background border border-border rounded-lg text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer shadow-sm">
-                        <option value="">All Years</option>
-                        {yearList.map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                </div>
-
-                {/* Month — only enabled when a year is selected */}
-                <div className="relative">
-                    <select
-                        value={filterMonth}
-                        disabled={filterYear === ''}
-                        onChange={e => {
-                            setFilterMonth(e.target.value === '' ? '' : Number(e.target.value));
-                        }}
-                        className="appearance-none pl-3 pr-8 py-2 bg-background border border-border rounded-lg text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-                        <option value="">All Months</option>
-                        {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                </div>
-
-                {/* Divider */}
-                <div className="h-5 w-px bg-border mx-1" />
-
-                {/* Rolling window — active only when no year is selected */}
-                <div className="relative">
-                    <select
-                        value={rolling ?? ''}
-                        disabled={filterYear !== ''}
-                        onChange={e => {
-                            setRolling(e.target.value === '' ? null : Number(e.target.value));
-                        }}
-                        className="appearance-none pl-3 pr-8 py-2 bg-background border border-border rounded-lg text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-                        <option value="">Rolling window</option>
-                        <option value={7}>Last 7 days</option>
-                        <option value={14}>Last 14 days</option>
-                        <option value={30}>Last 30 days</option>
-                        <option value={60}>Last 60 days</option>
-                        <option value={90}>Last 90 days</option>
-                        <option value={180}>Last 6 months</option>
-                        <option value={365}>Last 12 months</option>
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                </div>
-
-                {/* Clear filters */}
-                {(filterYear !== '' || rolling !== 30) && (
-                    <button
-                        onClick={() => { setFilterYear(''); setFilterMonth(''); setRolling(30); }}
-                        className="text-xs font-semibold text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors ml-1">
-                        Reset
-                    </button>
-                )}
-            </motion.div>
+        <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 h-full flex flex-col min-h-0 py-6 px-6">
 
             {/* ── Stat Cards ── */}
             <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

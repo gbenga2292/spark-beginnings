@@ -10,6 +10,8 @@ import { useUserStore } from '@/src/store/userStore';
 import { usePriv } from '@/src/hooks/usePriv';
 import * as XLSX from 'xlsx';
 import { toast, showConfirm } from '@/src/components/ui/toast';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History } from 'lucide-react';
 
 type EntryItem = {
   id?: string;
@@ -234,6 +236,38 @@ export function Ledger() {
       return;
     }
 
+    // Validation: for all filled rows, ensure category, client, and site are selected
+    const filledRows = items.filter(item => 
+      item.amount.trim() !== '' || 
+      item.category.trim() !== '' || 
+      (item.description && item.description.trim() !== '')
+    );
+
+    if (filledRows.length === 0) {
+      toast.error('No valid lines entered. Put an amount and category.');
+      return;
+    }
+
+    const invalidRows: number[] = [];
+    items.forEach((item, idx) => {
+      const isFilled = item.amount.trim() !== '' || item.category.trim() !== '' || (item.description && item.description.trim() !== '');
+      if (!isFilled) return;
+
+      const hasCategory = item.category.trim() !== '';
+      const hasClient = item.client && item.client !== 'none';
+      const hasSite = item.site && item.site !== 'none';
+      const hasAmount = item.amount.trim() !== '' && !isNaN(Number(item.amount));
+
+      if (!hasCategory || !hasClient || !hasSite || !hasAmount) {
+        invalidRows.push(idx + 1);
+      }
+    });
+
+    if (invalidRows.length > 0) {
+      toast.error(`Please complete rows: ${invalidRows.join(', ')}. Each must have a Category, Amount, Client, and Site.`);
+      return;
+    }
+
     const targetVoucherNo = activeVoucherNo || generatedVoucherNo;
     const existingRecords = ledgerEntries.filter(e => e.voucherNo === targetVoucherNo);
     
@@ -251,7 +285,8 @@ export function Ledger() {
     let savedCount = 0;
 
     items.forEach((item) => {
-      if (!item.amount || !item.category) return; // Skip empty rows
+      const isFilled = item.amount.trim() !== '' || item.category.trim() !== '' || (item.description && item.description.trim() !== '');
+      if (!isFilled) return;
       
       const entryDate = item.transactionDate && item.transactionDate.trim() !== ''
         ? item.transactionDate
@@ -535,6 +570,96 @@ export function Ledger() {
   );
 
 
+  useSetPageTitle(
+    'Company Ledger',
+    'Record vouchers, manage expenses, and track financial outflows across banks and sites',
+    <div className="flex items-center gap-2">
+      {/* Tab Toggle */}
+      <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60 shadow-sm backdrop-blur-sm">
+         <button 
+           onClick={() => setTab('entry')} 
+           className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${
+             tab === 'entry' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'
+           }`}
+         >
+           <FileText className="h-3 w-3" /> Entry
+         </button>
+         <button 
+           onClick={() => setTab('records')} 
+           className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${
+             tab === 'records' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'
+           }`}
+         >
+           <History className="h-3 w-3" /> History
+         </button>
+         <button 
+           onClick={() => setTab('summary')} 
+           className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${
+             tab === 'summary' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'
+           }`}
+         >
+           <BarChart2 className="h-3 w-3" /> Summary
+         </button>
+      </div>
+
+      <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
+
+      {tab === 'entry' ? (
+        <div className="flex items-center gap-2">
+          {activeVoucherNo && priv.canDelete && (
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="h-9 w-9 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-600 border border-rose-100" 
+              onClick={handleDeleteVoucher}
+              title="Delete Voucher"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            className="h-9 w-9 p-0 text-slate-500 hover:bg-slate-100 border border-slate-200" 
+            onClick={handleReload}
+            title="Reload Voucher"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className={`h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight ${hasUnsavedPending ? 'opacity-40 pointer-events-none' : 'hover:bg-slate-50'}`} 
+            onClick={handleClear}
+          >
+            <X className="h-3.5 w-3.5" /> Clear
+          </Button>
+          <Button 
+            size="sm" 
+            className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95" 
+            onClick={handleSubmit} 
+            disabled={!priv.canAdd}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" /> Submit Voucher
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+           {priv.canAdd && (
+             <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50">
+               <Upload className="h-3.5 w-3.5 text-indigo-500" /> Import
+             </Button>
+           )}
+           {priv.canExport && (
+             <Button variant="outline" size="sm" onClick={handleExport} className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50">
+               <Download className="h-3.5 w-3.5 text-emerald-500" /> Export
+             </Button>
+           )}
+        </div>
+      )}
+    </div>,
+    [tab, priv, hasUnsavedPending, activeVoucherNo, ledgerEntries]
+  );
 
   if (!priv?.canView) {
     return (
@@ -547,53 +672,15 @@ export function Ledger() {
     );
   }
 
-  const tdClass = "p-1.5 border border-slate-200 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:bg-indigo-50/20";
-  const inputClass = "w-full h-8 px-2 text-sm bg-transparent outline-none disabled:opacity-50 disabled:cursor-not-allowed";
+  const tdClass = "p-1.5 border border-slate-200 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:bg-indigo-50/20 transition-all";
+  const inputClass = "w-full h-8 px-2 text-sm bg-transparent outline-none disabled:opacity-50 disabled:cursor-not-allowed font-medium text-slate-700";
   
   return (
-    <div className="space-y-6">
-      {/* Header with simple button-based tabs */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Ledger</h1>
-        <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
-          <button
-            onClick={() => setTab('entry')}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              tab === 'entry' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            Voucher Entry
-          </button>
-          <button
-            onClick={() => setTab('records')}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              tab === 'records' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            Expense Record
-          </button>
-        </div>
-      </div>
-
-      <TabsContent active={tab === 'entry'} className="m-0">
-        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
-          {/* Header Bar */}
-          <div className="bg-indigo-700 px-4 py-3 flex flex-wrap items-center justify-between gap-4">
-            <h2 className="text-white font-bold text-lg tracking-wider flex items-center gap-2">
-              <FileText className="h-5 w-5 opacity-80" />
-              LEDGER ENTRY SYSTEM
-            </h2>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="secondary" className="font-semibold bg-white text-indigo-700 hover:bg-slate-100 shadow-sm" onClick={handleSubmit} disabled={!priv.canAdd}>SUBMIT</Button>
-              <Button size="sm" variant="secondary" className="font-semibold bg-indigo-600/50 text-white hover:bg-indigo-600 border-indigo-500 shadow-none" onClick={handleReload}>RELOAD</Button>
-              <Button size="sm" variant="secondary" className="font-semibold bg-indigo-600/50 text-white hover:bg-indigo-600 border-indigo-500 shadow-none" onClick={handleClear}>CLEAR</Button>
-              <Button size="sm" variant="secondary" className="font-semibold bg-indigo-600/50 text-white hover:bg-indigo-600 border-indigo-500 shadow-none" onClick={() => setTab('records')}>SEARCH</Button>
-              <Button size="sm" variant="destructive" className="font-semibold shadow-sm" onClick={handleDeleteVoucher} disabled={!priv.canDelete || !activeVoucherNo}>DELETE</Button>
-            </div>
-          </div>
-
+    <div className="flex flex-col gap-6">
+      <TabsContent active={tab === 'entry'} className="m-0 focus-visible:outline-none">
+        <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
           {/* Form Header */}
-          <div className="bg-slate-100 p-6 flex flex-col md:flex-row gap-8 border-b border-slate-200">
+          <div className="bg-slate-50/80 p-5 flex flex-col md:flex-row gap-8 border-b border-slate-200/60 backdrop-blur-sm">
             <div className="flex-1 space-y-4">
               <div className="flex items-center gap-4">
                 <label className="text-sm font-bold text-slate-600 uppercase tracking-widest w-32 shrink-0">Voucher No.</label>
@@ -641,16 +728,16 @@ export function Ledger() {
           {/* Grid Table */}
           <div className="overflow-x-auto select-none">
             <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-indigo-600 text-white font-semibold">
+              <thead className="bg-slate-900 text-white font-semibold">
                 <tr>
-                  <th className="py-2.5 px-3 text-center border-r border-indigo-500 w-10">S/N</th>
-                  <th className="py-2.5 px-3 border-r border-indigo-500 w-[140px]">Transaction Date</th>
-                  <th className="py-2.5 px-3 border-r border-indigo-500 w-1/4">Description</th>
-                  <th className="py-2.5 px-3 border-r border-indigo-500 w-48">Category</th>
-                  <th className="py-2.5 px-3 border-r border-indigo-500 w-32">Amount</th>
-                  <th className="py-2.5 px-3 border-r border-indigo-500 w-40">Client</th>
-                  <th className="py-2.5 px-3 border-r border-indigo-500 w-40">Site</th>
-                  <th className="py-2.5 px-3">Vendor</th>
+                  <th className="py-2.5 px-3 text-center border-r border-slate-800 w-10 text-[10px] uppercase tracking-widest opacity-70">NÂº</th>
+                  <th className="py-2.5 px-3 border-r border-slate-800 w-[140px] text-[10px] uppercase tracking-widest opacity-70">Date</th>
+                  <th className="py-2.5 px-3 border-r border-slate-800 w-1/4 text-[10px] uppercase tracking-widest opacity-70">Description</th>
+                  <th className="py-2.5 px-3 border-r border-slate-800 w-48 text-[10px] uppercase tracking-widest opacity-70">Category</th>
+                  <th className="py-2.5 px-3 border-r border-slate-800 w-32 text-[10px] uppercase tracking-widest opacity-70">Amount</th>
+                  <th className="py-2.5 px-3 border-r border-slate-800 w-40 text-[10px] uppercase tracking-widest opacity-70">Client</th>
+                  <th className="py-2.5 px-3 border-r border-slate-800 w-40 text-[10px] uppercase tracking-widest opacity-70">Site</th>
+                  <th className="py-2.5 px-3 text-[10px] uppercase tracking-widest opacity-70">Vendor</th>
                 </tr>
               </thead>
               <tbody className="bg-slate-50">
