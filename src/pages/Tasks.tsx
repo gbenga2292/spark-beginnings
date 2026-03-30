@@ -652,16 +652,6 @@ function AdminTasksView() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <div className="relative w-48 hidden md:block">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-        <Input 
-          placeholder="Search..." 
-          className="pl-8 h-9 text-xs border-slate-200 bg-white" 
-          value={scope === 'mine' ? mySearch : search} 
-          onChange={e => scope === 'mine' ? setMySearch(e.target.value) : setSearch(e.target.value)} 
-        />
-      </div>
-
       <Button 
         size="sm" 
         onClick={() => scope === 'projects' ? setShowCreateProject(true) : setShowCreate(true)}
@@ -671,7 +661,7 @@ function AdminTasksView() {
         <span className="hidden lg:inline">{scope === 'projects' ? 'New Project' : 'New Task'}</span>
       </Button>
     </div>,
-    [viewMode, scope, sortBy, search, mySearch, mySubs.length, pendingApprovalSubs.length]
+    [viewMode, scope, sortBy, mySubs.length, pendingApprovalSubs.length]
   );
 
   const toggle = (id: string) =>
@@ -679,17 +669,23 @@ function AdminTasksView() {
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
-      {/* Mobile Search */}
-      <div className="md:hidden">
-        <div className="relative w-full">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <Input 
-            placeholder="Search tasks..." 
-            className="pl-9 h-10 text-sm border-slate-200 bg-white" 
-            value={scope === 'mine' ? mySearch : search} 
-            onChange={e => scope === 'mine' ? setMySearch(e.target.value) : setSearch(e.target.value)} 
-          />
-        </div>
+      {/* Unified Search Toolbar */}
+      <div className="relative w-full max-w-md">
+        <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+        <Input 
+          placeholder="Search tasks..." 
+          className="pl-9 h-10 text-sm border-slate-200 bg-white shadow-sm transition-all hover:bg-slate-50 focus:bg-white" 
+          value={scope === 'mine' ? mySearch : search} 
+          onChange={e => scope === 'mine' ? setMySearch(e.target.value) : setSearch(e.target.value)} 
+        />
+        {(scope === 'mine' ? mySearch : search) && (
+          <button 
+            onClick={() => scope === 'mine' ? setMySearch('') : setSearch('')}
+            className="absolute right-3 top-2.5 p-1 rounded-full hover:bg-slate-100 transition-colors"
+          >
+            <X className="h-3.5 w-3.5 text-slate-400" />
+          </button>
+        )}
       </div>
 
       {/* ── BOARD VIEW ── */}
