@@ -30,7 +30,7 @@ export function WaybillForm({ onClose, initialType = 'waybill' }: WaybillFormPro
   const [type, setType] = useState<WaybillType>(initialType);
   const [siteName, setSiteName] = useState('');
   const [driverName, setDriverName] = useState('');
-  const [vehicle, setVehicle] = useState('');
+  const [vehicleNumber, setVehicleNumber] = useState('');
   const [items, setItems] = useState<{ assetId: string; assetName: string; quantity: number }[]>([]);
   
   const [searchAsset, setSearchAsset] = useState('');
@@ -64,7 +64,7 @@ export function WaybillForm({ onClose, initialType = 'waybill' }: WaybillFormPro
       type,
       issueDate: new Date().toISOString(),
       driverName,
-      vehicle,
+      vehicle: vehicleNumber,
       items
     });
     onClose();

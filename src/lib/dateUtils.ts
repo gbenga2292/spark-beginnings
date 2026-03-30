@@ -2,9 +2,23 @@
  * Normalizes a date string to yyyy-MM-dd format for input type="date".
  * If it's invalid or empty, returns an empty string.
  */
-export function normalizeDate(dateStr: string | null | undefined): string {
+export function normalizeDate(dateStr: any): string {
   if (!dateStr) return '';
   
+  // Handle native Date objects (from Excel's cellDates: true)
+  if (dateStr instanceof Date) {
+    if (isNaN(dateStr.getTime())) return '';
+    const y = dateStr.getFullYear();
+    const m = String(dateStr.getMonth() + 1).padStart(2, '0');
+    const d = String(dateStr.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // Ensure we're working with a string
+  if (typeof dateStr !== 'string') {
+    dateStr = String(dateStr);
+  }
+
   // If it's already in the correct format, or at least starts with 4 digits and has dashes
   if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.split('T')[0];
   
@@ -27,5 +41,8 @@ export function normalizeDate(dateStr: string | null | undefined): string {
     return '';
   }
   
-  return d.toISOString().split('T')[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }

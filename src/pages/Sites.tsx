@@ -378,12 +378,20 @@ export function Sites() {
       // Category helps distinguish if it's already live or still in onboarding
       const category = site ? "Active Site" : "Pending Onboarding";
 
+      // Helper to format internal YYYY-MM-DD strings as DD/MM/YYYY for Excel export
+      const toUserDate = (iso: string | null | undefined) => {
+        if (!iso) return '';
+        const parts = iso.split('T')[0].split('-');
+        if (parts.length !== 3) return iso;
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      };
+
       return {
         "Category": category,
         "Site Name": name,
         "Client": client,
-        "Start Date": site?.startDate || q?.phase1?.timelineStartDate || '',
-        "End Date": site?.endDate || q?.phase5?.actualEndDate || '',
+        "Start Date": toUserDate(site?.startDate || q?.phase1?.timelineStartDate),
+        "End Date": toUserDate(site?.endDate || q?.phase5?.actualEndDate),
         "VAT": site?.vat || (q?.phase4?.clientTaxStatus?.includes('Add') ? 'Add' : q?.phase4?.clientTaxStatus?.includes('Yes') ? 'Yes' : 'No'),
         "Status": site?.status || q?.status || 'Active',
         
@@ -439,7 +447,7 @@ export function Sites() {
     reader.onload = (evt) => {
       try {
         const bstr = evt.target?.result as string;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json<Site>(ws);
