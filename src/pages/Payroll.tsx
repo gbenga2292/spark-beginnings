@@ -51,6 +51,9 @@ const isNsitfEligible = (r: PayrollRecord) => r.nsitf > 0 && !r.department.trim(
 
 const currentYear = new Date().getFullYear();
 
+const fm = (v: number) => typeof v === 'number' ? v.toLocaleString() : '0';
+const fmT = fm;
+
 export function Payroll() {
   const [activeTab, setActiveTab] = useState('processing');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -157,6 +160,8 @@ export function Payroll() {
     { key: 'nov', label: 'November' },
     { key: 'dec', label: 'December' },
   ];
+
+  const selectedMonthLabel = useMemo(() => months.find(m => m.key === selectedMonth)?.label || '', [selectedMonth, months]);
 
 
     // Calculate payroll logic extracted for multi-month generation capabilities
@@ -576,144 +581,136 @@ export function Payroll() {
           }
         });
       } else if (printType === 'NSITF') {
-        csvStr = 'S/N,Employee Name,Month,Gross Pay (₦),NSITF Rate (%),NSITF Amount (₦)\n';
+        csvStr = 'S/N,Employee Name,Month,Gross Pay (₦),Rate (%),NSITF (₦)\n';
         let sn = 1;
         payslipsToPrint.forEach(slip => {
           if (csvNsitfOk(slip.record)) {
             csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.monthLabel}","${fmCSV(slip.record.grossPay)}","${payrollVariables.nsitfRate}","${fmCSV(slip.record.nsitf)}"\n`;
           }
         });
+      } else {
+        csvStr = 'S/N,Employee Name,Bank,Account No,Expected Net Pay (₦)\n';
+        let sn = 1;
+        payslipsToPrint.forEach(slip => {
+          csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.record.bankName}","${slip.record.accountNo}","${fmCSV(slip.record.takeHomePay)}"\n`;
+        });
       }
-
-      if (!csvStr) return;
+      
       const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${printType}_Schedule.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${printType}_Schedule_${selectedMonth}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     };
 
-    const selectedMonthLabel = months.find(m => m.key === selectedMonth)?.label || selectedMonth;
+    const activeTabTitle =
+      activeTab === 'processing' ? 'Payroll Processing' :
+      activeTab === 'paye' ? 'PAYE Schedule' :
+      activeTab === 'pension' ? 'Pension Schedule' :
+      'NSITF Schedule';
 
-    const hideAmounts = priv?.canViewAmounts === false;
-    const fm = (n: number) => hideAmounts ? '***' : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    // fmTotal always shows the real value (used for TOTALS rows)
-    const fmT = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  
     useSetPageTitle(
-      'Payroll & Finance',
-      'Manage salaries, taxes, generate payslips, and handle staff advances and loans'
+      activeTabTitle,
+      'Manage salaries, taxes, generate payslips, and handle staff advances and loans',
+      <div className="hidden sm:flex items-center gap-2">
+        <select
+          className="h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20 mr-2"
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+        >
+          {months.map(month => (
+            <option key={month.key} value={month.key}>{month.label}</option>
+          ))}
+        </select>
+        
+        {priv.canGenerate && (
+          <Button variant="outline" size="sm" className="gap-2 h-9 border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm" onClick={() => handleOpenPrintDialog(activeTab === 'processing' ? 'PAYSLIPS' : activeTab.toUpperCase() as any)}>
+            <Printer className="h-4 w-4" /> Print {activeTab === 'processing' ? 'Payslips' : 'Schedule'}
+          </Button>
+        )}
+        {finRepPriv?.canExport && activeTab === 'processing' && (
+          <Button variant="outline" size="sm" className="gap-2 h-9 shadow-sm" onClick={handleExportScheduleCSV}>
+            <Download className="h-4 w-4" /> Export CSV
+          </Button>
+        )}
+      </div>
     );
 
     return (
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+
+        {/* COMPACT TABS */}
+        <div className="flex bg-white p-2 rounded-xl shadow-sm border border-slate-100 items-center overflow-x-auto no-scrollbar gap-2">
+          <div className="flex gap-1">
+            {[
+              { id: 'processing', label: 'Payroll Processing' },
+              { id: 'paye', label: 'PAYE', priv: priv.canViewPayeSchedule },
+              { id: 'pension', label: 'Pension', priv: priv.canViewPensionSchedule },
+              { id: 'nsitf', label: 'NSITF', priv: priv.canViewNsitfSchedule }
+            ].map(tab => {
+              if (tab.priv === false) return null;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
+                    isActive 
+                      ? 'bg-indigo-600 text-white shadow-md' 
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <Tabs>
-          <TabsList className="grid w-full max-w-2xl grid-cols-4">
-            <TabsTrigger active={activeTab === 'processing'} onClick={() => setActiveTab('processing')}>
-              Payroll Processing
-            </TabsTrigger>
-            {priv.canViewPayeSchedule && (
-              <TabsTrigger active={activeTab === 'paye'} onClick={() => setActiveTab('paye')}>
-                PAYE
-              </TabsTrigger>
-            )}
-            {priv.canViewPensionSchedule && (
-              <TabsTrigger active={activeTab === 'pension'} onClick={() => setActiveTab('pension')}>
-                Pension
-              </TabsTrigger>
-            )}
-            {priv.canViewNsitfSchedule && (
-              <TabsTrigger active={activeTab === 'nsitf'} onClick={() => setActiveTab('nsitf')}>
-                NSITF
-              </TabsTrigger>
-            )}
-          </TabsList>
+          <TabsContent active={activeTab === 'processing'} className="space-y-6 mt-0">
 
-          <TabsContent active={activeTab === 'processing'} className="space-y-6 mt-6">
-            {/* Ã¢â€â‚¬Ã¢â€â‚¬ Month selector + Print/Export button Ã¢â€â‚¬Ã¢â€â‚¬ */}
-            <div className="flex items-center justify-between">
-              <div className="flex gap-4 items-center">
-                <label className="text-sm font-medium text-slate-700">Select Month:</label>
-                <select
-                  className="flex h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                >
-                  {months.map(month => (
-                    <option key={month.key} value={month.key}>{month.label}</option>
-                  ))}
-                </select>
-              </div>
+             {/* COMPACT METRICS BAR FOR PROCESSING */}
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-center">
+                   <div className="flex justify-between items-center mb-1">
+                     <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Gross Pay</span>
+                   </div>
+                   <div className="text-xl font-bold text-slate-900">₦{priv?.canViewAmounts === false ? '***' : totals.totalGross.toLocaleString()}</div>
+                   <div className="text-[10px] text-slate-400 mt-1">Salary + Overtime</div>
+                </div>
 
-              <div className="flex gap-3">
-                {priv.canGenerate && (
-                  <Button variant="outline" size="sm" className="gap-2 border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700" onClick={() => handleOpenPrintDialog('PAYSLIPS')}>
-                    <Printer className="h-4 w-4" /> Print Schedule
-                  </Button>
-                )}
-                {finRepPriv.canExport && (
-                  <Button variant="outline" className="gap-2">
-                    <Download className="h-4 w-4" />
-                    Export CSV
-                  </Button>
-                )}
-              </div>
-            </div>
+                <div className="bg-white p-4 rounded-xl border border-red-50 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                   <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-red-50/50 to-transparent pointer-events-none" />
+                   <div className="flex justify-between items-center mb-1 relative z-10">
+                     <span className="text-xs font-semibold text-red-500 uppercase tracking-wider">Total Deductions</span>
+                   </div>
+                   <div className="text-xl font-bold text-red-600 relative z-10 flex items-center gap-2">
+                     ₦{priv?.canViewAmounts === false ? '***' : totals.totalDeductions.toLocaleString()}
+                   </div>
+                   <div className="flex gap-2 mt-1.5 relative z-10 flex-wrap">
+                      <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 font-medium whitespace-nowrap">PAYE: ₦{fm(totals.totalPAYE)}</span>
+                      <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 font-medium whitespace-nowrap">Loans: ₦{fm(totals.totalLoans)}</span>
+                      <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 font-medium whitespace-nowrap">Pension: ₦{fm(totals.totalPension)}</span>
+                   </div>
+                </div>
 
-            <div className="grid gap-6 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-slate-500">Total Gross Pay</CardTitle>
-                  <CreditCard className="h-4 w-4 text-slate-400" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-slate-900">₦{priv?.canViewAmounts === false ? '***' : totals.totalGross.toLocaleString()}</div>
-                  <p className="text-xs text-slate-500 mt-1">Salary + Overtime</p>
-                </CardContent>
-              </Card>
-              <Card className="col-span-1 lg:col-span-2">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-slate-500">Total Deductions</CardTitle>
-                  <CreditCard className="h-4 w-4 text-slate-400" />
-                </CardHeader>
-                <CardContent className="flex items-center justify-between">
-                  <div>
-                    <div className="text-2xl font-bold text-red-600">₦{priv?.canViewAmounts === false ? '***' : totals.totalDeductions.toLocaleString()}</div>
-                    <p className="text-[10px] text-slate-500 mt-1">Sum of all deductions</p>
-                  </div>
-                  <div className="flex gap-2 ml-4">
-                    <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 flex flex-col items-start px-2 py-1">
-                      <span className="text-[9px] uppercase tracking-wider text-red-400">PAYE Tax</span>
-                      <span className="font-bold text-sm">₦{priv?.canViewAmounts === false ? '***' : totals.totalPAYE.toLocaleString()}</span>
-                    </Badge>
-                    <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 flex flex-col items-start px-2 py-1">
-                      <span className="text-[9px] uppercase tracking-wider text-red-400">Loans & Adv.</span>
-                      <span className="font-bold text-sm">₦{priv?.canViewAmounts === false ? '***' : totals.totalLoans.toLocaleString()}</span>
-                    </Badge>
-                    <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 flex flex-col items-start px-2 py-1">
-                      <span className="text-[9px] uppercase tracking-wider text-red-400">Pension</span>
-                      <span className="font-bold text-sm">₦{priv?.canViewAmounts === false ? '***' : totals.totalPension.toLocaleString()}</span>
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-slate-500">Net Payroll</CardTitle>
-                  <CreditCard className="h-4 w-4 text-slate-400" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-emerald-600">₦{priv?.canViewAmounts === false ? '***' : totals.totalNet.toLocaleString()}</div>
-                  <div className="flex items-center justify-between mt-1">
-                    <p className="text-[10px] text-slate-500">Take Home Pay</p>
-                    <p className="text-[10px] font-medium text-slate-700">{totals.employeeCount} active staff</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                <div className="bg-white p-4 rounded-xl border border-emerald-50 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                   <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-emerald-50/50 to-transparent pointer-events-none" />
+                   <div className="flex justify-between items-center mb-1 relative z-10">
+                     <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Net Payroll</span>
+                     <span className="text-[10px] font-medium bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full whitespace-nowrap">{totals.employeeCount} staff</span>
+                   </div>
+                   <div className="text-xl font-bold text-emerald-600 relative z-10">₦{priv?.canViewAmounts === false ? '***' : totals.totalNet.toLocaleString()}</div>
+                   <div className="text-[10px] text-emerald-500/80 mt-1 relative z-10 flex justify-between items-center whitespace-nowrap">
+                     Take Home Pay
+                   </div>
+                </div>
+             </div>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
@@ -803,24 +800,12 @@ export function Payroll() {
 
           {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ PAYE TAB Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
           {priv.canViewPayeSchedule && (
-            <TabsContent active={activeTab === 'paye'} className="space-y-6 mt-6">
-              <div className="flex gap-4 items-center">
-                <label className="text-sm font-medium text-slate-700">Month:</label>
-                <select
-                  className="flex h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                  value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}
-                >
-                  {months.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
-                </select>
-              </div>
+            <TabsContent active={activeTab === 'paye'} className="mt-0">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
                   <CardTitle>PAYE Tax Schedule: {selectedMonthLabel}</CardTitle>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-slate-500 font-medium">Total PAYE: <span className="text-red-600 font-bold">₦{fmT(totals.totalPAYE)}</span></span>
-                    <Button variant="outline" size="sm" className="gap-2" onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintDialogOpen(true); setPrintType('PAYE'); }}>
-                      <Printer className="h-4 w-4" /> Print Schedule
-                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 cursor-grab">
@@ -873,24 +858,12 @@ export function Payroll() {
 
           {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ PENSION TAB Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
           {priv.canViewPensionSchedule && (
-            <TabsContent active={activeTab === 'pension'} className="space-y-6 mt-6">
-              <div className="flex gap-4 items-center">
-                <label className="text-sm font-medium text-slate-700">Month:</label>
-                <select
-                  className="flex h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                  value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}
-                >
-                  {months.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
-                </select>
-              </div>
+            <TabsContent active={activeTab === 'pension'} className="mt-0">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
                   <CardTitle>Pension Schedule: {selectedMonthLabel}</CardTitle>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-slate-500 font-medium">Total Pension: <span className="text-amber-600 font-bold">₦{fmT(totals.totalPension)}</span></span>
-                    <Button variant="outline" size="sm" className="gap-2" onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintDialogOpen(true); setPrintType('PENSION'); }}>
-                      <Printer className="h-4 w-4" /> Print Schedule
-                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 cursor-grab">
@@ -940,24 +913,12 @@ export function Payroll() {
 
           {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ NSITF TAB Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
           {priv.canViewNsitfSchedule && (
-            <TabsContent active={activeTab === 'nsitf'} className="space-y-6 mt-6">
-              <div className="flex gap-4 items-center">
-                <label className="text-sm font-medium text-slate-700">Month:</label>
-                <select
-                  className="flex h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                  value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}
-                >
-                  {months.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
-                </select>
-              </div>
+            <TabsContent active={activeTab === 'nsitf'} className="mt-0">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100 pb-4">
                   <CardTitle>NSITF Schedule: {selectedMonthLabel}</CardTitle>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-slate-500 font-medium">Total NSITF: <span className="text-blue-600 font-bold">₦{fmT(payrollData.reduce((s, r) => s + r.nsitf, 0))}</span></span>
-                    <Button variant="outline" size="sm" className="gap-2" onClick={() => { setPrintSelectedMonths([selectedMonth]); setPrintSelectedEmployees([]); setPrintDialogOpen(true); setPrintType('NSITF'); }}>
-                      <Printer className="h-4 w-4" /> Print Schedule
-                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 cursor-grab">
