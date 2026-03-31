@@ -67,7 +67,7 @@ export interface Site {
   name: string;
   client: string;
   vat: 'Yes' | 'No' | 'Add';
-  status: 'Active' | 'Inactive';
+  status: 'Active' | 'Inactive' | 'Ended';
   startDate?: string;
   endDate?: string;
 }

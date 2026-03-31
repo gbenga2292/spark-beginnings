@@ -19,7 +19,7 @@ import { useAppData } from '@/src/contexts/AppDataContext';
 import { normalizeDate } from '@/src/lib/dateUtils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 
-const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive', startDate: new Date().toISOString().split('T')[0], endDate: '' };
+const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive' | 'Ended', startDate: new Date().toISOString().split('T')[0], endDate: '' };
 
 function ClientSummary() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -317,10 +317,13 @@ export function Sites() {
     }
     
     // Auto status based on start/end date range logic
-    let calcStatus: 'Active' | 'Inactive' = 'Active';
+    let calcStatus: 'Active' | 'Inactive' | 'Ended' = 'Active';
     const nowStr = new Date().toISOString().split('T')[0];
-    if (addForm.startDate && nowStr < addForm.startDate) calcStatus = 'Inactive';
-    if (addForm.endDate && nowStr > addForm.endDate) calcStatus = 'Inactive';
+    if (addForm.endDate) {
+      calcStatus = 'Ended';
+    } else if (addForm.startDate && nowStr < addForm.startDate) {
+      calcStatus = 'Inactive';
+    }
 
     addSite({
       id: generateId(),
@@ -352,8 +355,8 @@ export function Sites() {
     // Auto status based on end date
     const nowStr = new Date().toISOString().split('T')[0];
     let submitStatus = editForm.status;
-    if (editForm.endDate && nowStr > editForm.endDate) {
-      submitStatus = 'Inactive';
+    if (editForm.endDate) {
+      submitStatus = 'Ended';
     } else if (editForm.startDate && nowStr < editForm.startDate) {
       submitStatus = 'Inactive';
     }
@@ -512,7 +515,7 @@ export function Sites() {
                 startDate: startDate,
                 endDate: endDate,
                 vat: vat === 'Yes' ? 'Yes' : (vat === 'Add' ? 'Add' : 'No'),
-                status: status === 'Inactive' ? 'Inactive' : 'Active'
+                status: endDate ? 'Ended' : (status === 'Inactive' ? 'Inactive' : 'Active')
               });
             }
             
@@ -531,7 +534,7 @@ export function Sites() {
                siteId: isPendingOnly ? '' : newId,
                clientName: client,
                siteName: name,
-               status: isPendingOnly ? 'Pending' : 'Active',
+               status: endDate ? 'Ended' : (isPendingOnly ? 'Pending' : 'Active'),
                phase1: {
                   isNewSite: isPendingOnly, 
                   isNewClient: !clients.includes(client), 
@@ -788,14 +791,14 @@ export function Sites() {
                     <TableCell>
                       {editingId === site.id ? (
                         <Badge 
-                          variant={editForm.status === 'Active' ? 'success' : 'secondary'}
+                          variant={editForm.status === 'Ended' ? 'destructive' : editForm.status === 'Active' ? 'success' : 'secondary'}
                           className="text-[8px] px-1 py-0 h-[14px]"
                         >
                           {editForm.status}
                         </Badge>
                       ) : (
                         <Badge 
-                          variant={site.status === 'Active' ? 'success' : 'secondary'}
+                          variant={site.status === 'Ended' ? 'destructive' : site.status === 'Active' ? 'success' : 'secondary'}
                           className="text-[8px] px-1 py-0 h-[14px]"
                         >
                           {site.status}
@@ -1002,6 +1005,14 @@ export function Sites() {
                 <option value="Yes">Yes</option>
                 <option value="Add">Add</option>
               </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">End Date</label>
+              <Input
+                type="date"
+                value={addForm.endDate}
+                onChange={e => setAddForm({ ...addForm, endDate: e.target.value })}
+              />
             </div>
           </div>
           {addError && <p className="text-sm text-red-600">{addError}</p>}

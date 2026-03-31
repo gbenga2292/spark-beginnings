@@ -6,7 +6,7 @@ export interface SiteQuestionnaire {
   address?: string; // Site/client address
   contactPersonName?: string; // Initial contact person name
   contactPersonPhone?: string; // Contact person phone (numbers only)
-  status: 'Pending' | 'Active' | 'Rejected'; // 'Pending' means it hasn't passed phases 1-4
+  status: 'Pending' | 'Active' | 'Rejected' | 'Ended'; // 'Pending' means it hasn't passed phases 1-4
   
   // Phase 1 – Initial Inquiry (Head of Operations)
   phase1: {
