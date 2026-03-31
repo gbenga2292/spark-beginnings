@@ -130,7 +130,7 @@ export function usePayrollCalculator() {
 
           paye = annualTax / 12;
         } else if (emp.withholdingTax) {
-          paye = salary * (payrollVariables.withholdingTaxRate ?? 0);
+          paye = salary * ((payrollVariables as any).withholdingTaxRate ?? 0);
         }
 
         const empAdvances = salaryAdvances.filter(a => {

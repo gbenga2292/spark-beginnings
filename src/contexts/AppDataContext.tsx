@@ -587,7 +587,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             const mtComms = comments.filter(c => c.main_task_id === mainTaskId || c.task_id === mainTaskId);
             mtComms.forEach(c => {
                 const textStr = typeof c.text === 'string' ? c.text : String(c.text || "");
-                const mentions = Array.from(textStr.matchAll(/@(\w+)/g)).map(m => m[1].toLowerCase());
+                const mentions = Array.from(textStr.matchAll(/@(\w+)/g)).map((m: any) => m[1].toLowerCase());
                 const targetIds: string[] = [];
                 if (mentions.length > 0) {
                     users.forEach(u => {

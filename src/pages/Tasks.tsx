@@ -296,7 +296,7 @@ function PersonalTasksView() {
 
                   return (
                     <div key={mt.id} id={`task-row-${mt.id}`}
-                      className={`bg-card border rounded-xl overflow-hidden hover:shadow-sm transition-all border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority].border : 'border-l-violet-300 dark:border-l-violet-700'} border-violet-100 dark:border-violet-900/30`}>
+                      className={`bg-card border rounded-xl overflow-hidden hover:shadow-sm transition-all border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority as TaskPriority].border : 'border-l-violet-300 dark:border-l-violet-700'} border-violet-100 dark:border-violet-900/30`}>
                       {/* Task header */}
                       <div role="button" tabIndex={0}
                         onClick={() => toggle(mt.id)}
@@ -327,7 +327,7 @@ function PersonalTasksView() {
                                   {creator && (
                                     <span className="flex items-center gap-1 bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground" title="Created by">
                                       <div className={`w-3.5 h-3.5 rounded-full ${creator.avatarColor || 'bg-slate-400'} flex items-center justify-center text-white text-[7px] font-bold`}>
-                                        {creator.name?.split(" ").map(n => n[0]).join("").slice(0, 2) || 'U'}
+                                        {creator.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || 'U'}
                                       </div>
                                       <span className="text-[10px]">{creator.name?.split(" ")[0]}</span>
                                     </span>
@@ -335,7 +335,7 @@ function PersonalTasksView() {
                                   {assignee && (
                                     <span className="flex items-center gap-1 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 px-1.5 py-0.5 rounded-full" title="Assigned to">
                                       <div className={`w-3.5 h-3.5 rounded-full ${assignee.avatarColor} flex items-center justify-center text-white text-[7px] font-bold`}>
-                                        {assignee.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                                        {assignee.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                                       </div>
                                       <span className="text-[10px]">{assignee.name.split(" ")[0]}</span>
                                     </span>
@@ -370,7 +370,7 @@ function PersonalTasksView() {
 
                               <div className="divide-y divide-violet-50 dark:divide-violet-900/20">
                                 {subs.map((sub, i) => {
-                                  const sc2 = statusConfig[sub.status];
+                                  const sc2 = statusConfig[sub.status as SubTaskStatus];
                                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
                                   return (
                                     <motion.div key={sub.id ?? i} id={`subtask-row-${sub.id}`}
@@ -776,7 +776,7 @@ function AdminTasksView() {
                   <span className="w-20 text-center">Status</span>
                 </div>
                 {compactPool.map((sub, i) => {
-                  const sc = statusConfig[sub.status];
+                  const sc = statusConfig[sub.status as SubTaskStatus];
                   const mt = mainTasks.find(m => m.id === sub.mainTaskId);
                   const creator = mt ? users.find(u => u.id === mt.createdBy) : null;
                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== 'completed';
@@ -796,7 +796,7 @@ function AdminTasksView() {
                         {creator ? (
                           <div className="flex items-center gap-1">
                             <div className={`w-4 h-4 rounded-full ${creator.avatarColor} flex items-center justify-center text-white text-[7px] font-bold`}>
-                              {creator.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                              {creator.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                             </div>
                             <span className="text-[11px] text-muted-foreground truncate max-w-[48px]">{creator.name.split(' ')[0]}</span>
                           </div>
@@ -930,7 +930,7 @@ function AdminTasksView() {
                               )}
                               <div className="divide-y divide-border/50">
                                 {projSubs.map((sub, i) => {
-                                  const sc2 = statusConfig[sub.status];
+                                  const sc2 = statusConfig[sub.status as SubTaskStatus];
                                   const assignee = users.find(u => u.id === sub.assignedTo?.split(',')[0]);
                                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
                                   return (
@@ -950,7 +950,7 @@ function AdminTasksView() {
                                         {assignee ? (
                                           <>
                                             <div className={`w-5 h-5 rounded-full ${assignee.avatarColor} flex items-center justify-center text-white text-[9px] font-bold`}>
-                                              {assignee.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                                              {assignee.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                                             </div>
                                             <span className="text-xs text-muted-foreground whitespace-nowrap">{assignee.name.split(" ")[0]}</span>
                                           </>
@@ -1044,7 +1044,7 @@ function AdminTasksView() {
             ) : (
               <div className="space-y-2">
                 {filteredMySubs.map((sub, i) => {
-                  const sc = statusConfig[sub.status];
+                  const sc = statusConfig[sub.status as SubTaskStatus];
                   const mt = mainTasks.find(m => m.id === sub.mainTaskId);
                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
                   return (
@@ -1114,7 +1114,7 @@ function AdminTasksView() {
                     {submitter && (
                       <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
                         <div className={`w-5 h-5 rounded-full ${submitter.avatarColor} flex items-center justify-center text-white text-[8px] font-bold`}>
-                          {submitter.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                          {submitter.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                         </div>
                         <span className="text-xs text-muted-foreground">{submitter.name.split(' ')[0]}</span>
                       </div>
@@ -1180,7 +1180,7 @@ function AdminTasksView() {
 
                 return (
                   <div key={mt.id} id={`task-row-${mt.id}`}
-                    className={`bg-card border border-border rounded-xl overflow-hidden transition-colors border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority].border : 'border-l-transparent'
+                    className={`bg-card border border-border rounded-xl overflow-hidden transition-colors border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority as TaskPriority].border : 'border-l-transparent'
                       } hover:shadow-sm`}>
                     {/* Main task header */}
                     <div role="button" tabIndex={0}
@@ -1209,7 +1209,7 @@ function AdminTasksView() {
                                 {creator && (
                                   <span className="flex items-center gap-1 bg-muted px-1.5 py-0.5 rounded-full" title="Created by">
                                     <div className={`w-3.5 h-3.5 rounded-full ${creator.avatarColor || 'bg-slate-400'} flex items-center justify-center text-white text-[7px] font-bold`}>
-                                      {creator.name?.split(" ").map(n => n[0]).join("").slice(0, 2) || 'U'}
+                                      {creator.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || 'U'}
                                     </div>
                                     <span className="text-[10px]">{creator.name?.split(" ")[0]}</span>
                                   </span>
@@ -1217,7 +1217,7 @@ function AdminTasksView() {
                                 {assignee && (
                                   <span className="flex items-center gap-1 bg-primary/10 px-1.5 py-0.5 rounded-full" title="Assigned to">
                                     <div className={`w-3.5 h-3.5 rounded-full ${assignee.avatarColor} flex items-center justify-center text-white text-[7px] font-bold`}>
-                                      {assignee.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                                      {assignee.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                                     </div>
                                     <span className="text-[10px]">{assignee.name.split(" ")[0]}</span>
                                   </span>
@@ -1264,7 +1264,7 @@ function AdminTasksView() {
 
                             <div className="divide-y divide-border/50">
                               {subs.map((sub, i) => {
-                                const sc2 = statusConfig[sub.status];
+                                const sc2 = statusConfig[sub.status as SubTaskStatus];
                                 const assignee = users.find(u => u.id === sub.assignedTo?.split(',')[0]);
                                 const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
                                 return (
@@ -1285,7 +1285,7 @@ function AdminTasksView() {
                                       {assignee ? (
                                         <>
                                           <div className={`w-5 h-5 rounded-full ${assignee.avatarColor} flex items-center justify-center text-white text-[9px] font-bold`}>
-                                            {assignee.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                                            {assignee.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                                           </div>
                                           <span className="text-xs text-muted-foreground whitespace-nowrap">{assignee.name.split(" ")[0]}</span>
                                         </>
@@ -1452,7 +1452,7 @@ function AdminTasksView() {
           subtask={editingSubtask}
           users={activeUsers}
           onClose={() => setEditingSubtask(null)}
-          onSave={(patch) => { updateSubtask(editingSubtask.id, patch); setEditingSubtask(null); }}
+          onSave={(patch) => { updateSubtask(editingSubtask.id ?? '', patch); setEditingSubtask(null); }}
         />
       )}
 
@@ -1461,7 +1461,7 @@ function AdminTasksView() {
           subtaskId={assignDialog.subtaskId}
           currentAssignee={assignDialog.current}
           users={activeUsers}
-          onAssign={uid => { assignSubtask(assignDialog.subtaskId, uid); setAssignDialog(null); }}
+          onAssign={uid => { assignSubtask(assignDialog.subtaskId, uid ?? ''); setAssignDialog(null); }}
           onClose={() => setAssignDialog(null)}
         />
       )}
@@ -1642,7 +1642,7 @@ function UserTasksView() {
             ) : (
               <div className="space-y-2">
                 {filtered.map((sub, i) => {
-                  const sc = statusConfig[sub.status];
+                  const sc = statusConfig[sub.status as SubTaskStatus];
                   const mt = mainTasks.find(m => m.id === sub.mainTaskId);
                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
                   return (
@@ -2105,7 +2105,7 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
                               className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800"
                             >
                               <div className={`w-3.5 h-3.5 rounded-full ${u?.avatarColor || 'bg-slate-400'} flex items-center justify-center text-white text-[7px] font-bold`}>
-                                {name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                {name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                               </div>
                               {name.split(' ')[0]}
                             </span>
@@ -2161,7 +2161,7 @@ function AssignUserDialog({ subtaskId, currentAssignee, users, onAssign, onClose
             <button key={u.id} onClick={() => onAssign(u.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-left transition-colors ${currentAssignee === u.id ? "bg-primary/10 border border-primary/20" : "hover:bg-muted"}`}>
               <div className={`w-8 h-8 rounded-full ${u.avatarColor} flex items-center justify-center text-white text-xs font-bold`}>
-                {u.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                {u.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
               </div>
               <div>
                 <p className="font-medium text-foreground">{u.name}</p>
@@ -2267,7 +2267,7 @@ function EditTaskDialog({ task, users, onClose, onSave }: {
                             className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/20"
                           />
                           <div className={`w-5 h-5 rounded-full ${u.avatarColor} flex items-center justify-center text-white text-[8px] font-bold shrink-0`}>
-                            {u.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                            {u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                           </div>
                           <span className="text-xs text-foreground truncate">{u.name}</span>
                         </label>

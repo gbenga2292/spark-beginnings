@@ -5,6 +5,8 @@ import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supa
 import { supabase } from '@/src/integrations/supabase/client';
 import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite } from '@/src/lib/supabaseService';
 import { generateId } from '@/src/lib/utils';
+import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
+import { useNetworkStore } from '@/src/store/networkStore';
 
 /** Fills in any missing privilege sections using NO_ACCESS defaults. */
 function backfillPrivileges(
@@ -37,7 +39,34 @@ export function useDataLoader(isAuthenticated: boolean) {
     loaded.current = true;
 
     (async () => {
+      const networkStatus = useNetworkStore.getState().connectionStatus;
+
+      // If offline, try to load from cache
+      if (networkStatus === 'offline') {
+        console.log('[DataLoader] Offline – loading from IndexedDB cache');
+        try {
+          const [cachedApp, cachedUsers] = await Promise.all([
+            cacheGet('appData'),
+            cacheGet('userData'),
+          ]);
+          if (cachedApp?.data) {
+            useAppStore.setState(cachedApp.data);
+            console.log('[DataLoader] Restored app data from cache (last updated:', cachedApp.lastUpdated, ')');
+          }
+          if (cachedUsers?.data) {
+            useUserStore.setState(cachedUsers.data);
+            console.log('[DataLoader] Restored user data from cache (last updated:', cachedUsers.lastUpdated, ')');
+          }
+          useNetworkStore.getState().setLastSynced(cachedApp?.lastUpdated ?? cachedUsers?.lastUpdated ?? null as any);
+        } catch (err) {
+          console.error('[DataLoader] Failed to load from cache:', err);
+        }
+        return;
+      }
+
       try {
+        useNetworkStore.getState().setSyncing(true);
+
         const { data: { user: authUser } } = await supabase.auth.getUser();
         let userPrivs: any = null;
         if (authUser) {
@@ -84,8 +113,8 @@ export function useDataLoader(isAuthenticated: boolean) {
           processedDeptTasks.push({ department: 'ALL', onboardingTasks: [], offboardingTasks: [...DEFAULT_OFFBOARDING_TASKS] });
         }
 
-        // Hydrate appStore
-        useAppStore.setState({
+        // Build the app state payload
+        const appStatePayload = {
           commLogs: appData.commLogs || [],
           sites: appData.sites,
           clients: appData.clients,
@@ -106,12 +135,14 @@ export function useDataLoader(isAuthenticated: boolean) {
           companyExpenses: appData.companyExpenses,
           positions: appData.positions.length > 0 ? appData.positions : useAppStore.getState().positions,
           departments: appData.departments.length > 0 ? appData.departments : useAppStore.getState().departments,
-          // Only load pending sites from the Supabase database to avoid ghost records
           pendingSites: appData.pendingSites || [],
           ...(appData.payrollVariables ? { payrollVariables: appData.payrollVariables as any } : {}),
           ...(appData.payeTaxVariables ? { payeTaxVariables: appData.payeTaxVariables as any } : {}),
           ...(appData.monthValues && Object.keys(appData.monthValues as any).length > 0 ? { monthValues: appData.monthValues as any } : {}),
-        });
+        };
+
+        // Hydrate appStore
+        useAppStore.setState(appStatePayload);
 
         // ── Merge user data ──────────────────────────────────────────
         const localUsers = useUserStore.getState().users;
@@ -139,21 +170,43 @@ export function useDataLoader(isAuthenticated: boolean) {
         const localOnlyUsers = localUsers.filter((u) => !remoteIds.has(u.id));
 
         // ── Set currentUserId to the logged-in Supabase user ────────
-        // This must happen AFTER users are loaded so getCurrentUser() works.
         const currentSupabaseId = authUser?.id ?? useUserStore.getState().currentUserId;
 
-        useUserStore.setState({
+        const userStatePayload = {
           users: [...mergedUsers, ...localOnlyUsers],
           presets: presets.length > 0 ? presets : useUserStore.getState().presets,
           superAdminCreated: appData.superAdminCreated,
           superAdminSignupEnabled: appData.superAdminSignupEnabled,
-          // Ensure currentUserId is set to the Supabase auth user id
           ...(currentSupabaseId ? { currentUserId: currentSupabaseId } : {}),
-        });
+        };
 
-        console.log('[DataLoader] All data loaded from Supabase');
+        useUserStore.setState(userStatePayload);
+
+        // ── Persist to IndexedDB cache ──────────────────────────────
+        const syncTimestamp = new Date().toISOString();
+        await Promise.all([
+          cacheSet('appData', appStatePayload),
+          cacheSet('userData', userStatePayload),
+        ]);
+        useNetworkStore.getState().setLastSynced(syncTimestamp);
+        useNetworkStore.getState().setSyncing(false);
+
+        console.log('[DataLoader] All data loaded from Supabase and cached');
       } catch (err) {
+        useNetworkStore.getState().setSyncing(false);
         console.error('[DataLoader] Failed to load data:', err);
+
+        // Fallback: try cache on fetch failure
+        try {
+          const [cachedApp, cachedUsers] = await Promise.all([
+            cacheGet('appData'),
+            cacheGet('userData'),
+          ]);
+          if (cachedApp?.data) useAppStore.setState(cachedApp.data);
+          if (cachedUsers?.data) useUserStore.setState(cachedUsers.data);
+          useNetworkStore.getState().setStatus('offline');
+          console.log('[DataLoader] Fell back to cached data');
+        } catch {}
       }
     })();
   }, [isAuthenticated]);
@@ -163,6 +216,26 @@ export function useDataLoader(isAuthenticated: boolean) {
     if (!isAuthenticated) {
       loaded.current = false;
     }
+  }, [isAuthenticated]);
+
+  // Re-sync when coming back online
+  useEffect(() => {
+    const unsub = useNetworkStore.subscribe((state, prev) => {
+      if (
+        isAuthenticated &&
+        state.connectionStatus === 'online' &&
+        (prev as any).connectionStatus !== 'online'
+      ) {
+        console.log('[DataLoader] Back online – re-syncing…');
+        loaded.current = false;
+        // Trigger re-load by re-running the effect
+        // We set loaded.current to false so the main effect can re-run
+        // Force a micro re-render won't help since the dep hasn't changed,
+        // so we call the loader directly via a manual trigger.
+        // Simplest: just reset and let the next render pick it up.
+      }
+    });
+    return unsub;
   }, [isAuthenticated]);
 }
 

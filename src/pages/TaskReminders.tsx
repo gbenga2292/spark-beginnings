@@ -477,8 +477,8 @@ export default function Reminders() {
                         </span>
 
                         {/* Freq badge */}
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${FREQ_COLORS[rem.frequency]}`}>
-                          <RefreshCw className="w-2.5 h-2.5" />{FREQ_LABELS[rem.frequency]}
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${FREQ_COLORS[rem.frequency as ReminderFrequency]}`}>
+                          <RefreshCw className="w-2.5 h-2.5" />{FREQ_LABELS[rem.frequency as ReminderFrequency]}
                         </span>
 
                         {/* Email badge */}
@@ -499,13 +499,13 @@ export default function Reminders() {
                         {/* Recipient avatars */}
                         {rem.recipientIds.length > 0 && (
                           <div className="flex items-center -space-x-1 ml-auto">
-                            {rem.recipientIds.slice(0, 5).map(id => {
+                            {rem.recipientIds.slice(0, 5).map((id: string) => {
                               const u = users.find(u => u.id === id);
                               if (!u) return null;
                               return (
                                 <div key={id} title={u.name}
                                   className={`w-5 h-5 rounded-full border-2 border-card text-[8px] font-bold text-white flex items-center justify-center ${u.avatarColor}`}>
-                                  {u.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                  {u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                                 </div>
                               );
                             })}
@@ -546,7 +546,7 @@ export default function Reminders() {
                           <div>
                             <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1">Recipients</p>
                             <p className="text-xs font-medium text-foreground">
-                              {rem.recipientIds.map(id => users.find(u => u.id === id)?.name?.split(' ')[0]).filter(Boolean).join(', ') || '—'}
+                              {rem.recipientIds.map((id: string) => users.find(u => u.id === id)?.name?.split(' ')[0]).filter(Boolean).join(', ') || '—'}
                             </p>
                           </div>
                           {isOwner && (
@@ -664,7 +664,7 @@ export default function Reminders() {
                               <button key={u.id} type="button" onClick={() => toggleRecipient(u.id)}
                                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors ${sel ? 'bg-violet-50/50 dark:bg-violet-900/10' : ''}`}>
                                 <div className={`w-6 h-6 rounded-full ${u.avatarColor} flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0`}>
-                                  {u.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                  {u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                                 </div>
                                 <span className="flex-1 text-left font-medium text-foreground text-xs">{u.name}</span>
                                 {sel && <Check className="w-3.5 h-3.5 text-violet-600 flex-shrink-0" />}

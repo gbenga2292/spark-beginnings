@@ -25,7 +25,7 @@ export function TaskFocusView({ subtasks, mainTasks, users, onClickSubtask }: Ta
 
   const completedRecently = subtasks
     .filter(s => s.status === "completed")
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .sort((a, b) => new Date(b.updatedAt ?? '').getTime() - new Date(a.updatedAt ?? '').getTime())
     .slice(0, 5);
 
   const sections = [
@@ -67,7 +67,7 @@ export function TaskFocusView({ subtasks, mainTasks, users, onClickSubtask }: Ta
               const mt = mainTasks.find(m => m.id === sub.mainTaskId);
               const assignee = sub.assignedTo ? users.find(u => u.id === sub.assignedTo?.split(',')[0]) : undefined;
               return (
-                <SubtaskCard key={sub.id} subtask={sub} mainTask={mt} assignee={assignee} onClick={() => onClickSubtask(sub.id)} />
+                <SubtaskCard key={sub.id} subtask={sub} mainTask={mt} assignee={assignee} onClick={() => onClickSubtask(sub.id ?? '')} />
               );
             })}
           </div>
@@ -89,7 +89,7 @@ export function TaskFocusView({ subtasks, mainTasks, users, onClickSubtask }: Ta
               const mt = mainTasks.find(m => m.id === sub.mainTaskId);
               const assignee = sub.assignedTo ? users.find(u => u.id === sub.assignedTo?.split(',')[0]) : undefined;
               return (
-                <SubtaskCard key={sub.id} subtask={sub} mainTask={mt} assignee={assignee} onClick={() => onClickSubtask(sub.id)} compact />
+                <SubtaskCard key={sub.id} subtask={sub} mainTask={mt} assignee={assignee} onClick={() => onClickSubtask(sub.id ?? '')} compact />
               );
             })}
           </div>
@@ -111,7 +111,7 @@ export function TaskFocusView({ subtasks, mainTasks, users, onClickSubtask }: Ta
             {completedRecently.map(sub => {
               const mt = mainTasks.find(m => m.id === sub.mainTaskId);
               return (
-                <SubtaskCard key={sub.id} subtask={sub} mainTask={mt} onClick={() => onClickSubtask(sub.id)} compact />
+                <SubtaskCard key={sub.id} subtask={sub} mainTask={mt} onClick={() => onClickSubtask(sub.id ?? '')} compact />
               );
             })}
           </div>

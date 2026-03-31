@@ -419,7 +419,7 @@ function AnalyticsDashboard() {
                         ) : bottleneckData.map(u => (
                             <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors">
                                 <div className={`w-8 h-8 rounded-full ${u.avatarColor} flex-shrink-0 flex items-center justify-center text-white text-[10px] font-bold shadow-sm`}>
-                                    {u.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                    {u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-xs font-bold text-foreground truncate">{u.name}</p>

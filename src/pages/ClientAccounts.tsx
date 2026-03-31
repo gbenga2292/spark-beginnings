@@ -19,7 +19,7 @@ export function ClientAccounts() {
   const canViewPayment = paymentPriv?.canView === true;
   const canViewVat = paymentPriv?.canViewVat === true;
 
-  const tabs = [];
+  const tabs: { id: string; label: string; icon: any; component: React.ReactNode }[] = [];
   if (canViewInvoice) tabs.push({ id: 'invoice', label: 'Invoice', icon: ReceiptText, component: <Billing /> });
   if (canViewPayment) tabs.push({ id: 'payment', label: 'Payment', icon: NairaSign, component: <Payments /> });
   if (canViewVat) tabs.push({ id: 'vat', label: 'VAT', icon: Landmark, component: <VatPayments /> });

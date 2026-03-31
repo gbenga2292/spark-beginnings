@@ -579,11 +579,11 @@ export function Billing() {
               importedCount++;
             }
           } else {
-            const parsedPendingInvoice: PendingInvoice = {
+            const parsedPendingInvoice = {
               id: idToUse,
               ...rawData,
               vatInc: rawData.vatInc as any,
-            };
+            } as any;
             const existing = pendingInvoices.find(e => e.id === idToUse);
             if (existing && mode !== 'append') {
               updatePendingInvoice(existing.id, parsedPendingInvoice);

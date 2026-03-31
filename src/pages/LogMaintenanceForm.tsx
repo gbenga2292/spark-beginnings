@@ -6,7 +6,7 @@ import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { toast } from '@/src/components/ui/toast';
 import { SelectAssetsModal } from './SelectAssetsModal';
-import { MaintenanceLogType } from '../../types/operations';
+import { MaintenanceLogType } from '@/src/types/operations';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 

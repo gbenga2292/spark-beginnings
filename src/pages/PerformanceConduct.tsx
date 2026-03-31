@@ -557,7 +557,7 @@ export default function PerformanceConduct() {
                   <p className="text-sm font-medium text-slate-500 mt-1 uppercase tracking-wider text-[11px]">{selectedEmp?.position} &bull; {selectedEmp?.department}</p>
                 </div>
                 {priv.canAdd && (
-                  <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-sm px-6" onClick={() => { setFormData({ ...emptyForm, employeeId: selectedEmployeeId }); setIsAdding(true); }}>
+                  <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-sm px-6" onClick={() => { setFormData({ ...emptyForm, employeeId: selectedEmployeeId ?? undefined }); setIsAdding(true); }}>
                     <Plus className="h-4 w-4 mr-2" /> Log Performance Action
                   </Button>
                 )}

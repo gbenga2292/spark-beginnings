@@ -156,7 +156,7 @@ export function Employees() {
       for (const deptName of deptsToCheck) {
         const existingLevel2 = employees.find(e => 
           e.level === 2 && 
-          (e.department === deptName || e.secondaryDepartments?.includes(deptName)) && 
+          (e.department === deptName || e.secondaryDepartments?.includes(deptName as string)) && 
           e.status !== 'Terminated'
         );
         if (existingLevel2) {
@@ -282,7 +282,7 @@ export function Employees() {
       for (const deptName of deptsToCheck) {
         const existingLevel2 = employees.find(e => 
           e.level === 2 && 
-          (e.department === deptName || e.secondaryDepartments?.includes(deptName)) && 
+          (e.department === deptName || e.secondaryDepartments?.includes(deptName as string)) && 
           e.id !== editingEmployeeId && 
           e.status !== 'Terminated'
         );

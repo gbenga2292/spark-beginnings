@@ -81,7 +81,7 @@ export function SubtaskKanbanView({ subtasks, mainTasks, users, onClickSubtask, 
                       subtask={sub}
                       mainTask={mt}
                       assignee={assignee}
-                      onClick={() => onClickSubtask(sub.id)}
+                      onClick={() => onClickSubtask(sub.id ?? '')}
                       compact
                     />
                   );

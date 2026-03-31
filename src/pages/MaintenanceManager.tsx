@@ -19,9 +19,9 @@ import {
 import { Card, CardContent } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { cn } from '@/src/lib/utils';
-import { MaintenanceDashboard } from './maintenance/MaintenanceDashboard';
-import { MaintenanceAssetGrid } from './maintenance/MaintenanceAssetGrid';
-import { LogMaintenanceForm } from './maintenance/LogMaintenanceForm';
+import { MaintenanceDashboard } from '@/src/pages/MaintenanceDashboard';
+import { MaintenanceAssetGrid } from '@/src/pages/MaintenanceAssetGrid';
+import { LogMaintenanceForm } from '@/src/pages/LogMaintenanceForm';
 
 type MaintenanceTab = 'dashboard' | 'machines' | 'vehicles' | 'log';
 
