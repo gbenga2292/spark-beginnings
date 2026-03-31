@@ -11,6 +11,7 @@ import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { generateId } from '@/src/lib/utils';
 import * as XLSX from 'xlsx';
 
 export function Variables() {
@@ -39,7 +40,8 @@ export function Variables() {
   const {
     setPositions, setDepartments, setClients, setPublicHolidays,
     setLeaveTypes, setLedgerCategories, setLedgerVendors,
-    setLedgerBanks, setLedgerBeneficiaryBanks, setDepartmentTasksList
+    setLedgerBanks, setLedgerBeneficiaryBanks, setDepartmentTasksList,
+    updateHrVariables
   } = useAppStore();
 
   const [localPayrollVars, setLocalPayrollVars] = useState(storePayrollVariables);
@@ -170,7 +172,7 @@ export function Variables() {
 
   const handleAddPosition = () => {
     if (newPosition && newPosDeptId && !positions.some(p => p.title.toLowerCase() === newPosition.toLowerCase() && p.departmentId === newPosDeptId)) {
-      addPosition({ id: crypto.randomUUID(), title: newPosition, departmentId: newPosDeptId });
+      addPosition({ id: generateId(), title: newPosition, departmentId: newPosDeptId });
       setNewPosition('');
       setNewPosDeptId('');
     } else if (!newPosDeptId) {
@@ -182,7 +184,7 @@ export function Variables() {
 
   const handleAddDepartment = () => {
     if (newDepartment && !departments.some(d => d.name.toLowerCase() === newDepartment.toLowerCase())) {
-      addDepartment({ id: crypto.randomUUID(), name: newDepartment, staffType: newDeptStaffType, workDaysPerWeek: 5 });
+      addDepartment({ id: generateId(), name: newDepartment, staffType: newDeptStaffType, workDaysPerWeek: 5 });
       setNewDepartment('');
       setNewDeptStaffType('OFFICE');
     } else if (newDepartment) {
@@ -474,7 +476,7 @@ export function Variables() {
               const name = String(row.Department || row.name || '').trim();
               if (name && (isOverwrite || !newDepts.some(d => d.name.toLowerCase() === name.toLowerCase()))) {
                 newDepts.push({
-                  id: crypto.randomUUID(),
+                  id: generateId(),
                   name,
                   staffType: row.staffType || 'OFFICE',
                   workDaysPerWeek: Number(row['Work Days/Week'] || row.workDaysPerWeek) || 5
@@ -495,7 +497,7 @@ export function Variables() {
                 if (d) deptId = d.id;
               }
               if (title && (isOverwrite || !newPositions.some(p => p.title.toLowerCase() === title.toLowerCase() && p.departmentId === deptId))) {
-                newPositions.push({ id: crypto.randomUUID(), title, departmentId: deptId });
+                newPositions.push({ id: generateId(), title, departmentId: deptId });
               }
             });
             setPositions(newPositions);
@@ -540,7 +542,7 @@ export function Variables() {
             data.forEach(row => {
               const name = String(row.Category || '').trim();
               if (name && (isOverwrite || !newLCats.some(c => c.name.toLowerCase() === name.toLowerCase()))) {
-                newLCats.push({ id: crypto.randomUUID(), name });
+                newLCats.push({ id: generateId(), name });
               }
             });
             setLedgerCategories(newLCats);
@@ -551,7 +553,7 @@ export function Variables() {
             data.forEach(row => {
               const name = String(row.Vendor || '').trim();
               if (name && (isOverwrite || !newLVendors.some(v => v.name.toLowerCase() === name.toLowerCase()))) {
-                newLVendors.push({ id: crypto.randomUUID(), name, tinNumber: String(row.TIN || '') });
+                newLVendors.push({ id: generateId(), name, tinNumber: String(row.TIN || '') });
               }
             });
             setLedgerVendors(newLVendors);
@@ -562,7 +564,7 @@ export function Variables() {
             data.forEach(row => {
               const name = String(row.Bank || '').trim();
               if (name && (isOverwrite || !newLBanks.some(b => b.name.toLowerCase() === name.toLowerCase()))) {
-                newLBanks.push({ id: crypto.randomUUID(), name });
+                newLBanks.push({ id: generateId(), name });
               }
             });
             setLedgerBanks(newLBanks);
@@ -574,7 +576,7 @@ export function Variables() {
               const name = String(row.Bank || '').trim();
               const acc = String(row.AccountNo || '').trim();
               if (name && acc && (isOverwrite || !newLBenBanks.some(b => b.name.toLowerCase() === name.toLowerCase() && b.accountNo === acc))) {
-                newLBenBanks.push({ id: crypto.randomUUID(), name, accountNo: acc });
+                newLBenBanks.push({ id: generateId(), name, accountNo: acc });
               }
             });
             setLedgerBeneficiaryBanks(newLBenBanks);
@@ -969,7 +971,7 @@ export function Variables() {
             <CardContent className="space-y-4 pt-6">
               <div className="flex gap-2">
                 <Input value={newCat} onChange={e => setNewCat(e.target.value)} placeholder="New Category" />
-                <Button disabled={!priv.canEdit} onClick={() => { if(newCat) { addLedgerCategory({id: crypto.randomUUID(), name: newCat}); setNewCat(''); } }}>Add</Button>
+                <Button disabled={!priv.canEdit} onClick={() => { if(newCat) { addLedgerCategory({id: generateId(), name: newCat}); setNewCat(''); } }}>Add</Button>
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
                 <Table>
@@ -1003,7 +1005,7 @@ export function Variables() {
             <CardContent className="space-y-4 pt-6">
               <div className="flex gap-2">
                 <Input value={newBank} onChange={e => setNewBank(e.target.value)} placeholder="New Bank Name" />
-                <Button disabled={!priv.canEdit} onClick={() => { if(newBank) { addLedgerBank({id: crypto.randomUUID(), name: newBank}); setNewBank(''); } }}>Add</Button>
+                <Button disabled={!priv.canEdit} onClick={() => { if(newBank) { addLedgerBank({id: generateId(), name: newBank}); setNewBank(''); } }}>Add</Button>
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
                 <Table>
@@ -1038,7 +1040,7 @@ export function Variables() {
               <div className="flex gap-2">
                 <Input value={newVendorName} onChange={e => setNewVendorName(e.target.value)} placeholder="Vendor Name" className="flex-1" />
                 <Input value={newVendorTin} onChange={e => setNewVendorTin(e.target.value)} placeholder="TIN" className="w-[100px]" />
-                <Button disabled={!priv.canEdit} onClick={() => { if(newVendorName) { addLedgerVendor({id: crypto.randomUUID(), name: newVendorName, tinNumber: newVendorTin}); setNewVendorName(''); setNewVendorTin(''); } }}>Add</Button>
+                <Button disabled={!priv.canEdit} onClick={() => { if(newVendorName) { addLedgerVendor({id: generateId(), name: newVendorName, tinNumber: newVendorTin}); setNewVendorName(''); setNewVendorTin(''); } }}>Add</Button>
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
                 <Table>
@@ -1076,7 +1078,7 @@ export function Variables() {
                 <Input value={newBenBankName} onChange={e => setNewBenBankName(e.target.value)} placeholder="Bank Name" />
                 <div className="flex gap-2">
                   <Input value={newBenBankAccount} onChange={e => setNewBenBankAccount(e.target.value)} placeholder="Account Number" className="flex-1" />
-                  <Button disabled={!priv.canEdit} onClick={() => { if(newBenBankName && newBenBankAccount) { addLedgerBeneficiaryBank({id: crypto.randomUUID(), name: newBenBankName, accountNo: newBenBankAccount}); setNewBenBankName(''); setNewBenBankAccount(''); } }}>Add</Button>
+                  <Button disabled={!priv.canEdit} onClick={() => { if(newBenBankName && newBenBankAccount) { addLedgerBeneficiaryBank({id: generateId(), name: newBenBankName, accountNo: newBenBankAccount}); setNewBenBankName(''); setNewBenBankAccount(''); } }}>Add</Button>
                 </div>
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
@@ -1432,7 +1434,9 @@ export function Variables() {
                   <Button 
                     onClick={() => { 
                       if (newPayeeType && !(localHrVars.payeeTypes || []).includes(newPayeeType)) { 
-                        updateLocalHrVariables({ payeeTypes: [...(localHrVars.payeeTypes || []), newPayeeType] }); 
+                        const newTypes = [...(localHrVars.payeeTypes || []), newPayeeType];
+                        updateHrVariables({ payeeTypes: newTypes });
+                        updateLocalHrVariables({ payeeTypes: newTypes }); 
                         setNewPayeeType(''); 
                       } 
                     }} 
@@ -1451,6 +1455,7 @@ export function Variables() {
                       <button 
                         onClick={() => {
                           const newTypes = (localHrVars.payeeTypes || []).filter(t => t !== pt);
+                          updateHrVariables({ payeeTypes: newTypes });
                           updateLocalHrVariables({ payeeTypes: newTypes });
                         }} 
                         className="text-indigo-400 hover:text-rose-500"
@@ -1666,6 +1671,7 @@ export function Variables() {
                       {priv.canEdit && (
                         <button onClick={() => {
                           const newCats = (localHrVars.performanceCategories || ['Attendance', 'Behavioral', 'Performance', 'Safety/PPE', 'Accolade', 'Clarity']).filter(c => c !== cat);
+                          updateHrVariables({ performanceCategories: newCats });
                           updateLocalHrVariables({ performanceCategories: newCats });
                         }} className="text-slate-300 hover:text-rose-500 transition-colors">
                           <X className="h-3 w-3" />
@@ -1681,6 +1687,7 @@ export function Variables() {
                       const inp = document.getElementById('newPerformanceCat') as HTMLInputElement;
                       if (inp.value) {
                         const newCats = [...(localHrVars.performanceCategories || ['Attendance', 'Behavioral', 'Performance', 'Safety/PPE', 'Accolade', 'Clarity']), inp.value];
+                        updateHrVariables({ performanceCategories: newCats });
                         updateLocalHrVariables({ performanceCategories: newCats });
                         inp.value = '';
                       }

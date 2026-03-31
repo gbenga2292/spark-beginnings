@@ -14,6 +14,7 @@ import { usePriv } from '@/src/hooks/usePriv';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { generateId } from '@/src/lib/utils';
 
 export function SalaryLoans() {
   const priv = usePriv('payroll');
@@ -70,7 +71,7 @@ export function SalaryLoans() {
 
     if (requestType === 'Salary Advance') {
       const newAdvance: SalaryAdvance = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         employeeId: staffId,
         employeeName: empName,
         amount: Number(amount),
@@ -125,7 +126,7 @@ export function SalaryLoans() {
       const mths = Number(duration);
 
       const newLoan: Loan = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         employeeId: staffId,
         employeeName: empName,
         loanType: requestType,

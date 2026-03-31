@@ -18,6 +18,7 @@ import { useAppData } from '@/src/contexts/AppDataContext';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { getPositionIndex } from '@/src/lib/hierarchy';
 import { normalizeDate, formatDisplayDate } from '@/src/lib/dateUtils';
+import { generateId } from '@/src/lib/utils';
 
 
 export function Beneficiaries() {
@@ -187,7 +188,7 @@ export function Beneficiaries() {
     }
 
     const newEmployee: Employee = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       employeeCode,
       surname: formData.surname || '',
       firstname: formData.firstname || '',
@@ -314,10 +315,6 @@ export function Beneficiaries() {
   const handleExportCSV = () => {
     try {
       const beneficiaries = employees.filter(e => e.staffType === 'NON-EMPLOYEE');
-      if (beneficiaries.length === 0) {
-        toast.info('No beneficiaries to export');
-        return;
-      }
       const headers = ['id', 'beneficiaryCode', 'surname', 'firstname', 'department', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'withholdingTax', 'withholdingTaxRate', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
       // Standard CSV cell wrapper
       const extractCSV = (str: any) => `"${String(str ?? '').replace(/"/g, '""')}"`;
@@ -431,64 +428,99 @@ export function Beneficiaries() {
         let deletedCount = 0;
         const csvProcessedIds = new Set<string>();
 
-        // headers: ['id', 'beneficiaryCode', 'surname', 'firstname', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'jan', ...]
         const headerRow = parseCSVRow(lines[0]);
-        const hasCode = headerRow[1]?.toLowerCase().includes('code');
+        const getIdx = (candidates: string[]) => {
+          for (const cand of candidates) {
+            const idx = headerRow.findIndex(h => h.toLowerCase() === cand.toLowerCase());
+            if (idx !== -1) return idx;
+          }
+          return -1;
+        };
+
+        const idxMap = {
+          id: getIdx(['id']),
+          beneficiaryCode: getIdx(['beneficiaryCode', 'code', 'staffCode']),
+          surname: getIdx(['surname', 'last name']),
+          firstname: getIdx(['firstname', 'first name']),
+          department: getIdx(['department', 'dept']),
+          status: getIdx(['status']),
+          yearlyLeave: getIdx(['yearlyLeave', 'leave']),
+          startDate: getIdx(['startDate', 'start_date', 'joined']),
+          endDate: getIdx(['endDate', 'end_date', 'terminated']),
+          bankName: getIdx(['bankName', 'bank']),
+          accountNo: getIdx(['accountNo', 'account']),
+          withholdingTax: getIdx(['withholdingTax', 'wht']),
+          withholdingTaxRate: getIdx(['withholdingTaxRate', 'wht_rate']),
+          jan: getIdx(['jan']), feb: getIdx(['feb']), mar: getIdx(['mar']), apr: getIdx(['apr']),
+          may: getIdx(['may']), jun: getIdx(['jun']), jul: getIdx(['jul']), aug: getIdx(['aug']),
+          sep: getIdx(['sep']), oct: getIdx(['oct']), nov: getIdx(['nov']), dec: getIdx(['dec'])
+        };
 
         for (let i = 1; i < lines.length; i++) {
           const vals = parseCSVRow(lines[i]);
+          if (vals.length < 3) continue;
 
-          const offset = hasCode ? 1 : 0;
-          if (vals.length >= 8 + offset) {
-            const providedId = vals[0]?.trim() || '';
-            const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(providedId);
-            const employeeCodeValue = hasCode ? vals[1]?.trim() : '';
-            const idToUse = (mode !== 'append' && isValidUUID) ? providedId : crypto.randomUUID();
+          const providedId = idxMap.id !== -1 ? (vals[idxMap.id]?.trim() || '') : '';
+          const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(providedId);
+          const idToUse = (mode !== 'append' && isValidUUID) ? providedId : generateId();
 
-            if (idToUse) csvProcessedIds.add(idToUse);
+          if (idToUse) csvProcessedIds.add(idToUse);
 
-            const parsedEmp: Employee = {
-              id: idToUse,
-              employeeCode: mode === 'append' ? '' : (employeeCodeValue || (isValidUUID ? '' : providedId)),
-              surname: vals[1 + offset],
-              firstname: vals[2 + offset],
-              department: vals[3 + offset] || 'Beneficiary',
-              staffType: 'NON-EMPLOYEE',
-              position: 'Stipend Beneficiary',
-              status: vals[4 + offset] as 'Active' | 'On Leave' | 'Terminated',
-              yearlyLeave: parseInt(vals[5 + offset]) || 0,
-              startDate: vals[6 + offset] || '',
-              endDate: (() => {
-                const sd = vals[6 + offset] || '';
-                const ed = vals[7 + offset] || '';
-                if (ed && sd && new Date(ed) < new Date(sd)) return '';
-                return ed;
-              })(),
-              bankName: vals[8 + offset] || '',
-              accountNo: stripExcelText(vals[9 + offset] || ''), // preserve leading zeros
-              taxId: '',
-              pensionNumber: '',
-              payeTax: false,
-              withholdingTax: vals[10 + offset]?.toLowerCase() === 'yes',
-              withholdingTaxRate: parseFloat(vals[11 + offset]) || 0.05,
-              excludeFromOnboarding: true,
-              rent: 0,
-              monthlySalaries: {
-                jan: parseFloat(vals[12 + offset]) || 0, feb: parseFloat(vals[13 + offset]) || 0, mar: parseFloat(vals[14 + offset]) || 0,
-                apr: parseFloat(vals[15 + offset]) || 0, may: parseFloat(vals[16 + offset]) || 0, jun: parseFloat(vals[17 + offset]) || 0,
-                jul: parseFloat(vals[18 + offset]) || 0, aug: parseFloat(vals[19 + offset]) || 0, sep: parseFloat(vals[20 + offset]) || 0,
-                oct: parseFloat(vals[21 + offset]) || 0, nov: parseFloat(vals[22 + offset]) || 0, dec: parseFloat(vals[23 + offset]) || 0
-              },
-              avatar: ''
-            };
-            const existing = employees.find(e => e.id === parsedEmp.id);
-            if (existing && mode !== 'append') {
-              updateEmployee(existing.id, parsedEmp);
-              updatedCount++;
-            } else {
-              addEmployee(parsedEmp);
-              importedCount++;
-            }
+          const rawStartDate = idxMap.startDate !== -1 ? (vals[idxMap.startDate] || '') : '';
+          const rawEndDate = idxMap.endDate !== -1 ? (vals[idxMap.endDate] || '') : '';
+          const normalizedStartDate = normalizeDate(rawStartDate);
+          const normalizedEndDate = normalizeDate(rawEndDate);
+
+          const val = (idx: number) => idx !== -1 ? (vals[idx] || '') : '';
+          const num = (idx: number) => idx !== -1 ? (parseFloat(vals[idx]) || 0) : 0;
+          const bool = (idx: number) => {
+            if (idx === -1) return false;
+            const str = (vals[idx] || '').trim().toLowerCase();
+            return ['true', 'yes', '1'].includes(str);
+          };
+
+          const parsedEmp: Employee = {
+            id: idToUse,
+            employeeCode: mode === 'append' ? "" : (val(idxMap.beneficiaryCode) || (isValidUUID ? "" : providedId)),
+            surname: val(idxMap.surname),
+            firstname: val(idxMap.firstname),
+            department: val(idxMap.department) || 'Beneficiary',
+            staffType: 'NON-EMPLOYEE',
+            position: 'Stipend Beneficiary',
+            status: (val(idxMap.status) || 'Active') as any,
+            yearlyLeave: parseInt(val(idxMap.yearlyLeave)) || 0,
+            startDate: normalizedStartDate,
+            endDate: (() => {
+              if (normalizedEndDate && normalizedStartDate) {
+                const sDate = new Date(normalizedStartDate);
+                const eDate = new Date(normalizedEndDate);
+                if (!isNaN(eDate.getTime()) && !isNaN(sDate.getTime()) && eDate < sDate) return '';
+              }
+              return normalizedEndDate;
+            })(),
+            bankName: val(idxMap.bankName),
+            accountNo: stripExcelText(val(idxMap.accountNo)),
+            taxId: '',
+            pensionNumber: '',
+            payeTax: false,
+            withholdingTax: bool(idxMap.withholdingTax),
+            withholdingTaxRate: idxMap.withholdingTaxRate !== -1 ? (parseFloat(vals[idxMap.withholdingTaxRate]) || 0.05) : 0.05,
+            excludeFromOnboarding: true,
+            rent: 0,
+            monthlySalaries: {
+              jan: num(idxMap.jan), feb: num(idxMap.feb), mar: num(idxMap.mar), apr: num(idxMap.apr),
+              may: num(idxMap.may), jun: num(idxMap.jun), jul: num(idxMap.jul), aug: num(idxMap.aug),
+              sep: num(idxMap.sep), oct: num(idxMap.oct), nov: num(idxMap.nov), dec: num(idxMap.dec)
+            },
+            avatar: ''
+          };
+          const existing = employees.find(e => e.id === parsedEmp.id);
+          if (existing && mode !== 'append') {
+            updateEmployee(existing.id, parsedEmp);
+            updatedCount++;
+          } else {
+            addEmployee(parsedEmp);
+            importedCount++;
           }
         }
 
@@ -505,8 +537,9 @@ export function Beneficiaries() {
         let message = `Import complete: ${importedCount} Added | ${updatedCount} Updated`;
         if (deletedCount > 0) message += ` | ${deletedCount} Removed`;
         toast.success(message);
-      } catch (err) {
-        toast.error('Failed to parse CSV file');
+      } catch (err: any) {
+        toast.error(`Failed to parse CSV file: ${err.message}`);
+        console.error('CSV Import Error:', err);
       }
     };
     reader.readAsText(file);
@@ -630,11 +663,11 @@ export function Beneficiaries() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Date</label>
-                  <Input type="date" value={formData.startDate || ''} onChange={e => setFormData({ ...formData, startDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
+                  <Input type="date" value={normalizeDate(formData.startDate)} onChange={e => setFormData({ ...formData, startDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">End Date</label>
-                  <Input type="date" value={formData.endDate || ''} onChange={e => setFormData({ ...formData, endDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
+                  <Input type="date" value={normalizeDate(formData.endDate)} onChange={e => setFormData({ ...formData, endDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
                 </div>
               </div>
             </CardContent>

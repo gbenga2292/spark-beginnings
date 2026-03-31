@@ -10,6 +10,8 @@ import {
 import { useUserStore, AppUser, UserPrivileges, FULL_ACCESS, NO_ACCESS, PrivilegePreset } from '@/src/store/userStore';
 import { useAppStore } from '@/src/store/appStore';
 import { supabase } from '@/src/integrations/supabase/client';
+import { generateId } from '@/src/lib/utils';
+import { generateId } from '@/src/lib/utils';
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    Privilege tree definition (mirrors sidebar structure)
@@ -285,7 +287,7 @@ export function UserForm() {
 
   const handleSavePreset = () => {
     if (!presetName.trim()) return;
-    addPreset({ id: crypto.randomUUID(), name: presetName.trim(), privileges: JSON.parse(JSON.stringify(privileges)) });
+    addPreset({ id: generateId(), name: presetName.trim(), privileges: JSON.parse(JSON.stringify(privileges)) });
     setPresetName(''); setShowPresetSave(false);
   };
 

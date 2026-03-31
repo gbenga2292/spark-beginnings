@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { generateId } from '@/src/lib/utils';
 import { useAppStore, VatPayment } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { Trash2, Edit, CheckCircle, Plus, X, Upload, Download } from 'lucide-react';
@@ -72,7 +73,7 @@ export function VatPayments() {
             updateVatPayment(selectedId, data);
             toast.success('VAT payment updated successfully!');
         } else {
-            addVatPayment({ ...data, id: crypto.randomUUID() });
+            addVatPayment({ ...data, id: generateId() });
             toast.success('VAT submitted successfully!');
         }
         setIsModalOpen(false);
@@ -146,7 +147,7 @@ export function VatPayments() {
                     if (vals.length >= 4) { // Minimum required columns
                         const providedId = vals[0]?.trim() || '';
                         const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(providedId);
-                        const idToUse = (mode !== 'append' && isValidUUID) ? providedId : crypto.randomUUID();
+                        const idToUse = (mode !== 'append' && isValidUUID) ? providedId : generateId();
                         
                         if (idToUse) csvProcessedIds.add(idToUse);
 

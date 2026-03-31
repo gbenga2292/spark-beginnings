@@ -685,10 +685,18 @@ export const db = {
     if (error) console.error('deleteSite:', error);
   },
   async setSites(sites: Site[]) {
-    await supabase.from('sites').delete().neq('id', '');
+    // nil UUID — valid UUID that no real row ever has; lets PostgREST delete all rows
+    const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+    const { error: delErr } = await supabase.from('sites').delete().neq('id', NIL_UUID);
+    if (delErr) console.error('setSites delete:', delErr);
+
     if (sites.length > 0) {
-      const { error } = await supabase.from('sites').insert(sites.map(siteToDb));
-      if (error) console.error('setSites:', error);
+      // Use upsert so any row that survived the delete gets overwritten
+      // instead of hitting the sites_name_client_unique constraint.
+      const { error } = await supabase
+        .from('sites')
+        .upsert(sites.map(siteToDb), { onConflict: 'id' });
+      if (error) console.error('setSites upsert:', error);
     }
   },
 
@@ -708,6 +716,17 @@ export const db = {
   async deletePendingSite(id: string) {
     const { error } = await supabase.from('pending_sites').delete().eq('id', id);
     if (error) console.error('deletePendingSite:', error);
+  },
+  async setPendingSites(sites: SiteQuestionnaire[]) {
+    const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+    const { error: delErr } = await supabase.from('pending_sites').delete().neq('id', NIL_UUID);
+    if (delErr) console.error('setPendingSites delete:', delErr);
+    if (sites.length > 0) {
+      const { error } = await supabase
+        .from('pending_sites')
+        .upsert(sites.map(pendingSiteToDb), { onConflict: 'id' });
+      if (error) console.error('setPendingSites upsert:', error);
+    }
   },
 
   // Clients
@@ -1352,14 +1371,16 @@ export const db = {
     if (error) console.error('deleteStaffMeritRecord:', error);
   },
   async setPositions(positions: Position[]) {
-    await supabase.from('positions').delete().neq('id', '');
+    const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+    await supabase.from('positions').delete().neq('id', NIL_UUID);
     if (positions.length > 0) {
       const { error } = await supabase.from('positions').insert(positions.map(p => ({ id: p.id, title: p.title, department_id: p.departmentId })));
       if (error) console.error('setPositions:', error);
     }
   },
   async setDepartments(departments: Department[]) {
-    await supabase.from('departments').delete().neq('id', '');
+    const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+    await supabase.from('departments').delete().neq('id', NIL_UUID);
     if (departments.length > 0) {
       const { error } = await supabase.from('departments').insert(departments.map(d => ({ 
         id: d.id, name: d.name, staff_type: d.staffType, 
@@ -1376,7 +1397,8 @@ export const db = {
     }
   },
   async setPublicHolidays(holidays: { id: string, date: string, name: string }[]) {
-    await supabase.from('public_holidays').delete().neq('id', '');
+    const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+    await supabase.from('public_holidays').delete().neq('id', NIL_UUID);
     if (holidays.length > 0) {
       const { error } = await supabase.from('public_holidays').insert(holidays.map(h => ({ id: h.id, date: h.date, name: h.name })));
       if (error) console.error('setPublicHolidays:', error);
@@ -1390,28 +1412,32 @@ export const db = {
     }
   },
   async setLedgerCategories(cats: LedgerCategory[]) {
-    await supabase.from('ledger_categories').delete().neq('id', '');
+    const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+    await supabase.from('ledger_categories').delete().neq('id', NIL_UUID);
     if (cats.length > 0) {
       const { error } = await supabase.from('ledger_categories').insert(cats.map(c => ({ id: c.id, name: c.name })));
       if (error) console.error('setLedgerCategories:', error);
     }
   },
   async setLedgerVendors(vendors: LedgerVendor[]) {
-    await supabase.from('ledger_vendors').delete().neq('id', '');
+    const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+    await supabase.from('ledger_vendors').delete().neq('id', NIL_UUID);
     if (vendors.length > 0) {
       const { error } = await supabase.from('ledger_vendors').insert(vendors.map(v => ({ id: v.id, name: v.name, tin_number: v.tinNumber })));
       if (error) console.error('setLedgerVendors:', error);
     }
   },
   async setLedgerBanks(banks: LedgerBank[]) {
-    await supabase.from('ledger_banks').delete().neq('id', '');
+    const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+    await supabase.from('ledger_banks').delete().neq('id', NIL_UUID);
     if (banks.length > 0) {
       const { error } = await supabase.from('ledger_banks').insert(banks.map(b => ({ id: b.id, name: b.name })));
       if (error) console.error('setLedgerBanks:', error);
     }
   },
   async setLedgerBeneficiaryBanks(banks: LedgerBeneficiaryBank[]) {
-    await supabase.from('ledger_beneficiary_banks').delete().neq('id', '');
+    const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+    await supabase.from('ledger_beneficiary_banks').delete().neq('id', NIL_UUID);
     if (banks.length > 0) {
       const { error } = await supabase.from('ledger_beneficiary_banks').insert(banks.map(b => ({ id: b.id, name: b.name, account_no: b.accountNo })));
       if (error) console.error('setLedgerBeneficiaryBank:', error);

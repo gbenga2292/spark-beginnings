@@ -11,6 +11,7 @@ import { toast, showConfirm } from '@/src/components/ui/toast';
 import * as XLSX from 'xlsx';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { generateId } from '@/src/lib/utils';
 
 import { getPositionIndex } from '@/src/lib/hierarchy';
 
@@ -410,7 +411,7 @@ export function Attendance() {
       const day2 = (raw.day === 'Yes' ? 1 : 0) + (raw.night === 'Yes' ? 1 : 0);
 
       return {
-        id: crypto.randomUUID(),
+        id: generateId(),
         date: registerDate,
         staffId: raw.empId,
         staffName: raw.staffName,

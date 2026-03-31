@@ -3,7 +3,7 @@ import { useAppStore } from '@/src/store/appStore';
 import type { CommLog } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { useTheme } from '@/src/hooks/useTheme';
-import { cn } from '@/src/lib/utils';
+import { cn, generateId } from '@/src/lib/utils';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { format, isAfter, isBefore, parseISO, startOfDay } from 'date-fns';
 import {
@@ -1092,7 +1092,7 @@ export function CommLog() {
       setEditingId(null);
     } else {
       addCommLog({
-        id: crypto.randomUUID(),
+        id: generateId(),
         date: form.date,
         time: form.time || undefined,
         direction: form.direction,

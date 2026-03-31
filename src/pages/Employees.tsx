@@ -17,6 +17,7 @@ import { useAppData } from '@/src/contexts/AppDataContext';
 import { Checkbox } from '@/src/components/ui/checkbox';
 import { normalizeDate, formatDisplayDate } from '@/src/lib/dateUtils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { generateId } from '@/src/lib/utils';
 
 import { getPositionIndex } from '@/src/lib/hierarchy';
 
@@ -183,7 +184,7 @@ export function Employees() {
 
     const newEmployee: Employee = {
       ...(formData as Employee),
-      id: crypto.randomUUID(),
+      id: generateId(),
       employeeCode,
       status: finalStatus,
       monthlySalaries: formData.monthlySalaries || {
@@ -369,11 +370,7 @@ export function Employees() {
 
   const handleExportCSV = () => {
     try {
-      if (employees.length === 0) {
-        toast.info('No employees to export');
-        return;
-      }
-      const headers = ['id', 'employeeCode', 'surname', 'firstname', 'department', 'staffType', 'level', 'position', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'taxId', 'pensionNumber', 'lashmaPolicyNumber', 'lashmaRegistrationDate', 'lashmaExpiryDate', 'payeTax', 'withholdingTax', 'excludeFromOnboarding', 'rent', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      let headers: string[] = ['id', 'employeeCode', 'surname', 'firstname', 'department', 'staffType', 'level', 'position', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'taxId', 'pensionNumber', 'lashmaPolicyNumber', 'lashmaRegistrationDate', 'lashmaExpiryDate', 'payeTax', 'withholdingTax', 'excludeFromOnboarding', 'rent', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
       // Standard CSV cell wrapper
       const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
       // Text-force wrapper: properly CSV-encodes the Excel ="value" formula
@@ -490,7 +487,6 @@ export function Employees() {
         if (lines.length < 2) {
           toast.error('Invalid or empty CSV file'); return;
         }
-
         let importedCount = 0;
         let updatedCount = 0;
         let deletedCount = 0;
@@ -498,80 +494,119 @@ export function Employees() {
         const newPositions = new Set<string>();
         const csvProcessedIds = new Set<string>();
 
-        // Check if the current CSV has employeeCode as header index 1
         const headerRow = parseCSVRow(lines[0]);
-        const hasEmployeeCode = headerRow[1]?.toLowerCase() === 'employeecode';
+        
+        // Helper to find index by multiple common names (case-insensitive)
+        const getIdx = (candidates: string[]) => {
+          for (const cand of candidates) {
+            const idx = headerRow.findIndex(h => h.toLowerCase() === cand.toLowerCase());
+            if (idx !== -1) return idx;
+          }
+          return -1;
+        };
+
+        const idxMap = {
+          id: getIdx(['id']),
+          employeeCode: getIdx(['employeeCode', 'staffCode', 'code']),
+          surname: getIdx(['surname', 'last name']),
+          firstname: getIdx(['firstname', 'first name']),
+          department: getIdx(['department', 'dept']),
+          staffType: getIdx(['staffType', 'staff_type', 'type']),
+          level: getIdx(['level']),
+          position: getIdx(['position', 'title']),
+          status: getIdx(['status']),
+          yearlyLeave: getIdx(['yearlyLeave', 'yearly_leave', 'leave']),
+          startDate: getIdx(['startDate', 'start_date', 'joined']),
+          endDate: getIdx(['endDate', 'end_date', 'terminated']),
+          bankName: getIdx(['bankName', 'bank']),
+          accountNo: getIdx(['accountNo', 'account']),
+          taxId: getIdx(['taxId', 'tax_id', 'tin']),
+          pensionNumber: getIdx(['pensionNumber', 'pension']),
+          lashmaPolicyNumber: getIdx(['lashmaPolicyNumber', 'lashma_policy']),
+          lashmaRegistrationDate: getIdx(['lashmaRegistrationDate', 'lashma_reg_date']),
+          lashmaExpiryDate: getIdx(['lashmaExpiryDate', 'lashma_expiry']),
+          payeTax: getIdx(['payeTax', 'paye_tax', 'paye']),
+          withholdingTax: getIdx(['withholdingTax', 'with_tax', 'wht']),
+          excludeFromOnboarding: getIdx(['excludeFromOnboarding', 'exclude_from_onboarding']),
+          rent: getIdx(['rent']),
+          jan: getIdx(['jan']), feb: getIdx(['feb']), mar: getIdx(['mar']), apr: getIdx(['apr']),
+          may: getIdx(['may']), jun: getIdx(['jun']), jul: getIdx(['jul']), aug: getIdx(['aug']),
+          sep: getIdx(['sep']), oct: getIdx(['oct']), nov: getIdx(['nov']), dec: getIdx(['dec'])
+        };
 
         for (let i = 1; i < lines.length; i++) {
           const vals = parseCSVRow(lines[i]);
+          if (vals.length < 3) continue; // Skip Malformed rows
           
-          // Adjust index offsets dynamically depending on whether employeeCode existed in the file
-          const offset = hasEmployeeCode ? 1 : 0;
-          if (vals.length >= 17 + offset) {
-            const importedDept = vals[3 + offset]?.trim();
-            const importedPosition = vals[5 + offset]?.trim();
-            
-            if (importedDept && !departments.some(d => d.name === importedDept)) newDepartments.add(importedDept);
-            if (importedPosition && !positions.some(p => p.title === importedPosition)) newPositions.add(importedPosition);
+          const importedDept = idxMap.department !== -1 ? vals[idxMap.department]?.trim() : '';
+          const importedPosition = idxMap.position !== -1 ? vals[idxMap.position]?.trim() : '';
+          
+          if (importedDept && !departments.some(d => d.name === importedDept)) newDepartments.add(importedDept);
+          if (importedPosition && !positions.some(p => p.title === importedPosition)) newPositions.add(importedPosition);
 
-            const providedId = vals[0]?.trim() || '';
-            const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(providedId);
-            
-            // Adjust index offsets dynamically depending on whether level column exists
-            const hasLevel = headerRow.includes('level');
-            const levelIdx = headerRow.indexOf('level');
-            
-            const employeeCodeValue = hasEmployeeCode ? vals[1]?.trim() : '';
-            // Only preserve original ID if we aren't appending everything as new
-            const idToUse = (mode !== 'append' && isValidUUID) ? providedId : crypto.randomUUID();
-            
-            if (idToUse) csvProcessedIds.add(idToUse); // Track for 'replace' mode
+          const providedId = idxMap.id !== -1 ? (vals[idxMap.id]?.trim() || '') : '';
+          const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(providedId);
+          
+          const idToUse = (mode !== 'append' && isValidUUID) ? providedId : generateId();
+          if (idToUse) csvProcessedIds.add(idToUse);
 
-            const parsedEmp: Employee = {
-              id: idToUse,
-              employeeCode: mode === 'append' ? "" : (employeeCodeValue || (isValidUUID ? "" : providedId)),
-              surname: vals[1 + offset], 
-              firstname: vals[2 + offset], 
-              department: vals[3 + offset], 
-              staffType: vals[4 + offset] as any,
-              level: hasLevel ? (parseInt(vals[levelIdx]) || 10) : 10,
-              position: vals[6 + offset], 
-              status: vals[7 + offset] as any, 
-              yearlyLeave: parseInt(vals[8 + offset]) || 0,
-              startDate: vals[9 + offset] || '', 
-              endDate: (() => {
-                const sd = vals[9 + offset] || '';
-                const ed = vals[10 + offset] || '';
-                // Never allow endDate to precede startDate; blank it out if so
-                if (ed && sd && new Date(ed) < new Date(sd)) return '';
-                return ed;
-              })(),
-              bankName: vals[11 + offset] || '',
-              accountNo: stripExcelText(vals[12 + offset] || ''),         // preserve leading zeros
-              taxId: stripExcelText(vals[13 + offset] || ''),             // preserve leading zeros
-              pensionNumber: stripExcelText(vals[14 + offset] || ''),     // preserve leading zeros
-              lashmaPolicyNumber: stripExcelText(vals[15 + offset] || ''), // preserve leading zeros
-              lashmaRegistrationDate: vals[16 + offset] || '',
-              lashmaExpiryDate: vals[17 + offset] || '',
-              payeTax: ['true', 'yes', '1'].includes(vals[18 + offset]?.trim().toLowerCase() || ''),
-              withholdingTax: ['true', 'yes', '1'].includes(vals[19 + offset]?.trim().toLowerCase() || ''),
-              excludeFromOnboarding: ['true', 'yes', '1'].includes(vals[20 + offset]?.trim().toLowerCase() || ''),
-              rent: parseFloat(vals[21 + offset]) || 0,
-              monthlySalaries: {
-                jan: parseFloat(vals[22 + offset]) || 0, feb: parseFloat(vals[23 + offset]) || 0, mar: parseFloat(vals[24 + offset]) || 0,
-                apr: parseFloat(vals[25 + offset]) || 0, may: parseFloat(vals[26 + offset]) || 0, jun: parseFloat(vals[27 + offset]) || 0,
-                jul: parseFloat(vals[28 + offset]) || 0, aug: parseFloat(vals[29 + offset]) || 0, sep: parseFloat(vals[30 + offset]) || 0,
-                oct: parseFloat(vals[31 + offset]) || 0, nov: parseFloat(vals[32 + offset]) || 0, dec: parseFloat(vals[33 + offset]) || 0
+          const rawStartDate = idxMap.startDate !== -1 ? (vals[idxMap.startDate] || '') : '';
+          const rawEndDate = idxMap.endDate !== -1 ? (vals[idxMap.endDate] || '') : '';
+          const normalizedStartDate = normalizeDate(rawStartDate);
+          const normalizedEndDate = normalizeDate(rawEndDate);
+
+          const val = (idx: number) => idx !== -1 ? (vals[idx] || '') : '';
+          const num = (idx: number) => idx !== -1 ? (parseFloat(vals[idx]) || 0) : 0;
+          const bool = (idx: number) => {
+            if (idx === -1) return false;
+            const str = (vals[idx] || '').trim().toLowerCase();
+            return ['true', 'yes', '1'].includes(str);
+          };
+
+          const parsedEmp: Employee = {
+            id: idToUse,
+            employeeCode: mode === 'append' ? "" : (val(idxMap.employeeCode) || (isValidUUID ? "" : providedId)),
+            surname: val(idxMap.surname), 
+            firstname: val(idxMap.firstname), 
+            department: val(idxMap.department) || 'Unassigned', 
+            staffType: (val(idxMap.staffType) || 'FIELD') as any,
+            level: idxMap.level !== -1 ? (parseInt(vals[idxMap.level]) || 10) : 10,
+            position: val(idxMap.position), 
+            status: (val(idxMap.status) || 'Active') as any, 
+            yearlyLeave: parseInt(val(idxMap.yearlyLeave)) || 0,
+            startDate: normalizedStartDate, 
+            endDate: (() => {
+              if (normalizedEndDate && normalizedStartDate) {
+                const sDate = new Date(normalizedStartDate);
+                const eDate = new Date(normalizedEndDate);
+                if (!isNaN(eDate.getTime()) && !isNaN(sDate.getTime()) && eDate < sDate) return '';
               }
-            };
-            const existing = employees.find(e => e.id === parsedEmp.id);
-            if (existing && mode !== 'append') { 
-              updateEmployee(existing.id, parsedEmp); 
-              updatedCount++; 
-            } else { 
-              addEmployee(parsedEmp); 
-              importedCount++; 
+              return normalizedEndDate;
+            })(),
+            bankName: val(idxMap.bankName),
+            accountNo: stripExcelText(val(idxMap.accountNo)),
+            taxId: stripExcelText(val(idxMap.taxId)),
+            pensionNumber: stripExcelText(val(idxMap.pensionNumber)),
+            lashmaPolicyNumber: stripExcelText(val(idxMap.lashmaPolicyNumber)),
+            lashmaRegistrationDate: normalizeDate(val(idxMap.lashmaRegistrationDate)),
+            lashmaExpiryDate: normalizeDate(val(idxMap.lashmaExpiryDate)),
+            payeTax: bool(idxMap.payeTax),
+            withholdingTax: bool(idxMap.withholdingTax),
+            excludeFromOnboarding: bool(idxMap.excludeFromOnboarding),
+            rent: num(idxMap.rent),
+            monthlySalaries: {
+              jan: num(idxMap.jan), feb: num(idxMap.feb), mar: num(idxMap.mar), apr: num(idxMap.apr),
+              may: num(idxMap.may), jun: num(idxMap.jun), jul: num(idxMap.jul), aug: num(idxMap.aug),
+              sep: num(idxMap.sep), oct: num(idxMap.oct), nov: num(idxMap.nov), dec: num(idxMap.dec)
             }
+          };
+          const existing = employees.find(e => e.id === parsedEmp.id);
+          if (existing && mode !== 'append') { 
+            updateEmployee(existing.id, parsedEmp); 
+            updatedCount++; 
+          } else { 
+            addEmployee(parsedEmp); 
+            importedCount++; 
           }
         }
 
@@ -589,11 +624,11 @@ export function Employees() {
         let addedDeptCount = 0;
         let addedPosCount = 0;
         newDepartments.forEach(dept => {
-          addDepartment({ id: crypto.randomUUID(), name: dept, staffType: 'OFFICE', workDaysPerWeek: 5 });
+          addDepartment({ id: generateId(), name: dept, staffType: 'OFFICE', workDaysPerWeek: 5 });
           addedDeptCount++;
         });
         newPositions.forEach(pos => {
-          addPosition({ id: crypto.randomUUID(), title: pos, departmentId: '' });
+          addPosition({ id: generateId(), title: pos, departmentId: '' });
           addedPosCount++;
         });
 
@@ -603,8 +638,9 @@ export function Employees() {
           message += `. ${addedDeptCount} new department(s) and ${addedPosCount} new position(s) added to Variables.`;
         }
         toast.success(message);
-      } catch (err) {
-        toast.error('Failed to parse CSV file');
+      } catch (err: any) {
+        toast.error(`Failed to parse CSV file: ${err.message}`);
+        console.error('CSV Import Error:', err);
       }
     };
     reader.readAsText(file);
@@ -1677,7 +1713,7 @@ export function Employees() {
             <Button onClick={() => {
               if (!performanceRecord.description) return toast.error('Add description');
               const rec: DisciplinaryRecord = {
-                id: crypto.randomUUID(),
+                id: generateId(),
                 employeeId: emp.id,
                 date: performanceRecord.date || new Date().toISOString().split('T')[0],
                 type: performanceRecord.type || 'Behavioral',

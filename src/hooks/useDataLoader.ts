@@ -4,6 +4,7 @@ import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
 import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite } from '@/src/lib/supabaseService';
+import { generateId } from '@/src/lib/utils';
 
 /** Fills in any missing privilege sections using NO_ACCESS defaults. */
 function backfillPrivileges(
@@ -59,7 +60,7 @@ export function useDataLoader(isAuthenticated: boolean) {
           (s: any) => s.name.toLowerCase().trim() === 'office' && s.client.toLowerCase().trim() === 'dcel'
         );
         if (!hasDcelOffice) {
-          const officeSite = { id: crypto.randomUUID(), name: 'Office', client: 'DCEL', status: 'Active' as const, vat: 'No' as const };
+          const officeSite = { id: generateId(), name: 'Office', client: 'DCEL', status: 'Active' as const, vat: 'No' as const };
           appData.sites.push(officeSite);
           db.insertSite(officeSite);
         }

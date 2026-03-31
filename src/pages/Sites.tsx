@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { generateId } from '@/src/lib/utils';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -322,7 +323,7 @@ export function Sites() {
     if (addForm.endDate && nowStr > addForm.endDate) calcStatus = 'Inactive';
 
     addSite({
-      id: crypto.randomUUID(),
+      id: generateId(),
       name: addForm.name.trim(),
       client: addForm.client.trim(),
       vat: addForm.vat,
@@ -454,7 +455,7 @@ export function Sites() {
     reader.onload = (evt) => {
       try {
         const bstr = evt.target?.result as string;
-        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true });
+        const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json<Site>(ws);
@@ -481,16 +482,18 @@ export function Sites() {
             }
 
             const pairKey = `${client.toLowerCase()}::${name.toLowerCase()}`;
+            // Check against existing store data (Append mode) OR within-file duplicates
             const isDupWithStore = !isClear ? isDuplicate(name, client) : false;
+            const isDupInBatch = importedPairs.has(pairKey);
 
-            if (isDupWithStore || importedPairs.has(pairKey)) {
+            if (isDupWithStore || isDupInBatch) {
               skippedCount++;
               return;
             }
 
-            let newId = importedSite.id ? importedSite.id.toString().trim() : crypto.randomUUID();
+            let newId = importedSite.id ? importedSite.id.toString().trim() : generateId();
             if (importedIds.has(newId) || sites.some(s => s.id === newId)) {
-              newId = crypto.randomUUID();
+              newId = generateId();
             }
 
             importedPairs.add(pairKey);
@@ -524,7 +527,7 @@ export function Sites() {
             if (!diesel) missingInfo.push("Expected Daily Diesel Usage");
             
             validNewPendingSites.push({
-               id: crypto.randomUUID(),
+               id: generateId(),
                siteId: isPendingOnly ? '' : newId,
                clientName: client,
                siteName: name,

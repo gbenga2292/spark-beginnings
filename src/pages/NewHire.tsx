@@ -1,4 +1,5 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { generateId } from '@/src/lib/utils';
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -125,7 +126,7 @@ export function NewHire() {
     const guarantorSlots = Array.from({ length: noOfGuarantors }, () => ({ name: '', phone: '', verified: false }));
 
     const finalEmployee: Employee = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       employeeCode: `EMP-${Date.now().toString().slice(-6)}`,
       surname: (newHireData.surname as string).toUpperCase(),
       firstname: (newHireData.firstname as string).toUpperCase(),
@@ -187,6 +188,9 @@ export function NewHire() {
         ppeIssued: false,
         handbookProvided: false,
         otherRequirementsSupplied: false,
+        // 8. LASHMA
+        lashmaPolicyNumber: '',
+        lashmaVerified: false,
       },
     };
 
@@ -351,4 +355,3 @@ export function NewHire() {
     </div>
   );
 }
-

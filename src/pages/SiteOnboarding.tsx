@@ -10,6 +10,7 @@ import { Save, ArrowLeft, CheckCircle2, Building2, MapPin, Calendar, User, Layou
 import { CreateProjectDialog } from '@/src/components/tasks/CreateProjectDialog';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
+import { generateId } from '@/src/lib/utils';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -177,7 +178,7 @@ export function SiteOnboarding() {
       if (linked) {
         const newActive = {
           ...blankForm(),
-          id: crypto.randomUUID(),
+          id: generateId(),
           siteName: linked.name,
           clientName: linked.client,
           status: 'Active' as const,
@@ -186,7 +187,7 @@ export function SiteOnboarding() {
         setForm(newActive);
         setInitialForm(newActive);
       } else {
-        const blank = { ...blankForm(), id: crypto.randomUUID() };
+        const blank = { ...blankForm(), id: generateId() };
         setForm(blank);
         setInitialForm(blank);
       }
@@ -259,7 +260,7 @@ export function SiteOnboarding() {
     if (!canActivate) return;
     if (!clients.includes(form.clientName)) addClient(form.clientName);
     addSite({
-      id: crypto.randomUUID(),
+      id: generateId(),
       name: form.siteName,
       client: form.clientName,
       status: 'Active',

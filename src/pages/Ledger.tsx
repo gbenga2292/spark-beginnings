@@ -5,14 +5,14 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { TabsContent } from '@/src/components/ui/tabs';
-import { Search, Download, Upload, FileText, ChevronLeft, ChevronRight, X, Eye, BookOpen } from 'lucide-react';
+import { Search, Download, Upload, FileText, ChevronLeft, ChevronRight, X, Eye, BookOpen, RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History } from 'lucide-react';
 import { useAppStore, LedgerEntry } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { usePriv } from '@/src/hooks/usePriv';
 import * as XLSX from 'xlsx';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
-import { RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History } from 'lucide-react';
+import { generateId } from '@/src/lib/utils';
 
 type EntryItem = {
   id?: string;
@@ -294,7 +294,7 @@ export function Ledger() {
         : voucherDate || new Date().toISOString().split('T')[0];
       
       const payload: LedgerEntry = {
-        id: item.id || crypto.randomUUID(),
+        id: item.id || generateId(),
         voucherNo: targetVoucherNo,
         date: entryDate,
         description: item.description,
@@ -478,26 +478,26 @@ export function Ledger() {
 
           const catKey = String(category).toLowerCase();
           if (!existingCats.has(catKey)) {
-            addLedgerCategory({ id: crypto.randomUUID(), name: String(category) });
+            addLedgerCategory({ id: generateId(), name: String(category) });
             existingCats.add(catKey);
           }
           
           const bankKey = String(bank).toLowerCase();
           if (!existingBanks.has(bankKey)) {
-            addLedgerBank({ id: crypto.randomUUID(), name: String(bank) });
+            addLedgerBank({ id: generateId(), name: String(bank) });
             existingBanks.add(bankKey);
           }
           
           if (vendor && String(vendor).toLowerCase() !== 'none') {
             const vendorKey = String(vendor).toLowerCase();
             if (!existingVendors.has(vendorKey)) {
-              addLedgerVendor({ id: crypto.randomUUID(), name: String(vendor) });
+              addLedgerVendor({ id: generateId(), name: String(vendor) });
               existingVendors.add(vendorKey);
             }
           }
 
           addLedgerEntry({
-            id: crypto.randomUUID(),
+            id: generateId(),
             voucherNo: String(voucherNo),
             date: String(date),
             description: String(description),

@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { generateId } from '@/src/lib/utils';
 
 export function Payments() {
     const sites = useAppStore((state) => state.sites);
@@ -108,7 +109,7 @@ export function Payments() {
             updatePayment(selectedId, data);
             toast.success('Payment updated successfully!');
         } else {
-            addPayment({ ...data, id: crypto.randomUUID() });
+            addPayment({ ...data, id: generateId() });
             toast.success('Payment submitted successfully!');
         }
         setIsModalOpen(false);
@@ -184,7 +185,7 @@ export function Payments() {
                     if (vals.length >= 8) { // Minimum required columns
                         const providedId = vals[0]?.trim() || '';
                         const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(providedId);
-                        const idToUse = (mode !== 'append' && isValidUUID) ? providedId : crypto.randomUUID();
+                        const idToUse = (mode !== 'append' && isValidUUID) ? providedId : generateId();
                         
                         if (idToUse) csvProcessedIds.add(idToUse);
 
