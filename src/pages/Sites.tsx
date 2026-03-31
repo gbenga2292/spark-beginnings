@@ -12,6 +12,13 @@ import { useAppStore, Site } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/src/components/ui/dropdown-menu';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { useUserStore } from '@/src/store/userStore';
@@ -282,9 +289,6 @@ export function Sites() {
 
   const [sortField, setSortField] = useState<'client' | 'name' | 'startDate' | 'endDate' | 'status'>('client');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const closeMenu = () => setOpenMenuId(null);
-  const toggleMenu = (id: string) => setOpenMenuId(prev => prev === id ? null : id);
 
   const filteredSites = useMemo(() => {
     return sites.filter(site => {
@@ -899,64 +903,62 @@ export function Sites() {
                             </Button>
                           </div>
                         ) : (
-                          <div className="relative flex justify-end">
-                            <Button
-                              variant="ghost" size="sm"
-                              className="text-slate-400 hover:text-slate-700 h-8 w-8 p-0"
-                              onClick={() => toggleMenu(site.id)}
-                              title="Actions"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                            {openMenuId === site.id && (
-                              <>
-                                {/* Backdrop */}
-                                <div className="fixed inset-0 z-20" onClick={closeMenu} />
-                                {/* Dropdown */}
-                                <div className="absolute right-0 top-8 z-30 min-w-[150px] rounded-lg border border-slate-200 bg-white shadow-lg py-1">
-                                  {/* Info Summary — always visible */}
-                                  <button
-                                    onClick={() => { closeMenu(); setNarrativeSite({ site, q: pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client) || null }); }}
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                          <div className="flex justify-end">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost" size="sm"
+                                  className="text-slate-400 hover:text-slate-700 h-8 w-8 p-0"
+                                  title="Actions"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-[180px]">
+                                <DropdownMenuItem 
+                                  onClick={() => setNarrativeSite({ site, q: pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client) || null })}
+                                  className="gap-2"
+                                >
+                                  <FileText className="h-4 w-4 text-slate-400" />
+                                  <span>Site Summary</span>
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuItem 
+                                  onClick={() => {
+                                    const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
+                                    if (linkedQ) navigate(`/sites/onboarding/${linkedQ.id}`);
+                                    else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
+                                  }}
+                                  className="gap-2"
+                                >
+                                  <Eye className="h-4 w-4 text-slate-400" />
+                                  <span>View Onboarding</span>
+                                </DropdownMenuItem>
+
+                                {canEditSite && (
+                                  <DropdownMenuItem 
+                                    onClick={() => handleEditStart(site)}
+                                    className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50"
                                   >
-                                    <FileText className="h-4 w-4 text-slate-400" /> Site Summary
-                                  </button>
-                                  {/* Onboarding — always visible */}
-                                  <button
-                                    onClick={() => {
-                                      closeMenu();
-                                      const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
-                                      if (linkedQ) navigate(`/sites/onboarding/${linkedQ.id}`);
-                                      else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
-                                    }}
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                  >
-                                    <Eye className="h-4 w-4 text-slate-400" /> View Onboarding
-                                  </button>
-                                  {/* Edit */}
-                                  {canEditSite && (
-                                    <button
-                                      onClick={() => { closeMenu(); handleEditStart(site); }}
-                                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-indigo-700 hover:bg-indigo-50"
+                                    <Pencil className="h-4 w-4" />
+                                    <span>Edit Site</span>
+                                  </DropdownMenuItem>
+                                )}
+
+                                {canDeleteSite && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem 
+                                      onClick={() => handleDelete(site.id)}
+                                      className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50"
                                     >
-                                      <Pencil className="h-4 w-4" /> Edit Site
-                                    </button>
-                                  )}
-                                  {/* Delete */}
-                                  {canDeleteSite && (
-                                    <>
-                                      <div className="my-1 border-t border-slate-100" />
-                                      <button
-                                        onClick={() => { closeMenu(); handleDelete(site.id); }}
-                                        className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                                      >
-                                        <Trash2 className="h-4 w-4" /> Delete
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              </>
-                            )}
+                                      <Trash2 className="h-4 w-4" />
+                                      <span>Delete</span>
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         )}
                       </TableCell>
