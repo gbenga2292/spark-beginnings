@@ -37,6 +37,19 @@ interface AppDataContextType {
 
 export const TaskContext = createContext<AppDataContextType | null>(null);
 
+function showNativeNotification(title: string, body?: string) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+        new Notification(title, { body });
+    } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                new Notification(title, { body });
+            }
+        });
+    }
+}
+
 export function deriveMainTaskStatus(mainTaskId: string, subtasks: any[]): 'not_started'|'in_progress'|'completed' {
     const subs = subtasks.filter(s => s.main_task_id === mainTaskId || s.mainTaskId === mainTaskId);
     if (!subs.length) return 'not_started';
@@ -163,12 +176,23 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
             // subtasks
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'subtasks' }, (payload) => {
+                const assignedUserId = payload.new.assignedTo || payload.new.assigned_to;
+                if (assignedUserId === user?.id && payload.new.created_by !== user?.id) {
+                    toast.info(`You have been assigned a new task: ${payload.new.title}`);
+                    showNativeNotification("Task Assigned", `You have been assigned a new task: ${payload.new.title}`);
+                }
                 setSubtasks(prev => {
                     if (prev.some(s => s.id === payload.new.id)) return prev;
                     return [...prev, payload.new];
                 });
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'subtasks' }, (payload) => {
+                const oldAssigned = payload.old?.assignedTo || payload.old?.assigned_to;
+                const newAssigned = payload.new.assignedTo || payload.new.assigned_to;
+                if (newAssigned === user?.id && oldAssigned !== user?.id) {
+                    toast.info(`You have been assigned to task: ${payload.new.title}`);
+                    showNativeNotification("Task Assigned", `You have been assigned to task: ${payload.new.title}`);
+                }
                 setSubtasks(prev => prev.map(s => s.id === payload.new.id ? payload.new : s));
             })
             .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'subtasks' }, (payload) => {
@@ -197,7 +221,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     if (prev.some(r => r.id === camel.id)) return prev;
                     
                     if (camel.recipientIds && camel.recipientIds.includes(user?.id)) {
-                        toast.info(`Notification: ${camel.title}`);
+                        toast.info(`Reminder: ${camel.title}`);
+                        showNativeNotification("Reminder", camel.title);
                     }
                     
                     return [...prev, camel];
@@ -337,7 +362,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             toast.error('Failed to assign subtask.');
             return;
         }
-        if (data) setSubtasks(prev => prev.map(s => s.id === id ? data : s));
+        if (data) {
+             setSubtasks(prev => prev.map(s => s.id === id ? data : s));
+             supabase.functions.invoke('send-email-reminder', { body: data }).catch(console.error);
+        }
     }, []);
 
     const updateSubtaskStatus = useCallback(async (id: string, status: string, _userId?: string) => {
@@ -606,7 +634,12 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             toast.error('Failed to add reminder.');
             return;
         }
-        if (data) setReminders(prev => [...prev, mapReminderToCamel(data)]);
+        if (data) {
+            setReminders(prev => [...prev, mapReminderToCamel(data)]);
+            if (data.send_email) {
+                supabase.functions.invoke('send-email-reminder', { body: data }).catch(console.error);
+            }
+        }
     }, [user?.id]);
 
     const updateReminder = useCallback(async (id: string, p: any) => {

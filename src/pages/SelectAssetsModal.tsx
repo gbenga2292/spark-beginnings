@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useOperations } from '../../contexts/OperationsContext';
+import { useOperations } from '../contexts/OperationsContext';
 import { X, Search, Activity, Truck, Check } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/src/components/ui/dialog';
 import { Input } from '@/src/components/ui/input';

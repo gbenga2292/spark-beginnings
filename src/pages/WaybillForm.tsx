@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
-import { WaybillType } from '../types';
+import { WaybillType } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/src/components/ui/dialog';

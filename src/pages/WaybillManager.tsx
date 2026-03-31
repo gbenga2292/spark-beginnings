@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
-import { Waybill, WaybillStatus } from '../types';
+import { Waybill, WaybillStatus } from '../types/operations';
 import { WaybillDetailView } from './WaybillDetailView';
 
 import { Card } from '@/src/components/ui/card';

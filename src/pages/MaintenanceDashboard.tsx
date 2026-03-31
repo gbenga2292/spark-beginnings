@@ -1,5 +1,5 @@
 import React from 'react';
-import { useOperations } from '../../contexts/OperationsContext';
+import { useOperations } from '../contexts/OperationsContext';
 import { BarChart3, Clock, AlertCircle, CheckCircle2, Info } from 'lucide-react';
 import { Card, CardContent } from '@/src/components/ui/card';
 import { cn } from '@/src/lib/utils';

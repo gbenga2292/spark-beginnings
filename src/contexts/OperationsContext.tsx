@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { 
   Asset, Waybill, AssetCategory, AssetType, AssetStatus, WaybillStatus, WaybillType, 
   Checkout, MaintenanceAsset, MaintenanceSession, MaintenanceLogType, ServiceStatus 
-} from '../types';
+} from '../types/operations';
 
 interface OperationsContextType {
   assets: Asset[];

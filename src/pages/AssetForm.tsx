@@ -3,7 +3,7 @@ import { useOperations } from '../contexts/OperationsContext';
 import { X, Package, Save, ChevronDown, Lightbulb, Cpu } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
-import { Asset, AssetCategory, AssetType } from '../types';
+import { Asset, AssetCategory, AssetType } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/src/components/ui/dialog';

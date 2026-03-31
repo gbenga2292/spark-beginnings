@@ -1,6 +1,6 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import React, { useState } from 'react';
-import { useOperations } from '../../contexts/OperationsContext';
+import { useOperations } from '../contexts/OperationsContext';
 import { Search, CheckCircle2, Clock, AlertCircle, Eye, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/src/components/ui/card';
 import { Input } from '@/src/components/ui/input';

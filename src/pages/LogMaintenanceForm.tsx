@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { useOperations } from '../../contexts/OperationsContext';
+import { useOperations } from '../contexts/OperationsContext';
 import { Calendar, Plus, PlusCircle, Activity, Truck, CheckCircle2, XCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { toast } from '@/src/components/ui/toast';
 import { SelectAssetsModal } from './SelectAssetsModal';
-import { MaintenanceLogType } from '../../types';
+import { MaintenanceLogType } from '../../types/operations';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 

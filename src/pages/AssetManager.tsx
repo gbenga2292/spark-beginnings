@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
-import { Asset, AssetType, AssetCategory, AssetCondition } from '../types';
+import { Asset, AssetType, AssetCategory, AssetCondition } from '../types/operations';
 import { AssetForm } from './AssetForm';
 import { RestockModal } from './RestockModal';
 

@@ -14,7 +14,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
 import { toast } from '@/src/components/ui/toast';
-import { Checkout } from '../types';
+import { Checkout } from '../types/operations';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 export function QuickCheckout() {

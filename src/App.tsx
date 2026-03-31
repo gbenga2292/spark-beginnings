@@ -52,14 +52,14 @@ const TaskReminders = lazy(() => import('./pages/TaskReminders'));
 const Tasks = lazy(() => import('./pages/Tasks'));
 const TaskReports = lazy(() => import('./pages/TaskReports'));
 const CommLog = lazy(() => import('./pages/CommLog').then((m: any) => ({ default: m.CommLog ?? m.default ?? (() => null) })));
-const OperationsDashboard = lazy(() => import('./operations/components/Dashboard').then(m => ({ default: m.Dashboard })));
-const AssetManager = lazy(() => import('./operations/components/AssetManager').then(m => ({ default: m.AssetManager })));
-const WaybillManager = lazy(() => import('./operations/components/WaybillManager').then(m => ({ default: m.WaybillManager })));
-const SiteManager = lazy(() => import('./operations/components/SiteManager').then(m => ({ default: m.SiteManager })));
-const QuickCheckout = lazy(() => import('./operations/components/QuickCheckout').then(m => ({ default: m.QuickCheckout })));
-const MaintenanceManager = lazy(() => import('./operations/components/MaintenanceManager').then(m => ({ default: m.MaintenanceManager })));
-const EmployeeAnalytics = lazy(() => import('./operations/components/EmployeeAnalytics').then(m => ({ default: m.EmployeeAnalytics })));
-import { OperationsProvider } from './operations/contexts/OperationsContext';
+const OperationsDashboard = lazy(() => import('./pages/OperationsDashboard').then(m => ({ default: m.Dashboard })));
+const AssetManager = lazy(() => import('./pages/AssetManager').then(m => ({ default: m.AssetManager })));
+const WaybillManager = lazy(() => import('./pages/WaybillManager').then(m => ({ default: m.WaybillManager })));
+const SiteManager = lazy(() => import('./pages/SiteManager').then(m => ({ default: m.SiteManager })));
+const QuickCheckout = lazy(() => import('./pages/QuickCheckout').then(m => ({ default: m.QuickCheckout })));
+const MaintenanceManager = lazy(() => import('./pages/MaintenanceManager').then(m => ({ default: m.MaintenanceManager })));
+const EmployeeAnalytics = lazy(() => import('./pages/EmployeeAnalytics').then(m => ({ default: m.EmployeeAnalytics })));
+import { OperationsProvider } from './contexts/OperationsContext';
 
 // ── Suspense fallback ─────────────────────────────────────────────────────────
 function PageLoader() {

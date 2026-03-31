@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { 
   ArrowLeft, X, Printer, Share2, Calendar, User, Car, MapPin, FileText
 } from 'lucide-react';
-import { Waybill } from '../types';
+import { Waybill } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import { cn } from '@/src/lib/utils';
