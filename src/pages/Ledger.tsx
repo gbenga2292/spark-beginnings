@@ -526,27 +526,6 @@ export function Ledger() {
     reader.readAsBinaryString(file);
   };
 
-  // Summaries (kept for the hidden summary tab)
-  const catSummary = useMemo(() => {
-    const acc: Record<string, number> = {};
-    filteredEntries.forEach(e => { acc[e.category] = (acc[e.category] || 0) + e.amount; });
-    return Object.entries(acc).map(([name, total]) => ({ name, total })).sort((a,b) => b.total - a.total);
-  }, [filteredEntries]);
-  const bankSummary = useMemo(() => {
-    const acc: Record<string, number> = {};
-    filteredEntries.forEach(e => { acc[e.bank] = (acc[e.bank] || 0) + e.amount; });
-    return Object.entries(acc).map(([name, total]) => ({ name, total })).sort((a,b) => b.total - a.total);
-  }, [filteredEntries]);
-  const clientSummary = useMemo(() => {
-    const acc: Record<string, number> = {};
-    filteredEntries.forEach(e => { if(e.client) acc[e.client] = (acc[e.client] || 0) + e.amount; });
-    return Object.entries(acc).map(([name, total]) => ({ name, total })).sort((a,b) => b.total - a.total);
-  }, [filteredEntries]);
-  const siteSummary = useMemo(() => {
-    const acc: Record<string, number> = {};
-    filteredEntries.forEach(e => { if(e.site) acc[e.site] = (acc[e.site] || 0) + e.amount; });
-    return Object.entries(acc).map(([name, total]) => ({ name, total })).sort((a,b) => b.total - a.total);
-  }, [filteredEntries]);
 
   // Group filtered entries by voucher number (one row per voucher in the records view)
   const voucherSummaries = useMemo(() => {
@@ -592,14 +571,6 @@ export function Ledger() {
            }`}
          >
            <History className="h-3 w-3" /> History
-         </button>
-         <button 
-           onClick={() => setTab('summary')} 
-           className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${
-             tab === 'summary' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'
-           }`}
-         >
-           <BarChart2 className="h-3 w-3" /> Summary
          </button>
       </div>
 
@@ -1112,63 +1083,6 @@ export function Ledger() {
         </div>
       )}
 
-      {/* Summary tab removed — see Financial Reports > Ledger Summary */}
-      <TabsContent active={tab === 'summary'} className="m-0 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader className="bg-slate-50/50"><CardTitle>Expenses by Category</CardTitle></CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Total Amount</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {catSummary.map(s => (
-                    <TableRow key={s.name}><TableCell className="font-medium">{s.name}</TableCell><TableCell className="text-right font-semibold text-indigo-700">₦{s.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell></TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="bg-slate-50/50"><CardTitle>Expenses Paid From</CardTitle></CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader><TableRow><TableHead>Bank</TableHead><TableHead className="text-right">Total Amount</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {bankSummary.map(s => (
-                    <TableRow key={s.name}><TableCell className="font-medium">{s.name}</TableCell><TableCell className="text-right font-semibold text-indigo-700">₦{s.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell></TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="bg-slate-50/50"><CardTitle>Client Summary</CardTitle></CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader><TableRow><TableHead>Client</TableHead><TableHead className="text-right">Total Amount</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {clientSummary.map(s => (
-                    <TableRow key={s.name}><TableCell className="font-medium">{s.name}</TableCell><TableCell className="text-right font-semibold text-indigo-700">₦{s.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell></TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="bg-slate-50/50"><CardTitle>Site Summary</CardTitle></CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader><TableRow><TableHead>Site</TableHead><TableHead className="text-right">Total Amount</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {siteSummary.map(s => (
-                    <TableRow key={s.name}><TableCell className="font-medium">{s.name}</TableCell><TableCell className="text-right font-semibold text-indigo-700">₦{s.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell></TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
 
 
 
