@@ -1,31 +1,17 @@
 import { useState } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { 
-  Plus, 
-  Search, 
-  Eye,
-  Edit2,
-  Trash2,
-  Send,
-  Calendar,
-  User,
-  Package,
-  Truck,
-  ArrowRightLeft,
-  ChevronRight,
-  MoreHorizontal
+  Plus, Search, Eye, Edit2, Trash2, Truck, ArrowRightLeft, ListFilter
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
-import { Waybill, WaybillStatus, WaybillType } from '../types';
+import { Waybill, WaybillStatus } from '../types';
 import { WaybillDetailView } from './WaybillDetailView';
 
-import { Card, CardContent } from '@/src/components/ui/card';
+import { Card } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Input } from '@/src/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs"
 
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 
@@ -41,12 +27,8 @@ export function WaybillManager() {
   useSetPageTitle(
     'Logistics Management',
     'Track and manage asset deliveries (Waybills) and site returns',
-    <div className="flex items-center gap-2">
-      <Button 
-        size="sm" 
-        className="gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-sm" 
-        onClick={() => setShowCreateModal(true)}
-      >
+    <div className="hidden sm:flex items-center gap-2">
+      <Button size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9" onClick={() => setShowCreateModal(true)}>
         <Plus className="h-4 w-4" /> Create Waybill
       </Button>
     </div>
@@ -69,207 +51,140 @@ export function WaybillManager() {
 
   const getStatusBadge = (status: WaybillStatus) => {
     switch (status) {
-      case 'outstanding': return <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200 font-bold px-3 py-0.5 rounded-full text-[10px] uppercase">Outstanding</Badge>;
-      case 'sent_to_site': return <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 font-bold px-3 py-0.5 rounded-full text-[10px] uppercase">Sent to Site</Badge>;
-      case 'return_completed': return <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 font-bold px-3 py-0.5 rounded-full text-[10px] uppercase">Completed</Badge>;
-      default: return <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 font-bold px-3 py-0.5 rounded-full text-[10px] uppercase">{status}</Badge>;
+      case 'outstanding': return <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 font-semibold px-2 py-0.5 rounded-full text-[11px]">Outstanding</Badge>;
+      case 'sent_to_site': return <Badge variant="outline" className="bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 border-teal-200 font-semibold px-2 py-0.5 rounded-full text-[11px]">Sent to Site</Badge>;
+      case 'return_completed': return <Badge variant="outline" className="bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 font-semibold px-2 py-0.5 rounded-full text-[11px]">Completed</Badge>;
+      default: return <Badge variant="outline" className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 font-semibold px-2 py-0.5 rounded-full text-[11px]">{status}</Badge>;
     }
   };
 
+  const currentItems = activeTab === 'waybill' ? filteredOutgoing : filteredIncoming;
+  const currentSearch = activeTab === 'waybill' ? waybillSearch : returnSearch;
+  const setCurrentSearch = activeTab === 'waybill' ? setWaybillSearch : setReturnSearch;
+
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10 px-4 sm:px-6 lg:px-8 animate-in fade-in duration-500">
-      {viewingWaybill && (
-        <WaybillDetailView 
-          waybill={viewingWaybill} 
-          onClose={() => setViewingWaybill(null)} 
-        />
-      )}
-      
-      {/* Compact Tabs */}
-      <div className="flex bg-white dark:bg-slate-900 p-1.5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 items-center overflow-x-auto no-scrollbar gap-1 w-fit">
-        {[
-          { id: 'waybill', label: 'Waybills', count: outgoingWaybills.length },
-          { id: 'return', label: 'Returns', count: incomingReturns.length }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={cn(
-              "px-6 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 uppercase tracking-wider",
-              activeTab === tab.id 
-                ? 'bg-blue-600 text-white shadow-md' 
-                : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600'
-            )}
-          >
-            {tab.label}
-            <span className={cn(
-              "px-1.5 py-0.5 rounded-md text-[10px]",
-              activeTab === tab.id ? "bg-blue-500 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
-            )}>
-              {tab.count}
-            </span>
-          </button>
-        ))}
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+      {viewingWaybill && <WaybillDetailView waybill={viewingWaybill} onClose={() => setViewingWaybill(null)} />}
+
+      {/* Mobile Actions */}
+      <div className="flex sm:hidden flex-wrap gap-2 px-1">
+        <Button className="flex-1 gap-2 bg-teal-600 hover:bg-teal-700 text-white shadow-sm" onClick={() => setShowCreateModal(true)}>
+          <Plus className="h-4 w-4" /> Create Waybill
+        </Button>
       </div>
 
-      <Tabs className="w-full">
-        <TabsContent active={activeTab === 'waybill'} className="space-y-6 animate-in slide-in-from-left-4 duration-300">
-          <Card className="shadow-sm border border-slate-100 bg-white dark:bg-slate-900 p-4">
-            <div className="relative w-full max-w-2xl">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
-                <Input 
-                  value={waybillSearch}
-                  onChange={(e) => setWaybillSearch(e.target.value)}
-                  placeholder="Search waybills by ID, driver, or vehicle..." 
-                  className="pl-10 bg-slate-50/50 border-transparent dark:bg-slate-950 focus-visible:ring-blue-500 font-medium text-sm h-11 rounded-xl"
-                />
+      {/* Table Card */}
+      <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
+        <div className="border-b border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50 dark:bg-slate-800/30">
+          <div className="flex items-center gap-2 ml-1">
+            <div className="h-8 w-8 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center text-teal-600">
+              <ListFilter className="h-4 w-4" />
             </div>
-          </Card>
+            <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
+              {activeTab === 'waybill' ? 'Waybills' : 'Returns'} <span className="text-slate-400 font-normal">({currentItems.length})</span>
+            </p>
+          </div>
 
-          <div className="rounded-xl border border-slate-100/60 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50/50 dark:bg-slate-800/50 hover:bg-slate-50/50 border-b-slate-100 dark:border-slate-800 h-12">
-                    <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-400 pl-6 w-[120px]">Waybill ID</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-400">Driver & Vehicle</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-400">Destination</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-400">Date</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-400">Status</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-400">Items Summary</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-400 text-right pr-6">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOutgoing.map((wb) => (
-                    <TableRow key={wb.id} className="hover:bg-slate-50/30 dark:hover:bg-slate-800/20 border-b-slate-50 dark:border-slate-800 h-16">
-                      <TableCell className="pl-6">
-                        <span className="font-black text-slate-900 dark:text-white">{wb.id}</span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">{wb.driverName}</span>
-                          <span className="text-[10px] text-slate-400 font-medium uppercase">{wb.vehicle || 'L200'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                           <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{wb.siteName}</span>
-                           <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">from DCEL Warehouse</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col text-[11px]">
-                          <span className="font-bold text-slate-800 dark:text-slate-300">{new Date(wb.issueDate).toLocaleDateString()}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(wb.status)}
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-[10px] font-bold text-slate-500 truncate block max-w-[150px]">
-                          {wb.items.map(i => `${i.quantity} ${i.assetName}`).join(', ')}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right pr-6">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-slate-400 hover:text-blue-600 rounded-lg"
-                            onClick={() => setViewingWaybill(wb)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600 rounded-lg"><Edit2 className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600 rounded-lg" onClick={() => deleteWaybill(wb.id)}><Trash2 className="h-4 w-4" /></Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1 rounded-lg">
+              {[
+                { id: 'waybill' as const, label: 'Waybills', count: outgoingWaybills.length },
+                { id: 'return' as const, label: 'Returns', count: incomingReturns.length },
+              ].map(tab => (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
+                    activeTab === tab.id ? 'bg-white dark:bg-slate-700 text-teal-700 dark:text-teal-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {tab.label}
+                  <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-bold",
+                    activeTab === tab.id ? "bg-teal-100 dark:bg-teal-900/30 text-teal-700" : "bg-slate-100 dark:bg-slate-700 text-slate-500"
+                  )}>{tab.count}</span>
+                </button>
+              ))}
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input placeholder="Search by ID, driver, or vehicle..." className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-9 text-sm focus-visible:ring-teal-500/50 rounded-lg shadow-sm"
+                value={currentSearch} onChange={e => setCurrentSearch(e.target.value)} />
             </div>
           </div>
-        </TabsContent>
+        </div>
 
-        <TabsContent active={activeTab === 'return'} className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-          <Card className="shadow-sm border border-slate-100 bg-white dark:bg-slate-900 p-4">
-            <div className="relative w-full max-w-2xl">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
-                <Input 
-                  value={returnSearch}
-                  onChange={(e) => setReturnSearch(e.target.value)}
-                  placeholder="Search returns by ID, driver, or vehicle..." 
-                  className="pl-10 bg-slate-50/50 border-transparent dark:bg-slate-950 focus-visible:ring-blue-500 font-medium text-sm h-11 rounded-xl"
-                />
-            </div>
-          </Card>
-
-          <div className="rounded-xl border border-slate-100/60 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50/50 dark:bg-slate-800/50 hover:bg-slate-50/50 border-b-slate-100 dark:border-slate-800 h-12">
-                    <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-400 pl-6 w-[120px]">Return ID</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-400">Driver & Vehicle</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-400">Source Site</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-400">Date</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-400">Status</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-400">Items Summary</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-wider text-slate-400 text-right pr-6">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredIncoming.map((rb) => (
-                    <TableRow key={rb.id} className="hover:bg-slate-50/30 dark:hover:bg-slate-800/20 border-b-slate-50 dark:border-slate-800 h-16">
-                      <TableCell className="pl-6">
-                        <span className="font-black text-slate-900 dark:text-white">{rb.id}</span>
-                      </TableCell>
-                      <TableCell>
-                         <div className="flex flex-col">
-                            <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">{rb.driverName}</span>
-                            <span className="text-[10px] text-slate-400 font-medium uppercase">{rb.vehicle || 'SIENNA'}</span>
-                         </div>
-                      </TableCell>
-                      <TableCell>
-                         <div className="flex flex-col">
-                            <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{rb.siteName}</span>
-                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Return to Warehouse</span>
-                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col text-[11px]">
-                          <span className="font-bold text-slate-800 dark:text-slate-300">{new Date(rb.issueDate).toLocaleDateString()}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(rb.status)}
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-[10px] font-bold text-slate-500 truncate block max-w-[150px]">
-                          {rb.items.map(i => `${i.quantity} ${i.assetName}`).join(', ')}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right pr-6">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-slate-400 hover:text-blue-600 rounded-lg" 
-                          onClick={() => setViewingWaybill(rb)}
-                        >
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-teal-700 border-b border-teal-800 text-teal-50 uppercase text-[11px] tracking-wider font-bold">
+                <th className="px-5 py-4 whitespace-nowrap">{activeTab === 'waybill' ? 'Waybill' : 'Return'} ID</th>
+                <th className="px-5 py-4 whitespace-nowrap">Driver & Vehicle</th>
+                <th className="px-5 py-4 whitespace-nowrap">{activeTab === 'waybill' ? 'Destination' : 'Source Site'}</th>
+                <th className="px-5 py-4 whitespace-nowrap">Date</th>
+                <th className="px-5 py-4 whitespace-nowrap">Status</th>
+                <th className="px-5 py-4 min-w-[150px]">Items Summary</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+              {currentItems.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-12 text-center text-slate-500">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="h-12 w-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center border dark:border-slate-700">
+                        <Truck className="h-5 w-5 text-slate-400" />
+                      </div>
+                      <p>No {activeTab === 'waybill' ? 'waybills' : 'returns'} found.</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                currentItems.map((wb) => (
+                  <tr key={wb.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group">
+                    <td className="px-5 py-4 font-bold text-slate-800 dark:text-slate-200">{wb.id}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-slate-700 dark:text-slate-200 text-sm">{wb.driverName}</span>
+                        <span className="text-xs text-slate-400 font-medium">{wb.vehicle || '—'}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-slate-700 dark:text-slate-200 text-xs">{wb.siteName}</span>
+                        <span className="text-xs text-slate-400">{activeTab === 'waybill' ? 'from Warehouse' : 'Return to Warehouse'}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">
+                      {new Date(wb.issueDate).toLocaleDateString()}
+                    </td>
+                    <td className="px-5 py-4">{getStatusBadge(wb.status)}</td>
+                    <td className="px-5 py-4 max-w-xs text-slate-600 dark:text-slate-400 text-xs">
+                      {wb.items.map(i => `${i.quantity} ${i.assetName}`).join(', ')}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center justify-center gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20"
+                          onClick={() => setViewingWaybill(wb)}>
                           <Eye className="h-4 w-4" />
                         </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </TabsContent>
-
-      </Tabs>
+                        {activeTab === 'waybill' && (
+                          <>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20">
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                              onClick={() => deleteWaybill(wb.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }

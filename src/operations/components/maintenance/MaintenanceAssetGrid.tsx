@@ -1,23 +1,12 @@
 import React, { useState } from 'react';
 import { useOperations } from '../../contexts/OperationsContext';
-import { 
-  Search, 
-  MapPin, 
-  RefreshCw, 
-  ChevronRight, 
-  History,
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-  Eye,
-  FileText
-} from 'lucide-react';
+import { Search, CheckCircle2, Clock, AlertCircle, Eye, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/src/components/ui/card';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import { cn } from '@/src/lib/utils';
-import { MaintenanceAsset } from '../../types';
+import { useTheme } from '@/src/hooks/useTheme';
 
 interface MaintenanceAssetGridProps {
   category: 'machine' | 'vehicle';
@@ -25,6 +14,7 @@ interface MaintenanceAssetGridProps {
 
 export function MaintenanceAssetGrid({ category }: MaintenanceAssetGridProps) {
   const { maintenanceAssets } = useOperations();
+  const { isDark } = useTheme();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
@@ -35,36 +25,31 @@ export function MaintenanceAssetGrid({ category }: MaintenanceAssetGridProps) {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'ok': return <span className="flex items-center gap-1 text-green-600 bg-green-50 px-3 py-1 rounded-full text-[10px] font-black uppercase"><CheckCircle2 className="h-3 w-3" /> OK</span>;
-      case 'due_soon': return <span className="flex items-center gap-1 text-amber-600 bg-amber-50 px-3 py-1 rounded-full text-[10px] font-black uppercase"><Clock className="h-3 w-3" /> Due Soon</span>;
-      case 'overdue': return <span className="flex items-center gap-1 text-rose-600 bg-rose-50 px-3 py-1 rounded-full text-[10px] font-black uppercase"><AlertCircle className="h-3 w-3" /> Overdue</span>;
+      case 'ok': return <Badge variant="outline" className="bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 font-semibold text-[11px]"><CheckCircle2 className="h-3 w-3 mr-1" /> OK</Badge>;
+      case 'due_soon': return <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 font-semibold text-[11px]"><Clock className="h-3 w-3 mr-1" /> Due Soon</Badge>;
+      case 'overdue': return <Badge variant="outline" className="bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 font-semibold text-[11px]"><AlertCircle className="h-3 w-3 mr-1" /> Overdue</Badge>;
       default: return null;
     }
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-6">
       {/* Search and Filters */}
-      <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
-          <Input 
-            placeholder={`Search ${category}s...`}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-12 h-14 rounded-2xl bg-white border-slate-100 shadow-sm font-medium text-slate-600"
-          />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input placeholder={`Search ${category}s...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 h-9 rounded-lg bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm text-sm focus-visible:ring-teal-500/50" />
         </div>
-        <div className="flex bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1 rounded-lg">
           {['all', 'ok', 'due_soon', 'overdue'].map((f) => (
-            <button
-              key={f}
-              onClick={() => setStatusFilter(f)}
+            <button key={f} onClick={() => setStatusFilter(f)}
               className={cn(
-                "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
-                statusFilter === f ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-slate-400 hover:text-slate-600"
-              )}
-            >
+                "px-3 py-1.5 rounded-md text-xs font-semibold transition-all capitalize",
+                statusFilter === f
+                  ? "bg-white dark:bg-slate-700 text-teal-700 dark:text-teal-400 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              )}>
               {f.replace('_', ' ')}
             </button>
           ))}
@@ -72,60 +57,59 @@ export function MaintenanceAssetGrid({ category }: MaintenanceAssetGridProps) {
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {filteredAssets.map((asset) => (
-          <Card key={asset.id} className="rounded-3xl border-slate-100 shadow-sm overflow-hidden bg-white hover:shadow-xl transition-all border hover:border-blue-100 group">
-            <CardContent className="p-8">
-              <div className="flex items-start justify-between mb-8">
-                <div className="flex-1">
-                  <h3 className="text-xl font-black text-slate-900 group-hover:text-blue-600 transition-colors uppercase truncate">{asset.name}</h3>
-                  <div className="flex items-center gap-2 mt-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <Card key={asset.id} className={cn(
+            "rounded-xl border shadow-sm overflow-hidden hover:shadow-md transition-all group",
+            isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+          )}>
+            <CardContent className="p-5 sm:p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-white group-hover:text-teal-600 transition-colors uppercase truncate">{asset.name}</h3>
+                  <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-400">
                     <span>{asset.id}</span>
                     {asset.serialNumber && <span>• S/N: {asset.serialNumber}</span>}
                   </div>
                 </div>
-                <Badge className="bg-green-100 text-green-600 border-0 font-black uppercase text-[10px] tracking-widest px-3 py-1 rounded-full">
+                <Badge variant="outline" className="bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 font-semibold text-[11px] shrink-0">
                   Active
                 </Badge>
               </div>
 
-              <div className="grid grid-cols-2 gap-y-6 mb-8">
-                 <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Site:</span>
-                    <span className="text-sm font-black text-slate-700">{asset.site}</span>
-                 </div>
-                 <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Pattern:</span>
-                    <span className="text-sm font-black text-slate-700">{asset.pattern}</span>
-                 </div>
-                 <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Interval:</span>
-                    <span className="text-sm font-black text-slate-700">{asset.serviceIntervalMonths} months</span>
-                 </div>
+              <div className="grid grid-cols-2 gap-y-3 mb-4">
+                {[
+                  { label: 'Site', value: asset.site },
+                  { label: 'Pattern', value: asset.pattern },
+                  { label: 'Interval', value: `${asset.serviceIntervalMonths} months` },
+                  { label: 'Records', value: `${asset.totalMaintenanceRecords}` },
+                ].map((item, i) => (
+                  <div key={i}>
+                    <span className="text-xs font-semibold text-slate-400 block mb-0.5">{item.label}</span>
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{item.value}</span>
+                  </div>
+                ))}
               </div>
 
-              <div className="bg-slate-50/80 rounded-2xl p-6 mb-8 border border-slate-50">
-                 <div className="flex items-center justify-between mb-2">
-                    {getStatusBadge(asset.status)}
-                    <span className="text-[10px] font-bold text-slate-400">Next Service in {asset.nextServiceDate}</span>
-                 </div>
-                 <div className="flex items-center justify-between mt-4">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Next Due: {new Date(asset.nextServiceDate).toLocaleDateString()}</span>
-                 </div>
+              <div className={cn(
+                "rounded-lg p-3 mb-4 border",
+                isDark ? "bg-slate-800/50 border-slate-800" : "bg-slate-50 border-slate-100"
+              )}>
+                <div className="flex items-center justify-between">
+                  {getStatusBadge(asset.status)}
+                  <span className="text-xs font-medium text-slate-400">
+                    Next: {new Date(asset.nextServiceDate).toLocaleDateString()}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex items-center justify-between mb-6">
-                 <span className="text-xs font-bold text-slate-400">Total Maintenance:</span>
-                 <span className="text-xs font-black text-slate-900">{asset.totalMaintenanceRecords} records</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                 <Button variant="outline" className="rounded-xl border-slate-100 font-black text-[10px] uppercase tracking-widest text-slate-600 gap-2 h-12 shadow-sm bg-white hover:bg-slate-50">
-                    <Eye className="h-4 w-4" /> View Details
-                 </Button>
-                 <Button variant="outline" className="rounded-xl border-slate-100 font-black text-[10px] uppercase tracking-widest text-slate-600 gap-2 h-12 shadow-sm bg-white hover:bg-slate-50">
-                    <FileText className="h-4 w-4" /> Equipment Log
-                 </Button>
+              <div className="grid grid-cols-2 gap-3">
+                <Button variant="outline" size="sm" className="rounded-lg border-slate-200 dark:border-slate-700 font-semibold text-xs text-slate-600 dark:text-slate-300 gap-1.5 h-9">
+                  <Eye className="h-3.5 w-3.5" /> Details
+                </Button>
+                <Button variant="outline" size="sm" className="rounded-lg border-slate-200 dark:border-slate-700 font-semibold text-xs text-slate-600 dark:text-slate-300 gap-1.5 h-9">
+                  <FileText className="h-3.5 w-3.5" /> Log
+                </Button>
               </div>
             </CardContent>
           </Card>

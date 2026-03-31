@@ -1,5 +1,6 @@
 import { useOperations } from '../contexts/OperationsContext';
 import { Package, Truck, ArrowRightLeft, AlertCircle, TrendingUp, Clock } from 'lucide-react';
+import { Badge } from '@/src/components/ui/badge';
 import { useTheme } from '@/src/hooks/useTheme';
 import { cn } from '@/src/lib/utils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
@@ -15,21 +16,21 @@ export function Dashboard() {
   );
 
   const cards = [
-    { title: 'Total Assets', value: stats.totalAssets, icon: Package, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-    { title: 'Active Waybills', value: stats.activeWaybills, icon: Truck, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-    { title: 'Pending Returns', value: waybills.filter(w => w.type === 'return' && w.status === 'outstanding').length, icon: ArrowRightLeft, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/20' },
-    { title: 'Low Stock Alerts', value: assets.filter(a => a.availableQuantity < 5).length, icon: AlertCircle, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-900/20' },
+    { title: 'Total Assets', value: stats.totalAssets, icon: Package, color: 'text-teal-600', bg: 'bg-teal-100 dark:bg-teal-900/30' },
+    { title: 'Active Waybills', value: stats.activeWaybills, icon: Truck, color: 'text-teal-600', bg: 'bg-teal-100 dark:bg-teal-900/30' },
+    { title: 'Pending Returns', value: waybills.filter(w => w.type === 'return' && w.status === 'outstanding').length, icon: ArrowRightLeft, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/30' },
+    { title: 'Low Stock Alerts', value: assets.filter(a => a.availableQuantity < 5).length, icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-100 dark:bg-rose-900/30' },
   ];
 
   return (
-    <div className="flex flex-col gap-8 max-w-7xl mx-auto pb-10 px-4 sm:px-6 lg:px-8 animate-in fade-in duration-500">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {cards.map((card, i) => (
           <div 
             key={i} 
             className={cn(
-              "p-5 sm:p-6 rounded-2xl border transition-all hover:shadow-md",
-              isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+              "p-5 sm:p-6 rounded-xl border transition-all hover:shadow-md",
+              isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"
             )}
           >
             <div className="flex items-center justify-between mb-4">
@@ -39,50 +40,52 @@ export function Dashboard() {
               <TrendingUp className="h-4 w-4 text-slate-300" />
             </div>
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{card.title}</p>
-              <h3 className="text-xl sm:text-2xl font-black mt-1 text-slate-900 dark:text-white">{card.value}</h3>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{card.title}</p>
+              <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{card.value}</h3>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Waybills */}
         <div className={cn(
-          "lg:col-span-2 rounded-2xl border overflow-hidden",
-          isDark ? "bg-slate-900 border-slate-800" : "bg-white border border-slate-100"
+          "lg:col-span-2 rounded-xl border overflow-hidden shadow-sm",
+          isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
         )}>
-          <div className="px-6 py-5 border-b flex items-center justify-between">
-            <h3 className="font-bold text-lg text-slate-900 dark:text-white">Recent Logistics Activity</h3>
-            <button className="text-xs text-blue-600 hover:text-blue-700 font-bold uppercase tracking-wider">View All</button>
+          <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+            <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-200">Recent Logistics Activity</h3>
+            <button className="text-xs text-teal-600 hover:text-teal-700 font-semibold">View All</button>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {waybills.slice(0, 5).map((wb) => (
-              <div key={wb.id} className="px-4 sm:px-6 py-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                <div className="flex items-center gap-3 sm:gap-4">
+              <div key={wb.id} className="px-5 py-4 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                <div className="flex items-center gap-3">
                   <div className={cn(
-                    "p-2 sm:p-2.5 rounded-xl flex-shrink-0",
-                    wb.type === 'waybill' ? "bg-blue-50 text-blue-600" : "bg-orange-50 text-orange-600"
+                    "p-2 rounded-lg flex-shrink-0",
+                    wb.type === 'waybill' ? "bg-teal-100 dark:bg-teal-900/30 text-teal-600" : "bg-amber-100 dark:bg-amber-900/30 text-amber-600"
                   )}>
-                    {wb.type === 'waybill' ? <Truck className="h-5 w-5" /> : <ArrowRightLeft className="h-5 w-5" />}
+                    {wb.type === 'waybill' ? <Truck className="h-4 w-4" /> : <ArrowRightLeft className="h-4 w-4" />}
                   </div>
                   <div className="min-w-0">
-                    <p className="font-bold text-slate-900 dark:text-white truncate">{wb.siteName}</p>
-                    <p className="text-[10px] text-slate-400 font-medium flex items-center gap-1 uppercase tracking-tight truncate">
-                       <Clock className="h-3 w-3" /> {new Date(wb.issueDate).toLocaleDateString()} • {wb.driverName}
+                    <p className="font-semibold text-slate-800 dark:text-white text-sm truncate">{wb.siteName}</p>
+                    <p className="text-xs text-slate-400 flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> {new Date(wb.issueDate).toLocaleDateString()} • {wb.driverName}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 sm:gap-6 ml-4">
-                  <span className={cn(
-                    "hidden sm:inline-block px-3 py-1 rounded-full text-[9px] font-black uppercase border-0",
-                    wb.status === 'sent_to_site' ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"
+                <div className="flex items-center gap-4 ml-4">
+                  <Badge variant="outline" className={cn(
+                    "hidden sm:inline-flex text-[11px] font-semibold rounded-full px-2",
+                    wb.status === 'sent_to_site'
+                      ? "bg-teal-50 dark:bg-teal-900/20 text-teal-700 border-teal-200"
+                      : "bg-amber-50 dark:bg-amber-900/20 text-amber-700 border-amber-200"
                   )}>
                     {wb.status.replace(/_/g, ' ')}
-                  </span>
+                  </Badge>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-sm font-black text-slate-900 dark:text-white">{wb.items.length}</p>
-                    <p className="text-[9px] font-bold text-slate-400 mb-0 leading-none">Items</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-white">{wb.items.length}</p>
+                    <p className="text-xs text-slate-400">Items</p>
                   </div>
                 </div>
               </div>
@@ -90,38 +93,37 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Quick Actions / Categories */}
+        {/* Asset Distribution */}
         <div className={cn(
-          "rounded-2xl border p-6 border-slate-100",
-          isDark ? "bg-slate-900 border-slate-800" : "bg-white"
+          "rounded-xl border p-5 sm:p-6 shadow-sm",
+          isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
         )}>
-           <h3 className="font-bold text-lg mb-6 text-slate-900 dark:text-white">Asset Distribution</h3>
-           <div className="space-y-5">
-              {Object.entries(stats.categoriesCount).map(([cat, count]) => (
-                <div key={cat} className="space-y-2">
-                   <div className="flex justify-between text-xs font-bold">
-                      <span className="capitalize text-slate-400 uppercase tracking-wider">{cat}</span>
-                      <span className="text-slate-900 dark:text-slate-200">{count as number}</span>
-                   </div>
-                   <div className="h-2 w-full bg-slate-50 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-blue-600 rounded-full" 
-                        style={{ width: `${((count as number) / Math.max(stats.totalAssets, 1)) * 100}%` }}
-                      ></div>
-                   </div>
+          <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-200 mb-6">Asset Distribution</h3>
+          <div className="space-y-4">
+            {Object.entries(stats.categoriesCount).map(([cat, count]) => (
+              <div key={cat} className="space-y-2">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="capitalize text-slate-500">{cat}</span>
+                  <span className="text-slate-800 dark:text-slate-200">{count as number}</span>
                 </div>
-              ))}
-           </div>
+                <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-teal-500 rounded-full" 
+                    style={{ width: `${((count as number) / Math.max(stats.totalAssets, 1)) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+            ))}
+          </div>
 
-           <div className="mt-8 pt-6 border-t border-slate-50 dark:border-slate-800">
-              <button className="w-full flex items-center justify-center gap-2 py-4 px-4 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors text-xs font-black uppercase text-slate-600 dark:text-slate-300 tracking-widest border border-slate-100 dark:border-slate-700">
-                 <Package className="h-4 w-4" />
-                 Register New Asset
-              </button>
-           </div>
+          <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
+            <button className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-xs font-semibold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+              <Package className="h-4 w-4" />
+              Register New Asset
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
-

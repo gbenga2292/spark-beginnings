@@ -2,29 +2,9 @@ import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { useOperations } from '../contexts/OperationsContext';
 import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Package, 
-  AlertTriangle,
-  ChevronRight,
-  List,
-  Edit2,
-  Trash2,
-  FileText,
-  Tag, 
-  AlertCircle, 
-  MapPin, 
-  Truck, 
-  ArrowRightLeft,
-  Wrench,
-  Download,
-  Upload,
-  Circle,
-  BarChart2,
-  RefreshCw,
-  MoreHorizontal
+  Plus, Search, Filter, Package, AlertTriangle, ChevronRight,
+  Edit2, Trash2, FileText, AlertCircle, MapPin, Wrench,
+  Download, Upload, Circle, BarChart2, RefreshCw, MoreHorizontal, ListFilter
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
@@ -38,12 +18,8 @@ import { Badge } from '@/src/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Input } from '@/src/components/ui/input';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/src/components/ui/dropdown-menu"
 
 import { useSetPageTitle } from '@/src/contexts/PageContext';
@@ -61,26 +37,21 @@ export function AssetManager() {
   useSetPageTitle(
     'Inventory Management',
     'Track equipment, tools, and consumables across all sites',
-    <div className="flex items-center gap-2">
+    <div className="hidden sm:flex items-center gap-2">
       <Button 
-        variant="outline" 
-        size="sm" 
-        className="gap-2 h-9 border-slate-200" 
+        variant="outline" size="sm" className="gap-2 h-9"
         onClick={() => fileInputRef.current?.click()}
       >
         <Upload className="h-4 w-4" /> Bulk Import
       </Button>
       <Button 
-        variant="outline" 
-        size="sm" 
-        className="gap-2 h-9 border-slate-200" 
+        variant="outline" size="sm" className="gap-2 h-9"
         onClick={() => setShowRestockModal(true)}
       >
         <Package className="h-4 w-4" /> Restock
       </Button>
       <Button 
-        size="sm" 
-        className="gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-sm" 
+        size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9"
         onClick={() => setShowAddForm(true)}
       >
         <Plus className="h-4 w-4" /> Add Asset
@@ -91,17 +62,15 @@ export function AssetManager() {
   const handleBulkImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = (event) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const data = event.target?.result;
+        const wb = XLSX.read(data, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
-        
-        const assetsToImport = data.map((item: any) => ({
+        const rows = XLSX.utils.sheet_to_json(ws);
+        const assetsToImport = rows.map((item: any) => ({
           name: item['Asset Name'] || item['Name'] || item['Asset'] || 'Unnamed Asset',
           description: item['Description'] || '',
           category: (item['Category']?.toLowerCase() || 'dewatering') as AssetCategory,
@@ -113,7 +82,6 @@ export function AssetManager() {
           status: 'active',
           condition: 'good',
         }));
-
         bulkAddAssets(assetsToImport as any);
         if (fileInputRef.current) fileInputRef.current.value = '';
       } catch (error) {
@@ -130,178 +98,144 @@ export function AssetManager() {
   });
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10 px-4 sm:px-6 lg:px-8 animate-in fade-in duration-500">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
       {/* Modals */}
       {(showAddForm || editingAsset) && (
         <AssetForm 
           assetToEdit={editingAsset || undefined} 
-          onClose={() => {
-            setShowAddForm(false);
-            setEditingAsset(null);
-          }} 
+          onClose={() => { setShowAddForm(false); setEditingAsset(null); }} 
         />
       )}
       {showRestockModal && <RestockModal onClose={() => setShowRestockModal(false)} />}
-      
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={handleBulkImport} 
-        className="hidden" 
-        accept=".xlsx, .xls, .csv" 
-      />
+      <input type="file" ref={fileInputRef} onChange={handleBulkImport} className="hidden" accept=".xlsx, .xls, .csv" />
 
-      {/* Search & Filter Bar */}
-      <Card className="shadow-sm border border-slate-100 bg-white dark:bg-slate-900 p-4">
-         <div className="flex flex-col md:flex-row items-center gap-4 w-full">
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
-              <Input 
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search assets..." 
-                className="pl-10 bg-slate-50/50 border-transparent dark:bg-slate-950 w-full focus-visible:ring-blue-500 font-medium text-sm h-10 rounded-xl"
-              />
-            </div>
-            
-            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full md:w-auto">
-               <select
-                 className="h-10 rounded-xl border border-transparent bg-slate-50/50 dark:bg-slate-950 px-3 text-sm font-bold text-slate-500 outline-none focus:ring-2 focus:ring-blue-500/20"
-                 value={filter}
-                 onChange={(e) => setFilter(e.target.value as any)}
-               >
-                 <option value="all">Categories</option>
-                 <option value="dewatering">Dewatering</option>
-                 <option value="waterproofing">Waterproofing</option>
-                 <option value="tiling">Tiling</option>
-                 <option value="ppe">PPE</option>
-               </select>
-
-               <Button variant="ghost" className="h-10 px-4 bg-slate-50/50 dark:bg-slate-950 rounded-xl border-0 font-bold text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                  <Filter className="h-4 w-4" />
-                  <span className="hidden sm:inline">More Filters</span>
-               </Button>
-            </div>
-         </div>
-      </Card>
-
-
-      {/* Table (Reference App Style) */}
-      <div className="rounded-xl border border-slate-100/60 bg-white shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-slate-50/40 hover:bg-slate-50/40 border-b-slate-100">
-              <TableHead className="w-12 h-14 pl-6 text-center">
-                 <Circle className="h-4 w-4 text-blue-500" />
-              </TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-400 h-14">
-                 <div className="flex items-center gap-1">Asset Name <ChevronRight className="h-3 w-3 rotate-180" /></div>
-              </TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-400 h-14 text-center">Total Stock</TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-400 h-14 text-center">Reserved</TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-400 h-14 text-center">Available</TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-400 h-14 whitespace-nowrap px-4">Stats (M | D | U)</TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-400 h-14 px-4">Category | Type</TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-400 h-14">Location</TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-400 h-14 text-center">Stock Status</TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-400 h-14 text-right pr-6">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredAssets.map((asset) => (
-              <TableRow key={asset.id} className="hover:bg-slate-50/50 border-b-slate-50 h-20">
-                <TableCell className="pl-6 text-center">
-                   <Circle className="h-4 w-4 text-blue-200" />
-                </TableCell>
-                <TableCell>
-                  <span className="font-bold text-slate-900 text-sm">{asset.name}</span>
-                </TableCell>
-                <TableCell className="text-center">
-                   <span className="font-black text-blue-600 text-sm whitespace-nowrap">
-                     {asset.quantity} {asset.unitOfMeasurement}
-                   </span>
-                </TableCell>
-                <TableCell className="text-center font-bold text-slate-700 text-sm">
-                   {asset.reservedQuantity || 0}
-                </TableCell>
-                <TableCell className="text-center font-bold text-slate-700 text-sm">
-                   {asset.availableQuantity || 0}
-                </TableCell>
-                <TableCell className="px-4">
-                   <div className="flex flex-col text-[10px] leading-tight select-none">
-                      <div className="flex items-center justify-between gap-4">
-                         <span className="text-slate-400 font-bold uppercase">Missing:</span>
-                         <span className={cn("font-black", asset.missingQuantity > 0 ? "text-red-500" : "text-slate-400")}>{asset.missingQuantity || 0}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-4">
-                         <span className="text-slate-400 font-bold uppercase">Damaged:</span>
-                         <span className={cn("font-black", asset.damagedQuantity > 0 ? "text-amber-500" : "text-slate-400")}>{asset.damagedQuantity || 0}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-4">
-                         <span className="text-slate-400 font-bold uppercase">Used:</span>
-                         <span className={cn("font-black", asset.usedQuantity > 0 ? "text-blue-500" : "text-slate-400")}>{asset.usedQuantity || 0}</span>
-                      </div>
-                   </div>
-                </TableCell>
-                <TableCell className="px-4">
-                   <div className="flex flex-col gap-1">
-                      <Badge variant="secondary" className="bg-slate-50 text-slate-400 font-bold text-[9px] uppercase tracking-tighter w-fit px-2 border-0">{asset.category}</Badge>
-                      <Badge variant="secondary" className="bg-slate-50 text-slate-400 font-bold text-[9px] uppercase tracking-tighter w-fit px-2 border-0">{asset.type}</Badge>
-                   </div>
-                </TableCell>
-                <TableCell>
-                   <span className="text-xs font-bold text-slate-500 truncate block max-w-[100px]">{asset.location || 'store'}</span>
-                </TableCell>
-                <TableCell className="text-center">
-                   <Badge className={cn(
-                     "rounded-full px-3 py-1 font-bold text-[10px] uppercase border-0",
-                     asset.availableQuantity > 100 ? "bg-green-500 text-white" : 
-                     asset.availableQuantity > 0 ? "bg-amber-500 text-white" : 
-                     "bg-red-500 text-white"
-                   )}>
-                     {asset.availableQuantity > 100 ? 'In Stock' : asset.availableQuantity > 0 ? 'Critical' : 'Out of Stock'}
-                   </Badge>
-                </TableCell>
-                <TableCell className="text-right pr-6">
-                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-slate-100">
-                        <MoreHorizontal className="h-4 w-4 text-slate-400" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-xl border-slate-100 p-2">
-                       <DropdownMenuItem 
-                         className="gap-2 font-bold text-slate-600 rounded-lg p-3 cursor-pointer"
-                         onClick={() => setEditingAsset(asset)}
-                       >
-                          <Edit2 className="h-4 w-4" />
-                          Edit Form
-                       </DropdownMenuItem>
-                       <DropdownMenuItem className="gap-2 font-bold text-slate-600 rounded-lg p-3 cursor-pointer">
-                          <FileText className="h-4 w-4" />
-                          Description
-                       </DropdownMenuItem>
-                       <DropdownMenuItem className="gap-2 font-bold text-slate-600 rounded-lg p-3 cursor-pointer">
-                          <BarChart2 className="h-4 w-4" />
-                          Analytics
-                       </DropdownMenuItem>
-                       <DropdownMenuItem className="gap-2 font-bold text-slate-600 rounded-lg p-3 cursor-pointer">
-                          <RefreshCw className="h-4 w-4" />
-                          Restock History
-                       </DropdownMenuItem>
-                       <DropdownMenuSeparator className="my-2 bg-slate-50" />
-                       <DropdownMenuItem className="gap-2 font-bold text-red-500 hover:bg-red-50 rounded-lg p-3 cursor-pointer" onClick={() => deleteAsset(asset.id)}>
-                          <Trash2 className="h-4 w-4" />
-                          Delete
-                       </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      {/* Mobile Actions */}
+      <div className="flex sm:hidden flex-wrap gap-2 px-1">
+        <Button className="flex-1 gap-2 bg-teal-600 hover:bg-teal-700 text-white shadow-sm" onClick={() => setShowAddForm(true)}>
+          <Plus className="h-4 w-4" /> Add Asset
+        </Button>
       </div>
+
+      {/* Table Card */}
+      <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
+        <div className="border-b border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50 dark:bg-slate-800/30">
+          <div className="flex items-center gap-2 ml-1">
+            <div className="h-8 w-8 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center text-teal-600">
+              <ListFilter className="h-4 w-4" />
+            </div>
+            <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Assets <span className="text-slate-400 font-normal">({filteredAssets.length})</span></p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1 rounded-lg">
+              {(['all', 'dewatering', 'waterproofing', 'tiling', 'ppe'] as const).map(tab => (
+                <button key={tab} onClick={() => setFilter(tab)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all capitalize ${
+                    filter === tab ? 'bg-white dark:bg-slate-700 text-teal-700 dark:text-teal-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >{tab === 'all' ? 'All' : tab}</button>
+              ))}
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input placeholder="Search assets..." className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-9 text-sm focus-visible:ring-teal-500/50 rounded-lg shadow-sm" 
+                value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-teal-700 border-b border-teal-800 text-teal-50 uppercase text-[11px] tracking-wider font-bold">
+                <th className="px-5 py-4 whitespace-nowrap">Asset Name</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center">Total Stock</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center">Reserved</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center">Available</th>
+                <th className="px-5 py-4 whitespace-nowrap">Stats (M | D | U)</th>
+                <th className="px-5 py-4 whitespace-nowrap">Category | Type</th>
+                <th className="px-5 py-4 whitespace-nowrap">Location</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center">Status</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+              {filteredAssets.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-5 py-12 text-center text-slate-500">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="h-12 w-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center border dark:border-slate-700">
+                        <Package className="h-5 w-5 text-slate-400" />
+                      </div>
+                      <p>No assets found.</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredAssets.map((asset) => (
+                  <tr key={asset.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group">
+                    <td className="px-5 py-4 font-bold text-slate-800 dark:text-slate-200 text-xs uppercase">{asset.name}</td>
+                    <td className="px-5 py-4 text-center">
+                      <span className="font-bold text-teal-600 dark:text-teal-400 text-sm">{asset.quantity} {asset.unitOfMeasurement}</span>
+                    </td>
+                    <td className="px-5 py-4 text-center font-semibold text-slate-700 dark:text-slate-300">{asset.reservedQuantity || 0}</td>
+                    <td className="px-5 py-4 text-center font-semibold text-slate-700 dark:text-slate-300">{asset.availableQuantity || 0}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-col text-xs leading-relaxed">
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-slate-400 font-semibold">Missing:</span>
+                          <span className={cn("font-bold", asset.missingQuantity > 0 ? "text-red-500" : "text-slate-400")}>{asset.missingQuantity || 0}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-slate-400 font-semibold">Damaged:</span>
+                          <span className={cn("font-bold", asset.damagedQuantity > 0 ? "text-amber-500" : "text-slate-400")}>{asset.damagedQuantity || 0}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-slate-400 font-semibold">Used:</span>
+                          <span className={cn("font-bold", asset.usedQuantity > 0 ? "text-teal-500" : "text-slate-400")}>{asset.usedQuantity || 0}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-block px-2 py-1 text-[11px] font-semibold bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800 rounded-full capitalize w-fit">{asset.category}</span>
+                        <span className="inline-block px-2 py-1 text-[11px] font-semibold bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-full capitalize w-fit">{asset.type}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 truncate block max-w-[100px]">{asset.location || 'store'}</span>
+                    </td>
+                    <td className="px-5 py-4 text-center">
+                      <Badge className={cn(
+                        "rounded-full px-3 py-0.5 font-semibold text-[11px] border",
+                        asset.availableQuantity > 100
+                          ? "bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200"
+                          : asset.availableQuantity > 0
+                          ? "bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200"
+                          : "bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200"
+                      )} variant="outline">
+                        {asset.availableQuantity > 100 ? 'In Stock' : asset.availableQuantity > 0 ? 'Critical' : 'Out of Stock'}
+                      </Badge>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center justify-center gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20" title="Edit"
+                          onClick={() => setEditingAsset(asset)}>
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20" title="Delete"
+                          onClick={() => deleteAsset(asset.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }
