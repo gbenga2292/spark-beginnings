@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, dialog, shell, ipcMain, Notification } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
@@ -57,6 +57,11 @@ function initAutoUpdater() {
   // Check for updates 3 seconds after launch
   setTimeout(() => autoUpdater.checkForUpdates(), 3000);
 }
+
+// ── Customize the OS App Identity for Notifications
+// Must be set BEFORE app is ready so Windows uses it for notification grouping
+app.setAppUserModelId('com.dcel.officesuite');
+app.name = 'DCEL Office Suite';
 
 /* ─── Current user privileges (updated via IPC from renderer) ─── */
 let currentPrivileges = null; // null = super admin (no user record)
@@ -313,6 +318,20 @@ function initIPC() {
   // Open a file or folder in the default OS File Explorer / App
   ipcMain.on('shell:open-path', (event, filePath) => {
     if (filePath) shell.openPath(filePath);
+  });
+
+  // ── Native notification from main process (correct app name/icon on Windows)
+  ipcMain.on('app:notify', (_event, { title, body }) => {
+    if (!Notification.isSupported()) return;
+    const iconPath = path.join(__dirname, '..', 'logo', 'logo-2.png');
+    const n = new Notification({
+      title,
+      body: body || '',
+      icon: iconPath,
+      // Ensures Windows shows the app name, not "Electron"
+      appName: 'DCEL Office Suite',
+    });
+    n.show();
   });
 }
 

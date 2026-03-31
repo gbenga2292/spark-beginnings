@@ -1,6 +1,6 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle } from 'lucide-react';
+import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign } from 'lucide-react';
 import { StatusIndicator } from '@/src/components/offline/StatusIndicator';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/src/store/auth';
@@ -69,26 +69,38 @@ function useNotifications() {
       return dateStr <= todayStr;
     };
 
-    // 1. Reminders (Highest Priority: 0)
+    // 1. Reminders — show ALL active reminders for the current user (no time-window cap)
     const currentUser = useUserStore.getState().getCurrentUser();
     reminders.filter(r => {
       if (!r.isActive) return false;
       if (currentUser && r.recipientIds && r.recipientIds.length > 0 && !r.recipientIds.includes(currentUser.id)) return false;
-      const remDate = new Date(r.remindAt);
-      const diffHrs = (remDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-      return diffHrs <= 24;
+      return true;
     }).forEach((r) => {
+      const isMention = r.title && r.title.startsWith('Mentioned');
       const remDate = new Date(r.remindAt);
       const isPast = remDate < now;
-      notifs.push({ 
-        id: `rem-${r.id}`, 
-        icon: isPast ? AlertCircle : Bell, 
-        text: `Reminder: ${r.title}`, 
-        time: isPast ? 'Overdue' : r.remindAt.slice(0, 10), 
-        color: isPast ? 'text-rose-500' : 'text-indigo-500',
-        url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
-        priority: isPast ? 0 : 1
-      });
+      
+      if (isMention) {
+          notifs.push({
+            id: `rem-${r.id}`,
+            icon: AtSign,
+            text: r.body || r.title,
+            time: r.createdAt ? r.createdAt.slice(0, 10) : 'New',
+            color: 'text-indigo-500',
+            url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
+            priority: 1
+          });
+      } else {
+          notifs.push({ 
+            id: `rem-${r.id}`, 
+            icon: isPast ? AlertCircle : Bell, 
+            text: `Reminder: ${r.title}`, 
+            time: isPast ? 'Overdue' : r.remindAt.slice(0, 10), 
+            color: isPast ? 'text-rose-500' : 'text-indigo-500',
+            url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
+            priority: isPast ? 0 : 1
+          });
+      }
     });
 
     // 2. Pending Approvals (Priority: 2)
@@ -171,6 +183,7 @@ function useNotifications() {
 export function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuthStore();
   const { signOut } = useAuth();
+  const { updateReminder } = useAppData();
   const navigate = useNavigate();
   const location = useLocation();
   const { setCurrentUser } = useUserStore();
@@ -329,7 +342,12 @@ export function Header({ onMenuClick }: HeaderProps) {
                     {notifications.map((n) => (
                       <div 
                         key={n.id} 
-                        onClick={() => { if (n.url) { navigate(n.url); setNotifOpen(false); } }} 
+                        onClick={() => { 
+                          if (n.id.startsWith('rem-')) {
+                              updateReminder(n.id.replace('rem-', ''), { isActive: false });
+                          }
+                          if (n.url) { navigate(n.url); setNotifOpen(false); } 
+                        }} 
                         className={`flex items-start gap-3 px-4 py-3.5 transition-all relative group ${
                           n.url ? 'cursor-pointer' : ''
                         } ${
@@ -371,16 +389,14 @@ export function Header({ onMenuClick }: HeaderProps) {
                 )}
               </div>
               
-              {notifications.length > 0 && (
-                <div className={`px-4 py-2 text-center border-t ${isDark ? 'bg-slate-900/40 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
-                  <button 
-                    onClick={() => { navigate('/tasks'); setNotifOpen(false); }}
-                    className="text-[10px] font-bold text-slate-500 hover:text-indigo-600 transition-colors uppercase tracking-widest"
-                  >
-                    View Task Manager
-                  </button>
-                </div>
-              )}
+              <div className={`px-4 py-2 text-center border-t ${isDark ? 'bg-slate-900/40 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                <button 
+                  onClick={() => { navigate('/notifications'); setNotifOpen(false); }}
+                  className="text-[10px] font-bold text-slate-500 hover:text-indigo-600 transition-colors uppercase tracking-widest"
+                >
+                  View All Notifications
+                </button>
+              </div>
             </div>
           )}
         </div>

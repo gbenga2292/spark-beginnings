@@ -59,6 +59,7 @@ const SiteManager = lazy(() => import('./pages/SiteManager').then(m => ({ defaul
 const QuickCheckout = lazy(() => import('./pages/QuickCheckout').then(m => ({ default: m.QuickCheckout })));
 const MaintenanceManager = lazy(() => import('./pages/MaintenanceManager').then(m => ({ default: m.MaintenanceManager })));
 const EmployeeAnalytics = lazy(() => import('./pages/EmployeeAnalytics').then(m => ({ default: m.EmployeeAnalytics })));
+const NotificationsPage = lazy(() => import('./pages/Notifications'));
 import { OperationsProvider } from './contexts/OperationsContext';
 
 // ── Suspense fallback ─────────────────────────────────────────────────────────
@@ -179,6 +180,7 @@ function AppContent() {
           } />
 
           <Route path="activity-log" element={<ProtectedRoute requiredModule="variables"><ActivityLog /></ProtectedRoute>} />
+          <Route path="notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
           
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

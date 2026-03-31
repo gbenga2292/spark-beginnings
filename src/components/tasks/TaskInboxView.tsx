@@ -2,7 +2,9 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { format, isPast } from "date-fns";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from '@/src/hooks/useAuth';
+import { useUserStore, UserPrivileges } from '@/src/store/userStore';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import {
   Search, Circle, Loader2, CheckCircle2, AlertTriangle,
@@ -42,7 +44,9 @@ interface TaskInboxViewProps {
 }
 
 export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onSelectSubtask, className, onClose }: TaskInboxViewProps) {
+  const navigate = useNavigate();
   const { user: currentUser } = useAuth();
+  const subUser = useUserStore((s) => s.getCurrentUser());
   const { updateSubtaskStatus, postComment, getSubtaskComments, addSubtask, assignSubtask, getMainTaskWorkflow, approveSubtask, rejectSubtask, addReminder } = useAppData();
 
   const [search, setSearch] = useState("");
@@ -298,9 +302,79 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                     <h1 className="text-2xl font-bold text-slate-900 leading-tight mb-2">{activeSubtask.title}</h1>
                     <p className="text-sm text-slate-500">{activeMainTask.title}</p>
                   </div>
-                  <button className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">
-                    <CheckCircle2 className="w-4 h-4" /> Preview
-                  </button>
+                  {(() => {
+                    let link = '';
+                    let label = 'Preview';
+                    let privKey: keyof UserPrivileges | null = null;
+                    const mtTitle = activeMainTask.title.toLowerCase();
+                    const stTitle = activeSubtask.title.toLowerCase();
+
+                    try {
+                      const meta = JSON.parse(activeSubtask.description || '{}');
+                      if (meta.refType === 'leave') { link = '/leaves'; label = 'View Leaves'; privKey = 'leaves'; }
+                      if (meta.refType === 'salary_advance' || meta.refType === 'loan') { link = '/salary-loans'; label = 'View Loan'; privKey = 'salaryLoans'; }
+                      if (meta.refId && (meta.refType === 'site' || mtTitle.includes('onboard'))) { link = `/sites/onboarding/${meta.refId}`; label = 'View Onboarding'; privKey = 'sites'; }
+                    } catch(e) {}
+
+                    if (!link) {
+                      if (mtTitle.includes('onboard') || stTitle.includes('onboard')) {
+                        link = '/sites';
+                        label = 'Site Onboarding';
+                        privKey = 'sites';
+                      } else if (mtTitle.includes('site') || stTitle.includes('site')) {
+                        link = '/sites';
+                        label = 'View Sites';
+                        privKey = 'sites';
+                      } else if (mtTitle.includes('asset') || stTitle.includes('asset')) {
+                        link = '/operations';
+                        label = 'View Assets';
+                        privKey = 'operations';
+                      } else if (mtTitle.includes('waybill') || stTitle.includes('waybill')) {
+                        link = '/operations/waybills';
+                        label = 'View Waybills';
+                        privKey = 'operations';
+                      } else if (mtTitle.includes('employee') || mtTitle.includes('new hire') || stTitle.includes('employee') || stTitle.includes('new hire')) {
+                        link = '/employees';
+                        label = 'View Employee';
+                        privKey = 'employees';
+                      } else if (mtTitle.includes('payroll')) {
+                        link = '/payroll';
+                        label = 'View Payroll';
+                        privKey = 'payroll';
+                      } else if (mtTitle.includes('invoice') || mtTitle.includes('billing')) {
+                        link = '/client-accounts';
+                        label = 'View Billing';
+                        privKey = 'billing';
+                      }
+                    }
+
+                    if (!link) return null;
+
+                    let hasAccess = true;
+                    if (privKey && subUser) {
+                        hasAccess = !!((subUser.privileges[privKey] as any)?.canView);
+                    }
+
+                    if (!hasAccess) {
+                        return (
+                          <button 
+                            onClick={() => toast.error(`You do not have permission to access ${label.replace('View ', '')}`)}
+                            className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-400 cursor-not-allowed shadow-sm"
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5 opacity-60" /> No Access
+                          </button>
+                        );
+                    }
+
+                    return (
+                      <button 
+                        onClick={() => navigate(link)}
+                        className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-sm active:translate-y-px"
+                      >
+                        <LinkIcon className="w-4 h-4" /> {label}
+                      </button>
+                    );
+                  })()}
                 </div>
 
                 {/* Action Pills */}
@@ -627,10 +701,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
 
     let finalContent = content;
     if (replyingTo) {
-        const repliedText = replyingTo.text ? replyingTo.text.split('\n').map((l: string) => `> ${l}`).join('\n') : "";
-        const replyAuthor = users.find(u => u.id === (replyingTo.author_id || replyingTo.authorId));
-        const authorMention = replyAuthor ? `@${replyAuthor.name.split(' ')[0]}` : "@someone";
-        finalContent = `> Replying to ${authorMention}:\n${repliedText}\n\n${content}`;
+        finalContent = `[reply_to:${replyingTo.id}]\n${content}`;
     }
 
     // Capture "#" to create a linked subtask
@@ -708,7 +779,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
     <div className="flex-1 flex flex-col overflow-hidden">
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/40">
+      <div className="flex-1 overflow-y-auto px-3 py-2.5 space-y-1.5 bg-slate-50/40">
         {comments.length === 0 ? (
           <p className="text-sm text-center text-slate-400 py-10">No updates yet. Be the first to post!</p>
         ) : (
@@ -747,60 +818,89 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
               });
             };
             return (
-              <div key={c.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 relative z-0 group">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-2.5">
-                    <Avatar className="w-9 h-9 flex-shrink-0">
+              <div key={c.id} id={`comment-${c.id}`} className="bg-white rounded-xl border border-slate-100 shadow-sm px-3 py-2 relative z-0 group transition-all">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <Avatar className="w-6 h-6 flex-shrink-0">
                       <AvatarImage src={author?.avatarUrl} />
-                      <AvatarFallback className={`text-xs font-bold text-white ${author?.avatarColor || 'bg-slate-400'}`}>
+                      <AvatarFallback className={`text-[9px] font-bold text-white ${author?.avatarColor || 'bg-slate-400'}`}>
                         {author?.name?.substring(0, 2).toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">{author?.name || 'Unknown'}</p>
-                      <p className="text-[11px] text-slate-400">@{author?.name?.split(' ')[0] || 'user'}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[12px] font-bold text-slate-900 leading-none">{author?.name || 'Unknown'}</p>
+                      <p className="text-[10px] text-slate-400 leading-none">@{author?.name?.split(' ')[0] || 'user'}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {/* Actions show on hover */}
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                      <button onClick={() => setReplyingTo(c)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Reply"><Reply className="w-3.5 h-3.5" /></button>
-                      {isAuthor && <button onClick={() => { setEditingId(c.id); setEditTextContent(c.text); }} className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>}
+                  <div className="flex items-center gap-1">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                      <button onClick={() => setReplyingTo(c)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors" title="Reply"><Reply className="w-3 h-3" /></button>
+                      {isAuthor && <button onClick={() => { setEditingId(c.id); setEditTextContent(c.text); }} className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors" title="Edit"><Pencil className="w-3 h-3" /></button>}
                     </div>
-                    <span className="text-[11px] text-slate-400 flex-shrink-0">
+                    <span className="text-[10px] text-slate-400 flex-shrink-0">
                       {format(new Date(createdAt), "h:mm a")}
                     </span>
                   </div>
                 </div>
                 {editingId === c.id ? (
-                  <div className="mt-2">
+                  <div className="mt-1.5">
                     <textarea 
                       value={editTextContent} 
                       onChange={e => setEditTextContent(e.target.value)} 
-                      className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary/20" 
-                      rows={3} 
+                      className="w-full border border-slate-200 rounded-lg p-2 text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary/20" 
+                      rows={2} 
                     />
-                    <div className="flex gap-2 mt-2 justify-end">
-                      <button onClick={() => setEditingId(null)} className="text-xs font-semibold text-slate-500 hover:bg-slate-100 px-3 py-1.5 rounded-lg transition-colors">Cancel</button>
-                      <button onClick={() => { updateComment(c.id, editTextContent); setEditingId(null); }} className="text-xs font-bold bg-primary text-white px-4 py-1.5 rounded-lg hover:bg-primary/90 transition-colors shadow-sm">Save Changes</button>
+                    <div className="flex gap-1.5 mt-1 justify-end">
+                      <button onClick={() => setEditingId(null)} className="text-[10px] font-semibold text-slate-500 hover:bg-slate-100 px-2.5 py-1 rounded-md transition-colors">Cancel</button>
+                      <button onClick={() => { updateComment(c.id, editTextContent); setEditingId(null); }} className="text-[10px] font-bold bg-primary text-white px-3 py-1 rounded-md hover:bg-primary/90 transition-colors shadow-sm">Save</button>
                     </div>
                   </div>
                 ) : (
                   <>
-                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{renderText(c.text)}</p>
+                    {(() => {
+                      const m = c.text.match(/^\[reply_to:([a-zA-Z0-9.-]+)\]\n([\s\S]*)$/);
+                      if (m) {
+                        const refId = m[1];
+                        const refBody = m[2];
+                        const refComm = comments.find((pc: any) => pc.id === refId);
+                        const refAuthor = refComm ? users.find((u: any) => u.id === (refComm.authorId || refComm.author_id)) : null;
+                        
+                        return (
+                          <div className="mb-1">
+                            <div 
+                              onClick={() => {
+                                const el = document.getElementById(`comment-${refId}`);
+                                if (el) {
+                                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  el.classList.add('ring-2', 'ring-blue-400', 'ring-offset-1');
+                                  setTimeout(() => el.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-1'), 2000);
+                                }
+                              }}
+                              className="mb-1.5 px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all flex flex-col gap-0.5 border-l-4 border-l-blue-400"
+                            >
+                                <span className="text-[9px] font-bold text-blue-700 flex items-center gap-1"><Reply className="w-2.5 h-2.5"/> Reply to {refAuthor?.name || 'Unknown'}</span>
+                                <span className="text-[10px] text-slate-500 truncate">{refComm?.text.replace(/^\[reply_to:[^\]]+\]\n/, '') || 'Message deleted'}</span>
+                            </div>
+                            <p className="text-[12px] text-slate-700 leading-snug whitespace-pre-wrap">{renderText(refBody)}</p>
+                          </div>
+                        );
+                      }
+                      
+                      return <p className="text-[12px] text-slate-700 leading-snug whitespace-pre-wrap">{renderText(c.text)}</p>;
+                    })()}
                     {/* Attachments */}
                     {Array.isArray(c.attachments) && c.attachments.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
                         {c.attachments.map((att: any, ai: number) => {
                           const isImg = att.type?.startsWith('image/');
                           return isImg ? (
-                            <a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="block rounded-xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                              <img src={att.url} alt={att.name} className="max-w-[200px] max-h-[150px] object-cover" />
+                            <a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="block rounded-lg overflow-hidden border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                              <img src={att.url} alt={att.name} className="max-w-[160px] max-h-[120px] object-cover" />
                             </a>
                           ) : (
-                            <a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors">
-                              <FileText className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                              <span className="truncate max-w-[150px]">{att.name}</span>
+                            <a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 px-2 py-1 bg-slate-50 border border-slate-200 rounded-md text-[10px] font-medium text-slate-700 hover:bg-slate-100 transition-colors">
+                              <FileText className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                              <span className="truncate max-w-[120px]">{att.name}</span>
                             </a>
                           );
                         })}
@@ -808,7 +908,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
                     )}
                     {/* File path links */}
                     {Array.isArray(c.file_links) && c.file_links.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-2">
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
                         {c.file_links.map((lnk: string, li: number) => {
                            const isElectron = !!(window as any).electronAPI;
                            const linkName = lnk.split(/[/\\]/).pop() || lnk;
@@ -816,16 +916,16 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
                              <button
                                key={li}
                                onClick={() => (window as any).electronAPI.shellOpenPath(lnk)}
-                               className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 border border-sky-100 rounded-lg text-xs font-semibold text-sky-700 hover:bg-sky-100 hover:text-sky-800 transition-colors shadow-sm cursor-pointer text-left"
+                               className="flex items-center gap-1 px-2 py-1 bg-sky-50 border border-sky-100 rounded-md text-[10px] font-semibold text-sky-700 hover:bg-sky-100 transition-colors cursor-pointer text-left"
                                title={`Open: ${lnk}`}
                              >
-                                <LinkIcon className="w-3.5 h-3.5 flex-shrink-0" />
-                                <span className="truncate max-w-[280px] hover:underline underline-offset-2">{linkName}</span>
+                                <LinkIcon className="w-3 h-3 flex-shrink-0" />
+                                <span className="truncate max-w-[220px] hover:underline underline-offset-1">{linkName}</span>
                              </button>
                            ) : (
-                             <div key={li} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700">
+                             <div key={li} className="flex items-center gap-1 px-2 py-1 bg-slate-50 border border-slate-200 rounded-md text-[10px] font-semibold text-slate-700">
                                <LinkIcon className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                               <span className="truncate max-w-[280px]" title={lnk}>{linkName}</span>
+                               <span className="truncate max-w-[220px]" title={lnk}>{linkName}</span>
                              </div>
                            );
                         })}

@@ -31,4 +31,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // OS Shell integration (open file/folder natively)
   shellOpenPath: (path) => ipcRenderer.send('shell:open-path', path),
+
+  // Native notification via main process (shows correct app name & icon on Windows)
+  notify: (title, body) => ipcRenderer.send('app:notify', { title, body }),
 });

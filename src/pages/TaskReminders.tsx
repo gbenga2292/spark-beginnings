@@ -271,7 +271,7 @@ export default function Reminders() {
           </div>
           {/* Days */}
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="grid grid-cols-7 auto-rows-[minmax(120px,1fr)] h-full">
+            <div className="grid grid-cols-7 auto-rows-[minmax(80px,1fr)] h-full">
               {calendarDays.map((day, idx) => {
                 const dayReminders = remindersByDay(day);
                 const isSelected = isSameDay(day, selectedDate);
@@ -285,15 +285,15 @@ export default function Reminders() {
                       </span>
                     </div>
                     <div className="flex-1 overflow-y-auto space-y-1 mt-0.5 pr-1 no-scrollbar">
-                      {dayReminders.slice(0, 4).map(r => (
+                      {dayReminders.slice(0, 3).map(r => (
                         <div key={r.id} className={`text-[10px] font-medium px-1.5 py-1 rounded truncate flex items-center gap-1 border border-transparent ${r.isActive ? 'bg-violet-100/60 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 hover:border-violet-200' : 'bg-muted/50 text-muted-foreground'}`}>
                           <div className={`w-1 h-1 rounded-full flex-shrink-0 ${r.isActive ? 'bg-violet-500' : 'bg-muted-foreground'}`} />
                           <span className="truncate">{format(parseISO(r.remindAt), 'h:mma')} - {r.title}</span>
                         </div>
                       ))}
-                      {dayReminders.length > 4 && (
+                      {dayReminders.length > 3 && (
                         <div className="text-[10px] font-bold text-muted-foreground pl-1 mt-1">
-                          + {dayReminders.length - 4} more
+                          + {dayReminders.length - 3} more
                         </div>
                       )}
                     </div>

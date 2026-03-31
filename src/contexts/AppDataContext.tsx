@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { supabase } from '@/src/integrations/supabase/client';
 import { useAuth } from '@/src/hooks/useAuth';
 import { toast } from '@/src/components/ui/toast';
+import logoSrc from '../../logo/logo-2.png';
 import type { MainTask, SubTask, TaskComment, AppUser, CommentAttachment } from '@/src/types/tasks';
 
 // ── Typed context interface ──────────────────────────────────────────────────
@@ -38,13 +39,21 @@ interface AppDataContextType {
 export const TaskContext = createContext<AppDataContextType | null>(null);
 
 function showNativeNotification(title: string, body?: string) {
+    // In Electron: delegate to main process so Windows shows the correct
+    // app name ("DCEL Office Suite") and icon instead of generic "Electron"
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.notify) {
+        electronAPI.notify(title, body ?? '');
+        return;
+    }
+    // Fallback: browser Web Notification API
     if (!('Notification' in window)) return;
     if (Notification.permission === 'granted') {
-        new Notification(title, { body });
+        new Notification(title, { body, icon: logoSrc });
     } else if (Notification.permission !== 'denied') {
         Notification.requestPermission().then(permission => {
             if (permission === 'granted') {
-                new Notification(title, { body });
+                new Notification(title, { body, icon: logoSrc });
             }
         });
     }

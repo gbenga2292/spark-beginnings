@@ -70,7 +70,6 @@ export function Variables() {
   const [newVendorName, setNewVendorName] = useState('');
   const [newVendorTin, setNewVendorTin] = useState('');
   const [newBenBankName, setNewBenBankName] = useState('');
-  const [newBenBankAccount, setNewBenBankAccount] = useState('');
 
   // Top-level section switch: 'system' | 'ledger' | 'services'
   const [varSection, setVarSection] = useState<'system' | 'ledger' | 'services'>('system');
@@ -403,7 +402,7 @@ export function Variables() {
       const lBankData = ledgerBanks.map(b => ({ Bank: b.name }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lBankData), 'Ledger_Banks');
 
-      const lBenData = ledgerBeneficiaryBanks.map(b => ({ Bank: b.name, AccountNo: b.accountNo }));
+      const lBenData = ledgerBeneficiaryBanks.map(b => ({ Bank: b.name }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lBenData), 'Ledger_Beneficiary_Banks');
 
       // Service Templates
@@ -574,9 +573,8 @@ export function Variables() {
             const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Ledger_Beneficiary_Banks']);
             data.forEach(row => {
               const name = String(row.Bank || '').trim();
-              const acc = String(row.AccountNo || '').trim();
-              if (name && acc && (isOverwrite || !newLBenBanks.some(b => b.name.toLowerCase() === name.toLowerCase() && b.accountNo === acc))) {
-                newLBenBanks.push({ id: generateId(), name, accountNo: acc });
+              if (name && (isOverwrite || !newLBenBanks.some(b => b.name.toLowerCase() === name.toLowerCase()))) {
+                newLBenBanks.push({ id: generateId(), name, accountNo: '' });
               }
             });
             setLedgerBeneficiaryBanks(newLBenBanks);
@@ -1074,21 +1072,17 @@ export function Variables() {
               <CardDescription>Target banks and accounts for company expenses.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
-              <div className="flex flex-col gap-2">
-                <Input value={newBenBankName} onChange={e => setNewBenBankName(e.target.value)} placeholder="Bank Name" />
-                <div className="flex gap-2">
-                  <Input value={newBenBankAccount} onChange={e => setNewBenBankAccount(e.target.value)} placeholder="Account Number" className="flex-1" />
-                  <Button disabled={!priv.canEdit} onClick={() => { if(newBenBankName && newBenBankAccount) { addLedgerBeneficiaryBank({id: generateId(), name: newBenBankName, accountNo: newBenBankAccount}); setNewBenBankName(''); setNewBenBankAccount(''); } }}>Add</Button>
-                </div>
+              <div className="flex gap-2 w-full">
+                <Input value={newBenBankName} onChange={e => setNewBenBankName(e.target.value)} placeholder="Bank Name" className="flex-1" />
+                <Button disabled={!priv.canEdit} onClick={() => { if(newBenBankName) { addLedgerBeneficiaryBank({id: generateId(), name: newBenBankName, accountNo: ''}); setNewBenBankName(''); } }}>Add</Button>
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
                 <Table>
-                  <TableHeader className="bg-slate-50"><TableRow><TableHead>Bank</TableHead><TableHead>Account No</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                  <TableHeader className="bg-slate-50"><TableRow><TableHead>Bank</TableHead><TableHead></TableHead></TableRow></TableHeader>
                   <TableBody>
                     {ledgerBeneficiaryBanks.map(b => (
                       <TableRow key={b.id}>
                         <TableCell className="font-medium text-slate-700">{b.name}</TableCell>
-                        <TableCell className="text-sm text-slate-500 font-mono">{b.accountNo}</TableCell>
                         <TableCell className="w-[50px]">
                           {priv.canEdit && (
                             <Button variant="ghost" size="icon" onClick={async () => { const conf = await showConfirm(`Delete beneficiary bank "${b.name}"?`, { variant: 'danger' }); if (conf) removeLedgerBeneficiaryBank(b.id); }}>
@@ -1099,7 +1093,7 @@ export function Variables() {
                       </TableRow>
                     ))}
                     {ledgerBeneficiaryBanks.length === 0 && (
-                      <TableRow><TableCell colSpan={3} className="text-slate-400 text-center text-sm py-6 italic">No beneficiary banks yet.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={2} className="text-slate-400 text-center text-sm py-6 italic">No beneficiary banks yet.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>

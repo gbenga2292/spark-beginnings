@@ -9,7 +9,7 @@ import { useWorkspace } from '@/src/hooks/use-workspace';
 import { useAppStore } from '@/src/store/appStore';
 import type { SubTask, SubTaskStatus, MainTask, AppUser } from "@/src/types/tasks";
 import type { TaskPriority } from "@/src/types/tasks";
-import { RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, Plus, Search, Circle, Loader2, Calendar, X, Users, Clock, ChevronDown, ChevronRight, UserCheck, ArrowUpDown, Flag, MessageSquare, Send, Pencil, Lock, User, FolderOpen, List, Bell, RefreshCw } from 'lucide-react';
+import { RotateCcw, Reply, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, Plus, Search, Circle, Loader2, Calendar, X, Users, Clock, ChevronDown, ChevronRight, UserCheck, ArrowUpDown, Flag, MessageSquare, Send, Pencil, Lock, User, FolderOpen, List, Bell, RefreshCw, Link as LinkIcon, FileText, Paperclip } from 'lucide-react';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -243,7 +243,7 @@ function PersonalTasksView() {
           <TaskInboxView
             subtasks={wsSubs}
             mainTasks={wsTasks}
-            users={[]}
+            users={users}
             activeSubtaskId={openSubtaskId}
             onSelectSubtask={id => setOpenSubtaskId(id)}
           />
@@ -1458,10 +1458,9 @@ function AdminTasksView() {
 
       {assignDialog && (
         <AssignUserDialog
-          subtaskId={assignDialog.subtaskId}
-          currentAssignee={assignDialog.current}
+          currentAssignees={assignDialog.current ? assignDialog.current.split(',').filter(Boolean) : []}
           users={activeUsers}
-          onAssign={uid => { assignSubtask(assignDialog.subtaskId, uid ?? ''); setAssignDialog(null); }}
+          onAssign={uids => { assignSubtask(assignDialog.subtaskId, uids.length > 0 ? uids.join(',') : ''); setAssignDialog(null); }}
           onClose={() => setAssignDialog(null)}
         />
       )}
@@ -2136,40 +2135,131 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
   );
 }
 
-/* ─── Assign user dialog ───────────────────────────────────────────────────── */
-function AssignUserDialog({ subtaskId, currentAssignee, users, onAssign, onClose }: {
-  subtaskId: string; currentAssignee: string | null; users: AppUser[];
-  onAssign: (uid: string | null) => void; onClose: () => void;
+/* ─── Assign user dialog (multi-select) ─────────────────────────────────────── */
+function AssignUserDialog({ currentAssignees, users, onAssign, onClose }: {
+  currentAssignees: string[]; users: AppUser[];
+  onAssign: (uids: string[]) => void; onClose: () => void;
 }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set(currentAssignees));
+  const [search, setSearch] = useState('');
+
+  const filtered = users.filter(u =>
+    u.name.toLowerCase().includes(search.toLowerCase()) ||
+    u.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggle = (uid: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(uid) ? next.delete(uid) : next.add(uid);
+      return next;
+    });
+  };
+
+  const selectedUsers = users.filter(u => selected.has(u.id));
+
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-sm">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground">Assign Subtask</h2>
+        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-sm flex flex-col max-h-[85vh]">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Assign Subtask</h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {selected.size === 0 ? 'Select one or more assignees' : `${selected.size} selected`}
+            </p>
+          </div>
           <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted"><X className="w-4 h-4 text-muted-foreground" /></button>
         </div>
-        <div className="p-4 space-y-2">
-          <button onClick={() => onAssign(null)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-left transition-colors ${!currentAssignee ? "bg-primary/10 border border-primary/20" : "hover:bg-muted"}`}>
-            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+
+        {/* Selected pills */}
+        {selectedUsers.length > 0 && (
+          <div className="px-4 py-2.5 flex flex-wrap gap-1.5 border-b border-border bg-muted/30 flex-shrink-0">
+            {selectedUsers.map(u => (
+              <button
+                key={u.id}
+                onClick={() => toggle(u.id)}
+                className={`flex items-center gap-1.5 pl-2 pr-1.5 py-1 rounded-full text-[11px] font-semibold text-white ${u.avatarColor ?? 'bg-slate-500'} hover:opacity-80 transition-opacity`}
+              >
+                {u.name.split(' ')[0]}
+                <X className="w-3 h-3" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Search */}
+        <div className="px-4 py-3 border-b border-border flex-shrink-0">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <input
+              autoFocus
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search users…"
+              className="w-full pl-8 pr-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+        </div>
+
+        {/* User list */}
+        <div className="overflow-y-auto flex-1 p-2 space-y-0.5">
+          {/* Unassign option */}
+          <button
+            onClick={() => setSelected(new Set())}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-left transition-colors ${
+              selected.size === 0 ? 'bg-primary/10 border border-primary/20' : 'hover:bg-muted'
+            }`}
+          >
+            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
               <Users className="w-4 h-4 text-muted-foreground" />
             </div>
             <span className="text-muted-foreground italic">Unassign</span>
+            {selected.size === 0 && <CheckCircle2 className="w-4 h-4 text-primary ml-auto" />}
           </button>
-          {users.map(u => (
-            <button key={u.id} onClick={() => onAssign(u.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-left transition-colors ${currentAssignee === u.id ? "bg-primary/10 border border-primary/20" : "hover:bg-muted"}`}>
-              <div className={`w-8 h-8 rounded-full ${u.avatarColor} flex items-center justify-center text-white text-xs font-bold`}>
-                {u.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
-              </div>
-              <div>
-                <p className="font-medium text-foreground">{u.name}</p>
-                <p className="text-xs text-muted-foreground">{u.email}</p>
-              </div>
-              {currentAssignee === u.id && <CheckCircle2 className="w-4 h-4 text-primary ml-auto" />}
-            </button>
-          ))}
+
+          {filtered.map(u => {
+            const isSelected = selected.has(u.id);
+            return (
+              <button
+                key={u.id}
+                onClick={() => toggle(u.id)}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-left transition-all ${
+                  isSelected ? 'bg-primary/10 border border-primary/20' : 'hover:bg-muted'
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-full ${u.avatarColor ?? 'bg-slate-400'} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                  {u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground truncate">{u.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                </div>
+                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                  isSelected ? 'bg-primary border-primary' : 'border-border'
+                }`}>
+                  {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                </div>
+              </button>
+            );
+          })}
+          {filtered.length === 0 && (
+            <p className="text-center text-xs text-muted-foreground py-6">No users match your search</p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 py-3 border-t border-border flex-shrink-0 flex items-center justify-between gap-3">
+          <button onClick={onClose} className="px-4 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</button>
+          <button
+            onClick={() => onAssign([...selected])}
+            className="px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm flex items-center gap-2"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            Done{selected.size > 0 ? ` (${selected.size})` : ''}
+          </button>
         </div>
       </motion.div>
     </div>
@@ -2665,37 +2755,111 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
             </div>
           )}
           {allFeedEntries.map((c: any) => {
-            const author = users.find(u => u.id === c.authorId);
-            const isMe = c.authorId === currentUserId;
-            const isMain = c.subtaskId === mainTaskId;
-            const parentSub = !isMain ? taskSubtasks.find(s => s.id === c.subtaskId) : null;
+            const resolvedAuthorId = c.author_id || c.authorId;
+            const author = users.find(u => u.id === resolvedAuthorId);
+            const isMe = resolvedAuthorId === currentUserId;
+            const isMain = c.subtaskId === mainTaskId || (c as any).subtask_id === mainTaskId;
+            const resolvedSubId = c.subtaskId || (c as any).subtask_id;
+            const parentSub = !isMain ? taskSubtasks.find(s => s.id === resolvedSubId) : null;
 
             if (c.isEvent) {
               return (
                 <div key={c.id} className="flex justify-center my-3 relative">
                   <div className="absolute inset-x-0 top-1/2 h-px bg-border/40 pointer-events-none" />
                   <span className="relative z-10 text-[10px] bg-card px-2 py-0.5 rounded-full text-muted-foreground/80 font-medium whitespace-nowrap border border-border/50">
-                    <span className="text-foreground/70 font-semibold">{isMe ? 'You' : author?.name.split(' ')[0]}</span> {c.text.replace(/Subtask created:|Urgent info request:/, (match: string) => match.toLowerCase())}
+                    <span className="text-foreground/70 font-semibold">{isMe ? 'You' : (author?.name?.split(' ')[0] || 'Unknown')}</span> {c.text.replace(/Subtask created:|Urgent info request:/, (match: string) => match.toLowerCase())}
                   </span>
                 </div>
               );
             }
 
             return (
-              <div key={c.id} className={`flex gap-2.5 ${isMe ? 'flex-row-reverse' : ''}`}>
-                <div className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-white text-[10px] font-bold mt-0.5 ${author?.avatarColor ?? 'bg-muted-foreground'}`}>
-                  {author?.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2) ?? '?'}
+              <div key={c.id} id={`comment-${c.id}`} className={`flex gap-2.5 ${isMe ? 'flex-row-reverse' : ''}`}>
+                <div className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-white text-[10px] font-bold mt-0.5 ${author?.avatarColor ?? 'bg-slate-400'}`}>
+                  {author?.name ? author.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2) : '?'}
                 </div>
                 <div className={`max-w-[78%] flex flex-col gap-0.5 ${isMe ? 'items-end' : 'items-start'}`}>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[11px] font-semibold text-foreground">{isMe ? 'You' : author?.name.split(' ')[0]}</span>
+                    <span className="text-[11px] font-semibold text-foreground">{isMe ? 'You' : (author?.name?.split(' ')[0] || 'Unknown')}</span>
                     {isMain
                       ? <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold border border-primary/20 uppercase tracking-wide">Main</span>
                       : parentSub && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700 font-semibold">#{parentSub.title}</span>
                     }
                   </div>
                   <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${isMe ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-muted text-foreground rounded-tl-sm'}`}>
-                    <p className="whitespace-pre-wrap text-[13px]">{renderText(c.text)}</p>
+                    {(() => {
+                      const m = c.text.match(/^\[reply_to:([a-zA-Z0-9.-]+)\]\n([\s\S]*)$/);
+                      if (m) {
+                        const refId = m[1];
+                        const refBody = m[2];
+                        const refComm = allFeedEntries.find((pc: any) => pc.id === refId);
+                        const refAuthor = refComm ? users.find((u: any) => u.id === (refComm.authorId || refComm.author_id)) : null;
+                        
+                        return (
+                          <div className="mb-1">
+                            <div 
+                              onClick={() => {
+                                const el = document.getElementById(`comment-${refId}`);
+                                if (el) {
+                                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  el.classList.add('ring-2', 'ring-blue-400', 'ring-offset-2');
+                                  setTimeout(() => el.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-2'), 2000);
+                                }
+                              }}
+                              className={`mb-2 p-2 rounded-xl border cursor-pointer flex flex-col gap-0.5 shadow-sm transition-all ${isMe ? 'bg-primary-foreground/10 border-primary-foreground/20 hover:bg-primary-foreground/20' : 'bg-slate-50 hover:bg-slate-100 border-slate-200'}`}
+                            >
+                                <span className={`text-[9px] font-bold flex items-center gap-1.5 ${isMe ? 'text-primary-foreground/90' : 'text-blue-700'}`}><Reply className="w-2.5 h-2.5"/> Reply to {refAuthor?.name || 'Unknown'}</span>
+                                <span className={`text-[11px] truncate ${isMe ? 'text-primary-foreground/80' : 'text-slate-500'}`}>{refComm?.text.replace(/^\[reply_to:[^\]]+\]\n/, '') || 'Message deleted'}</span>
+                            </div>
+                            <p className="whitespace-pre-wrap text-[13px]">{renderText(refBody)}</p>
+                          </div>
+                        );
+                      }
+                      return <p className="whitespace-pre-wrap text-[13px]">{renderText(c.text)}</p>;
+                    })()}
+                    {/* Attachments */}
+                    {Array.isArray(c.attachments) && c.attachments.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {c.attachments.map((att: any, ai: number) => {
+                          const isImg = att.type?.startsWith('image/');
+                          return isImg ? (
+                            <a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="block rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                              <img src={att.url} alt={att.name} className="max-w-[200px] max-h-[150px] object-cover" />
+                            </a>
+                          ) : (
+                            <a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-1.5 px-3 py-1.5 border hover:opacity-80 transition-colors ${isMe ? 'bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground rounded-lg' : 'bg-background border-border rounded-lg text-foreground hover:bg-muted'}`}>
+                              <FileText className={`w-3.5 h-3.5 ${isMe ? 'opacity-80' : 'text-muted-foreground'} flex-shrink-0`} />
+                              <span className="truncate max-w-[150px] text-xs font-medium">{att.name}</span>
+                            </a>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {/* File path links */}
+                    {Array.isArray(c.file_links) && c.file_links.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                         {c.file_links.map((lnk: string, li: number) => {
+                            const isElectron = !!(window as any).electronAPI;
+                            const linkName = lnk.split(/[/\\]/).pop() || lnk;
+                            return isElectron ? (
+                              <button
+                                key={li}
+                                onClick={() => (window as any).electronAPI.shellOpenPath(lnk)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 border hover:opacity-80 transition-colors cursor-pointer text-left shadow-sm ${isMe ? 'bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground rounded-lg' : 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100 rounded-lg'}`}
+                                title={`Open: ${lnk}`}
+                              >
+                                 <LinkIcon className={`w-3.5 h-3.5 flex-shrink-0 ${isMe ? 'opacity-80' : ''}`} />
+                                 <span className="truncate max-w-[280px] text-xs font-semibold hover:underline underline-offset-2">{linkName}</span>
+                              </button>
+                            ) : (
+                              <div key={li} className={`flex items-center gap-1.5 px-3 py-1.5 border ${isMe ? 'bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground rounded-lg' : 'bg-background border-border text-foreground rounded-lg'}`}>
+                                <LinkIcon className={`w-3.5 h-3.5 ${isMe ? 'opacity-80' : 'text-muted-foreground'}`} />
+                                <span className="truncate max-w-[280px] text-xs font-semibold select-all cursor-text">{lnk}</span>
+                              </div>
+                            );
+                         })}
+                      </div>
+                    )}
                   </div>
                   <span className="text-[10px] text-muted-foreground/50 px-1">
                     {c.createdAt && !isNaN(new Date(c.createdAt).getTime()) 
