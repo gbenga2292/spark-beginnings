@@ -459,6 +459,7 @@ export interface VatPayment {
   client: string;
   date: string;
   month: string;
+  year: string;
   amount: number;
 }
 

@@ -182,24 +182,50 @@ export function Payments() {
                 for (let i = 1; i < lines.length; i++) {
                     const vals = parseCSVRow(lines[i]);
                     
-                    if (vals.length >= 8) { // Minimum required columns
+                    if (vals.length >= 5) { // Minimum required columns: id, client, site, date, amount
                         const providedId = vals[0]?.trim() || '';
                         const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(providedId);
                         const idToUse = (mode !== 'append' && isValidUUID) ? providedId : generateId();
                         
                         if (idToUse) csvProcessedIds.add(idToUse);
 
+                        const client = (vals[1] || '').trim();
+                        const site = (vals[2] || '').trim();
+                        const amount = parseFloat(vals[4]) || 0;
+
+                        // Lookup VAT policy from master site registry
+                        let siteObj = sites.find(s => s.name === site && s.client === client);
+                        
+                        // Fallback: Check if the user accidentally swapped Client and Site
+                        if (!siteObj) {
+                            siteObj = sites.find(s => s.name === client && s.client === site);
+                        }
+                        
+                        const payVat = siteObj ? (siteObj.vat as any) : (vals[7] || 'No');
+
+                        let vat = 0;
+                        if (payVat === 'Yes') {
+                            vat = (amount / (100 + vatRate)) * vatRate;
+                        } else if (payVat === 'Add') {
+                            vat = amount * (vatRate / 100);
+                        }
+
+                        let amountForVat = 0;
+                        if (payVat !== 'No') {
+                            amountForVat = amount - vat;
+                        }
+
                         const parsedPayment: Payment = {
                             id: idToUse,
-                            client: vals[1],
-                            site: vals[2],
+                            client: siteObj && siteObj.name === client ? site : client, // Restore correct client if swapped
+                            site: siteObj && siteObj.name === client ? client : site, // Restore correct site if swapped
                             date: vals[3],
-                            amount: parseFloat(vals[4]) || 0,
+                            amount,
                             withholdingTax: parseFloat(vals[5]) || 0,
                             discount: parseFloat(vals[6]) || 0,
-                            payVat: (vals[7] as any) || 'No',
-                            vat: parseFloat(vals[8]) || 0,
-                            amountForVat: parseFloat(vals[9]) || 0,
+                            payVat,
+                            vat,
+                            amountForVat,
                         };
                         const existing = payments.find(e => e.id === parsedPayment.id);
                         if (existing && mode !== 'append') { 

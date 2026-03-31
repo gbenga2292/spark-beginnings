@@ -19,8 +19,34 @@ const formatDisplayDate = (iso: string | null | undefined): string => {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 };
 
+const parseDateToISO = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return '';
+  const trimmed = dateStr.trim();
+  if (!trimmed) return '';
+
+  // Case 1: Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+
+  // Case 2: DD/MM/YYYY
+  const slashParts = trimmed.split('/');
+  if (slashParts.length === 3) {
+    const day = slashParts[0].padStart(2, '0');
+    const month = slashParts[1].padStart(2, '0');
+    let year = slashParts[2];
+    if (year.length === 2) year = '20' + year;
+    if (year.length === 4) return `${year}-${month}-${day}`;
+  }
+
+  // Case 3: Standard parse
+  const d = new Date(trimmed);
+  if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+
+  return trimmed;
+};
+
 export function Billing() {
   const sites = useAppStore((state) => state.sites);
+  const pendingSites = useAppStore((state) => state.pendingSites);
   const pendingInvoices = useAppStore((state) => state.pendingInvoices);
   const invoices = useAppStore((state) => state.invoices);
   const addPendingInvoice = useAppStore(state => state.addPendingInvoice);
@@ -41,6 +67,27 @@ export function Billing() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
 
+  // ── Master Site Registry ────────────────────────────────────
+  const siteRegistry = useMemo(() => {
+    const list = [
+      ...sites.map(s => ({ 
+        type: 'Active', 
+        name: (s.name || '').trim(), 
+        client: (s.client || '').trim(), 
+        vat: (s.vat || 'No') as 'Yes' | 'No' | 'Add'
+      })),
+      ...pendingSites.map(ps => ({ 
+        type: 'Pending', 
+        name: (ps.siteName || '').trim(), 
+        client: (ps.clientName || '').trim(), 
+        vat: (ps.phase4?.clientTaxStatus?.includes('Add') ? 'Add' : 
+             ps.phase4?.clientTaxStatus?.includes('Yes') ? 'Yes' : 'No') as 'Yes'|'No'|'Add'
+      }))
+    ];
+    return list.filter(item => item.name && item.client);
+  }, [sites, pendingSites]);
+
+
   const initialForm = {
     destination: 'Pending' as 'Pending' | 'Active',
     startDate: '',
@@ -59,8 +106,31 @@ export function Billing() {
     damages: '',
     createReminder: true,
     sendEmailNotification: true,
+    vatInc: 'No' as 'Yes' | 'No' | 'Add',
   };
   const [form, setForm] = useState(initialForm);
+
+  const uniqueClients = useMemo(() => {
+    const clients = new Set(siteRegistry.map(s => s.client));
+    if (form.client && !clients.has(form.client)) {
+      clients.add(form.client);
+    }
+    return Array.from(clients).sort();
+  }, [siteRegistry, form.client]);
+
+  const sitesBySelectedClient = useMemo(() => {
+    const matches = siteRegistry.filter(s => s.client === form.client).map(s => ({ name: s.name, type: s.type }));
+    if (form.site && !matches.some(m => m.name === form.site)) {
+      matches.push({ name: form.site, type: 'N/A' });
+    }
+    // De-duplicate by name
+    const seen = new Set();
+    return matches.filter(m => {
+      if (seen.has(m.name)) return false;
+      seen.add(m.name);
+      return true;
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }, [siteRegistry, form.client, form.site]);
 
   const handleChange = (field: string, value: string | boolean) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -91,8 +161,11 @@ export function Billing() {
 
     const totalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
 
-    const siteObj = sites.find(s => s.name === form.site && s.client === form.client);
-    const vatInc = siteObj ? siteObj.vat : 'No';
+    let siteRecord = siteRegistry.find(s => s.name === form.site && s.client === form.client);
+    if (!siteRecord) {
+      siteRecord = siteRegistry.find(s => s.name === form.client && s.client === form.site);
+    }
+    const vatInc = siteRecord ? siteRecord.vat : 'No';
 
     let vat = 0;
     if (vatInc === 'Yes') {
@@ -109,28 +182,28 @@ export function Billing() {
     return { totalCost, vat, totalCharge, vatInc };
   }, [form, sites, vatRate]);
 
-  const calculateInvoice = (): Omit<PendingInvoice, 'id'> | null => {
-    if (!form.invoiceNo || !form.client || !form.site) {
-      toast.error('Invoice Number, Client, and Site are required');
-      return null;
-    }
+  const calculateFullInvoiceData = (input: any) => {
+    const duration = parseFloat(input.duration) || 0;
+    const noOfMachine = parseFloat(input.noOfMachine) || 0;
+    const dailyRentalCost = parseFloat(input.dailyRentalCost) || 0;
+    const noOfTechnician = parseFloat(input.noOfTechnician) || 0;
+    const techniciansDailyRate = parseFloat(input.techniciansDailyRate) || 0;
+    const dieselCostPerLtr = parseFloat(input.dieselCostPerLtr) || 0;
+    const dailyUsage = parseFloat(input.dailyUsage) || 0;
+    const mobDemob = parseFloat(input.mobDemob) || 0;
+    const installation = parseFloat(input.installation) || 0;
+    const damages = parseFloat(input.damages) || 0;
 
-    const duration = parseFloat(form.duration) || 0;
-    const noOfMachine = parseFloat(form.noOfMachine) || 0;
-    const dailyRentalCost = parseFloat(form.dailyRentalCost) || 0;
-    const noOfTechnician = parseFloat(form.noOfTechnician) || 0;
-    const techniciansDailyRate = parseFloat(form.techniciansDailyRate) || 0;
-    const dieselCostPerLtr = parseFloat(form.dieselCostPerLtr) || 0;
-    const dailyUsage = parseFloat(form.dailyUsage) || 0;
-    const mobDemob = parseFloat(form.mobDemob) || 0;
-    const installation = parseFloat(form.installation) || 0;
-    const damages = parseFloat(form.damages) || 0;
-
+    let startDate = parseDateToISO(input.startDate || input.date);
     let endDate = '';
-    if (form.startDate && duration > 0) {
-      const start = new Date(form.startDate);
-      start.setDate(start.getDate() + duration - 1);
-      endDate = start.toISOString().split('T')[0];
+    if (startDate && duration > 0) {
+      const start = new Date(startDate);
+      if (!isNaN(start.getTime())) {
+        start.setDate(start.getDate() + duration - 1);
+        endDate = start.toISOString().split('T')[0];
+      }
+    } else if (input.endDate || input.dueDate) {
+      endDate = parseDateToISO(input.endDate || input.dueDate);
     }
 
     const rentalCost = noOfMachine * dailyRentalCost * duration;
@@ -141,8 +214,18 @@ export function Billing() {
 
     const totalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
 
-    const siteObj = sites.find(s => s.name === form.site && s.client === form.client);
-    const vatInc = siteObj ? siteObj.vat : 'No';
+    const siteName = (input.site || input.siteName || '').trim();
+    const clientName = (input.client || '').trim();
+    
+    let siteObj = siteRegistry.find(s => s.name === siteName && s.client === clientName);
+    
+    // Fallback: Check if the user accidentally swapped Client and Site
+    if (!siteObj) {
+      siteObj = siteRegistry.find(s => s.name === clientName && s.client === siteName);
+    }
+    
+    // Site configuration is the ground truth for VAT
+    const vatInc = siteObj ? siteObj.vat : (input.vatInc || 'No');
 
     let vat = 0;
     if (vatInc === 'Yes') {
@@ -156,33 +239,27 @@ export function Billing() {
       totalCharge = totalCost + vat;
     }
 
-    const totalExclusiveOfVat = totalCharge - vat;
-
     return {
-      invoiceNo: form.invoiceNo,
-      client: form.client,
-      site: form.site,
-      vatInc,
-      noOfMachine,
-      dailyRentalCost,
-      dieselCostPerLtr,
-      dailyUsage,
-      noOfTechnician,
-      techniciansDailyRate,
-      startDate: form.startDate,
-      duration,
-      endDate,
-      mobDemob,
-      installation,
-      damages,
-      rentalCost,
-      dieselCost,
-      techniciansCost,
-      totalCost,
-      vat,
-      totalCharge,
-      totalExclusiveOfVat,
+      duration, noOfMachine, dailyRentalCost, noOfTechnician, techniciansDailyRate,
+      dieselCostPerLtr, dailyUsage, mobDemob, installation, damages,
+      startDate, endDate, rentalCost, dieselCost, techniciansCost,
+      totalCost, vat, totalCharge, vatInc, 
+      totalExclusiveOfVat: totalCharge - vat,
+      invoiceNo: input.invoiceNo || input.invoiceNumber || '',
+      client: clientName, site: siteName
     };
+  };
+
+  const calculateInvoice = (): Omit<PendingInvoice, 'id'> | null => {
+    if (!form.invoiceNo || !form.client || !form.site) {
+      toast.error('Invoice Number, Client, and Site are required');
+      return null;
+    }
+    const data = calculateFullInvoiceData(form);
+    return {
+      id: '', // Placeholder
+      ...data
+    } as any;
   };
 
   const handleSubmit = () => {
@@ -266,12 +343,14 @@ export function Billing() {
   const handleEdit = (inv: PendingInvoice | Invoice) => {
     setSelectedId(inv.id);
     setForm({
+      ...initialForm,
+      vatInc: inv.vatInc || 'No',
       destination: 'totalCost' in inv ? 'Pending' : 'Active',
       startDate: 'startDate' in inv ? inv.startDate : inv.date,
       duration: 'duration' in inv ? String(inv.duration ?? 0) : '0',
       invoiceNo: 'invoiceNo' in inv ? inv.invoiceNo : inv.invoiceNumber,
-      client: inv.client,
-      site: 'site' in inv ? inv.site : inv.siteName,
+      client: (inv.client || '').trim(),
+      site: (('site' in inv ? inv.site : inv.siteName) || '').trim(),
       noOfMachine: 'noOfMachine' in inv ? String(inv.noOfMachine ?? 0) : '0',
       dailyRentalCost: 'dailyRentalCost' in inv ? String(inv.dailyRentalCost ?? 0) : '0',
       noOfTechnician: 'noOfTechnician' in inv ? String(inv.noOfTechnician ?? 0) : '0',
@@ -281,7 +360,7 @@ export function Billing() {
       mobDemob: 'mobDemob' in inv ? String(inv.mobDemob ?? 0) : '0',
       installation: 'installation' in inv ? String(inv.installation ?? 0) : '0',
       damages: 'damages' in inv ? String(inv.damages ?? 0) : '0',
-      createReminder: false, // Don't recreate a reminder automatically on edit
+      createReminder: false,
       sendEmailNotification: true,
     });
     setIsModalOpen(true);
@@ -351,13 +430,18 @@ export function Billing() {
       if (str[i] === '"') {
         inQuotes = !inQuotes;
       } else if (str[i] === ',' && !inQuotes) {
-        vals.push(cur.trim());
+        // Strip surrounding quotes if present
+        let val = cur.trim();
+        if (val.startsWith('"') && val.endsWith('"')) val = val.substring(1, val.length - 1);
+        vals.push(val.replace(/""/g, '"'));
         cur = '';
       } else {
         cur += str[i];
       }
     }
-    vals.push(cur.trim());
+    let lastVal = cur.trim();
+    if (lastVal.startsWith('"') && lastVal.endsWith('"')) lastVal = lastVal.substring(1, lastVal.length - 1);
+    vals.push(lastVal.replace(/""/g, '"'));
     return vals;
   };
 
@@ -384,92 +468,129 @@ export function Billing() {
         let deletedCount = 0;
         const csvProcessedIds = new Set<string>();
 
+        const headers = parseCSVRow(lines[0]).map(h => h.trim().toLowerCase().replace(/^["']|["']$/g, ''));
+        const getVal = (vals: string[], ...keys: string[]) => {
+          for (const key of keys) {
+            const idx = headers.indexOf(key.toLowerCase());
+            if (idx >= 0) return vals[idx];
+          }
+          return undefined;
+        };
+
+        const parseNum = (s: string | undefined): number => {
+          if (!s) return 0;
+          const clean = s.replace(/[^0-9.-]/g, '');
+          const val = parseFloat(clean);
+          return isNaN(val) ? 0 : val;
+        };
+
         for (let i = 1; i < lines.length; i++) {
           const vals = parseCSVRow(lines[i]);
+          if (vals.length < 3) continue;
 
-          if (vals.length >= 26) { // Minimum required columns
-            const providedId = vals[0]?.trim() || '';
-            const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(providedId);
-            const idToUse = (mode !== 'append' && isValidUUID) ? providedId : generateId();
+          const providedId = getVal(vals, 'id')?.trim() || '';
+          const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(providedId);
+          const idToUse = (mode !== 'append' && isValidUUID) ? providedId : generateId();
 
-            if (idToUse) csvProcessedIds.add(idToUse);
+          if (idToUse) csvProcessedIds.add(idToUse);
 
-            if (isViewingActive) {
-              const parsedInvoice: Invoice = {
-                id: idToUse,
-                invoiceNumber: vals[1],
-                client: vals[2],
-                project: vals[3] || 'Billed',
-                siteId: vals[4] || '',
-                siteName: vals[5] || '',
-                amount: parseFloat(vals[6]) || 0,
-                date: vals[7] || '',
-                dueDate: vals[8] || '',
-                billingCycle: (vals[9] as any) || 'Custom',
-                reminderDate: vals[10] || '',
-                status: (vals[11] as any) || 'Sent',
-                vatInc: (vals[12] as any) || 'No',
-                noOfMachine: parseFloat(vals[13]) || 0,
-                dailyRentalCost: parseFloat(vals[14]) || 0,
-                dieselCostPerLtr: parseFloat(vals[15]) || 0,
-                dailyUsage: parseFloat(vals[16]) || 0,
-                noOfTechnician: parseFloat(vals[17]) || 0,
-                techniciansDailyRate: parseFloat(vals[18]) || 0,
-                mobDemob: parseFloat(vals[19]) || 0,
-                installation: parseFloat(vals[20]) || 0,
-                damages: parseFloat(vals[21]) || 0,
-                duration: parseFloat(vals[22]) || 0,
-                rentalCost: parseFloat(vals[23]) || 0,
-                dieselCost: parseFloat(vals[24]) || 0,
-                techniciansCost: parseFloat(vals[25]) || 0,
-                totalCost: parseFloat(vals[26]) || 0,
-                vat: parseFloat(vals[27]) || 0,
-                totalCharge: parseFloat(vals[28]) || 0,
-                totalExclusiveOfVat: parseFloat(vals[29]) || 0,
-              };
-              const existing = invoices.find(e => e.id === parsedInvoice.id);
-              if (existing && mode !== 'append') {
-                updateInvoice(existing.id, parsedInvoice);
-                updatedCount++;
-              } else {
-                addInvoice(parsedInvoice);
-                importedCount++;
+          const rawData = {
+            invoiceNo: getVal(vals, 'invoiceNo', 'invoiceNumber'),
+            client: getVal(vals, 'client'),
+            site: getVal(vals, 'site', 'siteName'),
+            startDate: getVal(vals, 'startDate', 'date'),
+            duration: parseNum(getVal(vals, 'duration')),
+            noOfMachine: parseNum(getVal(vals, 'noOfMachine')),
+            dailyRentalCost: parseNum(getVal(vals, 'dailyRentalCost')),
+            dieselCostPerLtr: parseNum(getVal(vals, 'dieselCostPerLtr')),
+            dailyUsage: parseNum(getVal(vals, 'dailyUsage')),
+            noOfTechnician: parseNum(getVal(vals, 'noOfTechnician')),
+            techniciansDailyRate: parseNum(getVal(vals, 'techniciansDailyRate')),
+            mobDemob: parseNum(getVal(vals, 'mobDemob')),
+            installation: parseNum(getVal(vals, 'installation')),
+            damages: parseNum(getVal(vals, 'damages')),
+            vatInc: getVal(vals, 'vatInc', 'vatinc'),
+            endDate: getVal(vals, 'endDate', 'dueDate'),
+            amount: parseNum(getVal(vals, 'amount', 'totalCharge')),
+            rentalCost: parseNum(getVal(vals, 'rentalCost')),
+            dieselCost: parseNum(getVal(vals, 'dieselCost')),
+            techniciansCost: parseNum(getVal(vals, 'techniciansCost')),
+            totalCost: parseNum(getVal(vals, 'totalCost')),
+            vat: parseNum(getVal(vals, 'vat')),
+            totalCharge: parseNum(getVal(vals, 'totalCharge', 'amount')),
+            totalExclusiveOfVat: parseNum(getVal(vals, 'totalExclusiveOfVat')),
+          };
+
+          // Recalculate to ensure VAT and totals are correct based on current master data
+          const computed = calculateFullInvoiceData(rawData);
+          rawData.vatInc = computed.vatInc;
+
+          if (rawData.amount > 0 && rawData.totalCost > 0) {
+            // If CSV provided values, keep them, but use computed for missing ones
+            Object.keys(rawData).forEach(key => {
+              if ((rawData as any)[key] === 0 && (computed as any)[key] !== 0) {
+                (rawData as any)[key] = (computed as any)[key];
               }
+            });
+          } else {
+            // Use full computed data
+            Object.assign(rawData, computed);
+          }
+
+          if (isViewingActive) {
+            const parsedInvoice: Invoice = {
+              id: idToUse,
+              invoiceNumber: rawData.invoiceNo || '',
+              client: rawData.client || '',
+              project: getVal(vals, 'project') || 'Billed',
+              siteId: getVal(vals, 'siteId') || '',
+              siteName: rawData.site || '',
+              amount: rawData.totalCharge,
+              date: rawData.startDate || '',
+              dueDate: rawData.endDate || '',
+              billingCycle: (getVal(vals, 'billingCycle') as any) || 'Custom',
+              reminderDate: parseDateToISO(getVal(vals, 'reminderDate')),
+              status: (getVal(vals, 'status') as any) || 'Sent',
+              vatInc: rawData.vatInc as any,
+              noOfMachine: rawData.noOfMachine,
+              dailyRentalCost: rawData.dailyRentalCost,
+              dieselCostPerLtr: rawData.dieselCostPerLtr,
+              dailyUsage: rawData.dailyUsage,
+              noOfTechnician: rawData.noOfTechnician,
+              techniciansDailyRate: rawData.techniciansDailyRate,
+              mobDemob: rawData.mobDemob,
+              installation: rawData.installation,
+              damages: rawData.damages,
+              duration: rawData.duration,
+              rentalCost: rawData.rentalCost,
+              dieselCost: rawData.dieselCost,
+              techniciansCost: rawData.techniciansCost,
+              totalCost: rawData.totalCost,
+              vat: rawData.vat,
+              totalCharge: rawData.totalCharge,
+              totalExclusiveOfVat: rawData.totalExclusiveOfVat,
+            };
+            const existing = invoices.find(e => e.id === idToUse);
+            if (existing && mode !== 'append') {
+              updateInvoice(existing.id, parsedInvoice);
+              updatedCount++;
             } else {
-              const parsedPendingInvoice: PendingInvoice = {
-                id: idToUse,
-                invoiceNo: vals[1],
-                client: vals[2],
-                site: vals[3] || '',
-                vatInc: (vals[4] as any) || 'No',
-                noOfMachine: parseFloat(vals[5]) || 0,
-                dailyRentalCost: parseFloat(vals[6]) || 0,
-                dieselCostPerLtr: parseFloat(vals[7]) || 0,
-                dailyUsage: parseFloat(vals[8]) || 0,
-                noOfTechnician: parseFloat(vals[9]) || 0,
-                techniciansDailyRate: parseFloat(vals[10]) || 0,
-                startDate: vals[11] || '',
-                duration: parseFloat(vals[12]) || 0,
-                endDate: vals[13] || '',
-                mobDemob: parseFloat(vals[14]) || 0,
-                installation: parseFloat(vals[15]) || 0,
-                damages: parseFloat(vals[16]) || 0,
-                rentalCost: parseFloat(vals[17]) || 0,
-                dieselCost: parseFloat(vals[18]) || 0,
-                techniciansCost: parseFloat(vals[19]) || 0,
-                totalCost: parseFloat(vals[20]) || 0,
-                vat: parseFloat(vals[21]) || 0,
-                totalCharge: parseFloat(vals[22]) || 0,
-                totalExclusiveOfVat: parseFloat(vals[23]) || 0,
-              };
-              const existing = pendingInvoices.find(e => e.id === parsedPendingInvoice.id);
-              if (existing && mode !== 'append') {
-                updatePendingInvoice(existing.id, parsedPendingInvoice);
-                updatedCount++;
-              } else {
-                addPendingInvoice(parsedPendingInvoice);
-                importedCount++;
-              }
+              addInvoice(parsedInvoice);
+              importedCount++;
+            }
+          } else {
+            const parsedPendingInvoice: PendingInvoice = {
+              id: idToUse,
+              ...rawData,
+              vatInc: rawData.vatInc as any,
+            };
+            const existing = pendingInvoices.find(e => e.id === idToUse);
+            if (existing && mode !== 'append') {
+              updatePendingInvoice(existing.id, parsedPendingInvoice);
+              updatedCount++;
+            } else {
+              addPendingInvoice(parsedPendingInvoice);
+              importedCount++;
             }
           }
         }
@@ -502,39 +623,55 @@ export function Billing() {
     reader.readAsText(file);
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = (format: 'basic' | 'detailed') => {
     try {
-      if (currentList.length === 0) {
-        toast.info('No invoices to export');
-        return;
-      }
       let headers: string[] = [];
       let rows: string[] = [];
       const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
 
       if (isViewingActive) {
-        headers = ['id', 'invoiceNumber', 'client', 'project', 'siteId', 'siteName', 'amount', 'date', 'dueDate', 'billingCycle', 'reminderDate', 'status', 'vatInc', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'mobDemob', 'installation', 'damages', 'duration', 'rentalCost', 'dieselCost', 'techniciansCost', 'totalCost', 'vat', 'totalCharge', 'totalExclusiveOfVat'];
-        rows = (currentList as Invoice[]).map(inv => {
-          const data = [
-            inv.id, inv.invoiceNumber, inv.client, inv.project, inv.siteId, inv.siteName, inv.amount, inv.date, inv.dueDate, inv.billingCycle, inv.reminderDate, inv.status, inv.vatInc, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0, inv.duration || 0, inv.rentalCost || 0, inv.dieselCost || 0, inv.techniciansCost || 0, inv.totalCost || 0, inv.vat || 0, inv.totalCharge || 0, inv.totalExclusiveOfVat || 0
-          ];
-          return data.map(extractCSV).join(',');
-        });
+        if (format === 'detailed') {
+          headers = ['id', 'invoiceNumber', 'client', 'project', 'siteId', 'siteName', 'amount', 'date', 'dueDate', 'billingCycle', 'reminderDate', 'status', 'vatInc', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'mobDemob', 'installation', 'damages', 'duration', 'rentalCost', 'dieselCost', 'techniciansCost', 'totalCost', 'vat', 'totalCharge', 'totalExclusiveOfVat'];
+          rows = (currentList as Invoice[]).map(inv => {
+            const data = [
+              inv.id, inv.invoiceNumber, inv.client, inv.project, inv.siteId, inv.siteName, inv.amount, inv.date, inv.dueDate, inv.billingCycle, inv.reminderDate, inv.status, inv.vatInc, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0, inv.duration || 0, inv.rentalCost || 0, inv.dieselCost || 0, inv.techniciansCost || 0, inv.totalCost || 0, inv.vat || 0, inv.totalCharge || 0, inv.totalExclusiveOfVat || 0
+            ];
+            return data.map(extractCSV).join(',');
+          });
+        } else {
+          headers = ['id', 'invoiceNumber', 'client', 'siteName', 'date', 'duration', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'mobDemob', 'installation', 'damages'];
+          rows = (currentList as Invoice[]).map(inv => {
+            const data = [
+              inv.id, inv.invoiceNumber, inv.client, inv.siteName, inv.date, inv.duration || 0, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0
+            ];
+            return data.map(extractCSV).join(',');
+          });
+        }
       } else {
-        headers = ['id', 'invoiceNo', 'client', 'site', 'vatInc', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'startDate', 'duration', 'endDate', 'mobDemob', 'installation', 'damages', 'rentalCost', 'dieselCost', 'techniciansCost', 'totalCost', 'vat', 'totalCharge', 'totalExclusiveOfVat'];
-        rows = (currentList as PendingInvoice[]).map(inv => {
-          const data = [
-            inv.id, inv.invoiceNo, inv.client, inv.site, inv.vatInc, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.startDate || '', inv.duration || 0, inv.endDate || '', inv.mobDemob || 0, inv.installation || 0, inv.damages || 0, inv.rentalCost || 0, inv.dieselCost || 0, inv.techniciansCost || 0, inv.totalCost || 0, inv.vat || 0, inv.totalCharge || 0, inv.totalExclusiveOfVat || 0
-          ];
-          return data.map(extractCSV).join(',');
-        });
+        if (format === 'detailed') {
+          headers = ['id', 'invoiceNo', 'client', 'site', 'vatInc', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'startDate', 'duration', 'endDate', 'mobDemob', 'installation', 'damages', 'rentalCost', 'dieselCost', 'techniciansCost', 'totalCost', 'vat', 'totalCharge', 'totalExclusiveOfVat'];
+          rows = (currentList as PendingInvoice[]).map(inv => {
+            const data = [
+              inv.id, inv.invoiceNo, inv.client, inv.site, inv.vatInc, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.startDate || '', inv.duration || 0, inv.endDate || '', inv.mobDemob || 0, inv.installation || 0, inv.damages || 0, inv.rentalCost || 0, inv.dieselCost || 0, inv.techniciansCost || 0, inv.totalCost || 0, inv.vat || 0, inv.totalCharge || 0, inv.totalExclusiveOfVat || 0
+            ];
+            return data.map(extractCSV).join(',');
+          });
+        } else {
+          headers = ['id', 'invoiceNo', 'client', 'site', 'startDate', 'duration', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'mobDemob', 'installation', 'damages'];
+          rows = (currentList as PendingInvoice[]).map(inv => {
+            const data = [
+              inv.id, inv.invoiceNo, inv.client, inv.site, inv.startDate || '', inv.duration || 0, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0
+            ];
+            return data.map(extractCSV).join(',');
+          });
+        }
       }
 
       const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `invoices_${isViewingActive ? 'active' : 'pending'}_export_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.setAttribute("download", `invoices_${isViewingActive ? 'active' : 'pending'}_${format}_export_${new Date().toISOString().slice(0, 10)}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -545,9 +682,7 @@ export function Billing() {
   };
 
   const currentList = isViewingActive ? invoices : pendingInvoices;
-
-  const uniqueClients = useMemo(() => Array.from(new Set(sites.map(s => s.client))), [sites]);
-  const sitesForClient = useMemo(() => form.client ? sites.filter(s => s.client === form.client) : sites, [sites, form.client]);
+  const sitesForClient = siteRegistry.filter(s => s.client === (form.client || '').trim());
 
   useSetPageTitle(
     isViewingActive ? 'Active Invoices' : 'Pending Invoices',
@@ -562,9 +697,14 @@ export function Billing() {
         </label>
       )}
       {priv.canExport && (
-        <Button variant="outline" size="sm" className="gap-2 shrink-0 border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-9" onClick={handleExportCSV}>
-          <Download className="h-4 w-4" /> Export CSV
-        </Button>
+        <div className="flex bg-slate-50 border border-indigo-200 rounded-md shadow-sm h-9 overflow-hidden shrink-0">
+          <Button variant="ghost" size="sm" className="gap-2 h-full text-indigo-700 hover:bg-indigo-100 rounded-none border-r border-indigo-200 px-3" onClick={() => handleExportCSV('basic')} title="Export Basic Fields Only">
+            <Download className="h-4 w-4" /> Basic CSV
+          </Button>
+          <Button variant="ghost" size="sm" className="gap-2 h-full text-indigo-700 hover:bg-indigo-100 rounded-none px-3" onClick={() => handleExportCSV('detailed')} title="Export Complete Data">
+            Detailed CSV
+          </Button>
+        </div>
       )}
       {priv.canCreate && (
         <Button
@@ -610,9 +750,14 @@ export function Billing() {
               </label>
             )}
             {priv.canExport && (
-              <Button variant="outline" size="sm" className="gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-9" onClick={handleExportCSV}>
-                <Download className="h-4 w-4" /> Export
-              </Button>
+              <div className="flex flex-col gap-1">
+                <Button variant="outline" size="sm" className="gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-[30px] text-[11px]" onClick={() => handleExportCSV('basic')}>
+                  <Download className="h-3 w-3" /> Basic CSV
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-[30px] text-[11px]" onClick={() => handleExportCSV('detailed')}>
+                  <Download className="h-3 w-3" /> Detailed CSV
+                </Button>
+              </div>
             )}
             {priv.canCreate && (
               <Button
@@ -765,7 +910,16 @@ export function Billing() {
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Client</label>
                     <select
                       value={form.client}
-                      onChange={e => { handleChange('client', e.target.value); handleChange('site', ''); }}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const siteForClient = siteRegistry.find(s => s.client === val && s.name === form.site);
+                        setForm(f => ({ 
+                          ...f, 
+                          client: val,
+                          site: '', // Clear site when client changes to re-trigger selection
+                          vatInc: siteForClient ? siteForClient.vat : f.vatInc
+                        }));
+                      }}
                       className="flex h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
                     >
                       <option value="">Select Client...</option>
@@ -776,12 +930,20 @@ export function Billing() {
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Site</label>
                     <select
                       value={form.site}
-                      onChange={e => handleChange('site', e.target.value)}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const siteObj = siteRegistry.find(s => s.name === val && s.client === form.client);
+                        setForm(f => ({ 
+                          ...f, 
+                          site: val,
+                          vatInc: siteObj ? siteObj.vat : f.vatInc
+                        }));
+                      }}
                       disabled={!form.client}
                       className="flex h-11 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       <option value="">Select Site...</option>
-                      {sitesForClient.map((s, i) => <option key={i} value={s.name}>{s.name}</option>)}
+                      {sitesBySelectedClient.map((s, i) => <option key={i} value={s.name}>{s.name} ({s.type})</option>)}
                     </select>
                   </div>
                 </div>

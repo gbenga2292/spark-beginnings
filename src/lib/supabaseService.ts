@@ -135,7 +135,7 @@ export function dbToPayment(r: any): Payment {
 }
 
 export function dbToVatPayment(r: any): VatPayment {
-  return { id: r.id, client: r.client, date: r.date, month: r.month, amount: Number(r.amount) };
+  return { id: r.id, client: r.client, date: r.date, month: r.month, year: r.year || '', amount: Number(r.amount) };
 }
 
 export function dbToLeave(r: any): LeaveRecord {
@@ -404,7 +404,7 @@ function paymentToDb(p: Payment) {
 }
 
 function vatPaymentToDb(v: VatPayment) {
-  return { id: v.id, client: v.client, date: v.date, month: v.month, amount: v.amount };
+  return { id: v.id, client: v.client, date: v.date, month: v.month, year: v.year, amount: v.amount };
 }
 
 function leaveToDb(l: LeaveRecord) {

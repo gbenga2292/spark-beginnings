@@ -15,6 +15,8 @@ const MONTHS = [
     'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+const YEARS = Array.from({ length: 11 }, (_, i) => (new Date().getFullYear() - 5 + i).toString());
+
 export function VatPayments() {
     const sites = useAppStore((state) => state.sites);
     const payments = useAppStore((state) => state.payments);
@@ -34,6 +36,7 @@ export function VatPayments() {
         client: '',
         date: '',
         month: '',
+        year: new Date().getFullYear().toString(),
         amount: '',
     };
     const [form, setForm] = useState(initialForm);
@@ -66,6 +69,7 @@ export function VatPayments() {
             client: form.client,
             date: form.date,
             month: form.month,
+            year: form.year,
             amount,
         };
 
@@ -86,6 +90,7 @@ export function VatPayments() {
             client: pay.client,
             date: pay.date,
             month: pay.month || '',
+            year: pay.year || new Date().getFullYear().toString(),
             amount: pay.amount.toString(),
         });
         setIsModalOpen(true);
@@ -156,7 +161,8 @@ export function VatPayments() {
                             client: vals[1],
                             date: vals[2],
                             month: vals[3] || '',
-                            amount: parseFloat(vals[4]) || 0,
+                            year: vals[4] || '',
+                            amount: parseFloat(vals[5]) || 0,
                         };
                         const existing = vatPayments.find(e => e.id === parsedVatPayment.id);
                         if (existing && mode !== 'append') { 
@@ -194,12 +200,12 @@ export function VatPayments() {
                 toast.info('No VAT payments to export');
                 return;
             }
-            const headers = ['id', 'client', 'date', 'month', 'amount'];
+            const headers = ['id', 'client', 'date', 'month', 'year', 'amount'];
             const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
 
             const rows = vatPayments.map(pay => {
                 const data = [
-                    pay.id, pay.client, pay.date, pay.month || '', pay.amount
+                    pay.id, pay.client, pay.date, pay.month || '', pay.year || '', pay.amount
                 ];
                 return data.map(extractCSV).join(',');
             });
@@ -326,6 +332,7 @@ export function VatPayments() {
                                         <TableHead className="font-semibold px-4 py-3">Date</TableHead>
                                         <TableHead className="font-semibold px-4 py-3">Client</TableHead>
                                         <TableHead className="font-semibold px-4 py-3">Month</TableHead>
+                                        <TableHead className="font-semibold px-4 py-3 text-center">Year</TableHead>
                                         <TableHead className="font-semibold px-4 py-3 text-right">Amount (₦)</TableHead>
                                         {priv.canManageVat && (
                                           <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">Actions</TableHead>
@@ -338,6 +345,7 @@ export function VatPayments() {
                                             <TableCell className="px-4 py-3 text-slate-500">{p.date}</TableCell>
                                             <TableCell className="px-4 py-3 font-semibold text-slate-800">{p.client}</TableCell>
                                             <TableCell className="px-4 py-3 text-slate-600">{p.month}</TableCell>
+                                            <TableCell className="px-4 py-3 text-center text-slate-600">{p.year}</TableCell>
                                             <TableCell className="px-4 py-3 text-right font-mono font-bold text-emerald-600">
                                                 {priv?.canViewAmounts === false ? '***' : (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </TableCell>
@@ -466,15 +474,26 @@ export function VatPayments() {
                                 <Input type="date" value={form.date} onChange={e => handleChange('date', e.target.value)} className="bg-slate-50 h-11" />
                             </div>
 
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Month Coverage</label>
-                                <div className="relative">
-                                    <select value={form.month} onChange={e => handleChange('month', e.target.value)} className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none font-semibold text-slate-700">
-                                        <option value="" disabled>Select Month...</option>
-                                        {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
-                                    </select>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5 flex-1">
+                                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Month Coverage</label>
+                                        <div className="relative">
+                                            <select value={form.month} onChange={e => handleChange('month', e.target.value)} className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none font-semibold text-slate-700">
+                                                <option value="" disabled>Select...</option>
+                                                {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5 flex-1">
+                                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Year Coverage</label>
+                                        <div className="relative">
+                                            <select value={form.year} onChange={e => handleChange('year', e.target.value)} className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none appearance-none font-semibold text-slate-700">
+                                                <option value="" disabled>Select...</option>
+                                                {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
 
                             <div className="space-y-1.5">
                                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Amount Paid (₦)</label>

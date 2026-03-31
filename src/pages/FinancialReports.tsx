@@ -414,8 +414,8 @@ export function FinancialReports() {
 
   const exportVatReport = () => {
     let csv = "data:text/csv;charset=utf-8,";
-    csv += "VAT ID,Client,Date,Amount,Status\n";
-    vatPayments.forEach(v => { csv += `${v.id},${v.client},${v.date},${v.amount}\n`; });
+    csv += "VAT ID,Client,Date,Month,Year,Amount\n";
+    vatPayments.forEach(v => { csv += `${v.id},${v.client},${v.date},${v.month || ''},${v.year || ''},${v.amount}\n`; });
     const link = document.createElement("a");
     link.setAttribute("href", encodeURI(csv));
     link.setAttribute("download", "vat_report.csv");
@@ -485,7 +485,7 @@ export function FinancialReports() {
       XLSX.utils.book_append_sheet(wb, ws, 'Overdue Invoices');
     }
     if (selectedFields.includes('VAT Remittance')) {
-      const ws = XLSX.utils.json_to_sheet(vatPayments.map(v => ({ ID: v.id, Client: v.client, Month: v.month || '', Date: v.date, Amount: v.amount })));
+      const ws = XLSX.utils.json_to_sheet(vatPayments.map(v => ({ ID: v.id, Client: v.client, Date: v.date, Month: v.month || '', Year: v.year || '', Amount: v.amount })));
       XLSX.utils.book_append_sheet(wb, ws, 'VAT Remittance');
     }
     if (selectedFields.includes('VAT Collected vs Remitted')) {
