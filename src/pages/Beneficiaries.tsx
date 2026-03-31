@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { getPositionIndex } from '@/src/lib/hierarchy';
+import { normalizeDate, formatDisplayDate } from '@/src/lib/dateUtils';
 
 
 export function Beneficiaries() {
@@ -46,6 +47,7 @@ export function Beneficiaries() {
   const disciplinaryRecords = useAppStore((state) => state.disciplinaryRecords);
   const evaluations = useAppStore((state) => state.evaluations);
   const bulkUpdateEmployees = useAppStore(state => state.bulkUpdateEmployees);
+  const hrVariables = useAppStore((state) => state.hrVariables);
   const { reminders } = useAppData();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -56,7 +58,7 @@ export function Beneficiaries() {
   const priv = usePriv('employees');
   const canSeeSalary = useRedaction('employees');
 
-  const [sortBy, setSortBy] = useState<'name' | 'position' | 'startDate' | 'dateAdded'>('position');
+  const [sortBy, setSortBy] = useState<'name' | 'position' | 'department' | 'startDate' | 'dateAdded'>('position');
 
   const filteredBeneficiaries = employees.filter(emp => {
     const searchLow = searchTerm.toLowerCase();
@@ -74,6 +76,7 @@ export function Beneficiaries() {
       if (idxA !== idxB) return idxA - idxB;
       return (a.position || '').localeCompare(b.position || '');
     }
+    if (sortBy === 'department') return (a.department || '').localeCompare(b.department || '');
     if (sortBy === 'startDate') return new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime();
     return 0; // maintain default dateAdded order which matches array order
   });
@@ -128,9 +131,10 @@ export function Beneficiaries() {
   }, [formData.typeOfPay, formData.startMonthOfPay, isAdding, isEditing]);
 
   useEffect(() => {
-    // If no end date is provided, status should always default to 'Active'
+    // If no end date is provided (checked via normalizeDate), status should always default to 'Active'
     // and cannot be 'Terminated'.
-    if (!formData.endDate || formData.endDate.trim() === '') {
+    const normalizedEndDate = normalizeDate(formData.endDate);
+    if (!normalizedEndDate) {
       if (formData.status === 'Terminated') {
         setFormData(prev => ({ ...prev, status: 'Active' }));
       }
@@ -138,7 +142,7 @@ export function Beneficiaries() {
       // If end date is present, automate status based on current date
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const eDate = new Date(formData.endDate);
+      const eDate = new Date(normalizedEndDate);
       
       if (!isNaN(eDate.getTime())) {
         const autoStatus = today < eDate ? 'Active' : 'Terminated';
@@ -154,13 +158,33 @@ export function Beneficiaries() {
       toast.error('Surname and Firstname are required.');
       return;
     }
-    if (formData.endDate && formData.startDate && new Date(formData.endDate) < new Date(formData.startDate)) {
-      toast.error('End date cannot be before the start date.');
-      return;
+    const normalizedEndDate = normalizeDate(formData.endDate);
+    const normalizedStartDate = normalizeDate(formData.startDate);
+
+    if (normalizedEndDate && normalizedStartDate) {
+      const eDate = new Date(normalizedEndDate);
+      const sDate = new Date(normalizedStartDate);
+      if (!isNaN(eDate.getTime()) && !isNaN(sDate.getTime()) && eDate < sDate) {
+        toast.error('End date cannot be before the start date.');
+        return;
+      }
     }
 
     const nextCodeNumber = Math.max(0, ...employees.map(e => parseInt(e.employeeCode?.replace(/\D/g, '') || '0')));
     const employeeCode = formData.employeeCode || `EMP-${String(nextCodeNumber + 1).padStart(3, '0')}`;
+
+    let finalStatus = formData.status as 'Active' | 'On Leave' | 'Terminated';
+    const nEndDate = normalizeDate(formData.endDate);
+    if (!nEndDate) {
+      if (finalStatus === 'Terminated') finalStatus = 'Active';
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const eDate = new Date(nEndDate);
+      if (!isNaN(eDate.getTime())) {
+        finalStatus = today < eDate ? 'Active' : 'Terminated';
+      }
+    }
 
     const newEmployee: Employee = {
       id: crypto.randomUUID(),
@@ -183,7 +207,7 @@ export function Beneficiaries() {
       withholdingTaxRate: formData.withholdingTaxRate || 0.05,
       taxId: formData.taxId || '',
       pensionNumber: '',
-      status: formData.status as 'Active' | 'On Leave' | 'Terminated',
+      status: finalStatus,
       monthlySalaries: formData.monthlySalaries as MonthlySalary,
       avatar: formData.avatar || '',
       excludeFromOnboarding: true,
@@ -217,17 +241,38 @@ export function Beneficiaries() {
       toast.error('Surname and Firstname are required.');
       return;
     }
-    if (formData.endDate && formData.startDate && new Date(formData.endDate) < new Date(formData.startDate)) {
-      toast.error('End date cannot be before the start date.');
-      return;
+    const normalizedEndDate = normalizeDate(formData.endDate);
+    const normalizedStartDate = normalizeDate(formData.startDate);
+
+    if (normalizedEndDate && normalizedStartDate) {
+      const eDate = new Date(normalizedEndDate);
+      const sDate = new Date(normalizedStartDate);
+      if (!isNaN(eDate.getTime()) && !isNaN(sDate.getTime()) && eDate < sDate) {
+        toast.error('End date cannot be before the start date.');
+        return;
+      }
     }
+    let finalStatus = formData.status as 'Active' | 'On Leave' | 'Terminated';
+    const nEndDate = normalizeDate(formData.endDate);
+    if (!nEndDate) {
+      if (finalStatus === 'Terminated') finalStatus = 'Active';
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const eDate = new Date(nEndDate);
+      if (!isNaN(eDate.getTime())) {
+        finalStatus = today < eDate ? 'Active' : 'Terminated';
+      }
+    }
+
     const updateData = {
       ...formData,
       department: formData.department || 'Non-Employee',
       position: formData.payeeType || 'Stipend Payee',
       staffType: 'NON-EMPLOYEE' as 'NON-EMPLOYEE',
       excludeFromOnboarding: true,
-      withholdingTaxRate: formData.withholdingTaxRate || 0.05
+      withholdingTaxRate: formData.withholdingTaxRate || 0.05,
+      status: finalStatus,
     };
     updateEmployee(editingEmployeeId, updateData);
     setIsEditing(false);
@@ -273,7 +318,7 @@ export function Beneficiaries() {
         toast.info('No beneficiaries to export');
         return;
       }
-      const headers = ['id', 'beneficiaryCode', 'surname', 'firstname', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'withholdingTax', 'withholdingTaxRate', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      const headers = ['id', 'beneficiaryCode', 'surname', 'firstname', 'department', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'withholdingTax', 'withholdingTaxRate', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
       // Standard CSV cell wrapper
       const extractCSV = (str: any) => `"${String(str ?? '').replace(/"/g, '""')}"`;
       // Text-force wrapper: properly CSV-encodes the Excel ="value" formula
@@ -291,6 +336,7 @@ export function Beneficiaries() {
           extractCSV(emp.employeeCode || ''),
           extractCSV(emp.surname),
           extractCSV(emp.firstname),
+          extractCSV(emp.department || ''),
           extractCSV(emp.status),
           extractCSV(emp.yearlyLeave),
           extractCSV(emp.startDate || ''),
@@ -406,32 +452,32 @@ export function Beneficiaries() {
               employeeCode: mode === 'append' ? '' : (employeeCodeValue || (isValidUUID ? '' : providedId)),
               surname: vals[1 + offset],
               firstname: vals[2 + offset],
-              department: 'Beneficiary',
+              department: vals[3 + offset] || 'Beneficiary',
               staffType: 'NON-EMPLOYEE',
               position: 'Stipend Beneficiary',
-              status: vals[3 + offset] as 'Active' | 'On Leave' | 'Terminated',
-              yearlyLeave: parseInt(vals[4 + offset]) || 0,
-              startDate: vals[5 + offset] || '',
+              status: vals[4 + offset] as 'Active' | 'On Leave' | 'Terminated',
+              yearlyLeave: parseInt(vals[5 + offset]) || 0,
+              startDate: vals[6 + offset] || '',
               endDate: (() => {
-                const sd = vals[5 + offset] || '';
-                const ed = vals[6 + offset] || '';
+                const sd = vals[6 + offset] || '';
+                const ed = vals[7 + offset] || '';
                 if (ed && sd && new Date(ed) < new Date(sd)) return '';
                 return ed;
               })(),
-              bankName: vals[7 + offset] || '',
-              accountNo: stripExcelText(vals[8 + offset] || ''), // preserve leading zeros
+              bankName: vals[8 + offset] || '',
+              accountNo: stripExcelText(vals[9 + offset] || ''), // preserve leading zeros
               taxId: '',
               pensionNumber: '',
               payeTax: false,
-              withholdingTax: vals[9 + offset]?.toLowerCase() === 'yes',
-              withholdingTaxRate: parseFloat(vals[10 + offset]) || 0.05,
+              withholdingTax: vals[10 + offset]?.toLowerCase() === 'yes',
+              withholdingTaxRate: parseFloat(vals[11 + offset]) || 0.05,
               excludeFromOnboarding: true,
               rent: 0,
               monthlySalaries: {
-                jan: parseFloat(vals[11 + offset]) || 0, feb: parseFloat(vals[12 + offset]) || 0, mar: parseFloat(vals[13 + offset]) || 0,
-                apr: parseFloat(vals[14 + offset]) || 0, may: parseFloat(vals[15 + offset]) || 0, jun: parseFloat(vals[16 + offset]) || 0,
-                jul: parseFloat(vals[17 + offset]) || 0, aug: parseFloat(vals[18 + offset]) || 0, sep: parseFloat(vals[19 + offset]) || 0,
-                oct: parseFloat(vals[20 + offset]) || 0, nov: parseFloat(vals[21 + offset]) || 0, dec: parseFloat(vals[22 + offset]) || 0
+                jan: parseFloat(vals[12 + offset]) || 0, feb: parseFloat(vals[13 + offset]) || 0, mar: parseFloat(vals[14 + offset]) || 0,
+                apr: parseFloat(vals[15 + offset]) || 0, may: parseFloat(vals[16 + offset]) || 0, jun: parseFloat(vals[17 + offset]) || 0,
+                jul: parseFloat(vals[18 + offset]) || 0, aug: parseFloat(vals[19 + offset]) || 0, sep: parseFloat(vals[20 + offset]) || 0,
+                oct: parseFloat(vals[21 + offset]) || 0, nov: parseFloat(vals[22 + offset]) || 0, dec: parseFloat(vals[23 + offset]) || 0
               },
               avatar: ''
             };
@@ -511,8 +557,9 @@ export function Beneficiaries() {
                     onChange={e => setFormData({ ...formData, payeeType: e.target.value })}
                   >
                     <option value="">Select Type</option>
-                    <option value="Contractor">Contractor</option>
-                    <option value="Welfare Staff">Welfare Staff</option>
+                    {(hrVariables.payeeTypes || []).map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -522,17 +569,17 @@ export function Beneficiaries() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
                   <select
-                    className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none ${formData.endDate ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none ${normalizeDate(formData.endDate) ? 'opacity-70 cursor-not-allowed' : ''}`}
                     value={formData.status}
                     onChange={e => {
                       const newStatus = e.target.value;
-                      if (newStatus === 'Terminated' && (!formData.endDate || formData.endDate.trim() === '')) {
+                      if (newStatus === 'Terminated' && !normalizeDate(formData.endDate)) {
                         toast.error('Termination status requires an Official End Date.');
                         return;
                       }
                       setFormData({ ...formData, status: newStatus as any });
                     }}
-                    disabled={!!formData.endDate}
+                    disabled={!!normalizeDate(formData.endDate)}
                   >
                     <option value="Active">Active</option>
                     <option value="On Leave">On Leave</option>
@@ -567,8 +614,19 @@ export function Beneficiaries() {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Category / Entity</label>
-                  <Input value={formData.department || ''} onChange={e => setFormData({ ...formData, department: e.target.value })} placeholder="e.g. Welfare" className="bg-slate-50 focus:bg-white" />
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Department</label>
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                    value={formData.department || ''} 
+                    onChange={e => setFormData({ ...formData, department: e.target.value })}
+                  >
+                    <option value="">Select Department</option>
+                    {departments
+                      .filter(dept => dept.staffType === 'NON-EMPLOYEE')
+                      .map(dept => (
+                      <option key={dept.id} value={dept.name}>{dept.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Date</label>
@@ -855,6 +913,7 @@ export function Beneficiaries() {
                       <div className="flex justify-between"><span className="text-slate-500">Payee Type:</span><span className="font-semibold text-indigo-600">{emp.payeeType || 'N/A'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Payment Cycle:</span><span>{emp.typeOfPay || 'Monthly'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Start Month:</span><span>{emp.startMonthOfPay || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Department:</span><span className="font-semibold text-indigo-600">{emp.department || 'N/A'}</span></div>
                       {emp.withholdingTax && (
                         <div className="flex justify-between"><span className="text-slate-500">TIN:</span><span className="font-mono text-xs">{emp.taxId || 'N/A'}</span></div>
                       )}
@@ -1279,6 +1338,20 @@ export function Beneficiaries() {
               </div>
 
               <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Department</label>
+                <select 
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                  value={bulkFormData.department || ''} 
+                  onChange={e => setBulkFormData({ ...bulkFormData, department: e.target.value })}
+                >
+                  <option value="">No Change / Select Department</option>
+                  {departments.map(dept => (
+                    <option key={dept.id} value={dept.name}>{dept.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Payment Cycle</label>
                 <select
                   className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
@@ -1408,6 +1481,7 @@ export function Beneficiaries() {
             <select className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
               <option value="dateAdded">Sort By: Default</option>
               <option value="name">Sort By: Name</option>
+              <option value="department">Sort By: Department</option>
               <option value="position">Sort By: Position</option>
               <option value="startDate">Sort By: Start Date</option>
             </select>
@@ -1426,7 +1500,7 @@ export function Beneficiaries() {
                 />
               </TableHead>
               <TableHead>Non-Employee</TableHead>
-              <TableHead>Category / Entity</TableHead>
+              <TableHead>Department</TableHead>
               <TableHead>Payee Type</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Bank Info</TableHead>

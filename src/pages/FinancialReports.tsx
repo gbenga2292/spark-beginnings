@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -366,7 +367,7 @@ export function FinancialReports() {
       doc.text(title, 14, 34);
       doc.setFontSize(10);
       doc.setTextColor(100, 116, 139);
-      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 40);
+      doc.text(`Generated on: ${formatDisplayDate(Date.now())}`, 14, 40);
       autoTable(doc, { startY: 46, head, body, theme: 'striped', headStyles: { fillColor: [79, 70, 229] }, styles: { fontSize: 8, cellPadding: 3 } });
       doc.save(filename);
       showExportMessage(`${title} PDF exported successfully!`);

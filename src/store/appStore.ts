@@ -631,6 +631,7 @@ interface AppState {
     suspensionCapDays?: number; 
     enableAutomaticEvaluationPenalty?: boolean; 
     sanctionThresholds?: { action: string; points: number }[];
+    payeeTypes?: string[];
   };
   updateHrVariables: (variables: Partial<AppState['hrVariables']>) => void;
   saveAllSettings: (payroll: AppState['payrollVariables'], paye: AppState['payeTaxVariables'], months: AppState['monthValues'], hr: AppState['hrVariables']) => void;
@@ -649,6 +650,8 @@ interface AppState {
   leaveTypes: string[];
   addLeaveType: (type: string) => void;
   removeLeaveType: (type: string) => void;
+  isVariablesDirty: boolean;
+  setVariablesDirty: (val: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -657,6 +660,8 @@ export const useAppStore = create<AppState>()(
       // ── Default state (empty - data comes from Supabase) ──
       commLogs: [],
       leaves: [],
+      isVariablesDirty: false,
+      setVariablesDirty: (val) => set({ isVariablesDirty: val }),
       sites: [],
       pendingSites: [],
       clients: [],
@@ -721,7 +726,8 @@ export const useAppStore = create<AppState>()(
           { action: 'Final Warning', points: -5 },
           { action: 'Suspension', points: -8 },
           { action: 'Termination', points: -12 }
-        ]
+        ],
+        payeeTypes: []
       },
 
       // ── Actions with Supabase sync ──

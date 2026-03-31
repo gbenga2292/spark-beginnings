@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { 
@@ -153,7 +154,7 @@ export function WaybillManager() {
                       </div>
                     </td>
                     <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">
-                      {new Date(wb.issueDate).toLocaleDateString()}
+                      {formatDisplayDate(wb.issueDate)}
                     </td>
                     <td className="px-5 py-4">{getStatusBadge(wb.status)}</td>
                     <td className="px-5 py-4 max-w-xs text-slate-600 dark:text-slate-400 text-xs">

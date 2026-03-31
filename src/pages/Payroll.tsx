@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -524,7 +525,7 @@ export function Payroll() {
             <span>${currency(slip.record.takeHomePay)}</span>
         </div>
         
-        <div class="footer">This is a system generated payslip. No signature is required. Generated on ${new Date().toLocaleDateString()}</div>
+        <div class="footer">This is a system generated payslip. No signature is required. Generated on ${formatDisplayDate(Date.now())}</div>
       </div>
     `).join('');
 
@@ -1348,7 +1349,7 @@ export function Payroll() {
                         {/* Footer */}
                         <div className="mt-8 pt-4 border-t text-center text-xs text-slate-400">
                           <p>This is a computer-generated document. No signature required.</p>
-                          <p>Generated on {new Date().toLocaleDateString()}</p>
+                          <p>Generated on {formatDisplayDate(Date.now())}</p>
                         </div>
 
                       </div>
@@ -1451,7 +1452,7 @@ export function Payroll() {
                                 </h2>
                               </div>
                               <p style={{ margin: 0, fontSize: 13, color: '#64748b', marginLeft: 14 }}>
-                                Generated: {new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' })}
+                                Generated: {formatDisplayDate(Date.now())}
                               </p>
                             </div>
                             {/* The "Total Employees" box has been removed as requested */}

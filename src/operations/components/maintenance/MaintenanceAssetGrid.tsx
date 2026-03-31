@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/src/lib/dateUtils';
 import React, { useState } from 'react';
 import { useOperations } from '../../contexts/OperationsContext';
 import { Search, CheckCircle2, Clock, AlertCircle, Eye, FileText } from 'lucide-react';
@@ -98,7 +99,7 @@ export function MaintenanceAssetGrid({ category }: MaintenanceAssetGridProps) {
                 <div className="flex items-center justify-between">
                   {getStatusBadge(asset.status)}
                   <span className="text-xs font-medium text-slate-400">
-                    Next: {new Date(asset.nextServiceDate).toLocaleDateString()}
+                    Next: {formatDisplayDate(asset.nextServiceDate)}
                   </span>
                 </div>
               </div>

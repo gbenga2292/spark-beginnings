@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOperations } from '../contexts/OperationsContext';
@@ -132,7 +133,7 @@ export function QuickCheckout() {
                       </Badge>
                       <span className="text-xs text-slate-400 hidden sm:flex items-center gap-1">
                         <FileText className="h-3 w-3" />
-                        {new Date(c.checkoutDate).toLocaleDateString()}
+                        {formatDisplayDate(c.checkoutDate)}
                       </span>
                     </div>
                   </div>
@@ -237,7 +238,7 @@ export function QuickCheckout() {
                     <div>
                       <h4 className="font-semibold text-slate-800 dark:text-white text-sm">{c.assetName}</h4>
                       <p className="text-xs text-slate-400 mt-1">
-                        {c.employeeName} • {new Date(c.checkoutDate).toLocaleDateString()}
+                        {c.employeeName} • {formatDisplayDate(c.checkoutDate)}
                         {c.returnedQuantity > 0 && <span className="text-teal-500 ml-2">Returned: {c.returnedQuantity}</span>}
                       </p>
                     </div>

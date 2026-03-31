@@ -3,7 +3,7 @@ import { cn } from '@/src/lib/utils';
 import { useUserStore, UserPrivileges } from '@/src/store/userStore';
 import { useAppStore } from '@/src/store/appStore';
 import { useTheme } from '@/src/hooks/useTheme';
-import { toast } from '@/src/components/ui/toast';
+import { toast, showConfirm } from '@/src/components/ui/toast';
 import logoSrc from '../../../logo/logo-2.png';
 import {
   LayoutDashboard,
@@ -159,15 +159,35 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const pendingLedgerEntries = useAppStore((s) => s.pendingLedgerEntries);
   const { isDark } = useTheme();
+  const navigate = useNavigate();
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const handleLinkClick = (e: React.MouseEvent, href: string) => {
+  const handleLinkClick = async (e: React.MouseEvent, href: string) => {
+    const { isVariablesDirty, setVariablesDirty } = useAppStore.getState();
+
     if (location.pathname === '/ledger' && pendingLedgerEntries.length > 0 && href !== '/ledger') {
       e.preventDefault();
       toast.error('You have unsaved pending ledger entries. Please save before leaving.');
       return;
     }
+
+    if (location.pathname === '/settings' && isVariablesDirty && href !== '/settings') {
+      e.preventDefault();
+      const ok = await showConfirm('You have unsaved variable changes. Do you want to discard them and leave?', {
+        title: 'Unsaved Changes',
+        confirmLabel: 'Discard & Leave',
+        cancelLabel: 'Stay Here',
+        variant: 'danger'
+      });
+      if (ok) {
+        setVariablesDirty(false);
+        setIsOpen?.(false);
+        navigate(href);
+      }
+      return;
+    }
+
     setIsOpen?.(false);
   };
 
@@ -256,7 +276,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
           </div>
         </div>
 
-        <div className={cn("flex flex-1 flex-col overflow-y-auto overflow-x-hidden no-scrollbar", navBg)}>
+        <div className={cn("flex flex-1 flex-col overflow-y-auto overflow-x-hidden", navBg)}>
           <nav className={cn('flex-1 space-y-2 py-4', isCollapsed ? 'px-2' : 'px-3')}>
             {navigation.map((category) => {
               const visibleItems = getVisibleItems(category.items);

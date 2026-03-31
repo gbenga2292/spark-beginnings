@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -185,7 +186,7 @@ export function GenerateContract() {
                   const found = employees.find(emp => emp.id === id);
                   if (found) {
                     setContractTempFields({
-                      offerDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+                      offerDate: formatDisplayDate(Date.now()),
                       candidateTitle: 'Mr/Ms.',
                       candidateName: `${found.firstname} ${found.surname}`,
                       candidateAddress: 'Please provide exact address...',
@@ -196,7 +197,7 @@ export function GenerateContract() {
                       compensationText: `You are entitled to a monthly gross compensation of ₦${(found.monthlySalaries?.jan || 0).toLocaleString()} only. By your authority, The Company will deduct and remit all statutory deductions and contributions required by law on your behalf.`,
                       goodFaithText: `You shall be required at all times to act loyally, faithfully and in the best interest of and to use your best endeavours to develop and expand the business of The Company.`,
                       confidentialityText: `You shall be required to sign a confidentiality agreement as soon as the offer is accepted by you.`,
-                      resumeDateText: `You will be expected to resume on ${found.startDate ? new Date(found.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'a mutually agreed date'}.`,
+                      resumeDateText: `You will be expected to resume on ${found.startDate ? formatDisplayDate(found.startDate) : 'a mutually agreed date'}.`,
                       workingDaysText: `Your working days will be Monday - Friday from 8:00am. If need be, you will be required to work weekends to meet with demanding timelines.\n\nPlease confirm your acceptance of this offer by signing and returning the attached form in advance.`,
                       signatoryName: 'Hubert Olatokunbo Davies'
                     });

@@ -10,6 +10,7 @@ import { NairaSign } from '@/src/components/ui/naira-sign';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
+import { formatDisplayDate } from '@/src/lib/dateUtils';
 import * as XLSX from 'xlsx';
 
 export function Variables() {
@@ -45,7 +46,8 @@ export function Variables() {
   const [localPayeVars, setLocalPayeVars] = useState(storePayeTaxVariables);
   const [localMonthVals, setLocalMonthVals] = useState(storeMonthValues);
   const [localHrVars, setLocalHrVars] = useState(storeHrVariables);
-  const [isDirty, setIsDirty] = useState(false);
+  const isDirty = useAppStore((state) => state.isVariablesDirty);
+  const setIsDirty = useAppStore((state) => state.setVariablesDirty);
 
   // ── Ledger variables ───────────────────────────────────────
   const ledgerCategories = useAppStore((state) => state.ledgerCategories);
@@ -94,6 +96,10 @@ export function Variables() {
       setLocalHrVars(storeHrVariables);
     }
   }, [storePayrollVariables, storePayeTaxVariables, storeMonthValues, storeHrVariables, isDirty]);
+
+  useEffect(() => {
+    return () => setIsDirty(false);
+  }, []);
 
   // Navigation blocker removed because it requires react-router v6 createBrowserRouter data routers
   // Relying only on window.addEventListener('beforeunload') below
@@ -147,7 +153,9 @@ export function Variables() {
   const [newPosition, setNewPosition] = useState('');
   const [newPosDeptId, setNewPosDeptId] = useState('');
   const [newDepartment, setNewDepartment] = useState('');
+  const [newDeptStaffType, setNewDeptStaffType] = useState<'OFFICE' | 'FIELD' | 'NON-EMPLOYEE'>('OFFICE');
   const [newLeaveType, setNewLeaveType] = useState('');
+  const [newPayeeType, setNewPayeeType] = useState('');
 
   const handleAddHoliday = () => {
     if (!newDate || !newName) return;
@@ -174,8 +182,9 @@ export function Variables() {
 
   const handleAddDepartment = () => {
     if (newDepartment && !departments.some(d => d.name.toLowerCase() === newDepartment.toLowerCase())) {
-      addDepartment({ id: crypto.randomUUID(), name: newDepartment, staffType: 'OFFICE', workDaysPerWeek: 5 });
+      addDepartment({ id: crypto.randomUUID(), name: newDepartment, staffType: newDeptStaffType, workDaysPerWeek: 5 });
       setNewDepartment('');
+      setNewDeptStaffType('OFFICE');
     } else if (newDepartment) {
       toast.error('Department name already exists.');
     }
@@ -1264,6 +1273,15 @@ export function Variables() {
               {priv.canEdit && (
                 <div className="flex gap-2 mb-4">
                   <Input placeholder="New Department" value={newDepartment} onChange={(e) => setNewDepartment(e.target.value)} className="flex-1" />
+                  <select 
+                     className="h-10 w-40 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer"
+                     value={newDeptStaffType}
+                     onChange={(e) => setNewDeptStaffType(e.target.value as any)}
+                  >
+                     <option value="OFFICE">Office</option>
+                     <option value="FIELD">Field</option>
+                     <option value="NON-EMPLOYEE">Non-Employee</option>
+                  </select>
                   <Button onClick={handleAddDepartment} variant="outline" className="gap-2">
                     <Plus className="h-4 w-4" /> Add
                   </Button>
@@ -1275,6 +1293,7 @@ export function Variables() {
                     <TableRow>
                       <TableHead>Department</TableHead>
                       <TableHead>Parent Dept</TableHead>
+                      <TableHead>Type</TableHead>
                       <TableHead className="w-32 text-center">Work Days/Wk</TableHead>
                       <TableHead className="w-[80px] text-right">Action</TableHead>
                     </TableRow>
@@ -1310,6 +1329,23 @@ export function Variables() {
                               <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded-md block truncate">
                                 {departments.find(d => d.id === dep.parentDepartmentId)?.name || 'None'}
                               </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {priv.canEdit ? (
+                              <select 
+                                 className="h-8 rounded border border-slate-200 px-2 text-sm bg-white min-w-[120px]"
+                                 value={dep.staffType}
+                                 onChange={(e) => updateDepartment(dep.id, { staffType: e.target.value as any })}
+                              >
+                                 <option value="OFFICE">Office</option>
+                                 <option value="FIELD">Field</option>
+                                 <option value="NON-EMPLOYEE">Non-Employee</option>
+                              </select>
+                            ) : (
+                               <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded-md block truncate">
+                                 {dep.staffType}
+                               </span>
                             )}
                           </TableCell>
                           <TableCell className="text-center">
@@ -1369,6 +1405,56 @@ export function Variables() {
                     {lt}
                     {priv.canEdit && (
                       <button onClick={() => removeLeaveType(lt)} className="text-teal-400 hover:text-rose-500">
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ——— PAYEE TYPES ——— */}
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader>
+              <CardTitle>Payee Types</CardTitle>
+              <CardDescription>Define categories for non-employees (e.g. Director, Contractor).</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {priv.canEdit && (
+                <div className="flex gap-2 mb-4">
+                  <Input 
+                    placeholder="e.g. Volunteer" 
+                    value={newPayeeType} 
+                    onChange={(e) => setNewPayeeType(e.target.value)} 
+                    className="flex-1" 
+                  />
+                  <Button 
+                    onClick={() => { 
+                      if (newPayeeType && !(localHrVars.payeeTypes || []).includes(newPayeeType)) { 
+                        updateLocalHrVariables({ payeeTypes: [...(localHrVars.payeeTypes || []), newPayeeType] }); 
+                        setNewPayeeType(''); 
+                      } 
+                    }} 
+                    variant="outline" 
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" /> Add
+                  </Button>
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {(localHrVars.payeeTypes || []).map(pt => (
+                  <div key={pt} className="bg-indigo-50 border border-indigo-200 rounded-full px-3 py-1 text-sm flex items-center gap-2 text-indigo-800">
+                    {pt}
+                    {priv.canEdit && (
+                      <button 
+                        onClick={() => {
+                          const newTypes = (localHrVars.payeeTypes || []).filter(t => t !== pt);
+                          updateLocalHrVariables({ payeeTypes: newTypes });
+                        }} 
+                        className="text-indigo-400 hover:text-rose-500"
+                      >
                         <Trash2 className="h-3 w-3" />
                       </button>
                     )}
@@ -1807,8 +1893,8 @@ export function Variables() {
                       return (
                         <TableRow key={key}>
                           <TableCell className="font-medium">{label}</TableCell>
-                          <TableCell className="text-slate-500 text-xs font-mono">{formatDate(startDate)}</TableCell>
-                          <TableCell className="text-slate-500 text-xs font-mono">{formatDate(endDate)}</TableCell>
+                          <TableCell className="text-slate-500 text-xs font-mono">{formatDisplayDate(startDate)}</TableCell>
+                          <TableCell className="text-slate-500 text-xs font-mono">{formatDisplayDate(endDate)}</TableCell>
                           <TableCell className="text-center">
                             <span className="inline-flex items-center justify-center h-8 w-16 rounded bg-indigo-50 text-indigo-700 font-bold text-sm">
                               {computedWorkDays}

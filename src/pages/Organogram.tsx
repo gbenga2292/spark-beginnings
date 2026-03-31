@@ -43,7 +43,7 @@ export function Organogram() {
     const nodesMap = new Map<string, OrgNode>();
 
     // 1. Initialize all department nodes
-    departments.forEach(dept => {
+    departments.filter(dept => dept.staffType !== 'NON-EMPLOYEE').forEach(dept => {
       const deptPositions = positions.filter(pos => pos.departmentId === dept.id);
       const deptEmployees = activeEmployees.filter(emp => emp.department === dept.name || emp.secondaryDepartments?.includes(dept.name));
       

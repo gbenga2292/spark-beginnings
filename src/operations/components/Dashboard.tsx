@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useOperations } from '../contexts/OperationsContext';
 import { Package, Truck, ArrowRightLeft, AlertCircle, TrendingUp, Clock } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
@@ -70,7 +71,7 @@ export function Dashboard() {
                   <div className="min-w-0">
                     <p className="font-semibold text-slate-800 dark:text-white text-sm truncate">{wb.siteName}</p>
                     <p className="text-xs text-slate-400 flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> {new Date(wb.issueDate).toLocaleDateString()} • {wb.driverName}
+                      <Clock className="h-3 w-3" /> {formatDisplayDate(wb.issueDate)} • {wb.driverName}
                     </p>
                   </div>
                 </div>

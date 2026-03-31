@@ -37,7 +37,7 @@ export function normalizeDate(dateStr: any): string {
     dateStr = String(dateStr);
   }
   const s = dateStr.trim();
-  if (!s) return '';
+  if (!s || s === '0' || s === '0.0') return '';
 
   // ── Already yyyy-mm-dd (or yyyy-mm-ddT...) ───────────────────────
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.split('T')[0];
@@ -79,4 +79,21 @@ export function normalizeDate(dateStr: any): string {
   const d = String(parsed.getUTCDate()).padStart(2, '0');
   if (y < 1950 || y > 2100) return '';
   return `${y}-${m}-${d}`;
+}
+
+/**
+ * Standardizes a date value for UI display across the entire application.
+ * Returns in dd/mm/yyyy format as requested by the user.
+ */
+export function formatDisplayDate(dateStr: any): string {
+  const normalized = normalizeDate(dateStr);
+  if (!normalized) return '—';
+
+  // normalized is always yyyy-MM-dd at this point
+  const parts = normalized.split('-');
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    return `${d}/${m}/${y}`;
+  }
+  return '—';
 }

@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -978,7 +979,7 @@ export function Ledger() {
                         {v.voucherNo}
                       </TableCell>
                       <TableCell className="text-slate-600 text-sm whitespace-nowrap">
-                        {v.date ? new Date(v.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                        {v.date ? formatDisplayDate(v.date) : '—'}
                       </TableCell>
                       <TableCell className="text-slate-600">{v.bank}</TableCell>
                       <TableCell className="font-bold text-slate-900 text-right tabular-nums">
@@ -1079,7 +1080,7 @@ export function Ledger() {
                     <tr key={t.id} className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
                       <td className="py-2.5 px-4 text-slate-400 text-xs font-semibold">{idx + 1}</td>
                       <td className="py-2.5 px-3 text-slate-600 text-xs font-mono whitespace-nowrap">
-                        {t.date ? new Date(t.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}
+                        {t.date ? formatDisplayDate(t.date) : '—'}
                       </td>
                       <td className="py-2.5 px-3 text-slate-700 font-medium">{t.description || <span className="text-slate-300 italic">—</span>}</td>
                       <td className="py-2.5 px-3">

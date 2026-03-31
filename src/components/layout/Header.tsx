@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -350,7 +351,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                               {n.priority === 0 ? 'Urgent' : n.priority === 1 ? 'High Priority' : 'Attention'}
                             </p>
                             <p className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
-                              {n.time.includes('-') ? new Date(n.time).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : n.time}
+                              {n.time.includes('-') ? formatDisplayDate(n.time) : n.time}
                             </p>
                           </div>
                           <p className={`text-[12px] leading-tight font-medium mt-0.5 ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>

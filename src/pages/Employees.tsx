@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -15,7 +15,7 @@ import { Dialog } from '@/src/components/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/src/components/ui/dropdown-menu';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { Checkbox } from '@/src/components/ui/checkbox';
-import { normalizeDate } from '@/src/lib/dateUtils';
+import { normalizeDate, formatDisplayDate } from '@/src/lib/dateUtils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 import { getPositionIndex } from '@/src/lib/hierarchy';
@@ -99,15 +99,45 @@ export function Employees() {
       jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0
     }
   });
+  
+  useEffect(() => {
+    // If no end date is provided (checked via normalizeDate), status should always default to 'Active'
+    // and cannot be 'Terminated'.
+    const normalizedEndDate = normalizeDate(formData.endDate);
+    if (!normalizedEndDate) {
+      if (formData.status === 'Terminated') {
+        setFormData(prev => ({ ...prev, status: 'Active' }));
+      }
+    } else {
+      // If end date is present, automate status based on current date
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const eDate = new Date(normalizedEndDate);
+      
+      if (!isNaN(eDate.getTime())) {
+        const autoStatus = today < eDate ? 'Active' : 'Terminated';
+        if (formData.status !== autoStatus) {
+          setFormData(prev => ({ ...prev, status: autoStatus as any }));
+        }
+      }
+    }
+  }, [formData.endDate, formData.status]);
 
   const handleSave = () => {
     if (!formData.surname || !formData.firstname) {
       toast.error('Surname and Firstname are required.');
       return;
     }
-    if (formData.endDate && formData.startDate && new Date(formData.endDate) < new Date(formData.startDate)) {
-      toast.error('End date cannot be before the start date.');
-      return;
+    const normalizedEndDate = normalizeDate(formData.endDate);
+    const normalizedStartDate = normalizeDate(formData.startDate);
+
+    if (normalizedEndDate && normalizedStartDate) {
+      const eDate = new Date(normalizedEndDate);
+      const sDate = new Date(normalizedStartDate);
+      if (!isNaN(eDate.getTime()) && !isNaN(sDate.getTime()) && eDate < sDate) {
+        toast.error('End date cannot be before the start date.');
+        return;
+      }
     }
 
     // Level Validation: Only one Level 1 in the whole company
@@ -138,11 +168,24 @@ export function Employees() {
     const nextCodeNumber = Math.max(0, ...employees.map(e => parseInt(e.employeeCode?.replace(/\D/g, '') || '0')));
     const employeeCode = formData.employeeCode || `EMP-${String(nextCodeNumber + 1).padStart(3, '0')}`;
 
+    let finalStatus = formData.status as 'Active' | 'On Leave' | 'Terminated';
+    const nEndDate = normalizeDate(formData.endDate);
+    if (!nEndDate) {
+      if (finalStatus === 'Terminated') finalStatus = 'Active';
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const eDate = new Date(nEndDate);
+      if (!isNaN(eDate.getTime())) {
+        finalStatus = today < eDate ? 'Active' : 'Terminated';
+      }
+    }
+
     const newEmployee: Employee = {
       ...(formData as Employee),
       id: crypto.randomUUID(),
       employeeCode,
-      status: formData.status as any || 'Active',
+      status: finalStatus,
       monthlySalaries: formData.monthlySalaries || {
         jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0,
         jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0
@@ -212,9 +255,16 @@ export function Employees() {
       toast.error('Surname and Firstname are required.');
       return;
     }
-    if (formData.endDate && formData.startDate && new Date(formData.endDate) < new Date(formData.startDate)) {
-      toast.error('End date cannot be before the start date.');
-      return;
+    const normalizedEndDate = normalizeDate(formData.endDate);
+    const normalizedStartDate = normalizeDate(formData.startDate);
+
+    if (normalizedEndDate && normalizedStartDate) {
+      const eDate = new Date(normalizedEndDate);
+      const sDate = new Date(normalizedStartDate);
+      if (!isNaN(eDate.getTime()) && !isNaN(sDate.getTime()) && eDate < sDate) {
+        toast.error('End date cannot be before the start date.');
+        return;
+      }
     }
 
     // Level Validation for Edit
@@ -242,7 +292,21 @@ export function Employees() {
       }
     }
 
-    updateEmployee(editingEmployeeId, formData);
+    let finalStatus = formData.status as 'Active' | 'On Leave' | 'Terminated';
+    const nEndDate = normalizeDate(formData.endDate);
+    if (!nEndDate) {
+      if (finalStatus === 'Terminated') finalStatus = 'Active';
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const eDate = new Date(nEndDate);
+      if (!isNaN(eDate.getTime())) {
+        finalStatus = today < eDate ? 'Active' : 'Terminated';
+      }
+    }
+
+    const updateData = { ...formData, status: finalStatus };
+    updateEmployee(editingEmployeeId, updateData);
     
     // Manage LASHMA Renewal Reminder
     if (formData.lashmaExpiryDate) {
@@ -606,7 +670,12 @@ export function Employees() {
                       });
                     }}>
                     <option value="" disabled>Select Position</option>
-                    {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
+                    {positions
+                      .filter(p => {
+                        const dept = departments.find(d => d.id === p.departmentId);
+                        return dept?.staffType !== 'NON-EMPLOYEE';
+                      })
+                      .map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -617,7 +686,7 @@ export function Employees() {
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Secondary / Dual-Department (HOD Role)</label>
                   <div className="flex flex-wrap gap-2 p-3 bg-slate-50 border border-slate-200 rounded-md min-h-12 max-h-48 overflow-y-auto">
                     {departments
-                      .filter(d => d.name !== formData.department)
+                      .filter(d => d.name !== formData.department && d.staffType !== 'NON-EMPLOYEE')
                       .map(dept => (
                       <label key={dept.id} className="flex items-center gap-2 bg-white px-2 py-1 rounded border border-slate-200 text-xs font-semibold cursor-pointer hover:bg-indigo-50 transition-colors">
                         <input 
@@ -633,7 +702,7 @@ export function Employees() {
                         {dept.name}
                       </label>
                     ))}
-                    {departments.filter(d => d.name !== formData.department).length === 0 && (
+                    {departments.filter(d => d.name !== formData.department && d.staffType !== 'NON-EMPLOYEE').length === 0 && (
                       <span className="text-[10px] text-slate-400 italic">No other departments available.</span>
                     )}
                   </div>
@@ -688,7 +757,19 @@ export function Employees() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
-                  <select className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}>
+                  <select 
+                    className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none ${normalizeDate(formData.endDate) ? 'opacity-70 cursor-not-allowed' : ''}`} 
+                    value={formData.status} 
+                    onChange={e => {
+                      const newStatus = e.target.value;
+                      if (newStatus === 'Terminated' && !normalizeDate(formData.endDate)) {
+                        toast.error('Termination status requires an Official End Date.');
+                        return;
+                      }
+                      setFormData({ ...formData, status: newStatus as any });
+                    }}
+                    disabled={!!normalizeDate(formData.endDate)}
+                  >
                     <option value="Active">Active</option>
                     <option value="On Leave">On Leave</option>
                     <option value="Terminated">Terminated</option>

@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState } from 'react';
 import { 
   ArrowLeft, X, Printer, Share2, Calendar, User, Car, MapPin, FileText
@@ -27,7 +28,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(`Waybill No: ${waybill.id}`, 20, 45);
-    doc.text(`Date: ${new Date(waybill.issueDate).toLocaleDateString()}`, 20, 52);
+    doc.text(`Date: ${formatDisplayDate(waybill.issueDate)}`, 20, 52);
     doc.text(`Driver Name: ${waybill.driverName}`, 20, 59);
     doc.text(`Vehicle: ${waybill.vehicle || 'L200'}`, 20, 66);
     const fromText = waybill.type === 'waybill' ? 'DCEL Warehouse' : (waybill.siteName || 'Site');
@@ -95,7 +96,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
         <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-slate-400 text-xs font-bold">
           <div className="flex items-center gap-1.5">
             <Calendar className="h-3.5 w-3.5" />
-            <span>{new Date(waybill.issueDate).toLocaleDateString()}</span>
+            <span>{formatDisplayDate(waybill.issueDate)}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <MapPin className="h-3.5 w-3.5" />
@@ -115,7 +116,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
-                { icon: Calendar, label: 'Issue Date', value: new Date(waybill.issueDate).toLocaleDateString() },
+                { icon: Calendar, label: 'Issue Date', value: formatDisplayDate(waybill.issueDate) },
                 { icon: User, label: 'Driver', value: waybill.driverName },
                 { icon: Car, label: 'Vehicle', value: waybill.vehicle || 'L200' },
               ].map((item, i) => (

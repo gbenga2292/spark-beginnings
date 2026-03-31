@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -52,7 +53,7 @@ export function StartOffboarding() {
         title: task.title,
         assignee: task.assignee,
         status: index === 0 ? 'In Progress' : 'Pending',
-        date: taskDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        date: formatDisplayDate(taskDate),
       };
     });
 
