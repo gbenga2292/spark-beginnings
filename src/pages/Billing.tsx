@@ -11,6 +11,13 @@ import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 
+const formatDisplayDate = (iso: string | null | undefined): string => {
+  if (!iso) return '';
+  const parts = iso.split('T')[0].split('-');
+  if (parts.length !== 3) return iso;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+};
+
 export function Billing() {
   const sites = useAppStore((state) => state.sites);
   const pendingInvoices = useAppStore((state) => state.pendingInvoices);
@@ -660,7 +667,7 @@ export function Billing() {
                   </TableCell>
                   <TableCell className="px-4 py-3 text-right text-slate-600">
                     <div className="font-medium text-slate-800">{inv.duration || 0} Days</div>
-                    <div className="text-slate-500 text-xs">{inv.startDate || inv.date} - {inv.endDate || inv.dueDate}</div>
+                    <div className="text-slate-500 text-xs">{formatDisplayDate(inv.startDate || inv.date)} - {formatDisplayDate(inv.endDate || inv.dueDate)}</div>
                   </TableCell>
                   <TableCell className="px-4 py-3 text-right text-slate-600">
                     <div><span className="text-slate-400">Rent:</span> {priv?.canViewAmounts === false ? '***' : (inv.rentalCost || 0).toLocaleString()}</div>

@@ -5,7 +5,7 @@ import { Badge } from '@/src/components/ui/badge';
 import {
   Users as UsersIcon, Plus, Trash2, Eye, EyeOff, Shield, Search,
   LayoutDashboard, Building2, Landmark, Settings as SettingsIcon,
-  UserPlus, ChevronRight, ListTodo
+  UserPlus, ChevronRight, ListTodo, Package,
 } from 'lucide-react';
 import { useUserStore, AppUser, UserPrivileges } from '@/src/store/userStore';
 import { supabase } from '@/src/integrations/supabase/client';
@@ -13,12 +13,13 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 /* ── Color map for module badges ──────────────────────────────── */
 const MODULE_COLORS: Record<string, string> = {
-  Dashboard: 'bg-indigo-100 text-indigo-700',
-  HR:        'bg-teal-100 text-teal-700',
-  Admin:     'bg-violet-100 text-violet-700',
-  Account:   'bg-amber-100 text-amber-700',
-  Tasks:     'bg-blue-100 text-blue-700',
-  Settings:  'bg-slate-200 text-slate-700',
+  Dashboard:   'bg-indigo-100 text-indigo-700',
+  HR:          'bg-teal-100 text-teal-700',
+  Admin:       'bg-violet-100 text-violet-700',
+  Account:     'bg-amber-100 text-amber-700',
+  Tasks:       'bg-blue-100 text-blue-700',
+  Operations:  'bg-orange-100 text-orange-700',
+  Settings:    'bg-slate-200 text-slate-700',
 };
 
 const MODULE_ICONS: Record<string, any> = {
@@ -27,17 +28,19 @@ const MODULE_ICONS: Record<string, any> = {
   Admin:     Building2,
   Account:   Landmark,
   Tasks:     ListTodo,
+  Operations: Package,
   Settings:  SettingsIcon,
 };
 
 /* Quick check which groups the user has access to */
 const GROUP_CHECK: { name: string; keys: (keyof UserPrivileges)[]; field: string }[] = [
-  { name: 'Dashboard', keys: ['dashboard'], field: 'canView' },
-  { name: 'HR',        keys: ['employees', 'onboarding', 'attendance', 'leaves', 'salaryLoans', 'reports'], field: 'canView' },
-  { name: 'Admin',     keys: ['sites'], field: 'canView' },
-  { name: 'Tasks',     keys: ['tasks'], field: 'canView' },
-  { name: 'Account',   keys: ['billing', 'payments', 'payroll', 'financialReports'], field: 'canView' },
-  { name: 'Settings',  keys: ['variables', 'users'], field: 'canView' },
+  { name: 'Dashboard',  keys: ['dashboard'], field: 'canView' },
+  { name: 'HR',         keys: ['employees', 'onboarding', 'attendance', 'leaves', 'salaryLoans', 'evaluations', 'disciplinary', 'reports'], field: 'canView' },
+  { name: 'Operations', keys: ['operations'], field: 'canView' },
+  { name: 'Admin',      keys: ['sites'], field: 'canView' },
+  { name: 'Tasks',      keys: ['tasks'], field: 'canView' },
+  { name: 'Account',    keys: ['billing', 'payments', 'payroll', 'financialReports', 'ledger'], field: 'canView' },
+  { name: 'Settings',   keys: ['variables', 'users'], field: 'canView' },
 ];
 
 function getActiveModules(p: UserPrivileges): string[] {

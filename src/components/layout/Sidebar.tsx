@@ -144,18 +144,13 @@ const navigation: NavCategory[] = [
     ],
   },
   {
-    name: 'Settings',
+    name: 'Setting',
     icon: Settings,
-    standalone: true,
-    standaloneHref: '/settings',
-    items: [{ name: 'Settings', href: '/settings', icon: Settings, privKey: 'variables', privField: 'canView' }],
-  },
-  {
-    name: 'Activity Log',
-    icon: History,
-    standalone: true,
-    standaloneHref: '/activity-log',
-    items: [{ name: 'Activity Log', href: '/activity-log', icon: History, privKey: 'variables', privField: 'canView' }],
+    items: [
+      { name: 'User Management', href: '/users', icon: ShieldCheck, privKey: 'users', privField: 'canView' },
+      { name: 'Settings', href: '/settings', icon: Settings, privKey: 'variables', privField: 'canView' },
+      { name: 'Activity Log', href: '/activity-log', icon: History, privKey: 'variables', privField: 'canView' },
+    ],
   },
 ];
 

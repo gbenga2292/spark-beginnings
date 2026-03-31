@@ -173,6 +173,13 @@ function ClientSummary() {
   );
 }
 
+const toDisplayDate = (iso: string | null | undefined): string => {
+  if (!iso) return '';
+  const parts = iso.split('T')[0].split('-');
+  if (parts.length !== 3) return iso;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+};
+
 export function Sites() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -745,14 +752,14 @@ export function Sites() {
                       {editingId === site.id ? (
                         <Input type="date" value={editForm.startDate} className="h-8 w-32" onChange={e => setEditForm({ ...editForm, startDate: e.target.value })} />
                       ) : (
-                        site.startDate || <span className="text-slate-300">-</span>
+                        toDisplayDate(site.startDate) || <span className="text-slate-300">-</span>
                       )}
                     </TableCell>
                     <TableCell>
                       {editingId === site.id ? (
                         <Input type="date" value={editForm.endDate} className="h-8 w-32" onChange={e => setEditForm({ ...editForm, endDate: e.target.value })} />
                       ) : (
-                        site.endDate || <span className="text-slate-300">-</span>
+                        toDisplayDate(site.endDate) || <span className="text-slate-300">-</span>
                       )}
                     </TableCell>
                     <TableCell className="text-center">

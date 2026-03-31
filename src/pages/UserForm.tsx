@@ -5,7 +5,7 @@ import { Input } from '@/src/components/ui/input';
 import {
   ArrowLeft, Save, Eye, EyeOff, Shield, ChevronDown, ChevronRight,
   CheckCircle2, X, BookmarkPlus,
-  LayoutDashboard, Users as UsersIcon, Building2, Landmark, Settings,
+  LayoutDashboard, Users as UsersIcon, Building2, Landmark, Settings, Package, Library, History, ListTodo,
 } from 'lucide-react';
 import { useUserStore, AppUser, UserPrivileges, FULL_ACCESS, NO_ACCESS, PrivilegePreset } from '@/src/store/userStore';
 import { useAppStore } from '@/src/store/appStore';
@@ -27,7 +27,7 @@ const PRIV_GROUPS: PG[] = [
     ],
   },
   {
-    name: 'Tasks', icon: BookmarkPlus, color: 'blue',
+    name: 'Tasks', icon: ListTodo, color: 'blue',
     pages: [
       { key: 'tasks', label: 'Task Management', parentKey: 'tasks', masterField: 'canView',
         fields: [
@@ -39,7 +39,7 @@ const PRIV_GROUPS: PG[] = [
           { key: 'canCreateTasks', label: 'Create Tasks' },
           { key: 'canEditTasks', label: 'Edit Tasks' },
           { key: 'canDeleteTasks', label: 'Delete Tasks', danger: true },
-        ] 
+        ]
       },
     ],
   },
@@ -48,10 +48,6 @@ const PRIV_GROUPS: PG[] = [
     pages: [
       { key: 'employees', label: 'Employees', parentKey: 'employees', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewSalary', label: 'View Salary', special: true }, { key: 'canExport', label: 'Export' }] },
-      { key: 'disciplinary', label: 'Disciplinary', parentKey: 'disciplinary', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
-      { key: 'evaluations', label: 'Evaluations', parentKey: 'evaluations', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
       { key: 'onboarding', label: 'Onboarding', parentKey: 'onboarding', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
       { key: 'attendance', label: 'Daily Register', parentKey: 'attendance', masterField: 'canView',
@@ -60,8 +56,25 @@ const PRIV_GROUPS: PG[] = [
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewSummary', label: 'View Summary Page' }] },
       { key: 'salaryLoans', label: 'Salary Advances & Loans', parentKey: 'salaryLoans', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Approve / Delete', danger: true }, { key: 'canViewAmounts', label: 'View Amounts', special: true }] },
-      { key: 'reports', label: 'Employee Reports', parentKey: 'reports', masterField: 'canView',
+      { key: 'evaluations', label: 'Evaluations', parentKey: 'evaluations', masterField: 'canView',
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
+      { key: 'disciplinary', label: 'Performance & Conduct', parentKey: 'disciplinary', masterField: 'canView',
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
+      { key: 'reports', label: 'HR Reports', parentKey: 'reports', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canExport', label: 'Export' }] },
+    ],
+  },
+  {
+    name: 'Operations', icon: Package, color: 'orange',
+    pages: [
+      { key: 'operations', label: 'Operations Module', parentKey: 'operations', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'Overview & Sites' },
+          { key: 'canManageAssets', label: 'Inventory & Maintenance' },
+          { key: 'canManageWaybills', label: 'Waybills' },
+          { key: 'canManageLogistics', label: 'Quick Checkout' },
+          { key: 'canViewAnalytics', label: 'Analytics', special: true },
+        ] },
     ],
   },
   {
@@ -71,32 +84,29 @@ const PRIV_GROUPS: PG[] = [
         fields: [
           { key: 'canView', label: 'View' }, { key: 'canAddSite', label: 'Add Site' }, { key: 'canEditSite', label: 'Edit Site' }, { key: 'canDeleteSite', label: 'Delete Site', danger: true },
           { key: 'canAddClient', label: 'Add Client' }, { key: 'canEditClient', label: 'Edit Client' }, { key: 'canDeleteClient', label: 'Delete Client', danger: true },
-          { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }
+          { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' },
         ] },
     ],
   },
   {
     name: 'Account', icon: Landmark, color: 'amber',
     pages: [
-      { key: 'clientSummary', label: 'Client Summary', parentKey: 'sites', masterField: 'canViewClientSummary',
-        fields: [{ key: 'canViewClientSummary', label: 'View' }] },
+      { key: 'clientSummary', label: 'Client Accounts (Summary)', parentKey: 'sites', masterField: 'canViewClientSummary',
+        fields: [{ key: 'canViewClientSummary', label: 'View Client Summary' }] },
       { key: 'billing', label: 'Invoices & Billing', parentKey: 'billing', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canCreate', label: 'Create' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
-      { key: 'payments', label: 'Payments', parentKey: 'payments', masterField: 'canView',
+      { key: 'payments', label: 'Payments & VAT', parentKey: 'payments', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canViewVat', label: 'View VAT Tab' }, { key: 'canManageVat', label: 'Manage VAT' }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
       { key: 'payroll', label: 'Payroll', parentKey: 'payroll', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canGenerate', label: 'Generate / Edit' }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canViewPayeSchedule', label: 'PAYE Schedule' }, { key: 'canViewPensionSchedule', label: 'Pension Schedule' }, { key: 'canViewNsitfSchedule', label: 'NSITF Schedule' }] },
+        fields: [
+          { key: 'canView', label: 'View' }, { key: 'canGenerate', label: 'Generate / Edit' }, { key: 'canViewAmounts', label: 'View Amounts', special: true },
+          { key: 'canViewPayeSchedule', label: 'PAYE Schedule' }, { key: 'canViewPensionSchedule', label: 'Pension Schedule' },
+          { key: 'canViewNsitfSchedule', label: 'NSITF Schedule' }, { key: 'canViewWithholdingSchedule', label: 'Withholding Tax Schedule' },
+        ] },
       { key: 'financialReports', label: 'Financial Reports', parentKey: 'financialReports', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canExport', label: 'Export' }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canViewPayrollSummary', label: 'Payroll Summary Tab' }, { key: 'canViewLoansAndAdvances', label: 'Loans & Advances Tab' }] },
-      { key: 'ledger', label: 'Financial Ledger', parentKey: 'ledger', masterField: 'canView',
+      { key: 'ledger', label: 'Financial Ledger & Expenses', parentKey: 'ledger', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Record Entries' }, { key: 'canEdit', label: 'Edit Variables' }, { key: 'canDelete', label: 'Delete Entries', danger: true }, { key: 'canExport', label: 'Export' }] },
-    ],
-  },
-  {
-    name: 'Variables', icon: Settings, color: 'emerald',
-    pages: [
-      { key: 'variables', label: 'Variables', parentKey: 'variables', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canEdit', label: 'Edit' }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
     ],
   },
   {
@@ -104,18 +114,26 @@ const PRIV_GROUPS: PG[] = [
     pages: [
       { key: 'users', label: 'User Management', parentKey: 'users', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View Users' }, { key: 'canManage', label: 'Add / Edit Users', danger: true }] },
+      { key: 'variables', label: 'App Settings & Variables', parentKey: 'variables', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View (also grants Settings page & Activity Log access)' },
+          { key: 'canEdit', label: 'Edit Variables' },
+          { key: 'canImport', label: 'Import' },
+          { key: 'canExport', label: 'Export' },
+        ] },
     ],
   },
 ];
 
 const COLORS: Record<string, { bg: string; text: string; border: string; badge: string }> = {
-  indigo: { bg: 'bg-indigo-50',  text: 'text-indigo-700',  border: 'border-indigo-200', badge: 'bg-indigo-100 text-indigo-700' },
-  teal:   { bg: 'bg-teal-50',    text: 'text-teal-700',    border: 'border-teal-200',   badge: 'bg-teal-100 text-teal-700' },
-  violet: { bg: 'bg-violet-50',  text: 'text-violet-700',  border: 'border-violet-200', badge: 'bg-violet-100 text-violet-700' },
-  amber:  { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',  badge: 'bg-amber-100 text-amber-700' },
-  emerald:{ bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200',badge: 'bg-emerald-100 text-emerald-700' },
-  blue:   { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200',   badge: 'bg-blue-100 text-blue-700' },
-  slate:  { bg: 'bg-slate-100',  text: 'text-slate-700',   border: 'border-slate-300',  badge: 'bg-slate-200 text-slate-700' },
+  indigo:  { bg: 'bg-indigo-50',  text: 'text-indigo-700',  border: 'border-indigo-200',  badge: 'bg-indigo-100 text-indigo-700' },
+  teal:    { bg: 'bg-teal-50',    text: 'text-teal-700',    border: 'border-teal-200',    badge: 'bg-teal-100 text-teal-700' },
+  violet:  { bg: 'bg-violet-50',  text: 'text-violet-700',  border: 'border-violet-200',  badge: 'bg-violet-100 text-violet-700' },
+  amber:   { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   badge: 'bg-amber-100 text-amber-700' },
+  emerald: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700' },
+  blue:    { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200',    badge: 'bg-blue-100 text-blue-700' },
+  orange:  { bg: 'bg-orange-50',  text: 'text-orange-700',  border: 'border-orange-200',  badge: 'bg-orange-100 text-orange-700' },
+  slate:   { bg: 'bg-slate-100',  text: 'text-slate-700',   border: 'border-slate-300',   badge: 'bg-slate-200 text-slate-700' },
 };
 
 function getPrivObj(privs: UserPrivileges, key: keyof UserPrivileges): Record<string, boolean> {

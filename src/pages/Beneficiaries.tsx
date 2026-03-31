@@ -128,13 +128,23 @@ export function Beneficiaries() {
   }, [formData.typeOfPay, formData.startMonthOfPay, isAdding, isEditing]);
 
   useEffect(() => {
-    if (formData.endDate) {
+    // If no end date is provided, status should always default to 'Active'
+    // and cannot be 'Terminated'.
+    if (!formData.endDate || formData.endDate.trim() === '') {
+      if (formData.status === 'Terminated') {
+        setFormData(prev => ({ ...prev, status: 'Active' }));
+      }
+    } else {
+      // If end date is present, automate status based on current date
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const eDate = new Date(formData.endDate);
-      const autoStatus = today < eDate ? 'Active' : 'Terminated';
-      if (formData.status !== autoStatus) {
-        setFormData(prev => ({ ...prev, status: autoStatus as any }));
+      
+      if (!isNaN(eDate.getTime())) {
+        const autoStatus = today < eDate ? 'Active' : 'Terminated';
+        if (formData.status !== autoStatus) {
+          setFormData(prev => ({ ...prev, status: autoStatus as any }));
+        }
       }
     }
   }, [formData.endDate, formData.status]);
@@ -142,6 +152,10 @@ export function Beneficiaries() {
   const handleSave = () => {
     if (!formData.surname || !formData.firstname) {
       toast.error('Surname and Firstname are required.');
+      return;
+    }
+    if (formData.endDate && formData.startDate && new Date(formData.endDate) < new Date(formData.startDate)) {
+      toast.error('End date cannot be before the start date.');
       return;
     }
 
@@ -203,6 +217,10 @@ export function Beneficiaries() {
       toast.error('Surname and Firstname are required.');
       return;
     }
+    if (formData.endDate && formData.startDate && new Date(formData.endDate) < new Date(formData.startDate)) {
+      toast.error('End date cannot be before the start date.');
+      return;
+    }
     const updateData = {
       ...formData,
       department: formData.department || 'Non-Employee',
@@ -256,21 +274,45 @@ export function Beneficiaries() {
         return;
       }
       const headers = ['id', 'beneficiaryCode', 'surname', 'firstname', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'withholdingTax', 'withholdingTaxRate', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      // Standard CSV cell wrapper
       const extractCSV = (str: any) => `"${String(str ?? '').replace(/"/g, '""')}"`;
+      // Text-force wrapper: properly CSV-encodes the Excel ="value" formula
+      // The cell value is: ="value"
+      // CSV-encoded (inner quotes doubled): """"value""""
+      // Full quoted cell: "=""value"""
+      const extractCSVText = (str: any) => {
+        const val = String(str || '').replace(/"/g, '""');
+        return `"=""${val}"""`;
+      };
 
       const rows = beneficiaries.map(emp => {
         const data = [
-          emp.id, emp.employeeCode || '', emp.surname, emp.firstname, emp.status, emp.yearlyLeave,
-          emp.startDate || '', emp.endDate || '', emp.bankName || '', emp.accountNo || '',
-          emp.withholdingTax ? 'Yes' : 'No', emp.withholdingTaxRate || 0.05,
-          canSeeSalary ? emp.monthlySalaries.jan : '***', canSeeSalary ? emp.monthlySalaries.feb : '***',
-          canSeeSalary ? emp.monthlySalaries.mar : '***', canSeeSalary ? emp.monthlySalaries.apr : '***',
-          canSeeSalary ? emp.monthlySalaries.may : '***', canSeeSalary ? emp.monthlySalaries.jun : '***',
-          canSeeSalary ? emp.monthlySalaries.jul : '***', canSeeSalary ? emp.monthlySalaries.aug : '***',
-          canSeeSalary ? emp.monthlySalaries.sep : '***', canSeeSalary ? emp.monthlySalaries.oct : '***',
-          canSeeSalary ? emp.monthlySalaries.nov : '***', canSeeSalary ? emp.monthlySalaries.dec : '***'
+          extractCSV(emp.id),
+          extractCSV(emp.employeeCode || ''),
+          extractCSV(emp.surname),
+          extractCSV(emp.firstname),
+          extractCSV(emp.status),
+          extractCSV(emp.yearlyLeave),
+          extractCSV(emp.startDate || ''),
+          extractCSV(emp.endDate || ''),
+          extractCSV(emp.bankName || ''),
+          extractCSVText(emp.accountNo || ''),   // preserve leading zeros
+          extractCSV(emp.withholdingTax ? 'Yes' : 'No'),
+          extractCSV(emp.withholdingTaxRate || 0.05),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.jan : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.feb : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.mar : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.apr : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.may : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.jun : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.jul : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.aug : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.sep : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.oct : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.nov : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.dec : '***'),
         ];
-        return data.map(extractCSV).join(',');
+        return data.join(',');
       });
 
       const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
@@ -293,7 +335,13 @@ export function Beneficiaries() {
     let inQuotes = false;
     for (let i = 0; i < str.length; i++) {
       if (str[i] === '"') {
-        inQuotes = !inQuotes;
+        if (inQuotes && i + 1 < str.length && str[i + 1] === '"') {
+          // RFC 4180: "" inside a quoted field = literal quote character
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
       } else if (str[i] === ',' && !inQuotes) {
         vals.push(cur.trim());
         cur = '';
@@ -303,6 +351,15 @@ export function Beneficiaries() {
     }
     vals.push(cur.trim());
     return vals;
+  };
+
+  // Strip Excel text-force wrapper (="...") and tab prefix from a CSV value
+  const stripExcelText = (val: string): string => {
+    // Handle ="..." Excel formula wrapper (from our export)
+    if (/^=".*"$/.test(val)) return val.slice(2, -1).replace(/""/g, '"');
+    // Handle tab-prefixed values (Excel sometimes adds \t to force text)
+    if (val.startsWith('\t')) return val.slice(1);
+    return val;
   };
 
   const handleImportCSVSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -355,9 +412,14 @@ export function Beneficiaries() {
               status: vals[3 + offset] as 'Active' | 'On Leave' | 'Terminated',
               yearlyLeave: parseInt(vals[4 + offset]) || 0,
               startDate: vals[5 + offset] || '',
-              endDate: vals[6 + offset] || '',
+              endDate: (() => {
+                const sd = vals[5 + offset] || '';
+                const ed = vals[6 + offset] || '';
+                if (ed && sd && new Date(ed) < new Date(sd)) return '';
+                return ed;
+              })(),
               bankName: vals[7 + offset] || '',
-              accountNo: vals[8 + offset] || '',
+              accountNo: stripExcelText(vals[8 + offset] || ''), // preserve leading zeros
               taxId: '',
               pensionNumber: '',
               payeTax: false,
@@ -462,7 +524,14 @@ export function Beneficiaries() {
                   <select
                     className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none ${formData.endDate ? 'opacity-70 cursor-not-allowed' : ''}`}
                     value={formData.status}
-                    onChange={e => setFormData({ ...formData, status: e.target.value as any })}
+                    onChange={e => {
+                      const newStatus = e.target.value;
+                      if (newStatus === 'Terminated' && (!formData.endDate || formData.endDate.trim() === '')) {
+                        toast.error('Termination status requires an Official End Date.');
+                        return;
+                      }
+                      setFormData({ ...formData, status: newStatus as any });
+                    }}
                     disabled={!!formData.endDate}
                   >
                     <option value="Active">Active</option>

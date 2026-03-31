@@ -105,6 +105,10 @@ export function Employees() {
       toast.error('Surname and Firstname are required.');
       return;
     }
+    if (formData.endDate && formData.startDate && new Date(formData.endDate) < new Date(formData.startDate)) {
+      toast.error('End date cannot be before the start date.');
+      return;
+    }
 
     // Level Validation: Only one Level 1 in the whole company
     if (formData.level === 1) {
@@ -208,6 +212,10 @@ export function Employees() {
       toast.error('Surname and Firstname are required.');
       return;
     }
+    if (formData.endDate && formData.startDate && new Date(formData.endDate) < new Date(formData.startDate)) {
+      toast.error('End date cannot be before the start date.');
+      return;
+    }
 
     // Level Validation for Edit
     if (formData.level === 1) {
@@ -302,20 +310,56 @@ export function Employees() {
         return;
       }
       const headers = ['id', 'employeeCode', 'surname', 'firstname', 'department', 'staffType', 'level', 'position', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'taxId', 'pensionNumber', 'lashmaPolicyNumber', 'lashmaRegistrationDate', 'lashmaExpiryDate', 'payeTax', 'withholdingTax', 'excludeFromOnboarding', 'rent', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      // Standard CSV cell wrapper
       const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
+      // Text-force wrapper: properly CSV-encodes the Excel ="value" formula
+      // The cell value is: ="value"
+      // CSV-encoded (inner quotes doubled): """"value""""
+      // Full quoted cell: "=""value"""
+      const extractCSVText = (str: any) => {
+        const val = String(str || '').replace(/"/g, '""');
+        return `"=""${val}"""`;
+      };
 
       const rows = employees.map(emp => {
         const data = [
-          emp.id, emp.employeeCode || '', emp.surname, emp.firstname, emp.department, emp.staffType, emp.level || 10,
-          emp.position, emp.status, emp.yearlyLeave, emp.startDate || '',
-          emp.endDate || '', emp.bankName || '', emp.accountNo || '', emp.taxId || '',
-          emp.pensionNumber || '', emp.lashmaPolicyNumber || '', emp.lashmaRegistrationDate || '', emp.lashmaExpiryDate || '', emp.payeTax, emp.withholdingTax, emp.excludeFromOnboarding || false, emp.rent || 0,
-          canSeeSalary ? emp.monthlySalaries.jan : '***', canSeeSalary ? emp.monthlySalaries.feb : '***', canSeeSalary ? emp.monthlySalaries.mar : '***',
-          canSeeSalary ? emp.monthlySalaries.apr : '***', canSeeSalary ? emp.monthlySalaries.may : '***', canSeeSalary ? emp.monthlySalaries.jun : '***',
-          canSeeSalary ? emp.monthlySalaries.jul : '***', canSeeSalary ? emp.monthlySalaries.aug : '***', canSeeSalary ? emp.monthlySalaries.sep : '***',
-          canSeeSalary ? emp.monthlySalaries.oct : '***', canSeeSalary ? emp.monthlySalaries.nov : '***', canSeeSalary ? emp.monthlySalaries.dec : '***'
+          extractCSV(emp.id),
+          extractCSV(emp.employeeCode || ''),
+          extractCSV(emp.surname),
+          extractCSV(emp.firstname),
+          extractCSV(emp.department),
+          extractCSV(emp.staffType),
+          extractCSV(emp.level || 10),
+          extractCSV(emp.position),
+          extractCSV(emp.status),
+          extractCSV(emp.yearlyLeave),
+          extractCSV(emp.startDate || ''),
+          extractCSV(emp.endDate || ''),
+          extractCSV(emp.bankName || ''),
+          extractCSVText(emp.accountNo || ''),       // preserve leading zeros
+          extractCSVText(emp.taxId || ''),           // preserve leading zeros
+          extractCSVText(emp.pensionNumber || ''),   // preserve leading zeros
+          extractCSVText(emp.lashmaPolicyNumber || ''), // preserve leading zeros
+          extractCSV(emp.lashmaRegistrationDate || ''),
+          extractCSV(emp.lashmaExpiryDate || ''),
+          extractCSV(emp.payeTax),
+          extractCSV(emp.withholdingTax),
+          extractCSV(emp.excludeFromOnboarding || false),
+          extractCSV(emp.rent || 0),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.jan : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.feb : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.mar : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.apr : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.may : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.jun : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.jul : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.aug : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.sep : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.oct : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.nov : '***'),
+          extractCSV(canSeeSalary ? emp.monthlySalaries.dec : '***'),
         ];
-        return data.map(extractCSV).join(',');
+        return data.join(',');
       });
 
       const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
@@ -338,7 +382,13 @@ export function Employees() {
     let inQuotes = false;
     for (let i = 0; i < str.length; i++) {
       if (str[i] === '"') {
-        inQuotes = !inQuotes;
+        if (inQuotes && i + 1 < str.length && str[i + 1] === '"') {
+          // RFC 4180: "" inside a quoted field = literal quote character
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
       } else if (str[i] === ',' && !inQuotes) {
         vals.push(cur.trim());
         cur = '';
@@ -348,6 +398,15 @@ export function Employees() {
     }
     vals.push(cur.trim());
     return vals;
+  };
+
+  // Strip Excel text-force wrapper (="...") and tab prefix from a CSV value
+  const stripExcelText = (val: string): string => {
+    // Handle ="..." Excel formula wrapper (from our export)
+    if (/^=".*"$/.test(val)) return val.slice(2, -1).replace(/""/g, '"');
+    // Handle tab-prefixed values (Excel sometimes adds \t to force text)
+    if (val.startsWith('\t')) return val.slice(1);
+    return val;
   };
 
   const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -416,12 +475,18 @@ export function Employees() {
               status: vals[7 + offset] as any, 
               yearlyLeave: parseInt(vals[8 + offset]) || 0,
               startDate: vals[9 + offset] || '', 
-              endDate: vals[10 + offset] || '', 
+              endDate: (() => {
+                const sd = vals[9 + offset] || '';
+                const ed = vals[10 + offset] || '';
+                // Never allow endDate to precede startDate; blank it out if so
+                if (ed && sd && new Date(ed) < new Date(sd)) return '';
+                return ed;
+              })(),
               bankName: vals[11 + offset] || '',
-              accountNo: vals[12 + offset] || '', 
-              taxId: vals[13 + offset] || '', 
-              pensionNumber: vals[14 + offset] || '',
-              lashmaPolicyNumber: vals[15 + offset] || '',
+              accountNo: stripExcelText(vals[12 + offset] || ''),         // preserve leading zeros
+              taxId: stripExcelText(vals[13 + offset] || ''),             // preserve leading zeros
+              pensionNumber: stripExcelText(vals[14 + offset] || ''),     // preserve leading zeros
+              lashmaPolicyNumber: stripExcelText(vals[15 + offset] || ''), // preserve leading zeros
               lashmaRegistrationDate: vals[16 + offset] || '',
               lashmaExpiryDate: vals[17 + offset] || '',
               payeTax: ['true', 'yes', '1'].includes(vals[18 + offset]?.trim().toLowerCase() || ''),
