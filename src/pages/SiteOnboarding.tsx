@@ -11,6 +11,7 @@ import { CreateProjectDialog } from '@/src/components/tasks/CreateProjectDialog'
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { generateId } from '@/src/lib/utils';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -230,9 +231,26 @@ export function SiteOnboarding() {
       updatePendingSite(form.id, { ...form, updatedAt: new Date().toISOString() });
       if (form.status === 'Active') {
         const sites = useAppStore.getState().sites;
-        const matchingSite = sites.find(s => s.name === form.siteName && s.client === form.clientName);
-        if (matchingSite && form.phase5.actualEndDate !== matchingSite.endDate) {
-          updateSite(matchingSite.id, { endDate: form.phase5.actualEndDate || '' });
+        // Find matching site by siteId (preferred) or name/client
+        const matchingSite = sites.find(s => s.id === form.siteId) || 
+                           sites.find(s => s.name === form.siteName && s.client === form.clientName);
+        
+        if (matchingSite) {
+          const updates: any = {};
+          if (form.phase5.actualEndDate !== matchingSite.endDate) {
+            updates.endDate = form.phase5.actualEndDate || '';
+          }
+          
+          const newVat = ((form.phase4.clientTaxStatus as string) || '').includes('Add') ? 'Add' : 
+                        ((form.phase4.clientTaxStatus as string) || '').includes('Yes') ? 'Yes' : 'No';
+          
+          if (newVat !== matchingSite.vat) {
+            updates.vat = newVat;
+          }
+
+          if (Object.keys(updates).length > 0) {
+            updateSite(matchingSite.id, updates);
+          }
         }
       }
       setInitialForm(form);
@@ -289,57 +307,49 @@ export function SiteOnboarding() {
     navigate('/sites');
   };
 
+  const headerActions = (
+    <div className="flex items-center gap-2">
+      <Button variant="ghost" size="sm" onClick={handleBack} className="text-slate-500 mr-2">
+        <ArrowLeft className="h-4 w-4 mr-1" /> Back
+      </Button>
+      {!isNew && (
+        <>
+          {form.status === 'Active' && projects.some(p => p.name === form.siteName || p.id === form.siteName || p.title === form.siteName) ? (
+            <Button onClick={() => navigate(`/tasks?scope=projects&openProject=${encodeURIComponent(form.siteName)}`)}
+              className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border-indigo-200 gap-2 font-medium shadow-none h-9">
+              <LayoutGrid className="h-4 w-4" /> View Workspace
+            </Button>
+          ) : form.status === 'Active' ? (
+            <Button onClick={() => setShowProjectDialog(true)}
+              className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border-indigo-200 gap-2 font-medium shadow-none h-9">
+              <LayoutGrid className="h-4 w-4" /> Create Workspace
+            </Button>
+          ) : null}
+          <Button variant="outline" onClick={handleSave} className="gap-2 h-9">
+            <Save className="h-4 w-4" /> Save Progress
+          </Button>
+          {canActivate && (
+            <Button onClick={handleActivate} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 h-9">
+              <CheckCircle2 className="h-4 w-4" /> Activate Site
+            </Button>
+          )}
+        </>
+      )}
+    </div>
+  );
+
+  useSetPageTitle(
+    isNew ? 'New Site Onboarding' : `Site Onboarding — ${form.siteName}`,
+    isNew ? 'Start a new project inquiry' : `${form.status === 'Active' ? 'Site Active' : 'Activation Pending'} • Fill all phases. Activation unlocks at Phase 4.`,
+    headerActions,
+    [form.siteName, form.status, canActivate, isNew]
+  );
+
   const completedCount = [1, 2, 3, 4, 5].filter(p => (form as any)[`phase${p}`].completed).length;
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-5 h-full max-w-5xl mx-auto w-full">
-
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <Button variant="ghost" size="sm" onClick={handleBack} className="text-slate-500 mt-0.5">
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back
-        </Button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              {isNew ? 'Site Onboarding' : `Site Onboarding — ${form.siteName || 'New Site'}`}
-            </h1>
-            {!isNew && (
-              <Badge variant={form.status === 'Active' ? 'success' : 'secondary'}>{form.status}</Badge>
-            )}
-          </div>
-          <p className="text-sm text-slate-500 mt-0.5">
-            {form.status === 'Active'
-              ? 'This site is active. Client & site name are locked — all phases remain editable.'
-              : 'Fill all phases. Activation unlocks at Phase 4 when quotation is accepted and payment confirmed.'}
-          </p>
-        </div>
-        {/* Save always visible for existing records */}
-        {!isNew && (
-          <div className="flex gap-2 flex-shrink-0">
-            {form.status === 'Active' && projects.some(p => p.name === form.siteName || p.id === form.siteName || p.title === form.siteName) ? (
-              <Button onClick={() => navigate(`/tasks?scope=projects&openProject=${encodeURIComponent(form.siteName)}`)}
-                className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border-indigo-200 gap-2 font-medium shadow-none">
-                <LayoutGrid className="h-4 w-4" /> View Workspace
-              </Button>
-            ) : form.status === 'Active' ? (
-              <Button onClick={() => setShowProjectDialog(true)}
-                className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border-indigo-200 gap-2 font-medium shadow-none">
-                <LayoutGrid className="h-4 w-4" /> Create Workspace
-              </Button>
-            ) : null}
-            <Button variant="outline" onClick={handleSave} className="gap-2">
-              <Save className="h-4 w-4" /> Save
-            </Button>
-            {canActivate && (
-              <Button onClick={handleActivate} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
-                <CheckCircle2 className="h-4 w-4" /> Activate Site
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* Site info summary card — only after created */}
       {!isNew && (

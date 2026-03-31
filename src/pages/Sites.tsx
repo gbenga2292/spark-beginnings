@@ -7,7 +7,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical } from 'lucide-react';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
@@ -277,20 +277,57 @@ export function Sites() {
   const deleteSite = useAppStore((s) => s.deleteSite);
   const addPendingSite = useAppStore((s) => s.addPendingSite);
   const setPendingSites = useAppStore((s) => s.setPendingSites);
+  const updatePendingSite = useAppStore((s) => s.updatePendingSite);
   const { createMainTask } = useAppData();
 
+  const [sortField, setSortField] = useState<'client' | 'name' | 'startDate' | 'endDate' | 'status'>('client');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const closeMenu = () => setOpenMenuId(null);
   const toggleMenu = (id: string) => setOpenMenuId(prev => prev === id ? null : id);
 
-  const filteredSites = sites.filter(site => {
-    const isHardcoded = site.client.toLowerCase() === 'dcel' && site.name.toLowerCase() === 'office';
-    if (isHardcoded) return false;
-    return (
-      site.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      site.client.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  });
+  const filteredSites = useMemo(() => {
+    return sites.filter(site => {
+      const isHardcoded = site.client.toLowerCase() === 'dcel' && site.name.toLowerCase() === 'office';
+      if (isHardcoded) return false;
+      return (
+        site.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        site.client.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    });
+  }, [sites, searchTerm]);
+
+  const sortedSites = useMemo(() => {
+    return [...filteredSites].sort((a, b) => {
+      let valA = (a[sortField] || '').toString().toLowerCase();
+      let valB = (b[sortField] || '').toString().toLowerCase();
+
+      if (sortField === 'startDate' || sortField === 'endDate') {
+        valA = a[sortField] || '9999-99-99'; // Push empty dates to end
+        valB = b[sortField] || '9999-99-99';
+      }
+
+      if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredSites, sortField, sortDirection]);
+
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: typeof sortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-30" />;
+    return sortDirection === 'asc' 
+      ? <ChevronUp className="ml-1 h-3 w-3 text-indigo-600" /> 
+      : <ChevronDown className="ml-1 h-3 w-3 text-indigo-600" />;
+  };
 
   const filteredPendingSites = pendingSites.filter(site =>
     site.status === 'Pending' &&
@@ -306,7 +343,8 @@ export function Sites() {
     ) || pendingSites.some(ps =>
       ps.siteName.trim().toLowerCase() === name.trim().toLowerCase() &&
       ps.clientName.trim().toLowerCase() === client.trim().toLowerCase() &&
-      ps.id !== excludeId
+      ps.id !== excludeId &&
+      ps.siteId !== excludeId
     );
 
   const handleAdd = () => {
@@ -360,7 +398,29 @@ export function Sites() {
     } else if (editForm.startDate && nowStr < editForm.startDate) {
       submitStatus = 'Inactive';
     }
-    updateSite(editingId, { ...editForm, status: submitStatus });
+
+    updateSite(editingId, {
+      ...editForm,
+      status: submitStatus
+    });
+
+    // Synchronize changes to the linked questionnaire if it exists
+    const linkedPS = pendingSites.find(ps => ps.siteId === editingId);
+    if (linkedPS) {
+      const taxStatus = editForm.vat === 'Add' ? 'Mainland (Add 7.5% VAT)' : 
+                       editForm.vat === 'Yes' ? 'Mainland (Yes 7.5% VAT)' : 
+                       'Free Trade Zone (0% VAT)';
+      
+      updatePendingSite(linkedPS.id, {
+        siteName: editForm.name,
+        clientName: editForm.client,
+        phase4: {
+          ...linkedPS.phase4,
+          clientTaxStatus: taxStatus
+        }
+      });
+    }
+
     setEditingId(null);
   };
 
@@ -628,18 +688,8 @@ export function Sites() {
 
       <div className="h-6 w-px bg-slate-200 hidden sm:block" />
 
-      {canAddSite && (
-        <Button 
-          size="sm" 
-          className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-7.5 text-[10px] md:text-[11px] px-2.5 md:px-4 font-bold shadow-md shadow-indigo-200/50" 
-          onClick={() => setIsAddingSite(true)}
-        >
-          <Plus className="h-3 md:h-3.5 w-3 md:w-3.5" /> <span className="hidden sm:inline">Add Site</span><span className="sm:hidden">Add</span>
-        </Button>
-      )}
-
     </div>,
-    [activeTab, canAddSite]
+    [activeTab]
   );
 
   return (
@@ -648,39 +698,61 @@ export function Sites() {
 
       <Tabs className="flex flex-col flex-1 min-h-0 gap-8">
         <TabsContent active={activeTab === 'active'} className="flex-1 flex flex-col min-h-0 gap-6">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
             <Card className="border-indigo-100 bg-indigo-50/50 shadow-none">
               <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-                <CardTitle className="text-xs font-bold text-indigo-900 uppercase tracking-wider opacity-70">Total Active Sites</CardTitle>
+                <CardTitle className="text-[10px] font-bold text-indigo-900 uppercase tracking-wider opacity-70">Active Sites</CardTitle>
                 <MapPin className="h-3.5 w-3.5 text-indigo-500" />
               </CardHeader>
               <CardContent className="p-3 pt-0">
                 <div className="text-2xl font-bold text-indigo-900 leading-none">
                   {sites.filter(s => s.status === 'Active').length}
                 </div>
-                <p className="text-[10px] text-indigo-600 mt-1 opacity-80 font-medium">Currently operational</p>
+                <p className="text-[10px] text-indigo-600 mt-1 opacity-80 font-medium whitespace-nowrap overflow-hidden text-ellipsis">Currently operational</p>
               </CardContent>
             </Card>
 
             <Card className="border-slate-200 shadow-none">
               <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-                <CardTitle className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Clients</CardTitle>
+                <CardTitle className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Clients</CardTitle>
                 <Building2 className="h-3.5 w-3.5 text-slate-400" />
               </CardHeader>
               <CardContent className="p-3 pt-0">
                 <div className="text-2xl font-bold text-slate-900 leading-none">{uniqueClients}</div>
-                <p className="text-[10px] text-slate-500 mt-1 font-medium">Unique clients</p>
+                <p className="text-[10px] text-slate-500 mt-1 font-medium whitespace-nowrap overflow-hidden text-ellipsis">Unique clients</p>
               </CardContent>
             </Card>
 
             <Card className="border-emerald-100 bg-emerald-50/50 shadow-none">
               <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-                <CardTitle className="text-xs font-bold text-emerald-900 uppercase tracking-wider opacity-70">VAT Registered Sites</CardTitle>
+                <CardTitle className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider opacity-70">VAT Sites</CardTitle>
                 <span className="text-emerald-600 font-bold text-[8px] bg-emerald-100/50 px-1 rounded uppercase tracking-wider h-[14px] flex items-center">VAT</span>
               </CardHeader>
               <CardContent className="p-3 pt-0">
                 <div className="text-2xl font-bold text-emerald-900 leading-none">{sites.filter(s => s.vat === 'Yes' || s.vat === 'Add').length}</div>
-                <p className="text-[10px] text-emerald-600 mt-1 opacity-80 font-medium">Sites with VAT enabled</p>
+                <p className="text-[10px] text-emerald-600 mt-1 opacity-80 font-medium whitespace-nowrap overflow-hidden text-ellipsis">VAT enabled</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-amber-100 bg-amber-50/10 shadow-none">
+              <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+                <CardTitle className="text-[10px] font-bold text-amber-900 uppercase tracking-wider opacity-70">Pending Sites</CardTitle>
+                <Clock className="h-3.5 w-3.5 text-amber-500" />
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <div className="text-2xl font-bold text-amber-900 leading-none">{pendingSites.filter(ps => ps.status === 'Pending').length}</div>
+                <p className="text-[10px] text-amber-600 mt-1 opacity-80 font-medium whitespace-nowrap overflow-hidden text-ellipsis">In onboarding pipeline</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-200 shadow-none">
+              <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+                <CardTitle className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Records</CardTitle>
+                <LayoutGrid className="h-3.5 w-3.5 text-slate-400" />
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <div className="text-2xl font-bold text-slate-900 leading-none">{sites.length}</div>
+                <p className="text-[10px] text-slate-500 mt-1 font-medium whitespace-nowrap overflow-hidden text-ellipsis">Total sites on file</p>
               </CardContent>
             </Card>
           </div>
@@ -719,17 +791,27 @@ export function Sites() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Site ID</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Site Name</TableHead>
-                  <TableHead>Start Date</TableHead>
-                  <TableHead>End Date</TableHead>
+                  <TableHead onClick={() => handleSort('client')} className="cursor-pointer hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center">Client <SortIcon field="client" /></div>
+                  </TableHead>
+                  <TableHead onClick={() => handleSort('name')} className="cursor-pointer hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center">Site Name <SortIcon field="name" /></div>
+                  </TableHead>
+                  <TableHead onClick={() => handleSort('startDate')} className="cursor-pointer hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center">Start Date <SortIcon field="startDate" /></div>
+                  </TableHead>
+                  <TableHead onClick={() => handleSort('endDate')} className="cursor-pointer hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center">End Date <SortIcon field="endDate" /></div>
+                  </TableHead>
                   <TableHead className="text-center">VAT</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead onClick={() => handleSort('status')} className="cursor-pointer hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center">Status <SortIcon field="status" /></div>
+                  </TableHead>
                   {hasActions && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSites.map(site => {
+                {sortedSites.map(site => {
                   const siteIndex = sites.findIndex(s => s.id === site.id);
                   const siteCode = `S-${String(siteIndex + 1).padStart(3, '0')}`;
                   return (
@@ -957,75 +1039,6 @@ export function Sites() {
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* Floating Dialogs */}
-      <Dialog open={isAddingSite} onClose={() => { setIsAddingSite(false); setAddError(''); navigate('/sites', { replace: true }); }} title="Add New Site">
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-slate-700">Client <span className="text-red-500">*</span></label>
-            <Input
-              list="addClientList"
-              placeholder="Select or type to create new client"
-              value={addForm.client}
-              onChange={e => setAddForm({ ...addForm, client: e.target.value })}
-            />
-            <datalist id="addClientList">
-              {displayClients.map(c => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
-            <p className="text-xs text-slate-400">Select an existing client or type to quickly create a new one</p>
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-slate-700">Site Name <span className="text-red-500">*</span></label>
-            <Input
-              placeholder="e.g. Louiseville"
-              value={addForm.name}
-              onChange={e => setAddForm({ ...addForm, name: e.target.value })}
-            />
-            <p className="text-xs text-slate-400">Must be unique per client</p>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Start Date</label>
-              <Input
-                type="date"
-                value={addForm.startDate}
-                onChange={e => setAddForm({ ...addForm, startDate: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">VAT</label>
-              <select
-                value={addForm.vat}
-                onChange={e => setAddForm({ ...addForm, vat: e.target.value as 'Yes' | 'No' | 'Add' })}
-                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-              >
-                <option value="No">No</option>
-                <option value="Yes">Yes</option>
-                <option value="Add">Add</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">End Date</label>
-              <Input
-                type="date"
-                value={addForm.endDate}
-                onChange={e => setAddForm({ ...addForm, endDate: e.target.value })}
-              />
-            </div>
-          </div>
-          {addError && <p className="text-sm text-red-600">{addError}</p>}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => { setIsAddingSite(false); setAddError(''); navigate('/sites', { replace: true }); }}>Cancel</Button>
-          <Button onClick={handleAdd} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
-            <Save className="h-4 w-4" /> Save Site
-          </Button>
-        </DialogFooter>
-      </Dialog>
-
-
 
       {/* ── Site Narrative Info Modal ── */}
       {narrativeSite && (

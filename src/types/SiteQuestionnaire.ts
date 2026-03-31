@@ -47,7 +47,7 @@ export interface SiteQuestionnaire {
     quotationSent: boolean;
     clientFeedbackReceived: boolean;
     proposalAccepted: boolean;
-    clientTaxStatus: 'Mainland (7.5%)' | 'Free Trade Zone (0%)' | '';
+    clientTaxStatus: 'Mainland (Add 7.5% VAT)' | 'Mainland (Yes 7.5% VAT)' | 'Free Trade Zone (0% VAT)' | '';
     scopeOfWorkSummary: string;
     scopeExclusionsSummary: string;
     timelineConfirmed: boolean;
