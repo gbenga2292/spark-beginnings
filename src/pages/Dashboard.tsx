@@ -337,7 +337,7 @@ export function Dashboard() {
                     </CardHeader>
                     <CardContent className="pt-6">
                         <div className="h-[280px] w-full" style={{ minWidth: 0, minHeight: '280px' }}>
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
                                 <BarChart data={attendanceTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                     <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
@@ -413,7 +413,7 @@ export function Dashboard() {
                     </CardHeader>
                     <CardContent className="pt-6">
                         <div className="h-[220px] w-full" style={{ minWidth: 0, minHeight: '220px' }}>
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
                                 <AreaChart data={headcountChartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="colorHeadcount" x1="0" y1="0" x2="0" y2="1">
@@ -443,7 +443,7 @@ export function Dashboard() {
                     <CardContent className="pt-4">
                         {deptData.length > 0 ? (
                             <div className="h-[220px] w-full" style={{ minWidth: 0, minHeight: '220px' }}>
-                                <ResponsiveContainer width="100%" height="100%">
+                                <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
                                     <PieChart>
                                         <Pie data={deptData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={40} paddingAngle={3} label={({ name, value }) => `${name}: ${value}`} fontSize={10}>
                                             {deptData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
@@ -495,7 +495,7 @@ export function Dashboard() {
                     <CardContent className="pt-6">
                         {siteStaffing.length > 0 ? (
                             <div className="h-[200px] w-full" style={{ minWidth: 0, minHeight: '200px' }}>
-                                <ResponsiveContainer width="100%" height="100%">
+                                <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
                                     <BarChart data={siteStaffing} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                                         <XAxis type="number" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />

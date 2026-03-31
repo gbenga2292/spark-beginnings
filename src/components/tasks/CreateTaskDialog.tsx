@@ -48,7 +48,7 @@ export function CreateTaskDialog({ open, onOpenChange, onSubmit }: CreateTaskDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg bg-card border border-border rounded-2xl shadow-gcal p-0 gap-0 overflow-hidden">
+      <DialogContent aria-describedby={undefined} className="sm:max-w-lg bg-card border border-border rounded-2xl shadow-gcal p-0 gap-0 overflow-hidden">
         {/* Header */}
         <DialogHeader className="px-6 py-4 border-b border-border">
           <div className="flex items-center justify-between">

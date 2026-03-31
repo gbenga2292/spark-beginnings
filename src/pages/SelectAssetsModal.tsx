@@ -32,7 +32,7 @@ export function SelectAssetsModal({ isOpen, onClose, selectedIds, onSelect }: Se
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-xl p-0 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900">
+      <DialogContent aria-describedby={undefined} className="max-w-xl p-0 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900">
         <DialogHeader className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 space-y-4">
           <div className="flex items-center justify-between">
             <div>

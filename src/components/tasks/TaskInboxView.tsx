@@ -9,7 +9,7 @@ import {
   User, Calendar, Clock, ChevronDown, ChevronRight,
   MessageSquare, Hash, Paperclip, Send, FolderOpen, X,
   ArrowRight, ArrowLeft, Plus, Hourglass, FileText, FileSpreadsheet, Presentation,
-  Pencil, Reply
+  Pencil, Reply, Link as LinkIcon
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/src/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
@@ -186,26 +186,28 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                   : anyInProgress
                   ? 'border-l-amber-400'
                   : 'border-l-blue-300';
+              const isGroupActive = subs.some(s => s.id === activeSubtaskId);
+              
               return (
-              <div key={mainTask!.id} className={`mb-1 border-l-2 ${mtBorderColor} ml-1 rounded-sm`}>
+              <div key={mainTask!.id} className={`mb-1.5 border-l-4 ${isGroupActive ? 'border-orange-400 bg-orange-50/30 shadow-sm' : mtBorderColor} ml-0.5 rounded-r-lg transition-all`}>
                 {/* Group Header */}
                 <button
                   onClick={() => toggleGroup(mainTask!.id)}
-                  className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-50 transition-colors text-left"
+                  className={`w-full flex items-center justify-between px-3 py-2.5 transition-colors text-left rounded-r-lg ${isGroupActive ? 'bg-orange-50/80 border-b border-orange-100/50' : 'hover:bg-slate-50'}`}
                 >
                   <div className="flex items-center gap-1.5 min-w-0">
                     <ChevronDown
-                      className={`w-3.5 h-3.5 text-slate-400 flex-shrink-0 transition-transform ${expandedGroups.has(mainTask!.id) ? '' : '-rotate-90'}`}
+                      className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${isGroupActive ? 'text-orange-500' : 'text-slate-400'} ${expandedGroups.has(mainTask!.id) ? '' : '-rotate-90'}`}
                     />
                     <div className={`w-2 h-2 rounded-full flex-shrink-0 ${mtStatusColor}`} title={allDone ? 'Completed' : anyOverdue ? 'Overdue' : anyInProgress ? 'In Progress' : 'Not Started'} />
-                    <span className="text-[13px] font-semibold text-slate-700 truncate">{mainTask!.title}</span>
+                    <span className={`text-[13px] font-semibold truncate ${isGroupActive ? 'text-orange-950' : 'text-slate-700'}`}>{mainTask!.title}</span>
                   </div>
-                  <span className="text-[11px] font-medium text-slate-400 flex-shrink-0 ml-1">({subs.length})</span>
+                  <span className={`text-[11px] font-bold flex-shrink-0 ml-1 ${isGroupActive ? 'text-orange-600' : 'text-slate-400'}`}>({subs.length})</span>
                 </button>
 
                 {/* Subtask List */}
                 {expandedGroups.has(mainTask!.id) && (
-                  <div className="pl-1 pr-2 space-y-0.5">
+                  <div className="pl-1.5 pr-2 py-1 space-y-1">
                     {subs.map(sub => {
                       const isActive = sub.id === activeSubtaskId;
                       const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== 'completed';
@@ -216,23 +218,23 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                           key={sub.id}
                           onClick={() => onSelectSubtask(sub.id!)}
                           className={`group relative w-full flex items-center justify-between pl-6 pr-3 py-2.5 rounded-xl text-left transition-all
-                            ${isActive ? 'bg-primary/10' : 'hover:bg-slate-50'}
+                            ${isActive ? 'bg-orange-100/60 ring-1 ring-orange-300 shadow-sm' : 'hover:bg-slate-50'}
                           `}
                         >
                           {/* Active indicator */}
-                          {isActive && <div className="absolute left-2 top-2 bottom-2 w-1 bg-primary rounded-full" />}
+                          {isActive && <div className="absolute left-1.5 top-2 bottom-2 w-1.5 bg-orange-500 rounded-full shadow-sm" />}
 
                           <div className="flex items-center gap-2.5 min-w-0">
                             {/* Checkbox */}
                             <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors
-                              ${sub.status === 'completed' ? 'bg-primary border-primary' : 'border-slate-300 group-hover:border-primary/60'}
+                              ${sub.status === 'completed' ? (isActive ? 'bg-orange-500 border-orange-500' : 'bg-primary border-primary') : (isActive ? 'border-orange-400 bg-white' : 'border-slate-300 group-hover:border-primary/60')}
                             `}>
                               {sub.status === 'completed' && <CheckCircle2 className="w-2.5 h-2.5 text-white" />}
                             </div>
                             <div className="min-w-0">
                               <p className={`text-[13px] font-medium truncate ${
                                 sub.status === 'completed' ? 'line-through text-slate-400' :
-                                isActive ? 'text-primary' : 'text-slate-700'
+                                isActive ? 'text-orange-950 font-bold' : 'text-slate-700'
                               }`}>{sub.title}</p>
                               {sub.deadline && (
                                 <p className={`text-[11px] flex items-center gap-0.5 mt-0.5 ${isOverdue ? 'text-red-500' : 'text-slate-400'}`}>
@@ -264,24 +266,26 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
           {/* MIDDLE: Task Detail */}
           <div className="flex-1 flex flex-col overflow-hidden bg-[#f7f7f8]">
             {/* Top nav */}
-            <div className="h-14 border-b border-border bg-white flex items-center px-6 flex-shrink-0">
-              <div className="flex items-center gap-4 text-sm font-semibold text-slate-400">
-                <button
-                  onClick={() => navigateSubtask(-1)}
-                  disabled={activeIndex <= 0}
-                  className="flex items-center gap-1.5 hover:text-slate-700 transition-colors disabled:opacity-30"
-                >
-                  <ArrowLeft className="w-4 h-4" /> Previous Task
-                </button>
-                <div className="w-px h-4 bg-slate-200" />
-                <button
-                  onClick={() => navigateSubtask(1)}
-                  disabled={activeIndex >= allFlatSubtasks.length - 1 || activeIndex === -1}
-                  className="flex items-center gap-1.5 hover:text-slate-700 transition-colors disabled:opacity-30"
-                >
-                  Next Task <ArrowRight className="w-4 h-4" />
-                </button>
+            <div className="h-16 border-b border-border bg-slate-50/50 flex items-center justify-between px-6 flex-shrink-0">
+              <button
+                onClick={() => navigateSubtask(-1)}
+                disabled={activeIndex <= 0}
+                className="relative flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-slate-700 text-sm font-bold shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] hover:bg-slate-50 active:translate-y-[3px] active:shadow-[0_0_0_1px_#e2e8f0,0_0_0_0_#cbd5e1] transition-colors disabled:opacity-40 disabled:active:translate-y-0 disabled:active:shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] disabled:cursor-not-allowed after:absolute after:-inset-4 after:content-[''] select-none"
+              >
+                <ArrowLeft className="w-4 h-4 text-slate-400" /> Previous Task
+              </button>
+
+              <div className="text-xs font-bold tracking-widest text-slate-400 uppercase">
+                Task Navigation
               </div>
+
+              <button
+                onClick={() => navigateSubtask(1)}
+                disabled={activeIndex >= allFlatSubtasks.length - 1 || activeIndex === -1}
+                className="relative flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-slate-700 text-sm font-bold shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] hover:bg-slate-50 active:translate-y-[3px] active:shadow-[0_0_0_1px_#e2e8f0,0_0_0_0_#cbd5e1] transition-colors disabled:opacity-40 disabled:active:translate-y-0 disabled:active:shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] disabled:cursor-not-allowed after:absolute after:-inset-4 after:content-[''] select-none"
+              >
+                Next Task <ArrowRight className="w-4 h-4 text-slate-400" />
+              </button>
             </div>
 
             {/* Scrollable Content */}
@@ -577,23 +581,33 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
     e.target.value = ''; // reset so the same file can be selected again
   };
 
-  const handleAttachLink = async () => {
+  const handleAttachLink = async (isFolder: boolean) => {
      // In Electron, open a native folder picker — else fall back to a text input overlay workaround
      const electronAPI = (window as any).electronAPI;
      if (electronAPI?.openPathDialog) {
-         const result = await electronAPI.openPathDialog({ folder: true, title: 'Select a folder to link' });
-         if (result) setPendingFileLinks(prev => [...prev, result]);
+         const result = await electronAPI.openPathDialog({ folder: isFolder, title: isFolder ? 'Select a folder path to link' : 'Select a file path to link' });
+         if (result) {
+             const paths = Array.isArray(result) ? result : [result];
+             setPendingFileLinks(prev => [...prev, ...paths]);
+         }
      } else {
          // Web fallback: show a second hidden file input in 'directory' mode
          const inp = document.createElement('input');
          inp.type = 'file';
-         (inp as any).webkitdirectory = true;
+         if (isFolder) {
+             (inp as any).webkitdirectory = true;
+         }
          inp.onchange = () => {
-             const f = inp.files?.[0];
-             if (f) {
-                 // Extract directory path from webkitRelativePath
-                 const dir = f.webkitRelativePath.split('/')[0] || f.name;
-                 setPendingFileLinks(prev => [...prev, dir]);
+             const files = inp.files;
+             if (files && files.length > 0) {
+                 if (isFolder) {
+                     const dir = files[0].webkitRelativePath.split('/')[0] || files[0].name;
+                     setPendingFileLinks(prev => [...prev, dir]);
+                 } else {
+                     Array.from(files).forEach(f => {
+                         setPendingFileLinks(prev => [...prev, f.name]);
+                     });
+                 }
              }
          };
          inp.click();
@@ -795,12 +809,26 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
                     {/* File path links */}
                     {Array.isArray(c.file_links) && c.file_links.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
-                        {c.file_links.map((lnk: string, li: number) => (
-                          <div key={li} className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 border border-emerald-100 rounded-lg text-xs font-medium text-emerald-700">
-                            <FolderOpen className="w-3 h-3 text-emerald-400 flex-shrink-0" />
-                            <span className="truncate max-w-[180px]" title={lnk}>{lnk.split(/[/\\]/).pop() || lnk}</span>
-                          </div>
-                        ))}
+                        {c.file_links.map((lnk: string, li: number) => {
+                           const isElectron = !!(window as any).electronAPI;
+                           const linkName = lnk.split(/[/\\]/).pop() || lnk;
+                           return isElectron ? (
+                             <button
+                               key={li}
+                               onClick={() => (window as any).electronAPI.shellOpenPath(lnk)}
+                               className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 border border-sky-100 rounded-lg text-xs font-semibold text-sky-700 hover:bg-sky-100 hover:text-sky-800 transition-colors shadow-sm cursor-pointer text-left"
+                               title={`Open: ${lnk}`}
+                             >
+                                <LinkIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                                <span className="truncate max-w-[280px] hover:underline underline-offset-2">{linkName}</span>
+                             </button>
+                           ) : (
+                             <div key={li} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700">
+                               <LinkIcon className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                               <span className="truncate max-w-[280px]" title={lnk}>{linkName}</span>
+                             </div>
+                           );
+                        })}
                       </div>
                     )}
                   </>
@@ -949,6 +977,12 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
               <button onClick={() => fileInputRef.current?.click()} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-yellow-600 transition-colors" title="Attach file">
                 <Paperclip className="w-3.5 h-3.5" />
               </button>
+              <button onClick={() => handleAttachLink(false)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-sky-600 transition-colors" title="Link a file on local network">
+                <LinkIcon className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={() => handleAttachLink(true)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-600 transition-colors" title="Link a folder on local network">
+                <FolderOpen className="w-3.5 h-3.5" />
+              </button>
               <button onClick={() => {
                  const textarea = document.getElementById(`updates-textarea-${subtask.id}`) as HTMLTextAreaElement;
                  if (textarea) {
@@ -964,11 +998,8 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
                      setText(text + (text.endsWith(' ') || text === '' ? '#' : ' #'));
                      textarea.focus();
                  }
-              }} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-600 transition-colors" title="Create subtask">
+              }} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors" title="Create subtask">
                 <Hash className="w-3.5 h-3.5" />
-              </button>
-              <button onClick={handleAttachLink} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-600 transition-colors" title="File path">
-                <FolderOpen className="w-3.5 h-3.5" />
               </button>
             </div>
             <button
@@ -1081,7 +1112,8 @@ function FilesFeed({ subtask, getSubtaskComments, users }: { subtask: any; getSu
 
   const handleOpenFilePath = (filePath: string) => {
     const api = (window as any).electronAPI;
-    if (api?.showInFolder) api.showInFolder(filePath);
+    if (api?.shellOpenPath) api.shellOpenPath(filePath);
+    else if (api?.showInFolder) api.showInFolder(filePath);
     else { navigator.clipboard.writeText(filePath).catch(() => {}); alert(`Path copied to clipboard:\n${filePath}`); }
   };
 

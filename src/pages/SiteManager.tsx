@@ -155,14 +155,14 @@ export function SiteManager() {
       {/* Details Modal */}
       {selectedSite && (
         <Dialog open={!!selectedSite} onOpenChange={() => setSelectedSite(null)}>
-          <DialogContent className="max-w-2xl p-0 overflow-hidden rounded-2xl border-0 shadow-2xl bg-white dark:bg-slate-900 animate-in zoom-in-95 duration-500">
+          <DialogContent aria-describedby={undefined} className="max-w-2xl p-0 overflow-hidden rounded-2xl border-0 shadow-2xl bg-white dark:bg-slate-900 animate-in zoom-in-95 duration-500">
             <DialogHeader className="p-6 sm:p-8 pb-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-10 flex flex-row items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-xl bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
                   <MapPin className="h-6 w-6 text-teal-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white uppercase leading-tight">{selectedSite.site.name}</h2>
+                  <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white uppercase leading-tight">{selectedSite.site.name}</DialogTitle>
                   <p className="text-slate-400 font-semibold text-xs">{selectedSite.site.client}</p>
                 </div>
               </div>

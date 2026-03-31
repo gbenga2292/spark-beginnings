@@ -53,7 +53,7 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl p-0 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900">
+      <DialogContent aria-describedby={undefined} className="max-w-2xl p-0 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900">
         <DialogHeader className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-3">
             <div className="h-11 w-11 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-sm">

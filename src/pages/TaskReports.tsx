@@ -374,7 +374,7 @@ function AnalyticsDashboard() {
                         </p>
                     </div>
                     <div className="flex-1 w-full min-h-[250px]">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
                             <AreaChart data={velocityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="gClosed" x1="0" y1="0" x2="0" y2="1">
@@ -444,7 +444,7 @@ function AnalyticsDashboard() {
                         <p className="text-center text-xs text-muted-foreground py-12">No project data in this period.</p>
                     ) : (
                         <div className="flex-1 min-h-0" style={{ height: Math.max(200, projectHealthData.length * 40) }}>
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
                                 <BarChart data={projectHealthData} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} className="opacity-[0.08]" stroke="currentColor" />
                                     <XAxis type="number" axisLine={false} tickLine={false}

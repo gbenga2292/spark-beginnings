@@ -309,6 +309,11 @@ function initIPC() {
     if (canceled || !filePaths.length) return null;
     return opts.folder ? filePaths[0] : filePaths;
   });
+
+  // Open a file or folder in the default OS File Explorer / App
+  ipcMain.on('shell:open-path', (event, filePath) => {
+    if (filePath) shell.openPath(filePath);
+  });
 }
 
 /* ─── Main Window ──────────────────────────────────────────────── */

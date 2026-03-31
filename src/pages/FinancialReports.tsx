@@ -983,7 +983,7 @@ export function FinancialReports() {
           </CardHeader>
           <CardContent className="p-5 flex-1 min-h-[300px]">
             {trendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
                 <AreaChart data={trendData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorBilledR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#818cf8" stopOpacity={0.8} /><stop offset="95%" stopColor="#818cf8" stopOpacity={0} /></linearGradient>
@@ -1026,7 +1026,7 @@ export function FinancialReports() {
           <CardContent className="p-5 flex-1 min-h-[300px] flex flex-col items-center justify-center relative">
             {globalStats.totalVATCollected > 0 ? (
               <>
-                <ResponsiveContainer width="100%" height="80%">
+                <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="80%">
                   <PieChart>
                     <Pie data={vatPieData} cx="50%" cy="50%" innerRadius={65} outerRadius={95} paddingAngle={3} dataKey="value" stroke="none">
                       <Cell fill="#10b981" /><Cell fill="#f43f5e" />
@@ -1072,7 +1072,7 @@ export function FinancialReports() {
         <CardContent className="p-0 sm:p-5">
           {clientDebtData.length > 0 ? (
             <div className="overflow-x-auto">
-              <ResponsiveContainer width="100%" height={250} className="min-w-[600px]">
+              <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height={250} className="min-w-[600px]">
                 <BarChart data={clientDebtData} layout="vertical" margin={{ top: 10, right: 30, left: debtorView === 'site' ? 80 : 20, bottom: 5 }} barSize={20}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                   <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `₦${(val / 1000000)}M`} />
@@ -1103,7 +1103,7 @@ export function FinancialReports() {
         </CardHeader>
         <CardContent className="pt-6">
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
               <BarChart data={siteFinancialData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
@@ -1384,7 +1384,7 @@ export function FinancialReports() {
         </CardHeader>
         <CardContent className="pt-6">
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
               <LineChart data={payrollChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />

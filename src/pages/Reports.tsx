@@ -642,7 +642,7 @@ export function Reports() {
           </CardHeader>
           <CardContent className="pt-6">
             <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
                 <BarChart data={departmentData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
@@ -665,7 +665,7 @@ export function Reports() {
           </CardHeader>
           <CardContent className="pt-6 flex justify-center items-center">
             <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
                 <PieChart>
                   <Pie data={headcountStatusData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={5} dataKey="value" label={({ name, value, percent }: any) => `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`} labelLine={true}>
                     {headcountStatusData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
@@ -694,7 +694,7 @@ export function Reports() {
                {performanceLeaderboard.length === 0 ? (
                  <div className="flex items-center justify-center h-full text-slate-400 italic text-sm">No merit points recorded yet.</div>
                ) : (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
                   <BarChart data={performanceLeaderboard} layout="vertical" margin={{ left: 40, right: 40 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                     <XAxis type="number" hide />
@@ -1395,7 +1395,7 @@ export function Reports() {
                   </div>
                   <div className="p-4">
                     <div className="h-[340px]">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
                         <BarChart data={barData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }} barSize={18} barGap={2}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                           <XAxis dataKey="month" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />

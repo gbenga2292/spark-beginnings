@@ -44,7 +44,7 @@ export function RestockModal({ onClose }: RestockModalProps) {
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl p-0 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900">
+      <DialogContent aria-describedby={undefined} className="max-w-3xl p-0 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900">
         <DialogHeader className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-3">
             <Package className="h-5 w-5 text-slate-800 dark:text-white" />
