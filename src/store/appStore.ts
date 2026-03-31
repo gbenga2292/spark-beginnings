@@ -60,6 +60,7 @@ export interface CompanyExpense {
   paidToAccountNo: string;
   enteredBy: string;
   createdAt: string;
+  status?: string;
 }
 
 export interface Site {

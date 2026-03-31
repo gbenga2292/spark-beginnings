@@ -67,7 +67,7 @@ export function Ledger() {
 
   const pendingLedgerEntries = useAppStore((state) => state.pendingLedgerEntries);
   const clearPendingLedgerEntries = useAppStore((state) => state.clearPendingLedgerEntries);
-  const deleteCompanyExpense = useAppStore((state) => state.deleteCompanyExpense);
+  const updateCompanyExpense = useAppStore((state) => state.updateCompanyExpense);
 
   const [hasUnsavedPending, setHasUnsavedPending] = useState(false);
 
@@ -330,13 +330,13 @@ export function Ledger() {
     });
 
     if (hasUnsavedPending) {
-      // Remove these items from company expenses
+      // Mark these items as saved in company expenses
       pendingLedgerEntries.forEach(exp => {
-        deleteCompanyExpense(exp.id);
+        updateCompanyExpense(exp.id, { status: 'Saved to Ledger' });
       });
       clearPendingLedgerEntries();
       setHasUnsavedPending(false);
-      toast.success('Pending expenses moved to ledger and removed from Company Expenses.');
+      toast.success('Pending expenses moved to ledger and marked as saved in Company Expenses.');
     }
 
     toast.success(`Saved voucher ${targetVoucherNo}.`);

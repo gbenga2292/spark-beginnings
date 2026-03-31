@@ -219,7 +219,8 @@ export function dbToCompanyExpense(r: any): CompanyExpense {
     paidToBankName: r.paid_to_bank_name,
     paidToAccountNo: r.paid_to_account_no,
     enteredBy: r.entered_by,
-    createdAt: r.created_at
+    createdAt: r.created_at,
+    status: r.status || 'Pending'
   };
 }
 
@@ -474,7 +475,8 @@ function companyExpenseToDb(e: CompanyExpense) {
     paid_from: e.paidFrom,
     paid_to_bank_name: e.paidToBankName,
     paid_to_account_no: e.paidToAccountNo,
-    entered_by: e.enteredBy
+    entered_by: e.enteredBy,
+    status: e.status || 'Pending'
   };
 }
 
