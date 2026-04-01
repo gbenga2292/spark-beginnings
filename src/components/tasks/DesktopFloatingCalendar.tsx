@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar as CalendarIcon, X } from 'lucide-react';
 import CalendarPage from '@/src/pages/TaskCalendar';
@@ -6,9 +6,9 @@ import { useTheme } from '@/src/hooks/useTheme';
 
 export function DesktopFloatingCalendar() {
   const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const { isDark } = useTheme();
-  const isDragging = useRef(false);
-  
+
   const isMac = (window as any).electronAPI?.platform === 'darwin';
 
   useEffect(() => {
@@ -21,7 +21,7 @@ export function DesktopFloatingCalendar() {
   useEffect(() => {
     const api = (window as any).electronAPI;
     if (!api?.setTitleBarOverlay) return;
-    
+
     const updateOverlay = () => {
       let zoom = window.innerWidth ? window.outerWidth / window.innerWidth : 1;
       zoom = Math.round(zoom * 20) / 20;
@@ -29,7 +29,6 @@ export function DesktopFloatingCalendar() {
       const height = Math.round(40 * zoom);
 
       if (open) {
-        // Keep window controls visible via symbolColor
         api.setTitleBarOverlay({ color: '#0f111a', symbolColor: '#ffffff', height });
       } else {
         if (isDark) {
@@ -47,32 +46,38 @@ export function DesktopFloatingCalendar() {
 
   return (
     <>
-      <motion.div
-        drag
-        dragMomentum={false}
-        onDragStart={() => {
-          isDragging.current = true;
-        }}
-        onDragEnd={() => {
-          setTimeout(() => {
-            isDragging.current = false;
-          }, 150);
-        }}
-        onClick={(e) => {
-          if (isDragging.current) {
-            e.preventDefault();
-            return;
-          }
-          setOpen(true);
-        }}
-        className="pointer-events-auto fixed bottom-6 right-6 z-[150] w-14 h-14 md:w-16 md:h-16 rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-600/30 flex items-center justify-center hover:bg-indigo-500 transition-colors cursor-grab active:cursor-grabbing"
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        title="Drag to move, click to open Calendar"
-        style={{ touchAction: 'none' }}
+      {/* Minimal edge-docked tab — expands on hover */}
+      <motion.button
+        onClick={() => setOpen(true)}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className={`pointer-events-auto fixed bottom-8 right-0 z-[150] flex items-center gap-2 overflow-hidden rounded-l-xl border border-r-0 shadow-lg backdrop-blur-sm transition-colors ${
+          isDark
+            ? 'bg-slate-800/90 border-slate-700 text-slate-300 hover:bg-slate-700/90 hover:text-white'
+            : 'bg-white/90 border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+        }`}
+        animate={{ width: hovered ? 140 : 44, paddingRight: hovered ? 16 : 0 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+        title="Open Calendar"
+        style={{ height: 44 }}
       >
-        <CalendarIcon className="w-6 h-6 md:w-7 md:h-7 pointer-events-none" />
-      </motion.div>
+        <div className="flex items-center justify-center w-[44px] h-[44px] shrink-0">
+          <CalendarIcon className="w-[18px] h-[18px]" />
+        </div>
+        <AnimatePresence>
+          {hovered && (
+            <motion.span
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="text-xs font-semibold whitespace-nowrap"
+            >
+              Calendar
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </motion.button>
 
       <AnimatePresence>
         {open && (
@@ -99,7 +104,7 @@ export function DesktopFloatingCalendar() {
                     <p className="text-[11px] sm:text-xs text-white/50">Your tasks, deadlines, and reminders at a glance</p>
                   </div>
                 </div>
-                
+
                 {/* Close Window-like Button */}
                 <div className="absolute top-0 right-0 h-full flex items-center">
                   <button

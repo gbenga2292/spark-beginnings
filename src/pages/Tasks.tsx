@@ -2793,7 +2793,7 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
                         const refId = m[1];
                         const refBody = m[2];
                         const refComm = allFeedEntries.find((pc: any) => pc.id === refId);
-                        const refAuthor = refComm ? users.find((u: any) => u.id === (refComm.authorId || refComm.author_id)) : null;
+                        const refAuthor = refComm ? users.find((u: any) => u.id === refComm.authorId) : null;
                         
                         return (
                           <div className="mb-1">

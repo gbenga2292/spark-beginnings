@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -12,6 +12,7 @@ import * as XLSX from 'xlsx';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { generateId } from '@/src/lib/utils';
+import { useDebounce } from '@/src/hooks/useDebounce';
 
 import { getPositionIndex } from '@/src/lib/hierarchy';
 
@@ -77,49 +78,54 @@ export function Attendance() {
     }
   }, [registerDate, attendanceRecords]);
 
-  const filteredEmployees = employees.filter(emp => {
+  const filteredEmployees = useMemo(() => {
     const searchLow = searchTerm.toLowerCase();
-    const matchesSearch = emp.surname.toLowerCase().includes(searchLow) ||
-      emp.firstname.toLowerCase().includes(searchLow);
-    const matchesType = emp.staffType === staffTypeFilter;
-    const isNotCEO = emp.position !== 'CEO';
-    return matchesSearch && matchesType && isNotCEO;
-  }).sort((a, b) => {
-    const idxA = getPositionIndex(a.position);
-    const idxB = getPositionIndex(b.position);
-    if (idxA !== idxB) return idxA - idxB;
-    return (a.position || '').localeCompare(b.position || '');
-  });
+    return employees.filter(emp => {
+      const matchesSearch = emp.surname.toLowerCase().includes(searchLow) ||
+        emp.firstname.toLowerCase().includes(searchLow);
+      const matchesType = emp.staffType === staffTypeFilter;
+      const isNotCEO = emp.position !== 'CEO';
+      return matchesSearch && matchesType && isNotCEO;
+    }).sort((a, b) => {
+      const idxA = getPositionIndex(a.position);
+      const idxB = getPositionIndex(b.position);
+      if (idxA !== idxB) return idxA - idxB;
+      return (a.position || '').localeCompare(b.position || '');
+    });
+  }, [employees, searchTerm, staffTypeFilter]);
 
-  const filteredDbRecords = attendanceRecords.filter(r => {
-    const emp = employees.find(e => e.id === r.staffId);
-    if (dbStaffTypeFilter !== 'All') {
-      if (emp?.staffType !== dbStaffTypeFilter) return false;
-    } else {
-      if (emp?.staffType === 'NON-EMPLOYEE') return false;
-    }
-    if (dbSearchTerm) {
-      const matchName = r.staffName.toLowerCase().includes(dbSearchTerm.toLowerCase());
-      if (!matchName) return false;
-    }
-    if (dbSiteFilter !== 'All') {
-      if (r.daySite !== dbSiteFilter && r.nightSite !== dbSiteFilter) return false;
-    }
-    if (dbShiftFilter !== 'All') {
-      if (dbShiftFilter === 'Day' && r.day !== 'Yes') return false;
-      if (dbShiftFilter === 'Night' && r.night !== 'Yes') return false;
-    }
-    return true;
-  }).sort((a, b) => {
-    // Sort primarily by Date (descending) so newest records show first, then by position hierarchy
-    const dateCmp = new Date(b.date).getTime() - new Date(a.date).getTime();
-    if (dateCmp !== 0) return dateCmp;
+  const debouncedDbSearch = useDebounce(dbSearchTerm, 300);
 
-    const idxA = getPositionIndex(a.position);
-    const idxB = getPositionIndex(b.position);
-    if (idxA !== idxB) return idxA - idxB;
+  const filteredDbRecords = useMemo(() => {
+    return attendanceRecords.filter(r => {
+      const emp = employees.find(e => e.id === r.staffId);
+      if (dbStaffTypeFilter !== 'All') {
+        if (emp?.staffType !== dbStaffTypeFilter) return false;
+      } else {
+        if (emp?.staffType === 'NON-EMPLOYEE') return false;
+      }
+      if (debouncedDbSearch) {
+        const matchName = r.staffName.toLowerCase().includes(debouncedDbSearch.toLowerCase());
+        if (!matchName) return false;
+      }
+      if (dbSiteFilter !== 'All') {
+        if (r.daySite !== dbSiteFilter && r.nightSite !== dbSiteFilter) return false;
+      }
+      if (dbShiftFilter !== 'All') {
+        if (dbShiftFilter === 'Day' && r.day !== 'Yes') return false;
+        if (dbShiftFilter === 'Night' && r.night !== 'Yes') return false;
+      }
+      return true;
+    }).sort((a, b) => {
+      const dateCmp = new Date(b.date).getTime() - new Date(a.date).getTime();
+      if (dateCmp !== 0) return dateCmp;
+
+      const idxA = getPositionIndex(a.position);
+      const idxB = getPositionIndex(b.position);
+      if (idxA !== idxB) return idxA - idxB;
     return (a.position || '').localeCompare(b.position || '');
-  });
+    });
+  }, [attendanceRecords, employees, debouncedDbSearch, dbStaffTypeFilter, dbSiteFilter, dbShiftFilter]);
 
   // DB Actions
   const handleBulkDelete = async () => {

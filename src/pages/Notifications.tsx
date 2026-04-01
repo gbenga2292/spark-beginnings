@@ -180,17 +180,17 @@ export default function Notifications() {
   }, [notifications, dismissed]);
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
-      {/* Header */}
-      <div className="flex-shrink-0 px-6 pt-6 pb-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+    <div className="flex flex-col gap-6 w-full pb-12 animate-in fade-in duration-300">
+      {/* Header Card */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-sm">
               <Bell className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Notifications</h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{filtered.length} active notification{filtered.length !== 1 ? 's' : ''}</p>
+              <h1 className="text-xl font-bold text-slate-900">Notifications</h1>
+              <p className="text-xs text-slate-500">{filtered.length} active notification{filtered.length !== 1 ? 's' : ''}</p>
             </div>
           </div>
           {dismissed.size < notifications.length && (
@@ -221,13 +221,13 @@ export default function Notifications() {
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   activeCategory === key
                     ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
                 {label}
                 {count > 0 && (
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${
-                    activeCategory === key ? 'bg-white/20 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200'
+                    activeCategory === key ? 'bg-white/20 text-white' : 'bg-white text-slate-600'
                   }`}>{count}</span>
                 )}
               </button>
@@ -237,13 +237,13 @@ export default function Notifications() {
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="w-full">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="w-20 h-20 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+            <div className="w-20 h-20 rounded-3xl bg-slate-100 flex items-center justify-center mb-4">
               <CheckCircle className="w-10 h-10 text-emerald-400" />
             </div>
-            <p className="text-lg font-bold text-slate-700 dark:text-slate-200">All clear!</p>
+            <p className="text-lg font-bold text-slate-700">All clear!</p>
             <p className="text-sm text-slate-400 mt-1">No notifications in this category.</p>
           </div>
         ) : (
@@ -254,7 +254,7 @@ export default function Notifications() {
                 <div
                   key={n.id}
                   onClick={() => handleAction(n)}
-                  className={`group flex items-start gap-4 p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all relative overflow-hidden ${n.url ? 'cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-700' : ''}`}
+                  className={`group flex items-start gap-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden ${n.url ? 'cursor-pointer hover:border-indigo-200' : ''}`}
                 >
                   {/* Priority bar */}
                   {n.priority <= 1 && (
@@ -288,7 +288,7 @@ export default function Notifications() {
                         </button>
                       </div>
                     </div>
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 mt-1 leading-snug">{n.text}</p>
+                    <p className="text-sm font-semibold text-slate-800 mt-1 leading-snug">{n.text}</p>
                     {n.url && (
                       <div className="mt-2 flex items-center gap-1 text-[11px] text-indigo-500 font-bold group-hover:gap-2 transition-all">
                         Take Action <ChevronRight className="w-3 h-3" />

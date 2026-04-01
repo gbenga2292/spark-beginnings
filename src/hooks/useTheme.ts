@@ -7,6 +7,7 @@ export type UITheme = 'default' | 'modern' | 'glass' | 'brutalism' | 'minimalist
 const MODE_KEY = 'dcel-theme';
 const COLOR_KEY = 'dcel-color-theme';
 const UI_KEY = 'dcel-ui-theme';
+const CALENDAR_KEY = 'dcel-floating-calendar';
 
 const ALL_COLOR_THEMES: ColorTheme[] = ['default', 'ocean', 'forest', 'sunset', 'rose', 'violet', 'slate'];
 const ALL_UI_THEMES: UITheme[] = ['default', 'modern', 'glass', 'brutalism', 'minimalist', 'burgundy', 'midnight'];
@@ -35,10 +36,19 @@ function getInitialUI(): UITheme {
   return 'default';
 }
 
+function getInitialCalendar(): boolean {
+  try {
+    const stored = localStorage.getItem(CALENDAR_KEY);
+    if (stored === 'false') return false;
+  } catch {}
+  return true;
+}
+
 // Singleton state shared across components
 let _mode: Mode = getInitialMode();
 let _color: ColorTheme = getInitialColor();
 let _ui: UITheme = getInitialUI();
+let _showCalendar: boolean = getInitialCalendar();
 const _listeners = new Set<() => void>();
 
 function applyMode(m: Mode) {
@@ -55,7 +65,6 @@ function applyMode(m: Mode) {
 function applyColor(c: ColorTheme) {
   _color = c;
   try { localStorage.setItem(COLOR_KEY, c); } catch {}
-  // Remove all theme classes, then add the active one
   ALL_COLOR_THEMES.forEach(t => document.documentElement.classList.remove(`theme-${t}`));
   if (c !== 'default') {
     document.documentElement.classList.add(`theme-${c}`);
@@ -70,6 +79,12 @@ function applyUI(u: UITheme) {
   if (u !== 'default') {
     document.documentElement.classList.add(`ui-${u}`);
   }
+  _listeners.forEach(fn => fn());
+}
+
+function applyCalendar(show: boolean) {
+  _showCalendar = show;
+  try { localStorage.setItem(CALENDAR_KEY, String(show)); } catch {}
   _listeners.forEach(fn => fn());
 }
 
@@ -92,16 +107,19 @@ export function useTheme() {
   const setDark = () => applyMode('dark');
   const setColorTheme = (c: ColorTheme) => applyColor(c);
   const setUITheme = (u: UITheme) => applyUI(u);
+  const setShowFloatingCalendar = (show: boolean) => applyCalendar(show);
 
   return {
     theme: _mode,
     colorTheme: _color,
     uiTheme: _ui,
+    showFloatingCalendar: _showCalendar,
     toggle,
     setLight,
     setDark,
     setColorTheme,
     setUITheme,
+    setShowFloatingCalendar,
     isDark: _mode === 'dark',
   };
 }

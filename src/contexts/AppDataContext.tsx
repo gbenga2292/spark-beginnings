@@ -101,6 +101,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (!user) return;
+        
+        let isActive = true;
+        let fetchTimeout: ReturnType<typeof setTimeout>;
 
         // ── Initial fetch ─────────────────────────────────────────────────────
         const fetchAll = async () => {
@@ -113,31 +116,20 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     supabase.from('task_updates').select('*').order('created_at', { ascending: true }),
                     supabase.from('reminders').select('*'),
                 ]);
-                if (mtRes.error) console.error('Failed to load main_tasks:', mtRes.error);
-                if (stRes.error) console.error('Failed to load subtasks:', stRes.error);
-                if (pRes.error) console.error('Failed to load profiles:', pRes.error);
-                if (projRes.error) console.error('Failed to load sites:', projRes.error);
-                if (commRes.error) console.error('Failed to load task_updates:', commRes.error);
-                if (remRes.error) console.error('Failed to load reminders:', remRes.error);
+                
+                if (!isActive) return;
+
+                if (mtRes.error && !mtRes.error.message?.includes('AbortError')) console.error('Failed to load main_tasks:', mtRes.error);
+                if (stRes.error && !stRes.error.message?.includes('AbortError')) console.error('Failed to load subtasks:', stRes.error);
+                if (pRes.error && !pRes.error.message?.includes('AbortError')) console.error('Failed to load profiles:', pRes.error);
+                if (projRes.error && !projRes.error.message?.includes('AbortError')) console.error('Failed to load sites:', projRes.error);
+                if (commRes.error && !commRes.error.message?.includes('AbortError')) console.error('Failed to load task_updates:', commRes.error);
+                if (remRes.error && !remRes.error.message?.includes('AbortError')) console.error('Failed to load reminders:', remRes.error);
 
                 if (mtRes.data) setMainTasks(mtRes.data);
                 if (stRes.data) setSubtasks(stRes.data);
                 if (pRes.data) setUsers(pRes.data);
                 let loadedProjects: any[] = [];
-                // Only explicitly created projects (is_project = true) should be displayed in the Projects tab.
-                // Removing dynamic injection of sites here based on user feedback.
-                /*
-                if (projRes.data) {
-                    loadedProjects = projRes.data.map((p: any) => ({
-                        ...p,
-                        workspaceId: 'dcel-team', // Or derive appropriately
-                        templateId: '',
-                        serviceType: p.client || 'General',
-                        startDate: p.start_date || p.created_at,
-                        durationDays: parseInt(p.vat) || 30, // Fallback
-                    }));
-                }
-                */
                 if (mtRes.data) {
                     const genericProjects = mtRes.data
                         .filter((t: any) => t.is_project)
@@ -157,12 +149,20 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 setProjects(loadedProjects);
                 if (commRes.data) setComments(commRes.data);
                 if (remRes.data) setReminders(remRes.data.map(mapReminderToCamel));
-            } catch (err) {
+            } catch (err: any) {
+                if (!isActive) return;
+                if (err?.name === 'AbortError' || err?.message?.includes('AbortError') || err?.message?.includes('Lock')) {
+                    console.warn('Ignored AbortError in fetchAll (likely Strict Mode overlap).');
+                    return;
+                }
                 console.error('Task data fetch failed:', err);
                 toast.error('Failed to load task data. Please refresh.');
             }
         };
-        fetchAll();
+
+        fetchTimeout = setTimeout(() => {
+            if (isActive) fetchAll();
+        }, 150);
 
         // ── Real-time subscriptions ───────────────────────────────────────────
         const channel = supabase
@@ -247,6 +247,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             .subscribe();
 
         return () => {
+            isActive = false;
+            clearTimeout(fetchTimeout);
             supabase.removeChannel(channel);
         };
     }, [user]);

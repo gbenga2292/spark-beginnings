@@ -38,7 +38,7 @@ export function useDataLoader(isAuthenticated: boolean) {
     if (!isAuthenticated || loaded.current) return;
     loaded.current = true;
 
-    (async () => {
+    const timeoutId = setTimeout(async () => {
       const networkStatus = useNetworkStore.getState().connectionStatus;
 
       // If offline, try to load from cache
@@ -192,8 +192,14 @@ export function useDataLoader(isAuthenticated: boolean) {
         useNetworkStore.getState().setSyncing(false);
 
         console.log('[DataLoader] All data loaded from Supabase and cached');
-      } catch (err) {
+      } catch (err: any) {
         useNetworkStore.getState().setSyncing(false);
+        // Silently ignore abort errors typical of strict-mode or concurrent lock breakage
+        if (err?.name === 'AbortError' || err?.message?.includes('AbortError') || err?.message?.includes('Lock')) {
+             console.warn('[DataLoader] Ignored AbortError/Lock issue (likely Strict Mode overlap).');
+             loaded.current = false; // Allow it to retry if remounted
+             return;
+        }
         console.error('[DataLoader] Failed to load data:', err);
 
         // Fallback: try cache on fetch failure
@@ -208,7 +214,9 @@ export function useDataLoader(isAuthenticated: boolean) {
           console.log('[DataLoader] Fell back to cached data');
         } catch {}
       }
-    })();
+    }, 300); // Small 300ms delay to prevent lock-stealing conflicts with other providers
+
+    return () => clearTimeout(timeoutId);
   }, [isAuthenticated]);
 
   // Reset on logout

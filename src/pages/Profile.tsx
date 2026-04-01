@@ -24,7 +24,8 @@ import {
   Sun,
   Moon,
   Check,
-  LayoutTemplate
+  LayoutTemplate,
+  CalendarDays
 } from 'lucide-react';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 
@@ -53,7 +54,7 @@ export function Profile() {
   const navigate = useNavigate();
   const { user, login } = useAuthStore();
   const { updateUser, getCurrentUser } = useUserStore();
-  const { isDark, toggle, colorTheme, setColorTheme, uiTheme, setUITheme } = useTheme();
+  const { isDark, toggle, colorTheme, setColorTheme, uiTheme, setUITheme, showFloatingCalendar, setShowFloatingCalendar } = useTheme();
   const currentUser = getCurrentUser();
   
   const [isEditing, setIsEditing] = useState(false);
@@ -662,6 +663,30 @@ export function Profile() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Floating Calendar Toggle */}
+              <div className="h-px bg-slate-100 dark:bg-slate-800" />
+              <div className="flex items-center justify-between py-1">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center">
+                    <CalendarDays className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">Floating Calendar</p>
+                    <p className="text-xs text-slate-500">Quick-access calendar tab on the right edge</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowFloatingCalendar(!showFloatingCalendar)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    showFloatingCalendar ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                    showFloatingCalendar ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
               </div>
             </CardContent>
           </Card>

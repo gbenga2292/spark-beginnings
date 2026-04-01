@@ -19,9 +19,34 @@ function getDb() {
   return dbPromise;
 }
 
-/** Persist a keyed dataset to IndexedDB with timestamp metadata. */
+// ── Web Worker for off-thread writes ─────────────────────────────────────────
+let cacheWorker: Worker | null = null;
+
+function getWorker(): Worker | null {
+  if (cacheWorker) return cacheWorker;
+  try {
+    cacheWorker = new Worker(
+      new URL('../workers/cacheWorker.ts', import.meta.url),
+      { type: 'module' }
+    );
+    return cacheWorker;
+  } catch {
+    // Workers may not be available (e.g. in tests or some Electron builds)
+    return null;
+  }
+}
+
+/** Persist a keyed dataset to IndexedDB with timestamp metadata.
+ *  Uses a Web Worker when available to avoid blocking the main thread. */
 export async function cacheSet(key: string, data: any): Promise<void> {
   try {
+    const worker = getWorker();
+    if (worker) {
+      // Fire-and-forget to the worker — serialization happens off-thread
+      worker.postMessage({ key, data });
+      return;
+    }
+    // Fallback: write on main thread
     const db = await getDb();
     await db.put(STORE_NAME, { data, lastUpdated: new Date().toISOString() }, key);
   } catch (err) {

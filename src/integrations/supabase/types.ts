@@ -425,6 +425,7 @@ export type Database = {
           paid_from: string
           paid_to_account_no: string
           paid_to_bank_name: string
+          status: string | null
         }
         Insert: {
           amount: number
@@ -436,6 +437,7 @@ export type Database = {
           paid_from: string
           paid_to_account_no: string
           paid_to_bank_name: string
+          status?: string | null
         }
         Update: {
           amount?: number
@@ -447,6 +449,7 @@ export type Database = {
           paid_from?: string
           paid_to_account_no?: string
           paid_to_bank_name?: string
+          status?: string | null
         }
         Relationships: []
       }

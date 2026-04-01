@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/src/lib/utils';
+import { prefetchRoute } from '@/src/lib/routePrefetch';
 import { useUserStore, UserPrivileges } from '@/src/store/userStore';
 import { useAppStore } from '@/src/store/appStore';
 import { useTheme } from '@/src/hooks/useTheme';
@@ -294,6 +295,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                     <Link
                       to={category.standaloneHref!}
                       onClick={(e) => handleLinkClick(e, category.standaloneHref!)}
+                      onMouseEnter={() => prefetchRoute(category.standaloneHref!)}
                       title={isCollapsed ? category.name : undefined}
                       className={cn(
                         'flex w-full items-center rounded-md py-2 text-sm font-semibold transition-colors',
@@ -345,6 +347,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                             <Link
                               to={item.href}
                               onClick={(e) => handleLinkClick(e, item.href)}
+                              onMouseEnter={() => prefetchRoute(item.href)}
                               title={isCollapsed ? item.name : undefined}
                               className={cn(
                                 'group flex items-center rounded-md py-2.5 text-sm font-medium transition-colors',
@@ -373,6 +376,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
                                       key={subItem.name}
                                       to={subItem.href}
                                       onClick={(e) => handleLinkClick(e, subItem.href)}
+                                      onMouseEnter={() => prefetchRoute(subItem.href)}
                                       className={cn(
                                         'group flex items-center rounded-md py-2 px-3 text-xs font-medium transition-colors',
                                         isSubActive ? itemActive : itemBase

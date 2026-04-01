@@ -12,7 +12,7 @@ import { startNetworkMonitor } from '@/src/store/networkStore';
 export function Layout() {
   const { user, loading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { isDark } = useTheme();
+  const { isDark, showFloatingCalendar } = useTheme();
   const currentUser = useUserStore((s) => s.getCurrentUser());
 
   // Start network monitoring
@@ -44,7 +44,7 @@ export function Layout() {
       </div>
 
       {/* Global Features */}
-      {canViewCalendar && <DesktopFloatingCalendar />}
+      {canViewCalendar && showFloatingCalendar && <DesktopFloatingCalendar />}
     </div>
   );
 }

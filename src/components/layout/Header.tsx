@@ -12,6 +12,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar'
 import { Button } from '@/src/components/ui/button';
 import { useTheme } from '@/src/hooks/useTheme';
 import { usePage } from '@/src/contexts/PageContext';
+import { useShallow } from 'zustand/react/shallow';
+import { HEADER_PORTAL_ID } from '@/src/hooks/useHeaderPortal';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -49,7 +51,19 @@ function useNotifications() {
   const { 
     employees, attendanceRecords, leaves, pendingInvoices, invoices, 
     salaryAdvances, loans, sites, disciplinaryRecords, evaluations, commLogs 
-  } = useAppStore();
+  } = useAppStore(useShallow((s) => ({
+    employees: s.employees,
+    attendanceRecords: s.attendanceRecords,
+    leaves: s.leaves,
+    pendingInvoices: s.pendingInvoices,
+    invoices: s.invoices,
+    salaryAdvances: s.salaryAdvances,
+    loans: s.loans,
+    sites: s.sites,
+    disciplinaryRecords: s.disciplinaryRecords,
+    evaluations: s.evaluations,
+    commLogs: s.commLogs,
+  })));
   const { reminders } = useAppData();
 
   return useMemo(() => {
@@ -287,6 +301,8 @@ export function Header({ onMenuClick }: HeaderProps) {
 
       {/* Center/Right Actions */}
       <div className="flex items-center gap-2">
+        {/* Portal target for page-level header buttons */}
+        <div id={HEADER_PORTAL_ID} className="flex items-center gap-2" />
         {headerButtons}
         
         <StatusIndicator />

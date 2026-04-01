@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -18,6 +18,7 @@ import { Checkbox } from '@/src/components/ui/checkbox';
 import { normalizeDate, formatDisplayDate } from '@/src/lib/dateUtils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { generateId } from '@/src/lib/utils';
+import { useDebounce } from '@/src/hooks/useDebounce';
 
 import { getPositionIndex } from '@/src/lib/hierarchy';
 
@@ -69,25 +70,29 @@ export function Employees() {
 
   const [sortBy, setSortBy] = useState<'name' | 'position' | 'startDate' | 'dateAdded'>('position');
 
-  const filteredEmployees = employees.filter(emp => {
-    const searchLow = searchTerm.toLowerCase();
-    const matchesSearch = emp.surname.toLowerCase().includes(searchLow) ||
-      emp.firstname.toLowerCase().includes(searchLow) ||
-      emp.department.toLowerCase().includes(searchLow) ||
-      (emp.employeeCode?.toLowerCase() || '').includes(searchLow);
-    const matchesTab = activeTab === 'Delisted' ? emp.status === 'Terminated' : (emp.status === 'Active' || emp.status === 'On Leave');
-    return matchesSearch && matchesTab && emp.staffType !== 'NON-EMPLOYEE';
-  }).sort((a, b) => {
-    if (sortBy === 'name') return (a.surname + a.firstname).localeCompare(b.surname + b.firstname);
-    if (sortBy === 'position') {
-      const idxA = getPositionIndex(a.position);
-      const idxB = getPositionIndex(b.position);
-      if (idxA !== idxB) return idxA - idxB;
-      return (a.position || '').localeCompare(b.position || '');
-    }
-    if (sortBy === 'startDate') return new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime();
-    return 0; // maintain default dateAdded order which matches array order
-  });
+  const debouncedSearch = useDebounce(searchTerm, 300);
+
+  const filteredEmployees = useMemo(() => {
+    const searchLow = debouncedSearch.toLowerCase();
+    return employees.filter(emp => {
+      const matchesSearch = emp.surname.toLowerCase().includes(searchLow) ||
+        emp.firstname.toLowerCase().includes(searchLow) ||
+        emp.department.toLowerCase().includes(searchLow) ||
+        (emp.employeeCode?.toLowerCase() || '').includes(searchLow);
+      const matchesTab = activeTab === 'Delisted' ? emp.status === 'Terminated' : (emp.status === 'Active' || emp.status === 'On Leave');
+      return matchesSearch && matchesTab && emp.staffType !== 'NON-EMPLOYEE';
+    }).sort((a, b) => {
+      if (sortBy === 'name') return (a.surname + a.firstname).localeCompare(b.surname + b.firstname);
+      if (sortBy === 'position') {
+        const idxA = getPositionIndex(a.position);
+        const idxB = getPositionIndex(b.position);
+        if (idxA !== idxB) return idxA - idxB;
+        return (a.position || '').localeCompare(b.position || '');
+      }
+      if (sortBy === 'startDate') return new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime();
+      return 0;
+    });
+  }, [employees, debouncedSearch, activeTab, sortBy]);
 
   const [formData, setFormData] = useState<Partial<Employee>>({
     staffType: 'OFFICE',
