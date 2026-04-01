@@ -32,6 +32,7 @@ export function VatPayments() {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [importFile, setImportFile] = useState<File | null>(null);
+    const [showActions, setShowActions] = useState(false);
 
     const initialForm = {
         client: '',
@@ -286,6 +287,15 @@ export function VatPayments() {
         }), { totalPaid: 0, vat: 0, vatPaid: 0, vatBalanceToPay: 0, principleOnVatDue: 0 });
     }, [totalsData]);
 
+    const vatPaymentsSum = useMemo(() => {
+        return vatPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    }, [vatPayments]);
+
+    const formatSum = (val: number) => {
+        if (priv?.canViewAmounts === false) return '***';
+        return val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    };
+
     useSetPageTitle(
         'VAT Remittance',
         'Record and track VAT remittances to FIRS',
@@ -346,21 +356,71 @@ export function VatPayments() {
                                     <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
                                         VAT Payment Entries
                                     </h3>
+                                    <Badge variant="secondary" className="ml-2 font-mono bg-indigo-100 text-indigo-800 border-indigo-200">{vatPayments.length}</Badge>
                                 </div>
-                                <Badge variant="secondary" className="font-mono bg-indigo-100 text-indigo-800 border-indigo-200">{vatPayments.length}</Badge>
+
+                                {/* Toggle for Actions Column */}
+                                <div className="flex items-center gap-3">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Show Actions</span>
+                                    <button
+                                        onClick={() => setShowActions(!showActions)}
+                                        className={`group relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none`}
+                                    >
+                                        <span className={`absolute h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${showActions ? 'bg-indigo-600' : 'bg-slate-200'}`} />
+                                        <span
+                                            className={`absolute left-0 inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${showActions ? 'translate-x-5' : 'translate-x-0.5'}`}
+                                        />
+                                    </button>
+                                </div>
                             </div>
 
-                            <div className="flex-1 overflow-x-auto min-h-[250px] max-h-[350px]">
+                            <div className="flex-1 overflow-x-auto [scrollbar-gutter:stable] min-h-[250px] max-h-[350px] relative">
+                                <style>{`
+                                    .overflow-x-auto {
+                                        scrollbar-width: thin;
+                                        scrollbar-color: #6366f1 #f1f5f9;
+                                    }
+                                    .overflow-x-auto::-webkit-scrollbar {
+                                        height: 10px;
+                                        display: block !important;
+                                    }
+                                    .overflow-x-auto::-webkit-scrollbar-track {
+                                        background: #f1f5f9;
+                                        border-radius: 10px;
+                                    }
+                                    .overflow-x-auto::-webkit-scrollbar-thumb {
+                                        background-color: #6366f1;
+                                        border-radius: 10px;
+                                        border: 2px solid #f1f5f9;
+                                    }
+                                    .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+                                        background-color: #4f46e5;
+                                    }
+                                `}</style>
                                 <Table className="whitespace-nowrap min-w-full text-sm">
-                                    <TableHeader className="bg-slate-50 sticky top-0 z-10">
-                                        <TableRow>
-                                            <TableHead className="font-semibold px-4 py-3">Payment Date</TableHead>
-                                            <TableHead className="font-semibold px-4 py-3">Client</TableHead>
-                                            <TableHead className="font-semibold px-4 py-3">VAT Month</TableHead>
-                                            <TableHead className="font-semibold px-4 py-3 text-center">VAT Year</TableHead>
-                                            <TableHead className="font-semibold px-4 py-3 text-right">Amount (₦)</TableHead>
-                                            {priv.canManageVat && (
-                                                <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">Actions</TableHead>
+                                    <TableHeader className="bg-slate-50 sticky top-0 z-20">
+                                        <TableRow className="bg-slate-100/80 border-b border-slate-200">
+                                            <TableHead colSpan={4} className="px-6 py-2.5">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-1.5 h-4 bg-indigo-500 rounded-full"></div>
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-900">Total Remitted</span>
+                                                </div>
+                                            </TableHead>
+                                            <TableHead className="px-4 py-2.5 text-right">
+                                                <div className="text-[12px] font-mono font-black text-emerald-600 bg-white px-3 py-1 rounded border border-emerald-100 shadow-sm inline-block">
+                                                    ₦{formatSum(vatPaymentsSum)}
+                                                </div>
+                                            </TableHead>
+                                            {showActions && priv.canManageVat && <TableHead className="sticky right-0 bg-slate-100/80 p-0 w-20" />}
+                                        </TableRow>
+                                        <TableRow className="border-b-0">
+                                            <TableHead className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider">Payment Date</TableHead>
+                                            <TableHead className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider">Client</TableHead>
+                                            <TableHead className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider">VAT Month</TableHead>
+                                            <TableHead className="font-semibold px-4 py-3 text-center text-slate-500 uppercase text-[10px] tracking-wider">VAT Year</TableHead>
+                                            <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">Amount (₦)</TableHead>
+                                            {showActions && priv.canManageVat && (
+                                                <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-slate-50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)] uppercase text-[10px] tracking-wider">Actions</TableHead>
                                             )}
                                         </TableRow>
                                     </TableHeader>
@@ -374,7 +434,7 @@ export function VatPayments() {
                                                 <TableCell className="px-4 py-3 text-right font-mono font-bold text-emerald-600">
                                                     {priv?.canViewAmounts === false ? '***' : (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </TableCell>
-                                                {priv.canManageVat && (
+                                                {showActions && priv.canManageVat && (
                                                     <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
                                                         <div className="flex items-center justify-center gap-1">
                                                             <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(p); }} className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit">
@@ -390,7 +450,7 @@ export function VatPayments() {
                                         ))}
                                         {vatPayments.length === 0 && (
                                             <TableRow>
-                                                <TableCell colSpan={5} className="px-4 py-8 text-center text-slate-500 font-medium">
+                                                <TableCell colSpan={showActions ? 6 : 5} className="px-4 py-8 text-center text-slate-500 font-medium tracking-wide">
                                                     No VAT payment records.
                                                 </TableCell>
                                             </TableRow>
@@ -421,16 +481,49 @@ export function VatPayments() {
                                 </div>
                             </div>
 
-                            <div className="flex-1 overflow-x-auto min-h-[250px] max-h-[350px]">
+                            <div className="flex-1 overflow-x-auto [scrollbar-gutter:stable] min-h-[250px] max-h-[350px]">
                                 <Table className="whitespace-nowrap min-w-full text-sm">
-                                    <TableHeader className="bg-slate-50 sticky top-0 z-10">
-                                        <TableRow>
-                                            <TableHead className="font-semibold px-4 py-3">Client</TableHead>
-                                            <TableHead className="font-semibold px-4 py-3 text-right">Total Paid</TableHead>
-                                            <TableHead className="font-semibold px-4 py-3 text-right">VAT Value</TableHead>
-                                            <TableHead className="font-semibold px-4 py-3 text-right">VAT Remitted</TableHead>
-                                            <TableHead className="font-semibold px-4 py-3 text-right text-rose-600">Balance to Pay</TableHead>
-                                            <TableHead className="font-semibold px-4 py-3 text-right text-indigo-600">Principle on VAT Due</TableHead>
+                                    <TableHeader className="bg-slate-50 sticky top-0 z-20">
+                                        <TableRow className="bg-slate-100/80 border-b border-slate-200">
+                                            <TableHead className="px-6 py-2.5">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-1.5 h-4 bg-rose-500 rounded-full"></div>
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-rose-900">Aggregate Balances</span>
+                                                </div>
+                                            </TableHead>
+                                            <TableHead className="px-4 py-2.5 text-right">
+                                                <div className="text-[11px] font-mono font-bold text-slate-600 bg-white px-2 py-1 rounded border border-slate-100 shadow-sm inline-block">
+                                                    ₦{formatSum(overallTotals.totalPaid)}
+                                                </div>
+                                            </TableHead>
+                                            <TableHead className="px-4 py-2.5 text-right">
+                                                <div className="text-[11px] font-mono font-bold text-slate-600 bg-white px-2 py-1 rounded border border-slate-100 shadow-sm inline-block">
+                                                    ₦{formatSum(overallTotals.vat)}
+                                                </div>
+                                            </TableHead>
+                                            <TableHead className="px-4 py-2.5 text-right">
+                                                <div className="text-[11px] font-mono font-bold text-emerald-600 bg-white px-2 py-1 rounded border border-emerald-50 shadow-sm inline-block">
+                                                    ₦{formatSum(overallTotals.vatPaid)}
+                                                </div>
+                                            </TableHead>
+                                            <TableHead className="px-4 py-2.5 text-right">
+                                                <div className="text-[11px] font-mono font-black text-rose-600 bg-white px-2 py-1 rounded border border-rose-100 shadow-sm inline-block">
+                                                    ₦{formatSum(overallTotals.vatBalanceToPay)}
+                                                </div>
+                                            </TableHead>
+                                            <TableHead className="px-4 py-2.5 text-right">
+                                                <div className="text-[11px] font-mono font-bold text-indigo-600 bg-white px-2 py-1 rounded border border-indigo-50 shadow-sm inline-block">
+                                                    ₦{formatSum(overallTotals.principleOnVatDue)}
+                                                </div>
+                                            </TableHead>
+                                        </TableRow>
+                                        <TableRow className="border-b-0">
+                                            <TableHead className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider">Client</TableHead>
+                                            <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">Total Paid</TableHead>
+                                            <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">VAT Value</TableHead>
+                                            <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">VAT Remitted</TableHead>
+                                            <TableHead className="font-semibold px-4 py-3 text-right text-rose-600 uppercase text-[10px] tracking-wider">Balance to Pay</TableHead>
+                                            <TableHead className="font-semibold px-4 py-3 text-right text-indigo-600 uppercase text-[10px] tracking-wider">Principle on VAT Due</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>

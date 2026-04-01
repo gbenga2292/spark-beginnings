@@ -1,5 +1,5 @@
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppStore, PendingInvoice, Invoice } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown } from 'lucide-react';
@@ -37,6 +37,7 @@ export function Billing() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [sortField, setSortField] = useState<string>('startDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showActions, setShowActions] = useState(false);
 
   // ── Master Site Registry ────────────────────────────────────
   const siteRegistry = useMemo(() => {
@@ -624,7 +625,7 @@ export function Billing() {
           headers = ['id', 'invoiceNo', 'client', 'site', 'startDate', 'amount', 'totalCharge'];
           rows = (currentList as PendingInvoice[]).map(inv => {
             const data = [
-              inv.id, inv.invoiceNo, inv.client, inv.site, formatDisplayDate(inv.startDate), inv.amount || 0, inv.totalCharge || 0
+              inv.id, inv.invoiceNo, inv.client, inv.site, formatDisplayDate(inv.startDate), (inv as any).amount || 0, inv.totalCharge || 0
             ];
             return data.map(extractCSV).join(',');
           });
@@ -699,6 +700,23 @@ export function Billing() {
       setSortOrder('asc');
     }
   };
+
+  const tableSums = useMemo(() => {
+    return currentList.reduce((acc, inv: any) => ({
+        rentalCost: acc.rentalCost + (inv.rentalCost || 0),
+        dieselCost: acc.dieselCost + (inv.dieselCost || 0),
+        otherCost: acc.otherCost + ((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)),
+        totalCost: acc.totalCost + (inv.totalCost || 0),
+        vat: acc.vat + (inv.vat || 0),
+        totalCharge: acc.totalCharge + (inv.totalCharge || inv.amount || 0),
+    }), { rentalCost: 0, dieselCost: 0, otherCost: 0, totalCost: 0, vat: 0, totalCharge: 0 });
+  }, [currentList]);
+
+  const formatSum = (val: number) => {
+    if (priv?.canViewAmounts === false) return '***';
+    return val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  };
+
   const sitesForClient = siteRegistry.filter(s => s.client === (form.client || '').trim());
 
   useSetPageTitle(
@@ -779,10 +797,10 @@ export function Billing() {
             {priv.canCreate && (
               <Button
                 size="sm"
-                className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md h-9 px-3"
+                className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-9 px-4"
                 onClick={() => { handleClear(); setIsModalOpen(true); }}
               >
-                <Plus className="w-4 h-4" /> Add
+                <Plus className="w-4 h-4" /> Add Invoice
               </Button>
             )}
           </div>
@@ -790,22 +808,89 @@ export function Billing() {
 
         {/* Main Table View */}
         <div className="flex-1 w-full bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col min-w-0 min-h-[400px]">
-          <div className="border-b border-slate-100 p-4 bg-slate-50/50 flex justify-between items-center">
+          <div className="border-b border-slate-100 p-4 bg-slate-50/50 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
                 {isViewingActive ? 'Active Invoices' : 'Pending Invoices'}
               </h3>
               <Badge variant="secondary" className="ml-2 font-mono">{currentList.length}</Badge>
             </div>
-            {!isViewingActive && <p className="text-xs text-slate-500">Double click row or click action arrow to transition to Active.</p>}
+            
+            <div className="flex items-center gap-6">
+              {!isViewingActive && <p className="hidden md:block text-xs text-slate-500">Double click row to transition to Active.</p>}
+              
+              {/* Toggle for Actions Column */}
+              <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Show Actions</span>
+                  <button
+                      onClick={() => setShowActions(!showActions)}
+                      className="group relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none"
+                  >
+                      <span className={`absolute h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${showActions ? 'bg-indigo-600' : 'bg-slate-200'}`} />
+                      <span
+                          className={`absolute left-0 inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                          style={{ transform: `translateX(${showActions ? '20px' : '2px'})` }}
+                      />
+                  </button>
+              </div>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-x-auto">
+          <div className="flex-1 overflow-x-auto [scrollbar-gutter:stable] max-h-[calc(100vh-320px)] relative">
+            <style>{`
+                .overflow-x-auto {
+                    scrollbar-width: thin;
+                    scrollbar-color: #6366f1 #f1f5f9;
+                }
+                .overflow-x-auto::-webkit-scrollbar {
+                    height: 10px;
+                    display: block !important;
+                }
+                .overflow-x-auto::-webkit-scrollbar-track {
+                    background: #f1f5f9;
+                    border-radius: 10px;
+                }
+                .overflow-x-auto::-webkit-scrollbar-thumb {
+                    background-color: #6366f1;
+                    border-radius: 10px;
+                    border: 2px solid #f1f5f9;
+                }
+                .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+                    background-color: #4f46e5;
+                }
+            `}</style>
             <Table className="whitespace-nowrap min-w-full text-xs sm:text-sm">
-              <TableHeader className="bg-slate-50 sticky top-0 z-10">
-                <TableRow>
-                  <TableHead className="font-semibold px-4 py-3">Inv #</TableHead>
-                  <TableHead className="font-semibold px-4 py-3">
+              <TableHeader className="bg-slate-50 sticky top-0 z-20">
+                <TableRow className="bg-slate-100/80 border-b border-slate-200">
+                  <TableHead colSpan={2} className="px-6 py-2.5">
+                    <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-4 bg-indigo-500 rounded-full"></div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-900">Aggregate Totals</span>
+                    </div>
+                  </TableHead>
+                  <TableHead className="px-4 py-2.5 text-right"></TableHead>
+                  <TableHead className="px-4 py-2.5 text-right"></TableHead>
+                  <TableHead className="px-4 py-2.5 text-right">
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="text-[9px] font-bold text-slate-400 uppercase">Gross Sum</div>
+                      <div className="text-[11px] font-mono font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-100 shadow-sm">
+                        ₦{formatSum(tableSums.totalCost)}
+                      </div>
+                    </div>
+                  </TableHead>
+                  <TableHead className="px-4 py-2.5 text-right">
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="text-[9px] font-bold text-slate-400 uppercase">Total Charge</div>
+                      <div className="text-[12px] font-mono font-black text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-100 shadow-sm">
+                        ₦{formatSum(tableSums.totalCharge)}
+                      </div>
+                    </div>
+                  </TableHead>
+                  {showActions && (priv.canEdit || priv.canDelete) && <TableHead className="sticky right-0 bg-slate-100/80 p-0 w-20" />}
+                </TableRow>
+                <TableRow className="border-b-0">
+                  <TableHead className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider">Inv #</TableHead>
+                  <TableHead className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider">
                     <div className="flex flex-col select-none">
                       <div className="flex items-center gap-1 cursor-pointer hover:text-indigo-600" onClick={() => handleSort('client')}>
                         Client
@@ -817,17 +902,17 @@ export function Billing() {
                       </div>
                     </div>
                   </TableHead>
-                  <TableHead className="font-semibold px-4 py-3 text-right">Equipment</TableHead>
-                  <TableHead className="font-semibold px-4 py-3 text-right cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('startDate')}>
+                  <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">Equipment</TableHead>
+                  <TableHead className="font-semibold px-4 py-3 text-right cursor-pointer hover:bg-slate-100 select-none text-slate-500 uppercase text-[10px] tracking-wider" onClick={() => handleSort('startDate')}>
                     <div className="flex items-center justify-end gap-1">
                       Dates & Dur
                       {sortField === 'startDate' && (sortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
                     </div>
                   </TableHead>
-                  <TableHead className="font-semibold px-4 py-3 text-right">Cost Bkdn</TableHead>
-                  <TableHead className="font-semibold px-4 py-3 text-right">Totals (₦)</TableHead>
-                  {(priv.canEdit || priv.canDelete) && (
-                    <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">Actions</TableHead>
+                  <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">Cost Bkdn</TableHead>
+                  <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">Totals (₦)</TableHead>
+                  {showActions && (priv.canEdit || priv.canDelete) && (
+                    <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-slate-50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)] uppercase text-[10px] tracking-wider">Actions</TableHead>
                   )}
                 </TableRow>
               </TableHeader>
@@ -858,7 +943,7 @@ export function Billing() {
                       <div className="text-slate-500 text-xs">VAT: {priv?.canViewAmounts === false ? '***' : (inv.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       <div className="font-bold text-indigo-700 mt-1">{priv?.canViewAmounts === false ? '***' : (inv.totalCharge || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                     </TableCell>
-                    {(priv.canEdit || priv.canDelete) && (
+                    {showActions && (priv.canEdit || priv.canDelete) && (
                       <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
                         <div className="flex items-center justify-center gap-1">
                           {!isViewingActive && priv.canEdit && (
@@ -883,7 +968,7 @@ export function Billing() {
                 ))}
                 {currentList.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="px-4 py-12 text-center text-slate-500 font-medium tracking-wide">
+                    <TableCell colSpan={showActions ? 7 : 6} className="px-4 py-12 text-center text-slate-500 font-medium tracking-wide">
                       No {isViewingActive ? 'active' : 'pending'} records found.
                     </TableCell>
                   </TableRow>

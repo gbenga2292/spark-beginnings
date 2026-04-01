@@ -23,6 +23,7 @@ export function Payments() {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [importFile, setImportFile] = useState<File | null>(null);
+    const [showActions, setShowActions] = useState(false);
 
     const initialForm = {
         date: '',
@@ -290,6 +291,21 @@ export function Payments() {
     const uniqueClients = useMemo(() => Array.from(new Set(sites.map(s => s.client))), [sites]);
     const sitesForClient = useMemo(() => form.client ? sites.filter(s => s.client === form.client) : sites, [sites, form.client]);
 
+    const tableSums = useMemo(() => {
+        return payments.reduce((acc, p) => ({
+            amount: acc.amount + (p.amount || 0),
+            wht: acc.wht + (p.withholdingTax || 0),
+            discount: acc.discount + (p.discount || 0),
+            vat: acc.vat + (p.vat || 0),
+            amtForVat: acc.amtForVat + (p.amountForVat || 0),
+        }), { amount: 0, wht: 0, discount: 0, vat: 0, amtForVat: 0 });
+    }, [payments]);
+
+    const formatSum = (val: number) => {
+        if (priv?.canViewAmounts === false) return '***';
+        return val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    };
+
     useSetPageTitle(
         'Payment Records',
         `Tracking ${payments.length} transactions with automated VAT and withholding tax calculations`,
@@ -341,22 +357,95 @@ export function Payments() {
                             </h3>
                             <Badge variant="secondary" className="ml-2 font-mono bg-emerald-100 text-emerald-800 border-emerald-200">{payments.length}</Badge>
                         </div>
+
+                        {/* Toggle for Actions Column */}
+                        <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Show Actions</span>
+                            <button
+                                onClick={() => setShowActions(!showActions)}
+                                className={`group relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none`}
+                            >
+                                <span className={`absolute h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${showActions ? 'bg-indigo-600' : 'bg-slate-200'}`} />
+                                <span
+                                    className={`absolute left-0 inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${showActions ? 'translate-x-5' : 'translate-x-0.5'}`}
+                                />
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="flex-1 overflow-x-auto">
+                    <div className="flex-1 overflow-x-auto [scrollbar-gutter:stable] max-h-[calc(100vh-220px)] relative">
+                        <style>{`
+                            .overflow-x-auto {
+                                scrollbar-width: thin;
+                                scrollbar-color: #6366f1 #f1f5f9;
+                            }
+                            .overflow-x-auto::-webkit-scrollbar {
+                                height: 10px;
+                                display: block !important;
+                            }
+                            .overflow-x-auto::-webkit-scrollbar-track {
+                                background: #f1f5f9;
+                                border-radius: 10px;
+                            }
+                            .overflow-x-auto::-webkit-scrollbar-thumb {
+                                background-color: #6366f1;
+                                border-radius: 10px;
+                                border: 2px solid #f1f5f9;
+                            }
+                            .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+                                background-color: #4f46e5;
+                            }
+                        `}</style>
                         <Table className="whitespace-nowrap min-w-full text-sm">
-                            <TableHeader className="bg-slate-50 sticky top-0 z-10">
-                                <TableRow>
-                                    <TableHead className="font-semibold px-4 py-3">Date</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3">Client</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3">Site</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-right">Amount (₦)</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-right text-slate-500">WHT</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-right text-slate-500">Discount</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-center">VAT Policy</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-right">VAT (₦)</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-right">Amt For VAT</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-white shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">Actions</TableHead>
+                            <TableHeader className="bg-slate-50 sticky top-0 z-20">
+                                <TableRow className="bg-slate-100/80 border-b border-slate-200">
+                                    <TableHead colSpan={3} className="px-6 py-2.5">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-1.5 h-4 bg-indigo-500 rounded-full"></div>
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-900">Total Sums</span>
+                                        </div>
+                                    </TableHead>
+                                    <TableHead className="px-4 py-2.5 text-right">
+                                        <div className="text-[12px] font-mono font-black text-indigo-700 bg-white px-2 py-1 rounded border border-indigo-100 shadow-sm inline-block">
+                                            ₦{formatSum(tableSums.amount)}
+                                        </div>
+                                    </TableHead>
+                                    <TableHead className="px-4 py-2.5 text-right">
+                                        <div className="text-[11px] font-mono font-bold text-slate-600 bg-white px-2 py-1 rounded border border-slate-100 shadow-sm inline-block">
+                                            ₦{formatSum(tableSums.wht)}
+                                        </div>
+                                    </TableHead>
+                                    <TableHead className="px-4 py-2.5 text-right">
+                                        <div className="text-[11px] font-mono font-bold text-slate-600 bg-white px-2 py-1 rounded border border-slate-100 shadow-sm inline-block">
+                                            ₦{formatSum(tableSums.discount)}
+                                        </div>
+                                    </TableHead>
+                                    <TableHead className="px-4 py-2.5 text-center"></TableHead>
+                                    <TableHead className="px-4 py-2.5 text-right">
+                                        <div className="text-[12px] font-mono font-black text-indigo-600 bg-white px-2 py-1 rounded border border-indigo-50 shadow-sm inline-block">
+                                            ₦{formatSum(tableSums.vat)}
+                                        </div>
+                                    </TableHead>
+                                    <TableHead className="px-4 py-2.5 text-right">
+                                        <div className="text-[12px] font-mono font-black text-emerald-600 bg-white px-2 py-1 rounded border border-emerald-50 shadow-sm inline-block">
+                                            ₦{formatSum(tableSums.amtForVat)}
+                                        </div>
+                                    </TableHead>
+                                    {showActions && <TableHead className="sticky right-0 bg-slate-100/80 p-0 w-20" />}
+                                </TableRow>
+                                <TableRow className="border-b-0">
+                                    <TableHead className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider">Date</TableHead>
+                                    <TableHead className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider">Client</TableHead>
+                                    <TableHead className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider">Site</TableHead>
+                                    <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">Amount (₦)</TableHead>
+                                    <TableHead className="font-semibold px-4 py-3 text-right text-slate-400 uppercase text-[10px] tracking-wider">WHT</TableHead>
+                                    <TableHead className="font-semibold px-4 py-3 text-right text-slate-400 uppercase text-[10px] tracking-wider">Discount</TableHead>
+                                    <TableHead className="font-semibold px-4 py-3 text-center text-slate-500 uppercase text-[10px] tracking-wider">VAT Policy</TableHead>
+                                    <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">VAT (₦)</TableHead>
+                                    <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">Amt For VAT</TableHead>
+                                    {showActions && (
+                                        <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-slate-50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)] uppercase text-[10px] tracking-wider">Actions</TableHead>
+                                    )}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -385,25 +474,27 @@ export function Payments() {
                                         <TableCell className="px-4 py-3 text-right text-emerald-600 font-mono font-medium">
                                             {priv?.canViewAmounts === false ? '***' : (p.amountForVat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </TableCell>
-                                        <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                                        <div className="flex items-center justify-center gap-1">
-                                                {priv.canEdit && (
-                                                  <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(p); }} className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit record">
-                                                      <Edit className="w-4 h-4" />
-                                                  </Button>
-                                                )}
-                                                {priv.canDelete && (
-                                                  <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete record">
-                                                      <Trash2 className="w-4 h-4" />
-                                                  </Button>
-                                                )}
-                                            </div>
-                                        </TableCell>
+                                        {showActions && (
+                                            <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                                            <div className="flex items-center justify-center gap-1">
+                                                    {priv.canEdit && (
+                                                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(p); }} className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit record">
+                                                          <Edit className="w-4 h-4" />
+                                                      </Button>
+                                                    )}
+                                                    {priv.canDelete && (
+                                                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete record">
+                                                          <Trash2 className="w-4 h-4" />
+                                                      </Button>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                        )}
                                     </TableRow>
                                 ))}
                                 {payments.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={10} className="px-4 py-12 text-center text-slate-500 font-medium tracking-wide border-b-0">
+                                        <TableCell colSpan={showActions ? 10 : 9} className="px-4 py-12 text-center text-slate-500 font-medium tracking-wide border-b-0">
                                             No payment records found.
                                         </TableCell>
                                     </TableRow>

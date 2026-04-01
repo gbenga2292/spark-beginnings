@@ -40,6 +40,7 @@ export function Attendance() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('entry');
   const [staffTypeFilter, setStaffTypeFilter] = useState<'OFFICE' | 'FIELD'>('FIELD');
+  const [importFile, setImportFile] = useState<File | null>(null);
 
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('attendance');
@@ -221,6 +222,12 @@ export function Attendance() {
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setImportFile(file);
+    e.target.value = ''; // Reset input so same file can be re-selected
+  };
+
+  const processAttendanceImport = (file: File, mode: 'append' | 'overwrite') => {
+    setImportFile(null);
 
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -247,14 +254,12 @@ export function Attendance() {
             });
 
             Object.keys(byDate).forEach(dateStr => {
-              // dateStr is already normalized
               const recordsForDate = byDate[dateStr];
               const normalizedDate = normalizeDate(dateStr);
               const estimated = runEstimationForBatch(recordsForDate, normalizedDate);
               processedRecords.push(...estimated);
             });
           } else {
-            // Map keys back to AttendanceRecord interface if they came from an export
             rawData.forEach(row => {
               processedRecords.push({
                 id: row.id || generateId(),
@@ -284,8 +289,14 @@ export function Attendance() {
           }
 
           if (processedRecords.length > 0) {
+            if (mode === 'overwrite') {
+              // Remove all existing records for dates found in the file
+              const datesToOverwrite = new Set(processedRecords.map(r => r.date));
+              datesToOverwrite.forEach(date => removeAttendanceRecordsByDate(date));
+            }
             addAttendanceRecords(processedRecords);
-            toast.success(`Successfully imported ${processedRecords.length} records${needsEstimation ? ' with automatic estimation' : ''}!`);
+            const modeLabel = mode === 'overwrite' ? ' (dates overwritten)' : ' (appended)';
+            toast.success(`Successfully imported ${processedRecords.length} records${needsEstimation ? ' with automatic estimation' : ''}${modeLabel}!`);
           } else {
             toast.error('No valid records found in the file.');
           }
@@ -296,7 +307,6 @@ export function Attendance() {
         console.error(err);
         toast.error('Failed to parse Excel file.');
       }
-      e.target.value = ''; // Reset input
     };
     reader.readAsBinaryString(file);
   };
@@ -1106,6 +1116,42 @@ export function Attendance() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Import Policy Modal */}
+      {importFile && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
+          <div className="relative bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200">
+            <h3 className="text-xl font-bold text-slate-900 mb-1">Import Policy</h3>
+            <p className="text-sm text-slate-500 leading-relaxed mb-2">
+              File: <span className="font-medium text-slate-700">{importFile.name}</span>
+            </p>
+            <p className="text-sm text-slate-500 leading-relaxed mb-6">
+              How would you like to handle the attendance records from this file?
+            </p>
+            <div className="flex flex-col gap-3">
+              <Button
+                onClick={() => processAttendanceImport(importFile, 'append')}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3 flex-col items-center justify-center"
+              >
+                <span className="font-semibold block text-base">Append Records</span>
+                <span className="block text-xs opacity-80 mt-1 font-normal text-center">Adds imported records alongside existing ones. No data is removed.</span>
+              </Button>
+              <Button
+                onClick={() => processAttendanceImport(importFile, 'overwrite')}
+                variant="outline"
+                className="border-rose-200 h-auto py-3 text-rose-600 hover:bg-rose-50 flex-col items-center justify-center"
+              >
+                <span className="font-semibold block text-base">Overwrite by Date</span>
+                <span className="block text-xs text-rose-500/80 mt-1 font-normal text-center">Deletes all existing records for each date in the file, then saves the imported ones.</span>
+              </Button>
+              <Button onClick={() => setImportFile(null)} variant="ghost" className="text-slate-400 hover:text-slate-600 mt-2">
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

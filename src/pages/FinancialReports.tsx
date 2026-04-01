@@ -1,4 +1,4 @@
-import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -215,7 +215,10 @@ export function FinancialReports() {
   const availableYears = useMemo(() => {
     const years = new Set<string>();
     [...rawInvoices, ...rawPayments, ...rawVatPayments].forEach(item => {
-      if (item.date) years.add(item.date.substring(0, 4));
+      if (item.date) {
+        const normalized = normalizeDate(item.date);
+        if (normalized) years.add(normalized.substring(0, 4));
+      }
     });
     return Array.from(years).sort().reverse();
   }, [rawInvoices, rawPayments, rawVatPayments]);
@@ -225,19 +228,22 @@ export function FinancialReports() {
   }, [sites]);
 
   const invoices = useMemo(() => rawInvoices.filter(i => {
-    const matchY = filterYear === 'All' || (i.date && i.date.startsWith(filterYear));
+    const normalized = normalizeDate(i.date);
+    const matchY = filterYear === 'All' || (normalized && normalized.startsWith(filterYear));
     const matchC = filterClient === 'All' || i.client === filterClient;
     return matchY && matchC;
   }), [rawInvoices, filterYear, filterClient]);
 
   const payments = useMemo(() => rawPayments.filter(p => {
-    const matchY = filterYear === 'All' || (p.date && p.date.startsWith(filterYear));
+    const normalized = normalizeDate(p.date);
+    const matchY = filterYear === 'All' || (normalized && normalized.startsWith(filterYear));
     const matchC = filterClient === 'All' || p.client === filterClient;
     return matchY && matchC;
   }), [rawPayments, filterYear, filterClient]);
 
   const vatPayments = useMemo(() => rawVatPayments.filter(v => {
-    const matchY = filterYear === 'All' || (v.date && v.date.startsWith(filterYear));
+    const normalized = normalizeDate(v.date);
+    const matchY = filterYear === 'All' || (normalized && normalized.startsWith(filterYear));
     const matchC = filterClient === 'All' || v.client === filterClient;
     return matchY && matchC;
   }), [rawVatPayments, filterYear, filterClient]);
@@ -265,7 +271,9 @@ export function FinancialReports() {
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const processDate = (dateStr: string, amount: number, type: 'Billed' | 'Collected') => {
       if (!dateStr) return;
-      const d = new Date(dateStr);
+      const normalized = normalizeDate(dateStr);
+      if (!normalized) return;
+      const d = new Date(normalized);
       if (isNaN(d.getTime())) return;
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const display = `${monthNames[d.getMonth()]} ${d.getFullYear().toString().substring(2)}`;

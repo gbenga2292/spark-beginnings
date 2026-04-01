@@ -705,13 +705,18 @@ export function Payroll() {
 
              {/* COMPACT METRICS BAR FOR PROCESSING */}
              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-center">
+             <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                   <div className="absolute right-0 top-0 bottom-0 w-1/4 bg-gradient-to-l from-slate-50/50 to-transparent pointer-events-none" />
                    <div className="flex justify-between items-center mb-1">
                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Gross Pay</span>
                    </div>
                    <div className="text-xl font-bold text-slate-900">₦{priv?.canViewAmounts === false ? '***' : totals.totalGross.toLocaleString()}</div>
-                   <div className="text-[10px] text-slate-400 mt-1">Salary + Overtime</div>
+                   <div className="flex gap-2 mt-1.5 flex-wrap">
+                     <span className="text-[10px] bg-slate-50 text-slate-600 px-1.5 py-0.5 rounded border border-slate-100 font-medium whitespace-nowrap">Salary: ₦{fm(totals.totalSalary)}</span>
+                     <span className="text-[10px] bg-slate-50 text-slate-600 px-1.5 py-0.5 rounded border border-slate-100 font-medium whitespace-nowrap">Overtime: ₦{fm(totals.totalOvertime)}</span>
+                   </div>
                 </div>
+
 
                 <div className="bg-white p-4 rounded-xl border border-red-50 shadow-sm flex flex-col justify-center relative overflow-hidden">
                    <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-red-50/50 to-transparent pointer-events-none" />
