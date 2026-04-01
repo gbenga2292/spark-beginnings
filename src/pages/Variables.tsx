@@ -432,7 +432,24 @@ export function Variables() {
       const monthData = Object.entries(localMonthVals).map(([k, v]) => ({ Month: k, WorkDays: v.workDays, OTRate: v.overtimeRate }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(monthData), 'Month_Variables');
 
-      XLSX.writeFile(wb, 'System_Variables.xlsx');
+      const fileName = 'System_Variables.xlsx';
+      if (window.electronAPI?.savePathDialog) {
+        window.electronAPI.savePathDialog({
+          title: 'Export System Variables (Excel)',
+          defaultPath: fileName,
+          filters: [{ name: 'Excel Files', extensions: ['xlsx'] }]
+        }).then(filePath => {
+          if (filePath) {
+            const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+            window.electronAPI.writeFile(filePath, buf, 'binary').then(success => {
+              if (success) toast.success(`Exported to ${filePath}`);
+              else toast.error('Failed to save file.');
+            });
+          }
+        });
+      } else {
+        XLSX.writeFile(wb, fileName);
+      }
       toast.success('System variables exported successfully.');
     } catch (error) {
       toast.error('Failed to export variables.');

@@ -379,13 +379,29 @@ export function FinancialReports() {
 
   // Export functions
   const exportInvoiceReport = () => {
-    let csv = "data:text/csv;charset=utf-8,";
-    csv += "Invoice ID,Client,Site,Date,Amount,Status\n";
-    invoices.forEach(inv => { csv += `${inv.id},${inv.client},${inv.siteName},${inv.date},${inv.amount},${inv.status}\n`; });
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csv));
-    link.setAttribute("download", "invoice_report.csv");
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    const csvData = "Invoice ID,Client,Site,Date,Amount,Status\n" + 
+      invoices.map(inv => `${inv.id},${inv.client},${inv.siteName},${inv.date},${inv.amount},${inv.status}`).join("\n");
+    
+    const fileName = "invoice_report.csv";
+    if (window.electronAPI?.savePathDialog) {
+      window.electronAPI.savePathDialog({
+        title: 'Export Invoice Report (CSV)',
+        defaultPath: fileName,
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+      }).then(filePath => {
+        if (filePath) {
+          window.electronAPI.writeFile(filePath, csvData, 'utf8').then(success => {
+            if (success) toast.success(`Exported to ${filePath}`);
+            else toast.error('Failed to save file.');
+          });
+        }
+      });
+    } else {
+      const link = document.createElement("a");
+      link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
     showExportMessage("Invoice Report exported!");
   };
 
@@ -396,13 +412,29 @@ export function FinancialReports() {
   };
 
   const exportPaymentReport = () => {
-    let csv = "data:text/csv;charset=utf-8,";
-    csv += "Payment ID,Client,Site,Date,Amount,WHT,VAT,Discount\n";
-    payments.forEach(p => { csv += `${p.id},${p.client},${p.site},${p.date},${p.amount},${p.withholdingTax || 0},${p.vat || 0},${p.discount || 0}\n`; });
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csv));
-    link.setAttribute("download", "payment_report.csv");
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    const csvData = "Payment ID,Client,Site,Date,Amount,WHT,VAT,Discount\n" + 
+      payments.map(p => `${p.id},${p.client},${p.site},${p.date},${p.amount},${p.withholdingTax || 0},${p.vat || 0},${p.discount || 0}`).join("\n");
+    
+    const fileName = "payment_report.csv";
+    if (window.electronAPI?.savePathDialog) {
+      window.electronAPI.savePathDialog({
+        title: 'Export Payment Report (CSV)',
+        defaultPath: fileName,
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+      }).then(filePath => {
+        if (filePath) {
+          window.electronAPI.writeFile(filePath, csvData, 'utf8').then(success => {
+            if (success) toast.success(`Exported to ${filePath}`);
+            else toast.error('Failed to save file.');
+          });
+        }
+      });
+    } else {
+      const link = document.createElement("a");
+      link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
     showExportMessage("Payment Report exported!");
   };
 
@@ -413,13 +445,29 @@ export function FinancialReports() {
   };
 
   const exportVatReport = () => {
-    let csv = "data:text/csv;charset=utf-8,";
-    csv += "VAT ID,Client,Date,Month,Year,Amount\n";
-    vatPayments.forEach(v => { csv += `${v.id},${v.client},${v.date},${v.month || ''},${v.year || ''},${v.amount}\n`; });
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csv));
-    link.setAttribute("download", "vat_report.csv");
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    const csvData = "VAT ID,Client,Date,Month,Year,Amount\n" + 
+      vatPayments.map(v => `${v.id},${v.client},${v.date},${v.month || ''},${v.year || ''},${v.amount}`).join("\n");
+    
+    const fileName = "vat_report.csv";
+    if (window.electronAPI?.savePathDialog) {
+      window.electronAPI.savePathDialog({
+        title: 'Export VAT Report (CSV)',
+        defaultPath: fileName,
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+      }).then(filePath => {
+        if (filePath) {
+          window.electronAPI.writeFile(filePath, csvData, 'utf8').then(success => {
+            if (success) toast.success(`Exported to ${filePath}`);
+            else toast.error('Failed to save file.');
+          });
+        }
+      });
+    } else {
+      const link = document.createElement("a");
+      link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
     showExportMessage("VAT Report exported!");
   };
 
@@ -543,7 +591,24 @@ export function FinancialReports() {
       XLSX.utils.book_append_sheet(wb, ws, 'VAT Alert');
     }
 
-    XLSX.writeFile(wb, 'Custom_Financial_Report.xlsx');
+    const fileName = 'Custom_Financial_Report.xlsx';
+    if (window.electronAPI?.savePathDialog) {
+      window.electronAPI.savePathDialog({
+        title: 'Export Custom Financial Report (Excel)',
+        defaultPath: fileName,
+        filters: [{ name: 'Excel Files', extensions: ['xlsx'] }]
+      }).then(filePath => {
+        if (filePath) {
+          const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+          window.electronAPI.writeFile(filePath, buf, 'binary').then(success => {
+            if (success) toast.success(`Exported to ${filePath}`);
+            else toast.error('Failed to save file.');
+          });
+        }
+      });
+    } else {
+      XLSX.writeFile(wb, fileName);
+    }
     showExportMessage('Custom Financial Report (Excel) generated!');
   };
 

@@ -82,72 +82,6 @@ export function Reports() {
     { name: 'Inactive', value: inactiveEmployees, color: '#f43f5e' }
   ], [activeEmployees, inactiveEmployees]);
 
-  const performanceLeaderboard = useMemo(() => {
-    const scores: Record<string, number> = {};
-    disciplinaryRecords.forEach(r => {
-      scores[r.employeeId] = (scores[r.employeeId] || 0) + (r.points || 0);
-    });
-    return employees
-      .map(e => ({
-        name: `${e.surname} ${e.firstname.charAt(0)}.`,
-        points: scores[e.id] || 0
-      }))
-      .filter(p => p.points !== 0)
-      .sort((a, b) => b.points - a.points)
-      .slice(0, 5);
-  }, [employees, disciplinaryRecords]);
-
-  const netContextPoints = disciplinaryRecords.reduce((sum, r) => sum + (r.points || 0), 0);
-
-  // Filter operations staff
-  const operationsStaff = employees.filter(emp => emp.department === 'OPERATIONS');
-
-  // Palette for sites + absent (defined after operationsStaff)
-  const SITE_COLORS: Record<string, { bg: string; text: string; border: string }> = useMemo(() => {
-    const palette = [
-      { bg: '#6366f1', text: '#fff', border: '#4f46e5' }, // indigo
-      { bg: '#10b981', text: '#fff', border: '#059669' }, // emerald
-      { bg: '#f59e0b', text: '#fff', border: '#d97706' }, // amber
-      { bg: '#3b82f6', text: '#fff', border: '#2563eb' }, // blue
-      { bg: '#ec4899', text: '#fff', border: '#db2777' }, // pink
-      { bg: '#8b5cf6', text: '#fff', border: '#7c3aed' }, // violet
-      { bg: '#14b8a6', text: '#fff', border: '#0d9488' }, // teal
-      { bg: '#f97316', text: '#fff', border: '#ea580c' }, // orange
-    ];
-    const map: Record<string, { bg: string; text: string; border: string }> = {};
-    sites.forEach((s, i) => {
-      map[s.name] = palette[i % palette.length];
-    });
-    map['Absent'] = { bg: '#ef4444', text: '#fff', border: '#dc2626' };
-    map['Off'] = { bg: '#e2e8f0', text: '#94a3b8', border: '#cbd5e1' };
-    return map;
-  }, [sites]);
-
-  // Build per-day Gantt data (defined after operationsStaff)
-  const ganttData = useMemo(() => {
-    const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
-    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-
-    const grid: Record<string, Record<number, { site: string; isAbsent: boolean; isNight: boolean }>> = {};
-    operationsStaff.forEach(emp => {
-      grid[emp.id] = {};
-      days.forEach(d => { grid[emp.id][d] = { site: '', isAbsent: false, isNight: false }; });
-    });
-
-    const monthRecords = attendanceRecords.filter(rec => {
-      const d = new Date(rec.date);
-      return d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
-    });
-
-    monthRecords.forEach(rec => {
-      if (!grid[rec.staffId]) return;
-      const day = new Date(rec.date).getDate();
-      if (rec.absentStatus === 'Absent') {
-        grid[rec.staffId][day] = { site: 'Absent', isAbsent: true, isNight: false };
-      } else if (rec.day === 'Yes' && rec.daySite) {
-        grid[rec.staffId][day] = { site: rec.daySite, isAbsent: false, isNight: false };
-      } else if (rec.night === 'Yes' && rec.nightSite) {
-        grid[rec.staffId][day] = { site: rec.nightSite, isAbsent: false, isNight: true };
       }
     });
 
@@ -329,22 +263,41 @@ export function Reports() {
     totalRow.push(grandTotals.totalOTDays);
     totalRow.push(grandTotals.totalDaysAbsent);
 
-    // Create CSV
-    let csv = "data:text/csv;charset=utf-8,";
-    csv += headers.join(",") + "\n";
-    rows.forEach(row => {
-      csv += row.join(",") + "\n";
-    });
-    csv += totalRow.join(",") + "\n";
+    const fileName = `operations_staff_monthly_summary_${summaryYear}.csv`;
 
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csv));
-    link.setAttribute("download", `operations_staff_monthly_summary_${summaryYear}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (window.electronAPI?.savePathDialog) {
+      window.electronAPI.savePathDialog({
+        title: 'Export Monthly Summary (CSV)',
+        defaultPath: fileName,
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+      }).then(filePath => {
+        if (filePath) {
+          const csvData = headers.join(",") + "\n" + rows.map(r => r.join(",")).join("\n") + "\n" + totalRow.join(",") + "\n";
+          window.electronAPI.writeFile(filePath, csvData, 'utf8').then(success => {
+            if (success) toast.success(`Exported to ${filePath}`);
+            else toast.error('Failed to save file.');
+          });
+        }
+      });
+    } else {
+      // Create CSV
+      let csv = "data:text/csv;charset=utf-8,";
+      csv += headers.join(",") + "\n";
+      rows.forEach(row => {
+        csv += row.join(",") + "\n";
+      });
+      csv += totalRow.join(",") + "\n";
+
+      const link = document.createElement("a");
+      link.setAttribute("href", encodeURI(csv));
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
     showExportMessage("Operations Staff Monthly Summary exported!");
   };
+
 
   // Export to Excel
   const exportMonthlyWorkSummaryExcel = () => {
@@ -389,9 +342,28 @@ export function Reports() {
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
     XLSX.utils.book_append_sheet(wb, ws, "Monthly Summary");
-    XLSX.writeFile(wb, `operations_staff_monthly_summary_${summaryYear}.xlsx`);
+    
+    const fileName = `operations_staff_monthly_summary_${summaryYear}.xlsx`;
+    if (window.electronAPI?.savePathDialog) {
+      window.electronAPI.savePathDialog({
+        title: 'Export Monthly Summary (Excel)',
+        defaultPath: fileName,
+        filters: [{ name: 'Excel Files', extensions: ['xlsx'] }]
+      }).then(filePath => {
+        if (filePath) {
+          const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+          window.electronAPI.writeFile(filePath, buf, 'binary').then(success => {
+            if (success) toast.success(`Exported to ${filePath}`);
+            else toast.error('Failed to save file.');
+          });
+        }
+      });
+    } else {
+      XLSX.writeFile(wb, fileName);
+    }
     showExportMessage("Operations Staff Monthly Summary Excel exported!");
   };
+
 
   const toggleField = (field: string) => {
     setSelectedFields(prev => prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]);
@@ -423,15 +395,29 @@ export function Reports() {
   };
 
   const exportHeadcountReport = () => {
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Employee ID,Surname,Firstname,Department,Position,Status,Start Date\n";
-    employees.forEach(emp => {
-      csvContent += `${emp.id},${emp.surname},${emp.firstname},${emp.department},${emp.position},${emp.status},${emp.startDate}\n`;
-    });
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", "headcount_report.csv");
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    const csvData = "Employee ID,Surname,Firstname,Department,Position,Status,Start Date\n" + 
+      employees.map(emp => `${emp.id},${emp.surname},${emp.firstname},${emp.department},${emp.position},${emp.status},${emp.startDate}`).join("\n");
+    
+    const fileName = "headcount_report.csv";
+    if (window.electronAPI?.savePathDialog) {
+      window.electronAPI.savePathDialog({
+        title: 'Export Headcount Report (CSV)',
+        defaultPath: fileName,
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+      }).then(filePath => {
+        if (filePath) {
+          window.electronAPI.writeFile(filePath, csvData, 'utf8').then(success => {
+            if (success) toast.success(`Exported to ${filePath}`);
+            else toast.error('Failed to save file.');
+          });
+        }
+      });
+    } else {
+      const link = document.createElement("a");
+      link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
     showExportMessage("Headcount Report exported!");
   };
 
@@ -443,15 +429,29 @@ export function Reports() {
 
   const exportAttendanceReport = () => {
     if (attendanceRecords.length === 0) { toast.error('No attendance records found.'); return; }
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Date,Staff Name,Position,Day Site,Night Site,Day,Night,Absent Status,OT,Present\n";
-    attendanceRecords.forEach(rec => {
-      csvContent += `${rec.date},${rec.staffName},${rec.position},${rec.daySite},${rec.nightSite},${rec.day},${rec.night},${rec.absentStatus},${rec.ot},${rec.isPresent}\n`;
-    });
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", "attendance_report.csv");
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    const csvData = "Date,Staff Name,Position,Day Site,Night Site,Day,Night,Absent Status,OT,Present\n" + 
+      attendanceRecords.map(rec => `${rec.date},${rec.staffName},${rec.position},${rec.daySite},${rec.nightSite},${rec.day},${rec.night},${rec.absentStatus},${rec.ot},${rec.isPresent}`).join("\n");
+    
+    const fileName = "attendance_report.csv";
+    if (window.electronAPI?.savePathDialog) {
+      window.electronAPI.savePathDialog({
+        title: 'Export Attendance Report (CSV)',
+        defaultPath: fileName,
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+      }).then(filePath => {
+        if (filePath) {
+          window.electronAPI.writeFile(filePath, csvData, 'utf8').then(success => {
+            if (success) toast.success(`Exported to ${filePath}`);
+            else toast.error('Failed to save file.');
+          });
+        }
+      });
+    } else {
+      const link = document.createElement("a");
+      link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
     showExportMessage("Attendance Report exported!");
   };
 
@@ -529,20 +529,34 @@ export function Reports() {
 
   const generateReport = () => {
     if (selectedFields.length === 0) { toast.error('Please select at least one data point.'); return; }
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += selectedFields.join(",") + "\n";
-    employees.forEach(emp => {
-      const row = selectedFields.map(field => {
-        const val = resolveField(emp, field);
-        // Wrap in quotes if contains a comma
-        return String(val).includes(',') ? `"${val}"` : val;
+    const csvData = selectedFields.join(",") + "\n" + 
+      employees.map(emp => {
+        return selectedFields.map(field => {
+          const val = resolveField(emp, field);
+          return String(val).includes(',') ? `"${val}"` : val;
+        }).join(",");
+      }).join("\n");
+
+    const fileName = "custom_employee_report.csv";
+    if (window.electronAPI?.savePathDialog) {
+      window.electronAPI.savePathDialog({
+        title: 'Export Custom Report (CSV)',
+        defaultPath: fileName,
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+      }).then(filePath => {
+        if (filePath) {
+          window.electronAPI.writeFile(filePath, csvData, 'utf8').then(success => {
+            if (success) toast.success(`Exported to ${filePath}`);
+            else toast.error('Failed to save file.');
+          });
+        }
       });
-      csvContent += row.join(",") + "\n";
-    });
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", "custom_employee_report.csv");
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    } else {
+      const link = document.createElement("a");
+      link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
     showExportMessage("Custom Employee Report (CSV) generated!");
   };
 

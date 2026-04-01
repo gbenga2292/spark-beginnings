@@ -28,7 +28,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Native file / folder picker
   openPathDialog: (opts) => ipcRenderer.invoke('dialog:open-path', opts),
+  savePathDialog: (opts) => ipcRenderer.invoke('dialog:save-path', opts),
   
+  // Write file natively
+  writeFile: (filePath, content, encoding = 'utf8') => ipcRenderer.invoke('file:write', { filePath, content, encoding }),
+
   // OS Shell integration (open file/folder natively)
   shellOpenPath: (path) => ipcRenderer.send('shell:open-path', path),
 

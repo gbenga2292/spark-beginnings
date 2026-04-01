@@ -10,9 +10,18 @@ import { format } from 'date-fns';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import * as XLSX from 'xlsx';
 import { usePriv } from '@/src/hooks/usePriv';
+import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { generateId } from '@/src/lib/utils';
 import { useDebounce } from '@/src/hooks/useDebounce';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/src/components/ui/dropdown-menu';
 
 import { getPositionIndex } from '@/src/lib/hierarchy';
 
@@ -137,15 +146,76 @@ export function Attendance() {
     toast.success('Selected records deleted.');
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async (mode: 'bare' | 'detailed' = 'detailed') => {
     if (filteredDbRecords.length === 0) {
       toast.error('No records to export');
       return;
     }
-    const ws = XLSX.utils.json_to_sheet(filteredDbRecords);
+
+    const exportData = filteredDbRecords.map(r => {
+      if (mode === 'bare') {
+        return {
+          Date: formatDisplayDate(r.date),
+          'Staff ID': r.staffId,
+          'Staff Name': r.staffName,
+          'Day Site': r.daySite,
+          'Night Site': r.nightSite,
+          'Absent Status': r.absentStatus,
+          'Overtime Details': r.overtimeDetails
+        };
+      }
+      return {
+        Date: formatDisplayDate(r.date),
+        'Staff ID': r.staffId,
+        'Staff Name': r.staffName,
+        Position: r.position,
+        'Day Client': r.dayClient,
+        'Day Site': r.daySite,
+        'Night Client': r.nightClient,
+        'Night Site': r.nightSite,
+        Day: r.day,
+        Night: r.night,
+        Absent: r.absentStatus,
+        'Night Wk': r.nightWk,
+        OT: r.ot,
+        'OT Site': r.otSite,
+        'Day Wk': r.dayWk,
+        DOW: r.dow,
+        NDW: r.ndw,
+        Month: r.mth,
+        Present: r.isPresent,
+        'Day 2': r.day2,
+        'Overtime Details': r.overtimeDetails
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Attendance");
-    XLSX.writeFile(wb, `Attendance_Export_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+
+    const defaultFileName = `Attendance_${mode === 'bare' ? 'Bare_' : 'Detailed_'}${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+
+    // Try Electron Save Dialog first
+    if (window.electronAPI?.savePathDialog) {
+      const filePath = await window.electronAPI.savePathDialog({
+        title: `Export Attendance (${mode === 'bare' ? 'Bare Minimum' : 'Detailed'})`,
+        defaultPath: defaultFileName,
+        filters: [{ name: 'Excel Files', extensions: ['xlsx'] }]
+      });
+
+      if (filePath) {
+        const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        const success = await window.electronAPI.writeFile(filePath, buf, 'binary');
+        if (success) {
+          toast.success(`Exported to ${filePath}`);
+        } else {
+          toast.error('Failed to save file.');
+        }
+      }
+    } else {
+      // Fallback for browser-only mode
+      XLSX.writeFile(wb, defaultFileName);
+    }
   };
 
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -159,20 +229,181 @@ export function Attendance() {
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json<AttendanceRecord>(ws);
+        const rawData = XLSX.utils.sheet_to_json<any>(ws);
 
-        if (data && data.length > 0 && data[0].staffId) {
-          addAttendanceRecords(data);
-          toast.success(`Successfully imported ${data.length} records!`);
+        if (rawData && rawData.length > 0) {
+          const processedRecords: AttendanceRecord[] = [];
+          
+          // Determine if we need to estimate (if key "OT" or "NDW" is missing)
+          const needsEstimation = !rawData[0].hasOwnProperty('OT') && !rawData[0].hasOwnProperty('NDW');
+
+          if (needsEstimation) {
+            // Group by date to process batches for NDW calculation
+            const byDate: Record<string, any[]> = {};
+            rawData.forEach(row => {
+              const dt = row.Date || row.date;
+              if (!byDate[dt]) byDate[dt] = [];
+              byDate[dt].push(row);
+            });
+
+            Object.keys(byDate).forEach(dateStr => {
+              const recordsForDate = byDate[dateStr];
+              const normalizedDate = normalizeDate(dateStr);
+              const estimated = runEstimationForBatch(recordsForDate, normalizedDate);
+              processedRecords.push(...estimated);
+            });
+          } else {
+            // Map keys back to AttendanceRecord interface if they came from an export
+            rawData.forEach(row => {
+              processedRecords.push({
+                id: row.id || generateId(),
+                date: normalizeDate(row.Date || row.date),
+                staffId: row['Staff ID'] || row.staffId,
+                staffName: row['Staff Name'] || row.staffName,
+                position: row.Position || row.position || '',
+                dayClient: row['Day Client'] || row.dayClient || '',
+                daySite: row['Day Site'] || row.daySite || '',
+                nightClient: row['Night Client'] || row.nightClient || '',
+                nightSite: row['Night Site'] || row.nightSite || '',
+                day: row.Day || row.day || 'No',
+                night: row.Night || row.night || 'No',
+                absentStatus: row.Absent || row.absentStatus || '',
+                nightWk: row['Night Wk'] || row.nightWk || 0,
+                ot: row.OT || row.ot || 0,
+                otSite: row['OT Site'] || row.otSite || '',
+                dayWk: row['Day Wk'] || row.dayWk || 0,
+                dow: row.DOW || row.dow || 0,
+                ndw: row.NDW || row.ndw || 'No',
+                mth: row.Month || row.mth || 0,
+                isPresent: row.Present || row.isPresent || 'No',
+                day2: row['Day 2'] || row.day2 || 0,
+                overtimeDetails: row['Overtime Details'] || row.overtimeDetails || '',
+              });
+            });
+          }
+
+          if (processedRecords.length > 0) {
+            addAttendanceRecords(processedRecords);
+            toast.success(`Successfully imported ${processedRecords.length} records${needsEstimation ? ' with automatic estimation' : ''}!`);
+          } else {
+            toast.error('No valid records found in the file.');
+          }
         } else {
           toast.error('Invalid Excel file format.');
         }
       } catch (err) {
+        console.error(err);
         toast.error('Failed to parse Excel file.');
       }
       e.target.value = ''; // Reset input
     };
     reader.readAsBinaryString(file);
+  };
+
+  const runEstimationForBatch = (rows: any[], dateStr: string): AttendanceRecord[] => {
+    const dow = getDOW(dateStr);
+    const dateIsHoliday = isHoliday(dateStr);
+    const dateObj = new Date(dateStr);
+    const mth = dateObj.getMonth() + 1;
+
+    // We need next day data for NDW. In an import batch, we can only look at 
+    // what's already in the DB or in the batch itself.
+    const nextDayStr = getNextDayStr(dateStr);
+    const nextNextDayStr = getNextDayStr(dateStr, 2);
+    const existingNextDay = attendanceRecords.filter(r => r.date === nextDayStr);
+    const existingNextNextDay = attendanceRecords.filter(r => r.date === nextNextDayStr);
+
+    return rows.map(row => {
+      const staffId = row['Staff ID'] || row.staffId;
+      const staffName = row['Staff Name'] || row.staffName;
+      const emp = employees.find(e => e.id === staffId || (`${e.surname} ${e.firstname}`) === staffName);
+      
+      const daySite = row['Day Site'] || row.daySite || '';
+      const nightSite = row['Night Site'] || row.nightSite || '';
+      const absentStatus = row['Absent Status'] || row.absentStatus || '';
+      const overtimeDetails = row['Overtime Details'] || row.overtimeDetails || '';
+
+      const day = (daySite && !isAbsentStatus(daySite)) ? 'Yes' : 'No';
+      const night = (nightSite && !isAbsentStatus(nightSite)) ? 'Yes' : 'No';
+
+      const finalDaySite = isAbsentStatus(daySite) ? '' : daySite;
+      const finalNightSite = isAbsentStatus(nightSite) ? '' : nightSite;
+
+      const dayClient = sites.find(s => s.name === finalDaySite)?.client || '';
+      const nightClient = sites.find(s => s.name === finalNightSite)?.client || '';
+
+      const nightWk = night === 'Yes' ? 1 : 0;
+
+      let ndw: 'Yes' | 'No' = 'No';
+      if (dow !== 7) {
+        const staffWorksNextDay = existingNextDay.some(
+          r => r.staffId === staffId && (r.day === 'Yes' || r.night === 'Yes')
+        );
+        const nextDayDow = getDOW(nextDayStr);
+        const nextDayIsHolidayOrSunday = nextDayDow === 7 || isHoliday(nextDayStr);
+        const staffWorksNextNextDay = existingNextNextDay.some(
+          r => r.staffId === staffId && (r.day === 'Yes' || r.night === 'Yes')
+        );
+
+        if (staffWorksNextDay || (nextDayIsHolidayOrSunday && staffWorksNextNextDay)) {
+          ndw = 'Yes';
+        }
+      }
+
+      const worked = day === 'Yes' || night === 'Yes';
+      let ot = 0;
+      if (
+        (dow === 7 && worked) ||
+        (dateIsHoliday && worked) ||
+        (day === 'Yes' && night === 'Yes' && ndw === 'Yes') ||
+        !!overtimeDetails
+      ) {
+        ot = overtimeRates[mth] || 0.5;
+      }
+
+      const otSite = ot > 0 ? (night === 'Yes' ? finalNightSite : finalDaySite) : '';
+
+      let dayWk = 0;
+      if (ot > 0) {
+        dayWk = 1;
+      } else if (day === 'No' && night === 'No') {
+        dayWk = 0;
+      } else if (day === 'No') {
+        dayWk = 1;
+      } else if (night === 'Yes') {
+        dayWk = 2;
+      } else {
+        dayWk = 1;
+      }
+
+      const isPresent = (day === 'Yes' || night === 'Yes' || ndw === 'Yes') ? 'Yes' : 'No';
+      const day2 = (day === 'Yes' ? 1 : 0) + (night === 'Yes' ? 1 : 0);
+
+      return {
+        id: generateId(),
+        date: dateStr,
+        staffId: staffId || '',
+        staffName: staffName || '',
+        position: emp?.position || row.Position || row.position || '',
+        dayClient,
+        daySite: finalDaySite,
+        nightClient,
+        nightSite: finalNightSite,
+        day,
+        night,
+        absentStatus,
+        nightWk,
+        ot,
+        otSite,
+        dayWk,
+        dow,
+        ndw,
+        mth,
+        isPresent,
+        day2,
+        overtimeDetails,
+      };
+    });
   };
 
   const handleSelectChange = (empId: string, shift: 'day' | 'night' | 'overtimeDetails', value: string | boolean) => {
@@ -487,7 +718,7 @@ export function Attendance() {
             {/* Date controls */}
             <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1.5 shadow-sm">
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Last</span>
-              <span className="text-xs font-mono font-medium text-slate-700">{lastEntryDate}</span>
+              <span className="text-xs font-mono font-medium text-slate-700">{formatDisplayDate(lastEntryDate)}</span>
               <div className="w-px h-4 bg-slate-200" />
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Date</span>
               <Input
@@ -773,9 +1004,29 @@ export function Attendance() {
                 </Button>
               )}
               {priv.canExport && (
-                <Button onClick={handleExportExcel} size="sm" className="h-8 text-xs gap-1 bg-green-700 hover:bg-green-800 text-white shadow-sm">
-                  <Download className="h-3 w-3" /> Export Excel
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" className="h-8 text-xs gap-1 bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm">
+                      <Download className="h-3 w-3" /> Export Excel
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleExportExcel('bare')} className="cursor-pointer">
+                      <div className="flex flex-col">
+                        <span className="font-medium">Bare Minimum</span>
+                        <span className="text-[10px] text-slate-500">Essential fields for re-import</span>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExportExcel('detailed')} className="cursor-pointer">
+                      <div className="flex flex-col">
+                        <span className="font-medium">Detailed Version</span>
+                        <span className="text-[10px] text-slate-500">Full database records with estimates</span>
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
           </div>
@@ -824,7 +1075,7 @@ export function Attendance() {
                             }}
                           />
                         </td>
-                        <td className="py-1.5 px-2 font-mono">{r.date}</td>
+                        <td className="py-1.5 px-2 font-mono whitespace-nowrap">{formatDisplayDate(r.date)}</td>
                         <td className="py-1.5 px-2 font-medium text-slate-800">{r.staffName}</td>
                         <td className="py-1.5 px-2 text-slate-500">{r.position}</td>
                         <td className="py-1.5 px-2">{r.dayClient}</td>

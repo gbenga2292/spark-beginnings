@@ -430,7 +430,25 @@ export function Ledger() {
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Ledger Entries');
-    XLSX.writeFile(workbook, 'Ledger_Entries.xlsx');
+    
+    const fileName = 'Ledger_Entries.xlsx';
+    if (window.electronAPI?.savePathDialog) {
+      window.electronAPI.savePathDialog({
+        title: 'Export Ledger Entries (Excel)',
+        defaultPath: fileName,
+        filters: [{ name: 'Excel Files', extensions: ['xlsx'] }]
+      }).then(filePath => {
+        if (filePath) {
+          const buf = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+          window.electronAPI.writeFile(filePath, buf, 'binary').then(success => {
+            if (success) toast.success(`Exported to ${filePath}`);
+            else toast.error('Failed to save file.');
+          });
+        }
+      });
+    } else {
+      XLSX.writeFile(workbook, fileName);
+    }
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
