@@ -1,4 +1,4 @@
-import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -424,7 +424,7 @@ export function Ledger() {
   const handleExport = () => {
     if (!priv?.canExport) return;
     const data = filteredEntries.map(e => ({
-      'Voucher No': e.voucherNo, 'Date': e.date, 'Description': e.description, 'Category': e.category,
+      'Voucher No': e.voucherNo, 'Date': formatDisplayDate(e.date), 'Description': e.description, 'Category': e.category,
       'Amount': e.amount, 'Client': e.client, 'Site': e.site, 'Vendor': e.vendor, 'Bank': e.bank, 'Entered By': e.enteredBy,
     }));
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -517,7 +517,7 @@ export function Ledger() {
           addLedgerEntry({
             id: generateId(),
             voucherNo: String(voucherNo),
-            date: String(date),
+            date: normalizeDate(date),
             description: String(description),
             category: String(category),
             amount: Number(amount),

@@ -419,6 +419,8 @@ export function Payroll() {
 
     // Calculate totals
     const totals = useMemo(() => {
+      const totalSalary = payrollData.reduce((sum, p) => sum + p.salary, 0);
+      const totalOvertime = payrollData.reduce((sum, p) => sum + p.overtime, 0);
       const totalGross = payrollData.reduce((sum, p) => sum + p.grossPay, 0);
       const totalPAYE = payrollData.reduce((sum, p) => sum + p.paye, 0);
       const totalLoans = payrollData.reduce((sum, p) => sum + p.loanRepayment, 0);
@@ -426,7 +428,7 @@ export function Payroll() {
       const totalWithholding = payrollData.filter(p => p.staffType === 'NON-EMPLOYEE').reduce((sum, p) => sum + p.paye, 0);
       const totalDeductions = totalPAYE + totalLoans + totalPension;
       const totalNet = payrollData.reduce((sum, p) => sum + p.takeHomePay, 0);
-      return { totalGross, totalPAYE, totalLoans, totalPension, totalWithholding, totalDeductions, totalNet, employeeCount: payrollData.length };
+      return { totalSalary, totalOvertime, totalGross, totalPAYE, totalLoans, totalPension, totalWithholding, totalDeductions, totalNet, employeeCount: payrollData.length };
     }, [payrollData]);
 
     const handleProcess = () => {

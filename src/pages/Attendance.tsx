@@ -241,12 +241,13 @@ export function Attendance() {
             // Group by date to process batches for NDW calculation
             const byDate: Record<string, any[]> = {};
             rawData.forEach(row => {
-              const dt = row.Date || row.date;
+              const dt = normalizeDate(row.Date || row.date);
               if (!byDate[dt]) byDate[dt] = [];
               byDate[dt].push(row);
             });
 
             Object.keys(byDate).forEach(dateStr => {
+              // dateStr is already normalized
               const recordsForDate = byDate[dateStr];
               const normalizedDate = normalizeDate(dateStr);
               const estimated = runEstimationForBatch(recordsForDate, normalizedDate);

@@ -378,57 +378,96 @@ export function FinancialReports() {
   };
 
   // Export functions
-  const exportInvoiceReport = () => {
-    const csvData = "Invoice ID,Client,Site,Date,Amount,Status\n" + 
-      invoices.map(inv => `${inv.id},${inv.client},${inv.siteName},${inv.date},${inv.amount},${inv.status}`).join("\n");
-    
-    const fileName = "invoice_report.csv";
+  const exportInvoiceReport = async (mode: 'bare' | 'detailed' = 'detailed') => {
+    let headers: string[] = [];
+    if (mode === 'bare') {
+      headers = ['ID', 'Client', 'Site', 'Date', 'Amount', 'Status'];
+    } else {
+      headers = ['ID', 'Invoice Number', 'Client', 'Site', 'Project', 'Amount', 'Date', 'Due Date', 'Status', 'Billing Cycle', 'Duration', 'Machines', 'VAT Inc', 'Total Charge'];
+    }
+
+    const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
+
+    const rows = invoices.map(inv => {
+      let data: any[] = [];
+      if (mode === 'bare') {
+        data = [
+          inv.id,
+          inv.client,
+          inv.siteName,
+          formatDisplayDate(inv.date),
+          inv.amount,
+          inv.status
+        ];
+      } else {
+        data = [
+          inv.id,
+          inv.invoiceNumber,
+          inv.client,
+          inv.siteName || '',
+          inv.project || '',
+          inv.amount,
+          formatDisplayDate(inv.date),
+          formatDisplayDate(inv.dueDate) || '',
+          inv.status,
+          inv.billingCycle || '',
+          inv.duration || '',
+          inv.noOfMachine || '',
+          inv.vatInc || '',
+          inv.totalCharge || ''
+        ];
+      }
+      return data.map(extractCSV).join(',');
+    });
+
+    const csvData = [headers.join(','), ...rows].join('\n');
+    const fileName = `invoice_report_${mode === 'bare' ? 'bare_' : ''}${new Date().toISOString().slice(0, 10)}.csv`;
+
     if (window.electronAPI?.savePathDialog) {
-      window.electronAPI.savePathDialog({
-        title: 'Export Invoice Report (CSV)',
+      const filePath = await window.electronAPI.savePathDialog({
+        title: `Export Invoice Report (${mode === 'bare' ? 'Bare Minimum' : 'Detailed'})`,
         defaultPath: fileName,
         filters: [{ name: 'CSV Files', extensions: ['csv'] }]
-      }).then(filePath => {
-        if (filePath) {
-          window.electronAPI.writeFile(filePath, csvData, 'utf8').then(success => {
-            if (success) toast.success(`Exported to ${filePath}`);
-            else toast.error('Failed to save file.');
-          });
-        }
       });
+
+      if (filePath) {
+        const success = await window.electronAPI.writeFile(filePath, csvData, 'utf8');
+        if (success) toast.success(`Exported to ${filePath}`);
+        else toast.error('Failed to save file.');
+      }
     } else {
       const link = document.createElement("a");
       link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
       link.setAttribute("download", fileName);
       document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      toast.success("Invoice Report exported!");
     }
-    showExportMessage("Invoice Report exported!");
   };
 
   const exportInvoicePdf = () => {
     const head = [["Invoice ID", "Client", "Site", "Date", "Amount (₦)", "Status"]];
-    const body = invoices.map(inv => [inv.id, inv.client, inv.siteName, inv.date, (inv.amount || 0).toLocaleString(), inv.status]);
+    const body = invoices.map(inv => [inv.id, inv.client, inv.siteName, formatDisplayDate(inv.date), (inv.amount || 0).toLocaleString(), inv.status]);
     generatePdf("Invoice Report", head, body, "invoice_report.pdf");
   };
 
-  const exportPaymentReport = () => {
-    const csvData = "Payment ID,Client,Site,Date,Amount,WHT,VAT,Discount\n" + 
-      payments.map(p => `${p.id},${p.client},${p.site},${p.date},${p.amount},${p.withholdingTax || 0},${p.vat || 0},${p.discount || 0}`).join("\n");
-    
+  const exportPaymentReport = async () => {
+    const headers = ["Payment ID", "Client", "Site", "Date", "Amount", "WHT", "VAT", "Discount"];
+    const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
+    const rows = payments.map(p => [p.id, p.client, p.site, formatDisplayDate(p.date), p.amount, p.withholdingTax || 0, p.vat || 0, p.discount || 0].map(extractCSV).join(','));
+    const csvData = [headers.join(','), ...rows].join('\n');
     const fileName = "payment_report.csv";
+
     if (window.electronAPI?.savePathDialog) {
-      window.electronAPI.savePathDialog({
+      const filePath = await window.electronAPI.savePathDialog({
         title: 'Export Payment Report (CSV)',
         defaultPath: fileName,
         filters: [{ name: 'CSV Files', extensions: ['csv'] }]
-      }).then(filePath => {
-        if (filePath) {
-          window.electronAPI.writeFile(filePath, csvData, 'utf8').then(success => {
-            if (success) toast.success(`Exported to ${filePath}`);
-            else toast.error('Failed to save file.');
-          });
-        }
       });
+      if (filePath) {
+        const success = await window.electronAPI.writeFile(filePath, csvData, 'utf8');
+        if (success) toast.success(`Exported to ${filePath}`);
+        else toast.error('Failed to save file.');
+      }
     } else {
       const link = document.createElement("a");
       link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
@@ -440,28 +479,28 @@ export function FinancialReports() {
 
   const exportPaymentPdf = () => {
     const head = [["Payment ID", "Client", "Site", "Date", "Amount (₦)", "WHT (₦)", "VAT (₦)"]];
-    const body = payments.map(p => [p.id, p.client, p.site, p.date, (p.amount || 0).toLocaleString(), (p.withholdingTax || 0).toLocaleString(), (p.vat || 0).toLocaleString()]);
+    const body = payments.map(p => [p.id, p.client, p.site, formatDisplayDate(p.date), (p.amount || 0).toLocaleString(), (p.withholdingTax || 0).toLocaleString(), (p.vat || 0).toLocaleString()]);
     generatePdf("Payment Report", head, body, "payment_report.pdf");
   };
 
-  const exportVatReport = () => {
-    const csvData = "VAT ID,Client,Date,Month,Year,Amount\n" + 
-      vatPayments.map(v => `${v.id},${v.client},${v.date},${v.month || ''},${v.year || ''},${v.amount}`).join("\n");
-    
+  const exportVatReport = async () => {
+    const headers = ["VAT ID", "Client", "Date", "Month", "Year", "Amount"];
+    const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
+    const rows = vatPayments.map(v => [v.id, v.client, formatDisplayDate(v.date), v.month || '', v.year || '', v.amount].map(extractCSV).join(','));
+    const csvData = [headers.join(','), ...rows].join('\n');
     const fileName = "vat_report.csv";
+
     if (window.electronAPI?.savePathDialog) {
-      window.electronAPI.savePathDialog({
+      const filePath = await window.electronAPI.savePathDialog({
         title: 'Export VAT Report (CSV)',
         defaultPath: fileName,
         filters: [{ name: 'CSV Files', extensions: ['csv'] }]
-      }).then(filePath => {
-        if (filePath) {
-          window.electronAPI.writeFile(filePath, csvData, 'utf8').then(success => {
-            if (success) toast.success(`Exported to ${filePath}`);
-            else toast.error('Failed to save file.');
-          });
-        }
       });
+      if (filePath) {
+        const success = await window.electronAPI.writeFile(filePath, csvData, 'utf8');
+        if (success) toast.success(`Exported to ${filePath}`);
+        else toast.error('Failed to save file.');
+      }
     } else {
       const link = document.createElement("a");
       link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
@@ -516,11 +555,11 @@ export function FinancialReports() {
     const wb = XLSX.utils.book_new();
 
     if (selectedFields.includes('Invoice Summary')) {
-      const ws = XLSX.utils.json_to_sheet(invoices.map(i => ({ ID: i.id, Client: i.client, Site: i.siteName, Date: i.date, Amount: i.amount, Status: i.status, DueDate: i.dueDate || '', BillingCycle: i.billingCycle || '' })));
+      const ws = XLSX.utils.json_to_sheet(invoices.map(i => ({ ID: i.id, Client: i.client, Site: i.siteName, Date: formatDisplayDate(i.date), Amount: i.amount, Status: i.status, DueDate: formatDisplayDate(i.dueDate) || '', BillingCycle: i.billingCycle || '' })));
       XLSX.utils.book_append_sheet(wb, ws, 'Invoices');
     }
     if (selectedFields.includes('Payment Summary')) {
-      const ws = XLSX.utils.json_to_sheet(payments.map(p => ({ ID: p.id, Client: p.client, Site: p.site, Date: p.date, Amount: p.amount, WHT: p.withholdingTax || 0, VAT: p.vat || 0, Discount: p.discount || 0 })));
+      const ws = XLSX.utils.json_to_sheet(payments.map(p => ({ ID: p.id, Client: p.client, Site: p.site, Date: formatDisplayDate(p.date), Amount: p.amount, WHT: p.withholdingTax || 0, VAT: p.vat || 0, Discount: p.discount || 0 })));
       XLSX.utils.book_append_sheet(wb, ws, 'Payments');
     }
     if (selectedFields.includes('Outstanding Balances')) {
@@ -529,11 +568,11 @@ export function FinancialReports() {
     }
     if (selectedFields.includes('Overdue Invoices')) {
       const today = new Date().toISOString().split('T')[0];
-      const ws = XLSX.utils.json_to_sheet(rawInvoices.filter(i => i.status !== 'Paid' && i.dueDate && i.dueDate < today).map(i => ({ ID: i.id, Client: i.client, Site: i.siteName, Amount: i.amount, DueDate: i.dueDate, Status: i.status })));
+      const ws = XLSX.utils.json_to_sheet(rawInvoices.filter(i => i.status !== 'Paid' && i.dueDate && i.dueDate < today).map(i => ({ ID: i.id, Client: i.client, Site: i.siteName, Amount: i.amount, DueDate: formatDisplayDate(i.dueDate), Status: i.status })));
       XLSX.utils.book_append_sheet(wb, ws, 'Overdue Invoices');
     }
     if (selectedFields.includes('VAT Remittance')) {
-      const ws = XLSX.utils.json_to_sheet(vatPayments.map(v => ({ ID: v.id, Client: v.client, Date: v.date, Month: v.month || '', Year: v.year || '', Amount: v.amount })));
+      const ws = XLSX.utils.json_to_sheet(vatPayments.map(v => ({ ID: v.id, Client: v.client, Date: formatDisplayDate(v.date), Month: v.month || '', Year: v.year || '', Amount: v.amount })));
       XLSX.utils.book_append_sheet(wb, ws, 'VAT Remittance');
     }
     if (selectedFields.includes('VAT Collected vs Remitted')) {
@@ -541,7 +580,7 @@ export function FinancialReports() {
       XLSX.utils.book_append_sheet(wb, ws, 'VAT Summary');
     }
     if (selectedFields.includes('WHT Deductions')) {
-      const ws = XLSX.utils.json_to_sheet(payments.filter(p => (p.withholdingTax || 0) > 0).map(p => ({ Client: p.client, Site: p.site, Date: p.date, Amount: p.amount, WHT: p.withholdingTax })));
+      const ws = XLSX.utils.json_to_sheet(payments.filter(p => (p.withholdingTax || 0) > 0).map(p => ({ Client: p.client, Site: p.site, Date: formatDisplayDate(p.date), Amount: p.amount, WHT: p.withholdingTax })));
       XLSX.utils.book_append_sheet(wb, ws, 'WHT');
     }
     if (selectedFields.includes('WHT Summary by Client')) {
@@ -551,7 +590,7 @@ export function FinancialReports() {
       XLSX.utils.book_append_sheet(wb, ws, 'WHT By Client');
     }
     if (selectedFields.includes('Discounts Applied')) {
-      const ws = XLSX.utils.json_to_sheet(payments.filter(p => (p.discount || 0) > 0).map(p => ({ Client: p.client, Site: p.site, Date: p.date, Amount: p.amount, Discount: p.discount })));
+      const ws = XLSX.utils.json_to_sheet(payments.filter(p => (p.discount || 0) > 0).map(p => ({ Client: p.client, Site: p.site, Date: formatDisplayDate(p.date), Amount: p.amount, Discount: p.discount })));
       XLSX.utils.book_append_sheet(wb, ws, 'Discounts');
     }
     if (selectedFields.includes('Client Balances')) {
@@ -1196,11 +1235,16 @@ export function FinancialReports() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-slate-500 mb-4 h-10">Full invoice listing with client, site, amounts, and status.</p>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2">
               {priv.canExport && (
-                <Button variant="outline" size="sm" className="w-full gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportInvoiceReport}>
-                  <FileSpreadsheet className="h-4 w-4" /> Excel
-                </Button>
+                <div className="flex bg-slate-50 border border-slate-200 rounded-md shadow-sm h-9 overflow-hidden shrink-0 w-full font-semibold">
+                  <Button variant="ghost" size="sm" className="flex-1 gap-2 h-full text-indigo-700 hover:bg-indigo-100 rounded-none border-r border-slate-200 px-3 transition-colors text-xs font-semibold" onClick={() => exportInvoiceReport('bare')} title="Export Basic Fields Only">
+                    <Download className="h-4 w-4" /> Basic CSV
+                  </Button>
+                  <Button variant="ghost" size="sm" className="flex-1 gap-2 h-full text-indigo-700 hover:bg-indigo-100 rounded-none px-3 transition-colors text-xs font-semibold" onClick={() => exportInvoiceReport('detailed')} title="Export Complete Data">
+                    Detailed CSV
+                  </Button>
+                </div>
               )}
               {priv.canExport && (
                 <Button variant="outline" size="sm" className="w-full gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportInvoicePdf}>

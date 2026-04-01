@@ -373,70 +373,105 @@ export function Employees() {
     }
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async (mode: 'bare' | 'detailed' = 'detailed') => {
     try {
-      let headers: string[] = ['id', 'employeeCode', 'surname', 'firstname', 'department', 'staffType', 'level', 'position', 'status', 'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'taxId', 'pensionNumber', 'lashmaPolicyNumber', 'lashmaRegistrationDate', 'lashmaExpiryDate', 'payeTax', 'withholdingTax', 'excludeFromOnboarding', 'rent', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-      // Standard CSV cell wrapper
+      let headers: string[] = [];
+      const canSeeSalary = (priv as any)?.canViewSalaries ?? true;
+
+      if (mode === 'bare') {
+        headers = ['ID', 'Code', 'Surname', 'Firstname', 'Department', 'Position', 'Status', 'Start Date'];
+      } else {
+        headers = [
+          'id', 'employeeCode', 'surname', 'firstname', 'department', 'staffType', 'level', 'position', 'status',
+          'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'taxId', 'pensionNumber', 'lashmaPolicyNumber',
+          'lashmaRegistrationDate', 'lashmaExpiryDate', 'payeTax', 'withholdingTax', 'excludeFromOnboarding', 'rent',
+          'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+        ];
+      }
+
       const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
-      // Text-force wrapper: properly CSV-encodes the Excel ="value" formula
-      // The cell value is: ="value"
-      // CSV-encoded (inner quotes doubled): """"value""""
-      // Full quoted cell: "=""value"""
-      const extractCSVText = (str: any) => {
-        const val = String(str || '').replace(/"/g, '""');
-        return `"=""${val}"""`;
-      };
+      const extractCSVText = (str: any) => `="${String(str || '').replace(/"/g, '""')}"`;
 
       const rows = employees.map(emp => {
-        const data = [
-          extractCSV(emp.id),
-          extractCSV(emp.employeeCode || ''),
-          extractCSV(emp.surname),
-          extractCSV(emp.firstname),
-          extractCSV(emp.department),
-          extractCSV(emp.staffType),
-          extractCSV(emp.level || 10),
-          extractCSV(emp.position),
-          extractCSV(emp.status),
-          extractCSV(emp.yearlyLeave),
-          extractCSV(emp.startDate || ''),
-          extractCSV(emp.endDate || ''),
-          extractCSV(emp.bankName || ''),
-          extractCSVText(emp.accountNo || ''),       // preserve leading zeros
-          extractCSVText(emp.taxId || ''),           // preserve leading zeros
-          extractCSVText(emp.pensionNumber || ''),   // preserve leading zeros
-          extractCSVText(emp.lashmaPolicyNumber || ''), // preserve leading zeros
-          extractCSV(emp.lashmaRegistrationDate || ''),
-          extractCSV(emp.lashmaExpiryDate || ''),
-          extractCSV(emp.payeTax),
-          extractCSV(emp.withholdingTax),
-          extractCSV(emp.excludeFromOnboarding || false),
-          extractCSV(emp.rent || 0),
-          extractCSV(canSeeSalary ? emp.monthlySalaries.jan : '***'),
-          extractCSV(canSeeSalary ? emp.monthlySalaries.feb : '***'),
-          extractCSV(canSeeSalary ? emp.monthlySalaries.mar : '***'),
-          extractCSV(canSeeSalary ? emp.monthlySalaries.apr : '***'),
-          extractCSV(canSeeSalary ? emp.monthlySalaries.may : '***'),
-          extractCSV(canSeeSalary ? emp.monthlySalaries.jun : '***'),
-          extractCSV(canSeeSalary ? emp.monthlySalaries.jul : '***'),
-          extractCSV(canSeeSalary ? emp.monthlySalaries.aug : '***'),
-          extractCSV(canSeeSalary ? emp.monthlySalaries.sep : '***'),
-          extractCSV(canSeeSalary ? emp.monthlySalaries.oct : '***'),
-          extractCSV(canSeeSalary ? emp.monthlySalaries.nov : '***'),
-          extractCSV(canSeeSalary ? emp.monthlySalaries.dec : '***'),
-        ];
-        return data.join(',');
+        let data: any[] = [];
+        if (mode === 'bare') {
+          data = [
+            emp.id,
+            emp.employeeCode,
+            emp.surname,
+            emp.firstname,
+            emp.department,
+            emp.position,
+            emp.status,
+            formatDisplayDate(emp.startDate) || ''
+          ];
+        } else {
+          data = [
+            emp.id,
+            extractCSV(emp.employeeCode || ''),
+            extractCSV(emp.surname),
+            extractCSV(emp.firstname),
+            extractCSV(emp.department),
+            extractCSV(emp.staffType),
+            extractCSV(emp.level),
+            extractCSV(emp.position),
+            extractCSV(emp.status),
+            extractCSV(emp.yearlyLeave),
+            extractCSV(formatDisplayDate(emp.startDate) || ''),
+            extractCSV(formatDisplayDate(emp.endDate) || ''),
+            extractCSV(emp.bankName || ''),
+            extractCSVText(emp.accountNo || ''),
+            extractCSVText(emp.taxId || ''),
+            extractCSVText(emp.pensionNumber || ''),
+            extractCSVText(emp.lashmaPolicyNumber || ''),
+            extractCSV(formatDisplayDate(emp.lashmaRegistrationDate) || ''),
+            extractCSV(formatDisplayDate(emp.lashmaExpiryDate) || ''),
+            extractCSV(emp.payeTax),
+            extractCSV(emp.withholdingTax),
+            extractCSV(emp.excludeFromOnboarding || false),
+            extractCSV(emp.rent || 0),
+            extractCSV(canSeeSalary ? emp.monthlySalaries.jan : '***'),
+            extractCSV(canSeeSalary ? emp.monthlySalaries.feb : '***'),
+            extractCSV(canSeeSalary ? emp.monthlySalaries.mar : '***'),
+            extractCSV(canSeeSalary ? emp.monthlySalaries.apr : '***'),
+            extractCSV(canSeeSalary ? emp.monthlySalaries.may : '***'),
+            extractCSV(canSeeSalary ? emp.monthlySalaries.jun : '***'),
+            extractCSV(canSeeSalary ? emp.monthlySalaries.jul : '***'),
+            extractCSV(canSeeSalary ? emp.monthlySalaries.aug : '***'),
+            extractCSV(canSeeSalary ? emp.monthlySalaries.sep : '***'),
+            extractCSV(canSeeSalary ? emp.monthlySalaries.oct : '***'),
+            extractCSV(canSeeSalary ? emp.monthlySalaries.nov : '***'),
+            extractCSV(canSeeSalary ? emp.monthlySalaries.dec : '***'),
+          ];
+        }
+        return mode === 'bare' ? data.map(extractCSV).join(',') : data.join(',');
       });
 
-      const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `employees_export_${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success(`Successfully exported ${employees.length} employees`);
+      const csvContent = [headers.join(','), ...rows].join('\n');
+      const fileName = `employees_export_${mode === 'bare' ? 'bare_' : ''}${new Date().toISOString().slice(0, 10)}.csv`;
+
+      if (window.electronAPI?.savePathDialog) {
+        const filePath = await window.electronAPI.savePathDialog({
+          title: `Export Employee Directory (${mode === 'bare' ? 'Bare Minimum' : 'Detailed'})`,
+          defaultPath: fileName,
+          filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+        });
+
+        if (filePath) {
+          const success = await window.electronAPI.writeFile(filePath, csvContent, 'utf8');
+          if (success) toast.success(`Exported to ${filePath}`);
+          else toast.error('Failed to save file.');
+        }
+      } else {
+        const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success(`Successfully exported ${employees.length} employees`);
+      }
     } catch (e) {
       toast.error('Export failed');
     }
@@ -1066,8 +1101,8 @@ export function Employees() {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between"><span className="text-slate-500">Emp Code:</span><span className="font-mono">{emp.employeeCode || emp.id.substring(0,8)}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Staff Type:</span><span>{emp.staffType}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Start Date:</span><span>{emp.startDate || 'N/A'}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">End Date:</span><span>{emp.endDate || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Start Date:</span><span>{formatDisplayDate(emp.startDate) || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">End Date:</span><span>{formatDisplayDate(emp.endDate) || 'N/A'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Yearly Leave:</span><span>{emp.yearlyLeave} days</span></div>
                       {emp.phone && <div className="flex justify-between"><span className="text-slate-500">Phone:</span><span className="font-mono">{emp.phone}</span></div>}
                       {emp.email && <div className="flex justify-between"><span className="text-slate-500">Email:</span><span className="text-indigo-600">{emp.email}</span></div>}
@@ -1082,8 +1117,8 @@ export function Employees() {
                       <div className="flex justify-between"><span className="text-slate-500">Tax ID:</span><span className="font-mono">{emp.taxId || 'N/A'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Pension:</span><span className="font-mono">{emp.pensionNumber || 'N/A'}</span></div>
                       <div className="flex justify-between font-bold text-emerald-600"><span className="text-emerald-500">LASHMA:</span><span className="font-mono">{emp.lashmaPolicyNumber}</span></div>
-                      {emp.lashmaRegistrationDate && <div className="flex justify-between text-xs"><span className="text-slate-500">Reg. Date:</span><span>{emp.lashmaRegistrationDate}</span></div>}
-                      {emp.lashmaExpiryDate && <div className="flex justify-between text-xs text-rose-500 font-semibold"><span className="text-slate-500">Expiry Date:</span><span>{emp.lashmaExpiryDate}</span></div>}
+                      {emp.lashmaRegistrationDate && <div className="flex justify-between text-xs"><span className="text-slate-500">Reg. Date:</span><span>{formatDisplayDate(emp.lashmaRegistrationDate)}</span></div>}
+                      {emp.lashmaExpiryDate && <div className="flex justify-between text-xs text-rose-500 font-semibold"><span className="text-slate-500">Expiry Date:</span><span>{formatDisplayDate(emp.lashmaExpiryDate)}</span></div>}
                       <div className="flex justify-between"><span className="text-slate-500">PAYE Tax:</span><span>{emp.payeTax ? 'Yes' : 'No'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">WHT Tax:</span><span>{emp.withholdingTax ? 'Yes' : 'No'}</span></div>
                     </div>
@@ -1136,7 +1171,7 @@ export function Employees() {
                              return (
                                <TableRow key={r.id} className="hover:bg-slate-50/80">
                                  <TableCell className="font-semibold text-slate-800 text-xs">{r.title}</TableCell>
-                                 <TableCell className="font-mono text-[11px] text-slate-500">{new Date(r.remindAt).toLocaleString()}</TableCell>
+                                 <TableCell className="font-mono text-[11px] text-slate-500">{formatDisplayDate(r.remindAt)}</TableCell>
                                  <TableCell>
                                    <Badge variant="outline" className={`text-[10px] ${r.isActive ? (isPast ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-indigo-50 text-indigo-600 border-indigo-200') : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                                      {!r.isActive ? 'Dismissed' : (isPast ? 'Overdue' : 'Pending')}
@@ -1190,7 +1225,7 @@ export function Employees() {
                         <TableBody>
                           {empAtt.map(r => (
                             <TableRow key={r.id}>
-                              <TableCell className="font-mono text-[11px] text-slate-500">{r.date}</TableCell>
+                              <TableCell className="font-mono text-[11px] text-slate-500">{formatDisplayDate(r.date)}</TableCell>
                               <TableCell className="text-xs text-slate-600">
                                 {r.dayClient && r.dayClient !== 'N/A' ? `${r.dayClient} - ${r.daySite}` : 'N/A'}
                               </TableCell>
@@ -1248,7 +1283,7 @@ export function Employees() {
                           {empLeaves.map(l => (
                             <TableRow key={l.id}>
                               <TableCell className="font-semibold text-xs">{l.leaveType}</TableCell>
-                              <TableCell className="font-mono text-[11px] text-slate-500">{l.startDate} to {l.expectedEndDate}</TableCell>
+                              <TableCell className="font-mono text-[11px] text-slate-500">{formatDisplayDate(l.startDate)} to {formatDisplayDate(l.expectedEndDate)}</TableCell>
                               <TableCell className="text-[11px]">{l.duration} Days</TableCell>
                               <TableCell>
                                 <Badge variant="outline" className={l.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200'}>
@@ -1312,7 +1347,7 @@ export function Employees() {
                          <TableBody>
                            {empEvents.map(d => (
                              <TableRow key={d.id} className="hover:bg-slate-50/80">
-                               <TableCell className="font-mono text-[11px] text-slate-500">{d.date}</TableCell>
+                               <TableCell className="font-mono text-[11px] text-slate-500">{formatDisplayDate(d.date)}</TableCell>
                                <TableCell>
                                  <div className="font-semibold text-slate-800 text-xs">{d.type}</div>
                                  <div className="text-[10px] text-slate-500">{d.severity}</div>
@@ -1375,7 +1410,7 @@ export function Employees() {
                          <TableBody>
                            {empEvals.map(e => (
                              <TableRow key={e.id} className="hover:bg-slate-50/80">
-                               <TableCell className="font-mono text-[11px] text-slate-500">{e.date}</TableCell>
+                               <TableCell className="font-mono text-[11px] text-slate-500">{formatDisplayDate(e.date)}</TableCell>
                                <TableCell className="font-semibold text-slate-800 text-xs">{e.type}</TableCell>
                                <TableCell>
                                  <span className={`text-xs font-bold ${e.overallScore >= 70 ? 'text-emerald-600' : e.overallScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}>
@@ -1763,9 +1798,14 @@ export function Employees() {
         </Button>
       )}
       {priv.canExport && (
-        <Button variant="outline" size="sm" className="gap-2 h-9" onClick={handleExportCSV}>
-          <Download className="h-4 w-4" /> Export
-        </Button>
+        <div className="flex bg-slate-50 border border-indigo-200 rounded-md shadow-sm h-9 overflow-hidden shrink-0">
+          <Button variant="ghost" size="sm" className="gap-2 h-full text-indigo-700 hover:bg-indigo-100 rounded-none border-r border-indigo-200 px-3 transition-colors text-xs" onClick={() => handleExportCSV('bare')} title="Export Basic Fields Only">
+            <Download className="h-4 w-4" /> Basic CSV
+          </Button>
+          <Button variant="ghost" size="sm" className="gap-2 h-full text-indigo-700 hover:bg-indigo-100 rounded-none px-3 transition-colors text-xs" onClick={() => handleExportCSV('detailed')} title="Export Complete Data">
+            Detailed CSV
+          </Button>
+        </div>
       )}
       {priv.canAdd && (
         <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-sm font-medium cursor-pointer hover:bg-slate-50 transition-all shadow-sm">

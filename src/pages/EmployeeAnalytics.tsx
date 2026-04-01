@@ -146,7 +146,7 @@ export function EmployeeAnalytics() {
                            <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 border-blue-100 dark:border-blue-800 font-black uppercase text-[8px] tracking-widest px-3 py-0.5 rounded-full">
                               {selectedEmployee.position}
                            </Badge>
-                           <span className="text-slate-400 font-bold text-[10px] uppercase tracking-wider">Since {new Date(selectedEmployee.startDate || Date.now()).toLocaleDateString()}</span>
+                           <span className="text-slate-400 font-bold text-[10px] uppercase tracking-wider">Since {formatDisplayDate(selectedEmployee.startDate)}</span>
                         </div>
                      </div>
                   </div>

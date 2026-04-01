@@ -396,7 +396,7 @@ export function Reports() {
 
   const exportHeadcountReport = () => {
     const csvData = "Employee ID,Surname,Firstname,Department,Position,Status,Start Date\n" + 
-      employees.map(emp => `${emp.id},${emp.surname},${emp.firstname},${emp.department},${emp.position},${emp.status},${emp.startDate}`).join("\n");
+      employees.map(emp => `${emp.id},${emp.surname},${emp.firstname},${emp.department},${emp.position},${emp.status},${formatDisplayDate(emp.startDate)}`).join("\n");
     
     const fileName = "headcount_report.csv";
     if (window.electronAPI?.savePathDialog) {
@@ -423,14 +423,14 @@ export function Reports() {
 
   const exportHeadcountPdf = () => {
     const head = [["Employee ID", "Surname", "Firstname", "Department", "Position", "Status", "Start Date"]];
-    const body = employees.map(emp => [emp.id, emp.surname, emp.firstname, emp.department, emp.position, emp.status, emp.startDate]);
+    const body = employees.map(emp => [emp.id, emp.surname, emp.firstname, emp.department, emp.position, emp.status, formatDisplayDate(emp.startDate)]);
     generatePdf("Headcount Report", head, body, "headcount_report.pdf");
   };
 
   const exportAttendanceReport = () => {
     if (attendanceRecords.length === 0) { toast.error('No attendance records found.'); return; }
     const csvData = "Date,Staff Name,Position,Day Site,Night Site,Day,Night,Absent Status,OT,Present\n" + 
-      attendanceRecords.map(rec => `${rec.date},${rec.staffName},${rec.position},${rec.daySite},${rec.nightSite},${rec.day},${rec.night},${rec.absentStatus},${rec.ot},${rec.isPresent}`).join("\n");
+      attendanceRecords.map(rec => `${formatDisplayDate(rec.date)},${rec.staffName},${rec.position},${rec.daySite},${rec.nightSite},${rec.day},${rec.night},${rec.absentStatus},${rec.ot},${rec.isPresent}`).join("\n");
     
     const fileName = "attendance_report.csv";
     if (window.electronAPI?.savePathDialog) {
@@ -458,7 +458,7 @@ export function Reports() {
   const exportAttendancePdf = () => {
     if (attendanceRecords.length === 0) { toast.error('No attendance records found.'); return; }
     const head = [["Date", "Staff Name", "Day Site", "Night Site", "Present", "OT"]];
-    const body = attendanceRecords.slice(0, 100).map(rec => [rec.date, rec.staffName, rec.daySite, rec.nightSite, rec.isPresent, rec.ot]);
+    const body = attendanceRecords.slice(0, 100).map(rec => [formatDisplayDate(rec.date), rec.staffName, rec.daySite, rec.nightSite, rec.isPresent, rec.ot]);
     generatePdf("Attendance Report (Recent)", head, body, "attendance_report.pdf");
   };
 
@@ -509,8 +509,8 @@ export function Reports() {
       case 'Position':              return emp.position || 'N/A';
       case 'Staff Type':            return emp.staffType || 'N/A';
       case 'Status':                return emp.status;
-      case 'Start Date':            return emp.startDate || 'N/A';
-      case 'End Date':              return emp.endDate || 'N/A';
+      case 'Start Date':            return formatDisplayDate(emp.startDate) || 'N/A';
+      case 'End Date':              return formatDisplayDate(emp.endDate) || 'N/A';
       case 'Bank Name':             return emp.bankName || 'N/A';
       case 'Account Number':        return emp.accountNo || 'N/A';
       case 'Pension Number':        return emp.pensionNumber || 'N/A';
@@ -1247,7 +1247,7 @@ export function Reports() {
                       Days Worked (light → dark)
                     </span>
                     <span className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
-                      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-600 text-[9px] font-bold">â—</span>
+                      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-600 text-[9px] font-bold">â— </span>
                       OT days present
                     </span>
                     <span className="flex items-center gap-1.5 text-xs text-red-600 font-medium">
@@ -1611,7 +1611,7 @@ export function Reports() {
                   let csv = 'data:text/csv;charset=utf-8,';
                   csv += 'Employee,Start Date,Duration (Days),Expected Return,Actual Return,Reason,Contactable\n';
                   leaves.forEach(l => {
-                    csv += `"${l.employeeName}",${l.startDate},${l.duration},${l.expectedEndDate},${l.dateReturned || 'N/A'},"${l.reason}",${l.canBeContacted}\n`;
+                    csv += `"${l.employeeName}",${formatDisplayDate(l.startDate)},${l.duration},${formatDisplayDate(l.expectedEndDate)},${l.dateReturned ? formatDisplayDate(l.dateReturned) : 'N/A'},"${l.reason}",${l.canBeContacted}\n`;
                   });
                   const link = document.createElement('a');
                   link.setAttribute('href', encodeURI(csv));
@@ -1628,7 +1628,7 @@ export function Reports() {
                   generatePdf(
                     'Leave History Report',
                     [['Employee', 'Start Date', 'Duration', 'Expected Return', 'Actual Return', 'Reason', 'Contactable']],
-                    leaves.map(l => [l.employeeName, l.startDate, `${l.duration} days`, l.expectedEndDate, l.dateReturned || 'N/A', l.reason, l.canBeContacted]),
+                    leaves.map(l => [l.employeeName, formatDisplayDate(l.startDate), `${l.duration} days`, formatDisplayDate(l.expectedEndDate), l.dateReturned ? formatDisplayDate(l.dateReturned) : 'N/A', l.reason, l.canBeContacted]),
                     'leave_history_report.pdf'
                   );
                 }}
@@ -1665,12 +1665,12 @@ export function Reports() {
                         return (
                           <TableRow key={leave.id} className={`hover:bg-rose-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
                             <TableCell className="py-1.5 px-3 text-sm font-medium text-slate-800 whitespace-nowrap">{leave.employeeName}</TableCell>
-                            <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{leave.startDate}</TableCell>
+                            <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{formatDisplayDate(leave.startDate)}</TableCell>
                             <TableCell className="py-1.5 px-3 text-sm text-center">
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold">{leave.duration}d</span>
                             </TableCell>
-                            <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{leave.expectedEndDate}</TableCell>
-                            <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{leave.dateReturned || <span className="text-slate-400 italic">Not yet</span>}</TableCell>
+                            <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{formatDisplayDate(leave.expectedEndDate)}</TableCell>
+                            <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{leave.dateReturned ? formatDisplayDate(leave.dateReturned) : <span className="text-slate-400 italic">Not yet</span>}</TableCell>
                             <TableCell className="py-1.5 px-3 text-sm text-slate-600 max-w-[180px] truncate" title={leave.reason}>{leave.reason}</TableCell>
                             <TableCell className="py-1.5 px-3 text-center">
                               <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${

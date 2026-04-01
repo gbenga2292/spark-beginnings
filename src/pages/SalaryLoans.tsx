@@ -1,3 +1,4 @@
+import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -6,15 +7,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import {
   CheckCircle, ArrowLeft, List, Wallet, CalendarRange, Landmark,
-  Banknote, User, CreditCard, Clock, XCircle, ShieldCheck
+  Banknote, User, CreditCard, Clock, XCircle, ShieldCheck, Download, Upload
 } from 'lucide-react';
 import { useAppStore, SalaryAdvance, Loan } from '@/src/store/appStore';
-import { toast } from '@/src/components/ui/toast';
+import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { generateId } from '@/src/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/src/components/ui/dropdown-menu';
 
 export function SalaryLoans() {
   const priv = usePriv('payroll');
@@ -29,6 +38,7 @@ export function SalaryLoans() {
   const [payStartDate, setPayStartDate] = useState('');
   const [approverId, setApproverId] = useState('');
   const [viewMode, setViewMode] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
 
   const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
   const departments = useAppStore((state) => state.departments);
@@ -181,21 +191,244 @@ export function SalaryLoans() {
     handleClear();
   };
 
+  const handleExportCSV = async (mode: 'bare' | 'detailed') => {
+    try {
+      const isSalaryAdvance = true; // For now export both as separate blocks or combined
+      const headers = mode === 'bare' 
+        ? ['Type', 'Employee', 'Amount', 'Date', 'Status']
+        : ['id', 'Type', 'Employee ID', 'Employee Name', 'Amount', 'Date', 'Pay Start Date', 'Duration', 'Monthly Deduction', 'Remaining Balance', 'Approver', 'Status'];
+
+      const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
+
+      const advanceRows = salaryAdvances.map(sa => {
+        if (mode === 'bare') {
+          return [
+            'Salary Advance',
+            sa.employeeName,
+            sa.amount,
+            formatDisplayDate(sa.requestDate),
+            sa.status
+          ];
+        }
+        return [
+          sa.id,
+          'Salary Advance',
+          sa.employeeId,
+          sa.employeeName,
+          sa.amount,
+          formatDisplayDate(sa.requestDate),
+          '',
+          '',
+          '',
+          '',
+          sa.approvedByName || '',
+          sa.status
+        ];
+      });
+
+      const loanRows = loans.map(ln => {
+        if (mode === 'bare') {
+          return [
+            ln.loanType,
+            ln.employeeName,
+            ln.principalAmount,
+            formatDisplayDate(ln.startDate),
+            ln.status
+          ];
+        }
+        return [
+          ln.id,
+          ln.loanType,
+          ln.employeeId,
+          ln.employeeName,
+          ln.principalAmount,
+          formatDisplayDate(ln.startDate),
+          formatDisplayDate(ln.paymentStartDate),
+          ln.duration,
+          ln.monthlyDeduction,
+          ln.remainingBalance,
+          ln.approvedByName || '',
+          ln.status
+        ];
+      });
+
+      const csvContent = [headers.join(','), ...advanceRows.map(r => r.map(extractCSV).join(',')), ...loanRows.map(r => r.map(extractCSV).join(','))].join('\n');
+      const fileName = `Financial_Requests_${mode === 'bare' ? 'Bare' : 'Detailed'}_${new Date().toISOString().slice(0, 10)}.csv`;
+
+      if (window.electronAPI?.savePathDialog) {
+        const filePath = await window.electronAPI.savePathDialog({
+          title: `Export Financial Entries (${mode === 'bare' ? 'Bare Minimum' : 'Detailed'})`,
+          defaultPath: fileName,
+          filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+        });
+
+        if (filePath) {
+          const success = await window.electronAPI.writeFile(filePath, csvContent, 'utf8');
+          if (success) toast.success(`Exported to ${filePath}`);
+          else toast.error('Failed to save file.');
+        }
+      } else {
+        const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success('Successfully exported financial entries');
+      }
+    } catch (e) {
+      toast.error('Export failed');
+    }
+  };
+
+  const parseCSVRow = (str: string) => {
+    const vals: string[] = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < str.length; i++) {
+      if (str[i] === '"') {
+        inQuotes = !inQuotes;
+      } else if (str[i] === ',' && !inQuotes) {
+        vals.push(cur.trim());
+        cur = '';
+      } else {
+        cur += str[i];
+      }
+    }
+    vals.push(cur.trim());
+    return vals;
+  };
+
+  const handleImportCSVSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setImportFile(file);
+    e.target.value = '';
+  };
+
+  const processImport = (file: File, mode: 'update' | 'replace' | 'append') => {
+    setImportFile(null);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split('\n').filter(l => l.trim().length > 0);
+        if (lines.length < 2) {
+          toast.error('Invalid or empty CSV file'); return;
+        }
+
+        let advCount = 0;
+        let loanCount = 0;
+        
+        const headers = parseCSVRow(lines[0]).map(h => h.trim().toLowerCase());
+        const getIdx = (key: string) => headers.indexOf(key.toLowerCase());
+
+        const idx = {
+          type: getIdx('type'),
+          empName: getIdx('employee name'),
+          empId: getIdx('employee ID'),
+          amount: getIdx('amount'),
+          date: getIdx('date'),
+          payStart: getIdx('pay start date'),
+          duration: getIdx('duration'),
+          status: getIdx('status'),
+          id: getIdx('id')
+        };
+
+        for (let i = 1; i < lines.length; i++) {
+          const vals = parseCSVRow(lines[i]);
+          const type = vals[idx.type] || '';
+          const empName = vals[idx.empName] || '';
+          const empId = vals[idx.empId] || employees.find(e => `${e.surname} ${e.firstname}` === empName)?.id || '';
+          const amount = parseFloat(vals[idx.amount]) || 0;
+          const status = (vals[idx.status] || 'Pending') as any;
+          const date = normalizeDate(vals[idx.date]);
+
+          if (type.includes('Advance')) {
+            addSalaryAdvance({
+              id: (mode !== 'append' && vals[idx.id]) ? vals[idx.id] : generateId(),
+              employeeId: empId,
+              employeeName: empName,
+              amount,
+              requestDate: date,
+              status
+            });
+            advCount++;
+          } else {
+            const payStart = normalizeDate(vals[idx.payStart]);
+            const duration = parseInt(vals[idx.duration]) || 1;
+            addLoan({
+              id: (mode !== 'append' && vals[idx.id]) ? vals[idx.id] : generateId(),
+              employeeId: empId,
+              employeeName: empName,
+              loanType: type,
+              principalAmount: amount,
+              monthlyDeduction: amount / duration,
+              duration,
+              startDate: date,
+              paymentStartDate: payStart || date,
+              remainingBalance: amount,
+              status
+            });
+            loanCount++;
+          }
+        }
+        toast.success(`Imported ${advCount} advances and ${loanCount} loans.`);
+      } catch (err) {
+        toast.error('Failed to parse CSV file');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   useSetPageTitle(
     viewMode ? 'Financial Entries Database' : 'Financial Request',
     viewMode ? 'View all recorded salary advances and loans' : 'Submit salary advances or loans for approval',
-    <Button 
-      variant={viewMode ? "default" : "outline"}
-      size="sm"
-      className={viewMode ? "bg-indigo-600 hover:bg-indigo-700 h-9" : "border-slate-200 h-9"}
-      onClick={() => setViewMode(!viewMode)}
-    >
-      {viewMode ? (
-        <><ArrowLeft className="h-4 w-4 mr-2" /> Back to Form</>
-      ) : (
-        <><List className="h-4 w-4 mr-2" /> View Database</>
+    <div className="flex items-center gap-2">
+      {priv.canAdd && (
+        <label className="flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 shadow-sm border border-indigo-200 rounded-md h-9 px-3 text-xs font-medium cursor-pointer transition-colors whitespace-nowrap">
+          <Upload className="h-4 w-4" /> Import
+          <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
+        </label>
       )}
-    </Button>
+      {priv.canAdd && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-9 text-xs">
+              <Download className="h-4 w-4" /> Export
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => handleExportCSV('bare')} className="cursor-pointer">
+              <div className="flex flex-col">
+                <span className="font-medium text-sm">Bare Minimum</span>
+                <span className="text-[10px] text-slate-500">Essential fields for reporting</span>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExportCSV('detailed')} className="cursor-pointer">
+              <div className="flex flex-col">
+                <span className="font-medium text-sm">Detailed Version</span>
+                <span className="text-[10px] text-slate-500">Full database records</span>
+              </div>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+      <Button 
+        variant={viewMode ? "default" : "outline"}
+        size="sm"
+        className={viewMode ? "bg-indigo-600 hover:bg-indigo-700 h-9 text-xs" : "border-slate-200 h-9 text-xs"}
+        onClick={() => setViewMode(!viewMode)}
+      >
+        {viewMode ? (
+          <><ArrowLeft className="h-4 w-4 mr-2" /> Back to Form</>
+        ) : (
+          <><List className="h-4 w-4 mr-2" /> View Database</>
+        )}
+      </Button>
+    </div>
   );
 
   const getStatusBadge = (status: string) => {
@@ -245,7 +478,7 @@ export function SalaryLoans() {
                       <TableCell className="font-mono font-medium text-slate-700">
                         ₦{(priv as any)?.canViewAmounts === false ? '***' : sa.amount.toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-slate-500 text-sm">{sa.requestDate}</TableCell>
+                      <TableCell className="text-slate-500 text-sm">{formatDisplayDate(sa.requestDate)}</TableCell>
                       <TableCell>
                         {sa.approvedByName ? (
                           <div className="flex items-center gap-1 text-xs text-slate-600">
@@ -299,7 +532,7 @@ export function SalaryLoans() {
                       <TableCell className="font-mono font-medium text-slate-700">
                         ₦{(priv as any)?.canViewAmounts === false ? '***' : ln.principalAmount.toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-slate-500 text-sm">{ln.paymentStartDate}</TableCell>
+                      <TableCell className="text-slate-500 text-sm">{formatDisplayDate(ln.paymentStartDate)}</TableCell>
                       <TableCell>
                         {ln.approvedByName ? (
                           <div className="flex items-center gap-1 text-xs text-slate-600">
@@ -324,8 +557,33 @@ export function SalaryLoans() {
           </Card>
         </div>
       </div>
-    );
-  }
+
+      {/* Import Modal Options */}
+      {importFile && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
+          <div className="relative bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-slate-200">
+            <h3 className="text-xl font-bold text-slate-900 mb-2 font-display">Import Policy</h3>
+            <p className="text-sm text-slate-500 leading-relaxed mb-6">
+              How would you like to process the record entries from this CSV file?
+            </p>
+            <div className="flex flex-col gap-3">
+              <Button onClick={() => processImport(importFile, 'update')} className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3.5 flex-col items-center justify-center">
+                <span className="font-bold block text-base leading-none">Update & Add</span>
+                <span className="block text-[10px] opacity-70 mt-1.5 font-normal text-center">Matches IDs and adds new ones. Recommended.</span>
+              </Button>
+              <Button onClick={() => processImport(importFile, 'append')} variant="outline" className="border-slate-200 h-auto py-3.5 text-slate-700 hover:bg-slate-50 flex-col items-center justify-center">
+                <span className="font-bold block text-base leading-none">Append Only</span>
+                <span className="block text-[10px] text-slate-400 mt-1.5 font-normal text-center">Creates brand new records for every row.</span>
+              </Button>
+              <Button onClick={() => setImportFile(null)} variant="ghost" className="text-slate-400 hover:text-slate-600 mt-2 text-xs">
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
 
   return (
     <div className="flex items-center justify-center min-h-[80vh] p-4 lg:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">

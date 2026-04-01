@@ -1,3 +1,4 @@
+import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { useState, useMemo } from 'react';
 import { useAppStore, PendingInvoice, Invoice } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -11,38 +12,6 @@ import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { generateId } from '@/src/lib/utils';
-
-const formatDisplayDate = (iso: string | null | undefined): string => {
-  if (!iso) return '';
-  const parts = iso.split('T')[0].split('-');
-  if (parts.length !== 3) return iso;
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
-};
-
-const parseDateToISO = (dateStr: string | null | undefined): string => {
-  if (!dateStr) return '';
-  const trimmed = dateStr.trim();
-  if (!trimmed) return '';
-
-  // Case 1: Already YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
-
-  // Case 2: DD/MM/YYYY
-  const slashParts = trimmed.split('/');
-  if (slashParts.length === 3) {
-    const day = slashParts[0].padStart(2, '0');
-    const month = slashParts[1].padStart(2, '0');
-    let year = slashParts[2];
-    if (year.length === 2) year = '20' + year;
-    if (year.length === 4) return `${year}-${month}-${day}`;
-  }
-
-  // Case 3: Standard parse
-  const d = new Date(trimmed);
-  if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
-
-  return trimmed;
-};
 
 export function Billing() {
   const sites = useAppStore((state) => state.sites);
@@ -196,7 +165,7 @@ export function Billing() {
     const installation = parseFloat(input.installation) || 0;
     const damages = parseFloat(input.damages) || 0;
 
-    let startDate = parseDateToISO(input.startDate || input.date);
+    let startDate = normalizeDate(input.startDate || input.date);
     let endDate = '';
     if (startDate && duration > 0) {
       const start = new Date(startDate);
@@ -205,7 +174,7 @@ export function Billing() {
         endDate = start.toISOString().split('T')[0];
       }
     } else if (input.endDate || input.dueDate) {
-      endDate = parseDateToISO(input.endDate || input.dueDate);
+      endDate = normalizeDate(input.endDate || input.dueDate);
     }
 
     const rentalCost = noOfMachine * dailyRentalCost * duration;
@@ -551,7 +520,7 @@ export function Billing() {
               date: rawData.startDate || '',
               dueDate: rawData.endDate || '',
               billingCycle: (getVal(vals, 'billingCycle') as any) || 'Custom',
-              reminderDate: parseDateToISO(getVal(vals, 'reminderDate')),
+              reminderDate: normalizeDate(getVal(vals, 'reminderDate')),
               status: (getVal(vals, 'status') as any) || 'Sent',
               vatInc: rawData.vatInc as any,
               noOfMachine: rawData.noOfMachine,
@@ -625,36 +594,37 @@ export function Billing() {
     reader.readAsText(file);
   };
 
-  const handleExportCSV = (format: 'basic' | 'detailed') => {
+  const handleExportCSV = async (format: 'basic' | 'detailed') => {
     try {
       let headers: string[] = [];
       let rows: string[] = [];
+      const currentList = isViewingActive ? invoices : pendingInvoices;
       const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
 
       if (isViewingActive) {
-        if (format === 'detailed') {
-          headers = ['id', 'invoiceNumber', 'client', 'project', 'siteId', 'siteName', 'amount', 'date', 'dueDate', 'billingCycle', 'reminderDate', 'status', 'vatInc', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'mobDemob', 'installation', 'damages', 'duration', 'rentalCost', 'dieselCost', 'techniciansCost', 'totalCost', 'vat', 'totalCharge', 'totalExclusiveOfVat'];
+        if (format === 'basic') {
+          headers = ['id', 'invoiceNumber', 'client', 'siteName', 'date', 'amount', 'status'];
           rows = (currentList as Invoice[]).map(inv => {
             const data = [
-              inv.id, inv.invoiceNumber, inv.client, inv.project, inv.siteId, inv.siteName, inv.amount, inv.date, inv.dueDate, inv.billingCycle, inv.reminderDate, inv.status, inv.vatInc, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0, inv.duration || 0, inv.rentalCost || 0, inv.dieselCost || 0, inv.techniciansCost || 0, inv.totalCost || 0, inv.vat || 0, inv.totalCharge || 0, inv.totalExclusiveOfVat || 0
+              inv.id, inv.invoiceNumber, inv.client, inv.siteName, formatDisplayDate(inv.date), inv.amount, inv.status
             ];
             return data.map(extractCSV).join(',');
           });
         } else {
-          headers = ['id', 'invoiceNumber', 'client', 'siteName', 'date', 'duration', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'mobDemob', 'installation', 'damages'];
+          headers = ['id', 'invoiceNumber', 'client', 'siteName', 'project', 'amount', 'date', 'dueDate', 'billingCycle', 'vatInc', 'totalCharge', 'duration', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'mobDemob', 'installation', 'damages', 'rentalCost', 'dieselCost', 'techniciansCost', 'totalCost', 'vat', 'totalExclusiveOfVat'];
           rows = (currentList as Invoice[]).map(inv => {
             const data = [
-              inv.id, inv.invoiceNumber, inv.client, inv.siteName, inv.date, inv.duration || 0, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0
+              inv.id, inv.invoiceNumber, inv.client, inv.siteName, inv.project, inv.amount, formatDisplayDate(inv.date), formatDisplayDate(inv.dueDate), inv.billingCycle, inv.vatInc, inv.totalCharge, inv.duration || 0, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0, inv.rentalCost || 0, inv.dieselCost || 0, inv.techniciansCost || 0, inv.totalCost || 0, inv.vat || 0, inv.totalExclusiveOfVat || 0
             ];
             return data.map(extractCSV).join(',');
           });
         }
       } else {
-        if (format === 'detailed') {
-          headers = ['id', 'invoiceNo', 'client', 'site', 'vatInc', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'startDate', 'duration', 'endDate', 'mobDemob', 'installation', 'damages', 'rentalCost', 'dieselCost', 'techniciansCost', 'totalCost', 'vat', 'totalCharge', 'totalExclusiveOfVat'];
+        if (format === 'basic') {
+          headers = ['id', 'invoiceNo', 'client', 'site', 'startDate', 'amount', 'totalCharge'];
           rows = (currentList as PendingInvoice[]).map(inv => {
             const data = [
-              inv.id, inv.invoiceNo, inv.client, inv.site, inv.vatInc, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.startDate || '', inv.duration || 0, inv.endDate || '', inv.mobDemob || 0, inv.installation || 0, inv.damages || 0, inv.rentalCost || 0, inv.dieselCost || 0, inv.techniciansCost || 0, inv.totalCost || 0, inv.vat || 0, inv.totalCharge || 0, inv.totalExclusiveOfVat || 0
+              inv.id, inv.invoiceNo, inv.client, inv.site, formatDisplayDate(inv.startDate), inv.amount || 0, inv.totalCharge || 0
             ];
             return data.map(extractCSV).join(',');
           });
@@ -662,22 +632,37 @@ export function Billing() {
           headers = ['id', 'invoiceNo', 'client', 'site', 'startDate', 'duration', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'mobDemob', 'installation', 'damages'];
           rows = (currentList as PendingInvoice[]).map(inv => {
             const data = [
-              inv.id, inv.invoiceNo, inv.client, inv.site, inv.startDate || '', inv.duration || 0, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0
+              inv.id, inv.invoiceNo, inv.client, inv.site, formatDisplayDate(inv.startDate), inv.duration || 0, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0
             ];
             return data.map(extractCSV).join(',');
           });
         }
       }
 
-      const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `invoices_${isViewingActive ? 'active' : 'pending'}_${format}_export_${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success(`Successfully exported ${currentList.length} invoices`);
+      const csvContent = [headers.join(','), ...rows].join('\n');
+      const fileName = `invoices_${isViewingActive ? 'active' : 'pending'}_${format}_export_${new Date().toISOString().slice(0, 10)}.csv`;
+
+      if (window.electronAPI?.savePathDialog) {
+        const filePath = await window.electronAPI.savePathDialog({
+          title: `Export ${isViewingActive ? 'Active' : 'Pending'} Invoices (${format === 'basic' ? 'Basic' : 'Detailed'})`,
+          defaultPath: fileName,
+          filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+        });
+        if (filePath) {
+          const success = await window.electronAPI.writeFile(filePath, csvContent, 'utf8');
+          if (success) toast.success(`Exported to ${filePath}`);
+          else toast.error('Failed to save file.');
+        }
+      } else {
+        const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success(`Successfully exported ${currentList.length} invoices`);
+      }
     } catch (e) {
       toast.error('Export failed');
     }

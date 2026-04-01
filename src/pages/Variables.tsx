@@ -10,7 +10,7 @@ import { NairaSign } from '@/src/components/ui/naira-sign';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
-import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { generateId } from '@/src/lib/utils';
 import * as XLSX from 'xlsx';
 
@@ -433,15 +433,16 @@ export function Variables() {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(monthData), 'Month_Variables');
 
       const fileName = 'System_Variables.xlsx';
-      if (window.electronAPI?.savePathDialog) {
-        window.electronAPI.savePathDialog({
+      const win = window as any;
+      if (win.electronAPI?.savePathDialog) {
+        win.electronAPI.savePathDialog({
           title: 'Export System Variables (Excel)',
           defaultPath: fileName,
           filters: [{ name: 'Excel Files', extensions: ['xlsx'] }]
         }).then(filePath => {
           if (filePath) {
             const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-            window.electronAPI.writeFile(filePath, buf, 'binary').then(success => {
+            win.electronAPI.writeFile(filePath, buf, 'binary').then(success => {
               if (success) toast.success(`Exported to ${filePath}`);
               else toast.error('Failed to save file.');
             });
@@ -544,7 +545,7 @@ export function Variables() {
           if (wb.SheetNames.includes('Public_Holidays')) {
             const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Public_Holidays']);
             data.forEach(row => {
-              const date = String(row.Date || '');
+              const date = normalizeDate(String(row.Date || ''));
               const name = String(row.Name || '');
               if (date && name && (isOverwrite || !newHolidays.some(h => h.date === date && h.name === name))) {
                 newHolidays.push({ id: Math.random().toString(36).slice(2), date, name });
@@ -1165,7 +1166,7 @@ export function Variables() {
                     ) : (
                       publicHolidays.map((holiday) => (
                         <TableRow key={holiday.id}>
-                          <TableCell className="font-medium">{holiday.date}</TableCell>
+                          <TableCell className="font-medium">{formatDisplayDate(holiday.date)}</TableCell>
                           <TableCell>{holiday.name}</TableCell>
                           <TableCell className="text-right">
                             {priv.canEdit && (
