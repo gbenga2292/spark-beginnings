@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useAppStore, PendingInvoice, Invoice } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail } from 'lucide-react';
+import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -66,6 +66,8 @@ export function Billing() {
   const [isViewingActive, setIsViewingActive] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [sortField, setSortField] = useState<string>('startDate');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // ── Master Site Registry ────────────────────────────────────
   const siteRegistry = useMemo(() => {
@@ -681,7 +683,37 @@ export function Billing() {
     }
   };
 
-  const currentList = isViewingActive ? invoices : pendingInvoices;
+  const currentList = useMemo(() => {
+    const list = isViewingActive ? [...invoices] : [...pendingInvoices];
+    return list.sort((a, b) => {
+      let valA: any = '';
+      let valB: any = '';
+
+      if (sortField === 'client') {
+        valA = (a.client || '').toLowerCase();
+        valB = (b.client || '').toLowerCase();
+      } else if (sortField === 'site') {
+        valA = (('site' in a ? a.site : a.siteName) || '').toLowerCase();
+        valB = (('site' in b ? b.site : b.siteName) || '').toLowerCase();
+      } else if (sortField === 'startDate') {
+        valA = ('startDate' in a ? a.startDate : a.date) || '';
+        valB = ('startDate' in b ? b.startDate : b.date) || '';
+      }
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [isViewingActive, invoices, pendingInvoices, sortField, sortOrder]);
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
   const sitesForClient = siteRegistry.filter(s => s.client === (form.client || '').trim());
 
   useSetPageTitle(
@@ -788,9 +820,25 @@ export function Billing() {
               <TableHeader className="bg-slate-50 sticky top-0 z-10">
                 <TableRow>
                   <TableHead className="font-semibold px-4 py-3">Inv #</TableHead>
-                  <TableHead className="font-semibold px-4 py-3">Client / Site</TableHead>
+                  <TableHead className="font-semibold px-4 py-3">
+                    <div className="flex flex-col select-none">
+                      <div className="flex items-center gap-1 cursor-pointer hover:text-indigo-600" onClick={() => handleSort('client')}>
+                        Client
+                        {sortField === 'client' && (sortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+                      </div>
+                      <div className="flex items-center gap-1 cursor-pointer hover:text-indigo-600 text-[10px] text-slate-500" onClick={() => handleSort('site')}>
+                        Site
+                        {sortField === 'site' && (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                      </div>
+                    </div>
+                  </TableHead>
                   <TableHead className="font-semibold px-4 py-3 text-right">Equipment</TableHead>
-                  <TableHead className="font-semibold px-4 py-3 text-right">Dates & Dur</TableHead>
+                  <TableHead className="font-semibold px-4 py-3 text-right cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('startDate')}>
+                    <div className="flex items-center justify-end gap-1">
+                      Dates & Dur
+                      {sortField === 'startDate' && (sortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+                    </div>
+                  </TableHead>
                   <TableHead className="font-semibold px-4 py-3 text-right">Cost Bkdn</TableHead>
                   <TableHead className="font-semibold px-4 py-3 text-right">Totals (₦)</TableHead>
                   {(priv.canEdit || priv.canDelete) && (

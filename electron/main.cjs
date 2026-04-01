@@ -315,6 +315,33 @@ function initIPC() {
     return opts.folder ? filePaths[0] : filePaths;
   });
 
+  // Native "Save As" picker - returns selected path or null
+  ipcMain.handle('dialog:save-path', async (_event, opts = {}) => {
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: opts.title || 'Save File',
+      defaultPath: opts.defaultPath || '',
+      filters: opts.filters || [
+        { name: 'All Files', extensions: ['*'] },
+        { name: 'Excel Files', extensions: ['xlsx', 'xls'] },
+        { name: 'PDF', extensions: ['pdf'] },
+      ],
+    });
+    if (canceled) return null;
+    return filePath;
+  });
+
+  // Write file contents to disk (renderer needs this if it can't use fs)
+  ipcMain.handle('file:write', async (_event, { filePath, content, encoding }) => {
+    try {
+      const fs = require('fs');
+      fs.writeFileSync(filePath, content, encoding);
+      return true;
+    } catch (err) {
+      console.error('File write error:', err);
+      return false;
+    }
+  });
+
   // Open a file or folder in the default OS File Explorer / App
   ipcMain.on('shell:open-path', (event, filePath) => {
     if (filePath) shell.openPath(filePath);
