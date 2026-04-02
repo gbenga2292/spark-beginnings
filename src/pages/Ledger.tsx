@@ -5,7 +5,8 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { TabsContent } from '@/src/components/ui/tabs';
-import { Search, Download, Upload, FileText, ChevronLeft, ChevronRight, X, Eye, BookOpen, RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History } from 'lucide-react';
+import { Search, Download, Upload, FileText, ChevronLeft, ChevronRight, X, Eye, BookOpen, RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, ChevronDown } from 'lucide-react';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/src/components/ui/dropdown-menu';
 import { useAppStore, LedgerEntry } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { usePriv } from '@/src/hooks/usePriv';
@@ -421,31 +422,40 @@ export function Ledger() {
     });
   }, [ledgerEntries, search, searchKey, fromDate, toDate, dateFilterType]);
 
-  const handleExport = () => {
+  const handleExport = async (mode: 'bare' | 'detailed' = 'detailed') => {
     if (!priv?.canExport) return;
-    const data = filteredEntries.map(e => ({
-      'Voucher No': e.voucherNo, 'Date': formatDisplayDate(e.date), 'Description': e.description, 'Category': e.category,
-      'Amount': e.amount, 'Client': e.client, 'Site': e.site, 'Vendor': e.vendor, 'Bank': e.bank, 'Entered By': e.enteredBy,
-    }));
+    let data: any[];
+    if (mode === 'bare') {
+      data = filteredEntries.map(e => ({
+        'Voucher No': e.voucherNo,
+        'Date': formatDisplayDate(e.date),
+        'Description': e.description,
+        'Category': e.category,
+        'Amount': e.amount,
+      }));
+    } else {
+      data = filteredEntries.map(e => ({
+        'Voucher No': e.voucherNo, 'Date': formatDisplayDate(e.date), 'Description': e.description, 'Category': e.category,
+        'Amount': e.amount, 'Client': e.client, 'Site': e.site, 'Vendor': e.vendor, 'Bank': e.bank, 'Entered By': e.enteredBy,
+      }));
+    }
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Ledger Entries');
     
-    const fileName = 'Ledger_Entries.xlsx';
+    const fileName = `Ledger_Entries_${mode === 'bare' ? 'Basic_' : 'Detailed_'}${new Date().toISOString().slice(0, 10)}.xlsx`;
     if (window.electronAPI?.savePathDialog) {
-      window.electronAPI.savePathDialog({
-        title: 'Export Ledger Entries (Excel)',
+      const filePath = await window.electronAPI.savePathDialog({
+        title: `Export Ledger Entries (${mode === 'bare' ? 'Basic' : 'Detailed'})`,
         defaultPath: fileName,
         filters: [{ name: 'Excel Files', extensions: ['xlsx'] }]
-      }).then(filePath => {
-        if (filePath) {
-          const buf = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-          window.electronAPI.writeFile(filePath, buf, 'binary').then(success => {
-            if (success) toast.success(`Exported to ${filePath}`);
-            else toast.error('Failed to save file.');
-          });
-        }
       });
+      if (filePath) {
+        const buf = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        const success = await window.electronAPI.writeFile(filePath, buf, 'binary');
+        if (success) toast.success(`Exported to ${filePath}`);
+        else toast.error('Failed to save file.');
+      }
     } else {
       XLSX.writeFile(workbook, fileName);
     }
@@ -641,9 +651,29 @@ export function Ledger() {
              </Button>
            )}
            {priv.canExport && (
-             <Button variant="outline" size="sm" onClick={handleExport} className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50">
-               <Download className="h-3.5 w-3.5 text-emerald-500" /> Export
-             </Button>
+             <DropdownMenu>
+               <DropdownMenuTrigger asChild>
+                 <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50">
+                   <Download className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
+                 </Button>
+               </DropdownMenuTrigger>
+               <DropdownMenuContent align="end" className="w-52">
+                 <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
+                 <DropdownMenuSeparator />
+                 <DropdownMenuItem onClick={() => handleExport('bare')} className="cursor-pointer">
+                   <div className="flex flex-col">
+                     <span className="font-medium">Basic</span>
+                     <span className="text-[10px] text-slate-500">Voucher, date, description, category &amp; amount</span>
+                   </div>
+                 </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => handleExport('detailed')} className="cursor-pointer">
+                   <div className="flex flex-col">
+                     <span className="font-medium">Detailed</span>
+                     <span className="text-[10px] text-slate-500">Full records with client, site, vendor &amp; bank</span>
+                   </div>
+                 </DropdownMenuItem>
+               </DropdownMenuContent>
+             </DropdownMenu>
            )}
         </div>
       )}
@@ -937,9 +967,29 @@ export function Ledger() {
                   </>
                 )}
                 {priv.canExport && (
-                  <Button variant="outline" onClick={handleExport} className="h-9">
-                    <Download className="mr-2 h-4 w-4" /> Export
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="h-9 gap-2">
+                        <Download className="h-4 w-4" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52">
+                      <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleExport('bare')} className="cursor-pointer">
+                        <div className="flex flex-col">
+                          <span className="font-medium">Basic</span>
+                          <span className="text-[10px] text-slate-500">Voucher, date, description, category &amp; amount</span>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport('detailed')} className="cursor-pointer">
+                        <div className="flex flex-col">
+                          <span className="font-medium">Detailed</span>
+                          <span className="text-[10px] text-slate-500">Full records with client, site, vendor &amp; bank</span>
+                        </div>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
             </div>

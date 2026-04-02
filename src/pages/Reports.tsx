@@ -82,11 +82,74 @@ export function Reports() {
     { name: 'Inactive', value: inactiveEmployees, color: '#f43f5e' }
   ], [activeEmployees, inactiveEmployees]);
 
-      }
+
+  // ── Operations / Field staff for site-work report ──
+  const operationsStaff = useMemo(() =>
+    employees.filter(emp => emp.staffType === 'FIELD' && emp.status === 'Active'),
+  [employees]);
+
+  // ── Gantt data: per-employee, per-day attendance grid ──
+  const ganttData = useMemo(() => {
+    const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+    const grid: Record<string, Record<number, { site: string; isAbsent: boolean; isNight: boolean }>> = {};
+
+    operationsStaff.forEach(emp => {
+      grid[emp.id] = {};
+      days.forEach(d => { grid[emp.id][d] = { site: '', isAbsent: false, isNight: false }; });
+    });
+
+    attendanceRecords.forEach(rec => {
+      const recDate = new Date(rec.date);
+      if (recDate.getMonth() + 1 !== selectedMonth || recDate.getFullYear() !== selectedYear) return;
+      if (!grid[rec.staffId]) return;
+      const day = recDate.getDate();
+      const isAbsent = rec.day?.toLowerCase() !== 'yes';
+      const isNight = !isAbsent && rec.night?.toLowerCase() === 'yes';
+      const site = isAbsent ? 'Absent' : (rec.daySite || rec.nightSite || '');
+      grid[rec.staffId][day] = { site, isAbsent, isNight };
     });
 
     return { grid, days };
   }, [attendanceRecords, selectedMonth, selectedYear, operationsStaff]);
+
+  // ── Site color palette ──
+  const SITE_COLORS: Record<string, { bg: string; text: string; border: string }> = useMemo(() => {
+    const palette = [
+      { bg: '#6366f1', text: '#fff', border: '#4f46e5' },
+      { bg: '#10b981', text: '#fff', border: '#059669' },
+      { bg: '#f59e0b', text: '#fff', border: '#d97706' },
+      { bg: '#3b82f6', text: '#fff', border: '#2563eb' },
+      { bg: '#ec4899', text: '#fff', border: '#db2777' },
+      { bg: '#8b5cf6', text: '#fff', border: '#7c3aed' },
+      { bg: '#14b8a6', text: '#fff', border: '#0d9488' },
+      { bg: '#f97316', text: '#fff', border: '#ea580c' },
+    ];
+    const map: Record<string, { bg: string; text: string; border: string }> = {};
+    sites.forEach((s, i) => { map[s.name] = palette[i % palette.length]; });
+    return map;
+  }, [sites]);
+
+  // ── Merit / performance scores ──
+  const staffMeritRecords = useAppStore(s => s.staffMeritRecords);
+
+  const netContextPoints = useMemo(() => {
+    return staffMeritRecords.reduce((sum, r) => {
+      const pts = r.recordType === 'Accolade' ? 1 : -1;
+      return sum + pts;
+    }, 0);
+  }, [staffMeritRecords]);
+
+  const performanceLeaderboard = useMemo(() => {
+    const scores: Record<string, { name: string; points: number }> = {};
+    staffMeritRecords.forEach(r => {
+      if (!scores[r.employeeId]) scores[r.employeeId] = { name: r.employeeName, points: 0 };
+      const pts = r.recordType === 'Accolade' ? 1 : -1;
+      scores[r.employeeId].points += pts;
+    });
+    return Object.values(scores).sort((a, b) => Math.abs(b.points) - Math.abs(a.points)).slice(0, 5);
+  }, [staffMeritRecords]);
 
   // Calculate site work data for operations staff
   const operationsStaffSiteData = useMemo(() => {

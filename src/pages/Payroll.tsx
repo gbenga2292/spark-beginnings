@@ -54,6 +54,7 @@ const isPensionEligible = (r: PayrollRecord) => r.pension > 0 && r.staffType !==
 const isNsitfEligible = (r: PayrollRecord) => r.nsitf > 0 && !r.department.trim().toLowerCase().includes('adhoc');
 
 const currentYear = new Date().getFullYear();
+const YEAR_RANGE_START = 2020;
 
 const fm = (v: number) => typeof v === 'number' ? v.toLocaleString() : '0';
 const fmT = fm;
@@ -80,6 +81,7 @@ export function Payroll() {
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const publicHolidays = useAppStore((state) => state.publicHolidays);
   const [selectedMonth, setSelectedMonth] = useState('jan');
+  const [selectedYear, setSelectedYear] = useState(currentYear);
 
   // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Permissions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const priv = usePriv('payroll');
@@ -113,9 +115,6 @@ export function Payroll() {
     const walk = (x - startX) * 1.5;
     tableContainerRef.current.scrollLeft = scrollLeft - walk;
   };
-
-  // OPERATIONS departments – purely attendance-based pay
-  const OPERATIONS_DEPARTMENTS = ['OPERATIONS', 'ENGINEERING'];
 
   // Each column: id, label, summable (can be totalled), types it applies to ('all' or specific)
   const AVAILABLE_COLUMNS: Array<{ id: string; label: string; summable: boolean; types: string[] }> = [
@@ -179,7 +178,7 @@ export function Payroll() {
 
       // Auto-compute workdays for this month from public holidays
       const holidayDates = publicHolidays.map(h => h.date);
-      const fallbackWorkdays = computeWorkDays(currentYear, selectedMonthIndex, holidayDates, 6);
+      const fallbackWorkdays = computeWorkDays(selectedYear, selectedMonthIndex, holidayDates, 6);
 
       const monthConfig = monthValues[mKey as keyof typeof monthValues] || { workDays: fallbackWorkdays, overtimeRate: 0.5 };
       const otRate = monthConfig.overtimeRate;
@@ -218,9 +217,9 @@ export function Payroll() {
           let whtRateToStore = 0;
           const standardSalary = emp.monthlySalaries[mKey] || 0;
 
-          const defaultDays = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase()) ? 6 : 5;
+          const defaultDays = emp.staffType === 'FIELD' ? 6 : 5;
           const empWorkDaysPerWeek = payrollVariables.departmentWorkDays?.[emp.department] ?? defaultDays;
-          const empOfficialWorkdays = computeWorkDays(currentYear, selectedMonthIndex, holidayDates, empWorkDaysPerWeek);
+          const empOfficialWorkdays = computeWorkDays(selectedYear, selectedMonthIndex, holidayDates, empWorkDaysPerWeek);
 
           // Ã¢â€â‚¬Ã¢â€â‚¬ Attendance tallies Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
           let daysWorked = 0; // days where day === 'Yes'
@@ -228,7 +227,8 @@ export function Payroll() {
           let totalOTInstances = 0;
 
           for (const r of attendanceRecords) {
-            if (r.staffId === emp.id && r.mth === selectedMonthIndex) {
+            const recordYear = r.date ? parseInt(r.date.split('-')[0], 10) : selectedYear;
+            if (r.staffId === emp.id && r.mth === selectedMonthIndex && recordYear === selectedYear) {
               if (r.ot > 0) totalOTInstances += 1;
 
               if (r.day?.toLowerCase() === 'yes') {
@@ -253,13 +253,13 @@ export function Payroll() {
           if (standardSalary > 0 && empOfficialWorkdays > 0) {
             const dailyRate = standardSalary / empOfficialWorkdays;
 
-            const isOperations = OPERATIONS_DEPARTMENTS.includes(emp.department.toUpperCase());
+            const isFieldStaff = emp.staffType === 'FIELD';
 
-            if (isOperations) {
-              // Operations staff: paid only for days actually attended
+            if (isFieldStaff) {
+              // Field staff: paid only for days actually attended
               salary = dailyRate * daysWorked;
             } else {
-              // All other staff: full salary, deduct explicit absent days
+              // Office / Non-Employee staff: full salary, deduct explicit absent days
               salary = standardSalary - (dailyRate * daysAbsent);
               if (salary < 0) salary = 0;
             }
@@ -336,8 +336,9 @@ export function Payroll() {
             if (a.status !== 'Approved' && a.status !== 'Deducted') return false;
             if (!a.requestDate) return false;
             const dateParts = a.requestDate.split('-');
+            const advanceYear = parseInt(dateParts[0], 10);
             const advanceMonth = parseInt(dateParts[1], 10);
-            return advanceMonth === selectedMonthIndex;
+            return advanceYear === selectedYear && advanceMonth === selectedMonthIndex;
           });
           const advanceDeduction = empAdvances.reduce((sum, a) => sum + a.amount, 0);
 
@@ -349,7 +350,7 @@ export function Payroll() {
             const startYear = parseInt(dateParts[0], 10);
             const startMonth = parseInt(dateParts[1], 10);
 
-            const monthsElapsed = (currentYear - startYear) * 12 + (selectedMonthIndex - startMonth);
+            const monthsElapsed = (selectedYear - startYear) * 12 + (selectedMonthIndex - startMonth);
             return monthsElapsed >= 0 && monthsElapsed < l.duration;
           });
           const loanDeduction = empLoans.reduce((sum, l) => sum + l.monthlyDeduction, 0);
@@ -393,7 +394,7 @@ export function Payroll() {
             status: 'Pending' as const,
           };
         });
-    }, [employees, salaryAdvances, loans, payrollVariables, monthValues, attendanceRecords, months, currentYear]);
+    }, [employees, salaryAdvances, loans, payrollVariables, monthValues, attendanceRecords, months, selectedYear, payeTaxVariables, publicHolidays]);
 
     // Derive standard display payload
     const payrollData = useMemo(() => calculatePayrollForMonth(selectedMonth), [calculatePayrollForMonth, selectedMonth]);
@@ -646,12 +647,22 @@ export function Payroll() {
       'Manage salaries, taxes, generate payslips, and handle staff advances and loans',
       <div className="hidden sm:flex items-center gap-2">
         <select
-          className="h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20 mr-2"
+          className="h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20"
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
         >
           {months.map(month => (
             <option key={month.key} value={month.key}>{month.label}</option>
+          ))}
+        </select>
+
+        <select
+          className="h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20 mr-2"
+          value={selectedYear}
+          onChange={(e) => setSelectedYear(Number(e.target.value))}
+        >
+          {Array.from({ length: currentYear - YEAR_RANGE_START + 2 }, (_, i) => YEAR_RANGE_START + i).map(yr => (
+            <option key={yr} value={yr}>{yr}</option>
           ))}
         </select>
         
@@ -781,7 +792,7 @@ export function Payroll() {
               >
                 {/* Table mimicking Excel specific columns precisely */}
                 <Table className="whitespace-nowrap w-full text-xs">
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-40 bg-slate-50">
                     <TableRow className="bg-slate-50">
                       <TableHead className="font-bold text-slate-900 sticky top-0 left-0 z-30 bg-slate-50 ring-1 ring-slate-200" style={{minWidth:'48px'}}>S/N</TableHead>
                       <TableHead className="font-bold text-slate-900 sticky top-0 z-30 bg-slate-50 ring-1 ring-slate-200" style={{left:'48px',minWidth:'110px'}}>SURNAMES</TableHead>

@@ -12,7 +12,7 @@ import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useRedaction } from '@/src/hooks/useRedaction';
 import { Dialog } from '@/src/components/ui/dialog';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/src/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/src/components/ui/dropdown-menu';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { Checkbox } from '@/src/components/ui/checkbox';
 import { normalizeDate, formatDisplayDate } from '@/src/lib/dateUtils';
@@ -1798,18 +1798,33 @@ export function Employees() {
         </Button>
       )}
       {priv.canExport && (
-        <div className="flex bg-slate-50 border border-indigo-200 rounded-md shadow-sm h-9 overflow-hidden shrink-0">
-          <Button variant="ghost" size="sm" className="gap-2 h-full text-indigo-700 hover:bg-indigo-100 rounded-none border-r border-indigo-200 px-3 transition-colors text-xs" onClick={() => handleExportCSV('bare')} title="Export Basic Fields Only">
-            <Download className="h-4 w-4" /> Basic CSV
-          </Button>
-          <Button variant="ghost" size="sm" className="gap-2 h-full text-indigo-700 hover:bg-indigo-100 rounded-none px-3 transition-colors text-xs" onClick={() => handleExportCSV('detailed')} title="Export Complete Data">
-            Detailed CSV
-          </Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2 h-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-xs">
+              <Download className="h-4 w-4 text-emerald-500" /> Export
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => handleExportCSV('bare')} className="cursor-pointer">
+              <div className="flex flex-col">
+                <span className="font-medium">Basic CSV</span>
+                <span className="text-[10px] text-slate-500">Essential fields only</span>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExportCSV('detailed')} className="cursor-pointer">
+              <div className="flex flex-col">
+                <span className="font-medium">Detailed CSV</span>
+                <span className="text-[10px] text-slate-500">Full employee data including salaries</span>
+              </div>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
       {priv.canAdd && (
-        <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-sm font-medium cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
-          <Upload className="h-4 w-4" /> Import
+        <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-xs font-bold cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
+          <Upload className="h-4 w-4 text-indigo-500" /> Import
           <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
         </label>
       )}
@@ -1851,7 +1866,7 @@ export function Employees() {
         </div>
         <div className="flex gap-2">
           {priv.canExport && (
-            <Button variant="outline" className="flex-1 gap-2 text-xs" onClick={handleExportCSV}>
+            <Button variant="outline" className="flex-1 gap-2 text-xs" onClick={() => handleExportCSV('detailed')}>
               <Download className="h-3 w-3" /> Export CSV
             </Button>
           )}
