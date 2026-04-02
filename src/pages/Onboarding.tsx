@@ -447,7 +447,7 @@ export function Onboarding() {
 
     pendingEmployees.forEach(emp => {
       const defaultCL = makeDefaultChecklist(emp.noOfGuarantors ?? 1);
-      // Fill in critical fields as true/done
+      // Fill in critical fields as true/done and pull existing details
       const fullCL: OnboardingChecklist = {
         ...defaultCL,
         emailFormsSent: true,
@@ -458,9 +458,17 @@ export function Onboarding() {
         passportPhotos: true,
         addressVerification: true,
         educationalCredentials: true,
+        bankName: emp.bankName || '',
+        accountNo: emp.accountNo || '',
         accountDetailsVerified: true,
+        pensionNumberInput: emp.pensionNumber || '',
         pensionVerified: true,
+        payeNumberInput: emp.payeNumber || '',
         payeVerified: true,
+        lashmaPolicyNumber: emp.lashmaPolicyNumber || '',
+        lashmaRegistrationDate: emp.lashmaRegistrationDate || '',
+        lashmaExpiryDate: emp.lashmaExpiryDate || '',
+        lashmaVerified: !!emp.lashmaPolicyNumber,
         employmentLetterPrinted: true,
         employmentLetterSigned: true,
         employmentLetterFiled: true,

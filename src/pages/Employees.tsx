@@ -935,6 +935,92 @@ export function Employees() {
           </Card>
 
           <Card className="shadow-sm border-slate-200">
+            <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100 flex flex-row items-center justify-between">
+              <CardTitle className="text-slate-800">Guarantors</CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-8 gap-1.5 text-[11px] font-bold uppercase tracking-wider"
+                onClick={() => {
+                  const cl = formData.onboardingChecklist || { guarantors: [] };
+                  const nextGuarantors = [...(cl.guarantors || []), { name: '', phone: '', verified: false }];
+                  setFormData({ ...formData, onboardingChecklist: { ...cl, guarantors: nextGuarantors } as any });
+                }}
+              >
+                <Plus className="h-3.5 w-3.5" /> Add
+              </Button>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-4">
+              {((formData.onboardingChecklist?.guarantors) || []).length === 0 ? (
+                <div className="text-center py-4 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">No guarantors added</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {(formData.onboardingChecklist?.guarantors || []).map((g, idx) => (
+                    <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-100 relative group/g">
+                      <button 
+                        className="absolute top-2 right-2 text-slate-300 hover:text-rose-500 transition-colors"
+                        onClick={() => {
+                          const cl = formData.onboardingChecklist!;
+                          const nextGuarantors = cl.guarantors.filter((_, i) => i !== idx);
+                          setFormData({ ...formData, onboardingChecklist: { ...cl, guarantors: nextGuarantors } as any });
+                        }}
+                      >
+                         <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase text-slate-400">Guarantor Name</label>
+                          <Input 
+                            value={g.name} 
+                            onChange={e => {
+                              const cl = formData.onboardingChecklist!;
+                              const next = [...cl.guarantors];
+                              next[idx] = { ...next[idx], name: e.target.value };
+                              setFormData({ ...formData, onboardingChecklist: { ...cl, guarantors: next } as any });
+                            }}
+                            placeholder="Full Name"
+                            className="h-8 text-xs bg-white"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase text-slate-400">Phone Number</label>
+                          <Input 
+                            value={g.phone} 
+                            onChange={e => {
+                              const cl = formData.onboardingChecklist!;
+                              const next = [...cl.guarantors];
+                              next[idx] = { ...next[idx], phone: e.target.value };
+                              setFormData({ ...formData, onboardingChecklist: { ...cl, guarantors: next } as any });
+                            }}
+                            placeholder="Phone"
+                            className="h-8 text-xs bg-white font-mono"
+                          />
+                        </div>
+                        <label className="flex items-center gap-2 cursor-pointer pt-1">
+                           <input 
+                             type="checkbox" 
+                             checked={g.verified} 
+                             onChange={e => {
+                               const cl = formData.onboardingChecklist!;
+                               const next = [...cl.guarantors];
+                               next[idx] = { ...next[idx], verified: e.target.checked };
+                               setFormData({ ...formData, onboardingChecklist: { ...cl, guarantors: next } as any });
+                             }}
+                             className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-3.5 w-3.5"
+                           />
+                           <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Identity Verified</span>
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border-slate-200">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
               <CardTitle className="text-slate-800">Financial Setup</CardTitle>
             </CardHeader>

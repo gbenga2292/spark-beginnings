@@ -43,7 +43,7 @@ export function FinancialReports() {
   const rawVatPayments = useAppStore(state => state.vatPayments);
   const sites = useAppStore(state => state.sites);
 
-  const employees = useAppStore(state => state.employees).filter(e => e.status !== 'Terminated');
+  const employees = useAppStore(state => state.employees).filter(e => e.status === 'Active' || e.status === 'On Leave');
   const attendanceRecords = useAppStore(state => state.attendanceRecords);
   const loans = useAppStore(state => state.loans);
   const salaryAdvances = useAppStore(state => state.salaryAdvances);

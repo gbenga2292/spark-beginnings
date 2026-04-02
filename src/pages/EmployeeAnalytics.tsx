@@ -44,11 +44,13 @@ export function EmployeeAnalytics() {
     'Foreman', 'Engineer', 'Site Supervisor', 'Assistant Supervisor', 
     'Mechanic Technician/Site Worker', 'Site Worker', 'Driver', 'Security'
   ];
-  const opsStaff = allEmployees.filter(emp => {
-    const isOpStaff = opStaffPositions.includes(emp.position || '');
-    const matchesSearch = `${emp.firstname} ${emp.surname}`.toLowerCase().includes(searchTerm.toLowerCase());
-    return isOpStaff && matchesSearch;
-  });
+  const opsStaff = allEmployees
+    .filter(emp => emp.status === 'Active' || emp.status === 'On Leave')
+    .filter(emp => {
+      const isOpStaff = opStaffPositions.includes(emp.position || '');
+      const matchesSearch = `${emp.firstname} ${emp.surname}`.toLowerCase().includes(searchTerm.toLowerCase());
+      return isOpStaff && matchesSearch;
+    });
 
   const selectedEmployee = opsStaff.find(emp => emp.id === selectedEmployeeId);
 

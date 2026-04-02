@@ -570,7 +570,10 @@ function AdminTasksView() {
   }, [searchParams, setSearchParams, subtasks, projects, mainTasks]);
 
   const { wsTasks: teamTasks, wsMembers, workspace: teamWs } = useWorkspace();
-  const activeUsers = wsMembers;
+  const employees = useAppStore(state => state.employees);
+  const activeEmpIds = new Set(employees.filter(e => e.status === 'Active' || e.status === 'On Leave').map(e => e.id));
+  
+  const activeUsers = wsMembers.filter(m => activeEmpIds.has(m.id));
   const teamSubtaskIds = new Set(teamTasks.map(mt => mt.id));
   const teamSubtasks = subtasks.filter(s => teamSubtaskIds.has(s.mainTaskId));
   const mySubs = teamSubtasks.filter(s => s.assignedTo === currentUser?.id);
