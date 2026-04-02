@@ -40,7 +40,7 @@ export function SalaryLoans() {
   const [viewMode, setViewMode] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
 
-  const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
+  const employees = useAppStore((state) => state.employees).filter(e => e.status === 'Active' || e.status === 'On Leave');
   const departments = useAppStore((state) => state.departments);
   const salaryAdvances = useAppStore((state) => state.salaryAdvances);
   const loans = useAppStore((state) => state.loans);

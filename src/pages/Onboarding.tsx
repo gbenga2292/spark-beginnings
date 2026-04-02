@@ -437,6 +437,50 @@ export function Onboarding() {
     toast.success(`${selectedEmployee.firstname} ${selectedEmployee.surname} is now ACTIVE! ðŸŽ‰`);
   };
 
+  const handleMarkAllAsOnboarded = async () => {
+    if (pendingEmployees.length === 0) return;
+    const ok = await showConfirm(
+      `Mark all ${pendingEmployees.length} pending hires as "Onboarding Complete"? This will bypass the manual checklist and move them to the Active staff list immediately.`,
+      { variant: 'default', confirmLabel: 'Mark All Complete' }
+    );
+    if (!ok) return;
+
+    pendingEmployees.forEach(emp => {
+      const defaultCL = makeDefaultChecklist(emp.noOfGuarantors ?? 1);
+      // Fill in critical fields as true/done
+      const fullCL: OnboardingChecklist = {
+        ...defaultCL,
+        emailFormsSent: true,
+        emailFormsAcknowledged: true,
+        formsReturned: true,
+        guarantorFormsReturned: true,
+        personalEmployeeFormReturned: true,
+        passportPhotos: true,
+        addressVerification: true,
+        educationalCredentials: true,
+        accountDetailsVerified: true,
+        pensionVerified: true,
+        payeVerified: true,
+        employmentLetterPrinted: true,
+        employmentLetterSigned: true,
+        employmentLetterFiled: true,
+        employmentLettersIssued: true,
+        verifiedStartDate: emp.startDate,
+        orientationDone: true,
+        hrOrientation: true,
+        ppeHandbookIssued: true,
+      };
+      
+      updateEmployee(emp.id, {
+        status: 'Active',
+        startDate: emp.startDate,
+        verifiedStartDate: emp.startDate,
+        onboardingChecklist: fullCL,
+      });
+    });
+    toast.success(`Successfully onboarded all ${pendingEmployees.length} staff!`);
+  };
+
   const toggleOffboardingTask = (taskId: string) => {
     if (!selectedEmployee) return;
     const tasks = (selectedEmployee.offboardingTasks || []).map(t => {
@@ -534,9 +578,24 @@ export function Onboarding() {
           <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4 px-5 space-y-3">
             <CardTitle className="text-base font-bold text-slate-800 flex items-center justify-between">
               <span>{leftTab === 'Terminated' ? 'Offboarding' : leftTab} Directory</span>
-              <Badge variant="secondary" className="bg-indigo-100 text-indigo-700 rounded-full px-2.5">
-                {leftTab === 'Active' ? activeEmployees.length : leftTab === 'Pending' ? pendingEmployees.length : terminatedEmployees.length}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {leftTab === 'Pending' && pendingEmployees.length > 0 && priv.canEdit && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 text-[10px] font-bold uppercase tracking-tight text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-2 border border-indigo-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMarkAllAsOnboarded();
+                    }}
+                  >
+                    Mark All Complete
+                  </Button>
+                )}
+                <Badge variant="secondary" className="bg-indigo-100 text-indigo-700 rounded-full px-2.5">
+                  {leftTab === 'Active' ? activeEmployees.length : leftTab === 'Pending' ? pendingEmployees.length : terminatedEmployees.length}
+                </Badge>
+              </div>
             </CardTitle>
             <div className="flex p-1 bg-slate-200/50 rounded-lg">
               {(['Active', 'Pending', 'Terminated'] as const).map(tab => (

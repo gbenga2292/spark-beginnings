@@ -48,7 +48,7 @@ const MONTHS = [
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
 export function Dashboard() {
-    const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
+    const employees = useAppStore((state) => state.employees).filter(e => e.status === 'Active' || e.status === 'On Leave');
     const attendanceRecords = useAppStore((state) => state.attendanceRecords);
     const leaves = useAppStore((state) => state.leaves);
     const holidays = useAppStore((state) => state.publicHolidays);

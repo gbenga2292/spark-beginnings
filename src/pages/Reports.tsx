@@ -26,7 +26,7 @@ const getBase64ImageFromUrl = async (imageUrl: string) => {
 
 export function Reports() {
   const priv = usePriv('reports');
-  const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
+  const employees = useAppStore((state) => state.employees).filter(e => e.status === 'Active' || e.status === 'On Leave');
   const sites = useAppStore((state) => state.sites);
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const leaves = useAppStore((state) => state.leaves);

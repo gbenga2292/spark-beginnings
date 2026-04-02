@@ -13,7 +13,7 @@ export function LeaveSummary() {
   const departments = useAppStore((state) => state.departments);
 
   const employees = useMemo(() => {
-    const activeEmployees = allEmployees.filter(e => e.status !== 'Terminated');
+    const activeEmployees = allEmployees.filter(e => e.status === 'Active' || e.status === 'On Leave');
     return filterAndSortEmployeesExcludingCEO(activeEmployees);
   }, [allEmployees]);
 

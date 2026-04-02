@@ -36,7 +36,7 @@ import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
 
 export function Attendance() {
   const allEmployees = useAppStore((state) => state.employees);
-  const employees = allEmployees.filter(e => e.status !== 'Terminated');
+  const employees = allEmployees.filter(e => e.status === 'Active' || e.status === 'On Leave');
   const sites = useAppStore((state) => state.sites);
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const payrollVariables = useAppStore((state) => state.payrollVariables);
