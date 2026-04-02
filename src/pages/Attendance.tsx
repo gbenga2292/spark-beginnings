@@ -3,7 +3,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { useAppStore, AttendanceRecord } from '@/src/store/appStore';
-import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload } from 'lucide-react';
+import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { format } from 'date-fns';
@@ -45,6 +45,36 @@ export function Attendance() {
   const [activeTab, setActiveTab] = useState('entry');
   const [staffTypeFilter, setStaffTypeFilter] = useState<'OFFICE' | 'FIELD'>('FIELD');
   const [importFile, setImportFile] = useState<File | null>(null);
+
+  type SortConfig = { key: keyof AttendanceRecord; direction: 'asc' | 'desc' };
+  const [sortConfig, setSortConfig] = useState<SortConfig[]>([]);
+
+  const handleSort = (key: keyof AttendanceRecord, e: React.MouseEvent) => {
+    setSortConfig(prev => {
+      let newSort = [...prev];
+      const existingIdx = prev.findIndex(s => s.key === key);
+      
+      if (!e.shiftKey && (prev.length > 1 || existingIdx === -1)) {
+        return [{ key, direction: 'asc' }];
+      }
+      
+      if (!e.shiftKey && prev.length === 1 && existingIdx !== -1) {
+        if (newSort[existingIdx].direction === 'asc') newSort[existingIdx] = { key, direction: 'desc' };
+        else return [];
+        return newSort;
+      }
+      
+      if (e.shiftKey) {
+        if (existingIdx !== -1) {
+          if (newSort[existingIdx].direction === 'asc') newSort[existingIdx] = { key, direction: 'desc' };
+          else newSort.splice(existingIdx, 1);
+        } else {
+          newSort.push({ key, direction: 'asc' });
+        }
+      }
+      return newSort;
+    });
+  };
 
   // ─── Name Resolution Dialog ──────────────────────────────────
   type PendingImport = {
@@ -143,15 +173,27 @@ export function Attendance() {
       }
       return true;
     }).sort((a, b) => {
-      const dateCmp = new Date(b.date).getTime() - new Date(a.date).getTime();
-      if (dateCmp !== 0) return dateCmp;
+      if (sortConfig.length > 0) {
+        for (const sort of sortConfig) {
+          const aVal = String(a[sort.key] ?? '');
+          const bVal = String(b[sort.key] ?? '');
+          if (aVal !== bVal) {
+             const cmp = aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' });
+             return sort.direction === 'asc' ? cmp : -cmp;
+          }
+        }
+        return 0;
+      } else {
+        const dateCmp = new Date(b.date).getTime() - new Date(a.date).getTime();
+        if (dateCmp !== 0) return dateCmp;
 
-      const idxA = getPositionIndex(a.position);
-      const idxB = getPositionIndex(b.position);
-      if (idxA !== idxB) return idxA - idxB;
-      return (a.position || '').localeCompare(b.position || '');
+        const idxA = getPositionIndex(a.position);
+        const idxB = getPositionIndex(b.position);
+        if (idxA !== idxB) return idxA - idxB;
+        return (a.position || '').localeCompare(b.position || '');
+      }
     });
-  }, [attendanceRecords, employees, debouncedDbSearch, dbStaffTypeFilter, dbSiteFilter, dbShiftFilter]);
+  }, [attendanceRecords, employees, debouncedDbSearch, dbStaffTypeFilter, dbSiteFilter, dbShiftFilter, sortConfig]);
 
   // DB Actions
   const handleBulkDelete = async () => {
@@ -801,6 +843,50 @@ export function Attendance() {
     'Daily Register',
     'Attendance & site allocation',
     <div className="flex items-center gap-2">
+      {activeTab === 'database' && (
+        <>
+          {priv.canImport && (
+            <label className="cursor-pointer mb-0">
+              <Input type="file" accept=".xlsx" className="hidden" onChange={handleImportExcel} />
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1 pointer-events-none cursor-pointer border-slate-200">
+                <Upload className="h-3 w-3" /> Import
+              </Button>
+            </label>
+          )}
+          {priv.canDelete && dbSelectedIds.size > 0 && (
+            <Button onClick={handleBulkDelete} size="sm" variant="destructive" className="h-8 text-xs gap-1 shadow-sm">
+              <Trash2 className="h-3 w-3" /> Delete ({dbSelectedIds.size})
+            </Button>
+          )}
+          {priv.canExport && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" className="h-8 text-xs gap-1 bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm">
+                  <Download className="h-3 w-3" /> Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleExportExcel('bare')} className="cursor-pointer">
+                  <div className="flex flex-col">
+                    <span className="font-medium">Bare Minimum</span>
+                    <span className="text-[10px] text-slate-500">Essential fields for re-import</span>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExportExcel('detailed')} className="cursor-pointer">
+                  <div className="flex flex-col">
+                    <span className="font-medium">Detailed Version</span>
+                    <span className="text-[10px] text-slate-500">Full database records with estimates</span>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <div className="w-px h-5 bg-slate-200 mx-1" />
+        </>
+      )}
+
       <TabsList className="bg-slate-100 h-8">
         <TabsTrigger
           active={activeTab === 'entry'}
@@ -818,7 +904,7 @@ export function Attendance() {
         </TabsTrigger>
       </TabsList>
     </div>,
-    [activeTab]
+    [activeTab, priv.canImport, priv.canDelete, priv.canExport, dbSelectedIds.size, handleImportExcel, handleExportExcel, handleBulkDelete]
   );
 
   return (
@@ -1098,49 +1184,6 @@ export function Attendance() {
                 onChange={(e) => setDbSearchTerm(e.target.value)}
               />
             </div>
-
-            <div className="flex-1" />
-
-            <div className="flex items-center gap-2">
-              {priv.canImport && (
-                <label className="cursor-pointer">
-                  <Input type="file" accept=".xlsx" className="hidden" onChange={handleImportExcel} />
-                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1 pointer-events-none">
-                    <Upload className="h-3 w-3" /> Import
-                  </Button>
-                </label>
-              )}
-              {priv.canDelete && dbSelectedIds.size > 0 && (
-                <Button onClick={handleBulkDelete} size="sm" variant="destructive" className="h-8 text-xs gap-1 shadow-sm">
-                  <Trash2 className="h-3 w-3" /> Delete ({dbSelectedIds.size})
-                </Button>
-              )}
-              {priv.canExport && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm" className="h-8 text-xs gap-1 bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm">
-                      <Download className="h-3 w-3" /> Export Excel
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleExportExcel('bare')} className="cursor-pointer">
-                      <div className="flex flex-col">
-                        <span className="font-medium">Bare Minimum</span>
-                        <span className="text-[10px] text-slate-500">Essential fields for re-import</span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleExportExcel('detailed')} className="cursor-pointer">
-                      <div className="flex flex-col">
-                        <span className="font-medium">Detailed Version</span>
-                        <span className="text-[10px] text-slate-500">Full database records with estimates</span>
-                      </div>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
           </div>
 
           <div className="rounded-lg border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
@@ -1159,9 +1202,46 @@ export function Attendance() {
                         }}
                       />
                     </th>
-                    {['Date', 'Staff', 'Position', 'Day Client', 'Day Site', 'Night Client', 'Night Site', 'Day', 'Night', 'Absent', 'Night_wk', 'OT', 'OT Site', 'Day_Wk', 'DOW', 'NDW', 'Mth', 'Present', 'day2'].map(h => (
-                      <th key={h} className="text-left font-semibold text-slate-600 py-2 px-2 border-b border-slate-200">{h}</th>
-                    ))}
+                    {[
+                      { label: 'Date', key: 'date' as keyof AttendanceRecord },
+                      { label: 'Staff', key: 'staffName' as keyof AttendanceRecord },
+                      { label: 'Position', key: 'position' as keyof AttendanceRecord },
+                      { label: 'Day Client', key: 'dayClient' as keyof AttendanceRecord },
+                      { label: 'Day Site', key: 'daySite' as keyof AttendanceRecord },
+                      { label: 'Night Client', key: 'nightClient' as keyof AttendanceRecord },
+                      { label: 'Night Site', key: 'nightSite' as keyof AttendanceRecord },
+                      { label: 'Day', key: 'day' as keyof AttendanceRecord },
+                      { label: 'Night', key: 'night' as keyof AttendanceRecord },
+                      { label: 'Absent', key: 'absentStatus' as keyof AttendanceRecord },
+                      { label: 'Night_wk', key: 'nightWk' as keyof AttendanceRecord },
+                      { label: 'OT', key: 'ot' as keyof AttendanceRecord },
+                      { label: 'OT Site', key: 'otSite' as keyof AttendanceRecord },
+                      { label: 'Day_Wk', key: 'dayWk' as keyof AttendanceRecord },
+                      { label: 'DOW', key: 'dow' as keyof AttendanceRecord },
+                      { label: 'NDW', key: 'ndw' as keyof AttendanceRecord },
+                      { label: 'Mth', key: 'mth' as keyof AttendanceRecord },
+                      { label: 'Present', key: 'isPresent' as keyof AttendanceRecord },
+                      { label: 'day2', key: 'day2' as keyof AttendanceRecord },
+                    ].map(h => {
+                      const sortItem = sortConfig.find(s => s.key === h.key);
+                      return (
+                        <th 
+                          key={h.key} 
+                          className="text-left font-semibold text-slate-600 py-2 px-2 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition-colors group"
+                          onClick={(e) => handleSort(h.key, e)}
+                          title="Click to sort, Shift+Click to sort by multiple columns"
+                        >
+                          <div className="flex items-center gap-1">
+                            {h.label}
+                            {sortItem ? (
+                              sortItem.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-indigo-500" /> : <ArrowDown className="w-3 h-3 text-indigo-500" />
+                            ) : (
+                              <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">

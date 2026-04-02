@@ -26,7 +26,7 @@ import {
 } from '@/src/components/ui/dropdown-menu';
 
 export function SalaryLoans() {
-  const priv = usePriv('payroll');
+  const priv = usePriv('salaryLoans');
   const { user: currentUser } = useAuth();
   const { users, createMainTask, addSubtask } = useAppData();
 
@@ -450,140 +450,142 @@ export function SalaryLoans() {
 
   if (viewMode) {
     return (
-      <div className="flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Salary Advances Table */}
-          <Card className="shadow-md border-0 ring-1 ring-slate-100 rounded-2xl overflow-hidden">
-            <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-5">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Banknote className="h-5 w-5 text-indigo-500" /> Salary Advances
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader className="bg-slate-50">
-                  <TableRow>
-                    <TableHead className="px-4 h-12 text-xs uppercase tracking-wider">Employee</TableHead>
-                    <TableHead className="h-12 text-xs uppercase tracking-wider">Amount</TableHead>
-                    <TableHead className="h-12 text-xs uppercase tracking-wider">Date</TableHead>
-                    <TableHead className="h-12 text-xs uppercase tracking-wider">Approver</TableHead>
-                    <TableHead className="h-12 text-xs uppercase tracking-wider">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {salaryAdvances.map(sa => (
-                    <TableRow key={sa.id} className="hover:bg-slate-50/50">
-                      <TableCell className="font-medium px-4 text-slate-900">{sa.employeeName}</TableCell>
-                      <TableCell className="font-mono font-medium text-slate-700">
-                        ₦{(priv as any)?.canViewAmounts === false ? '***' : sa.amount.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-slate-500 text-sm">{formatDisplayDate(sa.requestDate)}</TableCell>
-                      <TableCell>
-                        {sa.approvedByName ? (
-                          <div className="flex items-center gap-1 text-xs text-slate-600">
-                            {sa.status === 'Approved'
-                              ? <ShieldCheck className="h-3 w-3 text-emerald-500" />
-                              : <Clock className="h-3 w-3 text-amber-500" />}
-                            {sa.approvedByName}
-                          </div>
-                        ) : <span className="text-slate-300 text-xs">—</span>}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(sa.status)}</TableCell>
-                    </TableRow>
-                  ))}
-                  {salaryAdvances.length === 0 && (
+      <>
+        <div className="flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Salary Advances Table */}
+            <Card className="shadow-md border-0 ring-1 ring-slate-100 rounded-2xl overflow-hidden">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-5">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Banknote className="h-5 w-5 text-indigo-500" /> Salary Advances
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader className="bg-slate-50">
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-12 text-slate-400">No salary advances recorded.</TableCell>
+                      <TableHead className="px-4 h-12 text-xs uppercase tracking-wider">Employee</TableHead>
+                      <TableHead className="h-12 text-xs uppercase tracking-wider">Amount</TableHead>
+                      <TableHead className="h-12 text-xs uppercase tracking-wider">Date</TableHead>
+                      <TableHead className="h-12 text-xs uppercase tracking-wider">Approver</TableHead>
+                      <TableHead className="h-12 text-xs uppercase tracking-wider">Status</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {salaryAdvances.map(sa => (
+                      <TableRow key={sa.id} className="hover:bg-slate-50/50">
+                        <TableCell className="font-medium px-4 text-slate-900">{sa.employeeName}</TableCell>
+                        <TableCell className="font-mono font-medium text-slate-700">
+                          ₦{(priv as any)?.canViewAmounts === false ? '***' : sa.amount.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-slate-500 text-sm">{formatDisplayDate(sa.requestDate)}</TableCell>
+                        <TableCell>
+                          {sa.approvedByName ? (
+                            <div className="flex items-center gap-1 text-xs text-slate-600">
+                              {sa.status === 'Approved'
+                                ? <ShieldCheck className="h-3 w-3 text-emerald-500" />
+                                : <Clock className="h-3 w-3 text-amber-500" />}
+                              {sa.approvedByName}
+                            </div>
+                          ) : <span className="text-slate-300 text-xs">—</span>}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(sa.status)}</TableCell>
+                      </TableRow>
+                    ))}
+                    {salaryAdvances.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-12 text-slate-400">No salary advances recorded.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
 
-          {/* Loans Table */}
-          <Card className="shadow-md border-0 ring-1 ring-slate-100 rounded-2xl overflow-hidden">
-            <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-5">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Landmark className="h-5 w-5 text-emerald-500" /> Active Loans
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader className="bg-slate-50">
-                  <TableRow>
-                    <TableHead className="px-4 h-12 text-xs uppercase tracking-wider">Employee</TableHead>
-                    <TableHead className="h-12 text-xs uppercase tracking-wider">Amount</TableHead>
-                    <TableHead className="h-12 text-xs uppercase tracking-wider">Pay Start</TableHead>
-                    <TableHead className="h-12 text-xs uppercase tracking-wider">Approver</TableHead>
-                    <TableHead className="h-12 text-xs uppercase tracking-wider">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loans.map(ln => (
-                    <TableRow key={ln.id} className="hover:bg-slate-50/50">
-                      <TableCell className="font-medium px-4">
-                        <div className="flex flex-col">
-                          <span className="text-slate-900">{ln.employeeName}</span>
-                          <span className="text-[10px] uppercase tracking-wider text-slate-400 mt-0.5 font-semibold">{ln.loanType}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono font-medium text-slate-700">
-                        ₦{(priv as any)?.canViewAmounts === false ? '***' : ln.principalAmount.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-slate-500 text-sm">{formatDisplayDate(ln.paymentStartDate)}</TableCell>
-                      <TableCell>
-                        {ln.approvedByName ? (
-                          <div className="flex items-center gap-1 text-xs text-slate-600">
-                            {ln.status === 'Approved' || ln.status === 'Active'
-                              ? <ShieldCheck className="h-3 w-3 text-emerald-500" />
-                              : <Clock className="h-3 w-3 text-amber-500" />}
-                            {ln.approvedByName}
-                          </div>
-                        ) : <span className="text-slate-300 text-xs">—</span>}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(ln.status)}</TableCell>
-                    </TableRow>
-                  ))}
-                  {loans.length === 0 && (
+            {/* Loans Table */}
+            <Card className="shadow-md border-0 ring-1 ring-slate-100 rounded-2xl overflow-hidden">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-5">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Landmark className="h-5 w-5 text-emerald-500" /> Active Loans
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader className="bg-slate-50">
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-12 text-slate-400">No loans recorded.</TableCell>
+                      <TableHead className="px-4 h-12 text-xs uppercase tracking-wider">Employee</TableHead>
+                      <TableHead className="h-12 text-xs uppercase tracking-wider">Amount</TableHead>
+                      <TableHead className="h-12 text-xs uppercase tracking-wider">Pay Start</TableHead>
+                      <TableHead className="h-12 text-xs uppercase tracking-wider">Approver</TableHead>
+                      <TableHead className="h-12 text-xs uppercase tracking-wider">Status</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Import Modal Options */}
-      {importFile && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
-          <div className="relative bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-slate-200">
-            <h3 className="text-xl font-bold text-slate-900 mb-2 font-display">Import Policy</h3>
-            <p className="text-sm text-slate-500 leading-relaxed mb-6">
-              How would you like to process the record entries from this CSV file?
-            </p>
-            <div className="flex flex-col gap-3">
-              <Button onClick={() => processImport(importFile, 'update')} className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3.5 flex-col items-center justify-center">
-                <span className="font-bold block text-base leading-none">Update & Add</span>
-                <span className="block text-[10px] opacity-70 mt-1.5 font-normal text-center">Matches IDs and adds new ones. Recommended.</span>
-              </Button>
-              <Button onClick={() => processImport(importFile, 'append')} variant="outline" className="border-slate-200 h-auto py-3.5 text-slate-700 hover:bg-slate-50 flex-col items-center justify-center">
-                <span className="font-bold block text-base leading-none">Append Only</span>
-                <span className="block text-[10px] text-slate-400 mt-1.5 font-normal text-center">Creates brand new records for every row.</span>
-              </Button>
-              <Button onClick={() => setImportFile(null)} variant="ghost" className="text-slate-400 hover:text-slate-600 mt-2 text-xs">
-                Cancel
-              </Button>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {loans.map(ln => (
+                      <TableRow key={ln.id} className="hover:bg-slate-50/50">
+                        <TableCell className="font-medium px-4">
+                          <div className="flex flex-col">
+                            <span className="text-slate-900">{ln.employeeName}</span>
+                            <span className="text-[10px] uppercase tracking-wider text-slate-400 mt-0.5 font-semibold">{ln.loanType}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono font-medium text-slate-700">
+                          ₦{(priv as any)?.canViewAmounts === false ? '***' : ln.principalAmount.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-slate-500 text-sm">{formatDisplayDate(ln.paymentStartDate)}</TableCell>
+                        <TableCell>
+                          {ln.approvedByName ? (
+                            <div className="flex items-center gap-1 text-xs text-slate-600">
+                              {ln.status === 'Approved' || ln.status === 'Active'
+                                ? <ShieldCheck className="h-3 w-3 text-emerald-500" />
+                                : <Clock className="h-3 w-3 text-amber-500" />}
+                              {ln.approvedByName}
+                            </div>
+                          ) : <span className="text-slate-300 text-xs">—</span>}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(ln.status)}</TableCell>
+                      </TableRow>
+                    ))}
+                    {loans.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-12 text-slate-400">No loans recorded.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </div>
         </div>
-      )}
-    </div>
+
+        {/* Import Modal Options */}
+        {importFile && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
+            <div className="relative bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-slate-200">
+              <h3 className="text-xl font-bold text-slate-900 mb-2 font-display">Import Policy</h3>
+              <p className="text-sm text-slate-500 leading-relaxed mb-6">
+                How would you like to process the record entries from this CSV file?
+              </p>
+              <div className="flex flex-col gap-3">
+                <Button onClick={() => processImport(importFile, 'update')} className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3.5 flex-col items-center justify-center">
+                  <span className="font-bold block text-base leading-none">Update & Add</span>
+                  <span className="block text-[10px] opacity-70 mt-1.5 font-normal text-center">Matches IDs and adds new ones. Recommended.</span>
+                </Button>
+                <Button onClick={() => processImport(importFile, 'append')} variant="outline" className="border-slate-200 h-auto py-3.5 text-slate-700 hover:bg-slate-50 flex-col items-center justify-center">
+                  <span className="font-bold block text-base leading-none">Append Only</span>
+                  <span className="block text-[10px] text-slate-400 mt-1.5 font-normal text-center">Creates brand new records for every row.</span>
+                </Button>
+                <Button onClick={() => setImportFile(null)} variant="ghost" className="text-slate-400 hover:text-slate-600 mt-2 text-xs">
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="flex items-center justify-center min-h-[80vh] p-4 lg:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
