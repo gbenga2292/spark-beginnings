@@ -189,7 +189,25 @@ export function Payroll() {
 
       return employees
         .filter(e => {
-          if (e.status !== 'Active') return false;
+          // Date-based eligibility
+          const startOfViewingMonth = new Date(year, selectedMonthIndex - 1, 1);
+          const endOfViewingMonth = new Date(year, selectedMonthIndex, 0);
+          
+          if (e.startDate) {
+            const empStart = new Date(e.startDate);
+            if (empStart > endOfViewingMonth) return false;
+          }
+          if (e.endDate) {
+            const empEnd = new Date(e.endDate);
+            if (empEnd < startOfViewingMonth) return false;
+          }
+
+          // If current status is not Active, only show if they were active in the viewed month
+          if (e.status !== 'Active') {
+             // For payroll history, we might want to see someone who was active but is now Terminated.
+             // If endDate is empty, they should be Active.
+             if (!e.endDate) return false;
+          }
 
           // Frequency logic for Non-Employees (NON-EMPLOYEE)
           if (e.staffType === 'NON-EMPLOYEE') {

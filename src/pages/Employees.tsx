@@ -1781,62 +1781,64 @@ export function Employees() {
 
   // Set page title and header buttons
   useSetPageTitle(
-    'Personnel Directory',
-    'Manage office & field staff, hierarchy, and payroll',
-    <div className="hidden sm:flex items-center gap-2">
-      {selectedIds.length > 0 && (
-        <Button 
-          variant="outline" 
-          size="sm"
-          className="gap-2 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 h-9"
-          onClick={() => {
-            setBulkFormData({});
-            setIsBulkEditing(true);
-          }}
-        >
-          <Settings2 className="h-4 w-4" /> Bulk Edit ({selectedIds.length})
+    isAdding ? 'Add New Employee' : isEditing ? 'Edit Employee Record' : viewingEmployee ? 'Employee Details' : 'Personnel Directory',
+    isAdding || isEditing || viewingEmployee ? 'Configure profile details, compensation, and system access.' : 'Manage office & field staff, hierarchy, and payroll',
+    (isAdding || isEditing || viewingEmployee) ? null : (
+      <div className="hidden sm:flex items-center gap-2">
+        {selectedIds.length > 0 && (
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="gap-2 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 h-9"
+            onClick={() => {
+              setBulkFormData({});
+              setIsBulkEditing(true);
+            }}
+          >
+            <Settings2 className="h-4 w-4" /> Bulk Edit ({selectedIds.length})
+          </Button>
+        )}
+        {priv.canExport && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm">
+                <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleExportCSV('bare')} className="cursor-pointer">
+                <div className="flex flex-col">
+                  <span className="font-medium">Basic CSV</span>
+                  <span className="text-[10px] text-slate-500">Essential fields only</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportCSV('detailed')} className="cursor-pointer">
+                <div className="flex flex-col">
+                  <span className="font-medium">Detailed CSV</span>
+                  <span className="text-[10px] text-slate-500">Full employee data including salaries</span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {priv.canAdd && (
+          <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
+            <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
+            <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
+          </label>
+        )}
+        <Button variant="outline" size="sm" className="gap-2 h-9" onClick={() => navigate('/organogram')}>
+          <Network className="h-4 w-4" /> Organogram
         </Button>
-      )}
-      {priv.canExport && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm">
-              <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => handleExportCSV('bare')} className="cursor-pointer">
-              <div className="flex flex-col">
-                <span className="font-medium">Basic CSV</span>
-                <span className="text-[10px] text-slate-500">Essential fields only</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExportCSV('detailed')} className="cursor-pointer">
-              <div className="flex flex-col">
-                <span className="font-medium">Detailed CSV</span>
-                <span className="text-[10px] text-slate-500">Full employee data including salaries</span>
-              </div>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-      {priv.canAdd && (
-        <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
-          <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
-          <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
-        </label>
-      )}
-      <Button variant="outline" size="sm" className="gap-2 h-9" onClick={() => navigate('/organogram')}>
-        <Network className="h-4 w-4" /> Organogram
-      </Button>
-      {priv.canAdd && (
-        <Button size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'OFFICE', level: 10, status: 'Active', payeTax: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
-          <Plus className="h-4 w-4" /> Add Employee
-        </Button>
-      )}
-    </div>
+        {priv.canAdd && (
+          <Button size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'OFFICE', level: 10, status: 'Active', payeTax: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
+            <Plus className="h-4 w-4" /> Add Employee
+          </Button>
+        )}
+      </div>
+    )
   );
 
   // If adding new employee
