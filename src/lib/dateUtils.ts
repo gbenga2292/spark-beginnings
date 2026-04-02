@@ -19,16 +19,32 @@ export function normalizeDate(dateStr: any): string {
     return `${y}-${m}-${d}`;
   }
 
-  // ── Excel serial number (cellDates: false, raw number) ───────────
+  // ── JS number (Excel serial or JS Timestamp) ───────────────────
   if (typeof dateStr === 'number') {
     if (dateStr <= 1) return ''; // 0 = empty, 1 = Jan 1 1900 (Excel bug)
-    // Excel epoch is Dec 30, 1899; convert serial → UTC date
-    const excelEpoch = Date.UTC(1899, 11, 30);
-    const msDate = new Date(excelEpoch + dateStr * 86_400_000);
+
+    let msDate: Date;
+    // Excel serial numbers for reasonable dates (1950-2100) are ~18,000 to ~73,000.
+    // JS timestamps for those dates are > 1,000,000,000 (ms) or > 1,000,000 (s).
+    if (dateStr > 200000) {
+      // Treat as JS timestamp (ms or s)
+      // If it's small-ish (e.g. < 1e11), it might be seconds. 
+      // If it's large (e.g. > 1e11), it's definitely milliseconds.
+      msDate = new Date(dateStr > 10000000000 ? dateStr : dateStr * 1000);
+    } else {
+      // Treat as Excel serial number (days since 1899-12-30)
+      const excelEpoch = Date.UTC(1899, 11, 30);
+      msDate = new Date(excelEpoch + dateStr * 86_400_000);
+    }
+
+    if (isNaN(msDate.getTime())) return '';
+
     const y = msDate.getUTCFullYear();
     const m = String(msDate.getUTCMonth() + 1).padStart(2, '0');
     const d = String(msDate.getUTCDate()).padStart(2, '0');
-    if (y < 1950 || y > 2100) return '';
+    
+    // Safety check for reasonable date range
+    if (y < 1900 || y > 2200) return '';
     return `${y}-${m}-${d}`;
   }
 
