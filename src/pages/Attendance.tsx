@@ -30,15 +30,7 @@ import {
   PopoverTrigger,
 } from "@/src/components/task_ui/popover";
 import { DayPicker } from "react-day-picker";
-import { 
-  startOfMonth, 
-  endOfMonth, 
-  eachDayOfInterval, 
-  isSameDay, 
-  parseISO,
-  isSunday,
-  startOfDay
-} from 'date-fns';
+import { parseISO, isSunday } from 'date-fns';
 
 
 export function Attendance() {
@@ -163,6 +155,44 @@ export function Attendance() {
     "On Leave"
   ];
 
+  const activeSitesForDate = useMemo(() => {
+    return sites.filter(s => {
+      // Exclude if it hasn't started yet
+      if (s.startDate && s.startDate > registerDate) return false;
+      // Exclude if it has already ended before this date
+      if (s.endDate && s.endDate < registerDate) return false;
+      // Exclude unconditionally inactive sites without bounds
+      if (!s.startDate && !s.endDate && s.status !== 'Active') return false; 
+      
+      return true;
+    });
+  }, [sites, registerDate]);
+
+  const renderSiteOptions = (prefix: string, currentVal: string) => {
+    const opts = activeSitesForDate.map(site => (
+      <option key={`${prefix}-${site.id}`} value={site.name}>{site.name} ({site.client})</option>
+    ));
+    
+    // Prevent data loss natively by maintaining the previously selected site as visual history
+    if (currentVal && !statuses.includes(currentVal) && !activeSitesForDate.find(s => s.name === currentVal)) {
+      const histSite = sites.find(s => s.name === currentVal);
+      if (histSite) {
+        opts.push(
+          <option key={`${prefix}-hist-${histSite.id}`} value={histSite.name}>
+            {histSite.name} ({histSite.client}) (Historical)
+          </option>
+        );
+      } else {
+        opts.push(
+          <option key={`${prefix}-hist-del`} value={currentVal}>
+            {currentVal} (Deleted)
+          </option>
+        );
+      }
+    }
+    return opts;
+  };
+
   // Auto-load existing records when date changes
   useEffect(() => {
     const existingRecords = attendanceRecords.filter(r => r.date === registerDate);
@@ -262,7 +292,7 @@ export function Attendance() {
     const exportData = filteredDbRecords.map(r => {
       if (mode === 'bare') {
         return {
-          Date: formatDisplayDate(r.date),
+          Date: r.date ? new Date(r.date) : '',
           'Staff ID': r.staffId,
           'Staff Name': r.staffName,
           'Day Site': r.daySite,
@@ -272,7 +302,7 @@ export function Attendance() {
         };
       }
       return {
-        Date: formatDisplayDate(r.date),
+        Date: r.date ? new Date(r.date) : '',
         'Staff ID': r.staffId,
         'Staff Name': r.staffName,
         Position: r.position,
@@ -296,7 +326,7 @@ export function Attendance() {
       };
     });
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
+    const ws = XLSX.utils.json_to_sheet(exportData, { cellDates: true });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Attendance");
 
@@ -339,7 +369,7 @@ export function Attendance() {
     reader.onload = (evt) => {
       try {
         const bstr = evt.target?.result as string;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wb = XLSX.read(bstr, { type: 'binary', raw: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rawData = XLSX.utils.sheet_to_json<any>(ws);
 
@@ -962,56 +992,16 @@ export function Attendance() {
             {/* Date controls */}
             <div className="flex flex-col gap-1.5 flex-1 max-w-[200px]">
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Date</span>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={`h-9 justify-start text-left font-medium border-slate-200 shadow-sm transition-all hover:bg-slate-50 ${
-                      !registerDate ? "text-muted-foreground" : "text-slate-900"
-                    }`}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4 text-indigo-500" />
-                    {registerDate ? formatDisplayDate(registerDate) : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0 border-slate-200 shadow-2xl rounded-xl overflow-hidden" align="start">
-                  <div className="p-3 bg-white">
-                    <DayPicker
-                      mode="single"
-                      selected={registerDate ? parseISO(registerDate) : undefined}
-                      onSelect={(date) => date && setRegisterDate(format(date, 'yyyy-MM-dd'))}
-                      modifiers={{
-                        fully: (date) => attendanceStatusMap[format(date, 'yyyy-MM-dd')] === 'fully',
-                        special: (date) => attendanceStatusMap[format(date, 'yyyy-MM-dd')] === 'special',
-                        partial: (date) => attendanceStatusMap[format(date, 'yyyy-MM-dd')] === 'partial',
-                      }}
-                      modifiersClassNames={{
-                        fully: "!bg-emerald-500 !text-white hover:!bg-emerald-600 rounded-full",
-                        special: "!bg-purple-500 !text-white hover:!bg-purple-600 rounded-full",
-                        partial: "!bg-amber-400 !text-white hover:!bg-amber-500 rounded-full",
-                      }}
-                      captionLayout="dropdown"
-                      disabled={{ after: new Date() }}
-                      footer={
-                        <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-y-2 gap-x-4">
-                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500" /> Fully Filled
-                          </div>
-                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                            <div className="w-2 h-2 rounded-full bg-purple-500" /> Hol/Sun
-                          </div>
-                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                            <div className="w-2 h-2 rounded-full bg-amber-400" /> Incomplete
-                          </div>
-                        </div>
-                      }
-                    />
-                  </div>
-                  <div className="p-2 border-t border-slate-100 flex justify-between bg-slate-50">
-                    <Button variant="ghost" size="sm" className="text-[10px] h-7 px-2" onClick={() => setRegisterDate(format(new Date(), 'yyyy-MM-dd'))}>Today</Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
+              <div className="relative">
+                <Input
+                  type="date"
+                  value={registerDate}
+                  max={format(new Date(), 'yyyy-MM-dd')}
+                  onChange={(e) => setRegisterDate(e.target.value)}
+                  className="h-8 pl-8 text-xs bg-white shadow-sm border-slate-200"
+                />
+                <CalendarIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+              </div>
             </div>
 
             {/* Staff Type filter */}
@@ -1130,9 +1120,7 @@ export function Attendance() {
                             >
                               <option value="">&mdash; Select &mdash;</option>
                               <optgroup label="Sites">
-                                {sites.filter(s => s.status === 'Active').map(site => (
-                                  <option key={`d-${site.id}`} value={site.name}>{site.name} ({site.client})</option>
-                                ))}
+                                {renderSiteOptions('d', dayVal)}
                               </optgroup>
                               <optgroup label="Status">
                                 {statuses.map(status => (
@@ -1155,9 +1143,7 @@ export function Attendance() {
                               >
                                 <option value="">&mdash; Select &mdash;</option>
                                 <optgroup label="Sites">
-                                  {sites.filter(s => s.status === 'Active').map(site => (
-                                    <option key={`n-${site.id}`} value={site.name}>{site.name} ({site.client})</option>
-                                  ))}
+                                  {renderSiteOptions('n', nightVal)}
                                 </optgroup>
                                 <optgroup label="Status">
                                   {statuses.map(status => (

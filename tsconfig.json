@@ -23,5 +23,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "exclude": ["supabase/functions", "temp_genesis"]
+  "include": ["src", "electron"],
+  "exclude": ["node_modules", "dist", "supabase/functions", "temp_genesis", "temp-genesis-glow", ".temp_fresh_start", "metadata.json"]
 }

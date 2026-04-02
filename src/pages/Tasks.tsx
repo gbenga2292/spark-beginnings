@@ -1901,6 +1901,17 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
                 <>
                   <div className="fixed inset-0 z-[100]" onClick={() => setOpenMainDropdown(false)} />
                   <div className="absolute top-full left-0 mt-2 w-full max-h-[220px] overflow-y-auto bg-card border border-border rounded-xl shadow-xl z-[101] py-1 hide-scrollbar">
+                    <label className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted transition-colors w-full border-b border-border">
+                      <input type="checkbox"
+                        checked={assignedTo.length === users.length && users.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) setAssignedTo(users.map(u => u.id));
+                          else setAssignedTo([]);
+                        }}
+                        className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/20"
+                      />
+                      <span className="text-sm font-semibold text-foreground truncate">All staff</span>
+                    </label>
                     {users.map(u => (
                       <label key={u.id} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted transition-colors w-full">
                         <input type="checkbox"
@@ -1984,6 +1995,17 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
                               <>
                                 <div className="fixed inset-0 z-[100]" onClick={() => setOpenSubDropdown(null)} />
                                 <div className="absolute top-full left-0 mt-1 w-[200px] max-h-[200px] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[101] py-1 hide-scrollbar">
+                                  <label className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-muted transition-colors w-full border-b border-border">
+                                    <input type="checkbox"
+                                      checked={sub.assignedTo.length === users.length && users.length > 0}
+                                      onChange={(e) => {
+                                        if (e.target.checked) updateRow(i, "assignedTo", users.map(u => u.id));
+                                        else updateRow(i, "assignedTo", []);
+                                      }}
+                                      className="w-3 h-3 rounded border-border text-primary focus:ring-primary/20"
+                                    />
+                                    <span className="text-xs font-semibold text-foreground truncate">All staff</span>
+                                  </label>
                                   {users.map(u => (
                                     <label key={u.id} className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-muted transition-colors w-full">
                                       <input type="checkbox"
@@ -2345,6 +2367,20 @@ function EditTaskDialog({ task, users, onClose, onSave }: {
                   <>
                     <div className="fixed inset-0 z-[100]" onClick={() => setOpenDropdown(false)} />
                     <div className="absolute top-full left-0 mt-2 w-full max-h-[220px] overflow-y-auto bg-card border border-border rounded-xl shadow-xl z-[101] py-1 hide-scrollbar">
+                      <label className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted transition-colors w-full border-b border-border">
+                        <input type="checkbox"
+                          checked={assignedTo.length === users.length && users.length > 0}
+                          onChange={(e) => {
+                            if (e.target.checked) setAssignedTo(users.map(u => u.id));
+                            else setAssignedTo([]);
+                          }}
+                          className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/20"
+                        />
+                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                          <Users className="w-3 h-3" />
+                        </div>
+                        <span className="text-xs font-semibold text-foreground truncate">All staff</span>
+                      </label>
                       {users.map(u => (
                         <label key={u.id} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted transition-colors w-full">
                           <input

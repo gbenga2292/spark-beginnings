@@ -26,6 +26,16 @@
 }
 
 /* ══════════════════════════════════════════════════════════════════════
+   ATTENDANCE CALENDAR — react-day-picker v9 modifier styles
+   ══════════════════════════════════════════════════════════════════════ */
+.rdp-day-fully button { background-color: #10b981 !important; color: #fff !important; border-radius: 9999px !important; font-weight: 600 !important; }
+.rdp-day-fully button:hover { background-color: #059669 !important; }
+.rdp-day-special button { background-color: #8b5cf6 !important; color: #fff !important; border-radius: 9999px !important; font-weight: 600 !important; }
+.rdp-day-special button:hover { background-color: #7c3aed !important; }
+.rdp-day-partial button { background-color: #f59e0b !important; color: #1c1917 !important; border-radius: 9999px !important; font-weight: 600 !important; }
+.rdp-day-partial button:hover { background-color: #d97706 !important; }
+
+/* ══════════════════════════════════════════════════════════════════════
    STATUS CHIP SYSTEM — Used across all task views
    ══════════════════════════════════════════════════════════════════════ */
 

@@ -439,10 +439,10 @@ export function Variables() {
           title: 'Export System Variables (Excel)',
           defaultPath: fileName,
           filters: [{ name: 'Excel Files', extensions: ['xlsx'] }]
-        }).then(filePath => {
+        }).then((filePath: string) => {
           if (filePath) {
             const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-            win.electronAPI.writeFile(filePath, buf, 'binary').then(success => {
+            win.electronAPI.writeFile(filePath, buf, 'binary').then((success: boolean) => {
               if (success) toast.success(`Exported to ${filePath}`);
               else toast.error('Failed to save file.');
             });

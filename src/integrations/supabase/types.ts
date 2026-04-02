@@ -2748,6 +2748,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_attendance_records_by_ids: {
+        Args: { record_ids: string[] }
+        Returns: undefined
+      }
       is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
