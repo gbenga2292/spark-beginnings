@@ -1475,5 +1475,17 @@ export const db = {
       })));
       if (error) console.error('setDepartmentTasksList:', error);
     }
+  },
+  async updateAttendanceRecord(id: string, a: Partial<AttendanceRecord>) {
+    const update: any = {};
+    if (a.position !== undefined) update.position = a.position;
+    if (a.dayClient !== undefined) update.day_client = a.dayClient;
+    if (a.daySite !== undefined) update.day_site = a.daySite;
+    if (a.nightClient !== undefined) update.night_client = a.nightClient;
+    if (a.nightSite !== undefined) update.night_site = a.nightSite;
+    if (a.day !== undefined) update.day = a.day;
+    if (a.night !== undefined) update.night = a.night;
+    const { error } = await supabase.from('attendance_records').update(update).eq('id', id);
+    if (error) console.error('updateAttendanceRecord:', error);
   }
 };

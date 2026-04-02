@@ -12,6 +12,7 @@ import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import logoSrc from '../../logo/logo-2.png';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
 
 interface PayrollRecord {
   id: string;
@@ -228,9 +229,15 @@ export function Payroll() {
           let totalOTInstances = 0;
 
           for (const r of attendanceRecords) {
-            const recordYear = r.date ? parseInt(r.date.split('-')[0], 10) : year;
-            if (r.staffId === emp.id && r.mth === selectedMonthIndex && recordYear === year) {
-              if (r.ot > 0) totalOTInstances += 1;
+            if (!r.date) continue;
+            const [yStr, mStr] = r.date.split('-');
+            const recordYear = parseInt(yStr, 10);
+            const recordMonth = parseInt(mStr, 10);
+            
+            if (r.staffId === emp.id && recordMonth === selectedMonthIndex && recordYear === year) {
+              const metrics = calculateAttendanceMetrics(r, holidayDates, payrollVariables, monthValues as any, attendanceRecords);
+              
+              if (metrics.ot > 0) totalOTInstances += 1;
 
               if (r.day?.toLowerCase() === 'yes') {
                 daysWorked += 1;
@@ -289,6 +296,7 @@ export function Payroll() {
           const pension = (emp.payeTax && emp.staffType !== 'NON-EMPLOYEE') ? pensionSum * (payrollVariables.employeePensionRate / 100) : 0;
 
           // Ã¢â€â‚¬Ã¢â€â‚¬ PAYE calculation matching Excel formula exactly: Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+          // Ã¢â€ â‚¬Ã¢â€ â‚¬ PAYE calculation matching Excel formula exactly: Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬
           // =IF(payeTax="Yes", NIGERIATAX(salary, SUM(Basic:Transport), overtime, rentRelief),
           //    IF(withholdingTax="Yes", salary * withholdingTaxRate, 0))
           let paye = 0;
@@ -309,18 +317,34 @@ export function Payroll() {
             // Case Else: AnnualTax = (AnnualTaxable - 49200000) * 0.25 + (330000 + 1620000 + 2730000 + 5750000)
 
             let annualTax = 0;
-            if (annualTaxable <= 0) {
-              annualTax = 0;
-            } else if (annualTaxable <= 2200000) {
-              annualTax = annualTaxable * 0.15;
-            } else if (annualTaxable <= 11200000) {
-              annualTax = (annualTaxable - 2200000) * 0.18 + 330000;
-            } else if (annualTaxable <= 24200000) {
-              annualTax = (annualTaxable - 11200000) * 0.21 + (330000 + 1620000);
-            } else if (annualTaxable <= 49200000) {
-              annualTax = (annualTaxable - 24200000) * 0.23 + (330000 + 1620000 + 2730000);
-            } else {
-              annualTax = (annualTaxable - 49200000) * 0.25 + (330000 + 1620000 + 2730000 + 5750000);
+            let remainingTaxable = annualTaxable;
+            let previousLimit = 0;
+
+            if (annualTaxable > 0) {
+              // Sort brackets by limit to ensure correct progressive application
+              const sortedBrackets = [...tv.taxBrackets].sort((a, b) => {
+                if (a.upTo === null) return 1;
+                if (b.upTo === null) return -1;
+                return a.upTo - b.upTo;
+              });
+
+              for (const bracket of sortedBrackets) {
+                if (remainingTaxable <= 0) break;
+
+                let taxableInBucket = 0;
+                if (bracket.upTo === null) {
+                  // Top bracket
+                  taxableInBucket = remainingTaxable;
+                } else {
+                  // Current bracket limit minus previous limit gives the chunk size for this rate
+                  const bracketSize = bracket.upTo - previousLimit;
+                  taxableInBucket = Math.min(remainingTaxable, bracketSize);
+                  previousLimit = bracket.upTo;
+                }
+
+                annualTax += taxableInBucket * bracket.rate;
+                remainingTaxable -= taxableInBucket;
+              }
             }
 
             paye = annualTax / 12;

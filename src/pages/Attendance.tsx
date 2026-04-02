@@ -31,6 +31,7 @@ import {
 } from "@/src/components/task_ui/popover";
 import { DayPicker } from "react-day-picker";
 import { parseISO, isSunday } from 'date-fns';
+import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
 
 
 export function Attendance() {
@@ -284,12 +285,8 @@ export function Attendance() {
   };
 
   const handleExportExcel = async (mode: 'bare' | 'detailed' = 'detailed') => {
-    if (filteredDbRecords.length === 0) {
-      toast.error('No records to export');
-      return;
-    }
-
-    const exportData = filteredDbRecords.map(r => {
+    const exportData = attendanceRecords.map(r => {
+      const met = calculateAttendanceMetrics(r, publicHolidays, payrollVariables, monthValues, attendanceRecords);
       if (mode === 'bare') {
         return {
           Date: r.date ? new Date(r.date) : '',
@@ -313,15 +310,15 @@ export function Attendance() {
         Day: r.day,
         Night: r.night,
         Absent: r.absentStatus,
-        'Night Wk': r.nightWk,
-        OT: r.ot,
-        'OT Site': r.otSite,
-        'Day Wk': r.dayWk,
-        DOW: r.dow,
-        NDW: r.ndw,
-        Month: r.mth,
-        Present: r.isPresent,
-        'Day 2': r.day2,
+        'Night Wk': met.nightWk,
+        OT: met.ot,
+        'OT Site': met.otSite ?? '',
+        'Day Wk': met.dayWk,
+        DOW: met.dow,
+        NDW: met.ndw,
+        Month: met.mth,
+        Present: met.isPresent,
+        'Day 2': met.day2,
         'Overtime Details': r.overtimeDetails
       };
     });
@@ -457,7 +454,8 @@ export function Attendance() {
                 nightWk: row['Night Wk'] || row.nightWk || 0, ot: row.OT || row.ot || 0,
                 otSite: row['OT Site'] || row.otSite || '', dayWk: row['Day Wk'] || row.dayWk || 0,
                 dow: row.DOW || row.dow || 0, ndw: row.NDW || row.ndw || 'No',
-                mth: row.Month || row.mth || 0, isPresent: row.Present || row.isPresent || 'No',
+                mth: row.Month || row.mth || parseInt(date.split('-')[1], 10),
+                isPresent: row.Present || row.isPresent || 'No',
                 day2: row['Day 2'] || row.day2 || 0, overtimeDetails: row['Overtime Details'] || row.overtimeDetails || '',
               });
             }
@@ -492,9 +490,24 @@ export function Attendance() {
           setNameSearchTerms({});
         } else {
           // All resolved — save directly
-          const allRecords = needsEstimation
-            ? matchedRecords // already built bare records
-            : matchedRecords;
+          let allRecords: AttendanceRecord[] = [];
+          
+          if (needsEstimation) {
+             // Group matchedRecords by date to run estimation per-day
+             const byDate: Record<string, AttendanceRecord[]> = {};
+             matchedRecords.forEach(r => {
+               if (!byDate[r.date]) byDate[r.date] = [];
+               byDate[r.date].push(r);
+             });
+             
+             Object.keys(byDate).forEach(d => {
+               const estimated = runEstimationForBatch(byDate[d], d);
+               allRecords.push(...estimated);
+             });
+          } else {
+             allRecords = matchedRecords;
+          }
+
           if (allRecords.length > 0) {
             if (mode === 'overwrite') {
               const dates = Array.from(new Set(allRecords.map(r => r.date)));
@@ -542,90 +555,44 @@ export function Attendance() {
   };
 
   const runEstimationForBatch = (rows: any[], dateStr: string): AttendanceRecord[] => {
-    const dow = getDOW(dateStr);
-    const dateIsHoliday = isHoliday(dateStr);
-    const dateObj = new Date(dateStr);
-    const mth = dateObj.getMonth() + 1;
-
-    // We need next day data for NDW. In an import batch, we can only look at 
-    // what's already in the DB or in the batch itself.
-    const nextDayStr = getNextDayStr(dateStr);
-    const nextNextDayStr = getNextDayStr(dateStr, 2);
-    const existingNextDay = attendanceRecords.filter(r => r.date === nextDayStr);
-    const existingNextNextDay = attendanceRecords.filter(r => r.date === nextNextDayStr);
-
     return rows.map(row => {
-      const staffId = row['Staff ID'] || row.staffId;
-      const staffName = row['Staff Name'] || row.staffName;
+      const staffId = row['Staff ID'] || row.staffId || row.staff_id || '';
+      const staffName = row['Staff Name'] || row.staffName || row.staff_name || '';
       const emp = employees.find(e => e.id === staffId || (`${e.surname} ${e.firstname}`) === staffName);
 
-      const daySite = row['Day Site'] || row.daySite || '';
-      const nightSite = row['Night Site'] || row.nightSite || '';
-      const absentStatus = row['Absent Status'] || row.absentStatus || '';
-      const overtimeDetails = row['Overtime Details'] || row.overtimeDetails || '';
+      const ds = row['Day Site'] || row.daySite || row.day_site || '';
+      const ns = row['Night Site'] || row.nightSite || row.night_site || '';
+      const absentStatus = row['Absent Status'] || row.absentStatus || row.absent_status || '';
+      const overtimeDetails = row['Overtime Details'] || row.overtimeDetails || row.overtime_details || row.over_time_details || '';
 
-      const day = (daySite && !isAbsentStatus(daySite)) ? 'Yes' : 'No';
-      const night = (nightSite && !isAbsentStatus(nightSite)) ? 'Yes' : 'No';
+      const day = (ds && !isAbsentStatus(ds)) ? 'Yes' : 'No';
+      const night = (ns && !isAbsentStatus(ns)) ? 'Yes' : 'No';
 
-      const finalDaySite = isAbsentStatus(daySite) ? '' : daySite;
-      const finalNightSite = isAbsentStatus(nightSite) ? '' : nightSite;
+      const finalDaySite = isAbsentStatus(ds) ? '' : ds;
+      const finalNightSite = isAbsentStatus(ns) ? '' : ns;
 
       const dayClient = sites.find(s => s.name === finalDaySite)?.client || '';
       const nightClient = sites.find(s => s.name === finalNightSite)?.client || '';
 
-      const nightWk = night === 'Yes' ? 1 : 0;
+      const partialRec: Partial<AttendanceRecord> = {
+        date: dateStr,
+        staffId: staffId || emp?.id || '',
+        day,
+        night,
+        daySite: finalDaySite,
+        nightSite: finalNightSite,
+        dayClient,
+        nightClient,
+        overtimeDetails,
+      };
 
-      let ndw: 'Yes' | 'No' = 'No';
-      if (dow !== 7) {
-        const staffWorksNextDay = existingNextDay.some(
-          r => r.staffId === staffId && (r.day === 'Yes' || r.night === 'Yes')
-        );
-        const nextDayDow = getDOW(nextDayStr);
-        const nextDayIsHolidayOrSunday = nextDayDow === 7 || isHoliday(nextDayStr);
-        const staffWorksNextNextDay = existingNextNextDay.some(
-          r => r.staffId === staffId && (r.day === 'Yes' || r.night === 'Yes')
-        );
-
-        if (staffWorksNextDay || (nextDayIsHolidayOrSunday && staffWorksNextNextDay)) {
-          ndw = 'Yes';
-        }
-      }
-
-      const worked = day === 'Yes' || night === 'Yes';
-      let ot = 0;
-      if (
-        (dow === 7 && worked) ||
-        (dateIsHoliday && worked) ||
-        (day === 'Yes' && night === 'Yes' && ndw === 'Yes') ||
-        !!overtimeDetails
-      ) {
-        const keys = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-        ot = monthValues?.[keys[mth - 1]]?.overtimeRate ?? 0.5;
-      }
-
-      const otSite = ot > 0 ? (night === 'Yes' ? finalNightSite : finalDaySite) : '';
-
-      let dayWk = 0;
-      if (ot > 0) {
-        dayWk = 1;
-      } else if (day === 'No' && night === 'No') {
-        dayWk = 0;
-      } else if (day === 'No') {
-        dayWk = 1;
-      } else if (night === 'Yes') {
-        dayWk = 2;
-      } else {
-        dayWk = 1;
-      }
-
-      const isPresent = (day === 'Yes' || night === 'Yes' || ndw === 'Yes') ? 'Yes' : 'No';
-      const day2 = (day === 'Yes' ? 1 : 0) + (night === 'Yes' ? 1 : 0);
+      const met = calculateAttendanceMetrics(partialRec, publicHolidays, payrollVariables, monthValues as any, attendanceRecords);
 
       return {
         id: generateId(),
         date: dateStr,
-        staffId: staffId || '',
-        staffName: staffName || '',
+        staffId: partialRec.staffId || '',
+        staffName: staffName || (emp ? `${emp.surname} ${emp.firstname}` : ''),
         position: emp?.position || row.Position || row.position || '',
         dayClient,
         daySite: finalDaySite,
@@ -634,16 +601,16 @@ export function Attendance() {
         day,
         night,
         absentStatus,
-        nightWk,
-        ot,
-        otSite,
-        dayWk,
-        dow,
-        ndw,
-        mth,
-        isPresent,
-        day2,
         overtimeDetails,
+        nightWk: met.nightWk,
+        ot: met.ot,
+        otSite: met.otSite,
+        dayWk: met.dayWk,
+        dow: met.dow,
+        ndw: met.ndw,
+        mth: met.mth,
+        isPresent: met.isPresent,
+        day2: met.day2,
       };
     });
   };
@@ -811,73 +778,19 @@ export function Attendance() {
     const mth = dateObj.getMonth() + 1;
 
     const records: AttendanceRecord[] = rawRecords.map(raw => {
-      // Col 11: Night_wk = IF(Night="Yes",1,0)
-      const nightWk = raw.night === 'Yes' ? 1 : 0;
+      const partialRec: Partial<AttendanceRecord> = {
+        date: registerDate,
+        staffId: raw.empId,
+        day: raw.day,
+        night: raw.night,
+        daySite: raw.daySite,
+        nightSite: raw.nightSite,
+        dayClient: raw.dayClient,
+        nightClient: raw.nightClient,
+        overtimeDetails: raw.overtimeDetails,
+      };
 
-      // Col 15: DOW
-      // Already calculated above as `dow`
-
-      // Col 16: NDW - Next Day Work
-      // If Sunday, NDW is blank ("")
-      // Otherwise check if staff works next day, or if next day is Sunday/holiday, check day after
-      let ndw: 'Yes' | 'No' = 'No';
-      if (dow !== 7) {
-        const staffWorksNextDay = existingNextDay.some(
-          r => r.staffName === raw.staffName && (r.day === 'Yes' || r.night === 'Yes')
-        );
-        const nextDayDow = getDOW(nextDayStr);
-        const nextDayIsHolidayOrSunday = nextDayDow === 7 || isHoliday(nextDayStr);
-        const staffWorksNextNextDay = existingNextNextDay.some(
-          r => r.staffName === raw.staffName && (r.day === 'Yes' || r.night === 'Yes')
-        );
-
-        if (staffWorksNextDay || (nextDayIsHolidayOrSunday && staffWorksNextNextDay)) {
-          ndw = 'Yes';
-        }
-      }
-
-      // Col 12: OT (Overtime)
-      // Three conditions:
-      // 1. Sunday + worked → OT
-      // 2. Public holiday + worked → OT
-      // 3. Day=Yes AND Night=Yes AND NDW=Yes → OT
-      // 4. Non-operations manual overtime ticked
-      const worked = raw.day === 'Yes' || raw.night === 'Yes';
-      let ot = 0;
-      const isManualOvertime = !!raw.overtimeDetails;
-      if (
-        (dow === 7 && worked) ||
-        (dateIsHoliday && worked) ||
-        (raw.day === 'Yes' && raw.night === 'Yes' && ndw === 'Yes') ||
-        isManualOvertime
-      ) {
-        const keys = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-        ot = monthValues?.[keys[mth - 1]]?.overtimeRate ?? 0.5;
-      }
-
-      // Col 13: OT_SITE = IF(OT>0, IF(Night="Yes", NightSite, DaySite), "")
-      const otSite = ot > 0 ? (raw.night === 'Yes' ? raw.nightSite : raw.daySite) : '';
-
-      // Col 14: Day_Wk
-      // =IF(OT="Yes",1, IF(AND(Day="No",Night="No"),0, IF(Day="No",1, IF(Night="Yes",2,1))))
-      let dayWk = 0;
-      if (ot > 0) {
-        dayWk = 1;
-      } else if (raw.day === 'No' && raw.night === 'No') {
-        dayWk = 0;
-      } else if (raw.day === 'No') {
-        dayWk = 1; // Night only
-      } else if (raw.night === 'Yes') {
-        dayWk = 2; // Day + Night
-      } else {
-        dayWk = 1; // Day only
-      }
-
-      // Col 18: IS PRESENT = IF(OR(Day="Yes",Night="Yes",NDW="Yes"),1,0)
-      const isPresent = (raw.day === 'Yes' || raw.night === 'Yes' || ndw === 'Yes') ? 'Yes' : 'No';
-
-      // Col 19: day2 = IF(Day="Yes",1,0) + IF(Night="Yes",1,0)
-      const day2 = (raw.day === 'Yes' ? 1 : 0) + (raw.night === 'Yes' ? 1 : 0);
+      const met = calculateAttendanceMetrics(partialRec, publicHolidays, payrollVariables, monthValues as any, attendanceRecords);
 
       return {
         id: generateId(),
@@ -892,16 +805,17 @@ export function Attendance() {
         day: raw.day,
         night: raw.night,
         absentStatus: raw.absentStatus,
-        nightWk,
-        ot,
-        otSite,
-        dayWk,
-        dow,
-        ndw,
-        mth,
-        isPresent,
-        day2,
         overtimeDetails: raw.overtimeDetails,
+        // The following are now transients/redundant but kept for DB compatibility if needed
+        nightWk: met.nightWk,
+        ot: met.ot,
+        otSite: met.otSite,
+        dayWk: met.dayWk,
+        dow: met.dow,
+        ndw: met.ndw,
+        mth: met.mth,
+        isPresent: met.isPresent,
+        day2: met.day2,
       };
     });
 
@@ -991,7 +905,15 @@ export function Attendance() {
           <div className="flex flex-wrap items-center gap-2 py-1 px-0">
             {/* Date controls */}
             <div className="flex flex-col gap-1.5 flex-1 max-w-[200px]">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Date</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Date</span>
+                {isHoliday(registerDate) && (
+                   <span className="bg-red-50 text-red-600 text-[10px] font-bold px-1.5 py-0.5 rounded border border-red-100 flex items-center gap-1 animate-pulse">
+                     <span className="w-1 h-1 bg-red-400 rounded-full" />
+                     PUBLIC HOLIDAY
+                   </span>
+                )}
+              </div>
               <div className="relative">
                 <Input
                   type="date"
@@ -1317,44 +1239,47 @@ export function Attendance() {
                       </td>
                     </tr>
                   ) : (
-                    filteredDbRecords.map((r) => (
-                      <tr key={r.id} className="hover:bg-slate-50">
-                        <td className="py-1.5 px-2">
-                          <input
-                            type="checkbox"
-                            className="rounded border-slate-300 w-3 h-3 text-slate-800"
-                            checked={dbSelectedIds.has(r.id)}
-                            onChange={(e) => {
-                              const s = new Set(dbSelectedIds);
-                              if (e.target.checked) s.add(r.id);
-                              else s.delete(r.id);
-                              setDbSelectedIds(s);
-                            }}
-                          />
-                        </td>
-                        <td className="py-1.5 px-2 font-mono whitespace-nowrap">{formatDisplayDate(r.date)}</td>
-                        <td className="py-1.5 px-2 font-medium text-slate-800">{r.staffName}</td>
-                        <td className="py-1.5 px-2 text-slate-500">{r.position}</td>
-                        <td className="py-1.5 px-2">{r.dayClient}</td>
-                        <td className="py-1.5 px-2">{r.daySite}</td>
-                        <td className="py-1.5 px-2">{r.nightClient}</td>
-                        <td className="py-1.5 px-2">{r.nightSite}</td>
-                        <td className="py-1.5 px-2">{r.day}</td>
-                        <td className="py-1.5 px-2">{r.night}</td>
-                        <td className="py-1.5 px-2 text-red-500">{r.absentStatus}</td>
-                        <td className="py-1.5 px-2 text-center">{r.nightWk}</td>
-                        <td className="py-1.5 px-2 text-center font-bold text-indigo-600">{r.ot}</td>
-                        <td className="py-1.5 px-2">{r.otSite}</td>
-                        <td className="py-1.5 px-2 text-center">{r.dayWk}</td>
-                        <td className="py-1.5 px-2 text-center">{r.dow}</td>
-                        <td className="py-1.5 px-2 text-center">{r.ndw}</td>
-                        <td className="py-1.5 px-2 text-center">{r.mth}</td>
-                        <td className={`py-1.5 px-2 text-center font-bold ${r.isPresent === 'Yes' ? 'text-emerald-600' : 'text-slate-300'}`}>
-                          {r.isPresent === 'Yes' ? '✓' : '—'}
-                        </td>
-                        <td className="py-1.5 px-2 text-center">{r.day2}</td>
-                      </tr>
-                    ))
+                    filteredDbRecords.map((r) => {
+                      const met = calculateAttendanceMetrics(r, publicHolidays, payrollVariables, monthValues, attendanceRecords);
+                      return (
+                        <tr key={r.id} className="hover:bg-slate-50">
+                          <td className="py-1.5 px-2">
+                            <input
+                              type="checkbox"
+                              className="rounded border-slate-300 w-3 h-3 text-slate-800"
+                              checked={dbSelectedIds.has(r.id)}
+                              onChange={(e) => {
+                                const s = new Set(dbSelectedIds);
+                                if (e.target.checked) s.add(r.id);
+                                else s.delete(r.id);
+                                setDbSelectedIds(s);
+                              }}
+                            />
+                          </td>
+                          <td className="py-1.5 px-2 font-mono whitespace-nowrap">{formatDisplayDate(r.date)}</td>
+                          <td className="py-1.5 px-2 font-medium text-slate-800">{r.staffName}</td>
+                          <td className="py-1.5 px-2 text-slate-500">{r.position}</td>
+                          <td className="py-1.5 px-2">{r.dayClient}</td>
+                          <td className="py-1.5 px-2">{r.daySite}</td>
+                          <td className="py-1.5 px-2">{r.nightClient}</td>
+                          <td className="py-1.5 px-2">{r.nightSite}</td>
+                          <td className="py-1.5 px-2">{r.day}</td>
+                          <td className="py-1.5 px-2">{r.night}</td>
+                          <td className="py-1.5 px-2 text-red-500">{r.absentStatus}</td>
+                          <td className="py-1.5 px-2 text-center">{met.nightWk}</td>
+                          <td className="py-1.5 px-2 text-center font-bold text-indigo-600">{met.ot}</td>
+                          <td className="py-1.5 px-2">{met.otSite ?? ''}</td>
+                          <td className="py-1.5 px-2 text-center">{met.dayWk}</td>
+                          <td className="py-1.5 px-2 text-center">{met.dow}</td>
+                          <td className="py-1.5 px-2 text-center">{met.ndw}</td>
+                          <td className="py-1.5 px-2 text-center">{met.mth}</td>
+                          <td className={`py-1.5 px-2 text-center font-bold ${met.isPresent === 'Yes' ? 'text-emerald-600' : 'text-slate-300'}`}>
+                            {met.isPresent === 'Yes' ? '✓' : '—'}
+                          </td>
+                          <td className="py-1.5 px-2 text-center">{met.day2}</td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

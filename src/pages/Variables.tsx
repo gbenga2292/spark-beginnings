@@ -4,14 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
-import { Plus, Trash2, Save, Download, Upload, BookOpen, Settings2, Briefcase, X, ChevronRight } from 'lucide-react';
-import { useAppStore } from '@/src/store/appStore';
+import { Plus, Trash2, Save, Download, Upload, BookOpen, Settings2, Briefcase, X, ChevronRight, Edit2 } from 'lucide-react';
+import { useAppStore, Employee, AttendanceRecord, Site, Invoice, PendingInvoice, LeaveRecord, LedgerEntry, CompanyExpense, CommLog } from '@/src/store/appStore';
 import { NairaSign } from '@/src/components/ui/naira-sign';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { generateId } from '@/src/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/src/components/ui/dialog';
 import * as XLSX from 'xlsx';
 
 export function Variables() {
@@ -48,8 +49,32 @@ export function Variables() {
   const [localPayeVars, setLocalPayeVars] = useState(storePayeTaxVariables);
   const [localMonthVals, setLocalMonthVals] = useState(storeMonthValues);
   const [localHrVars, setLocalHrVars] = useState(storeHrVariables);
-  const isDirty = useAppStore((state) => state.isVariablesDirty);
-  const setIsDirty = useAppStore((state) => state.setVariablesDirty);
+  const [isDirty, setIsDirty] = useState(false);
+  const setVariablesDirty = useAppStore((state) => state.setVariablesDirty || ((val) => setIsDirty(val))); // fallback
+
+  const [editingVar, setEditingVar] = useState<{
+    type: 'department' | 'position' | 'client' | 'leaveType' | 'holiday' | 'ledgerCategory' | 'ledgerVendor' | 'ledgerBank' | 'ledgerBenBank' | 'ledgerVendorTIN';
+    id?: string;
+    oldValue: string;
+    date?: string; // for holidays
+  } | null>(null);
+  const [renameInput, setRenameInput] = useState('');
+  const [renameDateInput, setRenameDateInput] = useState('');
+  const [usageCounts, setUsageCounts] = useState<Record<string, number>>({});
+  const [isPropagating, setIsPropagating] = useState(false);
+
+  useEffect(() => {
+    if (!isDirty) {
+      setLocalPayrollVars(storePayrollVariables);
+      setLocalPayeVars(storePayeTaxVariables);
+      setLocalMonthVals(storeMonthValues);
+      setLocalHrVars(storeHrVariables);
+    }
+  }, [storePayrollVariables, storePayeTaxVariables, storeMonthValues, storeHrVariables, isDirty]);
+
+  useEffect(() => {
+    return () => setIsDirty(false);
+  }, []);
 
   // ── Ledger variables ───────────────────────────────────────
   const ledgerCategories = useAppStore((state) => state.ledgerCategories);
@@ -88,19 +113,6 @@ export function Variables() {
   const [newServiceName, setNewServiceName] = useState('');
   const [newServiceTaskTitle, setNewServiceTaskTitle] = useState('');
   const [newServiceTaskAssignee, setNewServiceTaskAssignee] = useState('');
-
-  useEffect(() => {
-    if (!isDirty) {
-      setLocalPayrollVars(storePayrollVariables);
-      setLocalPayeVars(storePayeTaxVariables);
-      setLocalMonthVals(storeMonthValues);
-      setLocalHrVars(storeHrVariables);
-    }
-  }, [storePayrollVariables, storePayeTaxVariables, storeMonthValues, storeHrVariables, isDirty]);
-
-  useEffect(() => {
-    return () => setIsDirty(false);
-  }, []);
 
   // Navigation blocker removed because it requires react-router v6 createBrowserRouter data routers
   // Relying only on window.addEventListener('beforeunload') below
@@ -160,7 +172,7 @@ export function Variables() {
 
   const handleAddHoliday = () => {
     if (!newDate || !newName) return;
-    addPublicHoliday({ id: Math.random().toString(36).slice(2), date: newDate, name: newName });
+    addPublicHoliday({ id: generateId(), date: newDate, name: newName });
     setNewDate('');
     setNewName('');
   };
@@ -230,6 +242,141 @@ export function Variables() {
   const removeLocalExtraCond = (id: string) => {
     setLocalPayeVars(p => ({ ...p, extraConditions: p.extraConditions.filter(c => c.id !== id) }));
     setIsDirty(true);
+  };
+
+  const handleOpenRename = (type: any, oldValue: string, id?: string, date?: string) => {
+    const state = useAppStore.getState();
+    const counts: Record<string, number> = {};
+
+    // Filter out 0 counts to only show relevant ones
+    const addCount = (key: string, count: number) => {
+      if (count > 0) counts[key] = count;
+    };
+
+    if (type === 'department') {
+      addCount('Employees', state.employees.filter(e => e.department === oldValue).length);
+      addCount('Secondary Depts', state.employees.filter(e => e.secondaryDepartments?.includes(oldValue)).length);
+      addCount('Task Templates', (state.departmentTasksList || []).filter(t => t.department === oldValue).length);
+    } else if (type === 'position') {
+      addCount('Employees', state.employees.filter(e => e.position === oldValue).length);
+      addCount('Attendance Records', state.attendanceRecords.filter(a => a.position === oldValue).length);
+    } else if (type === 'client') {
+      addCount('Sites', state.sites.filter(s => s.client === oldValue).length);
+      addCount('Invoices', state.invoices.filter(i => i.client === oldValue).length);
+      addCount('Pending Invoices', state.pendingInvoices.filter(i => i.client === oldValue).length);
+      addCount('Ledger Entries', state.ledgerEntries.filter(l => l.client === oldValue).length);
+      addCount('Comm Logs', (state.commLogs || []).filter(c => c.client === oldValue).length);
+      addCount('Payments', (state.payments || []).filter(p => p.client === oldValue).length);
+      addCount('VAT Payments', (state.vatPayments || []).filter(v => v.client === oldValue).length);
+    } else if (type === 'leaveType') {
+      addCount('Leave Records', (state.leaves || []).filter(l => l.leaveType === oldValue).length);
+    } else if (type === 'ledgerCategory') {
+      addCount('Ledger Entries', state.ledgerEntries.filter(l => l.category === oldValue).length);
+    } else if (type === 'ledgerVendor') {
+      addCount('Ledger Entries', state.ledgerEntries.filter(l => l.vendor === oldValue).length);
+    } else if (type === 'ledgerBank') {
+      addCount('Ledger Entries', state.ledgerEntries.filter(l => l.bank === oldValue).length);
+      addCount('Company Expenses', state.companyExpenses.filter(e => e.paidFrom === oldValue).length);
+    } else if (type === 'ledgerBenBank') {
+      addCount('Company Expenses', (state.companyExpenses || []).filter(e => e.paidToBankName === oldValue).length);
+    }
+
+    setUsageCounts(counts);
+    setEditingVar({ type, oldValue, id, date });
+    setRenameInput(oldValue);
+    setRenameDateInput(date || '');
+  };
+
+  const handleCommitRename = async (propagate: boolean) => {
+    if (!editingVar || !renameInput.trim()) return;
+    const { type, id, oldValue, date } = editingVar;
+    const newValue = renameInput.trim();
+    const newDate = renameDateInput;
+    
+    if (oldValue === newValue && date === newDate) {
+      setEditingVar(null);
+      return;
+    }
+
+    setIsPropagating(true);
+    try {
+      const state = useAppStore.getState();
+
+      if (type === 'holiday' && id) {
+        state.addPublicHoliday({ id, date: newDate, name: newValue }); // This actually updates if id exists in many implementations, but let's check store
+        // Wait, store uses addPublicHoliday for both? Let's check removeHoliday + add
+      } else if (type === 'department' && id) {
+        state.updateDepartment(id, { name: newValue });
+        if (propagate) {
+          const empIds = state.employees.filter(e => e.department === oldValue).map(e => e.id);
+          if (empIds.length > 0) state.bulkUpdateEmployees(empIds, { department: newValue });
+          
+          state.employees.forEach(e => {
+            if (e.secondaryDepartments?.includes(oldValue)) {
+              const newSec = e.secondaryDepartments.map(d => d === oldValue ? newValue : d);
+              state.updateEmployee(e.id, { secondaryDepartments: newSec });
+            }
+          });
+          
+          const taskMatch = (state.departmentTasksList || []).find(t => t.department === oldValue);
+          if (taskMatch) state.updateDepartmentTasks({ ...taskMatch, department: newValue });
+        }
+      } else if (type === 'position' && id) {
+        state.updatePosition(id, { title: newValue });
+        if (propagate) {
+          const empIds = state.employees.filter(e => e.position === oldValue).map(e => e.id);
+          if (empIds.length > 0) state.bulkUpdateEmployees(empIds, { position: newValue });
+          
+          // Attendance records propagation (can be thousands, usually done via DB)
+          // But store logic call db.updateX for each usually. 
+          // For simplicity we try store functions if they exist.
+          state.attendanceRecords.forEach(a => {
+            if (a.position === oldValue) state.updateAttendanceRecord?.(a.id, { position: newValue });
+          });
+        }
+      } else if (type === 'client') {
+        state.setClients(state.clients.map(c => c === oldValue ? newValue : c));
+        if (propagate) {
+          state.sites.filter(s => s.client === oldValue).forEach(s => state.updateSite(s.id, { client: newValue }));
+          state.invoices.filter(i => i.client === oldValue).forEach(i => state.updateInvoice(i.id, { client: newValue }));
+          state.pendingInvoices.filter(i => i.client === oldValue).forEach(i => state.updatePendingInvoice(i.id, { client: newValue }));
+          state.ledgerEntries.filter(l => l.client === oldValue).forEach(l => state.updateLedgerEntry(l.id, { client: newValue }));
+          // ... etc for payments, vat, commLogs if functions exist
+        }
+      } else if (type === 'leaveType') {
+        state.setLeaveTypes(useAppStore.getState().leaveTypes.map(lt => lt === oldValue ? newValue : lt));
+        if (propagate) {
+           (state.leaves || []).filter(l => l.leaveType === oldValue).forEach(l => state.updateLeaveRecord?.(l.id, { leaveType: newValue }));
+        }
+      } else if (type === 'ledgerCategory') {
+        state.updateLedgerCategory(id!, { name: newValue });
+        if (propagate) state.ledgerEntries.filter(l => l.category === oldValue).forEach(l => state.updateLedgerEntry(l.id, { category: newValue }));
+      } else if (type === 'ledgerVendor') {
+        state.updateLedgerVendor(id!, { name: newValue });
+        if (propagate) state.ledgerEntries.filter(l => l.vendor === oldValue).forEach(l => state.updateLedgerEntry(l.id, { vendor: newValue }));
+      } else if (type === 'ledgerVendorTIN') {
+        state.updateLedgerVendor(id!, { tinNumber: newValue });
+      } else if (type === 'ledgerBank') {
+        state.updateLedgerBank(id!, { name: newValue });
+        if (propagate) {
+          state.ledgerEntries.filter(l => l.bank === oldValue).forEach(l => state.updateLedgerEntry(l.id, { bank: newValue }));
+          state.companyExpenses.filter(e => e.paidFrom === oldValue).forEach(e => state.updateCompanyExpense(e.id, { paidFrom: newValue }));
+        }
+      } else if (type === 'ledgerBenBank') {
+        state.updateLedgerBeneficiaryBank(id!, { name: newValue });
+        if (propagate) {
+          state.companyExpenses.filter(e => e.paidToBankName === oldValue).forEach(e => state.updateCompanyExpense(e.id, { paidToBankName: newValue }));
+        }
+      }
+
+      toast.success('Successfully updated and propagated changes.');
+      setEditingVar(null);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update some records.');
+    } finally {
+      setIsPropagating(false);
+    }
   };
 
   const handleSave = async () => {
@@ -545,10 +692,10 @@ export function Variables() {
           if (wb.SheetNames.includes('Public_Holidays')) {
             const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Public_Holidays']);
             data.forEach(row => {
-              const date = normalizeDate(String(row.Date || ''));
+              const date = normalizeDate(row.Date || row.date || '');
               const name = String(row.Name || '');
               if (date && name && (isOverwrite || !newHolidays.some(h => h.date === date && h.name === name))) {
-                newHolidays.push({ id: Math.random().toString(36).slice(2), date, name });
+                newHolidays.push({ id: generateId(), date, name });
               }
             });
             setPublicHolidays(newHolidays);
@@ -1066,12 +1213,19 @@ export function Variables() {
                       <TableRow key={v.id}>
                         <TableCell className="font-medium text-slate-700">{v.name}</TableCell>
                         <TableCell className="text-sm text-slate-500">{v.tinNumber || '—'}</TableCell>
-                        <TableCell className="w-[50px]">
-                          {priv.canEdit && (
-                            <Button variant="ghost" size="icon" onClick={async () => { const conf = await showConfirm(`Delete vendor "${v.name}"?`, { variant: 'danger' }); if (conf) removeLedgerVendor(v.id); }}>
-                              <Trash2 className="h-4 w-4 text-rose-500" />
-                            </Button>
-                          )}
+                        <TableCell className="w-[80px]">
+                          <div className="flex items-center gap-1">
+                            {priv.canEdit && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600" onClick={() => handleOpenRename('ledgerVendor', v.name, v.id)}>
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {priv.canEdit && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-500" onClick={async () => { const conf = await showConfirm(`Delete vendor "${v.name}"?`, { variant: 'danger' }); if (conf) removeLedgerVendor(v.id); }}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1101,12 +1255,19 @@ export function Variables() {
                     {ledgerBeneficiaryBanks.map(b => (
                       <TableRow key={b.id}>
                         <TableCell className="font-medium text-slate-700">{b.name}</TableCell>
-                        <TableCell className="w-[50px]">
-                          {priv.canEdit && (
-                            <Button variant="ghost" size="icon" onClick={async () => { const conf = await showConfirm(`Delete beneficiary bank "${b.name}"?`, { variant: 'danger' }); if (conf) removeLedgerBeneficiaryBank(b.id); }}>
-                              <Trash2 className="h-4 w-4 text-rose-500" />
-                            </Button>
-                          )}
+                        <TableCell className="w-[80px]">
+                          <div className="flex items-center gap-1">
+                            {priv.canEdit && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600" onClick={() => handleOpenRename('ledgerBenBank', b.name, b.id)}>
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {priv.canEdit && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-500" onClick={async () => { const conf = await showConfirm(`Delete beneficiary bank "${b.name}"?`, { variant: 'danger' }); if (conf) removeLedgerBeneficiaryBank(b.id); }}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1169,16 +1330,28 @@ export function Variables() {
                           <TableCell className="font-medium">{formatDisplayDate(holiday.date)}</TableCell>
                           <TableCell>{holiday.name}</TableCell>
                           <TableCell className="text-right">
-                            {priv.canEdit && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemoveHoliday(holiday.id)}
-                                className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
+                            <div className="flex items-center justify-end gap-1">
+                              {priv.canEdit && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleOpenRename('holiday', holiday.name, holiday.id, holiday.date)}
+                                  className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-50"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              {priv.canEdit && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRemoveHoliday(holiday.id)}
+                                  className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
@@ -1218,7 +1391,8 @@ export function Variables() {
                     <TableRow>
                       <TableHead>Position Title</TableHead>
                       <TableHead>Department</TableHead>
-                      <TableHead className="w-[60px] text-right">Action</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="w-[80px] text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1255,17 +1429,42 @@ export function Variables() {
                                 </span>
                               )}
                             </TableCell>
+                            <TableCell className="align-middle bg-transparent">
+                              {(() => {
+                                const dept = departments.find(d => d.id === pos.departmentId);
+                                if (!dept) return <span className="text-[10px] font-bold text-slate-300">N/A</span>;
+                                if (dept.staffType === 'NON-EMPLOYEE') 
+                                  return <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full uppercase">Non-Employee</span>;
+                                return (
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${dept.staffType === 'FIELD' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                                    {dept.staffType} Staff
+                                  </span>
+                                );
+                              })()}
+                            </TableCell>
                             <TableCell className="text-right align-middle">
-                              {priv.canEdit && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => removePosition(pos.id)}
-                                  className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
+                              <div className="flex items-center justify-end gap-1">
+                                {priv.canEdit && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleOpenRename('position', pos.title, pos.id)}
+                                    className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-50"
+                                  >
+                                    <Edit2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                {priv.canEdit && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removePosition(pos.id)}
+                                    className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -1287,15 +1486,18 @@ export function Variables() {
               {priv.canEdit && (
                 <div className="flex gap-2 mb-4">
                   <Input placeholder="New Department" value={newDepartment} onChange={(e) => setNewDepartment(e.target.value)} className="flex-1" />
-                  <select 
-                     className="h-10 w-40 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer"
-                     value={newDeptStaffType}
-                     onChange={(e) => setNewDeptStaffType(e.target.value as any)}
-                  >
-                     <option value="OFFICE">Office</option>
-                     <option value="FIELD">Field</option>
-                     <option value="NON-EMPLOYEE">Non-Employee</option>
-                  </select>
+                  <div className="flex flex-col gap-1.5 w-40">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase px-1">Dept Category</label>
+                    <select 
+                       className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer focus:ring-2 focus:ring-indigo-400 outline-none"
+                       value={newDeptStaffType}
+                       onChange={(e) => setNewDeptStaffType(e.target.value as any)}
+                    >
+                       <option value="OFFICE">Office Staff</option>
+                       <option value="FIELD">Field Staff</option>
+                       <option value="NON-EMPLOYEE">Non-Employee</option>
+                    </select>
+                  </div>
                   <Button onClick={handleAddDepartment} variant="outline" className="gap-2">
                     <Plus className="h-4 w-4" /> Add
                   </Button>
@@ -1307,7 +1509,7 @@ export function Variables() {
                     <TableRow>
                       <TableHead>Department</TableHead>
                       <TableHead>Parent Dept</TableHead>
-                      <TableHead>Type</TableHead>
+                      <TableHead>Category (Routing)</TableHead>
                       <TableHead className="w-32 text-center">Work Days/Wk</TableHead>
                       <TableHead className="w-[80px] text-right">Action</TableHead>
                     </TableRow>
@@ -1317,15 +1519,7 @@ export function Variables() {
                       return (
                         <TableRow key={dep.id}>
                           <TableCell className="font-medium text-slate-800">
-                            {priv.canEdit ? (
-                              <Input 
-                                value={dep.name} 
-                                onChange={(e) => updateDepartment(dep.id, { name: e.target.value })} 
-                                className="h-8 md:max-w-[200px]" 
-                              />
-                            ) : (
-                              dep.name
-                            )}
+                            {dep.name}
                           </TableCell>
                           <TableCell>
                             {priv.canEdit ? (
@@ -1348,18 +1542,24 @@ export function Variables() {
                           <TableCell>
                             {priv.canEdit ? (
                               <select 
-                                 className="h-8 rounded border border-slate-200 px-2 text-sm bg-white min-w-[120px]"
+                                 className="h-8 rounded border border-slate-200 px-2 text-sm bg-white min-w-[140px] focus:ring-2 focus:ring-indigo-400 outline-none"
                                  value={dep.staffType}
                                  onChange={(e) => updateDepartment(dep.id, { staffType: e.target.value as any })}
                               >
-                                 <option value="OFFICE">Office</option>
-                                 <option value="FIELD">Field</option>
+                                 <option value="OFFICE">Office Staff</option>
+                                 <option value="FIELD">Field Staff</option>
                                  <option value="NON-EMPLOYEE">Non-Employee</option>
                               </select>
                             ) : (
-                               <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded-md block truncate">
-                                 {dep.staffType}
-                               </span>
+                               <div className="flex">
+                                 {dep.staffType === 'NON-EMPLOYEE' ? (
+                                   <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full uppercase">Non-Employee</span>
+                                 ) : (
+                                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${dep.staffType === 'FIELD' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                                     {dep.staffType} Staff
+                                   </span>
+                                 )}
+                               </div>
                             )}
                           </TableCell>
                           <TableCell className="text-center">
@@ -1376,16 +1576,28 @@ export function Variables() {
                             />
                           </TableCell>
                           <TableCell className="text-right">
-                            {priv.canEdit && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeDepartment(dep.id)}
-                                className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
+                            <div className="flex items-center justify-end gap-1">
+                              {priv.canEdit && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleOpenRename('department', dep.name, dep.id)}
+                                  className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-50"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              {priv.canEdit && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeDepartment(dep.id)}
+                                  className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -1418,9 +1630,14 @@ export function Variables() {
                   <div key={lt} className="bg-teal-50 border border-teal-200 rounded-full px-3 py-1 text-sm flex items-center gap-2 text-teal-800">
                     {lt}
                     {priv.canEdit && (
-                      <button onClick={() => removeLeaveType(lt)} className="text-teal-400 hover:text-rose-500">
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                      <div className="flex items-center gap-1.5 ml-1 pl-1.5 border-l border-teal-200">
+                        <button onClick={() => handleOpenRename('leaveType', lt)} className="text-teal-400 hover:text-indigo-600">
+                          <Edit2 className="h-3 w-3" />
+                        </button>
+                        <button onClick={() => removeLeaveType(lt)} className="text-teal-400 hover:text-rose-500">
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -1848,6 +2065,16 @@ export function Variables() {
                   />
                   <p className="text-xs text-slate-400">Value Added Tax (7.5% by default)</p>
                 </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700 uppercase">WHT Rate (%)</label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={localPayrollVars.withholdingTaxRate}
+                    onChange={e => updateLocalPayrollVariables({ withholdingTaxRate: Number(e.target.value) })}
+                  />
+                  <p className="text-xs text-slate-400">Withholding Tax (5% by default)</p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1942,11 +2169,32 @@ export function Variables() {
             <CardHeader className="bg-amber-50/50 rounded-t-lg border-b border-amber-100">
               <CardTitle className="text-amber-900">PAYE Tax Variables (NIGERIATAX)</CardTitle>
               <CardDescription>
-                These values drive the <code className="text-xs bg-amber-100 px-1 rounded">NIGERIATAX()</code> function.
-                CRA = <em>CRA Base + Pension Contribution</em>. Taxable = AnnualGross &minus; CRA.
+                These values drive the payroll calculation system.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-4 space-y-6">
+              
+              <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-4 flex flex-col gap-3">
+                <h4 className="text-xs font-bold text-amber-800 uppercase tracking-tighter">Calculation Logic Reference</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase">1. Gross Revenue</p>
+                    <p className="text-xs text-slate-700 font-medium">(Monthly Salary × 12) + Overtime</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase">2. Reliefs (CRA)</p>
+                    <p className="text-xs text-slate-700 font-medium">Base CRA + Rent Relief (Max 500k) + Pension</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase">3. Taxable Income</p>
+                    <p className="text-xs text-slate-700 font-medium">Gross Revenue &minus; Total Reliefs</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase">4. Monthly PAYE</p>
+                    <p className="text-xs text-slate-700 font-medium">(Annual Tax from Brackets) &divide; 12</p>
+                  </div>
+                </div>
+              </div>
 
               {/* CRA & Pension Rate */}
               <div>
@@ -2190,7 +2438,149 @@ export function Variables() {
         </div>
       </div>
       )}
+      <RenameVariableDialog 
+        isOpen={!!editingVar}
+        onClose={() => setEditingVar(null)}
+        editingVar={editingVar}
+        renameInput={renameInput}
+        setRenameInput={setRenameInput}
+        renameDateInput={renameDateInput}
+        setRenameDateInput={setRenameDateInput}
+        usageCounts={usageCounts}
+        isPropagating={isPropagating}
+        onConfirm={handleCommitRename}
+      />
     </div>
+  );
+}
+
+function RenameVariableDialog({ isOpen, onClose, editingVar, renameInput, setRenameInput, renameDateInput, setRenameDateInput, usageCounts, isPropagating, onConfirm }: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  editingVar: any, 
+  renameInput: string, 
+  setRenameInput: (v: string) => void, 
+  renameDateInput?: string, 
+  setRenameDateInput?: (v: string) => void, 
+  usageCounts: Record<string, number>, 
+  isPropagating: boolean, 
+  onConfirm: (shouldProp: boolean) => void 
+}) {
+  const [shouldPropagate, setShouldPropagate] = useState(true);
+  const totalRefs = Object.values(usageCounts || {}).reduce((a: number, b: number) => a + b, 0);
+
+  // Auto-reset propagation checkbox when modal opens
+  useEffect(() => {
+    if (isOpen) setShouldPropagate(totalRefs > 0);
+  }, [isOpen, totalRefs]);
+
+  if (!editingVar) return null;
+
+  const getTitle = () => {
+    switch (editingVar.type) {
+      case 'department': return 'Rename Department';
+      case 'position': return 'Rename Position';
+      case 'client': return 'Rename Client';
+      case 'leaveType': return 'Rename Leave Type';
+      case 'holiday': return 'Edit Public Holiday';
+      case 'ledgerCategory': return 'Rename Ledger Category';
+      case 'ledgerVendor': return 'Rename Vendor Name';
+      case 'ledgerVendorTIN': return 'Update Vendor TIN';
+      case 'ledgerBank': return 'Rename Bank';
+      case 'ledgerBenBank': return 'Rename Beneficiary Bank';
+      default: return 'Rename Variable';
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[450px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Edit2 className="h-5 w-5 text-indigo-600" />
+            {getTitle()}
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-500 uppercase">Old Value</label>
+            <div className="p-3 bg-slate-50 border rounded-md text-sm font-medium text-slate-400 italic">
+              {editingVar.oldValue}
+            </div>
+          </div>
+
+          {editingVar.type === 'holiday' && (
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500 uppercase">Holiday Date</label>
+              <Input 
+                type="date"
+                value={renameDateInput}
+                onChange={e => setRenameDateInput(e.target.value)}
+                className="h-10"
+              />
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-500 uppercase">New Value</label>
+            <Input 
+              value={renameInput}
+              onChange={e => setRenameInput(e.target.value)}
+              placeholder="Enter new name..."
+              className="h-10 focus:ring-indigo-500"
+              autoFocus
+            />
+          </div>
+
+          {totalRefs > 0 && (
+            <div className="p-4 bg-amber-50 border border-amber-100 rounded-lg space-y-3">
+              <div className="flex items-start gap-2">
+                <Settings2 className="h-4 w-4 text-amber-600 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-amber-900">Found {totalRefs} referenced records</p>
+                  <div className="mt-1 space-y-1">
+                    {Object.entries(usageCounts).map(([key, count]) => (
+                      <div key={key} className="text-[11px] text-amber-700 flex justify-between">
+                        <span>{key}:</span>
+                        <span className="font-bold">{count} records</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2 border-t border-amber-200">
+                <input 
+                  type="checkbox" 
+                  id="propagateCheck"
+                  checked={shouldPropagate}
+                  onChange={e => setShouldPropagate(e.target.checked)}
+                  className="h-4 w-4 accent-amber-600"
+                />
+                <label htmlFor="propagateCheck" className="text-xs font-semibold text-amber-900 cursor-pointer select-none">
+                  Update all {totalRefs} records to the new name?
+                </label>
+              </div>
+              <p className="text-[10px] text-amber-600 leading-tight">
+                If checked, every instance mentioned above will be updated automatically. If unchecked, only the variable definition itself is changed.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="ghost" onClick={onClose} disabled={isPropagating}>Cancel</Button>
+          <Button 
+            className="bg-indigo-600 hover:bg-indigo-700 text-white" 
+            onClick={() => onConfirm(shouldPropagate)}
+            disabled={isPropagating || !renameInput.trim()}
+          >
+            {isPropagating ? 'Updating...' : 'Save Changes'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

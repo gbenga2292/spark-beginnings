@@ -337,16 +337,18 @@ export interface AttendanceRecord {
   day: 'Yes' | 'No';
   night: 'Yes' | 'No';
   absentStatus: string;
-  nightWk: number;
-  ot: number;
-  otSite: string;
-  dayWk: number;
-  dow: number;
-  ndw: 'Yes' | 'No';
-  mth: number;
-  isPresent: 'Yes' | 'No';
-  day2: number;
   overtimeDetails: string;
+
+  // Calculated fields (Transient, should be derived via calculateAttendanceMetrics)
+  nightWk?: number;
+  ot?: number;
+  otSite?: string;
+  dayWk?: number;
+  dow?: number;
+  ndw?: 'Yes' | 'No';
+  mth?: number;
+  isPresent?: 'Yes' | 'No';
+  day2?: number;
 }
 
 export interface PendingInvoice {
@@ -515,8 +517,13 @@ interface AppState {
   bulkUpdateEmployees: (ids: string[], employee: Partial<Employee>) => void;
   deleteEmployee: (id: string) => void;
   addAttendanceRecords: (records: AttendanceRecord[]) => void;
+  updateAttendanceRecord: (id: string, record: Partial<AttendanceRecord>) => void;
   removeAttendanceRecordsByDate: (date: string) => void;
   deleteAttendanceRecords: (ids: string[]) => void;
+  
+  addLeaveRecord: (leave: LeaveRecord) => void;
+  updateLeaveRecord: (id: string, leave: Partial<LeaveRecord>) => void;
+  deleteLeaveRecord: (id: string) => void;
   addDisciplinaryRecord: (record: DisciplinaryRecord) => void;
   updateDisciplinaryRecord: (id: string, record: Partial<DisciplinaryRecord>) => void;
   deleteDisciplinaryRecord: (id: string) => void;
@@ -601,6 +608,7 @@ interface AppState {
     employerPensionRate: number;
     nsitfRate: number;
     vatRate: number;
+    withholdingTaxRate: number;
     departmentWorkDays?: Record<string, number>;
   };
   updatePayrollVariables: (variables: Partial<AppState['payrollVariables']>) => void;
@@ -694,7 +702,7 @@ export const useAppStore = create<AppState>()(
       payrollVariables: {
         basic: 40, housing: 30, transport: 20, otherAllowances: 10,
         employeePensionRate: 8, employerPensionRate: 10,
-        nsitfRate: 1, vatRate: 7.5,
+        nsitfRate: 1, vatRate: 7.5, withholdingTaxRate: 5,
       },
       payeTaxVariables: {
         craBase: 800000, rentReliefRate: 0.20,
@@ -768,8 +776,14 @@ export const useAppStore = create<AppState>()(
 
       // Attendance
       addAttendanceRecords: (records) => { set((s) => ({ attendanceRecords: [...s.attendanceRecords, ...records] })); db.insertAttendanceRecords(records); },
+      updateAttendanceRecord: (id, record) => { set((s) => ({ attendanceRecords: s.attendanceRecords.map(r => r.id === id ? { ...r, ...record } : r) })); db.updateAttendanceRecord(id, record); },
       removeAttendanceRecordsByDate: (date) => { set((s) => ({ attendanceRecords: s.attendanceRecords.filter(r => r.date !== date) })); db.deleteAttendanceByDate(date); },
       deleteAttendanceRecords: (ids) => { set((s) => ({ attendanceRecords: s.attendanceRecords.filter(r => !ids.includes(r.id)) })); db.deleteAttendanceByIds(ids); },
+
+      // Leaves (Ensuring correct naming)
+      addLeaveRecord: (leave) => { set((s) => ({ leaves: [...s.leaves, leave] })); db.insertLeave(leave); },
+      updateLeaveRecord: (id, leave) => { set((s) => ({ leaves: s.leaves.map(l => l.id === id ? { ...l, ...leave } : l) })); db.updateLeave(id, leave); },
+      deleteLeaveRecord: (id) => { set((s) => ({ leaves: s.leaves.filter(l => l.id !== id) })); db.deleteLeave(id); },
 
       // Positions & Departments
       addPosition: (position) => { set((s) => ({ positions: [...s.positions, position] })); db.insertPosition(position); },
