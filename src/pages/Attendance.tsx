@@ -3,7 +3,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { useAppStore, AttendanceRecord } from '@/src/store/appStore';
-import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { format } from 'date-fns';
@@ -846,23 +846,21 @@ export function Attendance() {
       {activeTab === 'database' && (
         <>
           {priv.canImport && (
-            <label className="cursor-pointer mb-0">
+            <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm mb-0">
+              <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
               <Input type="file" accept=".xlsx" className="hidden" onChange={handleImportExcel} />
-              <Button variant="outline" size="sm" className="h-8 text-xs gap-1 pointer-events-none cursor-pointer border-slate-200">
-                <Upload className="h-3 w-3" /> Import
-              </Button>
             </label>
           )}
           {priv.canDelete && dbSelectedIds.size > 0 && (
-            <Button onClick={handleBulkDelete} size="sm" variant="destructive" className="h-8 text-xs gap-1 shadow-sm">
-              <Trash2 className="h-3 w-3" /> Delete ({dbSelectedIds.size})
+            <Button onClick={handleBulkDelete} size="sm" variant="destructive" className="h-9 px-3 text-[11px] font-bold uppercase tracking-tight gap-2 shadow-sm">
+              <Trash2 className="h-3.5 w-3.5" /> Delete ({dbSelectedIds.size})
             </Button>
           )}
           {priv.canExport && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" className="h-8 text-xs gap-1 bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm">
-                  <Download className="h-3 w-3" /> Export
+                <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50">
+                  <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">

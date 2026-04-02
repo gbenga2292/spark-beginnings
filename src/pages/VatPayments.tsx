@@ -302,13 +302,13 @@ export function VatPayments() {
         <div className="hidden sm:flex items-center gap-2">
             {priv.canImport && (
                 <label className="flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 shadow-sm border border-indigo-200 rounded-md h-9 px-4 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap">
-                    <Upload className="h-4 w-4" /> Import CSV
+                    <Download className="h-4 w-4" /> Import CSV
                     <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
                 </label>
             )}
             {priv.canExport && (
                 <Button variant="outline" size="sm" className="gap-2 shrink-0 border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-9" onClick={handleExportCSV}>
-                    <Download className="h-4 w-4" /> Export CSV
+                    <Upload className="h-4 w-4" /> Export CSV
                 </Button>
             )}
             {priv.canManageVat && (
@@ -331,13 +331,13 @@ export function VatPayments() {
                 <div className="flex sm:hidden justify-end gap-2">
                     {priv.canImport && (
                         <label className="flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 shadow-sm border border-indigo-200 rounded-md h-9 px-3 text-sm font-medium cursor-pointer transition-colors">
-                            <Upload className="h-4 w-4" /> Import
+                            <Download className="h-4 w-4" /> Import
                             <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
                         </label>
                     )}
                     {priv.canExport && (
                         <Button variant="outline" size="sm" className="gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-9" onClick={handleExportCSV}>
-                            <Download className="h-4 w-4" /> Export
+                            <Upload className="h-4 w-4" /> Export
                         </Button>
                     )}
                     {priv.canManageVat && (

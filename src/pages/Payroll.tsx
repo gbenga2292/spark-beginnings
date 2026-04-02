@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Input } from '@/src/components/ui/input';
-import { Download, CreditCard, ChevronDown, X, Printer } from 'lucide-react';
+import { Download, Upload, CreditCard, ChevronDown, X, Printer } from 'lucide-react';
 import { useAppStore, Employee } from '@/src/store/appStore';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import logoSrc from '../../logo/logo-2.png';
@@ -672,8 +672,8 @@ export function Payroll() {
           </Button>
         )}
         {finRepPriv?.canExport && activeTab === 'processing' && (
-          <Button variant="outline" size="sm" className="gap-2 h-9 shadow-sm" onClick={handleExportScheduleCSV}>
-            <Download className="h-4 w-4" /> Export CSV
+          <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50" onClick={handleExportScheduleCSV}>
+            <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export CSV
           </Button>
         )}
       </div>
@@ -1072,7 +1072,7 @@ export function Payroll() {
                 <div className="flex gap-2">
                   {printType !== 'PAYSLIPS' && (
                     <Button variant="secondary" size="sm" className="gap-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800" onClick={handleExportScheduleCSV} disabled={payslipsToPrint.length === 0}>
-                      <Download className="h-4 w-4" /> Export CSV
+                      <Upload className="h-4 w-4" /> Export CSV
                     </Button>
                   )}
                   <Button variant="secondary" size="sm" className="gap-1" onClick={handlePrint} disabled={payslipsToPrint.length === 0}>

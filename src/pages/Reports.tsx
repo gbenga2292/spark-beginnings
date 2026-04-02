@@ -114,6 +114,48 @@ export function Reports() {
     return { grid, days };
   }, [attendanceRecords, selectedMonth, selectedYear, operationsStaff]);
 
+  // ── Active sites for the selected month/year ──
+  const activeSitesForMonth = useMemo(() => {
+    const monthStart = new Date(selectedYear, selectedMonth - 1, 1).getTime();
+    // last day of month at 23:59:59
+    const monthEnd = new Date(selectedYear, selectedMonth, 0, 23, 59, 59, 999).getTime();
+
+    // Sites that have actual attendance this month should ALWAYS be shown.
+    const sitesWithAttendanceThisMonth = new Set<string>();
+    attendanceRecords.forEach(rec => {
+      if (!rec.date) return;
+      const parts = rec.date.split('-');
+      if (parts.length === 3) {
+        const recYear = parseInt(parts[0], 10);
+        const recMonth = parseInt(parts[1], 10);
+        if (recYear === selectedYear && recMonth === selectedMonth) {
+          if (rec.daySite) sitesWithAttendanceThisMonth.add(rec.daySite);
+          if (rec.nightSite) sitesWithAttendanceThisMonth.add(rec.nightSite);
+        }
+      }
+    });
+
+    return sites.filter(site => {
+      // 1) Force include if they actually had attendance this month
+      if (sitesWithAttendanceThisMonth.has(site.name)) return true;
+
+      // 2) Fallback to explicit date check
+      let siteStart = 0;
+      if (site.startDate && site.startDate.trim() !== '') {
+        const parsed = new Date(site.startDate).getTime();
+        if (!isNaN(parsed)) siteStart = parsed;
+      }
+
+      let siteEnd = Infinity;
+      if (site.endDate && site.endDate.trim() !== '') {
+        const parsed = new Date(site.endDate).getTime();
+        if (!isNaN(parsed)) siteEnd = parsed;
+      }
+
+      return siteStart <= monthEnd && siteEnd >= monthStart;
+    });
+  }, [sites, selectedMonth, selectedYear, attendanceRecords]);
+
   // ── Site color palette ──
   const SITE_COLORS: Record<string, { bg: string; text: string; border: string }> = useMemo(() => {
     const palette = [
@@ -162,7 +204,7 @@ export function Reports() {
 
     operationsStaff.forEach(emp => {
       siteCounts[emp.id] = {};
-      sites.forEach(site => {
+      activeSitesForMonth.forEach(site => {
         siteCounts[emp.id][site.name] = 0;
       });
     });
@@ -182,7 +224,7 @@ export function Reports() {
     });
 
     return { siteCounts, totalRecords: filteredRecords.length };
-  }, [attendanceRecords, selectedMonth, selectedYear, operationsStaff, sites]);
+  }, [attendanceRecords, selectedMonth, selectedYear, operationsStaff, activeSitesForMonth]);
 
   // Calculate monthly work summary for Operations internal staff (excluding Engineer and CEO)
   const operationsInternalStaff = useMemo(() => {
@@ -912,7 +954,7 @@ export function Reports() {
                     <TableHeader>
                       <TableRow className="bg-gradient-to-r from-slate-800 to-slate-700 sticky top-0 z-10">
                         <TableHead className="text-left font-semibold text-white py-2 px-3 whitespace-nowrap">Employee</TableHead>
-                        {sites.filter(s => s.status === 'Active').map(site => (
+                        {activeSitesForMonth.map(site => (
                           <TableHead key={site.id} className="text-center font-semibold text-white py-2 px-2 whitespace-nowrap">{site.name}</TableHead>
                         ))}
                         <TableHead className="text-center font-semibold text-white bg-indigo-700/60 py-2 px-3 whitespace-nowrap">Total Days</TableHead>
@@ -921,7 +963,7 @@ export function Reports() {
                     <TableBody>
                       {operationsStaff.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={sites.filter(s => s.status === 'Active').length + 2} className="text-center py-8 text-slate-500">
+                          <TableCell colSpan={activeSitesForMonth.length + 2} className="text-center py-8 text-slate-500">
                             No operations staff found.
                           </TableCell>
                         </TableRow>
@@ -935,7 +977,7 @@ export function Reports() {
                                 <div className="text-sm leading-tight">{emp.surname} {emp.firstname}</div>
                                 <div className="text-xs text-slate-400 leading-tight">{emp.position}</div>
                               </TableCell>
-                              {sites.filter(s => s.status === 'Active').map(site => {
+                              {activeSitesForMonth.map(site => {
                                 const days = empSiteCounts[site.name] || 0;
                                 return (
                                   <TableCell key={site.id} className={`text-center py-1.5 px-2 text-sm ${days > 0 ? 'font-semibold text-emerald-700' : 'text-slate-300'}`}>
@@ -963,7 +1005,7 @@ export function Reports() {
               {/* Legend */}
               <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide mr-1">Legend:</span>
-                {sites.map(site => {
+                {activeSitesForMonth.map(site => {
                   const color = SITE_COLORS[site.name];
                   return (
                     <span key={site.id} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: color?.bg ?? '#6366f1' }}>

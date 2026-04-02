@@ -646,15 +646,15 @@ export function Ledger() {
       ) : (
         <div className="flex items-center gap-2">
            {priv.canAdd && (
-             <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50">
-               <Upload className="h-3.5 w-3.5 text-indigo-500" /> Import
+             <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm">
+               <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
              </Button>
            )}
            {priv.canExport && (
              <DropdownMenu>
                <DropdownMenuTrigger asChild>
-                 <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50">
-                   <Download className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
+                 <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm">
+                   <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
                  </Button>
                </DropdownMenuTrigger>
                <DropdownMenuContent align="end" className="w-52">
@@ -961,16 +961,16 @@ export function Ledger() {
                 {priv?.canAdd && (
                   <>
                     <input type="file" ref={fileInputRef} accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImport} />
-                    <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="h-9">
-                      <Upload className="mr-2 h-4 w-4" /> Import
+                    <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm">
+                      <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
                     </Button>
                   </>
                 )}
                 {priv.canExport && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="h-9 gap-2">
-                        <Download className="h-4 w-4" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
+                      <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm">
+                        <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-52">

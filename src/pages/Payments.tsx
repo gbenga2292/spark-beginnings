@@ -312,7 +312,7 @@ export function Payments() {
         <div className="flex items-center gap-3">
             {priv.canImport && (
                 <label className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 shadow-sm border border-slate-200 rounded-lg h-9 px-4 text-[10px] font-bold uppercase tracking-tight cursor-pointer transition-all whitespace-nowrap active:scale-95">
-                    <Upload className="h-4 w-4" /> <span className="hidden sm:inline">Import CSV</span>
+                    <Download className="h-4 w-4" /> <span className="hidden sm:inline">Import CSV</span>
                     <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
                 </label>
             )}
@@ -324,7 +324,7 @@ export function Payments() {
                     className="h-9 px-4 gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-[10px] uppercase tracking-tight shadow-sm transition-all active:scale-95" 
                     onClick={handleExportCSV}
                 >
-                    <Download className="h-4 w-4" /> <span className="hidden sm:inline">Export CSV</span>
+                    <Upload className="h-4 w-4" /> <span className="hidden sm:inline">Export CSV</span>
                 </Button>
             )}
 

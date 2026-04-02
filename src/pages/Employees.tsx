@@ -5,7 +5,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
-import { Search, Plus, MoreHorizontal, Download, Upload, ArrowLeft, Save, Pencil, Trash2, Eye, X, Network, CheckSquare, Square, Settings2, Users } from 'lucide-react';
+import { Search, Plus, MoreHorizontal, Download, Upload, ArrowLeft, Save, Pencil, Trash2, Eye, X, Network, CheckSquare, Square, Settings2, Users, ChevronDown } from 'lucide-react';
 import { useAppStore, Employee, MonthlySalary, DisciplinaryRecord } from '@/src/store/appStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -1800,8 +1800,8 @@ export function Employees() {
       {priv.canExport && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2 h-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-xs">
-              <Download className="h-4 w-4 text-emerald-500" /> Export
+            <Button variant="outline" size="sm" className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm">
+              <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
@@ -1823,8 +1823,8 @@ export function Employees() {
         </DropdownMenu>
       )}
       {priv.canAdd && (
-        <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-xs font-bold cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
-          <Upload className="h-4 w-4 text-indigo-500" /> Import
+        <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
+          <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
           <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
         </label>
       )}
@@ -1866,13 +1866,13 @@ export function Employees() {
         </div>
         <div className="flex gap-2">
           {priv.canExport && (
-            <Button variant="outline" className="flex-1 gap-2 text-xs" onClick={() => handleExportCSV('detailed')}>
-              <Download className="h-3 w-3" /> Export CSV
+            <Button variant="outline" className="flex-1 gap-2 text-[11px] font-bold uppercase tracking-tight" onClick={() => handleExportCSV('detailed')}>
+              <Upload className="h-4 w-4 text-emerald-500" /> Export CSV
             </Button>
           )}
           {priv.canAdd && (
-            <label className="flex-1 flex items-center justify-center gap-2 px-4 h-10 bg-white rounded-md border border-slate-200 text-slate-600 text-xs font-medium cursor-pointer">
-              <Upload className="h-3 w-3" /> Import
+            <label className="flex-1 flex items-center justify-center gap-2 px-4 h-10 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50">
+              <Download className="h-4 w-4 text-indigo-500" /> Import
               <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
             </label>
           )}
