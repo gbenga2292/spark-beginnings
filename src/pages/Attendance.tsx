@@ -24,6 +24,21 @@ import {
 } from '@/src/components/ui/dropdown-menu';
 
 import { getPositionIndex } from '@/src/lib/hierarchy';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/src/components/task_ui/popover";
+import { DayPicker } from "react-day-picker";
+import { 
+  startOfMonth, 
+  endOfMonth, 
+  eachDayOfInterval, 
+  isSameDay, 
+  parseISO,
+  isSunday,
+  startOfDay
+} from 'date-fns';
 
 
 export function Attendance() {
@@ -98,6 +113,39 @@ export function Attendance() {
   const [dbStaffTypeFilter, setDbStaffTypeFilter] = useState<'OFFICE' | 'FIELD' | 'All'>('FIELD');
   const [dbSiteFilter, setDbSiteFilter] = useState('All');
   const [dbShiftFilter, setDbShiftFilter] = useState('All');
+
+  // ─── Calendar Status Logic ─────────────────────────────────
+  const attendanceStatusMap = useMemo(() => {
+    const map: Record<string, 'fully' | 'special' | 'partial' | 'none'> = {};
+    const groupedRecords = attendanceRecords.reduce((acc, rec) => {
+      if (!acc[rec.date]) acc[rec.date] = new Set();
+      acc[rec.date].add(rec.staffId);
+      return acc;
+    }, {} as Record<string, Set<string>>);
+
+    const totalNeeded = employees.length;
+    if (totalNeeded === 0) return map;
+
+    // Check all dates present in the store
+    Object.keys(groupedRecords).forEach(dateStr => {
+      const recordedCount = groupedRecords[dateStr].size;
+      const isPublicHoliday = publicHolidaysStore.some(h => h.date === dateStr);
+      const isSun = isSunday(parseISO(dateStr));
+      const fullyFilled = recordedCount >= totalNeeded;
+
+      if (fullyFilled) {
+        if (isPublicHoliday || isSun) map[dateStr] = 'special';
+        else map[dateStr] = 'fully';
+      } else if (recordedCount > 0) {
+        map[dateStr] = 'partial';
+      } else {
+        map[dateStr] = 'none';
+      }
+    });
+
+    return map;
+  }, [attendanceRecords, employees, publicHolidaysStore]);
+
 
   const [dbSelectedIds, setDbSelectedIds] = useState<Set<string>>(new Set());
 
@@ -912,25 +960,58 @@ export function Attendance() {
           {/* Toolbar: date, filters, search, actions — all in one row */}
           <div className="flex flex-wrap items-center gap-2 py-1 px-0">
             {/* Date controls */}
-            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1.5 shadow-sm">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Last</span>
-              <span className="text-xs font-mono font-medium text-slate-700">{formatDisplayDate(lastEntryDate)}</span>
-              <div className="w-px h-4 bg-slate-200" />
+            <div className="flex flex-col gap-1.5 flex-1 max-w-[200px]">
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Date</span>
-              <Input
-                type="date"
-                value={registerDate}
-                max={format(new Date(), 'yyyy-MM-dd')}
-                onChange={(e) => {
-                  const chosen = e.target.value;
-                  if (chosen > format(new Date(), 'yyyy-MM-dd')) {
-                    toast.error('You cannot record attendance for a future date.');
-                    return;
-                  }
-                  setRegisterDate(chosen);
-                }}
-                className="h-7 text-xs border-0 bg-transparent p-0 w-28 font-mono focus-visible:ring-0"
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={`h-9 justify-start text-left font-medium border-slate-200 shadow-sm transition-all hover:bg-slate-50 ${
+                      !registerDate ? "text-muted-foreground" : "text-slate-900"
+                    }`}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4 text-indigo-500" />
+                    {registerDate ? formatDisplayDate(registerDate) : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0 border-slate-200 shadow-2xl rounded-xl overflow-hidden" align="start">
+                  <div className="p-3 bg-white">
+                    <DayPicker
+                      mode="single"
+                      selected={registerDate ? parseISO(registerDate) : undefined}
+                      onSelect={(date) => date && setRegisterDate(format(date, 'yyyy-MM-dd'))}
+                      modifiers={{
+                        fully: (date) => attendanceStatusMap[format(date, 'yyyy-MM-dd')] === 'fully',
+                        special: (date) => attendanceStatusMap[format(date, 'yyyy-MM-dd')] === 'special',
+                        partial: (date) => attendanceStatusMap[format(date, 'yyyy-MM-dd')] === 'partial',
+                      }}
+                      modifiersClassNames={{
+                        fully: "!bg-emerald-500 !text-white hover:!bg-emerald-600 rounded-full",
+                        special: "!bg-purple-500 !text-white hover:!bg-purple-600 rounded-full",
+                        partial: "!bg-amber-400 !text-white hover:!bg-amber-500 rounded-full",
+                      }}
+                      captionLayout="dropdown"
+                      disabled={{ after: new Date() }}
+                      footer={
+                        <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-y-2 gap-x-4">
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500" /> Fully Filled
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                            <div className="w-2 h-2 rounded-full bg-purple-500" /> Hol/Sun
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                            <div className="w-2 h-2 rounded-full bg-amber-400" /> Incomplete
+                          </div>
+                        </div>
+                      }
+                    />
+                  </div>
+                  <div className="p-2 border-t border-slate-100 flex justify-between bg-slate-50">
+                    <Button variant="ghost" size="sm" className="text-[10px] h-7 px-2" onClick={() => setRegisterDate(format(new Date(), 'yyyy-MM-dd'))}>Today</Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             {/* Staff Type filter */}

@@ -60,18 +60,6 @@ const fm = (v: number) => typeof v === 'number' ? v.toLocaleString() : '0';
 const fmT = fm;
 
 export function Payroll() {
-  const [activeTab, setActiveTab] = useState('processing');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [printDialogOpen, setPrintDialogOpen] = useState(false);
-  const [printType, setPrintType] = useState<'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF' | 'WITHHOLDING'>('PAYSLIPS');
-  const [printSelectedMonths, setPrintSelectedMonths] = useState<string[]>([]);
-  const [printSelectedEmployees, setPrintSelectedEmployees] = useState<string[]>([]);
-  const [printSelectedDepts, setPrintSelectedDepts] = useState<string[]>([]);
-  const [printSelectedColumns, setPrintSelectedColumns] = useState<string[]>([]);
-  const [printViewMode, setPrintViewMode] = useState<'LIST' | 'MATRIX'>('LIST');
-  const [filterDept, setFilterDept] = useState<string>('');
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
-
   const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
   const salaryAdvances = useAppStore((state) => state.salaryAdvances);
   const loans = useAppStore((state) => state.loans);
@@ -80,8 +68,21 @@ export function Payroll() {
   const monthValues = useAppStore((state) => state.monthValues);
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const publicHolidays = useAppStore((state) => state.publicHolidays);
+
   const [selectedMonth, setSelectedMonth] = useState('jan');
   const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [activeTab, setActiveTab] = useState('processing');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [printType, setPrintType] = useState<'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF' | 'WITHHOLDING'>('PAYSLIPS');
+  const [printSelectedYear, setPrintSelectedYear] = useState(currentYear);
+  const [printSelectedMonths, setPrintSelectedMonths] = useState<string[]>([]);
+  const [printSelectedEmployees, setPrintSelectedEmployees] = useState<string[]>([]);
+  const [printSelectedDepts, setPrintSelectedDepts] = useState<string[]>([]);
+  const [printSelectedColumns, setPrintSelectedColumns] = useState<string[]>([]);
+  const [printViewMode, setPrintViewMode] = useState<'LIST' | 'MATRIX'>('LIST');
+  const [filterDept, setFilterDept] = useState<string>('');
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
 
   // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Permissions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const priv = usePriv('payroll');
@@ -172,13 +173,13 @@ export function Payroll() {
 
 
     // Calculate payroll logic extracted for multi-month generation capabilities
-    const calculatePayrollForMonth = useCallback((monthKey: string) => {
+    const calculatePayrollForMonth = useCallback((monthKey: string, year: number = selectedYear) => {
       const mKey = monthKey as keyof typeof employees[0]['monthlySalaries'];
       const selectedMonthIndex = months.findIndex(m => m.key === monthKey) + 1;
 
       // Auto-compute workdays for this month from public holidays
       const holidayDates = publicHolidays.map(h => h.date);
-      const fallbackWorkdays = computeWorkDays(selectedYear, selectedMonthIndex, holidayDates, 6);
+      const fallbackWorkdays = computeWorkDays(year, selectedMonthIndex, holidayDates, 6);
 
       const monthConfig = monthValues[mKey as keyof typeof monthValues] || { workDays: fallbackWorkdays, overtimeRate: 0.5 };
       const otRate = monthConfig.overtimeRate;
@@ -219,7 +220,7 @@ export function Payroll() {
 
           const defaultDays = emp.staffType === 'FIELD' ? 6 : 5;
           const empWorkDaysPerWeek = payrollVariables.departmentWorkDays?.[emp.department] ?? defaultDays;
-          const empOfficialWorkdays = computeWorkDays(selectedYear, selectedMonthIndex, holidayDates, empWorkDaysPerWeek);
+          const empOfficialWorkdays = computeWorkDays(year, selectedMonthIndex, holidayDates, empWorkDaysPerWeek);
 
           // Ã¢â€â‚¬Ã¢â€â‚¬ Attendance tallies Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
           let daysWorked = 0; // days where day === 'Yes'
@@ -227,8 +228,8 @@ export function Payroll() {
           let totalOTInstances = 0;
 
           for (const r of attendanceRecords) {
-            const recordYear = r.date ? parseInt(r.date.split('-')[0], 10) : selectedYear;
-            if (r.staffId === emp.id && r.mth === selectedMonthIndex && recordYear === selectedYear) {
+            const recordYear = r.date ? parseInt(r.date.split('-')[0], 10) : year;
+            if (r.staffId === emp.id && r.mth === selectedMonthIndex && recordYear === year) {
               if (r.ot > 0) totalOTInstances += 1;
 
               if (r.day?.toLowerCase() === 'yes') {
@@ -338,7 +339,7 @@ export function Payroll() {
             const dateParts = a.requestDate.split('-');
             const advanceYear = parseInt(dateParts[0], 10);
             const advanceMonth = parseInt(dateParts[1], 10);
-            return advanceYear === selectedYear && advanceMonth === selectedMonthIndex;
+            return advanceYear === year && advanceMonth === selectedMonthIndex;
           });
           const advanceDeduction = empAdvances.reduce((sum, a) => sum + a.amount, 0);
 
@@ -350,7 +351,7 @@ export function Payroll() {
             const startYear = parseInt(dateParts[0], 10);
             const startMonth = parseInt(dateParts[1], 10);
 
-            const monthsElapsed = (selectedYear - startYear) * 12 + (selectedMonthIndex - startMonth);
+            const monthsElapsed = (year - startYear) * 12 + (selectedMonthIndex - startMonth);
             return monthsElapsed >= 0 && monthsElapsed < l.duration;
           });
           const loanDeduction = empLoans.reduce((sum, l) => sum + l.monthlyDeduction, 0);
@@ -407,7 +408,7 @@ export function Payroll() {
 
       monthsToUse.forEach(mKey => {
         const mLabel = months.find(m => m.key === mKey)?.label || mKey;
-        const data = calculatePayrollForMonth(mKey);
+        const data = calculatePayrollForMonth(mKey, printSelectedYear);
         data.forEach(record => {
           // Now empty printSelectedEmployees means NONE (explicit list always used)
           if (printSelectedEmployees.length > 0 && printSelectedEmployees.includes(record.id)) {
@@ -439,6 +440,7 @@ export function Payroll() {
 
     const handleOpenPrintDialog = (type: 'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF' | 'WITHHOLDING') => {
       setPrintSelectedMonths([selectedMonth]);
+      setPrintSelectedYear(selectedYear);
       // Seed with ALL active employee IDs so all checkboxes appear checked
       setPrintSelectedEmployees(employees.filter(e => e.status === 'Active').map(e => e.id));
       setPrintType(type);
@@ -487,7 +489,7 @@ export function Payroll() {
       <div class="payslip${i === payslipsToPrint.length - 1 ? ' last' : ''}">
         <div class="header">
           <img src="${logoSrc}" alt="Company Logo" style="height: 48px; width: auto; margin-bottom: 8px;" />
-          <p>Employee Payslip &ndash; ${slip.monthLabel} ${currentYear}</p>
+          <p>Employee Payslip &ndash; ${slip.monthLabel} ${printSelectedYear}</p>
         </div>
         <div class="two-col">
           <table class="info-table">
@@ -628,7 +630,16 @@ export function Payroll() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `${printType}_Schedule_${selectedMonth}.csv`);
+      
+      let mLabel = selectedMonth;
+      if (printDialogOpen && printSelectedMonths.length > 0) {
+        if (printSelectedMonths.length === 1) mLabel = printSelectedMonths[0];
+        else if (printSelectedMonths.length > 1) mLabel = `${printSelectedMonths[0]}_to_${printSelectedMonths[printSelectedMonths.length-1]}`;
+      }
+      
+      const yrLabel = printDialogOpen ? printSelectedYear : selectedYear;
+      
+      link.setAttribute('download', `${printType}_Schedule_${mLabel}_${yrLabel}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
@@ -1104,6 +1115,19 @@ export function Payroll() {
                   </div>
 
                   <div>
+                    <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1">Select Year</h4>
+                    <select
+                      className="w-full h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm mt-2"
+                      value={printSelectedYear}
+                      onChange={(e) => setPrintSelectedYear(Number(e.target.value))}
+                    >
+                      {Array.from({ length: currentYear - YEAR_RANGE_START + 2 }, (_, i) => YEAR_RANGE_START + i).map(yr => (
+                        <option key={yr} value={yr}>{yr}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
                     <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1">Select Months</h4>
                     <div className="flex gap-2 mb-2">
                       <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedMonths(months.map(m => m.key))}>Select All</button>
@@ -1280,7 +1304,7 @@ export function Payroll() {
                         {/* Company Header */}
                         <div className="border-b-2 border-indigo-600 pb-4 mb-6">
                           <img src={logoSrc} alt="Company Logo" className="h-12 w-auto mb-2" />
-                          <p className="text-sm text-slate-500">Employee Payslip - {slip.monthLabel} {currentYear}</p>
+                          <p className="text-sm text-slate-500">Employee Payslip - {slip.monthLabel} {printSelectedYear}</p>
                         </div>
 
                         {/* Employee Info */}
