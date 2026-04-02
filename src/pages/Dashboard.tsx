@@ -14,11 +14,28 @@ import {
     Tooltip, XAxis, YAxis, Legend, PieChart, Pie, Cell, LabelList
 } from 'recharts';
 
-function computeWorkDays(year: number, monthNum: number, holidayDates: string[]): number {
+function computeWorkDays(year: number, monthNum: number, holidayDates: string[], empStartDate?: string, empEndDate?: string): number {
     const startDate = new Date(year, monthNum - 1, 1);
     const endDate = new Date(year, monthNum, 0);
+
+    let actualStart = new Date(startDate);
+    if (empStartDate) {
+        const empS = new Date(empStartDate);
+        if (!isNaN(empS.getTime()) && empS > actualStart) actualStart = empS;
+    }
+
+    let actualEnd = new Date(endDate);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    if (today < actualEnd) actualEnd = today;
+
+    if (empEndDate) {
+        const empE = new Date(empEndDate);
+        if (!isNaN(empE.getTime()) && empE < actualEnd) actualEnd = empE;
+    }
+
     let days = 0;
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(actualStart); d <= actualEnd; d.setDate(d.getDate() + 1)) {
         const dayOfWeek = d.getDay();
         if (dayOfWeek === 0) continue;
         const isHoliday = holidayDates.some(hd => {
@@ -27,7 +44,7 @@ function computeWorkDays(year: number, monthNum: number, holidayDates: string[])
         });
         if (!isHoliday) days++;
     }
-    return days;
+    return Math.max(0, days);
 }
 
 const MONTHS = [
@@ -77,13 +94,24 @@ export function Dashboard() {
 
         activeStaff.forEach(emp => {
             monthsToProcess.forEach(targetMonth => {
-                const officialWorkdays = computeWorkDays(filterYear, targetMonth, holidays.map(h => h.date));
+                const officialWorkdays = computeWorkDays(filterYear, targetMonth, holidays.map(h => h.date), emp.startDate, emp.endDate);
                 totalPossibleDays += officialWorkdays;
                 let present = 0, absent = 0, ot = 0;
                 for (const r of attendanceRecords) {
-                    if (r.staffId === emp.id && r.mth === targetMonth && r.date.startsWith(filterYear.toString())) {
-                        if (r.day?.toLowerCase() === 'yes') { present++; if (r.ot > 0) ot++; }
-                        else if (r.day?.toLowerCase() === 'no') { absent++; }
+                    if (!r.date) continue;
+                    const recMonth = parseInt(r.date.split('-')[1], 10);
+                    if (r.staffId === emp.id && recMonth === targetMonth && r.date.startsWith(filterYear.toString())) {
+                        const isDay = r.day?.toLowerCase() === 'yes';
+                        const isNight = r.night?.toLowerCase() === 'yes';
+                        const hasOt = (r.overtimeDetails && r.overtimeDetails.trim() !== '') || (r.ot || 0) > 0;
+                        
+                        if (isDay || isNight) { 
+                            present++; 
+                            if (hasOt) ot++; 
+                        }
+                        else if (r.day?.toLowerCase() === 'no' || r.night?.toLowerCase() === 'no') { 
+                            absent++; 
+                        }
                     }
                 }
                 totalPresentDays += present;
@@ -144,9 +172,20 @@ export function Dashboard() {
 
             activeStaff.forEach(emp => {
                 for (const r of attendanceRecords) {
-                    if (r.staffId === emp.id && r.mth === m.value && r.date.startsWith(filterYear.toString())) {
-                        if (r.day?.toLowerCase() === 'yes') { present++; if (r.ot > 0) overtime++; }
-                        else if (r.day?.toLowerCase() === 'no') { absent++; }
+                    if (!r.date) continue;
+                    const recMonth = parseInt(r.date.split('-')[1], 10);
+                    if (r.staffId === emp.id && recMonth === m.value && r.date.startsWith(filterYear.toString())) {
+                        const isDay = r.day?.toLowerCase() === 'yes';
+                        const isNight = r.night?.toLowerCase() === 'yes';
+                        const hasOt = (r.overtimeDetails && r.overtimeDetails.trim() !== '') || (r.ot || 0) > 0;
+
+                        if (isDay || isNight) { 
+                            present++; 
+                            if (hasOt) overtime++; 
+                        }
+                        else if (r.day?.toLowerCase() === 'no' || r.night?.toLowerCase() === 'no') { 
+                            absent++; 
+                        }
                     }
                 }
             });

@@ -37,6 +37,7 @@ export function Variables() {
   const storePayeTaxVariables = useAppStore((state) => state.payeTaxVariables);
   const storeHrVariables = useAppStore((state) => state.hrVariables);
   const saveAllSettingsStore = useAppStore((state) => state.saveAllSettings);
+  const departmentTasksList = useAppStore((state) => state.departmentTasksList);
 
   const {
     setPositions, setDepartments, setClients, setPublicHolidays,
@@ -99,7 +100,6 @@ export function Variables() {
   // Top-level section switch: 'system' | 'ledger' | 'services'
   const [varSection, setVarSection] = useState<'system' | 'ledger' | 'services'>('system');
 
-  const departmentTasksList = useAppStore((state) => state.departmentTasksList);
   const updateDepartmentTasks = useAppStore((state) => state.updateDepartmentTasks);
 
   // Service Templates State
@@ -263,7 +263,7 @@ export function Variables() {
     } else if (type === 'client') {
       addCount('Sites', state.sites.filter(s => s.client === oldValue).length);
       addCount('Invoices', state.invoices.filter(i => i.client === oldValue).length);
-      addCount('Pending Invoices', state.pendingInvoices.filter(i => i.client === oldValue).length);
+      addCount('Quotations', state.pendingInvoices.filter(i => i.client === oldValue).length);
       addCount('Ledger Entries', state.ledgerEntries.filter(l => l.client === oldValue).length);
       addCount('Comm Logs', (state.commLogs || []).filter(c => c.client === oldValue).length);
       addCount('Payments', (state.payments || []).filter(p => p.client === oldValue).length);
@@ -470,23 +470,33 @@ export function Variables() {
     try {
       const wb = XLSX.utils.book_new();
 
+      // Positions
       const posData = positions.map(p => {
         const dept = departments.find(d => d.id === p.departmentId);
         return { Position: p.title, Department: dept?.name || 'Unassigned' };
       });
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(posData), 'Positions');
+      const posSheet = posData.length > 0 ? XLSX.utils.json_to_sheet(posData, { header: ['Position', 'Department'] }) : XLSX.utils.aoa_to_sheet([['Position', 'Department']]);
+      XLSX.utils.book_append_sheet(wb, posSheet, 'Positions');
 
+      // Departments
       const deptData = departments.map(d => ({ Department: d.name, 'Work Days/Week': d.workDaysPerWeek }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(deptData), 'Departments');
+      const deptSheet = deptData.length > 0 ? XLSX.utils.json_to_sheet(deptData, { header: ['Department', 'Work Days/Week'] }) : XLSX.utils.aoa_to_sheet([['Department', 'Work Days/Week']]);
+      XLSX.utils.book_append_sheet(wb, deptSheet, 'Departments');
 
+      // Clients
       const clientData = clients.filter(c => c.toLowerCase() !== 'dcel').map(c => ({ Client: c }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(clientData), 'Clients');
+      const clientSheet = clientData.length > 0 ? XLSX.utils.json_to_sheet(clientData, { header: ['Client'] }) : XLSX.utils.aoa_to_sheet([['Client']]);
+      XLSX.utils.book_append_sheet(wb, clientSheet, 'Clients');
 
+      // Leave Types
       const leaveData = leaveTypes.map(l => ({ LeaveType: l }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(leaveData), 'Leave_Types');
+      const leaveSheet = leaveData.length > 0 ? XLSX.utils.json_to_sheet(leaveData, { header: ['LeaveType'] }) : XLSX.utils.aoa_to_sheet([['LeaveType']]);
+      XLSX.utils.book_append_sheet(wb, leaveSheet, 'Leave_Types');
 
+      // Public Holidays
       const phData = publicHolidays.map(h => ({ Date: h.date, Name: h.name }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(phData), 'Public_Holidays');
+      const phSheet = phData.length > 0 ? XLSX.utils.json_to_sheet(phData, { header: ['Date', 'Name'] }) : XLSX.utils.aoa_to_sheet([['Date', 'Name']]);
+      XLSX.utils.book_append_sheet(wb, phSheet, 'Public_Holidays');
 
       // Payroll Variables
       const payrollData = [
@@ -537,20 +547,25 @@ export function Variables() {
           Assignee: t.assignee
         }));
       });
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taskData), 'Task_Templates');
+      const taskSheet = taskData.length > 0 ? XLSX.utils.json_to_sheet(taskData, { header: ['Department', 'Type', 'Title', 'Assignee'] }) : XLSX.utils.aoa_to_sheet([['Department', 'Type', 'Title', 'Assignee']]);
+      XLSX.utils.book_append_sheet(wb, taskSheet, 'Task_Templates');
 
       // Ledger Variables
       const lCatData = ledgerCategories.map(c => ({ Category: c.name }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lCatData), 'Ledger_Categories');
+      const lCatSheet = lCatData.length > 0 ? XLSX.utils.json_to_sheet(lCatData, { header: ['Category'] }) : XLSX.utils.aoa_to_sheet([['Category']]);
+      XLSX.utils.book_append_sheet(wb, lCatSheet, 'Ledger_Categories');
 
       const lVenData = ledgerVendors.map(v => ({ Vendor: v.name, TIN: v.tinNumber }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lVenData), 'Ledger_Vendors');
+      const lVenSheet = lVenData.length > 0 ? XLSX.utils.json_to_sheet(lVenData, { header: ['Vendor', 'TIN'] }) : XLSX.utils.aoa_to_sheet([['Vendor', 'TIN']]);
+      XLSX.utils.book_append_sheet(wb, lVenSheet, 'Ledger_Vendors');
 
       const lBankData = ledgerBanks.map(b => ({ Bank: b.name }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lBankData), 'Ledger_Banks');
+      const lBankSheet = lBankData.length > 0 ? XLSX.utils.json_to_sheet(lBankData, { header: ['Bank'] }) : XLSX.utils.aoa_to_sheet([['Bank']]);
+      XLSX.utils.book_append_sheet(wb, lBankSheet, 'Ledger_Banks');
 
       const lBenData = ledgerBeneficiaryBanks.map(b => ({ Bank: b.name }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lBenData), 'Ledger_Beneficiary_Banks');
+      const lBenSheet = lBenData.length > 0 ? XLSX.utils.json_to_sheet(lBenData, { header: ['Bank'] }) : XLSX.utils.aoa_to_sheet([['Bank']]);
+      XLSX.utils.book_append_sheet(wb, lBenSheet, 'Ledger_Beneficiary_Banks');
 
       // Service Templates
       const srvData: any[] = [];
@@ -561,7 +576,8 @@ export function Variables() {
           Assignee: t.assignee
         }));
       });
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(srvData), 'Service_Templates');
+      const srvSheet = srvData.length > 0 ? XLSX.utils.json_to_sheet(srvData, { header: ['ServiceName', 'TaskTitle', 'Assignee'] }) : XLSX.utils.aoa_to_sheet([['ServiceName', 'TaskTitle', 'Assignee']]);
+      XLSX.utils.book_append_sheet(wb, srvSheet, 'Service_Templates');
 
       // HR & Month Variables
       const hrData = [
@@ -615,9 +631,9 @@ export function Variables() {
         confirmLabel: 'Overwrite All',
         cancelLabel: 'Append New'
       }
-    ).then((isOverwrite) => {
+    ).then(async (isOverwrite) => {
       const reader = new FileReader();
-      reader.onload = (evt) => {
+      reader.onload = async (evt) => {
         try {
           const data = evt.target?.result;
           const wb = XLSX.read(data, { type: 'binary' });
@@ -647,7 +663,7 @@ export function Variables() {
                 });
               }
             });
-            setDepartments(newDepts);
+            await setDepartments(newDepts);
           }
 
           if (wb.SheetNames.includes('Positions')) {
@@ -664,7 +680,7 @@ export function Variables() {
                 newPositions.push({ id: generateId(), title, departmentId: deptId });
               }
             });
-            setPositions(newPositions);
+            await setPositions(newPositions);
           }
 
           if (wb.SheetNames.includes('Clients')) {
@@ -675,7 +691,7 @@ export function Variables() {
                 newClients.push(c);
               }
             });
-            setClients(newClients);
+            await setClients(newClients);
           }
 
           if (wb.SheetNames.includes('Leave_Types')) {
@@ -686,7 +702,7 @@ export function Variables() {
                 newLeaveTypes.push(lt);
               }
             });
-            setLeaveTypes(newLeaveTypes);
+            await setLeaveTypes(newLeaveTypes);
           }
 
           if (wb.SheetNames.includes('Public_Holidays')) {
@@ -698,7 +714,7 @@ export function Variables() {
                 newHolidays.push({ id: generateId(), date, name });
               }
             });
-            setPublicHolidays(newHolidays);
+            await setPublicHolidays(newHolidays);
           }
 
           if (wb.SheetNames.includes('Ledger_Categories')) {
@@ -709,7 +725,7 @@ export function Variables() {
                 newLCats.push({ id: generateId(), name });
               }
             });
-            setLedgerCategories(newLCats);
+            await setLedgerCategories(newLCats);
           }
 
           if (wb.SheetNames.includes('Ledger_Vendors')) {
@@ -720,7 +736,7 @@ export function Variables() {
                 newLVendors.push({ id: generateId(), name, tinNumber: String(row.TIN || '') });
               }
             });
-            setLedgerVendors(newLVendors);
+            await setLedgerVendors(newLVendors);
           }
 
           if (wb.SheetNames.includes('Ledger_Banks')) {
@@ -731,7 +747,7 @@ export function Variables() {
                 newLBanks.push({ id: generateId(), name });
               }
             });
-            setLedgerBanks(newLBanks);
+            await setLedgerBanks(newLBanks);
           }
 
           if (wb.SheetNames.includes('Ledger_Beneficiary_Banks')) {
@@ -742,7 +758,7 @@ export function Variables() {
                 newLBenBanks.push({ id: generateId(), name, accountNo: '' });
               }
             });
-            setLedgerBeneficiaryBanks(newLBenBanks);
+            await setLedgerBeneficiaryBanks(newLBenBanks);
           }
 
           if (wb.SheetNames.includes('Payroll_Variables')) {
@@ -870,7 +886,7 @@ export function Variables() {
           }
           
           if (wb.SheetNames.includes('Task_Templates') || wb.SheetNames.includes('Service_Templates')) {
-            setDepartmentTasksList(newTaskLists);
+            await setDepartmentTasksList(newTaskLists);
           }
 
           toast.success('Variables imported successfully.');

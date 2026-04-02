@@ -196,7 +196,10 @@ export function Attendance() {
 
   // Auto-load existing records when date changes
   useEffect(() => {
-    const existingRecords = attendanceRecords.filter(r => r.date === registerDate);
+    // Normalizing both sides for safety against different string formats
+    const normDate = normalizeDate(registerDate);
+    const existingRecords = attendanceRecords.filter(r => normalizeDate(r.date) === normDate);
+    
     if (existingRecords.length > 0) {
       const loadedData: Record<string, { day: string, night: string, overtime: boolean, overtimeDetails: string }> = {};
       existingRecords.forEach(r => {
@@ -289,7 +292,7 @@ export function Attendance() {
       const met = calculateAttendanceMetrics(r, publicHolidays, payrollVariables, monthValues, attendanceRecords);
       if (mode === 'bare') {
         return {
-          Date: r.date ? new Date(r.date) : '',
+          Date: r.date ? new Date(r.date + 'T00:00:00') : '',
           'Staff ID': r.staffId,
           'Staff Name': r.staffName,
           'Day Site': r.daySite,
@@ -299,7 +302,7 @@ export function Attendance() {
         };
       }
       return {
-        Date: r.date ? new Date(r.date) : '',
+        Date: r.date ? new Date(r.date + 'T00:00:00') : '',
         'Staff ID': r.staffId,
         'Staff Name': r.staffName,
         Position: r.position,
@@ -409,17 +412,25 @@ export function Attendance() {
         const buildBareRecord = (row: any, date: string, empId: string, empName: string): AttendanceRecord => {
           const daySiteRaw = String(row['Day Site'] || row.daySite || '').trim();
           const nightSiteRaw = String(row['Night Site'] || row.nightSite || '').trim();
+          const absentStatusRaw = String(row['Absent Status'] || row.absentStatus || '').trim();
           const dSite = isAbsentStatus(daySiteRaw) ? '' : daySiteRaw;
           const nSite = isAbsentStatus(nightSiteRaw) ? '' : nightSiteRaw;
           const dSiteObj = findSite(dSite);
           const nSiteObj = findSite(nSite);
-          const day: 'Yes' | 'No' = (dSite && !isAbsentStatus(dSite)) ? 'Yes' : 'No';
-          const night: 'Yes' | 'No' = (nSite && !isAbsentStatus(nSite)) ? 'Yes' : 'No';
+          
+          const isPermit = (val: string) => val.toUpperCase() === 'ABSENT WITH PERMIT' || val.toUpperCase() === 'ON LEAVE';
+          const permitOverride = isPermit(daySiteRaw) || isPermit(absentStatusRaw);
+          const nightPermitOverride = isPermit(nightSiteRaw);
+
+          const day: 'Yes' | 'No' = (dSite && !isAbsentStatus(dSite)) || permitOverride ? 'Yes' : 'No';
+          const night: 'Yes' | 'No' = (nSite && !isAbsentStatus(nSite)) || nightPermitOverride ? 'Yes' : 'No';
           return {
             id: generateId(), date, staffId: empId, staffName: empName,
-            position: '', dayClient: dSiteObj?.client || '', daySite: dSiteObj?.name || dSite,
-            nightClient: nSiteObj?.client || '', nightSite: nSiteObj?.name || nSite,
-            day, night, absentStatus: String(row['Absent Status'] || row.absentStatus || ''),
+            position: '', dayClient: dSiteObj?.client || (permitOverride ? 'DCEL' : ''), 
+            daySite: dSiteObj?.name || (permitOverride ? 'Office' : dSite),
+            nightClient: nSiteObj?.client || (nightPermitOverride ? 'DCEL' : ''), 
+            nightSite: nSiteObj?.name || (nightPermitOverride ? 'Office' : nSite),
+            day, night, absentStatus: absentStatusRaw,
             nightWk: night === 'Yes' ? 1 : 0, ot: 0, otSite: '', dayWk: 0, dow: 0, ndw: 'No', mth: 0,
             isPresent: (day === 'Yes' || night === 'Yes') ? 'Yes' : 'No',
             day2: (day === 'Yes' ? 1 : 0) + (night === 'Yes' ? 1 : 0),
@@ -565,11 +576,15 @@ export function Attendance() {
       const absentStatus = row['Absent Status'] || row.absentStatus || row.absent_status || '';
       const overtimeDetails = row['Overtime Details'] || row.overtimeDetails || row.overtime_details || row.over_time_details || '';
 
-      const day = (ds && !isAbsentStatus(ds)) ? 'Yes' : 'No';
-      const night = (ns && !isAbsentStatus(ns)) ? 'Yes' : 'No';
+      const isPermit = (val: string) => val.toUpperCase() === 'ABSENT WITH PERMIT' || val.toUpperCase() === 'ON LEAVE';
+      const permitOverride = isPermit(ds) || isPermit(absentStatus);
+      const nightPermitOverride = isPermit(ns);
 
-      const finalDaySite = isAbsentStatus(ds) ? '' : ds;
-      const finalNightSite = isAbsentStatus(ns) ? '' : ns;
+      const day = (ds && !isAbsentStatus(ds)) || permitOverride ? 'Yes' : 'No';
+      const night = (ns && !isAbsentStatus(ns)) || nightPermitOverride ? 'Yes' : 'No';
+
+      const finalDaySite = (isAbsentStatus(ds) && !isPermit(ds)) ? (permitOverride ? 'Office' : '') : (permitOverride ? 'Office' : ds);
+      const finalNightSite = (isAbsentStatus(ns) && !isPermit(ns)) ? '' : (nightPermitOverride ? 'Office' : ns);
 
       const dayClient = sites.find(s => s.name === finalDaySite)?.client || '';
       const nightClient = sites.find(s => s.name === finalNightSite)?.client || '';
@@ -658,7 +673,7 @@ export function Attendance() {
       return { site: src, shift: "No", reason: src };
     }
     if (["ABSENT WITH PERMIT", "ON LEAVE", "SICK LEAVE", "MATERNITY LEAVE", "ANNUAL LEAVE", "PUBLIC HOLIDAY"].includes(upperSrc)) {
-      return { site: src, shift: "Yes", reason: src };
+      return { site: (upperSrc === "ABSENT WITH PERMIT" || upperSrc === "ON LEAVE") ? "Office" : src, shift: "Yes", reason: src };
     }
     return { site: src, shift: "Yes", reason: currentReason };
   };
@@ -668,27 +683,40 @@ export function Attendance() {
   const isHoliday = (dateStr: string) => publicHolidays.includes(dateStr);
 
   const getNextDayStr = (dateStr: string, offset: number = 1) => {
-    const d = new Date(dateStr);
+    // Add T00:00:00 to prevent timezone-shift-backward bugs in some environments
+    const d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) {
+      // Fallback if the dateStr somehow lacks the correct format
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const d2 = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        d2.setDate(d2.getDate() + offset);
+        return format(d2, 'yyyy-MM-dd');
+      }
+      return dateStr;
+    }
     d.setDate(d.getDate() + offset);
     return format(d, 'yyyy-MM-dd');
   };
 
   // Excel DOW: WEEKDAY(date, 2) → 1=Monday, 7=Sunday
   const getDOW = (dateStr: string) => {
-    const d = new Date(dateStr);
+    const d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return 1;
     const jsDay = d.getDay(); // 0=Sun, 1=Mon...6=Sat
     return jsDay === 0 ? 7 : jsDay; // Convert to 1=Mon...7=Sun
   };
 
   const handleSubmit = async () => {
-    const existingRecords = attendanceRecords.filter(r => r.date === registerDate);
+    const normDate = normalizeDate(registerDate);
+    const existingRecords = attendanceRecords.filter(r => normalizeDate(r.date) === normDate);
     if (existingRecords.length > 0) {
-      const ok = await showConfirm(`Entries already exist for ${registerDate}. Click OK to overwrite them, or Cancel to abort.`, { confirmLabel: 'Overwrite' });
+      const ok = await showConfirm(`Entries already exist for ${formatDisplayDate(registerDate)}. Click OK to overwrite them, or Cancel to abort.`, { confirmLabel: 'Overwrite' });
       if (!ok) return;
       removeAttendanceRecordsByDate(registerDate);
     }
 
-    const dateObj = new Date(registerDate);
+    const dateObj = new Date(registerDate + 'T00:00:00');
     const dow = getDOW(registerDate);
     const isSunday = dow === 7;
     const dateIsHoliday = isHoliday(registerDate);
@@ -772,8 +800,8 @@ export function Attendance() {
     // NDW checks if this staff works the next day (or day after if next day is Sunday/holiday)
     const nextDayStr = getNextDayStr(registerDate);
     const nextNextDayStr = getNextDayStr(registerDate, 2);
-    const existingNextDay = attendanceRecords.filter(r => r.date === nextDayStr);
-    const existingNextNextDay = attendanceRecords.filter(r => r.date === nextNextDayStr);
+    const existingNextDay = attendanceRecords.filter(r => normalizeDate(r.date) === nextDayStr);
+    const existingNextNextDay = attendanceRecords.filter(r => normalizeDate(r.date) === nextNextDayStr);
 
     const mth = dateObj.getMonth() + 1;
 
@@ -1370,7 +1398,7 @@ export function Attendance() {
                         <div className="font-semibold text-slate-800 text-sm">{name}</div>
                         <div className="text-xs text-slate-500 mt-0.5">
                           {recCount} record{recCount !== 1 ? 's' : ''} &bull; {dates.map(d => {
-                            try { return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }); } catch { return d; }
+                            try { return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }); } catch { return d; }
                           }).join(', ')}{pendingImport.unmatchedRecordsByName[name].length > 3 ? ` +${pendingImport.unmatchedRecordsByName[name].length - 3} more` : ''}
                         </div>
                       </div>

@@ -729,7 +729,8 @@ export function Payroll() {
             <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export CSV
           </Button>
         )}
-      </div>
+      </div>,
+      [selectedMonth, selectedYear, activeTab]
     );
 
     return (

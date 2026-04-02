@@ -73,6 +73,6 @@ export function useSetPageTitle(title: string, subtitle: string = '', buttons: R
       setHeaderButtons(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, subtitle, setTitle, setSubtitle, setHeaderButtons, ...deps]);
+  }, [title, subtitle, setTitle, setSubtitle, setHeaderButtons, deps]);
 }
 

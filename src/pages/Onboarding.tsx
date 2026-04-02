@@ -8,7 +8,7 @@ import {
   Clock, FileText, UserPlus, UserMinus, Users, Building, Activity,
   CalendarDays, Check, Search, AlertCircle, Mail, RotateCcw,
   ShieldCheck, CalendarCheck2, FileSignature, GraduationCap, Package,
-  ChevronDown, ChevronUp, Lock, Unlock, Siren, UserCheck, Pencil, PauseCircle, PlayCircle, X,
+  ChevronDown, ChevronUp, Lock, Unlock, Siren, UserCheck, Pencil, PauseCircle, PlayCircle, X, CheckCircle2
 } from 'lucide-react';
 import { useAppStore, Employee, OnboardingTask, OnboardingChecklist, GuarantorInfo } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -224,6 +224,8 @@ export function Onboarding() {
   const departments = useAppStore(s => s.departments);
   const positions = useAppStore(s => s.positions);
   const priv = usePriv('onboarding');
+  const privUsers = usePriv('users');
+  const isAdmin = privUsers.canManage;
   const navigate = useNavigate();
   const { createMainTask, subtasks, updateSubtaskStatus, addReminder, reminders } = useAppData();
   const { user } = useAuth();
@@ -489,6 +491,85 @@ export function Onboarding() {
     toast.success(`Successfully onboarded all ${pendingEmployees.length} staff!`);
   };
 
+  const handleBulkCompleteSteps = async () => {
+    if (!selectedEmployee) return;
+    const ok = await showConfirm(
+      `Mark all onboarding steps as "Complete" for ${selectedEmployee.firstname}? This will fill the audit trail for this employee if it was partially filled.`,
+      { variant: 'default', confirmLabel: 'Bulk Complete' }
+    );
+    if (!ok) return;
+
+    const defaultCL = makeDefaultChecklist(selectedEmployee.noOfGuarantors ?? 1);
+    const fullCL: OnboardingChecklist = {
+      ...defaultCL,
+      ...selectedEmployee.onboardingChecklist, // preserve what's there
+      emailFormsSent: true,
+      emailFormsAcknowledged: true,
+      formsReturned: true,
+      guarantorFormsReturned: true,
+      guarantorPassportReturned: true,
+      personalEmployeeFormReturned: true,
+      personalEmployeePassportReturned: true,
+      passportPhotos: true,
+      addressVerification: true,
+      educationalCredentials: true,
+      accountDetailsVerified: true,
+      pensionVerified: true,
+      payeVerified: true,
+      lashmaVerified: true,
+      employmentLetterPrinted: true,
+      employmentLetterSigned: true,
+      employmentLetterFiled: true,
+      employmentLettersIssued: true,
+      orientationDone: true,
+      hrOrientation: true,
+      ppeHandbookIssued: true,
+    };
+    updateEmployee(selectedEmployee.id, { onboardingChecklist: fullCL });
+    toast.success(`Onboarding steps marked as complete for ${selectedEmployee.firstname}!`);
+  };
+
+  const handleMarkAllActiveAsOnboardingComplete = async () => {
+    if (activeEmployees.length === 0) return;
+    const ok = await showConfirm(
+      `Mark all ${activeEmployees.length} active staff onboarding checklists as "Complete"? This will bypass manual ticking and fill the audit trails for all currently active staff.`,
+      { variant: 'default', confirmLabel: 'Bulk Complete All' }
+    );
+    if (!ok) return;
+
+    activeEmployees.forEach(emp => {
+      const defaultCL = makeDefaultChecklist(emp.noOfGuarantors ?? 1);
+      const fullCL: OnboardingChecklist = {
+        ...defaultCL,
+        ...emp.onboardingChecklist,
+        emailFormsSent: true,
+        emailFormsAcknowledged: true,
+        formsReturned: true,
+        guarantorFormsReturned: true,
+        guarantorPassportReturned: true,
+        personalEmployeeFormReturned: true,
+        personalEmployeePassportReturned: true,
+        passportPhotos: true,
+        addressVerification: true,
+        educationalCredentials: true,
+        accountDetailsVerified: true,
+        pensionVerified: true,
+        payeVerified: true,
+        lashmaVerified: true,
+        employmentLetterPrinted: true,
+        employmentLetterSigned: true,
+        employmentLetterFiled: true,
+        employmentLettersIssued: true,
+        orientationDone: true,
+        hrOrientation: true,
+        ppeHandbookIssued: true,
+        verifiedStartDate: emp.startDate,
+      };
+      updateEmployee(emp.id, { onboardingChecklist: fullCL });
+    });
+    toast.success(`Successfully updated checklists for all ${activeEmployees.length} active staff!`);
+  };
+
   const toggleOffboardingTask = (taskId: string) => {
     if (!selectedEmployee) return;
     const tasks = (selectedEmployee.offboardingTasks || []).map(t => {
@@ -587,11 +668,24 @@ export function Onboarding() {
             <CardTitle className="text-base font-bold text-slate-800 flex items-center justify-between">
               <span>{leftTab === 'Terminated' ? 'Offboarding' : leftTab} Directory</span>
               <div className="flex items-center gap-2">
-                {leftTab === 'Pending' && pendingEmployees.length > 0 && priv.canEdit && (
+                {leftTab === 'Active' && activeEmployees.length > 0 && isAdmin && (
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    className="h-7 text-[10px] font-bold uppercase tracking-tight text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-2 border border-indigo-100"
+                    className="h-7 text-[10px] font-bold uppercase tracking-tight text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 px-2 border border-emerald-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMarkAllActiveAsOnboardingComplete();
+                    }}
+                  >
+                    Bulk Complete Checklists
+                  </Button>
+                )}
+                {leftTab === 'Pending' && pendingEmployees.length > 0 && isAdmin && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 text-[10px] font-bold uppercase tracking-tight text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2 border border-amber-100"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleMarkAllAsOnboarded();
@@ -805,17 +899,29 @@ export function Onboarding() {
                         {selectedEmployee.bankName && <span>Bank: <strong>{selectedEmployee.bankName}</strong></span>}
                       </div>
                     </div>
-                    {priv.canEdit && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setChecklistEditMode(!checklistEditMode)} 
-                        className={`gap-1.5 transition-colors h-8 text-xs font-semibold shadow-sm ${checklistEditMode ? 'bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200 hover:text-amber-900 focus:bg-amber-200' : 'bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}
-                      >
-                        {checklistEditMode ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
-                        {checklistEditMode ? 'Done Editing' : 'Edit Checklist'}
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleBulkCompleteSteps}
+                          className="h-8 text-[10px] font-bold uppercase tracking-tight text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2 border border-amber-100"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Bulk Complete Steps
+                        </Button>
+                      )}
+                      {priv.canEdit && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setChecklistEditMode(!checklistEditMode)} 
+                          className={`gap-1.5 transition-colors h-8 text-xs font-semibold shadow-sm ${checklistEditMode ? 'bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200 hover:text-amber-900 focus:bg-amber-200' : 'bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}
+                        >
+                          {checklistEditMode ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
+                          {checklistEditMode ? 'Done Editing' : 'Edit Checklist'}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
 

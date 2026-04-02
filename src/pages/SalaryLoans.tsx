@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import {
   CheckCircle, ArrowLeft, List, Wallet, CalendarRange, Landmark,
-  Banknote, User, CreditCard, Clock, XCircle, ShieldCheck, Download, Upload
+  Banknote, User, CreditCard, Clock, XCircle, ShieldCheck, Download, Upload, Trash2
 } from 'lucide-react';
 import { useAppStore, SalaryAdvance, Loan } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -55,6 +55,8 @@ export function SalaryLoans() {
   const addLoan = useAppStore((state) => state.addLoan);
   const updateSalaryAdvance = useAppStore((state) => state.updateSalaryAdvance);
   const updateLoan = useAppStore((state) => state.updateLoan);
+  const deleteSalaryAdvance = useAppStore((state) => state.deleteSalaryAdvance);
+  const deleteLoan = useAppStore((state) => state.deleteLoan);
 
   // Approver options — all active system users except current user
   const approverOptions = users.filter((u: any) => u.id !== currentUser?.id && !u.isDeleted);
@@ -67,6 +69,22 @@ export function SalaryLoans() {
     setDuration('');
     setPayStartDate('');
     setApproverId('');
+  };
+
+  const handleDeleteAdvance = async (id: string, name: string) => {
+    const confirmed = await showConfirm(`Are you sure you want to delete the salary advance for ${name}?`, 'Delete Entry', 'destructive');
+    if (confirmed) {
+      deleteSalaryAdvance(id);
+      toast.success('Salary advance deleted successfully.');
+    }
+  };
+
+  const handleDeleteLoan = async (id: string, name: string) => {
+    const confirmed = await showConfirm(`Are you sure you want to delete the loan for ${name}?`, 'Delete Entry', 'destructive');
+    if (confirmed) {
+      deleteLoan(id);
+      toast.success('Loan deleted successfully.');
+    }
   };
 
   const handleSubmit = async () => {
@@ -469,6 +487,7 @@ export function SalaryLoans() {
                       <TableHead className="h-12 text-xs uppercase tracking-wider">Date</TableHead>
                       <TableHead className="h-12 text-xs uppercase tracking-wider">Approver</TableHead>
                       <TableHead className="h-12 text-xs uppercase tracking-wider">Status</TableHead>
+                      {priv.canDelete && <TableHead className="h-12 w-16 text-xs uppercase tracking-wider text-right">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -490,11 +509,23 @@ export function SalaryLoans() {
                           ) : <span className="text-slate-300 text-xs">—</span>}
                         </TableCell>
                         <TableCell>{getStatusBadge(sa.status)}</TableCell>
+                        {priv.canDelete && (
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => handleDeleteAdvance(sa.id, sa.employeeName)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                     {salaryAdvances.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-12 text-slate-400">No salary advances recorded.</TableCell>
+                        <TableCell colSpan={priv.canDelete ? 6 : 5} className="text-center py-12 text-slate-400">No salary advances recorded.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -518,6 +549,7 @@ export function SalaryLoans() {
                       <TableHead className="h-12 text-xs uppercase tracking-wider">Pay Start</TableHead>
                       <TableHead className="h-12 text-xs uppercase tracking-wider">Approver</TableHead>
                       <TableHead className="h-12 text-xs uppercase tracking-wider">Status</TableHead>
+                      {priv.canDelete && <TableHead className="h-12 w-16 text-xs uppercase tracking-wider text-right">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -544,11 +576,23 @@ export function SalaryLoans() {
                           ) : <span className="text-slate-300 text-xs">—</span>}
                         </TableCell>
                         <TableCell>{getStatusBadge(ln.status)}</TableCell>
+                        {priv.canDelete && (
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => handleDeleteLoan(ln.id, ln.employeeName)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                     {loans.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-12 text-slate-400">No loans recorded.</TableCell>
+                        <TableCell colSpan={priv.canDelete ? 6 : 5} className="text-center py-12 text-slate-400">No loans recorded.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>

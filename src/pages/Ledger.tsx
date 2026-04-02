@@ -678,7 +678,7 @@ export function Ledger() {
         </div>
       )}
     </div>,
-    [tab, priv, hasUnsavedPending, activeVoucherNo, ledgerEntries]
+    [tab, priv, hasUnsavedPending, activeVoucherNo, ledgerEntries, voucherDate, paidFrom, items, currentUser]
   );
 
   if (!priv?.canView) {

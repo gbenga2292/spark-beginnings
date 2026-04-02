@@ -15,7 +15,7 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 const MODULE_COLORS: Record<string, string> = {
   Dashboard:   'bg-indigo-100 text-indigo-700',
   HR:          'bg-teal-100 text-teal-700',
-  Admin:       'bg-violet-100 text-violet-700',
+  Clients:     'bg-violet-100 text-violet-700',
   Account:     'bg-amber-100 text-amber-700',
   Tasks:       'bg-blue-100 text-blue-700',
   Operations:  'bg-orange-100 text-orange-700',
@@ -25,7 +25,7 @@ const MODULE_COLORS: Record<string, string> = {
 const MODULE_ICONS: Record<string, any> = {
   Dashboard: LayoutDashboard,
   HR:        UsersIcon,
-  Admin:     Building2,
+  Clients:   Building2,
   Account:   Landmark,
   Tasks:     ListTodo,
   Operations: Package,
@@ -37,7 +37,7 @@ const GROUP_CHECK: { name: string; keys: (keyof UserPrivileges)[]; field: string
   { name: 'Dashboard',  keys: ['dashboard'], field: 'canView' },
   { name: 'HR',         keys: ['employees', 'onboarding', 'attendance', 'leaves', 'salaryLoans', 'evaluations', 'disciplinary', 'reports'], field: 'canView' },
   { name: 'Operations', keys: ['operations'], field: 'canView' },
-  { name: 'Admin',      keys: ['sites'], field: 'canView' },
+  { name: 'Clients',      keys: ['sites'], field: 'canView' },
   { name: 'Tasks',      keys: ['tasks'], field: 'canView' },
   { name: 'Account',    keys: ['billing', 'payments', 'payroll', 'financialReports', 'ledger'], field: 'canView' },
   { name: 'Settings',   keys: ['variables', 'users'], field: 'canView' },

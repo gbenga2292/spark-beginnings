@@ -12,6 +12,7 @@ import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { generateId } from '@/src/lib/utils';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/src/components/ui/dropdown-menu';
 
 export function Billing() {
   const sites = useAppStore((state) => state.sites);
@@ -662,7 +663,7 @@ export function Billing() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        toast.success(`Successfully exported ${currentList.length} invoices`);
+        toast.success(`Successfully exported ${currentList.length} ${isViewingActive ? 'invoices' : 'quotations'}`);
       }
     } catch (e) {
       toast.error('Export failed');
@@ -671,19 +672,49 @@ export function Billing() {
 
   const currentList = useMemo(() => {
     const list = isViewingActive ? [...invoices] : [...pendingInvoices];
-    return list.sort((a, b) => {
+    return list.sort((a: any, b: any) => {
       let valA: any = '';
       let valB: any = '';
 
-      if (sortField === 'client') {
-        valA = (a.client || '').toLowerCase();
-        valB = (b.client || '').toLowerCase();
-      } else if (sortField === 'site') {
-        valA = (('site' in a ? a.site : a.siteName) || '').toLowerCase();
-        valB = (('site' in b ? b.site : b.siteName) || '').toLowerCase();
-      } else if (sortField === 'startDate') {
-        valA = ('startDate' in a ? a.startDate : a.date) || '';
-        valB = ('startDate' in b ? b.startDate : b.date) || '';
+      const aSite = 'site' in a ? a.site : a.siteName;
+      const bSite = 'site' in b ? b.site : b.siteName;
+      const aDate = 'startDate' in a ? a.startDate : a.date;
+      const bDate = 'startDate' in b ? b.startDate : b.date;
+      const aInv = 'invoiceNo' in a ? a.invoiceNo : a.invoiceNumber;
+      const bInv = 'invoiceNo' in b ? b.invoiceNo : b.invoiceNumber;
+
+      switch (sortField) {
+        case 'client':
+            valA = (a.client || '').toLowerCase();
+            valB = (b.client || '').toLowerCase();
+            break;
+        case 'site':
+            valA = (aSite || '').toLowerCase();
+            valB = (bSite || '').toLowerCase();
+            break;
+        case 'startDate':
+            valA = aDate || '';
+            valB = bDate || '';
+            break;
+        case 'invoiceNo':
+            valA = String(aInv || '').toLowerCase();
+            valB = String(bInv || '').toLowerCase();
+            break;
+        case 'equipment':
+            valA = a.noOfMachine || 0;
+            valB = b.noOfMachine || 0;
+            break;
+        case 'costBkdn':
+            valA = a.totalCost || 0;
+            valB = b.totalCost || 0;
+            break;
+        case 'totals':
+            valA = a.totalCharge || a.amount || 0;
+            valB = b.totalCharge || b.amount || 0;
+            break;
+        default:
+            valA = aDate || '';
+            valB = bDate || '';
       }
 
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
@@ -691,6 +722,11 @@ export function Billing() {
       return 0;
     });
   }, [isViewingActive, invoices, pendingInvoices, sortField, sortOrder]);
+
+  const SortIcon = ({ field }: { field: string }) => {
+    if (sortField !== field) return <ChevronUp className="w-3 h-3 opacity-20" />;
+    return sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />;
+  };
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -720,31 +756,46 @@ export function Billing() {
   const sitesForClient = siteRegistry.filter(s => s.client === (form.client || '').trim());
 
   useSetPageTitle(
-    isViewingActive ? 'Active Invoices' : 'Pending Invoices',
+    isViewingActive ? 'Active Invoices' : 'Quotations',
     isViewingActive
       ? 'Manage and track all active client invoices'
-      : 'Review and process pending invoice drafts',
+      : 'Review and process quotation drafts',
     <div className="hidden sm:flex items-center gap-2">
+      {priv.canExport && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm">
+              <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => handleExportCSV('basic')} className="cursor-pointer">
+              <div className="flex flex-col">
+                <span className="font-medium">Basic CSV</span>
+                <span className="text-[10px] text-slate-500">Essential fields only</span>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExportCSV('detailed')} className="cursor-pointer">
+              <div className="flex flex-col">
+                <span className="font-medium">Detailed CSV</span>
+                <span className="text-[10px] text-slate-500">Full billing data</span>
+              </div>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       {priv.canImport && (
-        <label className="flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 shadow-sm border border-indigo-200 rounded-md h-9 px-4 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap">
-          <Upload className="h-4 w-4" /> Import CSV
+        <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
+          <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
           <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
         </label>
-      )}
-      {priv.canExport && (
-        <div className="flex bg-slate-50 border border-indigo-200 rounded-md shadow-sm h-9 overflow-hidden shrink-0">
-          <Button variant="ghost" size="sm" className="gap-2 h-full text-indigo-700 hover:bg-indigo-100 rounded-none border-r border-indigo-200 px-3" onClick={() => handleExportCSV('basic')} title="Export Basic Fields Only">
-            <Download className="h-4 w-4" /> Basic CSV
-          </Button>
-          <Button variant="ghost" size="sm" className="gap-2 h-full text-indigo-700 hover:bg-indigo-100 rounded-none px-3" onClick={() => handleExportCSV('detailed')} title="Export Complete Data">
-            Detailed CSV
-          </Button>
-        </div>
       )}
       {priv.canCreate && (
         <Button
           size="sm"
-          className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-9 px-4"
+          className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9 px-4 font-bold text-[11px] uppercase tracking-tight shadow-md"
           onClick={() => { handleClear(); setIsModalOpen(true); }}
         >
           <Plus className="w-4 h-4" /> Add Invoice
@@ -764,7 +815,7 @@ export function Billing() {
               className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${!isViewingActive ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               onClick={() => setIsViewingActive(false)}
             >
-              Pending Invoices
+              Quotations
               <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${!isViewingActive ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{pendingInvoices.length}</Badge>
             </button>
             <button
@@ -800,7 +851,7 @@ export function Billing() {
                 className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-9 px-4"
                 onClick={() => { handleClear(); setIsModalOpen(true); }}
               >
-                <Plus className="w-4 h-4" /> Add Invoice
+                <Plus className="w-4 h-4" /> Add {isViewingActive ? 'Invoice' : 'Quotation'}
               </Button>
             )}
           </div>
@@ -811,7 +862,7 @@ export function Billing() {
           <div className="border-b border-slate-100 p-4 bg-slate-50/50 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
-                {isViewingActive ? 'Active Invoices' : 'Pending Invoices'}
+                {isViewingActive ? 'Active Invoices' : 'Quotations'}
               </h3>
               <Badge variant="secondary" className="ml-2 font-mono">{currentList.length}</Badge>
             </div>
@@ -889,28 +940,65 @@ export function Billing() {
                   {showActions && (priv.canEdit || priv.canDelete) && <TableHead className="sticky right-0 bg-slate-100/80 p-0 w-20" />}
                 </TableRow>
                 <TableRow className="border-b-0">
-                  <TableHead className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider">Inv #</TableHead>
-                  <TableHead className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider">
-                    <div className="flex flex-col select-none">
-                      <div className="flex items-center gap-1 cursor-pointer hover:text-indigo-600" onClick={() => handleSort('client')}>
-                        Client
-                        {sortField === 'client' && (sortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+                  <TableHead 
+                    className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                    onClick={() => handleSort('invoiceNo')}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center gap-1">
+                      Inv # <SortIcon field="invoiceNo" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                    onClick={() => handleSort('client')}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-1">
+                        Client <SortIcon field="client" />
                       </div>
-                      <div className="flex items-center gap-1 cursor-pointer hover:text-indigo-600 text-[10px] text-slate-500" onClick={() => handleSort('site')}>
-                        Site
-                        {sortField === 'site' && (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                      <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                        Site <SortIcon field="site" />
                       </div>
                     </div>
                   </TableHead>
-                  <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">Equipment</TableHead>
-                  <TableHead className="font-semibold px-4 py-3 text-right cursor-pointer hover:bg-slate-100 select-none text-slate-500 uppercase text-[10px] tracking-wider" onClick={() => handleSort('startDate')}>
+                  <TableHead 
+                    className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                    onClick={() => handleSort('equipment')}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
                     <div className="flex items-center justify-end gap-1">
-                      Dates & Dur
-                      {sortField === 'startDate' && (sortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+                      Equipment <SortIcon field="equipment" />
                     </div>
                   </TableHead>
-                  <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">Cost Bkdn</TableHead>
-                  <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">Totals (₦)</TableHead>
+                  <TableHead 
+                    className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                    onClick={() => handleSort('startDate')}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      Dates & Dur <SortIcon field="startDate" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                    onClick={() => handleSort('costBkdn')}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      Cost Bkdn <SortIcon field="costBkdn" />
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider select-none cursor-pointer hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                    onClick={() => handleSort('totals')}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      Totals (₦) <SortIcon field="totals" />
+                    </div>
+                  </TableHead>
                   {showActions && (priv.canEdit || priv.canDelete) && (
                     <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-slate-50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)] uppercase text-[10px] tracking-wider">Actions</TableHead>
                   )}
@@ -966,10 +1054,17 @@ export function Billing() {
                     )}
                   </TableRow>
                 ))}
+                {!isViewingActive && currentList.length > 0 && (
+                  <TableRow className="bg-amber-50/30 border-t-2 border-amber-100/50 italic">
+                    <TableCell colSpan={showActions ? 7 : 6} className="px-4 py-3 text-center text-amber-700 text-[11px] font-medium tracking-wide">
+                      Double-click a quotation to transition it to Active.
+                    </TableCell>
+                  </TableRow>
+                )}
                 {currentList.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={showActions ? 7 : 6} className="px-4 py-12 text-center text-slate-500 font-medium tracking-wide">
-                      No {isViewingActive ? 'active' : 'pending'} records found.
+                      No {isViewingActive ? 'active' : 'quotation'} records found.
                     </TableCell>
                   </TableRow>
                 )}
@@ -984,7 +1079,7 @@ export function Billing() {
             <div className="bg-white max-w-2xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
               <div className="bg-slate-50/50 p-5 border-b border-slate-100 flex justify-between items-center">
                 <div>
-                  <h2 className="text-lg font-bold text-slate-800">{selectedId ? 'Edit Invoice' : 'Create Invoice'}</h2>
+                  <h2 className="text-lg font-bold text-slate-800">{selectedId ? 'Edit' : 'Create'} {form.destination === 'Active' ? 'Invoice' : 'Quotation'}</h2>
                   <p className="text-xs text-slate-500">Auto-calculate totals by entering valid numbers.</p>
                 </div>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-800" onClick={() => setIsModalOpen(false)}>
@@ -1001,7 +1096,7 @@ export function Billing() {
                     onChange={e => handleChange('destination', e.target.value)}
                     className="flex h-11 w-full rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none font-semibold text-slate-700 shadow-sm"
                   >
-                    <option value="Pending">Pending Invoices</option>
+                    <option value="Pending">Quotations</option>
                     <option value="Active">Active Invoices</option>
                   </select>
                   <p className="text-[11px] text-indigo-600 mt-1 pl-1">Select where you want this record to be inserted.</p>

@@ -576,16 +576,16 @@ interface AppState {
   addLedgerEntry: (entry: LedgerEntry) => void;
   updateLedgerEntry: (id: string, entry: Partial<LedgerEntry>) => void;
   deleteLedgerEntry: (id: string) => void;
-  setPositions: (positions: Position[]) => void;
-  setDepartments: (departments: Department[]) => void;
-  setClients: (clients: string[]) => void;
-  setPublicHolidays: (holidays: { id: string; date: string; name: string }[]) => void;
-  setLeaveTypes: (types: string[]) => void;
-  setLedgerCategories: (cats: LedgerCategory[]) => void;
-  setLedgerVendors: (vendors: LedgerVendor[]) => void;
-  setLedgerBanks: (banks: LedgerBank[]) => void;
-  setLedgerBeneficiaryBanks: (banks: LedgerBeneficiaryBank[]) => void;
-  setDepartmentTasksList: (list: DepartmentTasks[]) => void;
+  setPositions: (positions: Position[]) => Promise<void>;
+  setDepartments: (departments: Department[]) => Promise<void>;
+  setClients: (clients: string[]) => Promise<void>;
+  setPublicHolidays: (holidays: { id: string; date: string; name: string }[]) => Promise<void>;
+  setLeaveTypes: (types: string[]) => Promise<void>;
+  setLedgerCategories: (cats: LedgerCategory[]) => Promise<void>;
+  setLedgerVendors: (vendors: LedgerVendor[]) => Promise<void>;
+  setLedgerBanks: (banks: LedgerBank[]) => Promise<void>;
+  setLedgerBeneficiaryBanks: (banks: LedgerBeneficiaryBank[]) => Promise<void>;
+  setDepartmentTasksList: (list: DepartmentTasks[]) => Promise<void>;
 
   addCompanyExpense: (expense: CompanyExpense) => void;
   updateCompanyExpense: (id: string, expense: Partial<CompanyExpense>) => void;
@@ -1016,16 +1016,16 @@ export const useAppStore = create<AppState>()(
       addLeaveType: (type) => { set((s) => ({ leaveTypes: s.leaveTypes.includes(type) ? s.leaveTypes : [...s.leaveTypes, type] })); db.insertLeaveType(type); },
       removeLeaveType: (type) => { set((s) => ({ leaveTypes: s.leaveTypes.filter(t => t !== type) })); db.deleteLeaveType(type); },
 
-      setPositions: (positions) => { set({ positions }); db.setPositions(positions); },
-      setDepartments: (departments) => { set({ departments }); db.setDepartments(departments); },
-      setClients: (clients) => { set({ clients }); db.setClients(clients); },
-      setPublicHolidays: (publicHolidays) => { set({ publicHolidays }); db.setPublicHolidays(publicHolidays); },
-      setLeaveTypes: (leaveTypes) => { set({ leaveTypes }); db.setLeaveTypes(leaveTypes); },
-      setLedgerCategories: (ledgerCategories) => { set({ ledgerCategories }); db.setLedgerCategories(ledgerCategories); },
-      setLedgerVendors: (ledgerVendors) => { set({ ledgerVendors }); db.setLedgerVendors(ledgerVendors); },
-      setLedgerBanks: (ledgerBanks) => { set({ ledgerBanks }); db.setLedgerBanks(ledgerBanks); },
-      setLedgerBeneficiaryBanks: (ledgerBeneficiaryBanks) => { set({ ledgerBeneficiaryBanks }); db.setLedgerBeneficiaryBanks(ledgerBeneficiaryBanks); },
-      setDepartmentTasksList: (departmentTasksList) => { set({ departmentTasksList }); db.setDepartmentTasksList(departmentTasksList); },
+      setPositions: async (positions) => { set({ positions }); await db.setPositions(positions); },
+      setDepartments: async (departments) => { set({ departments }); await db.setDepartments(departments); },
+      setClients: async (clients) => { set({ clients }); await db.setClients(clients); },
+      setPublicHolidays: async (publicHolidays) => { set({ publicHolidays }); await db.setPublicHolidays(publicHolidays); },
+      setLeaveTypes: async (leaveTypes) => { set({ leaveTypes }); await db.setLeaveTypes(leaveTypes); },
+      setLedgerCategories: async (ledgerCategories) => { set({ ledgerCategories }); await db.setLedgerCategories(ledgerCategories); },
+      setLedgerVendors: async (ledgerVendors) => { set({ ledgerVendors }); await db.setLedgerVendors(ledgerVendors); },
+      setLedgerBanks: async (ledgerBanks) => { set({ ledgerBanks }); await db.setLedgerBanks(ledgerBanks); },
+      setLedgerBeneficiaryBanks: async (ledgerBeneficiaryBanks) => { set({ ledgerBeneficiaryBanks }); await db.setLedgerBeneficiaryBanks(ledgerBeneficiaryBanks); },
+      setDepartmentTasksList: async (departmentTasksList) => { set({ departmentTasksList }); await db.setDepartmentTasksList(departmentTasksList); },
     }),
     {
       name: 'dcel-hr-storage',

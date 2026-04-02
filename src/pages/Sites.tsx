@@ -663,153 +663,134 @@ export function Sites() {
 
   useSetPageTitle(
     'Sites & Clients',
-    'Manage project sites, clients, and onboarding',
-    <div className="flex items-center gap-1.5 md:gap-3">
-      {/* Small Badge Toggle */}
-      <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/60 shadow-sm overflow-hidden whitespace-nowrap">
-        <button
-          onClick={() => setActiveTab('active')}
-          className={`px-2.5 py-1 rounded-md text-[9px] md:text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
-            activeTab === 'active' 
-              ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200' 
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
+    'Manage project sites, clients, and technical onboarding summaries',
+    <div className="hidden sm:flex items-center gap-2">
+      {canImport && (
+        <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
+          <Upload className="h-3.5 w-3.5 text-indigo-500" /> Import Sites
+          <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
+        </label>
+      )}
+      {canExport && (
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
+          onClick={handleExportExcel}
         >
-          Active <span className="hidden sm:inline">Sites</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('pending')}
-          className={`px-2.5 py-1 rounded-md text-[9px] md:text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
-            activeTab === 'pending' 
-              ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200' 
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
+          <Download className="h-3.5 w-3.5 text-emerald-500" /> Export Excel
+        </Button>
+      )}
+      {canAddSite && (
+        <Button 
+          size="sm" 
+          className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9"
+          onClick={() => {
+            setAddForm({ ...EMPTY_FORM });
+            setAddError('');
+            setIsAddingSite(true);
+          }}
         >
-          Pending <span className="hidden sm:inline">Sites</span>
-        </button>
-
-      </div>
-
-      <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-
+          <Plus className="h-4 w-4" /> Add Site
+        </Button>
+      )}
     </div>,
-    [activeTab]
+    [canAddSite, canImport, canExport]
   );
 
   return (
-    <div className="flex flex-col gap-6 h-full">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+      
+      {/* ── Mobile Actions ── */}
+      <div className="flex sm:hidden flex-col gap-3 px-1">
+        <div className="flex flex-wrap gap-2">
+          {canAddSite && (
+            <Button className="flex-1 gap-2 bg-indigo-600 text-white" onClick={() => setIsAddingSite(true)}>
+              <Plus className="h-4 w-4" /> Add Site
+            </Button>
+          )}
+          {canExport && (
+            <Button variant="outline" className="flex-1 gap-2 text-[11px] font-bold uppercase tracking-tight" onClick={handleExportExcel}>
+              <Download className="h-4 w-4 text-emerald-500" /> Export
+            </Button>
+          )}
+        </div>
+      </div>
 
-
-      <Tabs className="flex flex-col flex-1 min-h-0 gap-8">
-        <TabsContent active={activeTab === 'active'} className="flex-1 flex flex-col min-h-0 gap-6">
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
-            <Card className="border-indigo-100 bg-indigo-50/50 shadow-none">
-              <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-                <CardTitle className="text-[10px] font-bold text-indigo-900 uppercase tracking-wider opacity-70">Active Sites</CardTitle>
-                <MapPin className="h-3.5 w-3.5 text-indigo-500" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0">
-                <div className="text-2xl font-bold text-indigo-900 leading-none">
-                  {sites.filter(s => s.status === 'Active').length}
-                </div>
-                <p className="text-[10px] text-indigo-600 mt-1 opacity-80 font-medium whitespace-nowrap overflow-hidden text-ellipsis">Currently operational</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200 shadow-none">
-              <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-                <CardTitle className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Clients</CardTitle>
-                <Building2 className="h-3.5 w-3.5 text-slate-400" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0">
-                <div className="text-2xl font-bold text-slate-900 leading-none">{uniqueClients}</div>
-                <p className="text-[10px] text-slate-500 mt-1 font-medium whitespace-nowrap overflow-hidden text-ellipsis">Unique clients</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-emerald-100 bg-emerald-50/50 shadow-none">
-              <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-                <CardTitle className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider opacity-70">VAT Sites</CardTitle>
-                <span className="text-emerald-600 font-bold text-[8px] bg-emerald-100/50 px-1 rounded uppercase tracking-wider h-[14px] flex items-center">VAT</span>
-              </CardHeader>
-              <CardContent className="p-3 pt-0">
-                <div className="text-2xl font-bold text-emerald-900 leading-none">{sites.filter(s => s.vat === 'Yes' || s.vat === 'Add').length}</div>
-                <p className="text-[10px] text-emerald-600 mt-1 opacity-80 font-medium whitespace-nowrap overflow-hidden text-ellipsis">VAT enabled</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-amber-100 bg-amber-50/10 shadow-none">
-              <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-                <CardTitle className="text-[10px] font-bold text-amber-900 uppercase tracking-wider opacity-70">Pending Sites</CardTitle>
-                <Clock className="h-3.5 w-3.5 text-amber-500" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0">
-                <div className="text-2xl font-bold text-amber-900 leading-none">{pendingSites.filter(ps => ps.status === 'Pending').length}</div>
-                <p className="text-[10px] text-amber-600 mt-1 opacity-80 font-medium whitespace-nowrap overflow-hidden text-ellipsis">In onboarding pipeline</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200 shadow-none">
-              <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-                <CardTitle className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Records</CardTitle>
-                <LayoutGrid className="h-3.5 w-3.5 text-slate-400" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0">
-                <div className="text-2xl font-bold text-slate-900 leading-none">{sites.length}</div>
-                <p className="text-[10px] text-slate-500 mt-1 font-medium whitespace-nowrap overflow-hidden text-ellipsis">Total sites on file</p>
-              </CardContent>
-            </Card>
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-[500px]">
+        {/* Unified Header with Tabs and Search */}
+        <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
+          <div className="flex bg-slate-200/50 p-1 rounded-lg">
+            <button
+              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'active' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              onClick={() => setActiveTab('active')}
+            >
+              Active Sites
+            </button>
+            <button
+              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'pending' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              onClick={() => setActiveTab('pending')}
+            >
+              Pending Onboarding
+            </button>
           </div>
 
-
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="p-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
-                <Input
-                  placeholder="Search sites or clients..."
-                  className="pl-9 text-sm h-9"
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <span className="text-xs text-slate-400 mr-auto">{filteredSites.length} of {sites.length} sites</span>
-
-              <div className="flex items-center gap-2">
-                {canImport && (
-                  <label className="cursor-pointer">
-                    <Input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
-                    <Button variant="outline" size="sm" className="h-9 gap-2 pointer-events-none text-slate-600">
-                      <Upload className="h-4 w-4" /> Import
-                    </Button>
-                  </label>
-                )}
-                {canExport && (
-                  <Button onClick={handleExportExcel} size="sm" className="h-9 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
-                    <Download className="h-4 w-4" /> Export Excel
-                  </Button>
-                )}
-              </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search Client or Site..."
+                className="pl-9 bg-white border-slate-200 h-9 text-sm focus-visible:ring-indigo-500/50 rounded-lg shadow-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
+            {activeTab === 'active' && (
+              <select 
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                value={sortField}
+                onChange={(e) => handleSort(e.target.value as any)}
+              >
+                <option value="client">Sort By: Client</option>
+                <option value="name">Sort By: Site Name</option>
+                <option value="startDate">Sort By: Start Date</option>
+                <option value="status">Sort By: Status</option>
+              </select>
+            )}
+          </div>
+        </div>
+
+        {activeTab === 'active' ? (
+          <div className="flex-1">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Site ID</TableHead>
-                  <TableHead onClick={() => handleSort('client')} className="cursor-pointer hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center">Client <SortIcon field="client" /></div>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-24">ID</TableHead>
+                  <TableHead className="cursor-pointer group" onMouseDown={(e) => e.stopPropagation()} onClick={() => handleSort('client')}>
+                    <div className="flex items-center gap-1 group-hover:text-indigo-600 transition-colors">
+                      Client <SortIcon field="client" />
+                    </div>
                   </TableHead>
-                  <TableHead onClick={() => handleSort('name')} className="cursor-pointer hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center">Site Name <SortIcon field="name" /></div>
+                  <TableHead className="cursor-pointer group" onMouseDown={(e) => e.stopPropagation()} onClick={() => handleSort('name')}>
+                    <div className="flex items-center gap-1 group-hover:text-indigo-600 transition-colors">
+                      Site Name <SortIcon field="name" />
+                    </div>
                   </TableHead>
-                  <TableHead onClick={() => handleSort('startDate')} className="cursor-pointer hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center">Start Date <SortIcon field="startDate" /></div>
+                  <TableHead className="cursor-pointer group" onMouseDown={(e) => e.stopPropagation()} onClick={() => handleSort('startDate')}>
+                    <div className="flex items-center gap-1 group-hover:text-indigo-600 transition-colors">
+                      Start Date <SortIcon field="startDate" />
+                    </div>
                   </TableHead>
-                  <TableHead onClick={() => handleSort('endDate')} className="cursor-pointer hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center">End Date <SortIcon field="endDate" /></div>
+                  <TableHead className="cursor-pointer group" onMouseDown={(e) => e.stopPropagation()} onClick={() => handleSort('endDate')}>
+                    <div className="flex items-center gap-1 group-hover:text-indigo-600 transition-colors">
+                      End Date <SortIcon field="endDate" />
+                    </div>
                   </TableHead>
-                  <TableHead className="text-center">VAT</TableHead>
-                  <TableHead onClick={() => handleSort('status')} className="cursor-pointer hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center">Status <SortIcon field="status" /></div>
+                  <TableHead className="text-center">VAT Status</TableHead>
+                  <TableHead className="cursor-pointer group" onMouseDown={(e) => e.stopPropagation()} onClick={() => handleSort('status')}>
+                    <div className="flex items-center gap-1 group-hover:text-indigo-600 transition-colors">
+                      Status <SortIcon field="status" />
+                    </div>
                   </TableHead>
                   {hasActions && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
@@ -819,180 +800,158 @@ export function Sites() {
                   const siteIndex = sites.findIndex(s => s.id === site.id);
                   const siteCode = `S-${String(siteIndex + 1).padStart(3, '0')}`;
                   return (
-                  <TableRow key={site.id}>
-                    <TableCell className="font-mono text-xs font-semibold text-slate-500">{siteCode}</TableCell>
-                    <TableCell className="font-medium text-slate-900">
-                      {editingId === site.id ? (
-                        <select
-                          value={editForm.client}
-                          onChange={e => setEditForm({ ...editForm, client: e.target.value })}
-                          className="flex h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-sm"
-                        >
-                          <option value="" disabled>Select Client</option>
-                          {displayClients.map(c => (
-                            <option key={c} value={c}>{c}</option>
-                          ))}
-                        </select>
-                      ) : site.client}
-                    </TableCell>
-                    <TableCell>
-                      {editingId === site.id
-                        ? <Input value={editForm.name} className="h-8" onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
-                        : site.name}
-                    </TableCell>
-                    <TableCell>
-                      {editingId === site.id ? (
-                        <Input type="date" value={editForm.startDate} className="h-8 w-32" onChange={e => setEditForm({ ...editForm, startDate: e.target.value })} />
-                      ) : (
-                        toDisplayDate(site.startDate) || <span className="text-slate-300">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editingId === site.id ? (
-                        <Input type="date" value={editForm.endDate} className="h-8 w-32" onChange={e => setEditForm({ ...editForm, endDate: e.target.value })} />
-                      ) : (
-                        toDisplayDate(site.endDate) || <span className="text-slate-300">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {editingId === site.id ? (
-                        <select
-                          value={editForm.vat}
-                          onChange={e => setEditForm({ ...editForm, vat: e.target.value as 'Yes' | 'No' | 'Add' })}
-                          className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm"
-                        >
-                          <option value="No">No</option>
-                          <option value="Yes">Yes</option>
-                          <option value="Add">Add</option>
-                        </select>
-                      ) : (
-                        <Badge 
-                          variant={site.vat === 'Yes' || site.vat === 'Add' ? 'success' : 'secondary'}
-                          className="text-[8px] px-1 py-0 h-[14px] min-w-[28px] justify-center"
-                        >
-                          {site.vat}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editingId === site.id ? (
-                        <Badge 
-                          variant={editForm.status === 'Ended' ? 'destructive' : editForm.status === 'Active' ? 'success' : 'secondary'}
-                          className="text-[8px] px-1 py-0 h-[14px]"
-                        >
-                          {editForm.status}
-                        </Badge>
-                      ) : (
+                    <TableRow key={site.id} className="hover:bg-slate-50/50 transition-colors">
+                      <TableCell className="font-mono text-xs font-semibold text-slate-400">{siteCode}</TableCell>
+                      <TableCell className="font-bold text-slate-900">
+                        {editingId === site.id ? (
+                          <select
+                            value={editForm.client}
+                            onChange={e => setEditForm({ ...editForm, client: e.target.value })}
+                            className="flex h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-sm"
+                          >
+                            <option value="" disabled>Select Client</option>
+                            {displayClients.map(c => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        ) : site.client}
+                      </TableCell>
+                      <TableCell>
+                        {editingId === site.id
+                          ? <Input value={editForm.name} className="h-8" onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+                          : site.name}
+                      </TableCell>
+                      <TableCell>
+                        {editingId === site.id ? (
+                          <Input type="date" value={editForm.startDate} className="h-8 w-32" onChange={e => setEditForm({ ...editForm, startDate: e.target.value })} />
+                        ) : (
+                          <span className="text-slate-600 font-medium">{toDisplayDate(site.startDate) || <span className="text-slate-300">-</span>}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingId === site.id ? (
+                          <Input type="date" value={editForm.endDate} className="h-8 w-32" onChange={e => setEditForm({ ...editForm, endDate: e.target.value })} />
+                        ) : (
+                          <span className="text-slate-500">{toDisplayDate(site.endDate) || <span className="text-slate-300">-</span>}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {editingId === site.id ? (
+                          <select
+                            value={editForm.vat}
+                            onChange={e => setEditForm({ ...editForm, vat: e.target.value as 'Yes' | 'No' | 'Add' })}
+                            className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm"
+                          >
+                            <option value="No">No</option>
+                            <option value="Yes">Yes</option>
+                            <option value="Add">Add</option>
+                          </select>
+                        ) : (
+                          <Badge 
+                            variant={site.vat === 'Yes' || site.vat === 'Add' ? 'success' : 'outline'}
+                            className="text-[10px] uppercase font-bold"
+                          >
+                            {site.vat}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <Badge 
                           variant={site.status === 'Ended' ? 'destructive' : site.status === 'Active' ? 'success' : 'secondary'}
-                          className="text-[8px] px-1 py-0 h-[14px]"
+                          className="text-[10px] font-bold"
                         >
                           {site.status}
                         </Badge>
-                      )}
-                    </TableCell>
-                    {hasActions && (
-                      <TableCell className="text-right whitespace-nowrap">
-                        {editingId === site.id ? (
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="sm" className="text-emerald-600" onClick={handleSaveEdit}>
-                              <Save className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="text-slate-500" onClick={() => setEditingId(null)}>
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex justify-end">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost" size="sm"
-                                  className="text-slate-400 hover:text-slate-700 h-8 w-8 p-0"
-                                  title="Actions"
-                                >
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-[180px]">
-                                <DropdownMenuItem 
-                                  onClick={() => setNarrativeSite({ site, q: pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client) || null })}
-                                  className="gap-2"
-                                >
-                                  <FileText className="h-4 w-4 text-slate-400" />
-                                  <span>Site Summary</span>
-                                </DropdownMenuItem>
-                                
-                                <DropdownMenuItem 
-                                  onClick={() => {
-                                    const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
-                                    if (linkedQ) navigate(`/sites/onboarding/${linkedQ.id}`);
-                                    else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
-                                  }}
-                                  className="gap-2"
-                                >
-                                  <Eye className="h-4 w-4 text-slate-400" />
-                                  <span>View Onboarding</span>
-                                </DropdownMenuItem>
-
-                                {canEditSite && (
-                                  <DropdownMenuItem 
-                                    onClick={() => handleEditStart(site)}
-                                    className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50"
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                    <span>Edit Site</span>
-                                  </DropdownMenuItem>
-                                )}
-
-                                {canDeleteSite && (
-                                  <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem 
-                                      onClick={() => handleDelete(site.id)}
-                                      className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                      <span>Delete</span>
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        )}
                       </TableCell>
-                    )}
-                  </TableRow>
-                )})}
+                      {hasActions && (
+                        <TableCell className="text-right whitespace-nowrap">
+                          {editingId === site.id ? (
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="sm" className="text-emerald-600" onClick={handleSaveEdit}>
+                                <Save className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-slate-500" onClick={() => setEditingId(null)}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex justify-end">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost" size="icon"
+                                    className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-50"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-[180px]">
+                                  <DropdownMenuItem 
+                                    onClick={() => setNarrativeSite({ site, q: pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client) || null })}
+                                    className="gap-2"
+                                  >
+                                    <FileText className="h-4 w-4 text-slate-400" />
+                                    <span>Site Summary</span>
+                                  </DropdownMenuItem>
+                                  
+                                  <DropdownMenuItem 
+                                    onClick={() => {
+                                      const linkedQ = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
+                                      if (linkedQ) navigate(`/sites/onboarding/${linkedQ.id}`);
+                                      else navigate('/sites/onboarding/new', { state: { linkedSite: site } });
+                                    }}
+                                    className="gap-2"
+                                  >
+                                    <Eye className="h-4 w-4 text-slate-400" />
+                                    <span>View Onboarding</span>
+                                  </DropdownMenuItem>
+  
+                                  {canEditSite && (
+                                    <DropdownMenuItem 
+                                      onClick={() => handleEditStart(site)}
+                                      className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                      <span>Edit Site</span>
+                                    </DropdownMenuItem>
+                                  )}
+  
+                                  {canDeleteSite && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem 
+                                        onClick={() => handleDelete(site.id)}
+                                        className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                        <span>Delete</span>
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          )}
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  )
+                })}
                 {filteredSites.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={hasActions ? 6 : 5} className="text-center py-8 text-slate-500">
-                      No sites found matching your search.
+                    <TableCell colSpan={hasActions ? 8 : 7} className="text-center py-12 text-slate-400 italic">
+                      No matching project sites found.
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           </div>
-        </TabsContent>
-
-        <TabsContent active={activeTab === 'pending'} className="flex-1 flex flex-col min-h-0 gap-6">
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm flex-1 min-h-0 flex flex-col">
-            <div className="p-4 border-b border-slate-200 flex items-center gap-3">
-              <div className="relative flex-1 max-w-xs">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
-                  <Input
-                    placeholder="Search pending sites or clients..."
-                    className="pl-9 text-sm h-9"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                  />
-                </div>
-            </div>
+        ) : (
+          <div className="flex-1">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="hover:bg-transparent">
                   <TableHead>Client</TableHead>
                   <TableHead>Proposed Site</TableHead>
                   <TableHead className="text-center">Phase 1</TableHead>
@@ -1006,24 +965,24 @@ export function Sites() {
               </TableHeader>
               <TableBody>
                 {filteredPendingSites.map(site => (
-                  <TableRow key={site.id}>
-                    <TableCell className="font-medium text-slate-900">{site.clientName}</TableCell>
-                    <TableCell>{site.siteName}</TableCell>
-                    <TableCell className="text-center">{site.phase1.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-green-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-300" />}</TableCell>
-                    <TableCell className="text-center">{site.phase2.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-green-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-300" />}</TableCell>
-                    <TableCell className="text-center">{site.phase3.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-green-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-300" />}</TableCell>
-                    <TableCell className="text-center">{site.phase4.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-green-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-300" />}</TableCell>
-                    <TableCell className="text-center">{site.phase5.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-green-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-300" />}</TableCell>
+                  <TableRow key={site.id} className="hover:bg-slate-50/50 transition-colors">
+                    <TableCell className="font-bold text-slate-900">{site.clientName}</TableCell>
+                    <TableCell className="font-medium text-slate-600">{site.siteName}</TableCell>
+                    <TableCell className="text-center">{site.phase1.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
+                    <TableCell className="text-center">{site.phase2.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
+                    <TableCell className="text-center">{site.phase3.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
+                    <TableCell className="text-center">{site.phase4.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
+                    <TableCell className="text-center">{site.phase5.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
                     <TableCell>
                       <Badge 
-                        variant={site.status === 'Pending' ? 'secondary' : 'success'}
-                        className="text-[8px] px-1 py-0 h-[14px]"
+                        variant={site.status === 'Pending' ? 'outline' : 'success'}
+                        className={`text-[10px] font-bold ${site.status === 'Pending' ? 'bg-slate-50 text-slate-500 border-slate-200' : ''}`}
                       >
                         {site.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => navigate(`/sites/onboarding/${site.id}`)}>
+                      <Button variant="ghost" size="sm" className="text-slate-400 hover:text-indigo-600 hover:bg-slate-50" onClick={() => navigate(`/sites/onboarding/${site.id}`)}>
                         <Eye className="h-4 w-4 mr-2" /> View Form
                       </Button>
                     </TableCell>
@@ -1031,16 +990,17 @@ export function Sites() {
                 ))}
                 {filteredPendingSites.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-slate-500">
-                      No pending sites found. Click "Site Onboarding" to create one.
+                    <TableCell colSpan={9} className="text-center py-12 text-slate-400 italic">
+                      No pending onboarding records found.
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           </div>
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
+
 
       {/* ── Site Narrative Info Modal ── */}
       {narrativeSite && (

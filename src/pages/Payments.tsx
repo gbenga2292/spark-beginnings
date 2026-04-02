@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useAppStore, Payment } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import { Trash2, Edit, CheckCircle, Plus, X, Upload, Download } from 'lucide-react';
+import { Trash2, Edit, CheckCircle, Plus, X, Upload, Download, ChevronUp, ChevronDown } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -24,6 +24,8 @@ export function Payments() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [importFile, setImportFile] = useState<File | null>(null);
     const [showActions, setShowActions] = useState(false);
+    const [sortField, setSortField] = useState<string>('date');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
     const initialForm = {
         date: '',
@@ -291,6 +293,39 @@ export function Payments() {
     const uniqueClients = useMemo(() => Array.from(new Set(sites.map(s => s.client))), [sites]);
     const sitesForClient = useMemo(() => form.client ? sites.filter(s => s.client === form.client) : sites, [sites, form.client]);
 
+    const handleSort = (field: string) => {
+        if (sortField === field) {
+            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortOrder('asc');
+        }
+    };
+
+    const SortIcon = ({ field }: { field: string }) => {
+        if (sortField !== field) return <ChevronUp className="w-3 h-3 opacity-20" />;
+        return sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />;
+    };
+
+    const sortedPayments = useMemo(() => {
+        return [...payments].sort((a, b) => {
+            let valA: any = '';
+            let valB: any = '';
+            if (sortField === 'date') { valA = a.date || ''; valB = b.date || ''; }
+            else if (sortField === 'client') { valA = (a.client || '').toLowerCase(); valB = (b.client || '').toLowerCase(); }
+            else if (sortField === 'site') { valA = (a.site || '').toLowerCase(); valB = (b.site || '').toLowerCase(); }
+            else if (sortField === 'amount') { valA = a.amount || 0; valB = b.amount || 0; }
+            else if (sortField === 'withholdingTax') { valA = a.withholdingTax || 0; valB = b.withholdingTax || 0; }
+            else if (sortField === 'discount') { valA = a.discount || 0; valB = b.discount || 0; }
+            else if (sortField === 'payVat') { valA = (a.payVat || '').toLowerCase(); valB = (b.payVat || '').toLowerCase(); }
+            else if (sortField === 'vat') { valA = a.vat || 0; valB = b.vat || 0; }
+            else if (sortField === 'amountForVat') { valA = a.amountForVat || 0; valB = b.amountForVat || 0; }
+            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }, [payments, sortField, sortOrder]);
+
     const tableSums = useMemo(() => {
         return payments.reduce((acc, p) => ({
             amount: acc.amount + (p.amount || 0),
@@ -310,22 +345,22 @@ export function Payments() {
         'Payment Records',
         `Tracking ${payments.length} transactions with automated VAT and withholding tax calculations`,
         <div className="flex items-center gap-3">
-            {priv.canImport && (
-                <label className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 shadow-sm border border-slate-200 rounded-lg h-9 px-4 text-[10px] font-bold uppercase tracking-tight cursor-pointer transition-all whitespace-nowrap active:scale-95">
-                    <Download className="h-4 w-4" /> <span className="hidden sm:inline">Import CSV</span>
-                    <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
-                </label>
-            )}
-            
             {priv.canExport && (
                 <Button 
                     variant="outline" 
                     size="sm" 
-                    className="h-9 px-4 gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-[10px] uppercase tracking-tight shadow-sm transition-all active:scale-95" 
+                    className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm transition-all active:scale-95" 
                     onClick={handleExportCSV}
                 >
-                    <Upload className="h-4 w-4" /> <span className="hidden sm:inline">Export CSV</span>
+                    <Upload className="h-3.5 w-3.5 text-emerald-500" /> <span className="hidden sm:inline">Export</span>
                 </Button>
+            )}
+
+            {priv.canImport && (
+                <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm active:scale-95">
+                    <Download className="h-3.5 w-3.5 text-indigo-500" /> <span className="hidden sm:inline">Import</span>
+                    <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
+                </label>
             )}
 
             <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
@@ -434,22 +469,35 @@ export function Payments() {
                                     {showActions && <TableHead className="sticky right-0 bg-slate-100/80 p-0 w-20" />}
                                 </TableRow>
                                 <TableRow className="border-b-0">
-                                    <TableHead className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider">Date</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider">Client</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider">Site</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">Amount (₦)</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-right text-slate-400 uppercase text-[10px] tracking-wider">WHT</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-right text-slate-400 uppercase text-[10px] tracking-wider">Discount</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-center text-slate-500 uppercase text-[10px] tracking-wider">VAT Policy</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">VAT (₦)</TableHead>
-                                    <TableHead className="font-semibold px-4 py-3 text-right text-slate-500 uppercase text-[10px] tracking-wider">Amt For VAT</TableHead>
+                                    {([
+                                        { field: 'date',           label: 'Date',        align: 'left'   },
+                                        { field: 'client',         label: 'Client',      align: 'left'   },
+                                        { field: 'site',           label: 'Site',        align: 'left'   },
+                                        { field: 'amount',         label: 'Amount (₦)',  align: 'right'  },
+                                        { field: 'withholdingTax', label: 'WHT',         align: 'right'  },
+                                        { field: 'discount',       label: 'Discount',    align: 'right'  },
+                                        { field: 'payVat',         label: 'VAT Policy',  align: 'center' },
+                                        { field: 'vat',            label: 'VAT (₦)',     align: 'right'  },
+                                        { field: 'amountForVat',   label: 'Amt For VAT', align: 'right'  },
+                                    ] as const).map(({ field, label, align }) => (
+                                        <TableHead
+                                            key={field}
+                                            className={`font-semibold px-4 py-3 text-slate-500 uppercase text-[10px] tracking-wider select-none text-${align} cursor-pointer hover:bg-slate-100 hover:text-indigo-600 transition-colors`}
+                                            onClick={() => handleSort(field)}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                        >
+                                            <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start'}`}>
+                                                {label} <SortIcon field={field} />
+                                            </div>
+                                        </TableHead>
+                                    ))}
                                     {showActions && (
                                         <TableHead className="font-semibold px-4 py-3 text-center sticky right-0 bg-slate-50 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)] uppercase text-[10px] tracking-wider">Actions</TableHead>
                                     )}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {payments.map((p: Payment) => (
+                                {sortedPayments.map((p: Payment) => (
                                     <TableRow key={p.id} className={`hover:bg-slate-50 transition-colors ${selectedId === p.id ? 'bg-indigo-50/50' : ''}`}>
                                         <TableCell className="px-4 py-3 text-slate-500">{p.date}</TableCell>
                                         <TableCell className="px-4 py-3 font-semibold text-slate-800">{p.client}</TableCell>
@@ -492,7 +540,7 @@ export function Payments() {
                                         )}
                                     </TableRow>
                                 ))}
-                                {payments.length === 0 && (
+                                {sortedPayments.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={showActions ? 10 : 9} className="px-4 py-12 text-center text-slate-500 font-medium tracking-wide border-b-0">
                                             No payment records found.

@@ -6,8 +6,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import {
   Download, Upload, ReceiptText, Wallet, TrendingUp, Landmark, Activity, AlertCircle,
-  PieChart as PieChartIcon, BarChart3, Filter, X, CheckCircle2, FileSpreadsheet, FileText, Backpack, CreditCard
+  PieChart as PieChartIcon, BarChart3, Filter, X, CheckCircle2, FileSpreadsheet, FileText, Backpack, CreditCard,
+  Eye, Save, Trash2, XCircle
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
 import { NairaSign } from '@/src/components/ui/naira-sign';
 import { useAppStore } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
@@ -210,6 +212,24 @@ export function FinancialReports() {
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [activeFinBuilderTab, setActiveFinBuilderTab] = useState<string>("Revenue & Billing");
+
+  const [previewModal, setPreviewModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    type: 'excel' | 'pdf' | 'csv';
+    data: any[];
+    headers: string[];
+    filename: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    type: 'excel',
+    data: [],
+    headers: [],
+    filename: '',
+    onConfirm: () => {},
+  });
 
   // Filters
   const availableYears = useMemo(() => {
@@ -425,97 +445,145 @@ export function FinancialReports() {
           inv.totalCharge || ''
         ];
       }
-      return data.map(extractCSV).join(',');
+      return data;
     });
 
-    const csvData = [headers.join(','), ...rows].join('\n');
+    const csvData = [headers.join(','), ...rows.map(row => row.map(extractCSV).join(','))].join('\n');
     const fileName = `invoice_report_${mode === 'bare' ? 'bare_' : ''}${new Date().toISOString().slice(0, 10)}.csv`;
 
-    if (window.electronAPI?.savePathDialog) {
-      const filePath = await window.electronAPI.savePathDialog({
-        title: `Export Invoice Report (${mode === 'bare' ? 'Bare Minimum' : 'Detailed'})`,
-        defaultPath: fileName,
-        filters: [{ name: 'CSV Files', extensions: ['csv'] }]
-      });
+    setPreviewModal({
+      isOpen: true,
+      title: `Invoice Report (${mode.toUpperCase()})`,
+      type: 'csv',
+      data: rows,
+      headers: headers,
+      filename: fileName,
+      onConfirm: async () => {
+        if (window.electronAPI?.savePathDialog) {
+          const filePath = await window.electronAPI.savePathDialog({
+            title: `Export Invoice Report (${mode === 'bare' ? 'Bare Minimum' : 'Detailed'})`,
+            defaultPath: fileName,
+            filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+          });
 
-      if (filePath) {
-        const success = await window.electronAPI.writeFile(filePath, csvData, 'utf8');
-        if (success) toast.success(`Exported to ${filePath}`);
-        else toast.error('Failed to save file.');
+          if (filePath) {
+            const success = await window.electronAPI.writeFile(filePath, csvData, 'utf8');
+            if (success) toast.success(`Exported to ${filePath}`);
+            else toast.error('Failed to save file.');
+          }
+        } else {
+          const link = document.createElement("a");
+          link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
+          link.setAttribute("download", fileName);
+          document.body.appendChild(link); link.click(); document.body.removeChild(link);
+          toast.success("Invoice Report exported!");
+        }
       }
-    } else {
-      const link = document.createElement("a");
-      link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
-      link.setAttribute("download", fileName);
-      document.body.appendChild(link); link.click(); document.body.removeChild(link);
-      toast.success("Invoice Report exported!");
-    }
+    });
   };
 
   const exportInvoicePdf = () => {
     const head = [["Invoice ID", "Client", "Site", "Date", "Amount (₦)", "Status"]];
     const body = invoices.map(inv => [inv.id, inv.client, inv.siteName, formatDisplayDate(inv.date), (inv.amount || 0).toLocaleString(), inv.status]);
-    generatePdf("Invoice Report", head, body, "invoice_report.pdf");
+    
+    setPreviewModal({
+      isOpen: true,
+      title: "Invoice Report",
+      type: 'pdf',
+      data: body,
+      headers: head[0],
+      filename: "invoice_report.pdf",
+      onConfirm: () => generatePdf("Invoice Report", head, body, "invoice_report.pdf")
+    });
   };
 
   const exportPaymentReport = async () => {
     const headers = ["Payment ID", "Client", "Site", "Date", "Amount", "WHT", "VAT", "Discount"];
     const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
-    const rows = payments.map(p => [p.id, p.client, p.site, formatDisplayDate(p.date), p.amount, p.withholdingTax || 0, p.vat || 0, p.discount || 0].map(extractCSV).join(','));
-    const csvData = [headers.join(','), ...rows].join('\n');
+    const data = payments.map(p => [p.id, p.client, p.site, formatDisplayDate(p.date), p.amount, p.withholdingTax || 0, p.vat || 0, p.discount || 0]);
+    const csvData = [headers.join(','), ...data.map(row => row.map(extractCSV).join(','))].join('\n');
     const fileName = "payment_report.csv";
 
-    if (window.electronAPI?.savePathDialog) {
-      const filePath = await window.electronAPI.savePathDialog({
-        title: 'Export Payment Report (CSV)',
-        defaultPath: fileName,
-        filters: [{ name: 'CSV Files', extensions: ['csv'] }]
-      });
-      if (filePath) {
-        const success = await window.electronAPI.writeFile(filePath, csvData, 'utf8');
-        if (success) toast.success(`Exported to ${filePath}`);
-        else toast.error('Failed to save file.');
+    setPreviewModal({
+      isOpen: true,
+      title: "Payment Report",
+      type: 'csv',
+      data: data,
+      headers: headers,
+      filename: fileName,
+      onConfirm: async () => {
+        if (window.electronAPI?.savePathDialog) {
+          const filePath = await window.electronAPI.savePathDialog({
+            title: 'Export Payment Report (CSV)',
+            defaultPath: fileName,
+            filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+          });
+          if (filePath) {
+            const success = await window.electronAPI.writeFile(filePath, csvData, 'utf8');
+            if (success) toast.success(`Exported to ${filePath}`);
+            else toast.error('Failed to save file.');
+          }
+        } else {
+          const link = document.createElement("a");
+          link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
+          link.setAttribute("download", fileName);
+          document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+        showExportMessage("Payment Report exported!");
       }
-    } else {
-      const link = document.createElement("a");
-      link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
-      link.setAttribute("download", fileName);
-      document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    }
-    showExportMessage("Payment Report exported!");
+    });
   };
 
   const exportPaymentPdf = () => {
     const head = [["Payment ID", "Client", "Site", "Date", "Amount (₦)", "WHT (₦)", "VAT (₦)"]];
     const body = payments.map(p => [p.id, p.client, p.site, formatDisplayDate(p.date), (p.amount || 0).toLocaleString(), (p.withholdingTax || 0).toLocaleString(), (p.vat || 0).toLocaleString()]);
-    generatePdf("Payment Report", head, body, "payment_report.pdf");
+    
+    setPreviewModal({
+      isOpen: true,
+      title: "Payment Report",
+      type: 'pdf',
+      data: body,
+      headers: head[0],
+      filename: "payment_report.pdf",
+      onConfirm: () => generatePdf("Payment Report", head, body, "payment_report.pdf")
+    });
   };
 
   const exportVatReport = async () => {
     const headers = ["VAT ID", "Client", "Date", "Month", "Year", "Amount"];
     const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
-    const rows = vatPayments.map(v => [v.id, v.client, formatDisplayDate(v.date), v.month || '', v.year || '', v.amount].map(extractCSV).join(','));
-    const csvData = [headers.join(','), ...rows].join('\n');
+    const data = vatPayments.map(v => [v.id, v.client, formatDisplayDate(v.date), v.month || '', v.year || '', v.amount]);
+    const csvData = [headers.join(','), ...data.map(row => row.map(extractCSV).join(','))].join('\n');
     const fileName = "vat_report.csv";
 
-    if (window.electronAPI?.savePathDialog) {
-      const filePath = await window.electronAPI.savePathDialog({
-        title: 'Export VAT Report (CSV)',
-        defaultPath: fileName,
-        filters: [{ name: 'CSV Files', extensions: ['csv'] }]
-      });
-      if (filePath) {
-        const success = await window.electronAPI.writeFile(filePath, csvData, 'utf8');
-        if (success) toast.success(`Exported to ${filePath}`);
-        else toast.error('Failed to save file.');
+    setPreviewModal({
+      isOpen: true,
+      title: "VAT Remittance Report",
+      type: 'csv',
+      data: data,
+      headers: headers,
+      filename: fileName,
+      onConfirm: async () => {
+        if (window.electronAPI?.savePathDialog) {
+          const filePath = await window.electronAPI.savePathDialog({
+            title: 'Export VAT Report (CSV)',
+            defaultPath: fileName,
+            filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+          });
+          if (filePath) {
+            const success = await window.electronAPI.writeFile(filePath, csvData, 'utf8');
+            if (success) toast.success(`Exported to ${filePath}`);
+            else toast.error('Failed to save file.');
+          }
+        } else {
+          const link = document.createElement("a");
+          link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
+          link.setAttribute("download", fileName);
+          document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+        showExportMessage("VAT Report exported!");
       }
-    } else {
-      const link = document.createElement("a");
-      link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
-      link.setAttribute("download", fileName);
-      document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    }
-    showExportMessage("VAT Report exported!");
+    });
   };
 
   const exportLedgerPdf = () => {
@@ -525,7 +593,16 @@ export function FinancialReports() {
       r.noOfInvoices, (r.totalInvoices || 0).toLocaleString(), (r.totalPayment || 0).toLocaleString(),
       (r.withholdingTax || 0).toLocaleString(), (r.balance || 0).toLocaleString(), r.status
     ]);
-    generatePdf("Financial Summary Ledger", head as string[][], body, "financial_ledger.pdf");
+    
+    setPreviewModal({
+      isOpen: true,
+      title: "Financial Summary Ledger",
+      type: 'pdf',
+      data: body,
+      headers: head as unknown as string[],
+      filename: "financial_ledger.pdf",
+      onConfirm: () => generatePdf("Financial Summary Ledger", head as string[][], body, "financial_ledger.pdf")
+    });
   };
 
   const toggleField = (field: string) => {
@@ -561,102 +638,148 @@ export function FinancialReports() {
     if (selectedFields.length === 0) { toast.error('Please select at least one data point.'); return; }
 
     const wb = XLSX.utils.book_new();
+    const previewRows: any[] = [];
+    const previewHeaders = ['Module', 'Scope', 'Status'];
 
     if (selectedFields.includes('Invoice Summary')) {
-      const ws = XLSX.utils.json_to_sheet(invoices.map(i => ({ ID: i.id, Client: i.client, Site: i.siteName, Date: formatDisplayDate(i.date), Amount: i.amount, Status: i.status, DueDate: formatDisplayDate(i.dueDate) || '', BillingCycle: i.billingCycle || '' })));
+      const data = invoices.map(i => ({ ID: i.id, Client: i.client, Site: i.siteName, Date: formatDisplayDate(i.date), Amount: i.amount, Status: i.status, DueDate: formatDisplayDate(i.dueDate) || '', BillingCycle: i.billingCycle || '' }));
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Invoices');
+      previewRows.push({ Module: 'Invoice Summary', Scope: `${data.length} invoices`, Status: 'Included' });
     }
     if (selectedFields.includes('Payment Summary')) {
-      const ws = XLSX.utils.json_to_sheet(payments.map(p => ({ ID: p.id, Client: p.client, Site: p.site, Date: formatDisplayDate(p.date), Amount: p.amount, WHT: p.withholdingTax || 0, VAT: p.vat || 0, Discount: p.discount || 0 })));
+      const data = payments.map(p => ({ ID: p.id, Client: p.client, Site: p.site, Date: formatDisplayDate(p.date), Amount: p.amount, WHT: p.withholdingTax || 0, VAT: p.vat || 0, Discount: p.discount || 0 }));
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Payments');
+      previewRows.push({ Module: 'Payment Summary', Scope: `${data.length} payments`, Status: 'Included' });
     }
     if (selectedFields.includes('Outstanding Balances')) {
-      const ws = XLSX.utils.json_to_sheet(summaryData.filter(r => r.balance > 0).map(r => ({ Client: r.client, Site: r.site, Invoiced: r.totalInvoices, Paid: r.totalPayment, Balance: r.balance, Status: r.status })));
+      const data = summaryData.filter(r => r.balance > 0).map(r => ({ Client: r.client, Site: r.site, Invoiced: r.totalInvoices, Paid: r.totalPayment, Balance: r.balance, Status: r.status }));
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Outstanding');
+      previewRows.push({ Module: 'Outstanding Balances', Scope: `${data.length} records`, Status: 'Included' });
     }
     if (selectedFields.includes('Overdue Invoices')) {
       const today = new Date().toISOString().split('T')[0];
-      const ws = XLSX.utils.json_to_sheet(rawInvoices.filter(i => i.status !== 'Paid' && i.dueDate && i.dueDate < today).map(i => ({ ID: i.id, Client: i.client, Site: i.siteName, Amount: i.amount, DueDate: formatDisplayDate(i.dueDate), Status: i.status })));
+      const data = rawInvoices.filter(i => i.status !== 'Paid' && i.dueDate && i.dueDate < today).map(i => ({ ID: i.id, Client: i.client, Site: i.siteName, Amount: i.amount, DueDate: formatDisplayDate(i.dueDate), Status: i.status }));
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Overdue Invoices');
+      previewRows.push({ Module: 'Overdue Invoices', Scope: `${data.length} overdue`, Status: 'Included' });
     }
     if (selectedFields.includes('VAT Remittance')) {
-      const ws = XLSX.utils.json_to_sheet(vatPayments.map(v => ({ ID: v.id, Client: v.client, Date: formatDisplayDate(v.date), Month: v.month || '', Year: v.year || '', Amount: v.amount })));
+      const data = vatPayments.map(v => ({ ID: v.id, Client: v.client, Date: formatDisplayDate(v.date), Month: v.month || '', Year: v.year || '', Amount: v.amount }));
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'VAT Remittance');
+      previewRows.push({ Module: 'VAT Remittance', Scope: `${data.length} entries`, Status: 'Included' });
     }
     if (selectedFields.includes('VAT Collected vs Remitted')) {
       const ws = XLSX.utils.json_to_sheet([{ VATCollected: globalStats.totalVATCollected, VATRemitted: globalStats.totalVATRemitted, VATDeficit: globalStats.vatDeficit }]);
       XLSX.utils.book_append_sheet(wb, ws, 'VAT Summary');
+      previewRows.push({ Module: 'VAT Collected vs Remitted', Scope: 'Summary Data', Status: 'Included' });
     }
     if (selectedFields.includes('WHT Deductions')) {
-      const ws = XLSX.utils.json_to_sheet(payments.filter(p => (p.withholdingTax || 0) > 0).map(p => ({ Client: p.client, Site: p.site, Date: formatDisplayDate(p.date), Amount: p.amount, WHT: p.withholdingTax })));
+      const data = payments.filter(p => (p.withholdingTax || 0) > 0).map(p => ({ Client: p.client, Site: p.site, Date: formatDisplayDate(p.date), Amount: p.amount, WHT: p.withholdingTax }));
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'WHT');
+      previewRows.push({ Module: 'WHT Deductions', Scope: `${data.length} records`, Status: 'Included' });
     }
     if (selectedFields.includes('WHT Summary by Client')) {
       const whtMap: Record<string, number> = {};
       payments.forEach(p => { if (p.withholdingTax) whtMap[p.client] = (whtMap[p.client] || 0) + p.withholdingTax; });
-      const ws = XLSX.utils.json_to_sheet(Object.entries(whtMap).map(([client, total]) => ({ Client: client, TotalWHT: total })));
+      const data = Object.entries(whtMap).map(([client, total]) => ({ Client: client, TotalWHT: total }));
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'WHT By Client');
+      previewRows.push({ Module: 'WHT Summary', Scope: `${data.length} clients`, Status: 'Included' });
     }
     if (selectedFields.includes('Discounts Applied')) {
-      const ws = XLSX.utils.json_to_sheet(payments.filter(p => (p.discount || 0) > 0).map(p => ({ Client: p.client, Site: p.site, Date: formatDisplayDate(p.date), Amount: p.amount, Discount: p.discount })));
+      const data = payments.filter(p => (p.discount || 0) > 0).map(p => ({ Client: p.client, Site: p.site, Date: formatDisplayDate(p.date), Amount: p.amount, Discount: p.discount }));
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Discounts');
+      previewRows.push({ Module: 'Discounts', Scope: `${data.length} records`, Status: 'Included' });
     }
     if (selectedFields.includes('Client Balances')) {
-      const ws = XLSX.utils.json_to_sheet(summaryData.map(r => ({ Client: r.client, Invoiced: r.totalInvoices, Paid: r.totalPayment, Discount: r.discount, WHT: r.withholdingTax, VAT: r.vat, Balance: r.balance, Status: r.status })));
+      const data = summaryData.map(r => ({ Client: r.client, Invoiced: r.totalInvoices, Paid: r.totalPayment, Discount: r.discount, WHT: r.withholdingTax, VAT: r.vat, Balance: r.balance, Status: r.status }));
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Client Balances');
+      previewRows.push({ Module: 'Client Balances', Scope: `${data.length} clients`, Status: 'Included' });
     }
     if (selectedFields.includes('Payment by Client')) {
       const clientPay: Record<string, number> = {};
       payments.forEach(p => { clientPay[p.client] = (clientPay[p.client] || 0) + p.amount; });
-      const ws = XLSX.utils.json_to_sheet(Object.entries(clientPay).map(([client, total]) => ({ Client: client, TotalPaid: total })));
+      const data = Object.entries(clientPay).map(([client, total]) => ({ Client: client, TotalPaid: total }));
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Pay By Client');
+      previewRows.push({ Module: 'Payment By Client', Scope: `${data.length} clients`, Status: 'Included' });
     }
     if (selectedFields.includes('Payment by Site')) {
       const sitePay: Record<string, number> = {};
       payments.forEach(p => { sitePay[p.site] = (sitePay[p.site] || 0) + p.amount; });
-      const ws = XLSX.utils.json_to_sheet(Object.entries(sitePay).map(([site, total]) => ({ Site: site, TotalPaid: total })));
+      const data = Object.entries(sitePay).map(([site, total]) => ({ Site: site, TotalPaid: total }));
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Pay By Site');
+      previewRows.push({ Module: 'Payment By Site', Scope: `${data.length} sites`, Status: 'Included' });
     }
     if (selectedFields.includes('Site Revenue')) {
-      const ws = XLSX.utils.json_to_sheet(siteFinancialData.map(s => ({ Site: s.name, PaidInvoices: s.paid, PendingInvoices: s.pending, Total: s.paid + s.pending })));
+      const data = siteFinancialData.map(s => ({ Site: s.name, PaidInvoices: s.paid, PendingInvoices: s.pending, Total: s.paid + s.pending }));
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Site Revenue');
+      previewRows.push({ Module: 'Site Revenue', Scope: `${data.length} sites`, Status: 'Included' });
     }
     if (selectedFields.includes('Collection Efficiency')) {
-      const ws = XLSX.utils.json_to_sheet([{ TotalBilled: globalStats.totalBilled, TotalCollected: globalStats.totalCollectedCash, TotalWHT: globalStats.totalWHT, TotalDiscount: globalStats.totalDiscount, TotalOutstanding: globalStats.totalOutstanding, CollectionRate: `${collectionRate}%`, VATCollected: globalStats.totalVATCollected, VATRemitted: globalStats.totalVATRemitted, VATDeficit: globalStats.vatDeficit }]);
+      const data = [{ TotalBilled: globalStats.totalBilled, TotalCollected: globalStats.totalCollectedCash, TotalWHT: globalStats.totalWHT, TotalDiscount: globalStats.totalDiscount, TotalOutstanding: globalStats.totalOutstanding, CollectionRate: `${collectionRate}%`, VATCollected: globalStats.totalVATCollected, VATRemitted: globalStats.totalVATRemitted, VATDeficit: globalStats.vatDeficit }];
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Efficiency');
+      previewRows.push({ Module: 'Collection Efficiency', Scope: 'Global Metrics', Status: 'Included' });
     }
     if (selectedFields.includes('Monthly Revenue Trend')) {
-      const ws = XLSX.utils.json_to_sheet(trendData.map(t => ({ Month: t.month, Billed: t.Billed, Collected: t.Collected })));
+      const data = trendData.map(t => ({ Month: t.month, Billed: t.Billed, Collected: t.Collected }));
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Monthly Trend');
+      previewRows.push({ Module: 'Monthly Trend', Scope: `${data.length} months`, Status: 'Included' });
     }
     if (selectedFields.includes('Top Debtors')) {
-      const ws = XLSX.utils.json_to_sheet(clientDebtData.map(d => ({ Name: d.name, Billed: d.Billed, Cleared: d.Cleared, Outstanding: d.Outstanding })));
+      const data = clientDebtData.map(d => ({ Name: d.name, Billed: d.Billed, Cleared: d.Cleared, Outstanding: d.Outstanding }));
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Top Debtors');
+      previewRows.push({ Module: 'Top Debtors', Scope: `${data.length} records`, Status: 'Included' });
     }
     if (selectedFields.includes('VAT Deficit Alert')) {
-      const ws = XLSX.utils.json_to_sheet([{ VATCollected: globalStats.totalVATCollected, VATRemitted: globalStats.totalVATRemitted, Deficit: globalStats.vatDeficit, DeficitPct: globalStats.totalVATCollected > 0 ? `${Math.round((globalStats.vatDeficit / globalStats.totalVATCollected) * 100)}%` : '0%' }]);
+      const data = [{ VATCollected: globalStats.totalVATCollected, VATRemitted: globalStats.totalVATRemitted, Deficit: globalStats.vatDeficit, DeficitPct: globalStats.totalVATCollected > 0 ? `${Math.round((globalStats.vatDeficit / globalStats.totalVATCollected) * 100)}%` : '0%' }];
+      const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'VAT Alert');
+      previewRows.push({ Module: 'VAT Alert', Scope: 'Deficit Analysis', Status: 'Included' });
     }
 
     const fileName = 'Custom_Financial_Report.xlsx';
-    if (window.electronAPI?.savePathDialog) {
-      window.electronAPI.savePathDialog({
-        title: 'Export Custom Financial Report (Excel)',
-        defaultPath: fileName,
-        filters: [{ name: 'Excel Files', extensions: ['xlsx'] }]
-      }).then(filePath => {
-        if (filePath) {
-          const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-          window.electronAPI.writeFile(filePath, buf, 'binary').then(success => {
-            if (success) toast.success(`Exported to ${filePath}`);
-            else toast.error('Failed to save file.');
+    
+    setPreviewModal({
+      isOpen: true,
+      title: 'Custom Financial Report (Multisheet)',
+      type: 'excel',
+      data: previewRows,
+      headers: previewHeaders,
+      filename: fileName,
+      onConfirm: () => {
+        if (window.electronAPI?.savePathDialog) {
+          window.electronAPI.savePathDialog({
+            title: 'Export Custom Financial Report (Excel)',
+            defaultPath: fileName,
+            filters: [{ name: 'Excel Files', extensions: ['xlsx'] }]
+          }).then(filePath => {
+            if (filePath) {
+              const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+              window.electronAPI.writeFile(filePath, buf, 'binary').then(success => {
+                if (success) toast.success(`Exported to ${filePath}`);
+                else toast.error('Failed to save file.');
+              });
+            }
           });
+        } else {
+          XLSX.writeFile(wb, fileName);
         }
-      });
-    } else {
-      XLSX.writeFile(wb, fileName);
-    }
-    showExportMessage('Custom Financial Report (Excel) generated!');
+        showExportMessage('Custom Financial Report (Excel) generated!');
+      }
+    });
   };
 
   const generateCustomReportPdf = () => {
@@ -693,11 +816,115 @@ export function FinancialReports() {
     if (body.length === 0) {
       body.push(['Selected fields', 'No numeric summary available — use Excel export for full detail.']);
     }
-    generatePdf(`Financial Report Summary (${filterYear === 'All' ? 'All Time' : filterYear})`, head, body, 'custom_financial_report.pdf');
+
+    setPreviewModal({
+      isOpen: true,
+      title: `Financial Report Summary (${filterYear === 'All' ? 'All Time' : filterYear})`,
+      type: 'pdf',
+      data: body,
+      headers: head[0],
+      filename: 'custom_financial_report.pdf',
+      onConfirm: () => generatePdf(`Financial Report Summary (${filterYear === 'All' ? 'All Time' : filterYear})`, head, body, 'custom_financial_report.pdf')
+    });
+  };
+  const renderReportPreview = () => {
+    if (!previewModal.isOpen) return null;
+
+    return (
+      <Dialog open={previewModal.isOpen} onOpenChange={(open: boolean) => setPreviewModal(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent className="max-w-4xl max-h-[85vh]">
+          <DialogHeader className="px-6 py-4 bg-slate-50/50 border-b">
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div>
+                  <DialogTitle>{previewModal.title}</DialogTitle>
+                  <p className="text-sm text-slate-500 font-medium">Previewing report content before export</p>
+                </div>
+              </div>
+              <Badge className="bg-indigo-600 text-white font-bold uppercase tracking-wider px-3 py-1">
+                {previewModal.type.toUpperCase()}
+              </Badge>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto p-6">
+            <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <Table className="text-[11px] whitespace-nowrap">
+                  <TableHeader className="bg-slate-900 sticky top-0 z-10">
+                    <TableRow className="hover:bg-slate-900 border-none">
+                      {previewModal.headers.map((h, i) => (
+                        <TableHead key={i} className="text-slate-300 font-bold uppercase tracking-wider h-10 px-4">{h}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {previewModal.data.slice(0, 10).map((row, ri) => (
+                      <TableRow key={ri} className={ri % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
+                        {Object.values(row).map((val: any, ci) => (
+                          <TableCell key={ci} className="px-4 py-2.5 font-medium text-slate-700 border-r border-slate-100 last:border-0">{String(val || '-')}</TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                    {previewModal.data.length > 10 && (
+                      <TableRow className="bg-amber-50/30 italic text-slate-500">
+                        <TableCell colSpan={previewModal.headers.length} className="px-4 py-3 text-center font-medium">
+                          ... and {previewModal.data.length - 10} more rows will be included in the export.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {previewModal.data.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={previewModal.headers.length} className="px-4 py-12 text-center text-slate-400 font-medium">
+                          No data to display in the preview.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+            
+            <div className="mt-4 p-4 rounded-xl border border-indigo-100 bg-indigo-50/30 flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-indigo-500 shrink-0 mt-0.5" />
+              <div className="text-xs text-indigo-900 font-medium leading-relaxed">
+                Verification complete: The report matches your current filters ({filterYear === 'All' ? 'All Time' : filterYear}{filterClient !== 'All' ? `, Client: ${filterClient}` : ''}). 
+                Clicking save will generate the full document as {previewModal.filename}.
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="px-6 py-4 bg-slate-50/50 border-t items-center justify-between sm:justify-between">
+            <Button 
+              variant="ghost" 
+              className="gap-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+              onClick={() => setPreviewModal(prev => ({ ...prev, isOpen: false }))}
+            >
+              <XCircle className="h-4 w-4" /> Cancel
+            </Button>
+            <div className="flex gap-3">
+              <Button 
+                className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg shadow-indigo-200"
+                onClick={() => {
+                  previewModal.onConfirm();
+                  setPreviewModal(prev => ({ ...prev, isOpen: false }));
+                }}
+              >
+                <Save className="h-4 w-4" /> Save Report
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
   };
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+      {renderReportPreview()}
       {exportMessage && (
         <div className="fixed top-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center gap-2 animate-in slide-in-from-top-2">
           <CheckCircle2 className="h-5 w-5" />{exportMessage}
@@ -1303,134 +1530,6 @@ export function FinancialReports() {
         </Card>
       </div>
 
-      {/* Custom Financial Report Builder */}
-      <Card className="bg-white border-slate-200 mb-6">
-        <CardHeader className="border-b border-slate-100 pb-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <CardTitle className="text-slate-900">Custom Financial Report Builder</CardTitle>
-              <p className="text-sm text-slate-500 mt-1">Pick the data modules you need — export as a multi-sheet Excel or a PDF summary.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSelectedFields(selectedFields.length === ALL_FINANCIAL_FIELDS.length ? [] : ALL_FINANCIAL_FIELDS)}
-                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline underline-offset-2 transition-colors"
-              >
-                {selectedFields.length === ALL_FINANCIAL_FIELDS.length ? 'Deselect All' : 'Select All'}
-              </button>
-              <span className="text-xs text-slate-400">{selectedFields.length} / {ALL_FINANCIAL_FIELDS.length} modules</span>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="space-y-6">
-            {/* Tab Navigation */}
-            <div className="flex overflow-x-auto gap-2 pb-2 hide-scrollbar border-b border-slate-100">
-              {FINANCIAL_REPORT_GROUPS.map(group => {
-                const isActive = activeFinBuilderTab === group.group;
-                const groupSelectedCount = group.fields.filter(f => selectedFields.includes(f)).length;
-                return (
-                  <button
-                    key={group.group}
-                    onClick={() => setActiveFinBuilderTab(group.group)}
-                    className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors whitespace-nowrap border-b-2 ${
-                      isActive 
-                        ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50' 
-                        : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-                    }`}
-                  >
-                    {group.group}
-                    {groupSelectedCount > 0 && (
-                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-100 text-indigo-800 text-[10px]">
-                        {groupSelectedCount}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Active Tab Content */}
-            {FINANCIAL_REPORT_GROUPS.filter(g => g.group === activeFinBuilderTab).map(group => {
-              const checkColor: Record<string, string> = {
-                indigo:  'accent-indigo-600',
-                emerald: 'accent-emerald-600',
-                amber:   'accent-amber-500',
-                violet:  'accent-violet-600',
-              };
-              const allGroupSelected = group.fields.every(f => selectedFields.includes(f));
-              return (
-                <div key={group.group} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <div className="flex items-center justify-between mb-3 px-1">
-                    <p className="text-sm font-medium text-slate-500">Select modules to include in your report:</p>
-                    <button
-                      onClick={() => {
-                        if (allGroupSelected) {
-                          setSelectedFields(prev => prev.filter(f => !group.fields.includes(f)));
-                        } else {
-                          setSelectedFields(prev => [...new Set([...prev, ...group.fields])]);
-                        }
-                      }}
-                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
-                    >
-                      {allGroupSelected ? '- Deselect Group' : '+ Select Group'}
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 bg-slate-50 p-5 rounded-xl border border-slate-100">
-                    {group.fields.map(field => (
-                      <label key={field} className="flex items-start gap-3 text-sm font-medium text-slate-700 cursor-pointer hover:text-slate-900 transition-colors bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                        <input
-                          type="checkbox"
-                          checked={selectedFields.includes(field)}
-                          onChange={() => toggleField(field)}
-                          className={`mt-0.5 h-4 w-4 rounded border-slate-300 ${checkColor[group.color]} transition-all`}
-                        />
-                        <span className="leading-tight">{field}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Preview bar */}
-            {selectedFields.length > 0 && (
-              <div className="flex items-start sm:items-center gap-3 text-xs text-slate-500 bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 sm:px-4 sm:py-3 animate-in fade-in">
-                <CheckCircle2 className="h-5 w-5 text-indigo-500 flex-shrink-0 mt-0.5 sm:mt-0" />
-                <div>
-                  Report will include <strong className="text-indigo-700">{selectedFields.length} module{selectedFields.length > 1 ? 's' : ''}</strong>. Excel = one sheet per module. PDF = key metric summary.
-                  <div className="text-indigo-600/80 italic mt-0.5">{selectedFields.slice(0, 5).join(', ')}{selectedFields.length > 5 ? ` +${selectedFields.length - 5} more` : ''}</div>
-                </div>
-              </div>
-            )}
-
-            {/* Export buttons */}
-            <div className="pt-2 flex flex-wrap items-center justify-end gap-3">
-              {priv.canExport ? (
-                <>
-                  <Button
-                    variant="outline"
-                    className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                    onClick={generateCustomReport}
-                    disabled={selectedFields.length === 0}
-                  >
-                    <FileSpreadsheet className="h-4 w-4" /> Export Excel
-                  </Button>
-                  <Button
-                    className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
-                    onClick={generateCustomReportPdf}
-                    disabled={selectedFields.length === 0}
-                  >
-                    <FileText className="h-4 w-4" /> Export PDF Summary
-                  </Button>
-                </>
-              ) : (
-                <p className="text-xs text-slate-400 italic">Export not permitted</p>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
       </>
       ) : (
         <>
@@ -1593,17 +1692,33 @@ export function FinancialReports() {
               const fmT = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
               const exportPayrollSummaryCsv = () => {
+                const headers = ['MONTH', 'SALARY', 'OVERTIME', 'GROSS PAY', 'OTHER PAY', 'PAYE', 'TOTAL PAYOUT'];
+                const data = [
+                  ...payrollSummaryData.map(r => [r.monthLabel, fm(r.salary), fm(r.overtime), fm(r.grossPay), fm(r.otherPay), fm(r.paye), fm(r.totalPayout)]),
+                  ['GRAND TOTAL', fm(gSalary), fm(gOvertime), fm(gGrossPay), fm(gOtherPay), fm(gPaye), fm(gTotalPayout)]
+                ];
                 let csv = 'data:text/csv;charset=utf-8,';
-                csv += 'MONTH,SALARY,OVERTIME,GROSS PAY,OTHER PAY,PAYE,TOTAL PAYOUT\n';
-                payrollSummaryData.forEach(r => {
-                  csv += `"${r.monthLabel}",${fm(r.salary)},${fm(r.overtime)},${fm(r.grossPay)},${fm(r.otherPay)},${fm(r.paye)},${fm(r.totalPayout)}\n`;
+                csv += headers.join(',') + '\n';
+                data.forEach(row => {
+                  csv += row.map(val => `"${val}"`).join(',') + '\n';
                 });
-                csv += `"GRAND TOTAL",${fm(gSalary)},${fm(gOvertime)},${fm(gGrossPay)},${fm(gOtherPay)},${fm(gPaye)},${fm(gTotalPayout)}\n`;
-                const link = document.createElement('a');
-                link.setAttribute('href', encodeURI(csv));
-                link.setAttribute('download', `payroll_summary_${payrollYear}.csv`);
-                document.body.appendChild(link); link.click(); document.body.removeChild(link);
-                showExportMessage('Payroll Summary (CSV) exported!');
+                const fileName = `payroll_summary_${payrollYear}.csv`;
+
+                setPreviewModal({
+                  isOpen: true,
+                  title: `Payroll Summary ${payrollYear}`,
+                  type: 'csv',
+                  data: data,
+                  headers: headers,
+                  filename: fileName,
+                  onConfirm: () => {
+                    const link = document.createElement('a');
+                    link.setAttribute('href', encodeURI(csv));
+                    link.setAttribute('download', fileName);
+                    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                    showExportMessage('Payroll Summary (CSV) exported!');
+                  }
+                });
               };
 
               const exportPayrollSummaryPdf = () => {
@@ -1628,7 +1743,16 @@ export function FinancialReports() {
                      fm(gTotalPayout)
                   ]
                 ];
-                generatePdf(`Payroll Summary ${payrollYear}`, head, body, `payroll_summary_${payrollYear}.pdf`);
+
+                setPreviewModal({
+                  isOpen: true,
+                  title: `Payroll Summary ${payrollYear}`,
+                  type: 'pdf',
+                  data: body,
+                  headers: head[0],
+                  filename: `payroll_summary_${payrollYear}.pdf`,
+                  onConfirm: () => generatePdf(`Payroll Summary ${payrollYear}`, head, body, `payroll_summary_${payrollYear}.pdf`)
+                });
               };
 
               return (
@@ -1772,19 +1896,37 @@ export function FinancialReports() {
               const pendingAdvances = salaryAdvances.filter(a => a.status !== 'Deducted');
 
               const exportLoansCsv = () => {
-                let csv = 'data:text/csv;charset=utf-8,';
-                csv += 'Type,Employee,Loan Type,Principal,Monthly Deduction,Remaining Balance,Duration,Start Date,Status\n';
+                const headers = ['Type', 'Employee', 'Loan Type', 'Principal', 'Monthly Deduction', 'Remaining Balance', 'Duration', 'Start Date', 'Status'];
+                const data: any[] = [];
                 loans.forEach(l => {
-                  csv += `Loan,"${l.employeeName}","${l.loanType}",${l.principalAmount},${l.monthlyDeduction},${l.remainingBalance},${l.duration} months,${l.startDate},${l.status}\n`;
+                  data.push(['Loan', l.employeeName, l.loanType, l.principalAmount, l.monthlyDeduction, l.remainingBalance, `${l.duration} months`, l.startDate, l.status]);
                 });
                 salaryAdvances.forEach(a => {
-                  csv += `Advance,"${a.employeeName}",,${a.amount},,,,,${a.status}\n`;
+                  data.push(['Advance', a.employeeName, '-', a.amount, '-', '-', '-', '-', a.status]);
                 });
-                const link = document.createElement('a');
-                link.setAttribute('href', encodeURI(csv));
-                link.setAttribute('download', 'loans_advances_report.csv');
-                document.body.appendChild(link); link.click(); document.body.removeChild(link);
-                showExportMessage('Loans & Advances (CSV) exported!');
+
+                let csv = 'data:text/csv;charset=utf-8,';
+                csv += headers.join(',') + '\n';
+                data.forEach(row => {
+                  csv += row.map((val: any) => `"${val}"`).join(',') + '\n';
+                });
+                const fileName = 'loans_advances_report.csv';
+
+                setPreviewModal({
+                  isOpen: true,
+                  title: 'Loans & Advances Report',
+                  type: 'csv',
+                  data: data,
+                  headers: headers,
+                  filename: fileName,
+                  onConfirm: () => {
+                    const link = document.createElement('a');
+                    link.setAttribute('href', encodeURI(csv));
+                    link.setAttribute('download', fileName);
+                    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                    showExportMessage('Loans & Advances (CSV) exported!');
+                  }
+                });
               };
 
               const exportLoansPdf = () => {
@@ -1793,7 +1935,16 @@ export function FinancialReports() {
                   ...loans.map(l => ['Loan', l.employeeName, l.loanType, l.principalAmount.toLocaleString(), l.monthlyDeduction.toLocaleString(), l.remainingBalance.toLocaleString(), l.status]),
                   ...salaryAdvances.map(a => ['Advance', a.employeeName, '-', a.amount.toLocaleString(), '-', '-', a.status]),
                 ];
-                generatePdf('Loans & Advances Report', head, body, 'loans_advances_report.pdf');
+                
+                setPreviewModal({
+                  isOpen: true,
+                  title: 'Loans & Advances Report',
+                  type: 'pdf',
+                  data: body,
+                  headers: head[0],
+                  filename: 'loans_advances_report.pdf',
+                  onConfirm: () => generatePdf('Loans & Advances Report', head, body, 'loans_advances_report.pdf')
+                });
               };
 
               return (
@@ -1916,6 +2067,9 @@ export function FinancialReports() {
           )}
         </CardContent>
       </Card>
+
+      </>
+      )}
 
       {/* Custom Financial Report Builder */}
       <Card className="bg-white border-slate-200 mb-6">
@@ -2045,8 +2199,7 @@ export function FinancialReports() {
           </div>
         </CardContent>
       </Card>
-      </>
-      )}
+
       </div>
     </div>
   );

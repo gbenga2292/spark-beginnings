@@ -1,5 +1,6 @@
 import { AttendanceRecord, MonthValue } from '@/src/store/appStore';
 import { format, addDays } from 'date-fns';
+import { normalizeDate } from './dateUtils';
 
 export interface AttendanceMetrics {
   ot: number;
@@ -30,7 +31,12 @@ export function calculateAttendanceMetrics(
     return { ot: 0, otSite: '', dayWk: 0, nightWk: 0, isPresent: 'No', dow: 0, mth: 0, day2: 0, ndw: 'No' };
   }
 
-  const d = new Date(dateStr);
+  // Ensure we parse the date string as local midnight to avoid timezone shift-back issues
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) {
+    return { ot: 0, otSite: '', dayWk: 0, nightWk: 0, isPresent: 'No', dow: 0, mth: 0, day2: 0, ndw: 'No' };
+  }
+
   const jsDay = d.getDay(); // 0=Sun
   const dow = jsDay === 0 ? 7 : jsDay;
   const mth = d.getMonth() + 1;
@@ -45,7 +51,12 @@ export function calculateAttendanceMetrics(
   let ndw: 'Yes' | 'No' = 'No';
   if (dow !== 7) {
     const nextDayStr = format(addDays(d, 1), 'yyyy-MM-dd');
-    const staffWorksNextDay = allRecords.some(r => r.staffId === record.staffId && r.date === nextDayStr && (r.day === 'Yes' || r.night === 'Yes'));
+    // Normalize dates for comparison to ensure robustness
+    const staffWorksNextDay = allRecords.some(r => 
+      r.staffId === record.staffId && 
+      (normalizeDate(r.date) === nextDayStr) && 
+      (r.day === 'Yes' || r.night === 'Yes')
+    );
     
     if (staffWorksNextDay) {
       ndw = 'Yes';
@@ -54,7 +65,11 @@ export function calculateAttendanceMetrics(
         const nextDayIsHolidayOrSun = publicHolidays.includes(nextDayStr) || nextDayDow === 7;
         if (nextDayIsHolidayOrSun) {
            const nextNextDayStr = format(addDays(d, 2), 'yyyy-MM-dd');
-           const staffWorksNextNextDay = allRecords.some(r => r.staffId === record.staffId && r.date === nextNextDayStr && (r.day === 'Yes' || r.night === 'Yes'));
+           const staffWorksNextNextDay = allRecords.some(r => 
+             r.staffId === record.staffId && 
+             (normalizeDate(r.date) === nextNextDayStr) && 
+             (r.day === 'Yes' || r.night === 'Yes')
+           );
            if (staffWorksNextNextDay) ndw = 'Yes';
         }
     }

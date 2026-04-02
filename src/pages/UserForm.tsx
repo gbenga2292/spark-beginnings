@@ -80,7 +80,7 @@ const PRIV_GROUPS: PG[] = [
     ],
   },
   {
-    name: 'Admin', icon: Building2, color: 'violet',
+    name: 'Clients', icon: Building2, color: 'violet',
     pages: [
       { key: 'sites', label: 'Sites & Clients', parentKey: 'sites', masterField: 'canView',
         fields: [

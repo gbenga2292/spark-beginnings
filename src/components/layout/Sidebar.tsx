@@ -88,7 +88,7 @@ const navigation: NavCategory[] = [
     name: 'Tasks',
     icon: ListTodo,
     items: [
-      { name: 'Dashboard', href: '/tasks/dashboard', icon: BarChart2, privKey: 'tasks', privField: 'canViewDashboard' },
+      { name: 'Task Dashboard', href: '/tasks/dashboard', icon: BarChart2, privKey: 'tasks', privField: 'canViewDashboard' },
       { name: 'Task', href: '/tasks', icon: ClipboardCheck, privKey: 'tasks', privField: 'canViewMyTasks' },
       { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'sites', privField: 'canView' },
       { name: 'Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'tasks', privField: 'canViewReminders' },
@@ -123,9 +123,9 @@ const navigation: NavCategory[] = [
       { name: 'Sites', href: '/operations/sites', icon: MapPin, privKey: 'operations', privField: 'canView' },
     ],
   },
-  // ── Admin ─────────────────────────────────────────────────────────────────
+  // ── Clients ───────────────────────────────────────────────────────────────
   {
-    name: 'Admin',
+    name: 'Clients',
     icon: Building2,
     items: [
       { name: 'Sites & Clients', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView' },

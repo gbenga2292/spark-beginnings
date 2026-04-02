@@ -133,9 +133,9 @@ function useNotifications() {
       notifs.push({ id: `inv-ov-${i.id}`, icon: FileText, text: `Overdue Invoice: ${i.invoiceNumber}`, time: i.dueDate, color: 'text-rose-600', url: '/client-accounts', priority: 1 });
     });
 
-    // 4. Pending Invoices (Priority: 3)
+    // 4. Quotations (Priority: 3)
     if (pendingInvoices.length > 0) {
-      notifs.push({ id: 'pending-inv', icon: FileText, text: `${pendingInvoices.length} Pending Invoices to draft`, time: 'Now', color: 'text-blue-500', url: '/client-accounts', priority: 3 });
+      notifs.push({ id: 'pending-inv', icon: FileText, text: `${pendingInvoices.length} Quotations to draft`, time: 'Now', color: 'text-blue-500', url: '/client-accounts', priority: 3 });
     }
 
     // 5. Expiring LASHMA (Priority: 2)
