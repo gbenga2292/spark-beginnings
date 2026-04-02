@@ -462,16 +462,21 @@ export function Ledger() {
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!priv?.canAdd) {
       toast.error('You do not have permission to add entries.');
       return;
     }
+    setImportFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
+  const processImport = (file: File, mode: 'append' | 'overwrite') => {
+    setImportFile(null);
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
@@ -480,12 +485,14 @@ export function Ledger() {
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
-        
+
         const existingCats = new Set(ledgerCategories.map(c => c.name.toLowerCase()));
         const existingBanks = new Set(ledgerBanks.map(b => b.name.toLowerCase()));
         const existingVendors = new Set(ledgerVendors.map(v => v.name.toLowerCase()));
 
         let importedCount = 0;
+        let skippedCount = 0;
+
         data.forEach((row: any) => {
           const voucherNo = row['Voucher No'] || row.voucher_no || row.voucherNo;
           const date = row['Transaction Date'] || row['Date'] || row.date || row['Voucher Date'];
@@ -497,25 +504,49 @@ export function Ledger() {
           const vendor = row['Vendor Name'] || row['Vendor'] || row.vendor || '';
           const bank = row['Paid From'] || row['Bank'] || row.bank;
           const enteredBy = row['Entered By'] || row.entered_by || row.enteredBy || currentUser?.name || 'Imported';
-          
+
           if (!voucherNo || !date || !category || !amount || !bank) return;
-          
-          // Basic duplicate check by combining fields
-          const isDup = ledgerEntries.some(e => e.voucherNo === voucherNo && e.category === category && e.amount === Number(amount) && e.description === description);
-          if (isDup) return;
+
+          // Duplicate check
+          const dupEntry = ledgerEntries.find(
+            e => e.voucherNo === voucherNo && e.category === category && e.amount === Number(amount) && e.description === description
+          );
+
+          if (dupEntry) {
+            if (mode === 'append') {
+              skippedCount++;
+              return; // skip duplicates in append mode
+            } else {
+              // overwrite: update the existing entry
+              updateLedgerEntry(dupEntry.id, {
+                ...dupEntry,
+                date: normalizeDate(date),
+                description: String(description),
+                category: String(category),
+                amount: Number(amount),
+                client: String(client),
+                site: String(site),
+                vendor: String(vendor),
+                bank: String(bank),
+                enteredBy: String(enteredBy),
+              });
+              importedCount++;
+              return;
+            }
+          }
 
           const catKey = String(category).toLowerCase();
           if (!existingCats.has(catKey)) {
             addLedgerCategory({ id: generateId(), name: String(category) });
             existingCats.add(catKey);
           }
-          
+
           const bankKey = String(bank).toLowerCase();
           if (!existingBanks.has(bankKey)) {
             addLedgerBank({ id: generateId(), name: String(bank) });
             existingBanks.add(bankKey);
           }
-          
+
           if (vendor && String(vendor).toLowerCase() !== 'none') {
             const vendorKey = String(vendor).toLowerCase();
             if (!existingVendors.has(vendorKey)) {
@@ -535,21 +566,23 @@ export function Ledger() {
             site: String(site),
             vendor: String(vendor),
             bank: String(bank),
-            enteredBy: String(enteredBy)
+            enteredBy: String(enteredBy),
           });
           importedCount++;
         });
 
         if (importedCount > 0) {
-          toast.success(`Successfully imported ${importedCount} ledger entries.`);
+          const suffix = skippedCount > 0 ? ` (${skippedCount} duplicate${skippedCount !== 1 ? 's' : ''} skipped)` : '';
+          toast.success(`Successfully imported ${importedCount} ledger entr${importedCount !== 1 ? 'ies' : 'y'}.${suffix}`);
+        } else if (skippedCount > 0) {
+          toast.info(`No new entries imported — ${skippedCount} duplicate${skippedCount !== 1 ? 's' : ''} skipped.`);
         } else {
-          toast.info('No new valid entries found to import (may be duplicates).');
+          toast.info('No valid entries found to import.');
         }
       } catch (err) {
         console.error('Import Error:', err);
         toast.error('Failed to parse file. Please ensure it is a valid Excel/CSV file matching the Ledger Export format.');
       }
-      if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsBinaryString(file);
   };
@@ -960,7 +993,7 @@ export function Ledger() {
                 </div>
                 {priv?.canAdd && (
                   <>
-                    <input type="file" ref={fileInputRef} accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImport} />
+                    <input type="file" ref={fileInputRef} accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportSelected} />
                     <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm">
                       <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
                     </Button>
@@ -1004,7 +1037,7 @@ export function Ledger() {
                     <TableHead>Bank</TableHead>
                     <TableHead className="text-right w-40">Amount</TableHead>
                     <TableHead className="w-16 text-center">Lines</TableHead>
-                    <TableHead className="w-24">Action</TableHead>
+                    <TableHead className="w-36">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1030,14 +1063,38 @@ export function Ledger() {
                         </span>
                       </TableCell>
                       <TableCell onClick={e => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 gap-1"
-                          onClick={() => setDialogVoucher(v.voucherNo)}
-                        >
-                          <Eye className="h-4 w-4" /> View
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 gap-1 h-8 px-2"
+                            onClick={() => setDialogVoucher(v.voucherNo)}
+                          >
+                            <Eye className="h-3.5 w-3.5" /> View
+                          </Button>
+                          {priv?.canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 h-8 w-8 p-0"
+                              title="Delete Voucher"
+                              onClick={async () => {
+                                const vno = v.voucherNo;
+                                const count = ledgerEntries.filter(e => e.voucherNo === vno).length;
+                                const ok = await showConfirm(
+                                  `Delete voucher ${vno}?\n\nThis will permanently remove all ${count} transaction(s) in this voucher.`,
+                                  { variant: 'danger', confirmLabel: 'Yes, Delete' }
+                                );
+                                if (ok) {
+                                  ledgerEntries.filter(e => e.voucherNo === vno).forEach(r => deleteLedgerEntry(r.id));
+                                  toast.success(`Deleted voucher ${vno}.`);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1151,8 +1208,57 @@ export function Ledger() {
         </div>
       )}
 
-
-
+      {/* ── Import Policy Modal ──────────────────────────────────────────────── */}
+      {importFile && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl p-7 w-full max-w-md mx-4 border border-slate-200">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
+                <Download className="h-5 w-5 text-indigo-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Import Policy</h3>
+                <p className="text-xs text-slate-500">How should existing duplicate entries be handled?</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 leading-relaxed mb-5">
+              File: <span className="font-semibold text-slate-800">{importFile.name}</span>
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => processImport(importFile, 'append')}
+                className="w-full text-left px-4 py-3.5 rounded-xl border-2 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 transition-all group"
+              >
+                <span className="font-semibold text-slate-800 block text-sm group-hover:text-indigo-700">
+                  Append Only
+                </span>
+                <span className="text-xs text-slate-500 mt-0.5 block">
+                  Adds new entries only. Skips rows that already exist (matched by voucher, category, amount &amp; description).
+                </span>
+              </button>
+              <button
+                onClick={() => processImport(importFile, 'overwrite')}
+                className="w-full text-left px-4 py-3.5 rounded-xl border-2 border-amber-200 hover:border-amber-400 hover:bg-amber-50/40 transition-all group"
+              >
+                <span className="font-semibold text-amber-700 block text-sm">
+                  Overwrite Duplicates
+                </span>
+                <span className="text-xs text-amber-600/80 mt-0.5 block">
+                  Replaces matching existing entries with data from the file. Adds entries that don't exist yet.
+                </span>
+              </button>
+              <button
+                onClick={() => setImportFile(null)}
+                className="w-full text-center py-2.5 text-sm text-slate-400 hover:text-slate-600 transition-colors mt-1"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

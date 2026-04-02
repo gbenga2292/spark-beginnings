@@ -25,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/src/components/ui/dropdown-menu';
 
-export function SalaryLoans() {
+export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) => void }) {
   const priv = usePriv('salaryLoans');
   const { user: currentUser } = useAuth();
   const { users, createMainTask, addSubtask } = useAppData();
@@ -72,7 +72,7 @@ export function SalaryLoans() {
   };
 
   const handleDeleteAdvance = async (id: string, name: string) => {
-    const confirmed = await showConfirm(`Are you sure you want to delete the salary advance for ${name}?`, 'Delete Entry', 'destructive');
+    const confirmed = await showConfirm(`Are you sure you want to delete the salary advance for ${name}?`, { variant: 'danger' });
     if (confirmed) {
       deleteSalaryAdvance(id);
       toast.success('Salary advance deleted successfully.');
@@ -80,7 +80,7 @@ export function SalaryLoans() {
   };
 
   const handleDeleteLoan = async (id: string, name: string) => {
-    const confirmed = await showConfirm(`Are you sure you want to delete the loan for ${name}?`, 'Delete Entry', 'destructive');
+    const confirmed = await showConfirm(`Are you sure you want to delete the loan for ${name}?`, { variant: 'danger' });
     if (confirmed) {
       deleteLoan(id);
       toast.success('Loan deleted successfully.');
@@ -211,7 +211,6 @@ export function SalaryLoans() {
 
   const handleExportCSV = async (mode: 'bare' | 'detailed') => {
     try {
-      const isSalaryAdvance = true; // For now export both as separate blocks or combined
       const headers = mode === 'bare' 
         ? ['Type', 'Employee', 'Amount', 'Date', 'Status']
         : ['id', 'Type', 'Employee ID', 'Employee Name', 'Amount', 'Date', 'Pay Start Date', 'Duration', 'Monthly Deduction', 'Remaining Balance', 'Approver', 'Status'];
@@ -273,27 +272,44 @@ export function SalaryLoans() {
       const csvContent = [headers.join(','), ...advanceRows.map(r => r.map(extractCSV).join(',')), ...loanRows.map(r => r.map(extractCSV).join(','))].join('\n');
       const fileName = `Financial_Requests_${mode === 'bare' ? 'Bare' : 'Detailed'}_${new Date().toISOString().slice(0, 10)}.csv`;
 
-      if (window.electronAPI?.savePathDialog) {
-        const filePath = await window.electronAPI.savePathDialog({
-          title: `Export Financial Entries (${mode === 'bare' ? 'Bare Minimum' : 'Detailed'})`,
-          defaultPath: fileName,
-          filters: [{ name: 'CSV Files', extensions: ['csv'] }]
-        });
+      const onConfirm = async () => {
+        if (window.electronAPI?.savePathDialog) {
+          const filePath = await window.electronAPI.savePathDialog({
+            title: `Export Financial Entries (${mode === 'bare' ? 'Bare Minimum' : 'Detailed'})`,
+            defaultPath: fileName,
+            filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+          });
 
-        if (filePath) {
-          const success = await window.electronAPI.writeFile(filePath, csvContent, 'utf8');
-          if (success) toast.success(`Exported to ${filePath}`);
-          else toast.error('Failed to save file.');
+          if (filePath) {
+            const success = await window.electronAPI.writeFile(filePath, csvContent, 'utf8');
+            if (success) toast.success(`Exported to ${filePath}`);
+            else toast.error('Failed to save file.');
+          }
+        } else {
+          const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
+          const link = document.createElement("a");
+          link.setAttribute("href", encodedUri);
+          link.setAttribute("download", fileName);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          toast.success('Successfully exported financial entries');
         }
+      };
+
+      if (setPreviewModal) {
+        setPreviewModal({
+          isOpen: true,
+          title: `Preview Financial Entries (${mode === 'bare' ? 'Summary' : 'Detailed'})`,
+          filename: fileName,
+          headers: headers.map(h => h.toUpperCase()),
+          data: [...advanceRows, ...loanRows].map(row => 
+            row.map(cell => typeof cell === 'number' ? `₦${cell.toLocaleString()}` : String(cell))
+          ),
+          onConfirm
+        });
       } else {
-        const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", fileName);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast.success('Successfully exported financial entries');
+        onConfirm();
       }
     } catch (e) {
       toast.error('Export failed');

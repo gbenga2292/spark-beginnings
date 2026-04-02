@@ -2,7 +2,7 @@ import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import React, { useState, useMemo } from 'react';
 import { useAppStore, PendingInvoice, Invoice } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown } from 'lucide-react';
+import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -33,7 +33,13 @@ export function Billing() {
   const { user: currentUser } = useAuth();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [isViewingActive, setIsViewingActive] = useState(true);
+  const [activeTab, setActiveTab] = useState<'quotations' | 'all' | 'active' | 'unpaid' | 'completed'>('all');
+  const isViewingAll = activeTab === 'all';
+  const isViewingActive = activeTab === 'active';
+  const isViewingQuotations = activeTab === 'quotations';
+  const isViewingUnpaid = activeTab === 'unpaid';
+  const isViewingCompleted = activeTab === 'completed';
+  const payments = useAppStore(state => state.payments);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [sortField, setSortField] = useState<string>('startDate');
@@ -239,10 +245,15 @@ export function Billing() {
     const data = calculateInvoice();
     if (!data) return;
 
+    // Determine where the record currently lives (if editing)
+    const existingInActive = selectedId ? invoices.find(i => i.id === selectedId) : null;
+    const existingInPending = selectedId ? pendingInvoices.find(i => i.id === selectedId) : null;
+    const movingFromActiveToQuotation = !!existingInActive && form.destination === 'Pending';
+    const movingFromQuotationToActive = !!existingInPending && form.destination === 'Active';
+
     if (form.destination === 'Active') {
-      // Create an Active Invoice directly
       const newInvoice: Invoice = {
-        id: generateId(),
+        id: selectedId && !movingFromQuotationToActive ? selectedId : generateId(),
         invoiceNumber: data.invoiceNo,
         client: data.client,
         project: 'Billed',
@@ -254,7 +265,6 @@ export function Billing() {
         billingCycle: 'Custom',
         reminderDate: '',
         status: 'Sent',
-        // Sync pending properties
         vatInc: data.vatInc,
         noOfMachine: data.noOfMachine,
         dailyRentalCost: data.dailyRentalCost,
@@ -275,8 +285,13 @@ export function Billing() {
         totalExclusiveOfVat: data.totalExclusiveOfVat
       };
 
-      if (selectedId) {
-        // If we are somehow editing and moving it to Active directly
+      if (movingFromQuotationToActive) {
+        // Move: remove from pending, add to active
+        deletePendingInvoice(selectedId!);
+        addInvoice(newInvoice);
+        toast.success('Moved to Active Invoices');
+      } else if (selectedId && existingInActive) {
+        // Edit in-place in active
         updateInvoice(selectedId, newInvoice);
         toast.success('Active Invoice updated successfully');
       } else {
@@ -285,13 +300,21 @@ export function Billing() {
       }
 
     } else {
-      // Destination is Pending
-      if (selectedId) {
-        updatePendingInvoice(selectedId, data);
-        toast.success('Pending Invoice updated successfully');
+      // Destination is Pending/Quotation
+      const pendingData = { ...data, id: selectedId && !movingFromActiveToQuotation ? selectedId : generateId() } as any;
+
+      if (movingFromActiveToQuotation) {
+        // Move: remove from active, add to pending
+        deleteInvoice(selectedId!);
+        addPendingInvoice({ ...pendingData, id: generateId() });
+        toast.success('Moved to Quotations');
+      } else if (selectedId && existingInPending) {
+        // Edit in-place in pending
+        updatePendingInvoice(selectedId, pendingData);
+        toast.success('Quotation updated successfully');
       } else {
         addPendingInvoice({ ...data, id: generateId() });
-        toast.success('Pending Invoice created successfully');
+        toast.success('Quotation created successfully');
       }
     }
 
@@ -345,9 +368,9 @@ export function Billing() {
       if (!ok) return;
     }
 
-    if (isViewingActive) {
+    if (activeTab === 'all' || activeTab === 'active') {
       deleteInvoice(id);
-    } else {
+    } else if (activeTab === 'quotations') {
       deletePendingInvoice(id);
     }
     if (selectedId === id) handleClear();
@@ -392,6 +415,7 @@ export function Billing() {
       deletePendingInvoice(inv.id);
       if (selectedId === inv.id) handleClear();
       toast.success('Moved to Active Invoices');
+      setActiveTab('all');
     }
   };
 
@@ -510,7 +534,7 @@ export function Billing() {
             Object.assign(rawData, computed);
           }
 
-          if (isViewingActive) {
+          if (activeTab === 'all' || activeTab === 'active') {
             const parsedInvoice: Invoice = {
               id: idToUse,
               invoiceNumber: rawData.invoiceNo || '',
@@ -569,7 +593,7 @@ export function Billing() {
         }
 
         if (mode === 'replace') {
-          if (isViewingActive) {
+          if (activeTab === 'all' || activeTab === 'active') {
             invoices.forEach(inv => {
               if (!csvProcessedIds.has(inv.id)) {
                 deleteInvoice(inv.id);
@@ -600,13 +624,13 @@ export function Billing() {
     try {
       let headers: string[] = [];
       let rows: string[] = [];
-      const currentList = isViewingActive ? invoices : pendingInvoices;
+      const currentListForExport = (activeTab === 'all' || activeTab === 'active' || activeTab === 'unpaid') ? invoices : pendingInvoices;
       const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
 
-      if (isViewingActive) {
+      if (activeTab !== 'quotations') {
         if (format === 'basic') {
           headers = ['id', 'invoiceNumber', 'client', 'siteName', 'date', 'amount', 'status'];
-          rows = (currentList as Invoice[]).map(inv => {
+          rows = (currentListForExport as Invoice[]).map(inv => {
             const data = [
               inv.id, inv.invoiceNumber, inv.client, inv.siteName, formatDisplayDate(inv.date), inv.amount, inv.status
             ];
@@ -614,7 +638,7 @@ export function Billing() {
           });
         } else {
           headers = ['id', 'invoiceNumber', 'client', 'siteName', 'project', 'amount', 'date', 'dueDate', 'billingCycle', 'vatInc', 'totalCharge', 'duration', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'mobDemob', 'installation', 'damages', 'rentalCost', 'dieselCost', 'techniciansCost', 'totalCost', 'vat', 'totalExclusiveOfVat'];
-          rows = (currentList as Invoice[]).map(inv => {
+          rows = (currentListForExport as Invoice[]).map(inv => {
             const data = [
               inv.id, inv.invoiceNumber, inv.client, inv.siteName, inv.project, inv.amount, formatDisplayDate(inv.date), formatDisplayDate(inv.dueDate), inv.billingCycle, inv.vatInc, inv.totalCharge, inv.duration || 0, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0, inv.rentalCost || 0, inv.dieselCost || 0, inv.techniciansCost || 0, inv.totalCost || 0, inv.vat || 0, inv.totalExclusiveOfVat || 0
             ];
@@ -624,7 +648,7 @@ export function Billing() {
       } else {
         if (format === 'basic') {
           headers = ['id', 'invoiceNo', 'client', 'site', 'startDate', 'amount', 'totalCharge'];
-          rows = (currentList as PendingInvoice[]).map(inv => {
+          rows = (currentListForExport as PendingInvoice[]).map(inv => {
             const data = [
               inv.id, inv.invoiceNo, inv.client, inv.site, formatDisplayDate(inv.startDate), (inv as any).amount || 0, inv.totalCharge || 0
             ];
@@ -632,7 +656,7 @@ export function Billing() {
           });
         } else {
           headers = ['id', 'invoiceNo', 'client', 'site', 'startDate', 'duration', 'noOfMachine', 'dailyRentalCost', 'dieselCostPerLtr', 'dailyUsage', 'noOfTechnician', 'techniciansDailyRate', 'mobDemob', 'installation', 'damages'];
-          rows = (currentList as PendingInvoice[]).map(inv => {
+          rows = (currentListForExport as PendingInvoice[]).map(inv => {
             const data = [
               inv.id, inv.invoiceNo, inv.client, inv.site, formatDisplayDate(inv.startDate), inv.duration || 0, inv.noOfMachine || 0, inv.dailyRentalCost || 0, inv.dieselCostPerLtr || 0, inv.dailyUsage || 0, inv.noOfTechnician || 0, inv.techniciansDailyRate || 0, inv.mobDemob || 0, inv.installation || 0, inv.damages || 0
             ];
@@ -642,11 +666,11 @@ export function Billing() {
       }
 
       const csvContent = [headers.join(','), ...rows].join('\n');
-      const fileName = `invoices_${isViewingActive ? 'active' : 'pending'}_${format}_export_${new Date().toISOString().slice(0, 10)}.csv`;
+      const fileName = `invoices_${activeTab}_${format}_export_${new Date().toISOString().slice(0, 10)}.csv`;
 
       if (window.electronAPI?.savePathDialog) {
         const filePath = await window.electronAPI.savePathDialog({
-          title: `Export ${isViewingActive ? 'Active' : 'Pending'} Invoices (${format === 'basic' ? 'Basic' : 'Detailed'})`,
+          title: `Export ${activeTab.toUpperCase()} Invoices (${format === 'basic' ? 'Basic' : 'Detailed'})`,
           defaultPath: fileName,
           filters: [{ name: 'CSV Files', extensions: ['csv'] }]
         });
@@ -663,7 +687,7 @@ export function Billing() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        toast.success(`Successfully exported ${currentList.length} ${isViewingActive ? 'invoices' : 'quotations'}`);
+        toast.success(`Successfully exported ${activeTab === 'quotations' ? pendingInvoices.length : invoices.length} ${activeTab !== 'quotations' ? 'invoices' : 'quotations'}`);
       }
     } catch (e) {
       toast.error('Export failed');
@@ -671,7 +695,22 @@ export function Billing() {
   };
 
   const currentList = useMemo(() => {
-    const list = isViewingActive ? [...invoices] : [...pendingInvoices];
+    let list: any[] = [];
+    if (activeTab === 'all') {
+      list = [...invoices];
+    } else if (activeTab === 'active') {
+      list = invoices.filter(inv => {
+        const s = sites.find(site => 
+          (site.name || '').trim().toLowerCase() === (inv.siteName || '').trim().toLowerCase() && 
+          (site.client || '').trim().toLowerCase() === (inv.client || '').trim().toLowerCase()
+        );
+        return s && s.status !== 'Ended';
+      });
+    } else if (activeTab === 'quotations') {
+      list = [...pendingInvoices];
+    }
+    
+    if (activeTab === 'completed' || activeTab === 'unpaid') return []; // Handled separately
     return list.sort((a: any, b: any) => {
       let valA: any = '';
       let valB: any = '';
@@ -721,7 +760,53 @@ export function Billing() {
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [isViewingActive, invoices, pendingInvoices, sortField, sortOrder]);
+  }, [activeTab, invoices, pendingInvoices, sortField, sortOrder, sites]);
+
+  const tableSums = useMemo(() => {
+    return (currentList || []).reduce((acc, inv: any) => ({
+        rentalCost: acc.rentalCost + (inv.rentalCost || 0),
+        dieselCost: acc.dieselCost + (inv.dieselCost || 0),
+        otherCost: acc.otherCost + ((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)),
+        totalCost: acc.totalCost + (inv.totalCost || 0),
+        vat: acc.vat + (inv.vat || 0),
+        totalCharge: acc.totalCharge + (inv.totalCharge || inv.amount || 0),
+    }), { rentalCost: 0, dieselCost: 0, otherCost: 0, totalCost: 0, vat: 0, totalCharge: 0 });
+  }, [currentList]);
+
+  const siteStats = useMemo(() => {
+    return sites.map(site => {
+      const siteInvoices = invoices.filter(inv => 
+        (inv.siteName || '').trim().toLowerCase() === (site.name || '').trim().toLowerCase() && 
+        (inv.client || '').trim().toLowerCase() === (site.client || '').trim().toLowerCase()
+      );
+      const sitePayments = payments.filter(p => 
+        (p.site || '').trim().toLowerCase() === (site.name || '').trim().toLowerCase() && 
+        (p.client || '').trim().toLowerCase() === (site.client || '').trim().toLowerCase()
+      );
+      
+      const totalInvoiceAmount = siteInvoices.reduce((sum, inv) => sum + (inv.totalCharge || inv.amount || 0), 0);
+      const totalPaymentAmount = sitePayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+      
+      return {
+        ...site,
+        invoices: siteInvoices,
+        totalInvoiceAmount,
+        totalPaymentAmount,
+        isCompleted: site.status === 'Ended' && totalPaymentAmount >= totalInvoiceAmount && totalInvoiceAmount > 0,
+        isUnpaid: totalPaymentAmount < totalInvoiceAmount && totalInvoiceAmount > 0
+      };
+    });
+  }, [sites, invoices, payments]);
+
+  const completedSites = useMemo(() => siteStats.filter(s => s.isCompleted), [siteStats]);
+  const unpaidSites = useMemo(() => siteStats.filter(s => s.isUnpaid), [siteStats]);
+
+  const [expandedSiteId, setExpandedSiteId] = useState<string | null>(null);
+
+  const formatSum = (val: number) => {
+    if (priv?.canViewAmounts === false) return '***';
+    return val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  };
 
   const SortIcon = ({ field }: { field: string }) => {
     if (sortField !== field) return <ChevronUp className="w-3 h-3 opacity-20" />;
@@ -737,29 +822,19 @@ export function Billing() {
     }
   };
 
-  const tableSums = useMemo(() => {
-    return currentList.reduce((acc, inv: any) => ({
-        rentalCost: acc.rentalCost + (inv.rentalCost || 0),
-        dieselCost: acc.dieselCost + (inv.dieselCost || 0),
-        otherCost: acc.otherCost + ((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)),
-        totalCost: acc.totalCost + (inv.totalCost || 0),
-        vat: acc.vat + (inv.vat || 0),
-        totalCharge: acc.totalCharge + (inv.totalCharge || inv.amount || 0),
-    }), { rentalCost: 0, dieselCost: 0, otherCost: 0, totalCost: 0, vat: 0, totalCharge: 0 });
-  }, [currentList]);
-
-  const formatSum = (val: number) => {
-    if (priv?.canViewAmounts === false) return '***';
-    return val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-  };
-
   const sitesForClient = siteRegistry.filter(s => s.client === (form.client || '').trim());
 
   useSetPageTitle(
-    isViewingActive ? 'Active Invoices' : 'Quotations',
-    isViewingActive
-      ? 'Manage and track all active client invoices'
-      : 'Review and process quotation drafts',
+    activeTab === 'all' ? 'All Invoices' : activeTab === 'active' ? 'Active Invoices' : activeTab === 'quotations' ? 'Quotations' : activeTab === 'unpaid' ? 'Unpaid Site Records' : 'Completed Invoices',
+    activeTab === 'all'
+      ? 'View every historical invoice record'
+      : activeTab === 'active'
+      ? 'Invoices for sites currently in progress'
+      : activeTab === 'unpaid'
+      ? 'Sites with outstanding balances'
+      : activeTab === 'quotations' 
+      ? 'Review and process quotation drafts'
+      : 'Review invoices for sites with consolidated payments',
     <div className="hidden sm:flex items-center gap-2">
       {priv.canExport && (
         <DropdownMenu>
@@ -792,13 +867,13 @@ export function Billing() {
           <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
         </label>
       )}
-      {priv.canCreate && (
+          {priv.canCreate && activeTab !== 'completed' && (
         <Button
           size="sm"
           className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9 px-4 font-bold text-[11px] uppercase tracking-tight shadow-md"
           onClick={() => { handleClear(); setIsModalOpen(true); }}
         >
-          <Plus className="w-4 h-4" /> Add Invoice
+          <Plus className="w-4 h-4" /> Add {activeTab === 'active' ? 'Invoice' : 'Quotation'}
         </Button>
       )}
     </div>
@@ -812,18 +887,39 @@ export function Billing() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex bg-slate-200/50 p-1 rounded-lg">
             <button
-              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${!isViewingActive ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              onClick={() => setIsViewingActive(false)}
+              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTab === 'all' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              onClick={() => setActiveTab('all')}
             >
-              Quotations
-              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${!isViewingActive ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{pendingInvoices.length}</Badge>
+              All Invoices
+              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'all' ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{invoices.length}</Badge>
             </button>
             <button
-              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${isViewingActive ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              onClick={() => setIsViewingActive(true)}
+              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTab === 'quotations' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              onClick={() => setActiveTab('quotations')}
+            >
+              Quotations
+              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'quotations' ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{pendingInvoices.length}</Badge>
+            </button>
+            <button
+              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTab === 'active' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              onClick={() => setActiveTab('active')}
             >
               Active Invoices
-              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${isViewingActive ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{invoices.length}</Badge>
+              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'active' ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{invoices.filter(i => { const s = sites.find(site => site.name === i.siteName && site.client === i.client); return s && s.status !== 'Ended'; }).length}</Badge>
+            </button>
+            <button
+              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTab === 'unpaid' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              onClick={() => setActiveTab('unpaid')}
+            >
+              Unpaid Invoices
+              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'unpaid' ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{unpaidSites.length}</Badge>
+            </button>
+            <button
+              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTab === 'completed' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              onClick={() => setActiveTab('completed')}
+            >
+              Completed Invoice
+              <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'completed' ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{completedSites.length}</Badge>
             </button>
           </div>
 
@@ -845,13 +941,13 @@ export function Billing() {
                 </Button>
               </div>
             )}
-            {priv.canCreate && (
+            {priv.canCreate && (activeTab === 'all' || activeTab === 'quotations') && (
               <Button
                 size="sm"
                 className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-9 px-4"
                 onClick={() => { handleClear(); setIsModalOpen(true); }}
               >
-                <Plus className="w-4 h-4" /> Add {isViewingActive ? 'Invoice' : 'Quotation'}
+                <Plus className="w-4 h-4" /> Add {activeTab === 'all' ? 'Invoice' : 'Quotation'}
               </Button>
             )}
           </div>
@@ -862,13 +958,13 @@ export function Billing() {
           <div className="border-b border-slate-100 p-4 bg-slate-50/50 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
-                {isViewingActive ? 'Active Invoices' : 'Quotations'}
+                {activeTab === 'active' ? 'Active Invoices' : activeTab === 'quotations' ? 'Quotations' : 'Completed paid sites'}
               </h3>
-              <Badge variant="secondary" className="ml-2 font-mono">{currentList.length}</Badge>
+              <Badge variant="secondary" className="ml-2 font-mono">{activeTab === 'completed' ? completedSites.length : currentList.length}</Badge>
             </div>
             
             <div className="flex items-center gap-6">
-              {!isViewingActive && <p className="hidden md:block text-xs text-slate-500">Double click row to transition to Active.</p>}
+              {activeTab === 'quotations' && <p className="hidden md:block text-xs text-slate-500">Double click row to transition to Active.</p>}
               
               {/* Toggle for Actions Column */}
               <div className="flex items-center gap-3">
@@ -1005,66 +1101,153 @@ export function Billing() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {currentList.map((inv: any) => (
-                  <TableRow key={inv.id} onDoubleClick={() => { if (!isViewingActive) handleMakeActive(inv) }} className="hover:bg-slate-50 transition-colors cursor-pointer">
-                    <TableCell className="px-4 py-3 font-mono font-bold text-slate-700">{inv.invoiceNo || inv.invoiceNumber}</TableCell>
-                    <TableCell className="px-4 py-3 text-slate-700">
-                      <div className="font-semibold">{inv.client}</div>
-                      <div className="text-slate-500 text-xs">{inv.site || inv.siteName} <span className="ml-1 px-1 rounded bg-slate-100 border text-[10px]">{inv.vatInc || 'No VAT'}</span></div>
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-right text-slate-600">
-                      <div><span className="text-slate-400">Mac:</span> {inv.noOfMachine || 0} x {priv?.canViewAmounts === false ? '***' : (inv.dailyRentalCost || 0).toLocaleString()}</div>
-                      <div><span className="text-slate-400">Tech:</span> {inv.noOfTechnician || 0} x {priv?.canViewAmounts === false ? '***' : (inv.techniciansDailyRate || 0).toLocaleString()}</div>
-                      <div><span className="text-slate-400">DsLtr:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCostPerLtr || 0).toLocaleString()} ({(inv.dailyUsage || 0)}L)</div>
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-right text-slate-600">
-                      <div className="font-medium text-slate-800">{inv.duration || 0} Days</div>
-                      <div className="text-slate-500 text-xs">{formatDisplayDate(inv.startDate || inv.date)} - {formatDisplayDate(inv.endDate || inv.dueDate)}</div>
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-right text-slate-600">
-                      <div><span className="text-slate-400">Rent:</span> {priv?.canViewAmounts === false ? '***' : (inv.rentalCost || 0).toLocaleString()}</div>
-                      <div><span className="text-slate-400">Fuel:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCost || 0).toLocaleString()}</div>
-                      <div><span className="text-slate-400">Other:</span> {priv?.canViewAmounts === false ? '***' : ((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)).toLocaleString()}</div>
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-right">
-                      <div className="text-slate-500 text-xs">Gross: {priv?.canViewAmounts === false ? '***' : (inv.totalCost || 0).toLocaleString()}</div>
-                      <div className="text-slate-500 text-xs">VAT: {priv?.canViewAmounts === false ? '***' : (inv.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                      <div className="font-bold text-indigo-700 mt-1">{priv?.canViewAmounts === false ? '***' : (inv.totalCharge || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                    </TableCell>
-                    {showActions && (priv.canEdit || priv.canDelete) && (
-                      <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                        <div className="flex items-center justify-center gap-1">
-                          {!isViewingActive && priv.canEdit && (
-                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleMakeActive(inv); }} className="h-8 w-8 text-emerald-600 hover:bg-emerald-50" title="Move to Active">
-                              <ArrowRightCircle className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {priv.canEdit && (
-                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(inv); }} className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit row">
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {priv.canDelete && (
-                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(inv.id); }} className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete row">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
+                {(activeTab === 'completed' || activeTab === 'unpaid') ? (
+                  (activeTab === 'completed' ? completedSites : unpaidSites).map((site) => (
+                    <React.Fragment key={site.id}>
+                      <TableRow
+                        className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                        onClick={() => setExpandedSiteId(expandedSiteId === site.id ? null : site.id)}
+                      >
+                        <TableCell className="px-4 py-3 font-bold text-slate-700">
+                          <div className="flex items-center gap-2">
+                            {expandedSiteId === site.id
+                              ? <ChevronDown className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                              : <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0 group-hover:text-indigo-400 transition-colors" />}
+                            <span className="font-mono">{site.client}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-slate-700">
+                          <div className="font-semibold">{site.name}</div>
+                          <div className="text-slate-500 text-xs">
+                            {site.status === 'Ended' ? `Ended on ${formatDisplayDate(site.endDate)}` : `Status: ${site.status}`}
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right text-slate-600">
+                          <div><span className="text-slate-400">Invoices:</span> {site.invoices.length}</div>
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right text-slate-600">
+                          <Badge className={activeTab === 'completed' ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-amber-100 text-amber-800 border-amber-200"}>
+                            {activeTab === 'completed' ? 'Fully Paid' : 'Outstanding Bal.'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right text-slate-600 font-mono">
+                          {priv?.canViewAmounts === false ? '***' : `₦${site.totalInvoiceAmount.toLocaleString()}`}
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right font-bold text-indigo-700 font-mono">
+                          {priv?.canViewAmounts === false ? '***' : `₦${site.totalPaymentAmount.toLocaleString()}`}
+                        </TableCell>
+                      </TableRow>
+                      {expandedSiteId === site.id && site.invoices.length === 0 && (
+                        <TableRow className="bg-slate-50/50">
+                          <TableCell colSpan={6} className="px-10 py-3 text-xs text-slate-400 italic">
+                            No invoices found for this site.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {expandedSiteId === site.id && site.invoices.map((inv: any) => (
+                        <TableRow key={inv.id} className="bg-indigo-50/30 border-l-4 border-l-indigo-400 hover:bg-indigo-50/60 transition-colors">
+                          <TableCell className="px-10 py-2.5 font-mono text-xs font-bold text-indigo-700">
+                            {inv.invoiceNumber || inv.invoiceNo || '—'}
+                          </TableCell>
+                          <TableCell className="px-4 py-2.5 text-xs text-slate-600">
+                            <span className="font-medium">{inv.client}</span>
+                            <span className="mx-1 text-slate-300">·</span>
+                            <span className="text-slate-400">{inv.siteName || inv.site}</span>
+                          </TableCell>
+                          <TableCell className="px-4 py-2.5 text-right text-xs text-slate-500">
+                            {formatDisplayDate(inv.date || inv.startDate)}
+                          </TableCell>
+                          <TableCell className="px-4 py-2.5 text-right text-xs text-slate-500">
+                            {inv.duration || 0} Days
+                          </TableCell>
+                          <TableCell className="px-4 py-2.5 text-right text-xs font-mono font-semibold text-slate-700">
+                            {priv?.canViewAmounts === false ? '***' : `₦${(inv.totalCharge || inv.amount || 0).toLocaleString()}`}
+                          </TableCell>
+                          <TableCell className="px-4 py-2.5 text-right text-xs">
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-slate-500">
+                              {inv.status || 'Sent'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  currentList.map((inv: any) => (
+                    <TableRow key={inv.id} onDoubleClick={() => { if (activeTab === 'quotations') handleMakeActive(inv) }} className="hover:bg-slate-50 transition-colors cursor-pointer">
+                      <TableCell className="px-4 py-3 font-mono font-bold text-slate-700">{inv.invoiceNo || inv.invoiceNumber}</TableCell>
+                      <TableCell className="px-4 py-3 text-slate-700">
+                        <div className="font-semibold">{inv.client}</div>
+                        <div className="text-slate-500 text-xs">{inv.site || inv.siteName} <span className="ml-1 px-1 rounded bg-slate-100 border text-[10px]">{inv.vatInc || 'No VAT'}</span></div>
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-                {!isViewingActive && currentList.length > 0 && (
+                      <TableCell className="px-4 py-3 text-right text-slate-600">
+                        <div><span className="text-slate-400">Mac:</span> {inv.noOfMachine || 0} x {priv?.canViewAmounts === false ? '***' : (inv.dailyRentalCost || 0).toLocaleString()}</div>
+                        <div><span className="text-slate-400">Tech:</span> {inv.noOfTechnician || 0} x {priv?.canViewAmounts === false ? '***' : (inv.techniciansDailyRate || 0).toLocaleString()}</div>
+                        <div><span className="text-slate-400">DsLtr:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCostPerLtr || 0).toLocaleString()} ({(inv.dailyUsage || 0)}L)</div>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-right text-slate-600">
+                        <div className="font-medium text-slate-800">{inv.duration || 0} Days</div>
+                        <div className="text-slate-500 text-xs">{formatDisplayDate(inv.startDate || inv.date)} - {formatDisplayDate(inv.endDate || inv.dueDate)}</div>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-right text-slate-600">
+                        <div><span className="text-slate-400">Rent:</span> {priv?.canViewAmounts === false ? '***' : (inv.rentalCost || 0).toLocaleString()}</div>
+                        <div><span className="text-slate-400">Fuel:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCost || 0).toLocaleString()}</div>
+                        <div><span className="text-slate-400">Other:</span> {priv?.canViewAmounts === false ? '***' : ((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)).toLocaleString()}</div>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-right">
+                        <div className="text-slate-500 text-xs">Gross: {priv?.canViewAmounts === false ? '***' : (inv.totalCost || 0).toLocaleString()}</div>
+                        <div className="text-slate-500 text-xs">VAT: {priv?.canViewAmounts === false ? '***' : (inv.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div className="font-bold text-indigo-700 mt-1">{priv?.canViewAmounts === false ? '***' : (inv.totalCharge || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      </TableCell>
+                      {showActions && (priv.canEdit || priv.canDelete) && (
+                        <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                          <div className="flex items-center justify-center gap-1">
+                            {activeTab === 'quotations' && priv.canEdit && (
+                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleMakeActive(inv); }} className="h-8 w-8 text-emerald-600 hover:bg-emerald-50" title="Move to Active">
+                                <ArrowRightCircle className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {priv.canEdit && (
+                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(inv); }} className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit row">
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {priv.canDelete && (
+                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(inv.id); }} className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete row">
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))
+                )}
+                {activeTab === 'quotations' && currentList.length > 0 && (
                   <TableRow className="bg-amber-50/30 border-t-2 border-amber-100/50 italic">
                     <TableCell colSpan={showActions ? 7 : 6} className="px-4 py-3 text-center text-amber-700 text-[11px] font-medium tracking-wide">
                       Double-click a quotation to transition it to Active.
                     </TableCell>
                   </TableRow>
                 )}
-                {currentList.length === 0 && (
+                {activeTab !== 'completed' && activeTab !== 'unpaid' && currentList.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={showActions ? 7 : 6} className="px-4 py-12 text-center text-slate-500 font-medium tracking-wide">
-                      No {isViewingActive ? 'active' : 'quotation'} records found.
+                      No {activeTab} records found.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {activeTab === 'completed' && completedSites.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="px-4 py-12 text-center text-slate-500 font-medium tracking-wide">
+                      No completely paid sites (Ended status) found.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {activeTab === 'unpaid' && unpaidSites.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="px-4 py-12 text-center text-slate-500 font-medium tracking-wide">
+                      No sites with outstanding balances found.
                     </TableCell>
                   </TableRow>
                 )}

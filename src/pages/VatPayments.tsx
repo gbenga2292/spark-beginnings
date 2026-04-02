@@ -18,7 +18,7 @@ const MONTHS = [
 
 const YEARS = Array.from({ length: 11 }, (_, i) => (new Date().getFullYear() - 5 + i).toString());
 
-export function VatPayments() {
+export function VatPayments({ setPreviewModal }: { setPreviewModal?: (val: any) => void }) {
     const sites = useAppStore((state) => state.sites);
     const payments = useAppStore((state) => state.payments);
     const vatPayments = useAppStore((state) => state.vatPayments);
@@ -226,30 +226,52 @@ export function VatPayments() {
             const csvContent = [headers.join(','), ...rows].join('\n');
             const fileName = `vat_payments_export_${new Date().toISOString().slice(0, 10)}.csv`;
 
-            if (window.electronAPI?.savePathDialog) {
-                const filePath = await window.electronAPI.savePathDialog({
-                    title: 'Export VAT Remittances (CSV)',
-                    defaultPath: fileName,
-                    filters: [{ name: 'CSV Files', extensions: ['csv'] }]
-                });
+            const onConfirm = async () => {
+                if (window.electronAPI?.savePathDialog) {
+                    const filePath = await window.electronAPI.savePathDialog({
+                        title: 'Export VAT Remittances (CSV)',
+                        defaultPath: fileName,
+                        filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+                    });
 
-                if (filePath) {
-                    const success = await window.electronAPI.writeFile(filePath, csvContent, 'utf8');
-                    if (success) {
-                        toast.success(`Exported to ${filePath}`);
-                    } else {
-                        toast.error('Failed to save file.');
+                    if (filePath) {
+                        const success = await window.electronAPI.writeFile(filePath, csvContent, 'utf8');
+                        if (success) {
+                            toast.success(`Exported to ${filePath}`);
+                        } else {
+                            toast.error('Failed to save file.');
+                        }
                     }
+                } else {
+                    const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", fileName);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    toast.success(`Successfully exported ${vatPayments.length} VAT payments`);
                 }
+            };
+
+            if (setPreviewModal) {
+                setPreviewModal({
+                    isOpen: true,
+                    title: 'Preview VAT Remittance Export',
+                    filename: fileName,
+                    headers: headers.map(h => h.toUpperCase()),
+                    data: vatPayments.map(pay => [
+                        pay.id,
+                        pay.client,
+                        formatDisplayDate(pay.date),
+                        pay.month || '',
+                        pay.year || '',
+                        `₦${(pay.amount || 0).toLocaleString()}`
+                    ]),
+                    onConfirm
+                });
             } else {
-                const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", fileName);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                toast.success(`Successfully exported ${vatPayments.length} VAT payments`);
+                onConfirm();
             }
         } catch (e) {
             toast.error('Export failed');

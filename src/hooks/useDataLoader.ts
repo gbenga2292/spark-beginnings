@@ -136,6 +136,13 @@ export function useDataLoader(isAuthenticated: boolean) {
           positions: appData.positions.length > 0 ? appData.positions : useAppStore.getState().positions,
           departments: appData.departments.length > 0 ? appData.departments : useAppStore.getState().departments,
           pendingSites: appData.pendingSites || [],
+          // ── Ledger variables ───────────────────────────────────────────
+          ledgerCategories: appData.ledgerCategories.length > 0 ? appData.ledgerCategories : useAppStore.getState().ledgerCategories,
+          ledgerVendors: appData.ledgerVendors.length > 0 ? appData.ledgerVendors : useAppStore.getState().ledgerVendors,
+          ledgerBanks: appData.ledgerBanks.length > 0 ? appData.ledgerBanks : useAppStore.getState().ledgerBanks,
+          ledgerBeneficiaryBanks: appData.ledgerBeneficiaryBanks.length > 0 ? appData.ledgerBeneficiaryBanks : useAppStore.getState().ledgerBeneficiaryBanks,
+          ledgerEntries: appData.ledgerEntries || [],
+          staffMeritRecords: appData.staffMeritRecords || [],
           ...(appData.payrollVariables ? { payrollVariables: appData.payrollVariables as any } : {}),
           ...(appData.payeTaxVariables ? { payeTaxVariables: appData.payeTaxVariables as any } : {}),
           ...(appData.monthValues && Object.keys(appData.monthValues as any).length > 0 ? { monthValues: appData.monthValues as any } : {}),
@@ -494,6 +501,58 @@ export function useRealtimeData(isAuthenticated: boolean) {
                 useAppStore.setState({ pendingSites: current.map((s: any) => s.id === updated.id ? updated : s) });
               } else if (eventType === 'DELETE') {
                 useAppStore.setState({ pendingSites: current.filter((s: any) => s.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'ledger_categories': {
+              const current = appState.ledgerCategories;
+              if (eventType === 'INSERT') {
+                if (!current.some(c => c.id === newRow.id)) {
+                  useAppStore.setState({ ledgerCategories: [...current, { id: newRow.id, name: newRow.name }] });
+                }
+              } else if (eventType === 'UPDATE') {
+                useAppStore.setState({ ledgerCategories: current.map(c => c.id === newRow.id ? { id: newRow.id, name: newRow.name } : c) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ ledgerCategories: current.filter(c => c.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'ledger_vendors': {
+              const current = appState.ledgerVendors;
+              if (eventType === 'INSERT') {
+                if (!current.some(v => v.id === newRow.id)) {
+                  useAppStore.setState({ ledgerVendors: [...current, { id: newRow.id, name: newRow.name, tinNumber: newRow.tin_number || '' }] });
+                }
+              } else if (eventType === 'UPDATE') {
+                useAppStore.setState({ ledgerVendors: current.map(v => v.id === newRow.id ? { id: newRow.id, name: newRow.name, tinNumber: newRow.tin_number || '' } : v) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ ledgerVendors: current.filter(v => v.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'ledger_banks': {
+              const current = appState.ledgerBanks;
+              if (eventType === 'INSERT') {
+                if (!current.some(b => b.id === newRow.id)) {
+                  useAppStore.setState({ ledgerBanks: [...current, { id: newRow.id, name: newRow.name }] });
+                }
+              } else if (eventType === 'UPDATE') {
+                useAppStore.setState({ ledgerBanks: current.map(b => b.id === newRow.id ? { id: newRow.id, name: newRow.name } : b) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ ledgerBanks: current.filter(b => b.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'ledger_beneficiary_banks': {
+              const current = appState.ledgerBeneficiaryBanks;
+              if (eventType === 'INSERT') {
+                if (!current.some(b => b.id === newRow.id)) {
+                  useAppStore.setState({ ledgerBeneficiaryBanks: [...current, { id: newRow.id, name: newRow.name, accountNo: newRow.account_no || '' }] });
+                }
+              } else if (eventType === 'UPDATE') {
+                useAppStore.setState({ ledgerBeneficiaryBanks: current.map(b => b.id === newRow.id ? { id: newRow.id, name: newRow.name, accountNo: newRow.account_no || '' } : b) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ ledgerBeneficiaryBanks: current.filter(b => b.id !== oldRow.id) });
               }
               break;
             }
