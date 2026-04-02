@@ -12,7 +12,7 @@ import * as XLSX from 'xlsx';
 import { usePriv } from '@/src/hooks/usePriv';
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
-import { generateId } from '@/src/lib/utils';
+import { generateId, isValidUUID } from '@/src/lib/utils';
 import { useDebounce } from '@/src/hooks/useDebounce';
 import {
   DropdownMenu,
@@ -27,7 +27,8 @@ import { getPositionIndex } from '@/src/lib/hierarchy';
 
 
 export function Attendance() {
-  const employees = useAppStore((state) => state.employees).filter(e => e.status !== 'Terminated');
+  const allEmployees = useAppStore((state) => state.employees);
+  const employees = allEmployees.filter(e => e.status !== 'Terminated');
   const sites = useAppStore((state) => state.sites);
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const payrollVariables = useAppStore((state) => state.payrollVariables);
@@ -35,12 +36,27 @@ export function Attendance() {
   const removeAttendanceRecordsByDate = useAppStore((state) => state.removeAttendanceRecordsByDate);
   const deleteAttendanceRecords = useAppStore((state) => state.deleteAttendanceRecords);
 
+  const publicHolidaysStore = useAppStore((state) => state.publicHolidays);
+  const monthValues = useAppStore((state) => state.monthValues);
+
   const [registerDate, setRegisterDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [lastEntryDate, setLastEntryDate] = useState(format(new Date(Date.now() - 86400000), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('entry');
   const [staffTypeFilter, setStaffTypeFilter] = useState<'OFFICE' | 'FIELD'>('FIELD');
   const [importFile, setImportFile] = useState<File | null>(null);
+
+  // ─── Name Resolution Dialog ──────────────────────────────────
+  type PendingImport = {
+    matchedRecords: AttendanceRecord[];
+    unmatchedNames: string[];
+    unmatchedRecordsByName: Record<string, AttendanceRecord[]>;
+    mode: 'append' | 'overwrite';
+    rawCount: number;
+  };
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
+  const [nameResolutions, setNameResolutions] = useState<Record<string, string>>({});
+  const [nameSearchTerms, setNameSearchTerms] = useState<Record<string, string>>({});
 
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('attendance');
@@ -57,7 +73,7 @@ export function Attendance() {
 
   const isFieldStaff = staffTypeFilter === 'FIELD';
   const isOfficeStaff = staffTypeFilter === 'OFFICE';
-  
+
   const departments = useAppStore((state) => state.departments);
 
   // State for the current form
@@ -133,7 +149,7 @@ export function Attendance() {
       const idxA = getPositionIndex(a.position);
       const idxB = getPositionIndex(b.position);
       if (idxA !== idxB) return idxA - idxB;
-    return (a.position || '').localeCompare(b.position || '');
+      return (a.position || '').localeCompare(b.position || '');
     });
   }, [attendanceRecords, employees, debouncedDbSearch, dbStaffTypeFilter, dbSiteFilter, dbShiftFilter]);
 
@@ -234,74 +250,141 @@ export function Attendance() {
       try {
         const bstr = evt.target?.result as string;
         const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
+        const ws = wb.Sheets[wb.SheetNames[0]];
         const rawData = XLSX.utils.sheet_to_json<any>(ws);
 
-        if (rawData && rawData.length > 0) {
-          const processedRecords: AttendanceRecord[] = [];
-          
-          // Determine if we need to estimate (if key "OT" or "NDW" is missing)
-          const needsEstimation = !rawData[0].hasOwnProperty('OT') && !rawData[0].hasOwnProperty('NDW');
+        if (!rawData || rawData.length === 0) { toast.error('Invalid Excel file format.'); return; }
 
-          if (needsEstimation) {
-            // Group by date to process batches for NDW calculation
-            const byDate: Record<string, any[]> = {};
-            rawData.forEach(row => {
-              const dt = normalizeDate(row.Date || row.date);
-              if (!byDate[dt]) byDate[dt] = [];
-              byDate[dt].push(row);
-            });
+        const needsEstimation = !rawData[0].hasOwnProperty('OT') && !rawData[0].hasOwnProperty('NDW');
 
-            Object.keys(byDate).forEach(dateStr => {
-              const recordsForDate = byDate[dateStr];
-              const normalizedDate = normalizeDate(dateStr);
-              const estimated = runEstimationForBatch(recordsForDate, normalizedDate);
-              processedRecords.push(...estimated);
+        // ─ Normalize helper ───────────────────────────────
+        const norm = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+
+        // ─ Find employee (ID match first, then fuzzy name match across ALL staff) ────
+        const findEmp = (sId: string, sName: string) => allEmployees.find(e => {
+          if (sId && e.id === sId) return true;
+          if (!sName) return false;
+          const n = norm(sName);
+          if (norm(`${e.surname} ${e.firstname}`) === n) return true;
+          if (norm(`${e.firstname} ${e.surname}`) === n) return true;
+          const words = n.split(' ').filter(w => w.length > 1);
+          if (words.length >= 2) {
+            const eFull = norm(`${e.surname} ${e.firstname}`);
+            if (words.every(w => eFull.includes(w))) return true;
+          }
+          return false;
+        });
+
+        // ─ Site lookup ─────────────────────────────────────────
+        const findSite = (name: string) => {
+          if (!name) return null;
+          const n = name.toLowerCase().trim();
+          return sites.find(s => s.name.toLowerCase().trim() === n)
+            || sites.find(s => n.includes(s.name.toLowerCase().trim()))
+            || sites.find(s => s.name.toLowerCase().trim().includes(n));
+        };
+
+        // ─ Classify each raw row ────────────────────────────────────
+        const matchedRecords: AttendanceRecord[] = [];
+        const unmatchedRecordsByName: Record<string, AttendanceRecord[]> = {};
+
+        // Build a partial 'bare' record for display/estimation later
+        const buildBareRecord = (row: any, date: string, empId: string, empName: string): AttendanceRecord => {
+          const daySiteRaw = String(row['Day Site'] || row.daySite || '').trim();
+          const nightSiteRaw = String(row['Night Site'] || row.nightSite || '').trim();
+          const dSite = isAbsentStatus(daySiteRaw) ? '' : daySiteRaw;
+          const nSite = isAbsentStatus(nightSiteRaw) ? '' : nightSiteRaw;
+          const dSiteObj = findSite(dSite);
+          const nSiteObj = findSite(nSite);
+          const day: 'Yes' | 'No' = (dSite && !isAbsentStatus(dSite)) ? 'Yes' : 'No';
+          const night: 'Yes' | 'No' = (nSite && !isAbsentStatus(nSite)) ? 'Yes' : 'No';
+          return {
+            id: generateId(), date, staffId: empId, staffName: empName,
+            position: '', dayClient: dSiteObj?.client || '', daySite: dSiteObj?.name || dSite,
+            nightClient: nSiteObj?.client || '', nightSite: nSiteObj?.name || nSite,
+            day, night, absentStatus: String(row['Absent Status'] || row.absentStatus || ''),
+            nightWk: night === 'Yes' ? 1 : 0, ot: 0, otSite: '', dayWk: 0, dow: 0, ndw: 'No', mth: 0,
+            isPresent: (day === 'Yes' || night === 'Yes') ? 'Yes' : 'No',
+            day2: (day === 'Yes' ? 1 : 0) + (night === 'Yes' ? 1 : 0),
+            overtimeDetails: String(row['Overtime Details'] || row.overtimeDetails || ''),
+          };
+        };
+
+        rawData.forEach(row => {
+          const date = normalizeDate(row.Date || row.date || row['Date'] || '');
+          if (!date) return; // skip rows with no valid date
+
+          const sIdRaw = String(row['Staff ID'] || row.staffId || row.id || row['Staff No'] || row['Employee Code'] || '').trim();
+          const sNameRaw = String(row['Staff Name'] || row.staffName || row.name || row['Employee Name'] || '').trim();
+          if (!sIdRaw && !sNameRaw) return;
+
+          const emp = findEmp(sIdRaw, sNameRaw);
+
+          if (emp) {
+            // ✓ Matched to employee in system
+            if (needsEstimation) {
+              const rec = buildBareRecord(row, date, emp.id, `${emp.surname} ${emp.firstname}`);
+              rec.position = emp.position;
+              matchedRecords.push(rec);
+            } else {
+              matchedRecords.push({
+                id: row.id || generateId(), date,
+                staffId: emp.id, staffName: `${emp.surname} ${emp.firstname}`,
+                position: emp.position || row.Position || '', dayClient: row['Day Client'] || row.dayClient || '',
+                daySite: row['Day Site'] || row.daySite || '', nightClient: row['Night Client'] || row.nightClient || '',
+                nightSite: row['Night Site'] || row.nightSite || '', day: row.Day || row.day || 'No',
+                night: row.Night || row.night || 'No', absentStatus: row.Absent || row.absentStatus || '',
+                nightWk: row['Night Wk'] || row.nightWk || 0, ot: row.OT || row.ot || 0,
+                otSite: row['OT Site'] || row.otSite || '', dayWk: row['Day Wk'] || row.dayWk || 0,
+                dow: row.DOW || row.dow || 0, ndw: row.NDW || row.ndw || 'No',
+                mth: row.Month || row.mth || 0, isPresent: row.Present || row.isPresent || 'No',
+                day2: row['Day 2'] || row.day2 || 0, overtimeDetails: row['Overtime Details'] || row.overtimeDetails || '',
+              });
+            }
+          } else if (isValidUUID(sIdRaw)) {
+            // ✓ Valid UUID even if not in employee list (terminated/deleted) — keep as-is
+            matchedRecords.push({
+              id: row.id || generateId(), date, staffId: sIdRaw, staffName: sNameRaw,
+              position: row.Position || '', dayClient: row['Day Client'] || '', daySite: row['Day Site'] || '',
+              nightClient: row['Night Client'] || '', nightSite: row['Night Site'] || '',
+              day: row.Day || 'No', night: row.Night || 'No', absentStatus: row.Absent || row.absentStatus || '',
+              nightWk: row['Night Wk'] || 0, ot: row.OT || 0, otSite: row['OT Site'] || '',
+              dayWk: row['Day Wk'] || 0, dow: row.DOW || 0, ndw: row.NDW || 'No',
+              mth: row.Month || 0, isPresent: row.Present || 'No', day2: row['Day 2'] || 0,
+              overtimeDetails: row['Overtime Details'] || '',
             });
           } else {
-            rawData.forEach(row => {
-              processedRecords.push({
-                id: row.id || generateId(),
-                date: normalizeDate(row.Date || row.date),
-                staffId: row['Staff ID'] || row.staffId,
-                staffName: row['Staff Name'] || row.staffName,
-                position: row.Position || row.position || '',
-                dayClient: row['Day Client'] || row.dayClient || '',
-                daySite: row['Day Site'] || row.daySite || '',
-                nightClient: row['Night Client'] || row.nightClient || '',
-                nightSite: row['Night Site'] || row.nightSite || '',
-                day: row.Day || row.day || 'No',
-                night: row.Night || row.night || 'No',
-                absentStatus: row.Absent || row.absentStatus || '',
-                nightWk: row['Night Wk'] || row.nightWk || 0,
-                ot: row.OT || row.ot || 0,
-                otSite: row['OT Site'] || row.otSite || '',
-                dayWk: row['Day Wk'] || row.dayWk || 0,
-                dow: row.DOW || row.dow || 0,
-                ndw: row.NDW || row.ndw || 'No',
-                mth: row.Month || row.mth || 0,
-                isPresent: row.Present || row.isPresent || 'No',
-                day2: row['Day 2'] || row.day2 || 0,
-                overtimeDetails: row['Overtime Details'] || row.overtimeDetails || '',
-              });
-            });
+            // ✗ Unknown name with no valid UUID — needs user resolution
+            const key = sNameRaw || sIdRaw;
+            if (!unmatchedRecordsByName[key]) unmatchedRecordsByName[key] = [];
+            unmatchedRecordsByName[key].push(buildBareRecord(row, date, '', key));
           }
+        });
 
-          if (processedRecords.length > 0) {
+        const unmatchedNames = Object.keys(unmatchedRecordsByName);
+
+        if (unmatchedNames.length > 0) {
+          // Show name resolution dialog before proceeding
+          const initRes: Record<string, string> = {};
+          unmatchedNames.forEach(n => { initRes[n] = ''; });
+          setPendingImport({ matchedRecords, unmatchedNames, unmatchedRecordsByName, mode, rawCount: rawData.length });
+          setNameResolutions(initRes);
+          setNameSearchTerms({});
+        } else {
+          // All resolved — save directly
+          const allRecords = needsEstimation
+            ? matchedRecords // already built bare records
+            : matchedRecords;
+          if (allRecords.length > 0) {
             if (mode === 'overwrite') {
-              // Remove all existing records for dates found in the file
-              const datesToOverwrite = new Set(processedRecords.map(r => r.date));
-              datesToOverwrite.forEach(date => removeAttendanceRecordsByDate(date));
+              const dates = Array.from(new Set(allRecords.map(r => r.date)));
+              dates.forEach(d => removeAttendanceRecordsByDate(d));
             }
-            addAttendanceRecords(processedRecords);
-            const modeLabel = mode === 'overwrite' ? ' (dates overwritten)' : ' (appended)';
-            toast.success(`Successfully imported ${processedRecords.length} records${needsEstimation ? ' with automatic estimation' : ''}${modeLabel}!`);
+            addAttendanceRecords(allRecords);
+            toast.success(`Imported ${allRecords.length} of ${rawData.length} records (${mode}).`);
           } else {
             toast.error('No valid records found in the file.');
           }
-        } else {
-          toast.error('Invalid Excel file format.');
         }
       } catch (err) {
         console.error(err);
@@ -309,6 +392,33 @@ export function Attendance() {
       }
     };
     reader.readAsBinaryString(file);
+  };
+
+  const completeImportWithResolutions = async () => {
+    if (!pendingImport) return;
+    const { matchedRecords, unmatchedNames, unmatchedRecordsByName, mode, rawCount } = pendingImport;
+    const allRecords: AttendanceRecord[] = [...matchedRecords];
+    let skipped = 0;
+    unmatchedNames.forEach(name => {
+      const empId = nameResolutions[name];
+      if (!empId || empId === 'skip') { skipped += unmatchedRecordsByName[name].length; return; }
+      const emp = allEmployees.find(e => e.id === empId);
+      unmatchedRecordsByName[name].forEach(rec =>
+        allRecords.push({ ...rec, staffId: empId, staffName: emp ? `${emp.surname} ${emp.firstname}` : rec.staffName, position: emp?.position || '' })
+      );
+    });
+    if (allRecords.length > 0) {
+      if (mode === 'overwrite') {
+        const dates = Array.from(new Set(allRecords.map(r => r.date)));
+        dates.forEach(d => removeAttendanceRecordsByDate(d));
+      }
+      await addAttendanceRecords(allRecords);
+      const skipNote = skipped > 0 ? ` | ${skipped} records skipped` : '';
+      toast.success(`Imported ${allRecords.length} of ${rawCount} records (${mode}).${skipNote}`);
+    } else {
+      toast.error('All records were skipped.');
+    }
+    setPendingImport(null); setNameResolutions({}); setNameSearchTerms({});
   };
 
   const runEstimationForBatch = (rows: any[], dateStr: string): AttendanceRecord[] => {
@@ -328,7 +438,7 @@ export function Attendance() {
       const staffId = row['Staff ID'] || row.staffId;
       const staffName = row['Staff Name'] || row.staffName;
       const emp = employees.find(e => e.id === staffId || (`${e.surname} ${e.firstname}`) === staffName);
-      
+
       const daySite = row['Day Site'] || row.daySite || '';
       const nightSite = row['Night Site'] || row.nightSite || '';
       const absentStatus = row['Absent Status'] || row.absentStatus || '';
@@ -369,7 +479,8 @@ export function Attendance() {
         (day === 'Yes' && night === 'Yes' && ndw === 'Yes') ||
         !!overtimeDetails
       ) {
-        ot = overtimeRates[mth] || 0.5;
+        const keys = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+        ot = monthValues?.[keys[mth - 1]]?.overtimeRate ?? 0.5;
       }
 
       const otSite = ot > 0 ? (night === 'Yes' ? finalNightSite : finalDaySite) : '';
@@ -465,18 +576,7 @@ export function Attendance() {
     return { site: src, shift: "Yes", reason: currentReason };
   };
 
-  // Public holidays from Variables page (in a real app, this would come from the store)
-  const publicHolidays = [
-    '2026-01-01', '2026-01-02', '2026-01-03', '2026-03-20', '2026-03-21',
-    '2026-04-03', '2026-04-06', '2026-05-01', '2026-05-27', '2026-05-28',
-    '2026-06-12', '2026-08-26', '2026-10-01', '2026-12-25'
-  ];
-
-  // Monthly overtime rates (from MonthsValues table equivalent)
-  const overtimeRates: Record<number, number> = {
-    1: 0.5, 2: 0.5, 3: 0.5, 4: 0.5, 5: 0.5, 6: 0.5,
-    7: 0.5, 8: 0.5, 9: 0.5, 10: 0.5, 11: 0.5, 12: 0.5
-  };
+  const publicHolidays = publicHolidaysStore ? publicHolidaysStore.map(h => h.date) : [];
 
   const isHoliday = (dateStr: string) => publicHolidays.includes(dateStr);
 
@@ -631,7 +731,8 @@ export function Attendance() {
         (raw.day === 'Yes' && raw.night === 'Yes' && ndw === 'Yes') ||
         isManualOvertime
       ) {
-        ot = overtimeRates[mth] || 0;
+        const keys = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+        ot = monthValues?.[keys[mth - 1]]?.overtimeRate ?? 0.5;
       }
 
       // Col 13: OT_SITE = IF(OT>0, IF(Night="Yes", NightSite, DaySite), "")
@@ -908,12 +1009,12 @@ export function Attendance() {
                                   const defaultDays = ['OPERATIONS', 'ENGINEERING'].includes(employee.department.toUpperCase()) ? 6 : 5;
                                   const wd = payrollVariables.departmentWorkDays?.[employee.department] ?? defaultDays;
                                   const isWorkday = (dow <= wd) && !isHoliday(registerDate);
-                                  
+
                                   return (
                                     <>
                                       <label className={`flex items-center gap-1 ${isWorkday ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} title={isWorkday ? "Overtime disabled on regular workdays" : ""}>
-                                        <input 
-                                          type="checkbox" 
+                                        <input
+                                          type="checkbox"
                                           className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                           checked={!isWorkday && (attendanceData[employee.id]?.overtime || false)}
                                           onChange={(e) => handleOvertimeToggle(employee.id, e.target.checked)}
@@ -1048,8 +1149,8 @@ export function Attendance() {
                 <thead className="bg-slate-100 sticky top-0 shadow-sm z-10">
                   <tr>
                     <th className="py-2 px-2 border-b border-slate-200">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         className="rounded border-slate-300 w-3 h-3 text-slate-800"
                         checked={filteredDbRecords.length > 0 && dbSelectedIds.size === filteredDbRecords.length}
                         onChange={(e) => {
@@ -1074,8 +1175,8 @@ export function Attendance() {
                     filteredDbRecords.map((r) => (
                       <tr key={r.id} className="hover:bg-slate-50">
                         <td className="py-1.5 px-2">
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             className="rounded border-slate-300 w-3 h-3 text-slate-800"
                             checked={dbSelectedIds.has(r.id)}
                             onChange={(e) => {
@@ -1117,37 +1218,156 @@ export function Attendance() {
         </TabsContent>
       </Tabs>
 
-      {/* Import Policy Modal */}
+
+      {/* ── Import Policy Modal ─────────────────────────────────────── */}
       {importFile && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImportFile(null)} />
           <div className="relative bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-200">
             <h3 className="text-xl font-bold text-slate-900 mb-1">Import Policy</h3>
-            <p className="text-sm text-slate-500 leading-relaxed mb-2">
-              File: <span className="font-medium text-slate-700">{importFile.name}</span>
-            </p>
-            <p className="text-sm text-slate-500 leading-relaxed mb-6">
-              How would you like to handle the attendance records from this file?
-            </p>
+            <p className="text-sm text-slate-500 leading-relaxed mb-2">File: <span className="font-medium text-slate-700">{importFile.name}</span></p>
+            <p className="text-sm text-slate-500 leading-relaxed mb-6">How would you like to handle the attendance records from this file?</p>
             <div className="flex flex-col gap-3">
-              <Button
-                onClick={() => processAttendanceImport(importFile, 'append')}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3 flex-col items-center justify-center"
-              >
+              <Button onClick={() => processAttendanceImport(importFile, 'append')} className="bg-indigo-600 hover:bg-indigo-700 text-white h-auto py-3 flex-col items-center justify-center">
                 <span className="font-semibold block text-base">Append Records</span>
                 <span className="block text-xs opacity-80 mt-1 font-normal text-center">Adds imported records alongside existing ones. No data is removed.</span>
               </Button>
-              <Button
-                onClick={() => processAttendanceImport(importFile, 'overwrite')}
-                variant="outline"
-                className="border-rose-200 h-auto py-3 text-rose-600 hover:bg-rose-50 flex-col items-center justify-center"
-              >
+              <Button onClick={() => processAttendanceImport(importFile, 'overwrite')} variant="outline" className="border-rose-200 h-auto py-3 text-rose-600 hover:bg-rose-50 flex-col items-center justify-center">
                 <span className="font-semibold block text-base">Overwrite by Date</span>
                 <span className="block text-xs text-rose-500/80 mt-1 font-normal text-center">Deletes all existing records for each date in the file, then saves the imported ones.</span>
               </Button>
-              <Button onClick={() => setImportFile(null)} variant="ghost" className="text-slate-400 hover:text-slate-600 mt-2">
-                Cancel
-              </Button>
+              <Button onClick={() => setImportFile(null)} variant="ghost" className="text-slate-400 hover:text-slate-600 mt-2">Cancel</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Name Resolution Dialog ──────────────────────────────────── */}
+      {pendingImport && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 border border-slate-200 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex-shrink-0">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">Resolve Unmatched Names</h3>
+                  <p className="text-sm text-slate-500 mt-1">
+                    <span className="font-semibold text-amber-600">{pendingImport.unmatchedNames.length} name{pendingImport.unmatchedNames.length !== 1 ? 's' : ''}</span> from the file couldn't be matched to an employee.
+                    Match them below, or skip to exclude those records.
+                  </p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="text-xs text-slate-400">Total rows in file</div>
+                  <div className="text-2xl font-bold text-slate-700">{pendingImport.rawCount}</div>
+                </div>
+              </div>
+              {/* Progress bar */}
+              <div className="mt-3 flex items-center gap-2">
+                <div className="flex-1 bg-slate-100 rounded-full h-2">
+                  <div
+                    className="bg-indigo-500 h-2 rounded-full transition-all"
+                    style={{ width: `${(Object.values(nameResolutions).filter(v => v && v !== 'skip').length / pendingImport.unmatchedNames.length) * 100}%` }}
+                  />
+                </div>
+                <span className="text-xs text-slate-500">
+                  {Object.values(nameResolutions).filter(v => !!v).length}/{pendingImport.unmatchedNames.length} resolved
+                </span>
+              </div>
+            </div>
+
+            {/* Scrollable list */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {pendingImport.unmatchedNames.map(name => {
+                const recCount = pendingImport.unmatchedRecordsByName[name].length;
+                const dates = [...new Set(pendingImport.unmatchedRecordsByName[name].map(r => r.date))].slice(0, 3);
+                const resolution = nameResolutions[name] || '';
+                const searchTerm = nameSearchTerms[name] || '';
+                const filteredEmps = allEmployees.filter(e => {
+                  if (!searchTerm) return true;
+                  const q = searchTerm.toLowerCase();
+                  return `${e.surname} ${e.firstname}`.toLowerCase().includes(q) || e.position?.toLowerCase().includes(q);
+                });
+                const selectedEmp = allEmployees.find(e => e.id === resolution);
+
+                return (
+                  <div key={name} className={`rounded-xl border p-4 transition-all ${resolution ? (resolution === 'skip' ? 'border-slate-200 bg-slate-50' : 'border-emerald-200 bg-emerald-50') : 'border-amber-200 bg-amber-50'}`}>
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div>
+                        <div className="font-semibold text-slate-800 text-sm">{name}</div>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          {recCount} record{recCount !== 1 ? 's' : ''} &bull; {dates.map(d => {
+                            try { return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }); } catch { return d; }
+                          }).join(', ')}{pendingImport.unmatchedRecordsByName[name].length > 3 ? ` +${pendingImport.unmatchedRecordsByName[name].length - 3} more` : ''}
+                        </div>
+                      </div>
+                      {resolution && resolution !== 'skip' && (
+                        <span className="text-xs bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5 font-medium flex-shrink-0">✓ Matched</span>
+                      )}
+                      {resolution === 'skip' && (
+                        <span className="text-xs bg-slate-200 text-slate-500 rounded-full px-2 py-0.5 font-medium flex-shrink-0">Skipped</span>
+                      )}
+                    </div>
+
+                    <div className="relative">
+                      <Input
+                        placeholder={selectedEmp ? `${selectedEmp.surname} ${selectedEmp.firstname}` : 'Type to search employee...'}
+                        value={searchTerm}
+                        onChange={e => setNameSearchTerms(prev => ({ ...prev, [name]: e.target.value }))}
+                        onFocus={() => setNameSearchTerms(prev => ({ ...prev, [name]: prev[name] || '' }))}
+                        className="text-sm h-9 pr-28"
+                      />
+                      {resolution && (
+                        <button
+                          onClick={() => { setNameResolutions(prev => ({ ...prev, [name]: '' })); setNameSearchTerms(prev => ({ ...prev, [name]: '' })); }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
+                        >Clear</button>
+                      )}
+                      {/* Dropdown list */}
+                      {searchTerm !== undefined && document.activeElement && (
+                        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                          <button
+                            onMouseDown={() => { setNameResolutions(prev => ({ ...prev, [name]: 'skip' })); setNameSearchTerms(prev => ({ ...prev, [name]: '' })); }}
+                            className="w-full text-left px-3 py-2 text-sm text-slate-400 hover:bg-slate-50 italic border-b border-slate-100"
+                          >Skip — exclude these records</button>
+                          {filteredEmps.map(e => (
+                            <button
+                              key={e.id}
+                              onMouseDown={() => { setNameResolutions(prev => ({ ...prev, [name]: e.id })); setNameSearchTerms(prev => ({ ...prev, [name]: '' })); }}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 flex items-center justify-between gap-2"
+                            >
+                              <span className="font-medium text-slate-800">{e.surname} {e.firstname}</span>
+                              <span className="text-xs text-slate-400 flex-shrink-0">{e.position} {e.status === 'Terminated' ? '· Terminated' : ''}</span>
+                            </button>
+                          ))}
+                          {filteredEmps.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-slate-400 italic">No employees found</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 flex-shrink-0 flex items-center justify-between gap-3">
+              <div className="text-sm text-slate-500">
+                <span className="font-medium text-slate-700">{pendingImport.matchedRecords.length}</span> already matched &bull; {' '}
+                <span className="font-medium text-slate-700">{Object.values(nameResolutions).filter(v => v && v !== 'skip').length * 0}</span>
+                {pendingImport.unmatchedNames.filter(n => !nameResolutions[n]).length > 0 && (
+                  <span className="text-amber-600">{pendingImport.unmatchedNames.filter(n => !nameResolutions[n]).length} unresolved will be skipped</span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={() => { setPendingImport(null); setNameResolutions({}); setNameSearchTerms({}); }} className="text-slate-500">
+                  Cancel Import
+                </Button>
+                <Button onClick={completeImportWithResolutions} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                  Import {pendingImport.matchedRecords.length + Object.values(nameResolutions).filter(v => v && v !== 'skip').length} Records
+                </Button>
+              </div>
             </div>
           </div>
         </div>

@@ -561,7 +561,7 @@ export async function fetchAllAppData(privs?: any) {
     canView('sites') ? supabase.from('sites').select('*').order('created_at') : Promise.resolve({ data: [] }),
     canView('sites') ? supabase.from('clients').select('*').order('name') : Promise.resolve({ data: [] }),
     canView('employees') ? supabase.from('employees').select('*').order('surname') : Promise.resolve({ data: [] }),
-    canView('attendance') ? supabase.from('attendance_records').select('*').order('date') : Promise.resolve({ data: [] }),
+    canView('attendance') ? supabase.from('attendance_records').select('*').order('date').limit(10000) : Promise.resolve({ data: [] }),
     canView('billing') ? supabase.from('invoices').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     canView('billing') ? supabase.from('pending_invoices').select('*').order('created_at') : Promise.resolve({ data: [] }),
     canView('salaryLoans') ? supabase.from('salary_advances').select('*').order('request_date', { ascending: false }) : Promise.resolve({ data: [] }),
@@ -857,8 +857,15 @@ export const db = {
   // Attendance
   async insertAttendanceRecords(records: AttendanceRecord[]) {
     if (records.length === 0) return;
-    const { error } = await supabase.from('attendance_records').insert(records.map(attendanceToDb));
-    if (error) console.error('insertAttendance:', error);
+    const CHUNK_SIZE = 200;
+    const rows = records.map(attendanceToDb);
+    for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+      const chunk = rows.slice(i, i + CHUNK_SIZE);
+      const { error } = await supabase
+        .from('attendance_records')
+        .upsert(chunk, { onConflict: 'id' });
+      if (error) console.error(`insertAttendance chunk ${i / CHUNK_SIZE + 1}:`, error);
+    }
   },
   async deleteAttendanceByDate(date: string) {
     const { error } = await supabase.from('attendance_records').delete().eq('date', date);
@@ -866,8 +873,21 @@ export const db = {
   },
   async deleteAttendanceByIds(ids: string[]) {
     if (ids.length === 0) return;
-    const { error } = await supabase.from('attendance_records').delete().in('id', ids);
-    if (error) console.error('deleteAttendanceByIds:', error);
+    
+    // We now use a PostgreSQL RPC function to securely process thousands 
+    // of UUIDs inside a single POST payload, completely avoiding URI length limits
+    const { error } = await supabase.rpc('delete_attendance_records_by_ids', { record_ids: ids });
+    
+    if (error) {
+      console.error('RPC bulk delete failed:', error);
+      // Fallback to chunks if RPC unexpectedly fails
+      const CHUNK_SIZE = 60;
+      const promises = [];
+      for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+        promises.push(supabase.from('attendance_records').delete().in('id', ids.slice(i, i + CHUNK_SIZE)));
+      }
+      await Promise.all(promises);
+    }
   },
 
   // Invoices
