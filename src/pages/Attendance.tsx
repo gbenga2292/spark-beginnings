@@ -877,20 +877,20 @@ export function Attendance() {
         </>
       )}
 
-      <TabsList className="bg-slate-100 h-8">
+      <TabsList className="bg-slate-100/80 p-1 h-10 border border-slate-200/50 shadow-sm">
         <TabsTrigger
           active={activeTab === 'entry'}
           onClick={() => setActiveTab('entry')}
-          className="gap-1.5 text-xs h-7 px-3"
+          className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-4 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all"
         >
-          <CalendarIcon className="h-3 w-3" /> Entry
+          <CalendarIcon className="h-3.5 w-3.5 text-indigo-500" /> Entry
         </TabsTrigger>
         <TabsTrigger
           active={activeTab === 'database'}
           onClick={() => setActiveTab('database')}
-          className="gap-1.5 text-xs h-7 px-3"
+          className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-4 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all"
         >
-          <Database className="h-3 w-3" /> Database
+          <Database className="h-3.5 w-3.5 text-emerald-500" /> Database
         </TabsTrigger>
       </TabsList>
     </div>,
@@ -902,15 +902,15 @@ export function Attendance() {
       <Tabs className="w-full flex-1 flex flex-col min-h-0">
         <TabsContent active={activeTab === 'entry'} className="flex-1 flex flex-col min-h-0 mt-0">
           {/* Toolbar: date, filters, search, actions — all in one row */}
-          <div className="flex flex-wrap items-center gap-2 py-1 px-0">
+          <div className="flex flex-wrap items-end gap-2 py-1 px-0">
             {/* Date controls */}
-            <div className="flex flex-col gap-1.5 flex-1 max-w-[200px]">
+            <div className="flex flex-col gap-1.5 flex-none w-[180px]">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Date</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-0.5">Date</span>
                 {isHoliday(registerDate) && (
-                   <span className="bg-red-50 text-red-600 text-[10px] font-bold px-1.5 py-0.5 rounded border border-red-100 flex items-center gap-1 animate-pulse">
+                   <span className="bg-red-50 text-red-600 text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-100 flex items-center gap-1 animate-pulse">
                      <span className="w-1 h-1 bg-red-400 rounded-full" />
-                     PUBLIC HOLIDAY
+                     HOLIDAY
                    </span>
                 )}
               </div>
@@ -920,31 +920,32 @@ export function Attendance() {
                   value={registerDate}
                   max={format(new Date(), 'yyyy-MM-dd')}
                   onChange={(e) => setRegisterDate(e.target.value)}
-                  className="h-8 pl-8 text-xs bg-white shadow-sm border-slate-200"
+                  className="h-9 pl-9 text-xs bg-white shadow-sm border-slate-200 hover:border-slate-300 transition-colors uppercase font-medium text-slate-700"
                 />
-                <CalendarIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
               </div>
             </div>
 
             {/* Staff Type filter */}
-            <div className="relative">
+            <div className="relative flex-none">
               <select
                 value={staffTypeFilter}
                 onChange={(e) => setStaffTypeFilter(e.target.value as any)}
-                className="h-8 pl-7 pr-3 text-xs rounded-lg border border-slate-200 bg-white shadow-sm appearance-none cursor-pointer focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none"
+                className="h-9 pl-9 pr-8 text-[11px] font-bold uppercase tracking-tight rounded-md border border-slate-200 bg-white shadow-sm appearance-none cursor-pointer hover:bg-slate-50 transition-all focus:ring-2 focus:ring-slate-900/5 outline-none text-slate-700"
               >
                 <option value="OFFICE">OFFICE STAFF</option>
                 <option value="FIELD">FIELD STAFF</option>
               </select>
-              <Filter className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300 pointer-events-none" />
             </div>
 
             {/* Search */}
-            <div className="relative flex-1 min-w-[140px] max-w-[220px]">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <div className="relative flex-none w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <Input
                 placeholder="Search..."
-                className="h-8 pl-7 text-xs bg-white shadow-sm"
+                className="h-9 pl-9 text-xs bg-white shadow-sm border-slate-200 hover:border-slate-300 transition-colors"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -962,20 +963,22 @@ export function Attendance() {
             </div>
 
             {/* Actions */}
-            {priv.canDelete && (
-              <Button onClick={handleClear} variant="outline" size="sm" className="h-8 text-xs gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200">
-                <Trash2 className="h-3 w-3" /> Clear
-              </Button>
-            )}
-            {priv.canAdd ? (
-              <Button onClick={handleSubmit} size="sm" className="h-8 text-xs gap-1 bg-slate-900 hover:bg-slate-800 text-white shadow-sm">
-                <Save className="h-3 w-3" /> Submit
-              </Button>
-            ) : (
-              <Button disabled size="sm" className="h-8 text-xs gap-1 opacity-40 cursor-not-allowed bg-slate-300 text-slate-500" title="You don't have permission to submit attendance">
-                <Save className="h-3 w-3" /> Submit
-              </Button>
-            )}
+            <div className="flex items-center gap-1.5">
+              {priv.canDelete && (
+                <Button onClick={handleClear} variant="outline" size="sm" className="h-9 text-[11px] font-bold uppercase tracking-tight gap-1.5 text-red-600 hover:text-red-700 hover:bg-rose-50 border-rose-100 shadow-sm transition-all">
+                  <Trash2 className="h-3.5 w-3.5" /> Clear
+                </Button>
+              )}
+              {priv.canAdd ? (
+                <Button onClick={handleSubmit} size="sm" className="h-9 text-[11px] font-bold uppercase tracking-tight gap-1.5 bg-slate-900 hover:bg-indigo-600 text-white shadow-md transition-all active:scale-[0.98]">
+                  <Save className="h-3.5 w-3.5" /> Submit
+                </Button>
+              ) : (
+                <Button disabled size="sm" className="h-9 text-[11px] font-bold uppercase tracking-tight gap-1.5 opacity-40 cursor-not-allowed bg-slate-300 text-slate-500" title="You don't have permission to submit attendance">
+                  <Save className="h-3.5 w-3.5" /> Submit
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Compact entry table */}
