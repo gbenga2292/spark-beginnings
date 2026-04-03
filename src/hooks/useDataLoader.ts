@@ -3,7 +3,7 @@ import { useAppStore, DEFAULT_OFFBOARDING_TASKS } from '@/src/store/appStore';
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry } from '@/src/lib/supabaseService';
 import { generateId } from '@/src/lib/utils';
 import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
 import { useNetworkStore } from '@/src/store/networkStore';
@@ -553,6 +553,20 @@ export function useRealtimeData(isAuthenticated: boolean) {
                 useAppStore.setState({ ledgerBeneficiaryBanks: current.map(b => b.id === newRow.id ? { id: newRow.id, name: newRow.name, accountNo: newRow.account_no || '' } : b) });
               } else if (eventType === 'DELETE') {
                 useAppStore.setState({ ledgerBeneficiaryBanks: current.filter(b => b.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'ledger_entries': {
+              const current = appState.ledgerEntries;
+              if (eventType === 'INSERT') {
+                if (!current.some(e => e.id === newRow.id)) {
+                  useAppStore.setState({ ledgerEntries: [dbToLedgerEntry(newRow), ...current] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToLedgerEntry(newRow);
+                useAppStore.setState({ ledgerEntries: current.map(e => e.id === updated.id ? updated : e) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ ledgerEntries: current.filter(e => e.id !== oldRow.id) });
               }
               break;
             }

@@ -586,6 +586,8 @@ interface AppState {
   setLedgerBanks: (banks: LedgerBank[]) => Promise<void>;
   setLedgerBeneficiaryBanks: (banks: LedgerBeneficiaryBank[]) => Promise<void>;
   setDepartmentTasksList: (list: DepartmentTasks[]) => Promise<void>;
+  bulkAddLedgerEntries: (entries: LedgerEntry[]) => void;
+  bulkUpdateLedgerEntries: (ids: string[], update: Partial<LedgerEntry>) => void;
 
   addCompanyExpense: (expense: CompanyExpense) => void;
   updateCompanyExpense: (id: string, expense: Partial<CompanyExpense>) => void;
@@ -846,7 +848,26 @@ export const useAppStore = create<AppState>()(
       // Ledger Entries
       addLedgerEntry: (e) => { set(s => ({ ledgerEntries: [...s.ledgerEntries, e] })); db.insertLedgerEntry(e); },
       updateLedgerEntry: (id, e) => { set(s => ({ ledgerEntries: s.ledgerEntries.map(c => c.id === id ? { ...c, ...e } : c) })); db.updateLedgerEntry(id, e); },
-      deleteLedgerEntry: (id) => { set(s => ({ ledgerEntries: s.ledgerEntries.filter(c => c.id !== id) })); db.deleteLedgerEntry(id); },
+      deleteLedgerEntry: (id: string) => {
+        set((state) => ({
+          ledgerEntries: state.ledgerEntries.filter((e) => e.id !== id)
+        }));
+        db.deleteLedgerEntry(id);
+      },
+      bulkAddLedgerEntries: (entries: LedgerEntry[]) => {
+        set((state) => ({
+          ledgerEntries: [...entries, ...state.ledgerEntries]
+        }));
+        db.bulkInsertLedgerEntries(entries);
+      },
+      bulkUpdateLedgerEntries: (ids: string[], update: Partial<LedgerEntry>) => {
+        set((state) => ({
+          ledgerEntries: state.ledgerEntries.map((e) => 
+            ids.includes(e.id) ? { ...e, ...update } : e
+          )
+        }));
+        db.bulkUpdateLedgerEntries(ids, update);
+      },
 
       // Company Expenses
       addCompanyExpense: (expense) => { set(s => ({ companyExpenses: [...s.companyExpenses, expense] })); db.insertCompanyExpense(expense); },

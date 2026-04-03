@@ -84,7 +84,7 @@ export function Ledger() {
     
     let maxSeq = 0;
     ledgerEntries.forEach(e => {
-      if (e.voucherNo.startsWith(prefix)) {
+      if (e.voucherNo && e.voucherNo.startsWith(prefix)) {
         const seqStr = e.voucherNo.replace(prefix, '');
         const seq = parseInt(seqStr, 10);
         if (!isNaN(seq) && seq > maxSeq) {
@@ -486,12 +486,13 @@ export function Ledger() {
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
 
-        const existingCats = new Set(ledgerCategories.map(c => c.name.toLowerCase()));
-        const existingBanks = new Set(ledgerBanks.map(b => b.name.toLowerCase()));
-        const existingVendors = new Set(ledgerVendors.map(v => v.name.toLowerCase()));
+        const existingCats = new Set((ledgerCategories || []).map(c => (c.name || '').toLowerCase()));
+        const existingBanks = new Set((ledgerBanks || []).map(b => (b.name || '').toLowerCase()));
+        const existingVendors = new Set((ledgerVendors || []).map(v => (v.name || '').toLowerCase()));
 
         let importedCount = 0;
         let skippedCount = 0;
+        const toAdd: LedgerEntry[] = [];
 
         data.forEach((row: any) => {
           const voucherNo = row['Voucher No'] || row.voucher_no || row.voucherNo;
@@ -519,7 +520,6 @@ export function Ledger() {
             } else {
               // overwrite: update the existing entry
               updateLedgerEntry(dupEntry.id, {
-                ...dupEntry,
                 date: normalizeDate(date),
                 description: String(description),
                 category: String(category),
@@ -555,7 +555,7 @@ export function Ledger() {
             }
           }
 
-          addLedgerEntry({
+          toAdd.push({
             id: generateId(),
             voucherNo: String(voucherNo),
             date: normalizeDate(date),
@@ -570,6 +570,15 @@ export function Ledger() {
           });
           importedCount++;
         });
+
+        if (toAdd.length > 0) {
+          const state = useAppStore.getState() as any;
+          if (state.bulkAddLedgerEntries) {
+            state.bulkAddLedgerEntries(toAdd);
+          } else {
+            toAdd.forEach(entry => addLedgerEntry(entry));
+          }
+        }
 
         if (importedCount > 0) {
           const suffix = skippedCount > 0 ? ` (${skippedCount} duplicate${skippedCount !== 1 ? 's' : ''} skipped)` : '';
@@ -592,14 +601,16 @@ export function Ledger() {
   const voucherSummaries = useMemo(() => {
     const map = new Map<string, { voucherNo: string; date: string; bank: string; total: number; count: number }>();
     filteredEntries.forEach(e => {
-      if (!map.has(e.voucherNo)) {
-        map.set(e.voucherNo, { voucherNo: e.voucherNo, date: e.date, bank: e.bank, total: 0, count: 0 });
+      const key = e.voucherNo || '';
+      if (!map.has(key)) {
+        map.set(key, { voucherNo: e.voucherNo || '', date: e.date || '', bank: e.bank || '', total: 0, count: 0 });
       }
-      const v = map.get(e.voucherNo)!;
-      v.total += e.amount;
+      const v = map.get(key)!;
+      // Coerce amount to number — DB may return it as a string
+      v.total += Number(e.amount) || 0;
       v.count += 1;
       // Use earliest date for display
-      if (e.date < v.date) v.date = e.date;
+      if (e.date && (!v.date || e.date < v.date)) v.date = e.date;
     });
     return Array.from(map.values()).sort((a, b) => b.voucherNo.localeCompare(a.voucherNo));
   }, [filteredEntries]);
@@ -991,39 +1002,6 @@ export function Ledger() {
                     <Input placeholder="Search..." className="pl-8 h-9 text-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
                   </div>
                 </div>
-                {priv?.canAdd && (
-                  <>
-                    <input type="file" ref={fileInputRef} accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportSelected} />
-                    <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm">
-                      <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
-                    </Button>
-                  </>
-                )}
-                {priv.canExport && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm">
-                        <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-52">
-                      <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleExport('bare')} className="cursor-pointer">
-                        <div className="flex flex-col">
-                          <span className="font-medium">Basic</span>
-                          <span className="text-[10px] text-slate-500">Voucher, date, description, category &amp; amount</span>
-                        </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleExport('detailed')} className="cursor-pointer">
-                        <div className="flex flex-col">
-                          <span className="font-medium">Detailed</span>
-                          <span className="text-[10px] text-slate-500">Full records with client, site, vendor &amp; bank</span>
-                        </div>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
               </div>
             </div>
           </CardHeader>
@@ -1041,21 +1019,21 @@ export function Ledger() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {voucherSummaries.map((v) => (
+                  {voucherSummaries.map((v, i) => (
                     <TableRow
-                      key={v.voucherNo}
+                      key={v.voucherNo || `v-${i}`}
                       className="hover:bg-indigo-50/30 cursor-pointer transition-colors"
                       onClick={() => setDialogVoucher(v.voucherNo)}
                     >
                       <TableCell className="font-mono font-bold text-indigo-600">
-                        {v.voucherNo}
+                        {v.voucherNo || '—'}
                       </TableCell>
                       <TableCell className="text-slate-600 text-sm whitespace-nowrap">
                         {v.date ? formatDisplayDate(v.date) : '—'}
                       </TableCell>
-                      <TableCell className="text-slate-600">{v.bank}</TableCell>
+                      <TableCell className="text-slate-600">{v.bank || '—'}</TableCell>
                       <TableCell className="font-bold text-slate-900 text-right tabular-nums">
-                        ₦{v.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        ₦{(isNaN(v.total) ? 0 : v.total).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell className="text-center">
                         <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
@@ -1099,7 +1077,7 @@ export function Ledger() {
                     </TableRow>
                   ))}
                   {voucherSummaries.length === 0 && (
-                    <TableRow>
+                    <TableRow key="no-results">
                       <TableCell colSpan={6} className="text-center py-12 text-slate-500 bg-slate-50/30">
                         No vouchers found.
                       </TableCell>
@@ -1169,11 +1147,12 @@ export function Ledger() {
                     <th className="py-2.5 px-3 text-left font-semibold text-slate-600 w-28">Site</th>
                     <th className="py-2.5 px-3 text-right font-semibold text-slate-600 w-32">Amount</th>
                     <th className="py-2.5 px-3 text-left font-semibold text-slate-600 w-28">Vendor</th>
+                    {priv?.canDelete && <th className="py-2.5 px-3 text-center font-semibold text-slate-600 w-16">Action</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {dialogTransactions.map((t, idx) => (
-                    <tr key={t.id} className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                    <tr key={t.id || `t-${idx}`} className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
                       <td className="py-2.5 px-4 text-slate-400 text-xs font-semibold">{idx + 1}</td>
                       <td className="py-2.5 px-3 text-slate-600 text-xs font-mono whitespace-nowrap">
                         {t.date ? formatDisplayDate(t.date) : '—'}
@@ -1188,14 +1167,33 @@ export function Ledger() {
                         ₦{t.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-2.5 px-3 text-slate-400 text-xs">{t.vendor || '—'}</td>
+                      {priv?.canDelete && (
+                        <td className="py-2.5 px-3 text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+                            onClick={async () => {
+                              const ok = await showConfirm('Delete this transaction line?', { variant: 'danger', confirmLabel: 'Delete Line' });
+                              if (ok) {
+                                deleteLedgerEntry(t.id);
+                                toast.success('Transaction line removed.');
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                   {/* Grand total row */}
-                  <tr className="bg-indigo-50 border-t-2 border-indigo-200">
+                  <tr key="voucher-total-row" className="bg-indigo-50 border-t-2 border-indigo-200">
                     <td colSpan={6} className="py-3 px-4 text-right font-bold text-slate-700">Total</td>
                     <td className="py-3 px-3 text-right font-extrabold text-indigo-700 tabular-nums">
                       ₦{dialogTransactions.reduce((s, e) => s + e.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
+                    {priv?.canDelete && <td />}
                     <td />
                   </tr>
                 </tbody>
@@ -1260,6 +1258,8 @@ export function Ledger() {
         </div>
       )}
 
+      {/* Hidden Global File Input */}
+      {priv?.canAdd && <input type="file" ref={fileInputRef} accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportSelected} />}
     </div>
   );
 }

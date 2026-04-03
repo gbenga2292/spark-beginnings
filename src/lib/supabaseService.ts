@@ -551,9 +551,9 @@ export async function fetchAllAppData(privs?: any) {
     leavesRes, leaveTypesRes, settingsRes,
     positionsRes, departmentsRes,
     disciplinaryRes, evaluationsRes,
-    lCatRes, lVenRes, lBankRes, lEntRes,
+    lCatRes, lVenRes, lBankRes, lBenBankRes,
+    lEntRes,
     compExpRes,
-    lBenBankRes,
     commLogsRes,
     pendingSitesRes,
     staffMeritRes,
@@ -1310,6 +1310,29 @@ export const db = {
     const { error } = await supabase.from('ledger_entries').delete().eq('id', id);
     if (error) {
       console.error('deleteLedgerEntry:', error.message, error.details, error.hint);
+    }
+  },
+  async bulkUpdateLedgerEntries(ids: string[], update: Partial<LedgerEntry>) {
+    const mappedUpdate: any = {};
+    if (update.date) mappedUpdate.date = update.date;
+    if (update.category) mappedUpdate.category = update.category;
+    if (update.client) mappedUpdate.client = update.client;
+    if (update.site) mappedUpdate.site = update.site;
+    if (update.bank) mappedUpdate.bank = update.bank;
+    if (update.vendor) mappedUpdate.vendor = update.vendor;
+    if (update.enteredBy) mappedUpdate.entered_by = update.enteredBy;
+
+    const { error } = await supabase.from('ledger_entries').update(mappedUpdate).in('id', ids);
+    if (error) console.error('bulkUpdateLedgerEntries:', error);
+  },
+  async bulkInsertLedgerEntries(entries: LedgerEntry[]) {
+    if (entries.length === 0) return;
+    const payload = entries.map(ledgerEntryToDb);
+    const { error } = await supabase
+      .from('ledger_entries')
+      .upsert(payload, { onConflict: 'id' });
+    if (error) {
+      console.error('bulkInsertLedgerEntries error:', error.message, error.details, error.hint);
     }
   },
 
