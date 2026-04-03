@@ -513,6 +513,13 @@ export function Onboarding() {
       passportPhotos: true,
       addressVerification: true,
       educationalCredentials: true,
+      bankName: selectedEmployee.onboardingChecklist?.bankName || selectedEmployee.bankName || '',
+      accountNo: selectedEmployee.onboardingChecklist?.accountNo || selectedEmployee.accountNo || '',
+      pensionNumberInput: selectedEmployee.onboardingChecklist?.pensionNumberInput || selectedEmployee.pensionNumber || '',
+      payeNumberInput: selectedEmployee.onboardingChecklist?.payeNumberInput || selectedEmployee.payeNumber || '',
+      lashmaPolicyNumber: selectedEmployee.onboardingChecklist?.lashmaPolicyNumber || selectedEmployee.lashmaPolicyNumber || '',
+      lashmaRegistrationDate: selectedEmployee.onboardingChecklist?.lashmaRegistrationDate || selectedEmployee.lashmaRegistrationDate || '',
+      lashmaExpiryDate: selectedEmployee.onboardingChecklist?.lashmaExpiryDate || selectedEmployee.lashmaExpiryDate || '',
       accountDetailsVerified: true,
       pensionVerified: true,
       payeVerified: true,
@@ -552,6 +559,13 @@ export function Onboarding() {
         passportPhotos: true,
         addressVerification: true,
         educationalCredentials: true,
+        bankName: emp.onboardingChecklist?.bankName || emp.bankName || '',
+        accountNo: emp.onboardingChecklist?.accountNo || emp.accountNo || '',
+        pensionNumberInput: emp.onboardingChecklist?.pensionNumberInput || emp.pensionNumber || '',
+        payeNumberInput: emp.onboardingChecklist?.payeNumberInput || emp.payeNumber || '',
+        lashmaPolicyNumber: emp.onboardingChecklist?.lashmaPolicyNumber || emp.lashmaPolicyNumber || '',
+        lashmaRegistrationDate: emp.onboardingChecklist?.lashmaRegistrationDate || emp.lashmaRegistrationDate || '',
+        lashmaExpiryDate: emp.onboardingChecklist?.lashmaExpiryDate || emp.lashmaExpiryDate || '',
         accountDetailsVerified: true,
         pensionVerified: true,
         payeVerified: true,
@@ -616,6 +630,16 @@ export function Onboarding() {
           <UserPlus className="h-4 w-4" /> Start New Hire
         </Button>
       )}
+      {priv.canDelete && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2 h-9 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-medium"
+          onClick={() => navigate('/onboarding/offboard')}
+        >
+          <UserMinus className="h-4 w-4" /> Offboarding
+        </Button>
+      )}
     </div>
   );
 
@@ -638,6 +662,15 @@ export function Onboarding() {
             onClick={() => navigate('/onboarding/contract')}
           >
             <FileText className="h-4 w-4 text-indigo-500" /> Contract
+          </Button>
+        )}
+        {priv.canDelete && (
+          <Button
+            variant="outline"
+            className="w-full sm:flex-1 gap-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-medium"
+            onClick={() => navigate('/onboarding/offboard')}
+          >
+            <UserMinus className="h-4 w-4" /> Offboarding
           </Button>
         )}
       </div>
@@ -875,11 +908,6 @@ export function Onboarding() {
                 </p>
               )}
             </div>
-            {selectedEmployee?.status === 'Active' && priv.canDelete && (
-              <Button className="shrink-0 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-semibold" onClick={() => navigate('/onboarding/offboard')}>
-                <UserMinus className="h-4 w-4 mr-2" />Start Offboarding
-              </Button>
-            )}
           </CardHeader>
 
           <CardContent className="p-5 flex-1 bg-slate-50/30 overflow-y-auto custom-scrollbar">

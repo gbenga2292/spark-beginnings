@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
-import { CalendarDays, Filter, ChevronDown, CheckCircle2, UserCheck, Mail, Phone, Download, Printer, Eye, X, Upload, Plus, Edit, Trash2, Ban, Search, ListFilter, CalendarClock, FileText, ShieldCheck, Clock, XCircle } from 'lucide-react';
+import { CalendarDays, Filter, ChevronDown, CheckCircle2, UserCheck, Mail, Phone, Download, Printer, Eye, X, Upload, Plus, Edit, Trash2, Ban, Search, ListFilter, CalendarClock, FileText, ShieldCheck, Clock, XCircle, MoreVertical } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
 import { useAppStore, LeaveRecord } from '@/src/store/appStore';
 import { useNavigate } from 'react-router-dom';
 import { usePriv } from '@/src/hooks/usePriv';
@@ -703,25 +704,37 @@ export function Leaves() {
                       )}
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex items-center justify-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50" title="Print Preview" onClick={() => openPrintPreview(leave)}>
-                          <Printer className="h-4 w-4" />
-                        </Button>
-                        {priv.canEdit && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit" onClick={() => handleEdit(leave)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {priv.canEdit && leave.status !== 'Cancelled' && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50" title="Cancel Leave" onClick={() => handleCancel(leave)}>
-                            <Ban className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {priv.canDelete && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete (Admin only)" onClick={() => handleDelete(leave)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
+                      <div className="flex items-center justify-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-800 hover:bg-slate-100">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40 bg-white">
+                            <DropdownMenuItem className="text-slate-600 cursor-pointer gap-2" onClick={() => openPrintPreview(leave)}>
+                              <Printer className="h-4 w-4" /> Print Preview
+                            </DropdownMenuItem>
+                            
+                            {priv.canEdit && (
+                              <DropdownMenuItem className="text-indigo-600 focus:text-indigo-600 cursor-pointer gap-2" onClick={() => handleEdit(leave)}>
+                                <Edit className="h-4 w-4" /> Edit
+                              </DropdownMenuItem>
+                            )}
+
+                            {priv.canDelete && leave.status !== 'Cancelled' && (
+                              <DropdownMenuItem className="text-amber-600 focus:text-amber-600 cursor-pointer gap-2" onClick={() => handleCancel(leave)}>
+                                <Ban className="h-4 w-4" /> Cancel Leave
+                              </DropdownMenuItem>
+                            )}
+
+                            {priv.canDelete && (
+                              <DropdownMenuItem className="text-rose-600 focus:text-rose-600 cursor-pointer gap-2" onClick={() => handleDelete(leave)}>
+                                <Trash2 className="h-4 w-4" /> Delete (Admin)
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </td>
                   </tr>

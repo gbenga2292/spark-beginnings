@@ -30,6 +30,7 @@ import {
   PopoverTrigger,
 } from "@/src/components/task_ui/popover";
 import { DayPicker } from "react-day-picker";
+import "react-day-picker/style.css";
 import { parseISO, isSunday } from 'date-fns';
 import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
 
@@ -124,13 +125,11 @@ export function Attendance() {
       const recordedCount = groupedRecords[dateStr].size;
       const isPublicHoliday = publicHolidaysStore.some(h => h.date === dateStr);
       const isSun = isSunday(parseISO(dateStr));
-      const fullyFilled = recordedCount >= totalNeeded;
-
-      if (fullyFilled) {
+      
+      // If any records exist for the date, it is considered filled
+      if (recordedCount > 0) {
         if (isPublicHoliday || isSun) map[dateStr] = 'special';
         else map[dateStr] = 'fully';
-      } else if (recordedCount > 0) {
-        map[dateStr] = 'partial';
       } else {
         map[dateStr] = 'none';
       }
@@ -139,6 +138,17 @@ export function Attendance() {
     return map;
   }, [attendanceRecords, employees, publicHolidaysStore]);
 
+
+  const lastAttendanceDate = useMemo(() => {
+    if (!attendanceRecords || attendanceRecords.length === 0) return null;
+    let latest = attendanceRecords[0].date;
+    for (let i = 1; i < attendanceRecords.length; i++) {
+       if (attendanceRecords[i].date > latest) {
+          latest = attendanceRecords[i].date;
+       }
+    }
+    return latest;
+  }, [attendanceRecords]);
 
   const [dbSelectedIds, setDbSelectedIds] = useState<Set<string>>(new Set());
 
@@ -932,9 +942,19 @@ export function Attendance() {
           {/* Toolbar: date, filters, search, actions — all in one row */}
           <div className="flex flex-wrap items-end gap-2 py-1 px-0">
             {/* Date controls */}
-            <div className="flex flex-col gap-1.5 flex-none w-[180px]">
+            <div className="flex flex-col gap-1.5 flex-none w-[260px]">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-0.5">Date</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest px-0.5">
+                    Date
+                  </span>
+                  <div className="flex items-center bg-indigo-50 border border-indigo-100 rounded-full px-2.5 py-0.5 whitespace-nowrap shadow-sm">
+                    <span className="text-[10px] font-semibold text-indigo-400 mr-1.5 uppercase tracking-wider">Latest:</span>
+                    <span className="text-[11.5px] font-bold text-indigo-800">
+                      {lastAttendanceDate ? formatDisplayDate(lastAttendanceDate) : 'None'}
+                    </span>
+                  </div>
+                </div>
                 {isHoliday(registerDate) && (
                    <span className="bg-red-50 text-red-600 text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-100 flex items-center gap-1 animate-pulse">
                      <span className="w-1 h-1 bg-red-400 rounded-full" />
@@ -942,15 +962,49 @@ export function Attendance() {
                    </span>
                 )}
               </div>
-              <div className="relative">
-                <Input
-                  type="date"
-                  value={registerDate}
-                  max={format(new Date(), 'yyyy-MM-dd')}
-                  onChange={(e) => setRegisterDate(e.target.value)}
-                  className="h-9 pl-9 text-xs bg-white shadow-sm border-slate-200 hover:border-slate-300 transition-colors uppercase font-medium text-slate-700"
-                />
-                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+              <div className="flex items-center gap-1.5">
+                <div className="relative flex-1">
+                  <Input
+                    type="date"
+                    value={registerDate}
+                    max={format(new Date(), 'yyyy-MM-dd')}
+                    onChange={(e) => setRegisterDate(e.target.value)}
+                    className="h-9 pl-9 text-xs bg-white shadow-sm border-slate-200 hover:border-slate-300 transition-colors uppercase font-medium text-slate-700 w-full"
+                  />
+                  <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                </div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 bg-white flex-shrink-0 shadow-sm hover:bg-slate-50 transition-colors" title="Attendance Calendar Overview">
+                      <CalendarIcon className="h-4 w-4 text-indigo-500" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-auto p-3 z-50 bg-white border border-slate-200 shadow-xl rounded-xl">
+                     <div className="mb-2 text-xs font-semibold text-slate-700">Attendance Overview</div>
+                     <DayPicker
+                        defaultMonth={parseISO(registerDate)}
+                        onDayClick={(date) => { setRegisterDate(format(date, 'yyyy-MM-dd')) }}
+                        modifiers={{
+                          fully: (date) => attendanceStatusMap[format(date, 'yyyy-MM-dd')] === 'fully',
+                          special: (date) => attendanceStatusMap[format(date, 'yyyy-MM-dd')] === 'special',
+                          viewing: (date) => format(date, 'yyyy-MM-dd') === registerDate,
+                        }}
+                        modifiersStyles={{
+                          today: { color: 'inherit', fontWeight: 'normal' },
+                          viewing: { backgroundColor: '#f8fafc', border: '2px solid #cbd5e1', borderRadius: '4px' },
+                          fully: { backgroundColor: '#d1fae5', color: '#065f46', fontWeight: 'bold', borderRadius: '4px' },
+                          special: { backgroundColor: '#e0e7ff', color: '#3730a3', fontWeight: 'bold', borderRadius: '4px' },
+                        }}
+                        className="bg-white"
+                     />
+                     <div className="mt-3 text-[10px] flex flex-col gap-1.5">
+                       <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#d1fae5]"></div> Attendance Entered</div>
+                       <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#e0e7ff]"></div> Attendance Entered (Holiday/Sun)</div>
+                       <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#f8fafc] border-2 border-[#cbd5e1]"></div> Date Currently Viewing</div>
+                       <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-transparent border border-slate-200"></div> No Entry</div>
+                     </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 

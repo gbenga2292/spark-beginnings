@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
-import { Download, FileSpreadsheet, FileText, PieChart as PieChartIcon, Users, Building2, Activity, CheckCircle2, CalendarClock, LayoutGrid, BarChart2, Flame } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, PieChart as PieChartIcon, Users, Building2, Activity, CheckCircle2, CalendarClock, LayoutGrid, BarChart2, Flame, Eye, Save, AlertCircle, XCircle } from 'lucide-react';
 import { useAppStore, DisciplinaryRecord } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LabelList } from 'recharts';
@@ -12,6 +12,8 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
+import { Badge } from '@/src/components/ui/badge';
 
 const getBase64ImageFromUrl = async (imageUrl: string) => {
   const res = await fetch(imageUrl);
@@ -34,6 +36,23 @@ export function Reports() {
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [activeEmpBuilderTab, setActiveEmpBuilderTab] = useState<string>("Identity & Profile");
+  const [previewModal, setPreviewModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    type: 'excel' | 'pdf' | 'csv';
+    data: any[];
+    headers: string[];
+    filename: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    type: 'excel',
+    data: [],
+    headers: [],
+    filename: '',
+    onConfirm: () => {},
+  });
 
   // Filter state for Operations Staff Site Work Report
   const currentYear = new Date().getFullYear();
@@ -42,6 +61,10 @@ export function Reports() {
   const [summaryYear, setSummaryYear] = useState<number>(currentYear);
   const [siteChartView, setSiteChartView] = useState<'table' | 'gantt'>('table');
   const [summaryChartView, setSummaryChartView] = useState<'table' | 'heatmap' | 'bar'>('table');
+
+  const [meritFilter, setMeritFilter] = useState<'All Time' | 'Year' | 'Month'>('All Time');
+  const [meritFilterYear, setMeritFilterYear] = useState<number>(currentYear);
+  const [meritFilterMonth, setMeritFilterMonth] = useState<number>(new Date().getMonth() + 1);
 
   const months = [
     { value: 1, label: 'January' },
@@ -85,7 +108,7 @@ export function Reports() {
 
   // ── Operations / Field staff for site-work report ──
   const operationsStaff = useMemo(() =>
-    employees.filter(emp => emp.staffType === 'FIELD' && emp.status === 'Active'),
+    employees.filter(emp => emp.department === 'OPERATIONS' && emp.staffType === 'FIELD' && emp.status === 'Active'),
   [employees]);
 
   // ── Gantt data: per-employee, per-day attendance grid ──
@@ -184,14 +207,27 @@ export function Reports() {
   }, [staffMeritRecords]);
 
   const performanceLeaderboard = useMemo(() => {
+    let filteredRecords = staffMeritRecords;
+    if (meritFilter === 'Year') {
+      filteredRecords = staffMeritRecords.filter(r => {
+        const d = new Date(r.incidentDate || r.createdAt);
+        return d.getFullYear() === meritFilterYear;
+      });
+    } else if (meritFilter === 'Month') {
+      filteredRecords = staffMeritRecords.filter(r => {
+        const d = new Date(r.incidentDate || r.createdAt);
+        return d.getFullYear() === meritFilterYear && d.getMonth() + 1 === meritFilterMonth;
+      });
+    }
+
     const scores: Record<string, { name: string; points: number }> = {};
-    staffMeritRecords.forEach(r => {
+    filteredRecords.forEach(r => {
       if (!scores[r.employeeId]) scores[r.employeeId] = { name: r.employeeName, points: 0 };
       const pts = r.recordType === 'Accolade' ? 1 : -1;
       scores[r.employeeId].points += pts;
     });
     return Object.values(scores).sort((a, b) => Math.abs(b.points) - Math.abs(a.points)).slice(0, 5);
-  }, [staffMeritRecords]);
+  }, [staffMeritRecords, meritFilter, meritFilterYear, meritFilterMonth]);
 
   // Calculate site work data for operations staff
   const operationsStaffSiteData = useMemo(() => {
@@ -230,7 +266,7 @@ export function Reports() {
   const operationsInternalStaff = useMemo(() => {
     return employees.filter(emp => 
       emp.department === 'OPERATIONS' && 
-      (emp.staffType === 'OFFICE' || emp.staffType === 'FIELD') &&
+      emp.staffType === 'FIELD' &&
       emp.position !== 'Engineer' &&
       emp.position !== 'CEO'
     );
@@ -606,7 +642,7 @@ export function Reports() {
     const remaining  = Math.max(0, (emp.yearlyLeave ?? 0) - totalTaken);
 
     switch (field) {
-      case 'Employee ID':           return emp.id;
+      case 'Employee ID':           return emp.employeeCode || 'N/A';
       case 'Full Name':             return `${emp.surname} ${emp.firstname}`;
       case 'Surname':               return emp.surname;
       case 'Firstname':             return emp.firstname;
@@ -634,42 +670,147 @@ export function Reports() {
 
   const generateReport = () => {
     if (selectedFields.length === 0) { toast.error('Please select at least one data point.'); return; }
-    const csvData = selectedFields.join(",") + "\n" + 
-      employees.map(emp => {
-        return selectedFields.map(field => {
-          const val = resolveField(emp, field);
-          return String(val).includes(',') ? `"${val}"` : val;
-        }).join(",");
-      }).join("\n");
+    const headers = selectedFields;
+    const body = employees.map(emp => selectedFields.map(field => resolveField(emp, field)));
 
     const fileName = "custom_employee_report.csv";
-    if (window.electronAPI?.savePathDialog) {
-      window.electronAPI.savePathDialog({
-        title: 'Export Custom Report (CSV)',
-        defaultPath: fileName,
-        filters: [{ name: 'CSV Files', extensions: ['csv'] }]
-      }).then(filePath => {
-        if (filePath) {
-          window.electronAPI.writeFile(filePath, csvData, 'utf8').then(success => {
-            if (success) toast.success(`Exported to ${filePath}`);
-            else toast.error('Failed to save file.');
+
+    setPreviewModal({
+      isOpen: true,
+      title: "Custom Employee Report (CSV)",
+      type: 'csv',
+      data: body,
+      headers: headers,
+      filename: fileName,
+      onConfirm: () => {
+        const csvData = headers.join(",") + "\n" + 
+          body.map(row => row.map(val => String(val).includes(',') ? `"${val}"` : val).join(",")).join("\n");
+
+        if (window.electronAPI?.savePathDialog) {
+          window.electronAPI.savePathDialog({
+            title: 'Export Custom Report (CSV)',
+            defaultPath: fileName,
+            filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+          }).then(filePath => {
+            if (filePath) {
+              window.electronAPI.writeFile(filePath, csvData, 'utf8').then(success => {
+                if (success) toast.success(`Exported to ${filePath}`);
+                else toast.error('Failed to save file.');
+              });
+            }
           });
+        } else {
+          const link = document.createElement("a");
+          link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
+          link.setAttribute("download", fileName);
+          document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
-      });
-    } else {
-      const link = document.createElement("a");
-      link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + csvData));
-      link.setAttribute("download", fileName);
-      document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    }
-    showExportMessage("Custom Employee Report (CSV) generated!");
+        showExportMessage("Custom Employee Report (CSV) generated!");
+      }
+    });
   };
 
   const generateReportPdf = () => {
     if (selectedFields.length === 0) { toast.error('Please select at least one data point.'); return; }
     const head = [selectedFields];
     const body = employees.map(emp => selectedFields.map(field => String(resolveField(emp, field))));
-    generatePdf('Custom Employee Report', head, body, 'custom_employee_report.pdf');
+    
+    setPreviewModal({
+      isOpen: true,
+      title: 'Custom Employee Report (PDF)',
+      type: 'pdf',
+      data: body,
+      headers: head[0],
+      filename: 'custom_employee_report.pdf',
+      onConfirm: () => generatePdf('Custom Employee Report', head, body, 'custom_employee_report.pdf')
+    });
+  };
+
+  const renderReportPreview = () => {
+    if (!previewModal.isOpen) return null;
+
+    return (
+      <Dialog open={previewModal.isOpen} onOpenChange={(open: boolean) => setPreviewModal(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent className="max-w-4xl max-h-[85vh]">
+          <DialogHeader className="px-6 py-4 bg-slate-50/50 border-b">
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div>
+                  <DialogTitle>{previewModal.title}</DialogTitle>
+                  <p className="text-sm text-slate-500 font-medium">Previewing report content before export</p>
+                </div>
+              </div>
+              <Badge className="bg-indigo-600 text-white font-bold uppercase tracking-wider px-3 py-1">
+                {previewModal.type.toUpperCase()}
+              </Badge>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto p-6">
+            <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <Table className="text-[11px] whitespace-nowrap">
+                  <TableHeader className="bg-slate-900 sticky top-0 z-10">
+                    <TableRow className="hover:bg-slate-900 border-none">
+                      {previewModal.headers.map((h, i) => (
+                        <TableHead key={i} className="text-slate-300 font-bold uppercase tracking-wider h-10 px-4">{h}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {previewModal.data.map((row, ri) => (
+                      <TableRow key={ri} className={ri % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
+                        {Object.values(row).map((val: any, ci) => (
+                          <TableCell key={ci} className="px-4 py-2.5 font-medium text-slate-700 border-r border-slate-100 last:border-0">{String(val || '-')}</TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                    {previewModal.data.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={previewModal.headers.length} className="px-4 py-12 text-center text-slate-400 font-medium">
+                          No data to display in the preview.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+            
+            <div className="mt-4 p-4 rounded-xl border border-indigo-100 bg-indigo-50/30 flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-indigo-500 shrink-0 mt-0.5" />
+              <div className="text-xs text-indigo-900 font-medium leading-relaxed">
+                Verification complete: Clicking save will generate the full document as {previewModal.filename}.
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="px-6 py-4 bg-slate-50/50 border-t items-center justify-between sm:justify-between">
+            <Button 
+              variant="ghost" 
+              className="gap-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+              onClick={() => setPreviewModal(prev => ({ ...prev, isOpen: false }))}
+            >
+              <XCircle className="h-4 w-4" /> Cancel
+            </Button>
+            <div className="flex gap-3">
+              <Button 
+                className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg shadow-indigo-200"
+                onClick={() => {
+                  previewModal.onConfirm();
+                  setPreviewModal(prev => ({ ...prev, isOpen: false }));
+                }}
+              >
+                <Save className="h-4 w-4" /> Save Report
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
   };
 
   useSetPageTitle(
@@ -701,6 +842,7 @@ export function Reports() {
 
   return (
     <div className="flex flex-col gap-8 pb-10">
+      {renderReportPreview()}
 
       {/* High-Density Summary Metrics */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -801,12 +943,48 @@ export function Reports() {
       <div className="grid gap-6 md:grid-cols-1">
         <Card className="shadow-sm bg-white border-slate-200">
           <CardHeader className="border-b border-slate-100 pb-4">
-            <CardTitle className="text-lg flex items-center justify-between text-slate-900 w-full">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row gap-4 justify-between sm:items-center w-full">
+              <CardTitle className="text-lg flex items-center gap-2 text-slate-900">
                 <Flame className="h-5 w-5 text-orange-500" /> Professional Merit Leaderboard
+                <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold ml-2">Top 5 Performers</span>
+              </CardTitle>
+              <div className="flex gap-2 items-center">
+                <select
+                  className="h-8 rounded-md border border-slate-200 text-sm px-2 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500"
+                  value={meritFilter}
+                  onChange={(e) => setMeritFilter(e.target.value as any)}
+                >
+                  <option value="All Time">All Time</option>
+                  <option value="Year">Year</option>
+                  <option value="Month">Month</option>
+                </select>
+
+                {(meritFilter === 'Year' || meritFilter === 'Month') && (
+                  <select
+                    className="h-8 rounded-md border border-slate-200 text-sm px-2 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500"
+                    value={meritFilterYear}
+                    onChange={(e) => setMeritFilterYear(Number(e.target.value))}
+                  >
+                    {[...Array(5)].map((_, i) => {
+                      const y = currentYear - i;
+                      return <option key={y} value={y}>{y}</option>;
+                    })}
+                  </select>
+                )}
+
+                {meritFilter === 'Month' && (
+                  <select
+                    className="h-8 rounded-md border border-slate-200 text-sm px-2 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500"
+                    value={meritFilterMonth}
+                    onChange={(e) => setMeritFilterMonth(Number(e.target.value))}
+                  >
+                    {months.map(m => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                )}
               </div>
-              <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Top 5 Performers</span>
-            </CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="h-[250px] w-full">
