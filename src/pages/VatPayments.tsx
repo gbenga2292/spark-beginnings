@@ -266,7 +266,7 @@ export function VatPayments({ setPreviewModal }: { setPreviewModal?: (val: any) 
                         formatDisplayDate(pay.date),
                         pay.month || '',
                         pay.year || '',
-                        `₦${(pay.amount || 0).toLocaleString()}`
+                        `₦${(pay.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                     ]),
                     onConfirm
                 });
@@ -373,7 +373,7 @@ export function VatPayments({ setPreviewModal }: { setPreviewModal?: (val: any) 
 
     const formatSum = (val: number) => {
         if (priv?.canViewAmounts === false) return '***';
-        return val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
     useSetPageTitle(

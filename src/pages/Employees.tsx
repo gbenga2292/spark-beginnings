@@ -1219,13 +1219,13 @@ export function Employees() {
                         {Object.entries(emp.monthlySalaries).map(([month, amount]) => (
                           <div key={month} className="flex justify-between">
                             <span className="text-slate-500 uppercase text-xs">{month}:</span>
-                            <span className="font-mono">₦{amount.toLocaleString()}</span>
+                            <span className="font-mono">₦{amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </div>
                         ))}
                       </div>
                       <div className="border-t border-slate-200 pt-3 flex justify-between items-center">
                         <span className="font-semibold">Annual Total:</span>
-                        <span className="text-xl font-bold text-indigo-600">₦{totalSalary.toLocaleString()}</span>
+                        <span className="text-xl font-bold text-indigo-600">₦{totalSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                     </div>
                   </div>

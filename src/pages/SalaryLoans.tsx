@@ -128,7 +128,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
         if (mainTask?.id) {
           const subtaskDesc = JSON.stringify({ refType: 'salary_advance', refId: newAdvance.id, amount: Number(amount), employeeName: empName });
           const sub = await addSubtask({
-            title: `Approve: ${empName} — ₦${Number(amount).toLocaleString()} Salary Advance`,
+            title: `Approve: ${empName} — ₦${Number().toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Salary Advance`,
             description: subtaskDesc,
             mainTaskId: mainTask.id,
             assignedTo: approverId,
@@ -188,7 +188,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
         if (mainTask?.id) {
           const subtaskDesc = JSON.stringify({ refType: 'loan', refId: newLoan.id, amount: principal, employeeName: empName });
           const sub = await addSubtask({
-            title: `Approve: ${empName} — ₦${principal.toLocaleString()} ${requestType}`,
+            title: `Approve: ${empName} — ₦${principal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${requestType}`,
             description: subtaskDesc,
             mainTaskId: mainTask.id,
             assignedTo: approverId,
@@ -304,7 +304,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
           filename: fileName,
           headers: headers.map(h => h.toUpperCase()),
           data: [...advanceRows, ...loanRows].map(row => 
-            row.map(cell => typeof cell === 'number' ? `₦${cell.toLocaleString()}` : String(cell))
+            row.map(cell => typeof cell === 'number' ? `₦${cell.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : String(cell))
           ),
           onConfirm
         });
@@ -511,7 +511,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
                       <TableRow key={sa.id} className="hover:bg-slate-50/50">
                         <TableCell className="font-medium px-4 text-slate-900">{sa.employeeName}</TableCell>
                         <TableCell className="font-mono font-medium text-slate-700">
-                          ₦{(priv as any)?.canViewAmounts === false ? '***' : sa.amount.toLocaleString()}
+                          ₦{(priv as any)?.canViewAmounts === false ? '***' : sa.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell className="text-slate-500 text-sm">{formatDisplayDate(sa.requestDate)}</TableCell>
                         <TableCell>
@@ -578,7 +578,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
                           </div>
                         </TableCell>
                         <TableCell className="font-mono font-medium text-slate-700">
-                          ₦{(priv as any)?.canViewAmounts === false ? '***' : ln.principalAmount.toLocaleString()}
+                          ₦{(priv as any)?.canViewAmounts === false ? '***' : ln.principalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell className="text-slate-500 text-sm">{formatDisplayDate(ln.paymentStartDate)}</TableCell>
                         <TableCell>

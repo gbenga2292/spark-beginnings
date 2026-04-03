@@ -749,7 +749,7 @@ export function Beneficiaries() {
                           }
                         }
                         return sum + (isPayMonth ? (formData.monthlySalaries?.[key as keyof MonthlySalary] || 0) : 0);
-                      }, 0).toLocaleString();
+                      }, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     })()}
                   </div>
                 </div>
@@ -988,7 +988,7 @@ export function Beneficiaries() {
                             <div key={key} className={`flex justify-between items-center border-b border-slate-100 pb-1 ${!isPayMonth ? 'opacity-20 grayscale' : ''}`}>
                               <span className="text-slate-400 uppercase text-[10px] font-bold">{key}</span>
                               <span className={`font-mono text-xs ${amount > 0 ? 'text-slate-700 font-bold' : 'text-slate-300'}`}>
-                                ₦{amount.toLocaleString()}
+                                ₦{amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </span>
                             </div>
                           );
@@ -996,7 +996,7 @@ export function Beneficiaries() {
                       </div>
                       <div className="border-t border-slate-200 pt-3 flex justify-between items-center">
                         <span className="font-semibold">Annual Total:</span>
-                        <span className="text-xl font-bold text-indigo-600">₦{totalSalary.toLocaleString()}</span>
+                        <span className="text-xl font-bold text-indigo-600">₦{totalSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                     </div>
                   </div>

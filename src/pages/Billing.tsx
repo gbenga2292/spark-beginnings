@@ -762,17 +762,6 @@ export function Billing() {
     });
   }, [activeTab, invoices, pendingInvoices, sortField, sortOrder, sites]);
 
-  const tableSums = useMemo(() => {
-    return (currentList || []).reduce((acc, inv: any) => ({
-        rentalCost: acc.rentalCost + (inv.rentalCost || 0),
-        dieselCost: acc.dieselCost + (inv.dieselCost || 0),
-        otherCost: acc.otherCost + ((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)),
-        totalCost: acc.totalCost + (inv.totalCost || 0),
-        vat: acc.vat + (inv.vat || 0),
-        totalCharge: acc.totalCharge + (inv.totalCharge || inv.amount || 0),
-    }), { rentalCost: 0, dieselCost: 0, otherCost: 0, totalCost: 0, vat: 0, totalCharge: 0 });
-  }, [currentList]);
-
   const siteStats = useMemo(() => {
     return sites.map(site => {
       const siteInvoices = invoices.filter(inv => 
@@ -801,11 +790,32 @@ export function Billing() {
   const completedSites = useMemo(() => siteStats.filter(s => s.isCompleted), [siteStats]);
   const unpaidSites = useMemo(() => siteStats.filter(s => s.isUnpaid), [siteStats]);
 
+  const tableSums = useMemo(() => {
+    if (activeTab === 'completed' || activeTab === 'unpaid') {
+      const list = activeTab === 'completed' ? completedSites : unpaidSites;
+      return list.reduce((acc, site) => ({
+        ...acc,
+        totalCharge: acc.totalCharge + (site.totalInvoiceAmount || 0),
+        amountPaid: acc.amountPaid + (site.totalPaymentAmount || 0)
+      }), { rentalCost: 0, dieselCost: 0, otherCost: 0, totalCost: 0, vat: 0, totalCharge: 0, amountPaid: 0 });
+    }
+
+    return (currentList || []).reduce((acc, inv: any) => ({
+        rentalCost: acc.rentalCost + (inv.rentalCost || 0),
+        dieselCost: acc.dieselCost + (inv.dieselCost || 0),
+        otherCost: acc.otherCost + ((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)),
+        totalCost: acc.totalCost + (inv.totalCost || 0),
+        vat: acc.vat + (inv.vat || 0),
+        totalCharge: acc.totalCharge + (inv.totalCharge || inv.amount || 0),
+        amountPaid: 0
+    }), { rentalCost: 0, dieselCost: 0, otherCost: 0, totalCost: 0, vat: 0, totalCharge: 0, amountPaid: 0 });
+  }, [currentList, activeTab, completedSites, unpaidSites]);
+
   const [expandedSiteKey, setExpandedSiteKey] = useState<string | null>(null);
 
   const formatSum = (val: number) => {
     if (priv?.canViewAmounts === false) return '***';
-    return val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   const SortIcon = ({ field }: { field: string }) => {
@@ -1019,17 +1029,21 @@ export function Billing() {
                   <TableHead className="px-4 py-2.5 text-right"></TableHead>
                   <TableHead className="px-4 py-2.5 text-right">
                     <div className="flex flex-col items-end gap-1">
-                      <div className="text-[9px] font-bold text-slate-400 uppercase">Gross Sum</div>
+                      <div className="text-[9px] font-bold text-slate-400 uppercase">
+                        {activeTab === 'completed' || activeTab === 'unpaid' ? 'Total Charge' : 'Gross Sum'}
+                      </div>
                       <div className="text-[11px] font-mono font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-100 shadow-sm">
-                        ₦{formatSum(tableSums.totalCost)}
+                        ₦{formatSum(activeTab === 'completed' || activeTab === 'unpaid' ? tableSums.totalCharge : tableSums.totalCost)}
                       </div>
                     </div>
                   </TableHead>
                   <TableHead className="px-4 py-2.5 text-right">
                     <div className="flex flex-col items-end gap-1">
-                      <div className="text-[9px] font-bold text-slate-400 uppercase">Total Charge</div>
+                      <div className="text-[9px] font-bold text-slate-400 uppercase">
+                        {activeTab === 'completed' || activeTab === 'unpaid' ? 'Amount Paid' : 'Total Charge'}
+                      </div>
                       <div className="text-[12px] font-mono font-black text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-100 shadow-sm">
-                        ₦{formatSum(tableSums.totalCharge)}
+                        ₦{formatSum(activeTab === 'completed' || activeTab === 'unpaid' ? tableSums.amountPaid : tableSums.totalCharge)}
                       </div>
                     </div>
                   </TableHead>
@@ -1065,7 +1079,9 @@ export function Billing() {
                     onMouseDown={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center justify-end gap-1">
-                      Equipment <SortIcon field="equipment" />
+                      {activeTab === 'completed' || activeTab === 'unpaid' 
+                        ? (expandedSiteKey ? 'Start Date' : 'No of Invoices') 
+                        : 'Equipment'} <SortIcon field="equipment" />
                     </div>
                   </TableHead>
                   <TableHead 
@@ -1074,7 +1090,9 @@ export function Billing() {
                     onMouseDown={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center justify-end gap-1">
-                      Dates & Dur <SortIcon field="startDate" />
+                      {activeTab === 'completed' || activeTab === 'unpaid' 
+                        ? (expandedSiteKey ? 'Duration' : 'Status') 
+                        : 'Dates & Dur'} <SortIcon field="startDate" />
                     </div>
                   </TableHead>
                   <TableHead 
@@ -1083,7 +1101,9 @@ export function Billing() {
                     onMouseDown={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center justify-end gap-1">
-                      Cost Bkdn <SortIcon field="costBkdn" />
+                      {activeTab === 'completed' || activeTab === 'unpaid' 
+                        ? 'Total Charge' 
+                        : 'Cost Bkdn'} <SortIcon field="costBkdn" />
                     </div>
                   </TableHead>
                   <TableHead 
@@ -1092,7 +1112,9 @@ export function Billing() {
                     onMouseDown={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center justify-end gap-1">
-                      Totals (₦) <SortIcon field="totals" />
+                      {activeTab === 'completed' || activeTab === 'unpaid' 
+                        ? (expandedSiteKey ? 'Status' : 'Amount Paid') 
+                        : 'Totals (₦)'} <SortIcon field="totals" />
                     </div>
                   </TableHead>
                   {showActions && (priv.canEdit || priv.canDelete) && (
@@ -1137,10 +1159,10 @@ export function Billing() {
                           </Badge>
                         </TableCell>
                         <TableCell className="px-4 py-3 text-right text-slate-600 font-mono">
-                          {priv?.canViewAmounts === false ? '***' : `₦${site.totalInvoiceAmount.toLocaleString()}`}
+                          {priv?.canViewAmounts === false ? '***' : `₦${site.totalInvoiceAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                         </TableCell>
                         <TableCell className="px-4 py-3 text-right font-bold text-indigo-700 font-mono">
-                          {priv?.canViewAmounts === false ? '***' : `₦${site.totalPaymentAmount.toLocaleString()}`}
+                          {priv?.canViewAmounts === false ? '***' : `₦${site.totalPaymentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                         </TableCell>
                       </TableRow>
                       {isExpanded && site.invoices.length === 0 && (
@@ -1167,7 +1189,7 @@ export function Billing() {
                             {inv.duration || 0} Days
                           </TableCell>
                           <TableCell className="px-4 py-2.5 text-right text-xs font-mono font-semibold text-slate-700">
-                            {priv?.canViewAmounts === false ? '***' : `₦${(inv.totalCharge || inv.amount || 0).toLocaleString()}`}
+                            {priv?.canViewAmounts === false ? '***' : `₦${(inv.totalCharge || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                           </TableCell>
                           <TableCell className="px-4 py-2.5 text-right text-xs">
                             <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-slate-500">
@@ -1188,21 +1210,21 @@ export function Billing() {
                         <div className="text-slate-500 text-xs">{inv.site || inv.siteName} <span className="ml-1 px-1 rounded bg-slate-100 border text-[10px]">{inv.vatInc || 'No VAT'}</span></div>
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right text-slate-600">
-                        <div><span className="text-slate-400">Mac:</span> {inv.noOfMachine || 0} x {priv?.canViewAmounts === false ? '***' : (inv.dailyRentalCost || 0).toLocaleString()}</div>
-                        <div><span className="text-slate-400">Tech:</span> {inv.noOfTechnician || 0} x {priv?.canViewAmounts === false ? '***' : (inv.techniciansDailyRate || 0).toLocaleString()}</div>
-                        <div><span className="text-slate-400">DsLtr:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCostPerLtr || 0).toLocaleString()} ({(inv.dailyUsage || 0)}L)</div>
+                        <div><span className="text-slate-400">Mac:</span> {inv.noOfMachine || 0} x {priv?.canViewAmounts === false ? '***' : (inv.dailyRentalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div><span className="text-slate-400">Tech:</span> {inv.noOfTechnician || 0} x {priv?.canViewAmounts === false ? '***' : (inv.techniciansDailyRate || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div><span className="text-slate-400">DsLtr:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCostPerLtr || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({(inv.dailyUsage || 0)}L)</div>
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right text-slate-600">
                         <div className="font-medium text-slate-800">{inv.duration || 0} Days</div>
                         <div className="text-slate-500 text-xs">{formatDisplayDate(inv.startDate || inv.date)} - {formatDisplayDate(inv.endDate || inv.dueDate)}</div>
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right text-slate-600">
-                        <div><span className="text-slate-400">Rent:</span> {priv?.canViewAmounts === false ? '***' : (inv.rentalCost || 0).toLocaleString()}</div>
-                        <div><span className="text-slate-400">Fuel:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCost || 0).toLocaleString()}</div>
-                        <div><span className="text-slate-400">Other:</span> {priv?.canViewAmounts === false ? '***' : ((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)).toLocaleString()}</div>
+                        <div><span className="text-slate-400">Rent:</span> {priv?.canViewAmounts === false ? '***' : (inv.rentalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div><span className="text-slate-400">Fuel:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div><span className="text-slate-400">Other:</span> {priv?.canViewAmounts === false ? '***' : ((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right">
-                        <div className="text-slate-500 text-xs">Gross: {priv?.canViewAmounts === false ? '***' : (inv.totalCost || 0).toLocaleString()}</div>
+                        <div className="text-slate-500 text-xs">Gross: {priv?.canViewAmounts === false ? '***' : (inv.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         <div className="text-slate-500 text-xs">VAT: {priv?.canViewAmounts === false ? '***' : (inv.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         <div className="font-bold text-indigo-700 mt-1">{priv?.canViewAmounts === false ? '***' : (inv.totalCharge || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       </TableCell>

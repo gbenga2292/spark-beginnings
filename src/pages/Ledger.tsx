@@ -615,9 +615,9 @@ export function Ledger() {
     return Array.from(map.values()).sort((a, b) => b.voucherNo.localeCompare(a.voucherNo));
   }, [filteredEntries]);
 
-  // Transactions for the dialog
+  // Transactions for the dialog (all lines — no cap)
   const dialogTransactions = useMemo(() =>
-    dialogVoucher ? ledgerEntries.filter(e => e.voucherNo === dialogVoucher).slice(0, 8) : [],
+    dialogVoucher ? ledgerEntries.filter(e => e.voucherNo === dialogVoucher) : [],
     [dialogVoucher, ledgerEntries]
   );
 
@@ -882,7 +882,7 @@ export function Ledger() {
                     Total
                   </td>
                   <td className="py-3 px-3 font-bold text-indigo-700 border border-slate-200 bg-indigo-50/50">
-                    ₦{formTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    ₦{formTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td colSpan={3} className="bg-white border border-slate-200 text-slate-300 px-4 text-xs italic">
                     All amounts aggregated per voucher automatically.
@@ -1033,7 +1033,7 @@ export function Ledger() {
                       </TableCell>
                       <TableCell className="text-slate-600">{v.bank || '—'}</TableCell>
                       <TableCell className="font-bold text-slate-900 text-right tabular-nums">
-                        ₦{(isNaN(v.total) ? 0 : v.total).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        ₦{(isNaN(v.total) ? 0 : v.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell className="text-center">
                         <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
@@ -1110,7 +1110,7 @@ export function Ledger() {
                 <div className="text-right">
                   <p className="text-indigo-200 text-xs">Total Amount</p>
                   <p className="text-white font-bold text-lg">
-                    ₦{dialogTransactions.reduce((s, e) => s + e.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    ₦{dialogTransactions.reduce((s, e) => s + e.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
                 <button
@@ -1127,7 +1127,7 @@ export function Ledger() {
               <div className="flex items-center gap-6 px-6 py-3 bg-slate-50 border-b border-slate-100 text-sm shrink-0">
                 <span className="text-slate-500">Bank: <strong className="text-slate-700">{dialogTransactions[0].bank}</strong></span>
                 <span className="text-slate-500">Entered by: <strong className="text-slate-700">{dialogTransactions[0].enteredBy}</strong></span>
-                <span className="text-slate-500">{dialogTransactions.length} transaction{dialogTransactions.length !== 1 ? 's' : ''} (max 8)</span>
+                <span className="text-slate-500">{dialogTransactions.length} transaction{dialogTransactions.length !== 1 ? 's' : ''}</span>
                 <Button size="sm" variant="outline" className="ml-auto" onClick={() => { setDialogVoucher(null); loadVoucher(dialogVoucher); setTab('entry'); }}>
                   <Eye className="h-4 w-4 mr-1.5" /> Edit in Form
                 </Button>
@@ -1164,7 +1164,7 @@ export function Ledger() {
                       <td className="py-2.5 px-3 text-slate-500 text-xs">{t.client || '—'}</td>
                       <td className="py-2.5 px-3 text-slate-500 text-xs">{t.site || '—'}</td>
                       <td className="py-2.5 px-3 text-right font-bold text-slate-900 tabular-nums">
-                        ₦{t.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        ₦{t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="py-2.5 px-3 text-slate-400 text-xs">{t.vendor || '—'}</td>
                       {priv?.canDelete && (
@@ -1173,11 +1173,19 @@ export function Ledger() {
                             variant="ghost"
                             size="sm"
                             className="h-7 w-7 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
-                            onClick={async () => {
-                              const ok = await showConfirm('Delete this transaction line?', { variant: 'danger', confirmLabel: 'Delete Line' });
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const isLast = dialogTransactions.length === 1;
+                              const ok = await showConfirm(
+                                isLast
+                                  ? `This is the only transaction in voucher ${dialogVoucher}. Deleting it will remove the entire voucher. Continue?`
+                                  : 'Delete this transaction line from the voucher?',
+                                { variant: 'danger', confirmLabel: 'Delete Line' }
+                              );
                               if (ok) {
                                 deleteLedgerEntry(t.id);
                                 toast.success('Transaction line removed.');
+                                if (isLast) setDialogVoucher(null);
                               }
                             }}
                           >
@@ -1191,7 +1199,7 @@ export function Ledger() {
                   <tr key="voucher-total-row" className="bg-indigo-50 border-t-2 border-indigo-200">
                     <td colSpan={6} className="py-3 px-4 text-right font-bold text-slate-700">Total</td>
                     <td className="py-3 px-3 text-right font-extrabold text-indigo-700 tabular-nums">
-                      ₦{dialogTransactions.reduce((s, e) => s + e.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      ₦{dialogTransactions.reduce((s, e) => s + e.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     {priv?.canDelete && <td />}
                     <td />

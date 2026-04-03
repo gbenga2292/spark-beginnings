@@ -145,7 +145,7 @@ export function usePayrollCalculator() {
 
         const empLoans = loans.filter(l => {
           if (l.employeeId !== emp.id) return false;
-          if (l.status !== 'Active' && l.status !== 'Completed') return false;
+          if (l.status !== 'Active' && l.status !== 'Completed' && l.status !== 'Approved') return false;
           if (!l.paymentStartDate) return false;
           const dateParts = l.paymentStartDate.split('-');
           const startYear = parseInt(dateParts[0], 10);

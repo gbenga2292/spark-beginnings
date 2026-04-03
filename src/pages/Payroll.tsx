@@ -12,6 +12,7 @@ import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import logoSrc from '../../logo/logo-2.png';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
 import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
 
 interface PayrollRecord {
@@ -57,7 +58,7 @@ const isNsitfEligible = (r: PayrollRecord) => r.nsitf > 0 && !r.department.trim(
 const currentYear = new Date().getFullYear();
 const YEAR_RANGE_START = 2020;
 
-const fm = (v: number) => typeof v === 'number' ? v.toLocaleString() : '0';
+const fm = (v: number) => typeof v === 'number' ? v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0';
 const fmT = fm;
 
 export function Payroll() {
@@ -387,7 +388,7 @@ export function Payroll() {
 
           const empLoans = loans.filter(l => {
             if (l.employeeId !== emp.id) return false;
-            if (l.status !== 'Active' && l.status !== 'Completed') return false;
+            if (l.status !== 'Active' && l.status !== 'Completed' && l.status !== 'Approved') return false;
             if (!l.paymentStartDate) return false;
             const dateParts = l.paymentStartDate.split('-');
             const startYear = parseInt(dateParts[0], 10);
@@ -526,7 +527,7 @@ export function Payroll() {
       }
 
       // Build self-contained HTML for every payslip so all appear in one print job
-      const currency = (n: number) => '₦' + n.toLocaleString();
+      const currency = (n: number) => '₦' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const slipsHtml = payslipsToPrint.map((slip, i) => `
       <div class="payslip${i === payslipsToPrint.length - 1 ? ' last' : ''}">
         <div class="header">
@@ -616,59 +617,67 @@ export function Payroll() {
       }, 300);
     };
 
-    const handleExportScheduleCSV = () => {
+    const handleExportScheduleCSV = (customType?: 'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF' | 'WITHHOLDING') => {
       let csvStr = '';
       const fmCSV = (n: number) => n.toFixed(2);
+      
+      const typeToExport = customType || printType;
+      
+      // When called from the main page (not print dialog), build slips from payrollData for the current month
+      const sourceSlips: Array<{ monthLabel: string; monthKey: string; record: PayrollRecord }> =
+        printDialogOpen && payslipsToPrint.length > 0
+          ? payslipsToPrint
+          : payrollData.map(record => ({ monthLabel: selectedMonthLabel, monthKey: selectedMonth, record }));
 
       // Helpers for CSV eligibility
-      const csvPayeOk  = (r: typeof payslipsToPrint[0]['record']) => r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
-      const csvPenOk   = (r: typeof payslipsToPrint[0]['record']) => r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
-      const csvNsitfOk = (r: typeof payslipsToPrint[0]['record']) => r.nsitf > 0 && !r.department.trim().toLowerCase().includes('adhoc');
+      const csvPayeOk  = (r: PayrollRecord) => r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
+      const csvPenOk   = (r: PayrollRecord) => r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
+      const csvNsitfOk = (r: PayrollRecord) => r.nsitf > 0 && !r.department.trim().toLowerCase().includes('adhoc');
 
-      if (printType === 'PAYE') {
+      if (typeToExport === 'PAYE') {
         csvStr = 'S/N,Employee Name,Month,Basic Salary (₦),Housing (₦),Transport (₦),Other Allowances (₦),Gross Pay (₦),PAYE Deducted (₦)\n';
         let sn = 1;
-        payslipsToPrint.forEach(slip => {
+        sourceSlips.forEach(slip => {
           if (csvPayeOk(slip.record)) {
             csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.monthLabel}","${fmCSV(slip.record.basicSalary)}","${fmCSV(slip.record.housing)}","${fmCSV(slip.record.transport)}","${fmCSV(slip.record.otherAllowances)}","${fmCSV(slip.record.grossPay)}","${fmCSV(slip.record.paye)}"\n`;
           }
         });
-      } else if (printType === 'PENSION') {
+      } else if (typeToExport === 'PENSION') {
         csvStr = 'S/N,Employee Name,Month,Pensionable Sum (₦),Employee Contrib. (₦),Employer Contrib. (₦),Total Contrib. (₦)\n';
         let sn = 1;
-        payslipsToPrint.forEach(slip => {
+        sourceSlips.forEach(slip => {
           if (csvPenOk(slip.record)) {
             const penSum = slip.record.basicSalary + slip.record.housing + slip.record.transport;
             const totalPen = slip.record.pension + slip.record.employerPension;
             csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.monthLabel}","${fmCSV(penSum)}","${fmCSV(slip.record.pension)}","${fmCSV(slip.record.employerPension)}","${fmCSV(totalPen)}"\n`;
           }
         });
-      } else if (printType === 'NSITF') {
+      } else if (typeToExport === 'NSITF') {
         csvStr = 'S/N,Employee Name,Month,Gross Pay (₦),Rate (%),NSITF (₦)\n';
         let sn = 1;
-        payslipsToPrint.forEach(slip => {
+        sourceSlips.forEach(slip => {
           if (csvNsitfOk(slip.record)) {
             csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.monthLabel}","${fmCSV(slip.record.grossPay)}","${payrollVariables.nsitfRate}","${fmCSV(slip.record.nsitf)}"\n`;
           }
         });
-      } else if (printType === 'WITHHOLDING') {
+      } else if (typeToExport === 'WITHHOLDING') {
         csvStr = 'S/N,Employee Name,TIN,Month,Gross Pay (₦),Rate (%),Withholding Tax (₦)\n';
         let sn = 1;
-        payslipsToPrint.forEach(slip => {
+        sourceSlips.forEach(slip => {
           if (slip.record.staffType === 'NON-EMPLOYEE') {
             const whtRate = slip.record.withholdingTaxRate ? (slip.record.withholdingTaxRate * 100).toFixed(1) + '%' : '5%';
             csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.record.taxId || ''}","${slip.monthLabel}","${fmCSV(slip.record.grossPay)}","${whtRate}","${fmCSV(slip.record.paye)}"\n`;
           }
         });
       } else {
-        csvStr = 'S/N,Employee Name,Bank,Account No,Expected Net Pay (₦)\n';
+        csvStr = 'S/N,Surname,Firstname,Job Title,Bank,Account No,Salary (₦),Basic Salary (₦),Housing (₦),Transport (₦),Other Allowances (₦),Total Allowances (₦),Overtime (₦),Gross Pay (₦),PAYE Tax (₦),Loan Repayment (₦),Pension (₦),Net Pay (₦),Month\n';
         let sn = 1;
-        payslipsToPrint.forEach(slip => {
-          csvStr += `"${sn++}","${slip.record.surname} ${slip.record.firstname}","${slip.record.bankName}","${slip.record.accountNo}","${fmCSV(slip.record.takeHomePay)}"\n`;
+        sourceSlips.forEach(slip => {
+          csvStr += `"${sn++}","${slip.record.surname}","${slip.record.firstname}","${slip.record.position || ''}","${slip.record.bankName}","${slip.record.accountNo}","${fmCSV(slip.record.salary)}","${fmCSV(slip.record.basicSalary)}","${fmCSV(slip.record.housing)}","${fmCSV(slip.record.transport)}","${fmCSV(slip.record.otherAllowances)}","${fmCSV(slip.record.totalAllowances)}","${fmCSV(slip.record.overtime)}","${fmCSV(slip.record.grossPay)}","${fmCSV(slip.record.paye)}","${fmCSV(slip.record.loanRepayment)}","${fmCSV(slip.record.pension)}","${fmCSV(slip.record.takeHomePay)}","${slip.monthLabel}"\n`;
         });
       }
       
-      const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8;' });
+      const blob = new Blob(['\uFEFF' + csvStr], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
@@ -681,7 +690,7 @@ export function Payroll() {
       
       const yrLabel = printDialogOpen ? printSelectedYear : selectedYear;
       
-      link.setAttribute('download', `${printType}_Schedule_${mLabel}_${yrLabel}.csv`);
+      link.setAttribute('download', `${typeToExport}_Schedule_${mLabel}_${yrLabel}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
@@ -725,9 +734,32 @@ export function Payroll() {
           </Button>
         )}
         {finRepPriv?.canExport && activeTab === 'processing' && (
-          <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50" onClick={handleExportScheduleCSV}>
-            <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export CSV
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50">
+                <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export CSV <ChevronDown className="h-3 w-3 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleExportScheduleCSV('PAYSLIPS')} className="cursor-pointer font-medium text-sm">
+                Entire Payroll Table
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportScheduleCSV('PAYE')} className="cursor-pointer text-sm">
+                PAYE Schedule
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportScheduleCSV('PENSION')} className="cursor-pointer text-sm">
+                Pension Schedule
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportScheduleCSV('NSITF')} className="cursor-pointer text-sm">
+                NSITF Schedule
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportScheduleCSV('WITHHOLDING')} className="cursor-pointer text-sm">
+                Withholding Schedule
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>,
       [selectedMonth, selectedYear, activeTab]
@@ -775,7 +807,7 @@ export function Payroll() {
                    <div className="flex justify-between items-center mb-1">
                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Gross Pay</span>
                    </div>
-                   <div className="text-xl font-bold text-slate-900">₦{priv?.canViewAmounts === false ? '***' : totals.totalGross.toLocaleString()}</div>
+                   <div className="text-xl font-bold text-slate-900">₦{priv?.canViewAmounts === false ? '***' : totals.totalGross.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                    <div className="flex gap-2 mt-1.5 flex-wrap">
                      <span className="text-[10px] bg-slate-50 text-slate-600 px-1.5 py-0.5 rounded border border-slate-100 font-medium whitespace-nowrap">Salary: ₦{fm(totals.totalSalary)}</span>
                      <span className="text-[10px] bg-slate-50 text-slate-600 px-1.5 py-0.5 rounded border border-slate-100 font-medium whitespace-nowrap">Overtime: ₦{fm(totals.totalOvertime)}</span>
@@ -789,7 +821,7 @@ export function Payroll() {
                      <span className="text-xs font-semibold text-red-500 uppercase tracking-wider">Total Deductions</span>
                    </div>
                    <div className="text-xl font-bold text-red-600 relative z-10 flex items-center gap-2">
-                     ₦{priv?.canViewAmounts === false ? '***' : totals.totalDeductions.toLocaleString()}
+                     ₦{priv?.canViewAmounts === false ? '***' : totals.totalDeductions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                    </div>
                    <div className="flex gap-2 mt-1.5 relative z-10 flex-wrap">
                       <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 font-medium whitespace-nowrap">PAYE: ₦{fm(totals.totalPAYE)}</span>
@@ -804,7 +836,7 @@ export function Payroll() {
                      <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Net Payroll</span>
                      <span className="text-[10px] font-medium bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full whitespace-nowrap">{totals.employeeCount} staff</span>
                    </div>
-                   <div className="text-xl font-bold text-emerald-600 relative z-10">₦{priv?.canViewAmounts === false ? '***' : totals.totalNet.toLocaleString()}</div>
+                   <div className="text-xl font-bold text-emerald-600 relative z-10">₦{priv?.canViewAmounts === false ? '***' : totals.totalNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                    <div className="text-[10px] text-emerald-500/80 mt-1 relative z-10 flex justify-between items-center whitespace-nowrap">
                      Take Home Pay
                    </div>
@@ -877,18 +909,18 @@ export function Payroll() {
                         <TableCell className="sticky z-10 bg-white border-r border-slate-300" style={{left:'268px',minWidth:'180px'}}>{record.position}</TableCell>
                         <TableCell>{record.bankName}</TableCell>
                         <TableCell className="font-mono">{record.accountNo}</TableCell>
-                        <TableCell className="font-mono text-indigo-700 bg-indigo-50/30">₦{priv?.canViewAmounts === false ? '***' : record.salary.toLocaleString()}</TableCell>
-                        <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.basicSalary.toLocaleString()}</TableCell>
-                        <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.housing.toLocaleString()}</TableCell>
-                        <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.transport.toLocaleString()}</TableCell>
-                        <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.otherAllowances.toLocaleString()}</TableCell>
-                        <TableCell className="font-mono font-medium bg-slate-50 border-x">{priv?.canViewAmounts === false ? '***' : record.totalAllowances.toLocaleString()}</TableCell>
+                        <TableCell className="font-mono text-indigo-700 bg-indigo-50/30">₦{priv?.canViewAmounts === false ? '***' : record.salary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.basicSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.housing.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.transport.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono text-slate-600">{priv?.canViewAmounts === false ? '***' : record.otherAllowances.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono font-medium bg-slate-50 border-x">{priv?.canViewAmounts === false ? '***' : record.totalAllowances.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                         <TableCell className="font-mono text-amber-600">{priv?.canViewAmounts === false ? '***' : record.overtime.toLocaleString()}</TableCell>
-                        <TableCell className="font-mono font-bold text-slate-900 bg-emerald-50/50">₦{priv?.canViewAmounts === false ? '***' : record.grossPay.toLocaleString()}</TableCell>
-                        <TableCell className="font-mono text-red-600">{priv?.canViewAmounts === false ? '***' : record.paye.toLocaleString()}</TableCell>
-                        <TableCell className="font-mono text-red-600">{priv?.canViewAmounts === false ? '***' : record.loanRepayment.toLocaleString()}</TableCell>
-                        <TableCell className="font-mono text-red-600">{priv?.canViewAmounts === false ? '***' : record.pension.toLocaleString()}</TableCell>
-                        <TableCell className="font-mono font-bold text-emerald-700 bg-emerald-50 border-l">₦{priv?.canViewAmounts === false ? '***' : record.takeHomePay.toLocaleString()}</TableCell>
+                        <TableCell className="font-mono font-bold text-slate-900 bg-emerald-50/50">₦{priv?.canViewAmounts === false ? '***' : record.grossPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono text-red-600">{priv?.canViewAmounts === false ? '***' : record.paye.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono text-red-600">{priv?.canViewAmounts === false ? '***' : record.loanRepayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono text-red-600">{priv?.canViewAmounts === false ? '***' : record.pension.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-mono font-bold text-emerald-700 bg-emerald-50 border-l">₦{priv?.canViewAmounts === false ? '***' : record.takeHomePay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1125,7 +1157,7 @@ export function Payroll() {
                 </h3>
                 <div className="flex gap-2">
                   {printType !== 'PAYSLIPS' && (
-                    <Button variant="secondary" size="sm" className="gap-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800" onClick={handleExportScheduleCSV} disabled={payslipsToPrint.length === 0}>
+                    <Button variant="secondary" size="sm" className="gap-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800" onClick={() => handleExportScheduleCSV()} disabled={payslipsToPrint.length === 0}>
                       <Upload className="h-4 w-4" /> Export CSV
                     </Button>
                   )}
@@ -1385,12 +1417,12 @@ export function Payroll() {
                               <tr className="text-left"><th className="py-2 text-slate-600">Description</th><th className="py-2 text-right text-slate-600">Amount (₦)</th></tr>
                             </thead>
                             <tbody>
-                              {printSelectedColumns.includes('basic') && <tr><td className="py-2">Basic Salary</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.basicSalary.toLocaleString()}</td></tr>}
-                              {printSelectedColumns.includes('housing') && slip.record.housing > 0 && <tr><td className="py-2">Housing Allowance</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.housing.toLocaleString()}</td></tr>}
-                              {printSelectedColumns.includes('transport') && slip.record.transport > 0 && <tr><td className="py-2">Transport Allowance</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.transport.toLocaleString()}</td></tr>}
-                              {printSelectedColumns.includes('other') && slip.record.otherAllowances > 0 && <tr><td className="py-2">Other Allowances</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.otherAllowances.toLocaleString()}</td></tr>}
+                              {printSelectedColumns.includes('basic') && <tr><td className="py-2">Basic Salary</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.basicSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
+                              {printSelectedColumns.includes('housing') && slip.record.housing > 0 && <tr><td className="py-2">Housing Allowance</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.housing.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
+                              {printSelectedColumns.includes('transport') && slip.record.transport > 0 && <tr><td className="py-2">Transport Allowance</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.transport.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
+                              {printSelectedColumns.includes('other') && slip.record.otherAllowances > 0 && <tr><td className="py-2">Other Allowances</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.otherAllowances.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
                               {printSelectedColumns.includes('overtime') && slip.record.overtime > 0 && <tr><td className="py-2">Overtime Pay</td><td className="py-2 text-right font-mono text-emerald-600">+{priv?.canViewAmounts === false ? '***' : slip.record.overtime.toLocaleString()}</td></tr>}
-                              {printSelectedColumns.includes('gross') && <tr className="border-t font-semibold"><td className="py-2">GROSS PAY</td><td className="py-2 text-right font-mono text-lg">{priv?.canViewAmounts === false ? '***' : slip.record.grossPay.toLocaleString()}</td></tr>}
+                              {printSelectedColumns.includes('gross') && <tr className="border-t font-semibold"><td className="py-2">GROSS PAY</td><td className="py-2 text-right font-mono text-lg">{priv?.canViewAmounts === false ? '***' : slip.record.grossPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
                             </tbody>
                           </table>
                         </div>
@@ -1403,9 +1435,9 @@ export function Payroll() {
                               <tr className="text-left"><th className="py-2 text-slate-600">Description</th><th className="py-2 text-right text-slate-600">Amount (₦)</th></tr>
                             </thead>
                             <tbody>
-                              {printSelectedColumns.includes('paye') && slip.record.paye > 0 && <tr><td className="py-2">PAYE Tax</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.paye.toLocaleString()}</td></tr>}
-                              {printSelectedColumns.includes('loan') && slip.record.loanRepayment > 0 && <tr><td className="py-2">Loan & Advance Repayment</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.loanRepayment.toLocaleString()}</td></tr>}
-                              {printSelectedColumns.includes('employee_pension') && slip.record.pension > 0 && <tr><td className="py-2">Pension Contribution</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.pension.toLocaleString()}</td></tr>}
+                              {printSelectedColumns.includes('paye') && slip.record.paye > 0 && <tr><td className="py-2">PAYE Tax</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.paye.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
+                              {printSelectedColumns.includes('loan') && slip.record.loanRepayment > 0 && <tr><td className="py-2">Loan & Advance Repayment</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.loanRepayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
+                              {printSelectedColumns.includes('employee_pension') && slip.record.pension > 0 && <tr><td className="py-2">Pension Contribution</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.pension.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
                               
                               <tr className="border-t font-semibold">
                                 <td className="py-2">TOTAL DEDUCTIONS</td>
@@ -1414,7 +1446,7 @@ export function Payroll() {
                                     (printSelectedColumns.includes('paye') ? slip.record.paye : 0) + 
                                     (printSelectedColumns.includes('loan') ? slip.record.loanRepayment : 0) + 
                                     (printSelectedColumns.includes('employee_pension') ? slip.record.pension : 0)
-                                  ).toLocaleString()}
+                                  ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </td>
                               </tr>
                             </tbody>
@@ -1426,7 +1458,7 @@ export function Payroll() {
                           <div className="bg-emerald-50 p-6 rounded-lg border border-emerald-100">
                             <div className="flex justify-between items-center">
                               <span className="text-lg font-bold text-slate-900">TAKE HOME PAY</span>
-                              <span className="text-3xl font-bold text-emerald-700">₦{priv?.canViewAmounts === false ? '***' : slip.record.takeHomePay.toLocaleString()}</span>
+                              <span className="text-3xl font-bold text-emerald-700">₦{priv?.canViewAmounts === false ? '***' : slip.record.takeHomePay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                           </div>
                         )}

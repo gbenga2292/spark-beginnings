@@ -338,7 +338,7 @@ export function Payments() {
 
     const formatSum = (val: number) => {
         if (priv?.canViewAmounts === false) return '***';
-        return val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
     useSetPageTitle(
@@ -506,10 +506,10 @@ export function Payments() {
                                             {priv?.canViewAmounts === false ? '***' : (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-right text-slate-500 font-mono">
-                                            {p.withholdingTax ? p.withholdingTax.toLocaleString() : '-'}
+                                            {p.withholdingTax ? p.withholdingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-right text-slate-500 font-mono">
-                                            {p.discount ? p.discount.toLocaleString() : '-'}
+                                            {p.discount ? p.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-center text-xs">
                                             <Badge variant={p.payVat === 'Yes' ? 'default' : p.payVat === 'Add' ? 'outline' : 'secondary'} className={`${p.payVat === 'Yes' ? 'bg-indigo-100 text-indigo-800' : ''}`}>

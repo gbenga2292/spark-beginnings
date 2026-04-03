@@ -117,8 +117,8 @@ export function FinancialReports() {
   }
 
   const hideAmounts = priv.canViewAmounts === false;
-  const fm = (n: number) => hideAmounts ? '***' : n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-  const fmRaw = (n: number) => hideAmounts ? '***' : '₦' + n.toLocaleString();
+  const fm = (n: number) => hideAmounts ? '***' : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmRaw = (n: number) => hideAmounts ? '***' : '₦' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // Payroll Exposure calculations
   const payrollStats = useMemo(() => {
@@ -376,7 +376,7 @@ export function FinancialReports() {
     if (hideAmounts) return '***';
     if (val >= 1000000) return `₦${(val / 1000000).toFixed(2)}M`;
     if (val >= 1000) return `₦${(val / 1000).toFixed(1)}k`;
-    return `₦${val.toLocaleString()}`;
+    return `₦${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
   const formatCurr = (val: number) => hideAmounts ? '***' : `₦${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -484,7 +484,7 @@ export function FinancialReports() {
 
   const exportInvoicePdf = () => {
     const head = [["Invoice ID", "Client", "Site", "Date", "Amount (₦)", "Status"]];
-    const body = invoices.map(inv => [inv.id, inv.client, inv.siteName, formatDisplayDate(inv.date), (inv.amount || 0).toLocaleString(), inv.status]);
+    const body = invoices.map(inv => [inv.id, inv.client, inv.siteName, formatDisplayDate(inv.date), (inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), inv.status]);
     
     setPreviewModal({
       isOpen: true,
@@ -536,7 +536,7 @@ export function FinancialReports() {
 
   const exportPaymentPdf = () => {
     const head = [["Payment ID", "Client", "Site", "Date", "Amount (₦)", "WHT (₦)", "VAT (₦)"]];
-    const body = payments.map(p => [p.id, p.client, p.site, formatDisplayDate(p.date), (p.amount || 0).toLocaleString(), (p.withholdingTax || 0).toLocaleString(), (p.vat || 0).toLocaleString()]);
+    const body = payments.map(p => [p.id, p.client, p.site, formatDisplayDate(p.date), (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), (p.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), (p.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })]);
     
     setPreviewModal({
       isOpen: true,
@@ -590,8 +590,8 @@ export function FinancialReports() {
     const head = [["Client", summaryTab === 'site' ? "Site" : "", "Inv. Qty", "Total Invoiced (₦)", "Total Payments (₦)", "WHT (₦)", "Balance Due (₦)", "Status"].filter(Boolean)];
     const body = summaryData.map(r => [
       r.client, ...(summaryTab === 'site' ? [r.site] : []),
-      r.noOfInvoices, (r.totalInvoices || 0).toLocaleString(), (r.totalPayment || 0).toLocaleString(),
-      (r.withholdingTax || 0).toLocaleString(), (r.balance || 0).toLocaleString(), r.status
+      r.noOfInvoices, (r.totalInvoices || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), (r.totalPayment || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      (r.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), (r.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), r.status
     ]);
     
     setPreviewModal({
@@ -789,29 +789,29 @@ export function FinancialReports() {
     const body: string[][] = [];
     if (selectedFields.includes('Invoice Summary') || selectedFields.includes('Revenue & Billing')) {
       body.push(['Total Invoices', invoices.length.toString()]);
-      body.push(['Total Billed', `₦${globalStats.totalBilled.toLocaleString()}`]);
+      body.push(['Total Billed', `₦${globalStats.totalBilled.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
     }
     if (selectedFields.includes('Payment Summary') || selectedFields.includes('Collections & Payments')) {
-      body.push(['Total Payments (Cash)', `₦${globalStats.totalCollectedCash.toLocaleString()}`]);
-      body.push(['Total WHT', `₦${globalStats.totalWHT.toLocaleString()}`]);
-      body.push(['Total Discounts', `₦${globalStats.totalDiscount.toLocaleString()}`]);
+      body.push(['Total Payments (Cash)', `₦${globalStats.totalCollectedCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
+      body.push(['Total WHT', `₦${globalStats.totalWHT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
+      body.push(['Total Discounts', `₦${globalStats.totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
     }
     if (selectedFields.includes('Outstanding Balances') || selectedFields.includes('Client Balances')) {
-      body.push(['Outstanding Receivables', `₦${globalStats.totalOutstanding.toLocaleString()}`]);
+      body.push(['Outstanding Receivables', `₦${globalStats.totalOutstanding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
     }
     if (selectedFields.includes('Collection Efficiency')) {
       body.push(['Collection Efficiency Rate', `${collectionRate}%`]);
     }
     if (selectedFields.includes('VAT Remittance') || selectedFields.includes('VAT Collected vs Remitted')) {
-      body.push(['VAT Collected', `₦${globalStats.totalVATCollected.toLocaleString()}`]);
-      body.push(['VAT Remitted', `₦${globalStats.totalVATRemitted.toLocaleString()}`]);
-      body.push(['VAT Deficit', `₦${globalStats.vatDeficit.toLocaleString()}`]);
+      body.push(['VAT Collected', `₦${globalStats.totalVATCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
+      body.push(['VAT Remitted', `₦${globalStats.totalVATRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
+      body.push(['VAT Deficit', `₦${globalStats.vatDeficit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
     }
     if (selectedFields.includes('Site Revenue')) {
-      siteFinancialData.forEach(s => body.push([`Site: ${s.name}`, `₦${(s.paid + s.pending).toLocaleString()} total (₦${s.paid.toLocaleString()} paid)`]));
+      siteFinancialData.forEach(s => body.push([`Site: ${s.name}`, `₦${(s.paid + s.pending).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total (₦${s.paid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} paid)`]));
     }
     if (selectedFields.includes('Top Debtors')) {
-      clientDebtData.slice(0, 5).forEach(d => body.push([`Debtor: ${d.name}`, `₦${d.Outstanding.toLocaleString()} outstanding`]));
+      clientDebtData.slice(0, 5).forEach(d => body.push([`Debtor: ${d.name}`, `₦${d.Outstanding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} outstanding`]));
     }
     if (body.length === 0) {
       body.push(['Selected fields', 'No numeric summary available — use Excel export for full detail.']);
@@ -1030,7 +1030,7 @@ export function FinancialReports() {
                   ))}
                 </div>
                 <div className="ml-auto text-sm text-slate-500">
-                  <span className="font-bold text-slate-900">₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> total
+                  <span className="font-bold text-slate-900">₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> total
                 </div>
               </div>
 
@@ -1066,12 +1066,12 @@ export function FinancialReports() {
                                   <td key={mi} className={`py-2 px-2 text-right tabular-nums text-xs ${
                                     val > 0 ? 'text-slate-800 font-medium' : 'text-slate-300'
                                   }`}>
-                                    {val > 0 ? val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—'}
+                                    {val > 0 ? val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                                   </td>
                                 );
                               })}
                               <td className="py-2 px-4 text-right font-bold text-indigo-700 whitespace-nowrap tabular-nums">
-                                ₦{rowTotal.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                                ₦{rowTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             </tr>
                           );
@@ -1086,12 +1086,12 @@ export function FinancialReports() {
                                 .reduce((sum, e) => sum + (e.amount || 0), 0);
                               return (
                                 <td key={mi} className="py-2.5 px-2 text-right text-indigo-800 tabular-nums text-xs">
-                                  {colTotal > 0 ? colTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—'}
+                                  {colTotal > 0 ? colTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                                 </td>
                               );
                             })}
                             <td className="py-2.5 px-4 text-right text-indigo-900 whitespace-nowrap tabular-nums">
-                              ₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                              ₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                           </tr>
                         )}
@@ -1122,7 +1122,7 @@ export function FinancialReports() {
                                 <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
                               </div>
                               <div className="text-right text-xs font-semibold text-slate-700 w-28 shrink-0 tabular-nums">
-                                ₦{item.total.toLocaleString(undefined, { minimumFractionDigits: 0 })} <span className="text-slate-400">({pct.toFixed(1)}%)</span>
+                                ₦{item.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-slate-400">({pct.toFixed(1)}%)</span>
                               </div>
                             </div>
                           );
@@ -1447,7 +1447,7 @@ export function FinancialReports() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
-                <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString()}`} />
+                <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
                 <Legend verticalAlign="bottom" height={36} />
                 <Bar dataKey="paid" stackId="a" fill="#10b981" name="Paid Invoice">
                   <LabelList dataKey="paid" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
@@ -1609,7 +1609,7 @@ export function FinancialReports() {
                 <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false}
                   tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
                 <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString()}`} />
+                  formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
                 <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
                   <LabelList dataKey="Payroll" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
@@ -1932,8 +1932,8 @@ export function FinancialReports() {
               const exportLoansPdf = () => {
                 const head = [['Type', 'Employee', 'Loan Type', 'Principal', 'Monthly Ded.', 'Balance', 'Status']];
                 const body = [
-                  ...loans.map(l => ['Loan', l.employeeName, l.loanType, l.principalAmount.toLocaleString(), l.monthlyDeduction.toLocaleString(), l.remainingBalance.toLocaleString(), l.status]),
-                  ...salaryAdvances.map(a => ['Advance', a.employeeName, '-', a.amount.toLocaleString(), '-', '-', a.status]),
+                  ...loans.map(l => ['Loan', l.employeeName, l.loanType, l.principalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), l.monthlyDeduction.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), l.remainingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), l.status]),
+                  ...salaryAdvances.map(a => ['Advance', a.employeeName, '-', a.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), '-', '-', a.status]),
                 ];
                 
                 setPreviewModal({

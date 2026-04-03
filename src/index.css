@@ -309,6 +309,8 @@
   --color-ring:          37  99  235;       /* blue-600 */
   --color-primary:       37  99  235;       /* blue-600 */
   --color-primary-foreground: 255 255 255;
+  --color-popover:       255 255 255;
+  --color-popover-foreground: 15 23 42;
 
   /* We map indigo to blue as the base color for the entire app */
   --color-indigo-50:  #eff6ff;
@@ -335,8 +337,10 @@
 .bg-background  { background-color: rgb(var(--color-background))  !important; }
 .bg-card        { background-color: rgb(var(--color-card))        !important; }
 .bg-muted       { background-color: rgb(var(--color-muted))       !important; }
+.bg-popover     { background-color: rgb(var(--color-popover))     !important; }
 .text-foreground      { color: rgb(var(--color-foreground))           !important; }
 .text-muted-foreground { color: rgb(var(--color-muted-foreground))   !important; }
+.text-popover-foreground { color: rgb(var(--color-popover-foreground)) !important; }
 .border-border  { border-color: rgb(var(--color-border))          !important; }
 .ring-ring      { --tw-ring-color: rgb(var(--color-ring));                      }
 /* bg-primary / text-primary keep TW defaults — they already resolve fine via indigo palette */
@@ -354,14 +358,18 @@
   --color-ring:            99 102 241;
   --color-accent:          30  41  59;
   --color-accent-foreground: 226 232 240;
+  --color-popover:            30 41  59;
+  --color-popover-foreground: 226 232 240;
 }
 
 /* Force card-coloured surfaces opaque in dark mode */
 .dark .bg-card     { background-color: rgb(30 41 59)  !important; }  /* slate-800 */
 .dark .bg-background { background-color: rgb(15 23 42) !important; }  /* slate-950 */
 .dark .bg-muted    { background-color: rgb(30 41 59)  !important; }
+.dark .bg-popover  { background-color: rgb(30 41 59)  !important; }
 .dark .text-foreground  { color: rgb(226 232 240) !important; }
 .dark .text-muted-foreground { color: rgb(100 116 139) !important; }
+.dark .text-popover-foreground { color: rgb(226 232 240) !important; }
 .dark .border-border    { border-color: rgb(51 65 85)  !important; }
 
 /* ══════════════════════════════════════════════════════════════════════
