@@ -34,11 +34,13 @@ export function formatDueDate(d?: string) {
   } catch { return ""; }
 }
 
-export type SortOption = 'date_asc' | 'date_desc' | 'urgency' | 'alpha';
+export type SortOption = 'date_asc' | 'date_desc' | 'urgency' | 'alpha' | 'created_asc' | 'created_desc';
 export const SORT_OPTIONS: { label: string; value: SortOption }[] = [
   { label: 'Most Urgent', value: 'urgency' },
   { label: 'Due Date (Earliest)', value: 'date_asc' },
   { label: 'Due Date (Latest)', value: 'date_desc' },
+  { label: 'Date Created (Oldest)', value: 'created_asc' },
+  { label: 'Date Created (Newest)', value: 'created_desc' },
   { label: 'Alphabetical', value: 'alpha' },
 ];
 
@@ -213,13 +215,15 @@ export function urgencyScore(sub: { deadline?: string; status: string }) {
   return hoursUntil < 0 ? -1000 + hoursUntil : hoursUntil;
 }
 
-export function applySortToSubs<T extends { title: string; deadline?: string; status: string }>(list: T[], sort: SortOption): T[] {
+export function applySortToSubs<T extends { title: string; deadline?: string; status: string; createdAt?: string; created_at?: string }>(list: T[], sort: SortOption): T[] {
   const sorted = [...list];
   switch (sort) {
     case 'urgency': return sorted.sort((a, b) => urgencyScore(a) - urgencyScore(b));
     case 'date_asc': return sorted.sort((a, b) => (a.deadline ?? '9999').localeCompare(b.deadline ?? '9999'));
     case 'date_desc': return sorted.sort((a, b) => (b.deadline ?? '').localeCompare(a.deadline ?? ''));
     case 'alpha': return sorted.sort((a, b) => a.title.localeCompare(b.title));
+    case 'created_asc': return sorted.sort((a, b) => ((a.createdAt || a.created_at) ?? '9999').localeCompare((b.createdAt || b.created_at) ?? '9999'));
+    case 'created_desc': return sorted.sort((a, b) => ((b.createdAt || b.created_at) ?? '').localeCompare((a.createdAt || a.created_at) ?? ''));
   }
 }
 

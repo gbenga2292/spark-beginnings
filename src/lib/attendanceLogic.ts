@@ -5,7 +5,7 @@ import { normalizeDate } from './dateUtils';
 export interface AttendanceMetrics {
   ot: number;
   otSite: string;
-  dayWk: number;
+  dayWk: number
   nightWk: number;
   isPresent: 'Yes' | 'No';
   dow: number;

@@ -3,3 +3,6 @@ release/
 dist/
 andriod/
 .env
+temp_genesis/
+temp-genesis-glow/
+.temp_fresh_start/

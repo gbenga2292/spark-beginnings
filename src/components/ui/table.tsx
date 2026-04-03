@@ -4,37 +4,54 @@ import { cn } from "@/src/lib/utils"
 const TableContainer = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, children, ...props }, ref) => {
   const innerRef = React.useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = React.useState(false);
-  const [startX, setStartX] = React.useState(0);
-  const [startY, setStartY] = React.useState(0);
-  const [scrollLeft, setScrollLeft] = React.useState(0);
-  const [scrollTop, setScrollTop] = React.useState(0);
+  const startX = React.useRef(0);
+  const startY = React.useRef(0);
+  const scrollLeftRef = React.useRef(0);
+  const scrollTopRef = React.useRef(0);
+  const hasMoved = React.useRef(false);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    const container = innerRef.current;
-    if (!container) return;
-    setStartX(e.pageX - container.offsetLeft);
-    setStartY(e.pageY - container.offsetTop);
-    setScrollLeft(container.scrollLeft);
-    setScrollTop(container.scrollTop);
-  };
-  
-  const handleMouseLeave = () => setIsDragging(false);
-  const handleMouseUp = () => setIsDragging(false);
-  
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    e.preventDefault();
+    // Only capture left-clicks, and skip any interactive elements.
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button, a, input, select, textarea, [role="button"], label')) return;
+    
     const container = innerRef.current;
     if (!container) return;
     
-    const x = e.pageX - container.offsetLeft;
-    const walkX = (x - startX) * 1;
-    container.scrollLeft = scrollLeft - walkX;
+    startX.current = e.pageX - container.offsetLeft;
+    startY.current = e.pageY - container.offsetTop;
+    scrollLeftRef.current = container.scrollLeft;
+    scrollTopRef.current = container.scrollTop;
+    hasMoved.current = false;
     
-    const y = e.pageY - container.offsetTop;
-    const walkY = (y - startY) * 1;
-    container.scrollTop = scrollTop - walkY;
+    // We don't set isDragging to true yet to prevent cursor changes from interrupting clicks
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const x = moveEvent.pageX - container.offsetLeft;
+      const y = moveEvent.pageY - container.offsetTop;
+      const walkX = x - startX.current;
+      const walkY = y - startY.current;
+
+      if (!hasMoved.current && (Math.abs(walkX) > 10 || Math.abs(walkY) > 10)) {
+        hasMoved.current = true;
+        setIsDragging(true);
+      }
+
+      if (hasMoved.current) {
+        moveEvent.preventDefault();
+        container.scrollLeft = scrollLeftRef.current - walkX;
+        container.scrollTop = scrollTopRef.current - walkY;
+      }
+    };
+
+    const onMouseUp = () => {
+      setIsDragging(false);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
   };
 
   React.useImperativeHandle(ref, () => innerRef.current as HTMLDivElement);
@@ -44,9 +61,6 @@ const TableContainer = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTM
       ref={innerRef}
       className={cn("relative w-full overflow-auto max-h-[70vh]", isDragging ? "cursor-grabbing select-none" : "cursor-grab", className)}
       onMouseDown={handleMouseDown}
-      onMouseLeave={handleMouseLeave}
-      onMouseUp={handleMouseUp}
-      onMouseMove={handleMouseMove}
       {...props}
     >
       {children}

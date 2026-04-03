@@ -801,7 +801,7 @@ export function Billing() {
   const completedSites = useMemo(() => siteStats.filter(s => s.isCompleted), [siteStats]);
   const unpaidSites = useMemo(() => siteStats.filter(s => s.isUnpaid), [siteStats]);
 
-  const [expandedSiteId, setExpandedSiteId] = useState<string | null>(null);
+  const [expandedSiteKey, setExpandedSiteKey] = useState<string | null>(null);
 
   const formatSum = (val: number) => {
     if (priv?.canViewAmounts === false) return '***';
@@ -1102,15 +1102,21 @@ export function Billing() {
               </TableHeader>
               <TableBody>
                 {(activeTab === 'completed' || activeTab === 'unpaid') ? (
-                  (activeTab === 'completed' ? completedSites : unpaidSites).map((site) => (
-                    <React.Fragment key={site.id}>
+                  (activeTab === 'completed' ? completedSites : unpaidSites).map((site) => {
+                    const siteKey = `${site.client}_${site.id || site.name}_${activeTab}`;
+                    const isExpanded = expandedSiteKey === siteKey;
+                    return (
+                    <React.Fragment key={siteKey}>
                       <TableRow
                         className="hover:bg-slate-50 transition-colors cursor-pointer group"
-                        onClick={() => setExpandedSiteId(expandedSiteId === site.id ? null : site.id)}
+                        onClick={() => {
+                          console.log('Billing: Toggling site expansion', { siteKey, current: expandedSiteKey });
+                          setExpandedSiteKey(prev => prev === siteKey ? null : siteKey);
+                        }}
                       >
                         <TableCell className="px-4 py-3 font-bold text-slate-700">
                           <div className="flex items-center gap-2">
-                            {expandedSiteId === site.id
+                            {isExpanded
                               ? <ChevronDown className="w-4 h-4 text-indigo-500 flex-shrink-0" />
                               : <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0 group-hover:text-indigo-400 transition-colors" />}
                             <span className="font-mono">{site.client}</span>
@@ -1137,14 +1143,14 @@ export function Billing() {
                           {priv?.canViewAmounts === false ? '***' : `₦${site.totalPaymentAmount.toLocaleString()}`}
                         </TableCell>
                       </TableRow>
-                      {expandedSiteId === site.id && site.invoices.length === 0 && (
+                      {isExpanded && site.invoices.length === 0 && (
                         <TableRow className="bg-slate-50/50">
                           <TableCell colSpan={6} className="px-10 py-3 text-xs text-slate-400 italic">
                             No invoices found for this site.
                           </TableCell>
                         </TableRow>
                       )}
-                      {expandedSiteId === site.id && site.invoices.map((inv: any) => (
+                      {isExpanded && site.invoices.map((inv: any) => (
                         <TableRow key={inv.id} className="bg-indigo-50/30 border-l-4 border-l-indigo-400 hover:bg-indigo-50/60 transition-colors">
                           <TableCell className="px-10 py-2.5 font-mono text-xs font-bold text-indigo-700">
                             {inv.invoiceNumber || inv.invoiceNo || '—'}
@@ -1171,7 +1177,8 @@ export function Billing() {
                         </TableRow>
                       ))}
                     </React.Fragment>
-                  ))
+                    );
+                  })
                 ) : (
                   currentList.map((inv: any) => (
                     <TableRow key={inv.id} onDoubleClick={() => { if (activeTab === 'quotations') handleMakeActive(inv) }} className="hover:bg-slate-50 transition-colors cursor-pointer">
