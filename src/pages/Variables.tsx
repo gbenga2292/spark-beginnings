@@ -463,6 +463,30 @@ export function Variables() {
     updateDepartmentTasks(currentTasks);
   };
 
+  const handleDeduplicateAllTasks = async () => {
+    const cleaned = departmentTasksList.map(dept => ({
+      ...dept,
+      onboardingTasks: dept.onboardingTasks.filter((t, i, self) =>
+        i === self.findIndex(x => x.title === t.title && x.assignee === t.assignee)
+      ),
+      offboardingTasks: dept.offboardingTasks.filter((t, i, self) =>
+        i === self.findIndex(x => x.title === t.title && x.assignee === t.assignee)
+      )
+    }));
+    
+    // Check if anything was actually removed
+    const totalOriginal = departmentTasksList.reduce((acc, d) => acc + d.onboardingTasks.length + d.offboardingTasks.length, 0);
+    const totalCleaned = cleaned.reduce((acc, d) => acc + d.onboardingTasks.length + d.offboardingTasks.length, 0);
+    
+    if (totalOriginal === totalCleaned) {
+      toast.info("No duplicates found to clean.");
+      return;
+    }
+
+    await setDepartmentTasksList(cleaned);
+    toast.success(`Cleanup complete: Removed ${totalOriginal - totalCleaned} duplicate tasks.`);
+  };
+
   const currentTaskView = departmentTasksList.find(d => d.department === taskDeptFilter) ||
     { department: taskDeptFilter, onboardingTasks: [], offboardingTasks: [] };
 
@@ -867,8 +891,10 @@ export function Variables() {
                 newTaskLists.push(list);
               }
               const task = { title: String(row.Title || ''), assignee: String(row.Assignee || '') };
-              if (String(row.Type).toLowerCase() === 'onboarding') list.onboardingTasks.push(task);
-              else list.offboardingTasks.push(task);
+              const isOnboarding = String(row.Type).toLowerCase() === 'onboarding';
+              const targetList = isOnboarding ? list.onboardingTasks : list.offboardingTasks;
+              const exists = targetList.some(t => t.title === task.title && t.assignee === task.assignee);
+              if (!exists) targetList.push(task);
             });
           }
 
@@ -881,7 +907,8 @@ export function Variables() {
                 list = { department: sName, onboardingTasks: [], offboardingTasks: [] };
                 newTaskLists.push(list);
               }
-              list.onboardingTasks.push({ title: String(row.TaskTitle), assignee: String(row.Assignee) });
+              const exists = list.onboardingTasks.some(t => t.title === String(row.TaskTitle) && t.assignee === String(row.Assignee));
+              if (!exists) list.onboardingTasks.push({ title: String(row.TaskTitle), assignee: String(row.Assignee) });
             });
           }
           
@@ -912,23 +939,24 @@ export function Variables() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {priv.canImport && (
-            <div className="relative">
+            <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
+              <Download className="h-3.5 w-3.5 text-indigo-500" />
+              Import
               <input
                 type="file"
                 accept=".xlsx, .xls, .csv"
                 onChange={handleImportVariables}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                title="Import Variables"
+                className="hidden"
               />
-              <Button variant="outline" className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 gap-2">
-                <Upload className="h-4 w-4 text-slate-400" />
-                Import
-              </Button>
-            </div>
+            </label>
           )}
           {priv.canExport && (
-            <Button variant="outline" onClick={handleExportVariables} className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 gap-2">
-              <Download className="h-4 w-4 text-slate-400" />
+            <Button 
+              variant="outline" 
+              onClick={handleExportVariables} 
+              className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
+            >
+              <Upload className="h-3.5 w-3.5 text-emerald-500" />
               Export
             </Button>
           )}
@@ -1716,12 +1744,24 @@ export function Variables() {
 
           {/* Task Templates */}
           <Card className="shadow-sm border-slate-200 border-t-4 border-t-indigo-500">
-            <CardHeader className="bg-indigo-50/30 rounded-t-lg border-b border-indigo-100">
-              <CardTitle className="text-indigo-900">Onboarding Task Templates</CardTitle>
-              <CardDescription>
-                <strong>System Default Tasks</strong> (Steps 1–8) are built-in for all departments and cannot be removed.
-                Add <strong>custom extra tasks</strong> below and choose where they slot in.
-              </CardDescription>
+            <CardHeader className="bg-indigo-50/30 rounded-t-lg border-b border-indigo-100 flex-row items-center justify-between">
+              <div className="flex-1">
+                <CardTitle className="text-indigo-900">Onboarding Task Templates</CardTitle>
+                <CardDescription>
+                  <strong>System Default Tasks</strong> (Steps 1–8) are built-in for all departments and cannot be removed.
+                  Add <strong>custom extra tasks</strong> below and choose where they slot in.
+                </CardDescription>
+              </div>
+              {priv.canEdit && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="bg-indigo-600 text-white hover:bg-indigo-700 border-none h-8 gap-2 ml-4 px-4"
+                  onClick={handleDeduplicateAllTasks}
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Clean Duplicate Tasks
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="pt-4 space-y-4">
               {/* Department filter */}
