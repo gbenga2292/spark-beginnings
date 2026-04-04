@@ -32,7 +32,7 @@ export function NewHire() {
     startDate: '',
     tentativeStartDate: '',
     probationPeriod: undefined,
-    noOfGuarantors: 1,
+    noOfGuarantors: 2,
     monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 }
   });
 
@@ -328,7 +328,7 @@ export function NewHire() {
                 max={5}
                 className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-colors"
                 placeholder="e.g. 2"
-                value={newHireData.noOfGuarantors ?? 1}
+                value={newHireData.noOfGuarantors ?? 2}
                 onChange={(e) => setNewHireData({ ...newHireData, noOfGuarantors: Math.max(1, Number(e.target.value)) })}
               />
               <p className="text-[11px] text-slate-400 mt-1">Number of guarantor forms the employee must submit.</p>

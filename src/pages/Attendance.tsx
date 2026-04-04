@@ -1000,22 +1000,34 @@ export function Attendance() {
                      <DayPicker
                         defaultMonth={parseISO(registerDate)}
                         onDayClick={(date) => { setRegisterDate(format(date, 'yyyy-MM-dd')) }}
+                        disabled={{ after: new Date() }}
                         modifiers={{
                           fully: (date) => attendanceStatusMap[format(date, 'yyyy-MM-dd')] === 'fully',
                           special: (date) => attendanceStatusMap[format(date, 'yyyy-MM-dd')] === 'special',
                           viewing: (date) => format(date, 'yyyy-MM-dd') === registerDate,
+                          missing: (date) => {
+                            const dStr = format(date, 'yyyy-MM-dd');
+                            const status = attendanceStatusMap[dStr];
+                            const d = new Date(date); d.setHours(0,0,0,0);
+                            const now = new Date(); now.setHours(0,0,0,0);
+                            const isHolidayDay = isHoliday(dStr);
+                            const isSun = isSunday(d);
+                            return d <= now && (!status || status === 'none') && !isHolidayDay && !isSun;
+                          }
                         }}
                         modifiersStyles={{
-                          today: { color: 'inherit', fontWeight: 'normal' },
+                          today: { color: 'inherit', fontWeight: 'bold' },
                           viewing: { backgroundColor: '#f8fafc', border: '2px solid #cbd5e1', borderRadius: '4px' },
                           fully: { backgroundColor: '#d1fae5', color: '#065f46', fontWeight: 'bold', borderRadius: '4px' },
                           special: { backgroundColor: '#e0e7ff', color: '#3730a3', fontWeight: 'bold', borderRadius: '4px' },
+                          missing: { border: '2px solid #ef4444', borderRadius: '50%' },
                         }}
                         className="bg-white"
                      />
                      <div className="mt-3 text-[10px] flex flex-col gap-1.5">
                        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#d1fae5]"></div> Attendance Entered</div>
                        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#e0e7ff]"></div> Attendance Entered (Holiday/Sun)</div>
+                       <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full border-2 border-red-500"></div> Missing/Due Attendance</div>
                        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#f8fafc] border-2 border-[#cbd5e1]"></div> Date Currently Viewing</div>
                        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-transparent border border-slate-200"></div> No Entry</div>
                      </div>

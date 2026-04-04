@@ -245,7 +245,7 @@ export function Onboarding() {
   const saveEdit = () => {
     if (!editEmp) return;
     const currentEmp = employees.find(e => e.id === editEmp.id);
-    const newCount = editEmp.noOfGuarantors ?? 1;
+    const newCount = editEmp.noOfGuarantors ?? 2;
     // Sync guarantors array to the new count, preserving existing entries
     let updatedChecklist = currentEmp?.onboardingChecklist;
     if (updatedChecklist) {
@@ -316,11 +316,18 @@ export function Onboarding() {
 
   // ── Active checklist ──────────────────────────────────────
   const cl: OnboardingChecklist = useMemo(() => {
-    const defaultCl = makeDefaultChecklist(selectedEmployee?.noOfGuarantors ?? 1);
+    const count = Math.max(2, selectedEmployee?.noOfGuarantors ?? 2);
+    const defaultCl = makeDefaultChecklist(count);
     if (!selectedEmployee) return defaultCl;
-    const storedCl = selectedEmployee.onboardingChecklist || {};
-    // Merge stored checklist with defaults to handle versioning (new fields)
-    return { ...defaultCl, ...storedCl };
+    const storedCl = (selectedEmployee.onboardingChecklist || {}) as Partial<OnboardingChecklist>;
+    
+    // Ensure guarantors array reflects the required count (pad with defaults if too small)
+    const storedGuarantors = storedCl.guarantors || [];
+    const syncedGuarantors = Array.from({ length: Math.max(count, storedGuarantors.length) }, (_, i) => 
+      storedGuarantors[i] || { name: '', phone: '', verified: false }
+    );
+
+    return { ...defaultCl, ...storedCl, guarantors: syncedGuarantors };
   }, [selectedEmployee]);
 
   const updateCL = (patch: Partial<OnboardingChecklist>) => {
@@ -448,7 +455,7 @@ export function Onboarding() {
     if (!ok) return;
 
     pendingEmployees.forEach(emp => {
-      const defaultCL = makeDefaultChecklist(emp.noOfGuarantors ?? 1);
+      const defaultCL = makeDefaultChecklist(emp.noOfGuarantors ?? 2);
       // Fill in critical fields as true/done and pull existing details
       const fullCL: OnboardingChecklist = {
         ...defaultCL,
@@ -499,7 +506,7 @@ export function Onboarding() {
     );
     if (!ok) return;
 
-    const defaultCL = makeDefaultChecklist(selectedEmployee.noOfGuarantors ?? 1);
+    const defaultCL = makeDefaultChecklist(selectedEmployee.noOfGuarantors ?? 2);
     const fullCL: OnboardingChecklist = {
       ...defaultCL,
       ...selectedEmployee.onboardingChecklist, // preserve what's there
@@ -545,7 +552,7 @@ export function Onboarding() {
     if (!ok) return;
 
     activeEmployees.forEach(emp => {
-      const defaultCL = makeDefaultChecklist(emp.noOfGuarantors ?? 1);
+      const defaultCL = makeDefaultChecklist(emp.noOfGuarantors ?? 2);
       const fullCL: OnboardingChecklist = {
         ...defaultCL,
         ...emp.onboardingChecklist,
@@ -776,7 +783,7 @@ export function Onboarding() {
             {leftTab === 'Pending' && (filteredPending.length === 0
               ? <div className="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center"><UserPlus className="h-10 w-10 text-slate-200 mb-2" /><p className="text-sm">No pending hires.</p></div>
               : <div className="divide-y divide-slate-100">{filteredPending.map(emp => {
-                const empCl = emp.onboardingChecklist ?? makeDefaultChecklist(emp.noOfGuarantors ?? 1);
+                const empCl = emp.onboardingChecklist ?? makeDefaultChecklist(emp.noOfGuarantors ?? 2);
                 const ready = allCriticalDone(empCl);
                 const suspended = !!emp.onboardingSuspended;
                 const hasPendingTasks = !ready; // still has incomplete required tasks
