@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { db } from '@/src/lib/supabaseService';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
+import { Vehicle, VehicleTripLeg } from '@/src/types/operations';
 
 export interface CommLog {
   id: string;
@@ -500,6 +501,8 @@ interface AppState {
   companyExpenses: CompanyExpense[];
   pendingLedgerEntries: CompanyExpense[];
   staffMeritRecords: StaffMeritRecord[];
+  vehicles: Vehicle[];
+  vehicleTrips: VehicleTripLeg[];
   addSite: (site: Site) => void;
   setSites: (sites: Site[]) => void;
   updateSite: (id: string, site: Partial<Site>) => void;
@@ -600,6 +603,10 @@ interface AppState {
   updateStaffMeritRecord: (id: string, record: Partial<StaffMeritRecord>) => void;
   deleteStaffMeritRecord: (id: string) => void;
   setStaffMeritRecords: (records: StaffMeritRecord[]) => void;
+  addVehicle: (vehicle: Vehicle) => void;
+  updateVehicle: (id: string, vehicle: Partial<Vehicle>) => void;
+  deleteVehicle: (id: string) => void;
+  addVehicleTripRecords: (logs: any[]) => void;
 
   payrollVariables: {
     basic: number;
@@ -700,6 +707,8 @@ export const useAppStore = create<AppState>()(
       companyExpenses: [],
       pendingLedgerEntries: [],
       staffMeritRecords: [],
+      vehicles: [],
+      vehicleTrips: [],
 
       payrollVariables: {
         basic: 40, housing: 30, transport: 20, otherAllowances: 10,
@@ -1047,6 +1056,12 @@ export const useAppStore = create<AppState>()(
       setLedgerBanks: async (ledgerBanks) => { set({ ledgerBanks }); await db.setLedgerBanks(ledgerBanks); },
       setLedgerBeneficiaryBanks: async (ledgerBeneficiaryBanks) => { set({ ledgerBeneficiaryBanks }); await db.setLedgerBeneficiaryBanks(ledgerBeneficiaryBanks); },
       setDepartmentTasksList: async (departmentTasksList) => { set({ departmentTasksList }); await db.setDepartmentTasksList(departmentTasksList); },
+
+      // Vehicles
+      addVehicle: (vehicle) => { set((s) => ({ vehicles: [...s.vehicles, vehicle] })); db.insertVehicle(vehicle); },
+      updateVehicle: (id, vehicle) => { set((s) => ({ vehicles: s.vehicles.map(v => v.id === id ? { ...v, ...vehicle } : v) })); db.updateVehicle(id, vehicle); },
+      deleteVehicle: (id) => { set((s) => ({ vehicles: s.vehicles.filter(v => v.id !== id) })); db.deleteVehicle(id); },
+      addVehicleTripRecords: (logs) => { set((s) => ({ vehicleTrips: [...logs, ...s.vehicleTrips] })); db.insertVehicleTripRecords(logs); },
     }),
     {
       name: 'dcel-hr-storage',

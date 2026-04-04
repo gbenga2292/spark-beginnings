@@ -120,6 +120,7 @@ const navigation: NavCategory[] = [
       { name: 'Waybills', href: '/operations/waybills', icon: FileText, privKey: 'operations', privField: 'canManageWaybills' },
       { name: 'Quick Checkout', href: '/operations/checkout', icon: ShoppingCart, privKey: 'operations', privField: 'canManageLogistics' },
       { name: 'Maintenance', href: '/operations/maintenance', icon: Activity, privKey: 'operations', privField: 'canManageAssets' },
+      { name: 'Vehicles', href: '/operations/vehicles', icon: Truck, privKey: 'operations', privField: 'canManageLogistics' },
       { name: 'Sites', href: '/operations/sites', icon: MapPin, privKey: 'operations', privField: 'canView' },
     ],
   },

@@ -137,3 +137,36 @@ export interface MaintenanceSession {
     remark?: string;
   }[];
 }
+export interface Vehicle {
+  id: string;
+  name: string;
+  type?: string;
+  registration_number: string;
+  status: 'active' | 'inactive';
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface VehicleTripLeg {
+  id?: string;
+  vehicle_id: string;
+  vehicle_reg: string;
+  driver_name: string;
+  site_id?: string;
+  site_name: string;
+  purpose: string;
+  departure_time: string;
+  arrival_time?: string;
+  remark?: string;
+  odometer_start?: number;
+  odometer_end?: number;
+}
+
+export interface VehicleDailyLog {
+  date: string;
+  vehicle_id: string;
+  vehicle_reg: string;
+  driver_name: string;
+  driver_employee_id?: string;
+  legs: VehicleTripLeg[];
+}

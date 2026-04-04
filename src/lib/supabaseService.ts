@@ -12,6 +12,7 @@ import type {
 } from '@/src/store/appStore';
 import type { AppUser, PrivilegePreset } from '@/src/store/userStore';
 import type { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
+import type { Vehicle, VehicleTripLeg } from '@/src/types/operations';
 
 // ─── Mappers: DB → App ──────────────────────────────────────
 
@@ -286,11 +287,41 @@ export function dbToProfile(r: any): AppUser {
   };
 }
 
+export function dbToVehicle(r: any): Vehicle {
+  return {
+    id: r.id,
+    name: r.name,
+    type: r.type || undefined,
+    registration_number: r.registration_number,
+    status: r.status as 'active' | 'inactive',
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  };
+}
+
+export function dbToVehicleMovement(r: any): VehicleTripLeg {
+  return {
+    id: r.id,
+    vehicle_id: r.vehicle_id,
+    vehicle_reg: r.vehicle_reg,
+    driver_name: r.driver_name,
+    site_id: r.site_id || undefined,
+    site_name: r.site_name,
+    purpose: r.purpose,
+    departure_time: r.departure_time,
+    arrival_time: r.arrival_time || undefined,
+    remark: r.remark || undefined,
+    odometer_start: r.odometer_start || undefined,
+    odometer_end: r.odometer_end || undefined,
+  };
+}
+
 // ─── Mappers: App → DB ──────────────────────────────────────
 
 function siteToDb(s: Site) {
   return { id: s.id, name: s.name, client: s.client, vat: s.vat, status: s.status, start_date: s.startDate, end_date: s.endDate };
 }
+
 
 function employeeToDb(e: Employee) {
   return {
@@ -538,6 +569,37 @@ function ledgerBeneficiaryBankToDb(b: LedgerBeneficiaryBank) {
   return { id: b.id, name: b.name, account_no: b.accountNo };
 }
 
+function vehicleToDb(v: Vehicle) {
+  return {
+    id: v.id,
+    name: v.name,
+    type: v.type || null,
+    registration_number: v.registration_number,
+    status: v.status,
+  };
+}
+
+function vehicleMovementToDb(v: VehicleTripLeg & { vehicle_id: string; vehicle_reg: string; driver_name: string; driver_employee_id?: string; created_by_id?: string; created_by_name?: string }) {
+  return {
+    id: v.id,
+    workspace_id: 'dcel-team',
+    vehicle_id: v.vehicle_id,
+    vehicle_reg: v.vehicle_reg,
+    driver_name: v.driver_name,
+    driver_employee_id: v.driver_employee_id || null,
+    site_id: v.site_id || null,
+    site_name: v.site_name,
+    purpose: v.purpose,
+    departure_time: v.departure_time,
+    arrival_time: v.arrival_time || null,
+    odometer_start: v.odometer_start || null,
+    odometer_end: v.odometer_end || null,
+    notes: v.remark || null,
+    created_by_id: v.created_by_id || null,
+    created_by_name: v.created_by_name || null,
+  };
+}
+
 // ─── FETCH ALL ───────────────────────────────────────────────
 
 export async function fetchAllAppData(privs?: any) {
@@ -557,6 +619,8 @@ export async function fetchAllAppData(privs?: any) {
     commLogsRes,
     pendingSitesRes,
     staffMeritRes,
+    vehiclesRes,
+    vehicleTripsRes,
   ] = await Promise.all([
     canView('sites') ? supabase.from('sites').select('*').order('created_at') : Promise.resolve({ data: [] }),
     canView('sites') ? supabase.from('clients').select('*').order('name') : Promise.resolve({ data: [] }),
@@ -586,6 +650,8 @@ export async function fetchAllAppData(privs?: any) {
     supabase.from('comm_logs').select('*').order('date', { ascending: false }),
     canView('sites') ? supabase.from('pending_sites').select('*').order('created_at') : Promise.resolve({ data: [] }),
     supabase.from('staff_merit_record').select('*').order('incident_date', { ascending: false }),
+    supabase.from('vehicles').select('*').order('name'),
+    supabase.from('vehicle_movement_log').select('*').order('departure_time', { ascending: false }).limit(500),
   ]);
 
   const settings = settingsRes.data;
@@ -620,6 +686,8 @@ export async function fetchAllAppData(privs?: any) {
     ledgerEntries: (lEntRes.data || []).map(dbToLedgerEntry),
     companyExpenses: (compExpRes.data || []).map(dbToCompanyExpense),
     staffMeritRecords: (staffMeritRes.data || []).map(dbToStaffMerit),
+    vehicles: (arguments[3] as any)?.data?.map(dbToVehicle) || [], // vehiclesRes
+    vehicleTrips: (arguments[4] as any)?.data?.map(dbToVehicleMovement) || [], // logRes
     positions: (positionsRes.data || []).map((p: any) => ({
       id: p.id,
       title: p.title || p.name,
@@ -1510,5 +1578,29 @@ export const db = {
     if (a.night !== undefined) update.night = a.night;
     const { error } = await supabase.from('attendance_records').update(update).eq('id', id);
     if (error) console.error('updateAttendanceRecord:', error);
+  },
+  // Vehicles
+  async insertVehicle(v: Vehicle) {
+    const { error } = await supabase.from('vehicles').insert(vehicleToDb(v));
+    if (error) console.error('insertVehicle:', error);
+  },
+  async updateVehicle(id: string, v: Partial<Vehicle>) {
+    const update: any = {};
+    if (v.name !== undefined) update.name = v.name;
+    if (v.type !== undefined) update.type = v.type;
+    if (v.registration_number !== undefined) update.registration_number = v.registration_number;
+    if (v.status !== undefined) update.status = v.status;
+    const { error } = await supabase.from('vehicles').update(update).eq('id', id);
+    if (error) console.error('updateVehicle:', error);
+  },
+  async deleteVehicle(id: string) {
+    const { error } = await supabase.from('vehicles').delete().eq('id', id);
+    if (error) console.error('deleteVehicle:', error);
+  },
+
+  // Vehicle Trip Logs
+  async insertVehicleTripRecords(logs: any[]) {
+    const { error } = await supabase.from('vehicle_movement_log').insert(logs.map(vehicleMovementToDb));
+    if (error) console.error('insertVehicleTripRecords:', error);
   }
 };

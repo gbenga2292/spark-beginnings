@@ -1,8 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { 
+import {
   Asset, Waybill, AssetCategory, AssetType, AssetStatus, WaybillStatus, WaybillType, 
-  Checkout, MaintenanceAsset, MaintenanceSession, MaintenanceLogType, ServiceStatus 
+  Checkout, MaintenanceAsset, MaintenanceSession, MaintenanceLogType, ServiceStatus,
+  Vehicle, VehicleTripLeg
 } from '../types/operations';
+import { db } from '@/src/lib/supabaseService';
+import { useAppStore } from '../store/appStore';
+import { useSetPageTitle } from './PageContext';
 
 interface OperationsContextType {
   assets: Asset[];
@@ -36,6 +40,14 @@ interface OperationsContextType {
   getAssetAnalytics: () => any;
   getSiteAnalytics: (siteId: string) => any;
   getMaintenanceStats: () => any;
+
+  // Vehicle methods
+  vehicles: Vehicle[];
+  vehicleTrips: VehicleTripLeg[];
+  addVehicle: (vehicle: Omit<Vehicle, 'id' | 'created_at' | 'updated_at'>) => void;
+  updateVehicle: (id: string, updates: Partial<Vehicle>) => void;
+  deleteVehicle: (id: string) => void;
+  addVehicleTripRecords: (logs: any[]) => void;
 }
 
 const OperationsContext = createContext<OperationsContextType | undefined>(undefined);
@@ -124,6 +136,15 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const [checkouts, setCheckouts] = useState<Checkout[]>(initialCheckouts);
   const [maintenanceAssets, setMaintenanceAssets] = useState<MaintenanceAsset[]>(initialMaintenanceAssets);
   const [maintenanceSessions, setMaintenanceSessions] = useState<MaintenanceSession[]>([]);
+
+  const { 
+    vehicles, 
+    vehicleTrips, 
+    addVehicle: storeAddVehicle, 
+    updateVehicle: storeUpdateVehicle, 
+    deleteVehicle: storeDeleteVehicle, 
+    addVehicleTripRecords: storeAddVehicleTripRecords 
+  } = useAppStore();
 
   const addAsset = (asset: Omit<Asset, 'id' | 'availableQuantity'>) => {
     const newAsset: Asset = {
@@ -312,6 +333,24 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       getAssetAnalytics,
       getSiteAnalytics,
       getMaintenanceStats,
+      vehicles,
+      vehicleTrips,
+      addVehicle: (v) => {
+        const newVehicle: Vehicle = {
+          ...v,
+          id: crypto.randomUUID(),
+          status: 'active' as const,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        storeAddVehicle(newVehicle);
+      },
+      updateVehicle: storeUpdateVehicle,
+      deleteVehicle: storeDeleteVehicle,
+      addVehicleTripRecords: (logs) => {
+        const logsWithIds = logs.map(l => ({ ...l, id: crypto.randomUUID() }));
+        storeAddVehicleTripRecords(logsWithIds);
+      },
     }}>
       {children}
     </OperationsContext.Provider>

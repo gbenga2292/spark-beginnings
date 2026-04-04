@@ -58,6 +58,7 @@ const WaybillManager = lazy(() => import('./pages/WaybillManager').then(m => ({ 
 const SiteManager = lazy(() => import('./pages/SiteManager').then(m => ({ default: m.SiteManager })));
 const QuickCheckout = lazy(() => import('./pages/QuickCheckout').then(m => ({ default: m.QuickCheckout })));
 const MaintenanceManager = lazy(() => import('./pages/MaintenanceManager').then(m => ({ default: m.MaintenanceManager })));
+const VehicleManager = lazy(() => import('./pages/VehicleManager').then(m => ({ default: m.VehicleManager })));
 const EmployeeAnalytics = lazy(() => import('./pages/EmployeeAnalytics').then(m => ({ default: m.EmployeeAnalytics })));
 const NotificationsPage = lazy(() => import('./pages/Notifications'));
 import { OperationsProvider } from './contexts/OperationsContext';
@@ -172,6 +173,7 @@ function AppContent() {
                   <Route path="waybills" element={<WaybillManager />} />
                   <Route path="checkout" element={<QuickCheckout />} />
                   <Route path="maintenance" element={<MaintenanceManager />} />
+                  <Route path="vehicles" element={<VehicleManager />} />
                   <Route path="sites" element={<SiteManager />} />
                   <Route path="*" element={<Navigate to="/operations" replace />} />
                 </Routes>

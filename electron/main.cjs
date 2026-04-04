@@ -60,7 +60,7 @@ function initAutoUpdater() {
 
 // ── Customize the OS App Identity for Notifications
 // Must be set BEFORE app is ready so Windows uses it for notification grouping
-app.setAppUserModelId('com.dcel.officesuite');
+app.setAppUserModelId('com.dcel.hr');
 app.name = 'DCEL Office Suite';
 
 /* ─── Current user privileges (updated via IPC from renderer) ─── */
