@@ -112,7 +112,16 @@ export function Login() {
       setIsLoading(false);
       navigate('/');
     } catch (err: any) {
-      setError(err.message || 'An error occurred.');
+      const isOffline =
+        !navigator.onLine ||
+        err?.message === 'Failed to fetch' ||
+        err?.message?.toLowerCase().includes('network') ||
+        err?.message?.toLowerCase().includes('fetch');
+      setError(
+        isOffline
+          ? 'No internet connection. Please check your network and try again.'
+          : err.message || 'An error occurred.'
+      );
       setIsLoading(false);
     }
   };
