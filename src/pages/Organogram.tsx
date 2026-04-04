@@ -35,7 +35,7 @@ export function Organogram() {
   const handleResetZoom = () => setZoom(1);
 
   const activeEmployees = useMemo(() => {
-    return employees.filter(emp => (emp.status === 'Active' || emp.status === 'On Leave') && emp.staffType !== 'NON-EMPLOYEE');
+    return employees.filter(emp => (emp.status === 'Active' || emp.status === 'On Leave') && (emp.staffType === 'OFFICE' || emp.staffType === 'FIELD'));
   }, [employees]);
 
   // Recursively build the organogram tree

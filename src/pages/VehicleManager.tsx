@@ -238,7 +238,7 @@ export function VehicleManager() {
                             setTForm({...tForm, legs: newLegs});
                           }} />
                         <datalist id={`site-list-${idx}`}>
-                          {allSites.map(s => <option key={s.id} value={s.name}>{s.type.toUpperCase()}</option>)}
+                          {Array.from(new Map(allSites.map(s => [s.name, s])).values()).map(s => <option key={s.id} value={s.name} />)}
                         </datalist>
                       </div>
                       <div className="space-y-2">

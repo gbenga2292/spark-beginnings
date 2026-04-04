@@ -207,6 +207,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
   const [recentlyOnboardedSite, setRecentlyOnboardedSite] = useState<{ id: string; name: string } | null>(null);
   // track sites the user has already decided on (to avoid re-prompting)
   const [processedKeys, setProcessedKeys] = useState<Set<string>>(new Set());
+  const [isManualSite, setIsManualSite] = useState(false);
 
   const inputCls = cn(
     'flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors',
@@ -410,39 +411,93 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
-            ) : (
+            ) : isPotential ? (
               <>
                 <input
                   type="text"
-                  list={isPotential ? undefined : "comm-log-site-list"}
-                  placeholder={isExistingClient && form.client ? `Sites for ${form.client}…` : 'Type or select site name'}
+                  placeholder="Type site name"
                   value={form.siteName}
                   onChange={e => {
-                    const val = e.target.value;
-                    const match = !isPotential ? filteredSites.find(s => s.name.toLowerCase() === val.toLowerCase()) : undefined;
-                    if (match) {
-                      onChange({ siteName: match.name, siteId: match.id, client: form.client || match.client });
-                    } else {
-                      onChange({ siteName: val, siteId: '' });
-                    }
-                    if (onboardBannerFor && val.toLowerCase() !== onboardBannerFor.toLowerCase()) setOnboardBannerFor(null);
+                    onChange({ siteName: e.target.value, siteId: '' });
+                    if (onboardBannerFor && e.target.value.toLowerCase() !== onboardBannerFor.toLowerCase()) setOnboardBannerFor(null);
                   }}
                   onBlur={handleSiteInputBlur}
                   className={inputCls}
                 />
-                {!isPotential && (
-                  <datalist id="comm-log-site-list">
-                    {filteredSites.map(s => (
-                      <option key={s.id} value={s.name}>{s.name} — {s.client}</option>
-                    ))}
-                  </datalist>
-                )}
                 {form.siteName.trim() && isSiteNew(form.siteName) && !onboardBannerFor && (
+                  <p className="mt-1.5 text-xs text-amber-500 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" /> Potential site — leave field or click away to get onboarding prompt.
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="space-y-2">
+                {!isManualSite ? (
+                  <select
+                    value={filteredSites.some(s => s.name === form.siteName) ? form.siteName : (form.siteName ? '__CUSTOM__' : '')}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === '__ADD_NEW__') {
+                        setIsManualSite(true);
+                        onChange({ siteName: '', siteId: '' });
+                      } else if (val === '__CUSTOM__') {
+                        // Keep current
+                      } else {
+                        const match = filteredSites.find(s => s.name === val);
+                        if (match) {
+                          onChange({ siteName: match.name, siteId: match.id, client: form.client || match.client });
+                        } else {
+                          onChange({ siteName: '', siteId: '' });
+                        }
+                        setOnboardBannerFor(null);
+                      }
+                    }}
+                    className={selectCls}
+                  >
+                    <option value="">Select site...</option>
+                    {Array.from(new Map(filteredSites.map(s => [s.name, s])).values()).map(s => (
+                      <option key={s.id} value={s.name}>
+                        {s.name} {s.client !== form.client ? ` — ${s.client}` : ''}
+                      </option>
+                    ))}
+                    <option value="__ADD_NEW__">+ Type a new site...</option>
+                    {form.siteName && !filteredSites.some(s => s.name === form.siteName) && (
+                      <option value="__CUSTOM__">Custom: {form.siteName}</option>
+                    )}
+                  </select>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Type new site name..."
+                      value={form.siteName}
+                      onChange={e => {
+                        onChange({ siteName: e.target.value, siteId: '' });
+                        if (onboardBannerFor && e.target.value.toLowerCase() !== onboardBannerFor.toLowerCase()) setOnboardBannerFor(null);
+                      }}
+                      onBlur={handleSiteInputBlur}
+                      className={cn(inputCls, 'flex-1')}
+                    />
+                    <Button 
+                      variant="ghost" 
+                      className="h-9 px-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" 
+                      onClick={() => {
+                        setIsManualSite(false);
+                        onChange({ siteName: '', siteId: '' });
+                        setOnboardBannerFor(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+                {form.siteName.trim() && isSiteNew(form.siteName) && !onboardBannerFor && isManualSite && (
                   <p className="mt-1.5 text-xs text-amber-500 flex items-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5" /> New site — leave field or click away to get onboarding prompt.
                   </p>
                 )}
-              </>
+              </div>
             )}
           </div>
         </div>

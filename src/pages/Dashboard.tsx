@@ -210,30 +210,17 @@ export function Dashboard() {
         });
     }, [employees, filterYear]);
 
-    // ── SITE STAFFING ──
-    const siteStaffing = useMemo(() => {
-        const siteMap: Record<string, number> = {};
+    // ── POSITION STAFFING ──
+    const positionStaffing = useMemo(() => {
+        const positionMap: Record<string, number> = {};
         employees.filter(e => e.status === 'Active').forEach(emp => {
-            const site = (emp as any).site || (emp as any).siteName || 'Unassigned';
-            siteMap[site] = (siteMap[site] || 0) + 1;
+            const pos = emp.position || 'Unassigned';
+            positionMap[pos] = (positionMap[pos] || 0) + 1;
         });
-        return Object.entries(siteMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8);
+        return Object.entries(positionMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8);
     }, [employees]);
 
-    // ── LEAVE TYPE BREAKDOWN ──
-    const leaveBreakdown = useMemo(() => {
-        const typeMap: Record<string, number> = {};
-        leaves.forEach(l => {
-            if (l.startDate) {
-                const d = new Date(l.startDate);
-                if (d.getFullYear() === filterYear && (filterMonth === null || d.getMonth() + 1 === filterMonth)) {
-                    const type = l.reason?.split(' ')[0] || 'Leave';
-                    typeMap[type] = (typeMap[type] || 0) + 1;
-                }
-            }
-        });
-        return Object.entries(typeMap).map(([name, value]) => ({ name, value }));
-    }, [leaves, filterYear, filterMonth]);
+
 
     // ── ALERTS ──
     const alerts = useMemo(() => {
@@ -441,9 +428,9 @@ export function Dashboard() {
                 </div>
             </div>
 
-            {/* ROW 3: HEADCOUNT TREND + DEPARTMENT PIE + LEAVE BREAKDOWN */}
+            {/* ROW 3: HEADCOUNT TREND + DEPARTMENT PIE */}
             <div className="grid gap-6 md:grid-cols-12">
-                <Card className="md:col-span-5 shadow-sm border-slate-200">
+                <Card className="md:col-span-7 shadow-sm border-slate-200">
                     <CardHeader className="border-b bg-slate-50/50 pb-4">
                         <CardTitle className="text-lg flex items-center justify-between gap-2 text-slate-800">
                             <span className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-indigo-600" /> Headcount Growth</span>
@@ -473,7 +460,7 @@ export function Dashboard() {
                     </CardContent>
                 </Card>
 
-                <Card className="md:col-span-4 shadow-sm border-slate-200">
+                <Card className="md:col-span-5 shadow-sm border-slate-200">
                     <CardHeader className="border-b bg-slate-50/50 pb-4">
                         <CardTitle className="text-lg flex items-center gap-2 text-slate-800">
                             <Briefcase className="h-5 w-5 text-indigo-600" /> Staff by Department
@@ -496,46 +483,21 @@ export function Dashboard() {
                         )}
                     </CardContent>
                 </Card>
-
-                <Card className="md:col-span-3 shadow-sm border-slate-200">
-                    <CardHeader className="border-b bg-slate-50/50 pb-4">
-                        <CardTitle className="text-lg flex items-center gap-2 text-slate-800">
-                            <CalendarCheck className="h-5 w-5 text-indigo-600" /> Leave Types
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-4">
-                        {leaveBreakdown.length > 0 ? (
-                            <div className="space-y-3">
-                                {leaveBreakdown.map((item, i) => (
-                                    <div key={item.name} className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}></div>
-                                            <span className="text-sm font-medium text-slate-700">{item.name}</span>
-                                        </div>
-                                        <Badge variant="outline" className="text-xs font-bold">{item.value}</Badge>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="flex items-center justify-center h-[180px] text-slate-400 text-sm">No leave records</div>
-                        )}
-                    </CardContent>
-                </Card>
             </div>
 
-            {/* ROW 4: SITE STAFFING + ACTION CENTER */}
+            {/* ROW 4: POSITION STAFFING + ACTION CENTER */}
             <div className="grid gap-6 md:grid-cols-12">
                 <Card className="md:col-span-7 shadow-sm border-slate-200">
                     <CardHeader className="border-b bg-slate-50/50 pb-4">
                         <CardTitle className="text-lg flex items-center gap-2 text-slate-800">
-                            <MapPin className="h-5 w-5 text-indigo-600" /> Staff Distribution by Site
+                            <Briefcase className="h-5 w-5 text-indigo-600" /> Staff Distribution by Position
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-6">
-                        {siteStaffing.length > 0 ? (
+                        {positionStaffing.length > 0 ? (
                             <div className="h-[200px] w-full" style={{ minWidth: 0, minHeight: '200px' }}>
                                 <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
-                                    <BarChart data={siteStaffing} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
+                                    <BarChart data={positionStaffing} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                                         <XAxis type="number" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
                                         <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} width={100} />
@@ -547,7 +509,7 @@ export function Dashboard() {
                                 </ResponsiveContainer>
                             </div>
                         ) : (
-                            <div className="flex items-center justify-center h-[200px] text-slate-400 text-sm">No site assignment data</div>
+                            <div className="flex items-center justify-center h-[200px] text-slate-400 text-sm">No position assignment data</div>
                         )}
                     </CardContent>
                 </Card>

@@ -89,6 +89,10 @@ export function Reports() {
   const totalSites = sites.length;
   const activeSites = sites.filter(s => s.status === 'Active').length;
 
+  const uniqueAttendanceDays = useMemo(() => {
+    return new Set(attendanceRecords.map(r => r.date)).size;
+  }, [attendanceRecords]);
+
   const departmentData = useMemo(() => {
     const deps: Record<string, number> = {};
     employees.forEach(e => {
@@ -874,8 +878,8 @@ export function Reports() {
             <CalendarClock className="h-3.5 w-3.5 text-amber-500" />
           </CardHeader>
           <CardContent className="p-3 pt-0">
-            <div className="text-2xl font-bold text-amber-900 leading-none">{attendanceRecords.length}</div>
-            <p className="text-[10px] text-amber-600 mt-1 opacity-80 font-medium">Daily register entries</p>
+            <div className="text-2xl font-bold text-amber-900 leading-none">{uniqueAttendanceDays}</div>
+            <p className="text-[10px] text-amber-600 mt-1 opacity-80 font-medium">Unique days recorded</p>
           </CardContent>
         </Card>
 

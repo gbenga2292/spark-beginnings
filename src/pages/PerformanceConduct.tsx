@@ -219,7 +219,15 @@ export default function PerformanceConduct() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Incident Type</label>
-              <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-indigo-500/20" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
+              <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-indigo-500/20" value={formData.type} onChange={e => {
+                const newType = e.target.value;
+                const isPositive = newType === 'Accolade';
+                setFormData({ 
+                  ...formData, 
+                  type: newType,
+                  severity: isPositive ? 'Commendation' : (hrVariables?.actionLevels?.[0] || 'Verbal Warning')
+                });
+              }}>
                 <option value="Attendance">Attendance Issue</option>
                 <option value="Behavioral">Behavioral Misconduct</option>
                 <option value="Performance">Poor Performance</option>
@@ -256,7 +264,7 @@ export default function PerformanceConduct() {
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Action/Sanction Level</label>
               <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-indigo-500/20" value={formData.severity} onChange={e => setFormData({ ...formData, severity: e.target.value })}>
-                {formData.points && formData.points > 0 ? (
+                {formData.type === 'Accolade' || (formData.points && formData.points > 0) ? (
                   <>
                     <option value="Commendation">Commendation Letter</option>
                     <option value="Bonus Recommendation">Bonus Recommendation</option>

@@ -16,6 +16,7 @@ import { useAppData } from '@/src/contexts/AppDataContext';
 import { toast } from '@/src/components/ui/toast';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { exportFullAppToExcel, restoreFullAppFromExcel } from '@/src/lib/excelBackup';
 
 interface CompanyInfo {
   name: string;
@@ -72,7 +73,10 @@ export function Settings() {
   });
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [isRestoringExcel, setIsRestoringExcel] = useState(false);
   const restoreInputRef = useRef<HTMLInputElement>(null);
+  const restoreExcelInputRef = useRef<HTMLInputElement>(null);
   const autoBackupTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Get all app data from store
@@ -247,6 +251,70 @@ export function Settings() {
       }
     };
     reader.readAsText(file);
+  };
+
+  /* ── Export full App state to Excel ──────────────────────── */
+  const handleExportExcel = async () => {
+    setIsExportingExcel(true);
+    try {
+      const backupData = createBackupData();
+      await exportFullAppToExcel(backupData.data, backupData.appVersion);
+      toast.success('Excel export completed successfully!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Excel Export failed. Please try again.');
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
+  /* ── Restore full App state from Excel ───────────────────── */
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsRestoringExcel(true);
+
+    try {
+      const d = await restoreFullAppFromExcel(file);
+      
+      // Restore each slice of state
+      if (d.sites)                useAppStore.setState({ sites: d.sites });
+      if (d.clients)              useAppStore.setState({ clients: d.clients });
+      if (d.employees)            useAppStore.setState({ employees: d.employees });
+      if (d.attendanceRecords)    useAppStore.setState({ attendanceRecords: d.attendanceRecords });
+      if (d.positions)            useAppStore.setState({ positions: d.positions });
+      if (d.departments)          useAppStore.setState({ departments: d.departments });
+      if (d.invoices)             useAppStore.setState({ invoices: d.invoices });
+      if (d.pendingInvoices)      useAppStore.setState({ pendingInvoices: d.pendingInvoices });
+      if (d.salaryAdvances)       useAppStore.setState({ salaryAdvances: d.salaryAdvances });
+      if (d.loans)                useAppStore.setState({ loans: d.loans });
+      if (d.payments)             useAppStore.setState({ payments: d.payments });
+      if (d.vatPayments)          useAppStore.setState({ vatPayments: d.vatPayments });
+      if (d.payrollVariables)     useAppStore.setState({ payrollVariables: d.payrollVariables });
+      if (d.payeTaxVariables)     useAppStore.setState({ payeTaxVariables: d.payeTaxVariables });
+      if (d.monthValues)          useAppStore.setState({ monthValues: d.monthValues });
+      if (d.publicHolidays)       useAppStore.setState({ publicHolidays: d.publicHolidays });
+      if (d.departmentTasksList)  useAppStore.setState({ departmentTasksList: d.departmentTasksList });
+      if (d.leaves)               useAppStore.setState({ leaves: d.leaves });
+      if (d.leaveTypes)           useAppStore.setState({ leaveTypes: d.leaveTypes });
+      if (d.disciplinaryRecords)  useAppStore.setState({ disciplinaryRecords: d.disciplinaryRecords });
+      if (d.evaluations)          useAppStore.setState({ evaluations: d.evaluations });
+      if (d.ledgerCategories)     useAppStore.setState({ ledgerCategories: d.ledgerCategories });
+      if (d.ledgerVendors)        useAppStore.setState({ ledgerVendors: d.ledgerVendors });
+      if (d.ledgerBanks)          useAppStore.setState({ ledgerBanks: d.ledgerBanks });
+      if (d.ledgerBeneficiaryBanks) useAppStore.setState({ ledgerBeneficiaryBanks: d.ledgerBeneficiaryBanks });
+      if (d.ledgerEntries)        useAppStore.setState({ ledgerEntries: d.ledgerEntries });
+      if (d.companyExpenses)      useAppStore.setState({ companyExpenses: d.companyExpenses });
+      if (d.hrVariables)          useAppStore.setState({ hrVariables: d.hrVariables });
+
+      toast.success('Data restored from Excel successfully');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to restore from Excel. File might be invalid.');
+    } finally {
+      setIsRestoringExcel(false);
+      if (restoreExcelInputRef.current) restoreExcelInputRef.current.value = '';
+    }
   };
 
   /* ── Auto-backup scheduler ───────────────────────────────── */
@@ -526,6 +594,83 @@ export function Settings() {
                       {isRestoring
                         ? <><RefreshCw className="h-4 w-4 animate-spin" /> Restoring…</>
                         : <><Upload className="h-4 w-4" /> Select Backup File</>
+                      }
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Excel Manual Backup & Restore */}
+            <Card className="border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-teal-50 to-white border-b border-slate-100 px-6 py-5">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-teal-100 flex items-center justify-center text-teal-600 shadow-sm">
+                    <DatabaseBackup className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold text-slate-800">Excel Data Sync</CardTitle>
+                    <p className="text-xs text-slate-500 mt-0.5">Export all application data to a multi-tab Excel file, or restore from one.</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="px-6 py-6">
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Export section */}
+                  <div className="flex flex-col gap-4 p-5 bg-teal-50/50 rounded-2xl border border-teal-100">
+                    <div className="flex items-center gap-2">
+                      <Download className="h-5 w-5 text-teal-600" />
+                      <h3 className="font-bold text-slate-800">Export to Excel</h3>
+                    </div>
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                      Downloads an <strong>.xlsx</strong> file mapping every major section (e.g., Employees, Attendance, Leaves, Salary) to separate tabs. Ideal for reporting and robust backups.
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg px-3 py-2 mt-auto">
+                      <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <span>Generates snapshot of current database instantly.</span>
+                    </div>
+                    <Button
+                      onClick={handleExportExcel}
+                      disabled={isExportingExcel}
+                      className="bg-teal-600 hover:bg-teal-700 text-white gap-2 h-11 rounded-xl shadow-sm mt-2"
+                    >
+                      {isExportingExcel
+                        ? <><RefreshCw className="h-4 w-4 animate-spin" /> Exporting…</>
+                        : <><Download className="h-4 w-4" /> Download Excel File</>
+                      }
+                    </Button>
+                  </div>
+
+                  {/* Restore section */}
+                  <div className="flex flex-col gap-4 p-5 bg-amber-50/50 rounded-2xl border border-amber-100">
+                    <div className="flex items-center gap-2">
+                      <Upload className="h-5 w-5 text-amber-600" />
+                      <h3 className="font-bold text-slate-800">Restore from Excel</h3>
+                    </div>
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                      Upload a previously exported <strong>.xlsx</strong> file. The system will read each tab and update your data accordingly. <strong className="text-amber-700">This will overwrite all current system data!</strong>
+                    </p>
+                    <div className="flex items-center gap-2 text-xs bg-amber-100 text-amber-800 rounded-lg px-3 py-2 border border-amber-200 mt-auto">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                      <span>Ensure file structure hasn't been tampered with.</span>
+                    </div>
+                    <input
+                      ref={restoreExcelInputRef}
+                      type="file"
+                      accept=".xlsx, .xls"
+                      onChange={handleImportExcel}
+                      className="hidden"
+                      id="restore-excel-file-input"
+                    />
+                    <Button
+                      variant="outline"
+                      disabled={isRestoringExcel}
+                      onClick={() => restoreExcelInputRef.current?.click()}
+                      className="border-amber-300 text-amber-700 hover:bg-amber-50 gap-2 h-11 rounded-xl mt-2"
+                    >
+                      {isRestoringExcel
+                        ? <><RefreshCw className="h-4 w-4 animate-spin" /> Syncing from Excel…</>
+                        : <><Upload className="h-4 w-4" /> Select Excel File</>
                       }
                     </Button>
                   </div>
