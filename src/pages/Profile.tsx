@@ -579,89 +579,44 @@ export function Profile() {
               <CardDescription>Choose your preferred color theme and mode</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Light / Dark toggle */}
-              <div>
-                <label className="text-sm font-medium text-slate-700 mb-3 block">Mode</label>
-                <div className="flex gap-3">
-                  <button
-                    onClick={toggle}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                      !isDark
-                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                        : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                    }`}
+              {/* Theme Settings Dropdowns */}
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700 block">Mode</label>
+                  <select 
+                    value={isDark ? 'dark' : 'light'} 
+                    onChange={() => toggle()}
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
-                    <Sun className="h-4 w-4" /> Light
-                  </button>
-                  <button
-                    onClick={toggle}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                      isDark
-                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                        : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                    }`}
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700 block">Color Theme</label>
+                  <select
+                    value={colorTheme}
+                    onChange={(e) => setColorTheme(e.target.value as ColorTheme)}
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
-                    <Moon className="h-4 w-4" /> Dark
-                  </button>
+                    {THEME_OPTIONS.map(opt => (
+                      <option key={opt.id} value={opt.id}>{opt.label}</option>
+                    ))}
+                  </select>
                 </div>
-              </div>
 
-              {/* Color themes */}
-              <div>
-                <label className="text-sm font-medium text-slate-700 mb-3 block">Color Theme</label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {THEME_OPTIONS.map(opt => (
-                    <button
-                      key={opt.id}
-                      onClick={() => setColorTheme(opt.id)}
-                      className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                        colorTheme === opt.id
-                          ? 'border-indigo-500 bg-indigo-50/60 shadow-sm'
-                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      {colorTheme === opt.id && (
-                        <div className="absolute top-2 right-2">
-                          <Check className="h-4 w-4 text-indigo-600" />
-                        </div>
-                      )}
-                      <div className="flex gap-1">
-                        {opt.swatches.map((c, i) => (
-                          <div key={i} className="w-5 h-5 rounded-full" style={{ backgroundColor: c }} />
-                        ))}
-                      </div>
-                      <span className="text-xs font-medium text-slate-700">{opt.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* UI structure themes */}
-              <div>
-                <label className="text-sm font-medium text-slate-700 mb-3 block">App Layout Theme</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {UI_THEME_OPTIONS.map(opt => (
-                    <button
-                      key={opt.id}
-                      onClick={() => setUITheme(opt.id)}
-                      className={`relative flex flex-col items-start text-left gap-1 p-4 rounded-xl border-2 transition-all ${
-                        uiTheme === opt.id
-                          ? 'border-indigo-500 bg-indigo-50/60 shadow-sm'
-                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      {uiTheme === opt.id && (
-                        <div className="absolute top-2 right-2">
-                          <Check className="h-4 w-4 text-indigo-600" />
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 mb-1">
-                        <LayoutTemplate className={`h-4 w-4 ${uiTheme === opt.id ? 'text-indigo-600' : 'text-slate-500'}`} />
-                        <span className="text-sm font-semibold text-slate-900">{opt.label}</span>
-                      </div>
-                      <span className="text-xs text-slate-500">{opt.description}</span>
-                    </button>
-                  ))}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700 block">App Layout Theme</label>
+                  <select
+                    value={uiTheme}
+                    onChange={(e) => setUITheme(e.target.value as UITheme)}
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {UI_THEME_OPTIONS.map(opt => (
+                      <option key={opt.id} value={opt.id}>{opt.label} - {opt.description}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

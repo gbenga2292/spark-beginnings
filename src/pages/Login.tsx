@@ -287,7 +287,7 @@ export function Login() {
 
           {/* Footer */}
           <p className="mt-10 text-center text-[11px] text-slate-400">
-            Â© {CURRENT_YEAR} Dewatering Construction Etc Limited. All rights reserved.
+            © {CURRENT_YEAR} Dewatering Construction Etc Limited. All rights reserved.
           </p>
         </div>
       </div>

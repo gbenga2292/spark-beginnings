@@ -104,21 +104,28 @@ export function Attendance() {
 
   // Database filters
   const [dbSearchTerm, setDbSearchTerm] = useState('');
-  const [dbStaffTypeFilter, setDbStaffTypeFilter] = useState<'OFFICE' | 'FIELD' | 'All'>('FIELD');
+  const [dbStaffTypeFilter, setDbStaffTypeFilter] = useState<'OFFICE' | 'FIELD' | 'All'>('All');
   const [dbSiteFilter, setDbSiteFilter] = useState('All');
   const [dbShiftFilter, setDbShiftFilter] = useState('All');
 
   // ─── Calendar Status Logic ─────────────────────────────────
   const attendanceStatusMap = useMemo(() => {
     const map: Record<string, 'fully' | 'special' | 'partial' | 'none'> = {};
+    
+    const opsFieldEmployees = employees.filter(emp => 
+      emp.staffType === 'FIELD' && ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase())
+    );
+    const totalNeeded = opsFieldEmployees.length;
+    if (totalNeeded === 0) return map;
+
     const groupedRecords = attendanceRecords.reduce((acc, rec) => {
-      if (!acc[rec.date]) acc[rec.date] = new Set();
-      acc[rec.date].add(rec.staffId);
+      const isOpsField = opsFieldEmployees.some(emp => emp.id === rec.staffId);
+      if (isOpsField) {
+        if (!acc[rec.date]) acc[rec.date] = new Set();
+        acc[rec.date].add(rec.staffId);
+      }
       return acc;
     }, {} as Record<string, Set<string>>);
-
-    const totalNeeded = employees.length;
-    if (totalNeeded === 0) return map;
 
     // Check all dates present in the store
     Object.keys(groupedRecords).forEach(dateStr => {
@@ -126,7 +133,7 @@ export function Attendance() {
       const isPublicHoliday = publicHolidaysStore.some(h => h.date === dateStr);
       const isSun = isSunday(parseISO(dateStr));
       
-      // If any records exist for the date, it is considered filled
+      // If any records exist for the date among ops field staff, it is considered filled
       if (recordedCount > 0) {
         if (isPublicHoliday || isSun) map[dateStr] = 'special';
         else map[dateStr] = 'fully';
@@ -141,13 +148,22 @@ export function Attendance() {
 
   const lastAttendanceDate = useMemo(() => {
     if (!attendanceRecords || attendanceRecords.length === 0) return null;
-    let latest = attendanceRecords[0].date;
-    for (let i = 1; i < attendanceRecords.length; i++) {
-       if (attendanceRecords[i].date > latest) {
-          latest = attendanceRecords[i].date;
-       }
+    let latestObj = new Date(1900, 0, 1);
+    let latestRaw = attendanceRecords[0].date;
+
+    for (const record of attendanceRecords) {
+      if (!record.date) continue;
+      
+      const nDate = normalizeDate(record.date);
+      if (nDate) {
+        const d = new Date(nDate + 'T00:00:00');
+        if (!isNaN(d.getTime()) && d > latestObj) {
+          latestObj = d;
+          latestRaw = record.date;
+        }
+      }
     }
-    return latest;
+    return latestRaw;
   }, [attendanceRecords]);
 
   const [dbSelectedIds, setDbSelectedIds] = useState<Set<string>>(new Set());

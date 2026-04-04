@@ -305,11 +305,13 @@ function initIPC() {
     const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
       title: opts.title || 'Select file or folder',
       properties,
-      filters: opts.filters || [
-        { name: 'All Files', extensions: ['*'] },
-        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] },
-        { name: 'Documents', extensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'] },
-      ],
+      ...(opts.folder ? {} : {
+        filters: opts.filters || [
+          { name: 'All Files', extensions: ['*'] },
+          { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] },
+          { name: 'Documents', extensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'] },
+        ],
+      })
     });
     if (canceled || !filePaths.length) return null;
     return opts.folder ? filePaths[0] : filePaths;
@@ -334,6 +336,8 @@ function initIPC() {
   ipcMain.handle('file:write', async (_event, { filePath, content, encoding }) => {
     try {
       const fs = require('fs');
+      const p = require('path');
+      fs.mkdirSync(p.dirname(filePath), { recursive: true });
       fs.writeFileSync(filePath, content, encoding);
       return true;
     } catch (err) {

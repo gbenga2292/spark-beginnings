@@ -6,7 +6,7 @@ import { Badge } from '@/src/components/ui/badge';
 import {
   Save, Building, Link as LinkIcon, CloudDownload,
   RefreshCw, Library, Pencil, X, Mail, Phone, MapPin, Hash, CheckCircle2,
-  DatabaseBackup, Upload, Download, Clock, ShieldCheck, AlertTriangle,
+  DatabaseBackup, Upload, Download, Clock, ShieldCheck, AlertTriangle, FolderOpen,
 } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Variables } from './Variables';
@@ -38,8 +38,12 @@ const BACKUP_SETTINGS_KEY = 'dcel-backup-settings';
 
 interface BackupSettings {
   autoBackupEnabled: boolean;
-  autoBackupInterval: 'daily' | 'weekly' | 'monthly';
+  autoBackupInterval: 'daily' | 'weekly' | 'monthly' | 'yearly';
   autoBackupTime: string; // HH:MM
+  autoBackupLocation: string | null; // Base directory
+  autoBackupDayOfWeek: string; // '1'(Mon)-'7'(Sun)
+  autoBackupDayOfMonth: string; // '1'-'31'
+  autoBackupMonthOfYear: string; // '0'(Jan)-'11'(Dec)
   lastBackupAt: string | null;
 }
 
@@ -47,6 +51,10 @@ const DEFAULT_BACKUP_SETTINGS: BackupSettings = {
   autoBackupEnabled: false,
   autoBackupInterval: 'daily',
   autoBackupTime: '08:00',
+  autoBackupLocation: null,
+  autoBackupDayOfWeek: '1',
+  autoBackupDayOfMonth: '1',
+  autoBackupMonthOfYear: '0',
   lastBackupAt: null,
 };
 
@@ -166,25 +174,36 @@ export function Settings() {
   }, [state, userState, taskState, appVersion]);
 
   /* ── Manual backup to file ───────────────────────────────── */
-  const handleManualBackup = async () => {
+  const handleManualBackup = async (overrideBasePath?: string) => {
     setIsBackingUp(true);
     try {
       const backup = createBackupData();
       const json = JSON.stringify(backup, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      
       const now = new Date();
       const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
       const timeStr = `${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `DCEL_Backup_${dateStr}_${timeStr}.json`;
-      link.click();
-      URL.revokeObjectURL(url);
+      const fileName = `DCEL_Backup_${dateStr}_${timeStr}.json`;
+
+      if (overrideBasePath && (window as any).electronAPI?.writeFile) {
+        // Auto-save silently to defined location
+        const pathSep = (window as any).electronAPI.platform === 'win32' ? '\\' : '/';
+        const overridePath = `${overrideBasePath}${pathSep}json backups${pathSep}${fileName}`;
+        await (window as any).electronAPI.writeFile(overridePath, json, 'utf8');
+      } else {
+        // Manual browser/electron download
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
 
       const updated = { ...backupSettings, lastBackupAt: new Date().toISOString() };
       saveBackupSettings(updated);
-      toast.success('Backup downloaded successfully!');
+      toast.success('JSON Backup completed successfully!');
     } catch (err) {
       toast.error('Backup failed. Please try again.');
     } finally {
@@ -254,11 +273,22 @@ export function Settings() {
   };
 
   /* ── Export full App state to Excel ──────────────────────── */
-  const handleExportExcel = async () => {
+  const handleExportExcel = async (overrideBasePath?: string) => {
     setIsExportingExcel(true);
     try {
       const backupData = createBackupData();
-      await exportFullAppToExcel(backupData.data, backupData.appVersion);
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+      const timeStr = `${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+      const fileName = `DCEL_Full_Backup_${dateStr}_${timeStr}.xlsx`;
+
+      let overridePath: string | undefined;
+      if (overrideBasePath && (window as any).electronAPI?.platform) {
+        const pathSep = (window as any).electronAPI.platform === 'win32' ? '\\' : '/';
+        overridePath = `${overrideBasePath}${pathSep}excel back ups${pathSep}${fileName}`;
+      }
+
+      await exportFullAppToExcel(backupData.data, backupData.appVersion, overridePath);
       toast.success('Excel export completed successfully!');
     } catch (err) {
       console.error(err);
@@ -328,19 +358,52 @@ export function Settings() {
       const isRightTime = now.getHours() === hh && now.getMinutes() === mm;
       if (!isRightTime) return;
 
-      const last = backupSettings.lastBackupAt ? new Date(backupSettings.lastBackupAt) : null;
-      const msInDay = 86400000;
-      const intervals = { daily: msInDay, weekly: msInDay * 7, monthly: msInDay * 30 };
-      const msRequired = intervals[backupSettings.autoBackupInterval];
+      const currentDayOfWeek = now.getDay() === 0 ? 7 : now.getDay(); // 1=Mon, 7=Sun
+      const currentDayOfMonth = now.getDate();
+      const currentMonth = now.getMonth(); // 0=Jan
 
-      if (!last || (now.getTime() - last.getTime()) >= msRequired) {
-        handleManualBackup();
+      // Check interval conditions
+      if (backupSettings.autoBackupInterval === 'weekly') {
+        if (currentDayOfWeek !== parseInt(backupSettings.autoBackupDayOfWeek, 10)) return;
+      }
+      if (backupSettings.autoBackupInterval === 'monthly') {
+        if (currentDayOfMonth !== parseInt(backupSettings.autoBackupDayOfMonth, 10)) return;
+      }
+      if (backupSettings.autoBackupInterval === 'yearly') {
+        if (currentMonth !== parseInt(backupSettings.autoBackupMonthOfYear, 10) || 
+            currentDayOfMonth !== parseInt(backupSettings.autoBackupDayOfMonth, 10)) return;
+      }
+
+      const last = backupSettings.lastBackupAt ? new Date(backupSettings.lastBackupAt) : null;
+      // If we already backed up today, don't run again
+      if (last && last.getDate() === currentDayOfMonth && last.getMonth() === currentMonth && last.getFullYear() === now.getFullYear()) {
+         return;
+      }
+
+      // Execute both JSON and EXCEL to the predetermined location
+      const loc = backupSettings.autoBackupLocation;
+      if (loc && isElectron) {
+        handleManualBackup(loc);
+        handleExportExcel(loc);
+      } else {
+        handleManualBackup(); // fallback if no location set (will prompt download in browser)
       }
     };
 
     autoBackupTimerRef.current = setInterval(checkAndBackup, 60000); // check every minute
     return () => { if (autoBackupTimerRef.current) clearInterval(autoBackupTimerRef.current); };
-  }, [backupSettings, handleManualBackup]);
+  }, [backupSettings]);
+
+  const selectBackupLocation = async () => {
+    if ((window as any).electronAPI?.openPathDialog) {
+      const path = await (window as any).electronAPI.openPathDialog({ folder: true, title: 'Select Backup Folder' });
+      if (path) {
+        saveBackupSettings({ ...backupSettings, autoBackupLocation: path });
+      }
+    } else {
+       toast.error('Directory selection is only supported in Desktop App mode.');
+    }
+  };
 
   const handleCheckForUpdates = () => {
     if (isElectron && ((window as any).electronAPI as any)?.checkForUpdates) {
@@ -553,7 +616,7 @@ export function Settings() {
                       <span>Last backup: <strong>{lastBackupFormatted}</strong></span>
                     </div>
                     <Button
-                      onClick={handleManualBackup}
+                      onClick={() => handleManualBackup()}
                       disabled={isBackingUp}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-11 rounded-xl shadow-sm"
                     >
@@ -630,7 +693,7 @@ export function Settings() {
                       <span>Generates snapshot of current database instantly.</span>
                     </div>
                     <Button
-                      onClick={handleExportExcel}
+                      onClick={() => handleExportExcel()}
                       disabled={isExportingExcel}
                       className="bg-teal-600 hover:bg-teal-700 text-white gap-2 h-11 rounded-xl shadow-sm mt-2"
                     >
@@ -710,7 +773,7 @@ export function Settings() {
                 </div>
               </CardHeader>
               <CardContent className="px-6 py-6">
-                <div className={`grid md:grid-cols-3 gap-5 transition-opacity ${backupSettings.autoBackupEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                <div className={`grid md:grid-cols-2 lg:grid-cols-4 gap-5 transition-opacity ${backupSettings.autoBackupEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
                   {/* Interval */}
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Backup Frequency</label>
@@ -722,8 +785,68 @@ export function Settings() {
                       <option value="daily">Every Day</option>
                       <option value="weekly">Every Week</option>
                       <option value="monthly">Every Month</option>
+                      <option value="yearly">Every Year</option>
                     </select>
                   </div>
+
+                  {/* Dynamic Date Pickers Based On Interval */}
+                  {backupSettings.autoBackupInterval === 'weekly' && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Day of Week</label>
+                      <select
+                        value={backupSettings.autoBackupDayOfWeek}
+                        onChange={e => saveBackupSettings({ ...backupSettings, autoBackupDayOfWeek: e.target.value })}
+                        className="w-full h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                      >
+                        <option value="1">Monday</option>
+                        <option value="2">Tuesday</option>
+                        <option value="3">Wednesday</option>
+                        <option value="4">Thursday</option>
+                        <option value="5">Friday</option>
+                        <option value="6">Saturday</option>
+                        <option value="7">Sunday</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {(backupSettings.autoBackupInterval === 'yearly') && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Month</label>
+                      <select
+                        value={backupSettings.autoBackupMonthOfYear}
+                        onChange={e => saveBackupSettings({ ...backupSettings, autoBackupMonthOfYear: e.target.value })}
+                        className="w-full h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                      >
+                        <option value="0">January</option>
+                        <option value="1">February</option>
+                        <option value="2">March</option>
+                        <option value="3">April</option>
+                        <option value="4">May</option>
+                        <option value="5">June</option>
+                        <option value="6">July</option>
+                        <option value="7">August</option>
+                        <option value="8">September</option>
+                        <option value="9">October</option>
+                        <option value="10">November</option>
+                        <option value="11">December</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {(backupSettings.autoBackupInterval === 'monthly' || backupSettings.autoBackupInterval === 'yearly') && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Day of Month</label>
+                      <select
+                        value={backupSettings.autoBackupDayOfMonth}
+                        onChange={e => saveBackupSettings({ ...backupSettings, autoBackupDayOfMonth: e.target.value })}
+                        className="w-full h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                      >
+                        {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                          <option key={day} value={String(day)}>{day}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   {/* Time */}
                   <div className="space-y-2">
@@ -736,26 +859,27 @@ export function Settings() {
                     />
                   </div>
 
-                  {/* Status */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
-                    <div className="h-10 flex items-center gap-2">
-                      {backupSettings.autoBackupEnabled ? (
-                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 gap-1.5">
-                          <ShieldCheck className="h-3.5 w-3.5" /> Active — Auto-save on
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-slate-500 gap-1.5">
-                          <X className="h-3.5 w-3.5" /> Disabled
-                        </Badge>
-                      )}
+                  {/* Location Picker */}
+                  <div className="space-y-2 md:col-span-2 lg:col-span-4">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Backup Storage Folder</label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="text"
+                        readOnly
+                        onClick={selectBackupLocation}
+                        value={backupSettings.autoBackupLocation || 'Not selected — defaults to browser downloads'}
+                        className="h-10 bg-slate-50 border-slate-200 flex-1 text-slate-600 truncate cursor-pointer hover:bg-slate-100 transition-colors"
+                      />
+                      <Button variant="outline" onClick={selectBackupLocation} className="h-10 px-4 shrink-0 text-slate-700 bg-white">
+                        <FolderOpen className="h-4 w-4 mr-2" /> Browse...
+                      </Button>
                     </div>
                   </div>
                 </div>
 
                 {backupSettings.autoBackupEnabled && (
-                  <div className="mt-4 text-xs text-slate-500 bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-3">
-                    <strong className="text-emerald-700">How it works:</strong> The app checks your schedule every minute while open. When the backup time arrives and the required interval has passed since the last backup, a file will automatically be downloaded to your browser's default download folder.
+                  <div className="mt-6 text-xs text-slate-600 bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-3 leading-relaxed">
+                    <strong className="text-emerald-700">How it works:</strong> The app checks your schedule in the background. When the assigned time arrives, both a <strong>JSON file</strong> and an <strong>Excel file</strong> will be automatically generated and securely saved into structured folders in your selected Backup Storage Folder.
                   </div>
                 )}
               </CardContent>

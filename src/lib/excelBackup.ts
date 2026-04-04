@@ -33,7 +33,7 @@ function objectToSheet(obj: any, sheetName: string) {
   return XLSX.utils.json_to_sheet(rows);
 }
 
-export const exportFullAppToExcel = async (appStateData: any, appVersion: string) => {
+export const exportFullAppToExcel = async (appStateData: any, appVersion: string, overridePath?: string) => {
   const wb = XLSX.utils.book_new();
 
   // Create a metadata / cover sheet
@@ -72,7 +72,6 @@ export const exportFullAppToExcel = async (appStateData: any, appVersion: string
   /* ---- Variables & Configuration ---- */
   appendArraySheet('positions', 'Positions');
   appendArraySheet('departments', 'Departments');
-  appendArraySheet('clients', 'Clients'); // Can be array of strings, json_to_sheet handles array of objects better. If array of strings, we should map it.
   
   // specifically format clients if it's string[]
   if (Array.isArray(appStateData.clients) && typeof appStateData.clients[0] === 'string') {
@@ -117,6 +116,12 @@ export const exportFullAppToExcel = async (appStateData: any, appVersion: string
   const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   const timeStr = `${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
   const fileName = `DCEL_Full_Backup_${dateStr}_${timeStr}.xlsx`;
+
+  if (overridePath && (window as any).electronAPI?.writeFile) {
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const success = await (window as any).electronAPI.writeFile(overridePath, buf, 'binary');
+    return success ? overridePath : null;
+  }
 
   if ((window as any).electronAPI?.savePathDialog) {
     const filePath = await (window as any).electronAPI.savePathDialog({

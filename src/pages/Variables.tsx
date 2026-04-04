@@ -2047,41 +2047,103 @@ export function Variables() {
               <CardDescription>Adjust the percentage breakdown for components of basic salary and automated deductions.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-700 uppercase">Basic Salary</label>
-                  <Input
-                    type="number"
-                    value={localPayrollVars.basic}
-                    onChange={e => updateLocalPayrollVariables({ basic: Number(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-700 uppercase">Housing</label>
-                  <Input
-                    type="number"
-                    value={localPayrollVars.housing}
-                    onChange={e => updateLocalPayrollVariables({ housing: Number(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-700 uppercase">Transport</label>
-                  <Input
-                    type="number"
-                    value={localPayrollVars.transport}
-                    onChange={e => updateLocalPayrollVariables({ transport: Number(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-700 uppercase">Other Allowances</label>
-                  <Input
-                    type="number"
-                    value={localPayrollVars.otherAllowances}
-                    onChange={e => updateLocalPayrollVariables({ otherAllowances: Number(e.target.value) })}
-                  />
+              <div className="mb-8 p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Salary Components Breakdown</h3>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">Combined components should correctly total 100%.</p>
+                  </div>
+                  {(() => {
+                    const total = Number(localPayrollVars.basic || 0) + Number(localPayrollVars.housing || 0) + Number(localPayrollVars.transport || 0) + Number(localPayrollVars.otherAllowances || 0);
+                    const isPerfect = total === 100;
+                    const isOver = total > 100;
+                    return (
+                      <div className={`px-4 py-2 rounded-lg border flex flex-col items-end justify-center transition-colors shadow-sm ${
+                        isPerfect ? 'bg-emerald-50 border-emerald-200' : isOver ? 'bg-rose-50 border-rose-200' : 'bg-amber-50 border-amber-200'
+                      }`}>
+                        <span className={`text-xl font-black leading-none ${isPerfect ? 'text-emerald-600' : isOver ? 'text-rose-600' : 'text-amber-600'}`}>
+                          {total}%
+                        </span>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${isPerfect ? 'text-emerald-500' : isOver ? 'text-rose-500' : 'text-amber-500'}`}>
+                          Total
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
-                <div className="space-y-2">
+                {(() => {
+                  const total = Number(localPayrollVars.basic || 0) + Number(localPayrollVars.housing || 0) + Number(localPayrollVars.transport || 0) + Number(localPayrollVars.otherAllowances || 0);
+                  const denom = Math.max(100, total);
+                  const b = (Number(localPayrollVars.basic || 0) / denom) * 100;
+                  const h = (Number(localPayrollVars.housing || 0) / denom) * 100;
+                  const t = (Number(localPayrollVars.transport || 0) / denom) * 100;
+                  const o = (Number(localPayrollVars.otherAllowances || 0) / denom) * 100;
+
+                  return (
+                    <div className="h-3.5 w-full bg-slate-200 rounded-full overflow-hidden flex border border-slate-300/50 shadow-inner">
+                      {b > 0 && <div className="bg-indigo-500 h-full transition-all duration-300" style={{ width: `${b}%` }} title={`Basic: ${localPayrollVars.basic}%`} />}
+                      {h > 0 && <div className="bg-emerald-500 h-full transition-all duration-300" style={{ width: `${h}%` }} title={`Housing: ${localPayrollVars.housing}%`} />}
+                      {t > 0 && <div className="bg-amber-500 h-full transition-all duration-300" style={{ width: `${t}%` }} title={`Transport: ${localPayrollVars.transport}%`} />}
+                      {o > 0 && <div className="bg-rose-500 h-full transition-all duration-300" style={{ width: `${o}%` }} title={`Other: ${localPayrollVars.otherAllowances}%`} />}
+                    </div>
+                  );
+                })()}
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-600 uppercase flex items-start gap-1.5">
+                      <span className="w-2.5 h-2.5 mt-0.5 rounded-sm bg-indigo-500 block shrink-0"></span>
+                      Basic Salary
+                    </label>
+                    <Input
+                      type="number"
+                      className="font-mono text-sm shadow-sm h-9"
+                      value={localPayrollVars.basic}
+                      onChange={e => updateLocalPayrollVariables({ basic: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-600 uppercase flex items-start gap-1.5">
+                      <span className="w-2.5 h-2.5 mt-0.5 rounded-sm bg-emerald-500 block shrink-0"></span>
+                      Housing
+                    </label>
+                    <Input
+                      type="number"
+                      className="font-mono text-sm shadow-sm h-9"
+                      value={localPayrollVars.housing}
+                      onChange={e => updateLocalPayrollVariables({ housing: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-600 uppercase flex items-start gap-1.5">
+                      <span className="w-2.5 h-2.5 mt-0.5 rounded-sm bg-amber-500 block shrink-0"></span>
+                      Transport
+                    </label>
+                    <Input
+                      type="number"
+                      className="font-mono text-sm shadow-sm h-9"
+                      value={localPayrollVars.transport}
+                      onChange={e => updateLocalPayrollVariables({ transport: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-600 uppercase flex items-start gap-1.5 leading-tight">
+                      <span className="w-2.5 h-2.5 mt-0.5 rounded-sm bg-rose-500 block shrink-0"></span>
+                      Other Allowances
+                    </label>
+                    <Input
+                      type="number"
+                      className="font-mono text-sm shadow-sm h-9"
+                      value={localPayrollVars.otherAllowances}
+                      onChange={e => updateLocalPayrollVariables({ otherAllowances: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
+                <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-700 uppercase">Employee Pension Rate (%)</label>
                   <Input
                     type="number"
