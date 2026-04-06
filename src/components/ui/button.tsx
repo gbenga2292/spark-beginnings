@@ -1,14 +1,39 @@
 import * as React from "react"
 import { cn } from "@/src/lib/utils"
+import { useNetworkStore } from "@/src/store/networkStore"
+import { Lock } from "lucide-react"
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
   size?: "default" | "sm" | "lg" | "icon"
+  disableOffline?: boolean
+}
+
+function extractText(children: React.ReactNode): string {
+  let text = '';
+  React.Children.forEach(children, child => {
+    if (typeof child === 'string' || typeof child === 'number') {
+      text += child;
+    } else if (React.isValidElement(child) && (child.props as any).children) {
+      text += extractText((child.props as any).children);
+    }
+  });
+  return text;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "default", size = "default", ...props }, ref) => {
+  ({ className, variant = "default", size = "default", disableOffline, ...props }, ref) => {
+    const isOnline = useNetworkStore((state) => state.connectionStatus) !== 'offline';
+    
+    // Check if the button represents a mutating action
+    const textContent = extractText(props.children);
+    const isAction = /\b(add|save|submit|delete|create|update|import|export|upload|remove|checkout|approve|reject)\b/i.test(textContent);
+    const autoDisable = props.type === "submit" || variant === "destructive" || isAction;
+    
+    // Enable forcing opt-out via disableOffline={false}
+    const shouldLock = !isOnline && (disableOffline === true || (disableOffline !== false && autoDisable));
+
     return (
       <button
         className={cn(
@@ -24,12 +49,17 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             "h-9 rounded-md px-3": size === "sm",
             "h-11 rounded-md px-8": size === "lg",
             "h-10 w-10": size === "icon",
+            "cursor-not-allowed border-dashed relative": shouldLock,
           },
           className
         )}
         ref={ref}
         {...props}
-      />
+        disabled={props.disabled || shouldLock}
+      >
+        {shouldLock && <Lock className="mr-1.5 h-3.5 w-3.5 text-slate-500 bg-slate-200/50 rounded-full p-0.5" />}
+        {props.children}
+      </button>
     )
   }
 )

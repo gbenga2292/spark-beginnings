@@ -524,9 +524,6 @@ interface AppState {
   removeAttendanceRecordsByDate: (date: string) => void;
   deleteAttendanceRecords: (ids: string[]) => void;
   
-  addLeaveRecord: (leave: LeaveRecord) => void;
-  updateLeaveRecord: (id: string, leave: Partial<LeaveRecord>) => void;
-  deleteLeaveRecord: (id: string) => void;
   addDisciplinaryRecord: (record: DisciplinaryRecord) => void;
   updateDisciplinaryRecord: (id: string, record: Partial<DisciplinaryRecord>) => void;
   deleteDisciplinaryRecord: (id: string) => void;
@@ -790,11 +787,6 @@ export const useAppStore = create<AppState>()(
       updateAttendanceRecord: (id, record) => { set((s) => ({ attendanceRecords: s.attendanceRecords.map(r => r.id === id ? { ...r, ...record } : r) })); db.updateAttendanceRecord(id, record); },
       removeAttendanceRecordsByDate: (date) => { set((s) => ({ attendanceRecords: s.attendanceRecords.filter(r => r.date !== date) })); db.deleteAttendanceByDate(date); },
       deleteAttendanceRecords: (ids) => { set((s) => ({ attendanceRecords: s.attendanceRecords.filter(r => !ids.includes(r.id)) })); db.deleteAttendanceByIds(ids); },
-
-      // Leaves (Ensuring correct naming)
-      addLeaveRecord: (leave) => { set((s) => ({ leaves: [...s.leaves, leave] })); db.insertLeave(leave); },
-      updateLeaveRecord: (id, leave) => { set((s) => ({ leaves: s.leaves.map(l => l.id === id ? { ...l, ...leave } : l) })); db.updateLeave(id, leave); },
-      deleteLeaveRecord: (id) => { set((s) => ({ leaves: s.leaves.filter(l => l.id !== id) })); db.deleteLeave(id); },
 
       // Positions & Departments
       addPosition: (position) => { set((s) => ({ positions: [...s.positions, position] })); db.insertPosition(position); },

@@ -10,7 +10,10 @@ import type {
   LedgerCategory, LedgerVendor, LedgerBank, LedgerBeneficiaryBank, LedgerEntry, CommLog,
   CompanyExpense, StaffMeritRecord
 } from '@/src/store/appStore';
-import type { AppUser, PrivilegePreset } from '@/src/store/userStore';
+import { useUserStore, type AppUser, type PrivilegePreset } from '@/src/store/userStore';
+
+// Workspace identifier — update this if this app is ever redeployed for another organisation.
+const getWS = () => useUserStore.getState().getCurrentUser()?.workspaceId || 'dcel-team';
 import type { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import type { Vehicle, VehicleTripLeg } from '@/src/types/operations';
 
@@ -281,6 +284,7 @@ export function dbToPendingSite(r: any): SiteQuestionnaire {
 export function dbToProfile(r: any): AppUser {
   return {
     id: r.id, name: r.name, email: r.email, avatar: r.avatar,
+    workspaceId: r.workspace_id || getWS(),
     password: '', // Not stored in DB
     privileges: r.privileges || {},
     isActive: r.is_active, createdAt: r.created_at,
@@ -582,7 +586,7 @@ function vehicleToDb(v: Vehicle) {
 function vehicleMovementToDb(v: VehicleTripLeg & { vehicle_id: string; vehicle_reg: string; driver_name: string; driver_employee_id?: string; created_by_id?: string; created_by_name?: string }) {
   return {
     id: v.id,
-    workspace_id: 'dcel-team',
+    workspace_id: getWS(),
     vehicle_id: v.vehicle_id,
     vehicle_reg: v.vehicle_reg,
     driver_name: v.driver_name,
@@ -686,8 +690,8 @@ export async function fetchAllAppData(privs?: any) {
     ledgerEntries: (lEntRes.data || []).map(dbToLedgerEntry),
     companyExpenses: (compExpRes.data || []).map(dbToCompanyExpense),
     staffMeritRecords: (staffMeritRes.data || []).map(dbToStaffMerit),
-    vehicles: (arguments[3] as any)?.data?.map(dbToVehicle) || [], // vehiclesRes
-    vehicleTrips: (arguments[4] as any)?.data?.map(dbToVehicleMovement) || [], // logRes
+    vehicles: (vehiclesRes.data || []).map(dbToVehicle),
+    vehicleTrips: (vehicleTripsRes.data || []).map(dbToVehicleMovement),
     positions: (positionsRes.data || []).map((p: any) => ({
       id: p.id,
       title: p.title || p.name,
@@ -734,9 +738,7 @@ export const db = {
       .upsert(siteToDb(s), { onConflict: 'id' })
       .select('id')
       .single();
-    if (error) {
-      console.error('insertSite:', error);
-    }
+    if (error) { console.error('insertSite:', error); throw error; }
     return data;
   },
   async updateSite(id: string, s: Partial<Site>) {
@@ -748,44 +750,44 @@ export const db = {
     if (s.startDate !== undefined) update.start_date = s.startDate;
     if (s.endDate !== undefined) update.end_date = s.endDate;
     const { error } = await supabase.from('sites').update(update).eq('id', id);
-    if (error) console.error('updateSite:', error);
+    if (error) { console.error('updateSite:', error); throw error; }
   },
   async deleteSite(id: string) {
     const { error } = await supabase.from('sites').delete().eq('id', id);
-    if (error) console.error('deleteSite:', error);
+    if (error) { console.error('deleteSite:', error); throw error; }
   },
   async setSites(sites: Site[]) {
-    // nil UUID — valid UUID that no real row ever has; lets PostgREST delete all rows
-    const NIL_UUID = '00000000-0000-0000-0000-000000000000';
-    const { error: delErr } = await supabase.from('sites').delete().neq('id', NIL_UUID);
-    if (delErr) console.error('setSites delete:', delErr);
-
+    // Task 3: Differential Upsert Fix
     if (sites.length > 0) {
-      // Use upsert so any row that survived the delete gets overwritten
-      // instead of hitting the sites_name_client_unique constraint.
-      const { error } = await supabase
-        .from('sites')
-        .upsert(sites.map(siteToDb), { onConflict: 'id' });
-      if (error) console.error('setSites upsert:', error);
+      const { error: upsertErr } = await supabase.from('sites').upsert(sites.map(siteToDb));
+      if (upsertErr) { console.error('setSites upsert:', upsertErr); throw upsertErr; }
+      
+      const ids = sites.map(s => s.id);
+      const { error: delErr } = await supabase.from('sites').delete().not('id', 'in', `(${ids.join(',')})`);
+      if (delErr) { console.error('setSites delete orphans:', delErr); throw delErr; }
+    } else {
+      const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+      const { error: delErr } = await supabase.from('sites').delete().neq('id', NIL_UUID);
+      if (delErr) { console.error('setSites clear all:', delErr); throw delErr; }
     }
   },
 
   // Pending Sites
   async insertPendingSite(p: SiteQuestionnaire) {
     const { error } = await supabase.from('pending_sites').insert(pendingSiteToDb(p));
-    if (error) console.error('insertPendingSite:', error);
+    if (error) { console.error('insertPendingSite:', error); throw error; }
   },
   async updatePendingSite(id: string, p: Partial<SiteQuestionnaire>) {
     // For pending sites, we overwrite the whole object as we're saving all phases.
     if (p.id) {
        const mapped = pendingSiteToDb(p as SiteQuestionnaire);
        const { error } = await supabase.from('pending_sites').update(mapped).eq('id', id);
-       if (error) console.error('updatePendingSite:', error);
+       if (error) { console.error('updatePendingSite:', error); throw error; }
     }
   },
   async deletePendingSite(id: string) {
     const { error } = await supabase.from('pending_sites').delete().eq('id', id);
-    if (error) console.error('deletePendingSite:', error);
+    if (error) { console.error('deletePendingSite:', error); throw error; }
   },
   async setPendingSites(sites: SiteQuestionnaire[]) {
     const NIL_UUID = '00000000-0000-0000-0000-000000000000';
@@ -848,7 +850,7 @@ export const db = {
   // Employees
   async insertEmployee(e: Employee) {
     const { error } = await supabase.from('employees').insert(employeeToDb(e));
-    if (error) console.error('insertEmployee:', error);
+    if (error) { console.error('insertEmployee:', error); throw error; }
   },
   async updateEmployee(id: string, e: Partial<Employee>) {
     const update: any = {};
@@ -896,7 +898,7 @@ export const db = {
     if (e.lashmaExpiryDate !== undefined) update.lashma_expiry_date = e.lashmaExpiryDate;
     if (e.secondaryDepartments !== undefined) update.secondary_departments = e.secondaryDepartments;
     const { error } = await supabase.from('employees').update(update).eq('id', id);
-    if (error) console.error('updateEmployee:', error);
+    if (error) { console.error('updateEmployee:', error); throw error; }
   },
   async bulkUpdateEmployees(ids: string[], e: Partial<Employee>) {
     if (ids.length === 0) return;
@@ -932,12 +934,12 @@ export const db = {
       const { error } = await supabase
         .from('attendance_records')
         .upsert(chunk, { onConflict: 'id' });
-      if (error) console.error(`insertAttendance chunk ${i / CHUNK_SIZE + 1}:`, error);
+      if (error) { console.error(`insertAttendance chunk ${i / CHUNK_SIZE + 1}:`, error); throw error; }
     }
   },
   async deleteAttendanceByDate(date: string) {
     const { error } = await supabase.from('attendance_records').delete().eq('date', date);
-    if (error) console.error('deleteAttendanceByDate:', error);
+    if (error) { console.error('deleteAttendanceByDate:', error); throw error; }
   },
   async deleteAttendanceByIds(ids: string[]) {
     if (ids.length === 0) return;
@@ -979,11 +981,11 @@ export const db = {
       update[map[k] || k] = v;
     });
     const { error } = await supabase.from('invoices').update(update).eq('id', id);
-    if (error) console.error('updateInvoice:', error);
+    if (error) { console.error('updateInvoice:', error); throw error; }
   },
   async deleteInvoice(id: string) {
     const { error } = await supabase.from('invoices').delete().eq('id', id);
-    if (error) console.error('deleteInvoice:', error);
+    if (error) { console.error('deleteInvoice:', error); throw error; }
   },
 
   // Pending Invoices

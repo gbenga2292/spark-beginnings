@@ -107,6 +107,7 @@ export function Attendance() {
   const [dbStaffTypeFilter, setDbStaffTypeFilter] = useState<'OFFICE' | 'FIELD' | 'All'>('All');
   const [dbSiteFilter, setDbSiteFilter] = useState('All');
   const [dbShiftFilter, setDbShiftFilter] = useState('All');
+  const [dbDateFilter, setDbDateFilter] = useState<Date | undefined>(undefined);
 
   // ─── Calendar Status Logic ─────────────────────────────────
   const attendanceStatusMap = useMemo(() => {
@@ -278,6 +279,10 @@ export function Attendance() {
       if (dbShiftFilter !== 'All') {
         if (dbShiftFilter === 'Day' && r.day !== 'Yes') return false;
         if (dbShiftFilter === 'Night' && r.night !== 'Yes') return false;
+      }
+      if (dbDateFilter) {
+        const selectedDateStr = format(dbDateFilter, 'yyyy-MM-dd');
+        if (normalizeDate(r.date) !== selectedDateStr) return false;
       }
       return true;
     }).sort((a, b) => {
@@ -1283,6 +1288,45 @@ export function Attendance() {
                 value={dbSearchTerm}
                 onChange={(e) => setDbSearchTerm(e.target.value)}
               />
+            </div>
+
+            <div className="flex items-center gap-1.5 ml-auto">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={`h-8 px-3 text-xs font-medium flex items-center justify-between gap-2 rounded-lg border-slate-200 shadow-sm hover:bg-slate-50 transition-colors ${dbDateFilter ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white text-slate-600'}`}
+                  >
+                    <div className="flex items-center gap-2">
+                       <CalendarIcon className={`h-3.5 w-3.5 ${dbDateFilter ? 'text-indigo-500' : 'text-slate-400'}`} />
+                       <span>{dbDateFilter ? format(dbDateFilter, 'PPP') : 'Filter by Date'}</span>
+                    </div>
+                    {dbDateFilter && (
+                      <div 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDbDateFilter(undefined);
+                        }}
+                        className="hover:bg-indigo-100 p-0.5 rounded-md transition-colors"
+                      >
+                        <Trash2 className="h-3 w-3 text-indigo-400" />
+                      </div>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-[120]" align="end">
+                  <DayPicker
+                    mode="single"
+                    selected={dbDateFilter}
+                    onSelect={setDbDateFilter}
+                    className="p-3 border-none shadow-none"
+                    classNames={{
+                      day_selected: "bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg",
+                      day_today: "text-indigo-600 font-bold border-b-2 border-indigo-600",
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 

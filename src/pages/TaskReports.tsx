@@ -44,7 +44,7 @@ function buildYearList(subtasks: { createdAt?: string }[]): number[] {
     return Array.from(set).sort((a, b) => b - a); // newest first
 }
 
-export default function Reports() {
+export function TaskReports() {
     useAuth(); // keep auth context alive
     return <AnalyticsDashboard />;
 }

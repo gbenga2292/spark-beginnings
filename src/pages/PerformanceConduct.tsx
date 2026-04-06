@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback } from '@/src/components/ui/avatar';
 import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 
-export default function PerformanceConduct() {
+export function PerformanceConduct() {
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);

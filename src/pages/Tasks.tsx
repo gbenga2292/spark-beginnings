@@ -58,7 +58,7 @@ const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { st
 type PriorityFilter = TaskPriority | 'all';
 
 /* ─── Main export ──────────────────────────────────────────────────────────── */
-export default function Tasks() {
+export function Tasks() {
   const { user: currentUser } = useAuth();
   const { isPersonal } = useWorkspace();
   if (isPersonal) return <PersonalTasksView />;
@@ -261,12 +261,12 @@ function PersonalTasksView() {
               if (tab.value !== 'all' && count === 0) return null;
               return (
                 <button key={tab.value} onClick={() => setStatusFilter(tab.value)}
-                  className={`relative px-4 py-2 text-sm font-medium transition-colors rounded-t-md ${isActive ? "text-violet-600 dark:text-violet-400" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"}`}>
+                  className={`relative px-4 py-2 text-sm font-medium transition-colors rounded-t-md ${isActive ? "text-indigo-600 dark:text-indigo-400" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"}`}>
                   {tab.label}
                   {count > 0 && (
-                    <span className={`ml-1.5 text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${isActive ? "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400" : "bg-muted text-muted-foreground"}`}>{count}</span>
+                    <span className={`ml-1.5 text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${isActive ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400" : "bg-muted text-muted-foreground"}`}>{count}</span>
                   )}
-                  {isActive && <motion.div layoutId="personal-status-indicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-500 rounded-full" />}
+                  {isActive && <motion.div layoutId="personal-status-indicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 rounded-full" />}
                 </button>
               );
             })}
@@ -275,12 +275,12 @@ function PersonalTasksView() {
           {/* Task list */}
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
             {filtered.length === 0 ? (
-              <div className="text-center py-24 bg-card border border-violet-100 dark:border-violet-900/30 rounded-xl">
+              <div className="text-center py-24 bg-card border border-indigo-100 dark:border-indigo-900/30 rounded-xl">
                 <p className="text-4xl mb-3">📋</p>
                 <p className="text-base font-medium text-foreground">No personal tasks yet</p>
                 <p className="text-sm text-muted-foreground mt-1">Create your first private task to get started.</p>
                 <button onClick={() => setShowCreate(true)}
-                  className="mt-4 px-5 py-2 rounded-full bg-violet-600 text-white text-sm font-medium hover:bg-violet-500 transition-colors">
+                  className="mt-4 px-5 py-2 rounded-full bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-500 transition-colors">
                   + New Task
                 </button>
               </div>
@@ -296,12 +296,12 @@ function PersonalTasksView() {
 
                   return (
                     <div key={mt.id} id={`task-row-${mt.id}`}
-                      className={`bg-card border rounded-xl overflow-hidden hover:shadow-sm transition-all border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority as TaskPriority].border : 'border-l-violet-300 dark:border-l-violet-700'} border-violet-100 dark:border-violet-900/30`}>
+                      className={`bg-card border rounded-xl overflow-hidden hover:shadow-sm transition-all border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority as TaskPriority].border : 'border-l-indigo-300 dark:border-l-indigo-700'} border-indigo-100 dark:border-indigo-900/30`}>
                       {/* Task header */}
                       <div role="button" tabIndex={0}
                         onClick={() => toggle(mt.id)}
                         onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggle(mt.id)}
-                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-violet-50/50 dark:hover:bg-violet-950/20 transition-colors text-left cursor-pointer">
+                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 transition-colors text-left cursor-pointer">
                         <div className="text-muted-foreground flex-shrink-0">
                           {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                         </div>
@@ -313,7 +313,7 @@ function PersonalTasksView() {
                           <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                             <span>{progress.completed}/{progress.total} tasks</span>
                             <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div className="h-full rounded-full bg-violet-400 dark:bg-violet-500" style={{ width: `${pct}%` }} />
+                              <div className="h-full rounded-full bg-indigo-400 dark:bg-indigo-500" style={{ width: `${pct}%` }} />
                             </div>
                             <span className="font-medium">{pct}%</span>
                           </div>
@@ -333,7 +333,7 @@ function PersonalTasksView() {
                                     </span>
                                   )}
                                   {assignee && (
-                                    <span className="flex items-center gap-1 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 px-1.5 py-0.5 rounded-full" title="Assigned to">
+                                    <span className="flex items-center gap-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded-full" title="Assigned to">
                                       <div className={`w-3.5 h-3.5 rounded-full ${assignee.avatarColor} flex items-center justify-center text-white text-[7px] font-bold`}>
                                         {assignee.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                                       </div>
@@ -363,12 +363,12 @@ function PersonalTasksView() {
                         {isExpanded && (
                           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                            <div className="border-t border-violet-100 dark:border-violet-900/30">
+                            <div className="border-t border-indigo-100 dark:border-indigo-900/30">
                               {subs.length === 0 && (
                                 <p className="px-5 py-4 text-xs text-muted-foreground italic">No subtasks yet.</p>
                               )}
 
-                              <div className="divide-y divide-violet-50 dark:divide-violet-900/20">
+                              <div className="divide-y divide-indigo-50 dark:divide-indigo-900/20">
                                 {subs.map((sub, i) => {
                                   const sc2 = statusConfig[sub.status as SubTaskStatus];
                                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
@@ -377,10 +377,10 @@ function PersonalTasksView() {
                                       initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                                       transition={{ delay: i * 0.03, duration: 0.25 }}
                                       onClick={() => setOpenSubtaskId(sub.id ?? null)}
-                                      className="flex items-center gap-3 px-5 py-3 hover:bg-violet-50/60 dark:hover:bg-violet-950/30 transition-colors cursor-pointer group">
+                                      className="flex items-center gap-3 px-5 py-3 hover:bg-indigo-50/60 dark:hover:bg-indigo-950/30 transition-colors cursor-pointer group">
                                       <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc2.dot}`} />
                                       <div className="min-w-0 flex-1">
-                                        <p className={`text-sm font-medium truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"} group-hover:text-violet-600 transition-colors`}>
+                                        <p className={`text-sm font-medium truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"} group-hover:text-indigo-600 transition-colors`}>
                                           {sub.title}
                                         </p>
                                         <div className="flex items-center gap-2 mt-0.5">
@@ -407,7 +407,7 @@ function PersonalTasksView() {
                                 })}
                               </div>
 
-                              <div className="px-5 py-3 border-t border-violet-100 dark:border-violet-900/30 flex items-center justify-between gap-2">
+                              <div className="px-5 py-3 border-t border-indigo-100 dark:border-indigo-900/30 flex items-center justify-between gap-2">
                                 <AddSubtaskInline mainTaskId={mt.id} users={[]} onAdd={sub => addSubtask(sub)} isPersonal />
                                 <DeleteTaskButton onConfirm={() => deleteMainTask(mt.id)} />
                               </div>
@@ -1716,8 +1716,8 @@ function AddSubtaskInline({ mainTaskId, users, onAdd, isPersonal }: {
     setTitle(""); setDesc(""); setAssignedTo(""); setDeadline(""); setPriority(undefined); setOpen(false);
   };
 
-  const accentColor = isPersonal ? 'text-violet-600 hover:text-violet-700' : 'text-primary hover:text-primary/80';
-  const accentRing = isPersonal ? 'focus:ring-violet-200 border-violet-200/60 dark:border-violet-800/40' : 'focus:ring-primary/20 border-primary/20';
+  const accentColor = isPersonal ? 'text-indigo-600 hover:text-indigo-700' : 'text-primary hover:text-primary/80';
+  const accentRing = isPersonal ? 'focus:ring-indigo-200 border-indigo-200/60 dark:border-indigo-800/40' : 'focus:ring-primary/20 border-primary/20';
 
   if (!open) return (
     <button onClick={() => setOpen(true)} className={`flex items-center gap-1.5 text-xs font-semibold ${accentColor} transition-colors`}>
@@ -1727,7 +1727,7 @@ function AddSubtaskInline({ mainTaskId, users, onAdd, isPersonal }: {
 
   return (
     <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-      className={`space-y-3 rounded-xl p-4 border flex-1 shadow-sm w-full ${isPersonal ? 'bg-violet-50/50 dark:bg-violet-950/20 border-violet-200/60 dark:border-violet-800/40' : 'bg-primary/5 border-primary/20'}`}>
+      className={`space-y-3 rounded-xl p-4 border flex-1 shadow-sm w-full ${isPersonal ? 'bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200/60 dark:border-indigo-800/40' : 'bg-primary/5 border-primary/20'}`}>
       <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Subtask title *"
         className={`w-full px-3 py-2 rounded-lg border text-sm bg-card text-foreground focus:outline-none focus:ring-2 ${accentRing}`} />
       <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Description (optional)"
@@ -1751,7 +1751,7 @@ function AddSubtaskInline({ mainTaskId, users, onAdd, isPersonal }: {
       <div className="flex gap-2 justify-end pt-1">
         <button onClick={() => setOpen(false)} className="px-4 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:bg-muted transition-colors">Cancel</button>
         <button onClick={handleAdd}
-          className={`px-4 py-1.5 rounded-lg text-xs font-semibold hover:opacity-90 transition-colors shadow-sm ${isPersonal ? 'bg-violet-600 text-white hover:bg-violet-500' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}>Add Subtask</button>
+          className={`px-4 py-1.5 rounded-lg text-xs font-semibold hover:opacity-90 transition-colors shadow-sm ${isPersonal ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}>Add Subtask</button>
       </div>
     </motion.div>
   );
@@ -2059,9 +2059,9 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
               className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted transition-colors text-left"
             >
               <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-                <Bell className={`w-3.5 h-3.5 ${enableReminder ? 'text-violet-500' : 'text-muted-foreground'}`} />
+                <Bell className={`w-3.5 h-3.5 ${enableReminder ? 'text-indigo-500' : 'text-muted-foreground'}`} />
                 Time &amp; Reminder
-                {enableReminder && <span className="text-[11px] bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full font-semibold">On</span>}
+                {enableReminder && <span className="text-[11px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full font-semibold">On</span>}
               </span>
               <span className="text-xs text-muted-foreground">{enableReminder ? 'Hide' : 'Optional'}</span>
             </button>
@@ -2103,8 +2103,8 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
                             onClick={() => setReminderFreq(f as any)}
                             className={`py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${
                               reminderFreq === f
-                                ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700'
-                                : 'border-border text-muted-foreground hover:border-violet-300 hover:text-foreground'
+                                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700'
+                                : 'border-border text-muted-foreground hover:border-indigo-300 hover:text-foreground'
                             }`}
                           >
                             {FREQ_LABELS[f]}
@@ -2126,7 +2126,7 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
                           return (
                             <span
                               key={id}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800"
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
                             >
                               <div className={`w-3.5 h-3.5 rounded-full ${u?.avatarColor || 'bg-slate-400'} flex items-center justify-center text-white text-[7px] font-bold`}>
                                 {name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
@@ -2147,12 +2147,12 @@ function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, wor
           </div>
 
           <div className="flex justify-end gap-3 pt-1">
-            <button type="button" onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</button>
-            <button type="submit" disabled={!title.trim() || (enableReminder && !reminderAt)}
-              className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+            <Button type="button" onClick={onClose}
+              className="px-5 h-auto py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</Button>
+            <Button type="submit" disabled={!title.trim() || (enableReminder && !reminderAt)}
+              className="px-5 h-auto py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
               Create Task
-            </button>
+            </Button>
           </div>
         </form>
       </motion.div>
@@ -2456,12 +2456,12 @@ function EditTaskDialog({ task, users, onClose, onSave }: {
           <EditTaskReminderSection taskId={task.id} assignedTo={assignedTo.join(',')} users={users} />
 
           <div className="flex justify-end gap-3 pt-1">
-            <button type="button" onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</button>
-            <button type="submit" disabled={!title.trim()}
-              className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+            <Button type="button" onClick={onClose}
+              className="px-5 h-auto py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</Button>
+            <Button type="submit" disabled={!title.trim()}
+              className="px-5 h-auto py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
               Save Changes
-            </button>
+            </Button>
           </div>
         </form>
       </motion.div>
@@ -2515,9 +2515,9 @@ function EditTaskReminderSection({ taskId, assignedTo, users }: { taskId: string
         className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted transition-colors text-left"
       >
         <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <Bell className={`w-3.5 h-3.5 ${enableReminder ? 'text-violet-500' : 'text-muted-foreground'}`} />
+          <Bell className={`w-3.5 h-3.5 ${enableReminder ? 'text-indigo-500' : 'text-muted-foreground'}`} />
           Time &amp; Reminder
-          {enableReminder && <span className="text-[11px] bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full font-semibold">On</span>}
+          {enableReminder && <span className="text-[11px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full font-semibold">On</span>}
         </span>
         <span className="text-xs text-muted-foreground">{enableReminder ? 'Hide' : 'Optional'}</span>
       </button>
@@ -2559,8 +2559,8 @@ function EditTaskReminderSection({ taskId, assignedTo, users }: { taskId: string
                       onClick={() => { setReminderFreq(f as any); setSaved(false); }}
                       className={`py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${
                         reminderFreq === f
-                          ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700'
-                          : 'border-border text-muted-foreground hover:border-violet-300 hover:text-foreground'
+                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700'
+                          : 'border-border text-muted-foreground hover:border-indigo-300 hover:text-foreground'
                       }`}
                     >
                       {FREQ_LABELS[f]}
@@ -2582,7 +2582,7 @@ function EditTaskReminderSection({ taskId, assignedTo, users }: { taskId: string
                     return (
                       <span
                         key={id}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
                       >
                         <div className={`w-3.5 h-3.5 rounded-full ${u?.avatarColor || 'bg-slate-400'} flex items-center justify-center text-white text-[7px] font-bold`}>
                           {name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
@@ -2606,7 +2606,7 @@ function EditTaskReminderSection({ taskId, assignedTo, users }: { taskId: string
                     ? 'bg-green-500 text-white border border-green-500'
                     : !reminderAt
                     ? 'bg-muted text-muted-foreground border border-border cursor-not-allowed opacity-50'
-                    : 'bg-violet-600 hover:bg-violet-700 text-white border border-violet-600'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-600'
                 }`}
               >
                 <Bell className="w-3.5 h-3.5" />
@@ -3078,12 +3078,12 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-1">
-            <button type="button" onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</button>
-            <button type="submit" disabled={!title.trim()}
-              className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+            <Button type="button" onClick={onClose}
+              className="px-5 h-auto py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</Button>
+            <Button type="submit" disabled={!title.trim()}
+              className="px-5 h-auto py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
               Save Changes
-            </button>
+            </Button>
           </div>
         </form>
       </motion.div>

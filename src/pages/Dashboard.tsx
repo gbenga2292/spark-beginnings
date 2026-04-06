@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { useAppStore } from '@/src/store/appStore';
 import { useAppData } from '@/src/contexts/AppDataContext';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 import {
     Users, AlertCircle, Clock, UserPlus, CheckCircle2, Filter,
     UserX, CalendarOff, FileText, Briefcase, TrendingUp, MapPin,
@@ -267,28 +268,25 @@ export function Dashboard() {
 
     const availableYears = Array.from({ length: Math.max(filterYear - 2023 + 1, 5) }, (_, i) => 2023 + i).reverse();
 
+    useSetPageTitle(
+        'Dashboard',
+        'Operational & Workforce Overview',
+        <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+            <Filter className="h-4 w-4 text-slate-400 mx-2 hidden sm:block" />
+            <select className="bg-transparent text-sm font-medium outline-none py-1 pr-2 text-slate-700 cursor-pointer border-r border-slate-200"
+                value={filterMonth ?? ''} onChange={e => setFilterMonth(e.target.value === '' ? null : Number(e.target.value))}>
+                <option value="">All Months</option>
+                {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+            <select className="bg-transparent text-sm font-medium outline-none py-1 pl-2 text-slate-700 cursor-pointer"
+                value={filterYear} onChange={e => setFilterYear(Number(e.target.value))}>
+                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+        </div>
+    );
+
     return (
         <div className="flex flex-col gap-6 pb-10">
-            {/* Header + Filters */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
-                    <p className="text-slate-500 mt-1">Operational & Workforce Overview</p>
-                </div>
-                <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-                    <Filter className="h-4 w-4 text-slate-400 mx-2" />
-                    <select className="bg-transparent text-sm font-medium outline-none py-1 pr-2 text-slate-700 cursor-pointer border-r border-slate-200"
-                        value={filterMonth ?? ''} onChange={e => setFilterMonth(e.target.value === '' ? null : Number(e.target.value))}>
-                        <option value="">All Months</option>
-                        {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                    </select>
-                    <select className="bg-transparent text-sm font-medium outline-none py-1 pl-2 text-slate-700 cursor-pointer"
-                        value={filterYear} onChange={e => setFilterYear(Number(e.target.value))}>
-                        {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
-                </div>
-            </div>
-
             {/* TOP KPI CARDS */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                 <Card className="shadow-sm border-slate-200">

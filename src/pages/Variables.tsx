@@ -346,7 +346,7 @@ export function Variables() {
       } else if (type === 'leaveType') {
         state.setLeaveTypes(useAppStore.getState().leaveTypes.map(lt => lt === oldValue ? newValue : lt));
         if (propagate) {
-           (state.leaves || []).filter(l => l.leaveType === oldValue).forEach(l => state.updateLeaveRecord?.(l.id, { leaveType: newValue }));
+           (state.leaves || []).filter(l => l.leaveType === oldValue).forEach(l => state.updateLeave?.(l.id, { leaveType: newValue }));
         }
       } else if (type === 'ledgerCategory') {
         state.updateLedgerCategory(id!, { name: newValue });

@@ -37,7 +37,7 @@ const FREQ_COLORS: Record<ReminderFrequency, string> = {
   once:         'bg-slate-100 text-slate-600 border-slate-200',
   hourly:       'bg-blue-50 text-blue-600 border-blue-200',
   every_6_hours:'bg-indigo-50 text-indigo-600 border-indigo-200',
-  daily:        'bg-violet-50 text-violet-600 border-violet-200',
+  daily:        'bg-indigo-50 text-indigo-600 border-indigo-200',
   weekly:       'bg-purple-50 text-purple-600 border-purple-200',
   monthly:      'bg-pink-50 text-pink-600 border-pink-200',
 };
@@ -81,7 +81,7 @@ const toneIconStyles = {
 };
 
 /* ─── Main Component ────────────────────────────────────────────────────────── */
-export default function Reminders() {
+export function TaskReminders() {
   const { user: currentUser } = useAuth();
   const { reminders, addReminder, updateReminder, deleteReminder, toggleReminderActive, users } = useAppData();
   const { wsMembers: activeUsers, wsTasks: mainTasks } = useWorkspace();
@@ -211,10 +211,10 @@ export default function Reminders() {
         </div>
         <div className="space-y-2">
           {reminders.map(rem => (
-            <div key={rem.id} className={`p-2.5 rounded-xl border transition-all group ${rem.isActive ? 'bg-card border-border hover:border-violet-200 hover:shadow-sm' : 'bg-muted/30 border-border/50 opacity-70'}`}>
+            <div key={rem.id} className={`p-2.5 rounded-xl border transition-all group ${rem.isActive ? 'bg-card border-border hover:border-indigo-200 hover:shadow-sm' : 'bg-muted/30 border-border/50 opacity-70'}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <div className={`w-1.5 h-1.5 rounded-full ${rem.isActive ? 'bg-violet-500' : 'bg-muted-foreground'}`} />
+                  <div className={`w-1.5 h-1.5 rounded-full ${rem.isActive ? 'bg-indigo-500' : 'bg-muted-foreground'}`} />
                   <span className="text-xs font-semibold text-foreground truncate">{format(parseISO(rem.remindAt), 'h:mm a')}</span>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -278,16 +278,16 @@ export default function Reminders() {
                 const isCurrentMonth = isSameMonth(day, monthStart);
                 return (
                   <div key={day.toString()} onClick={() => setSelectedDate(day)}
-                    className={`p-2 border-b border-border/60 cursor-pointer transition-all hover:bg-muted/40 flex flex-col gap-1.5 ${!isCurrentMonth ? 'opacity-40 bg-muted/5' : ''} ${isSelected ? 'bg-violet-50/50 dark:bg-violet-900/10 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.5)] z-10' : ''} ${idx % 7 !== 6 ? 'border-r' : ''}`}>
+                    className={`p-2 border-b border-border/60 cursor-pointer transition-all hover:bg-muted/40 flex flex-col gap-1.5 ${!isCurrentMonth ? 'opacity-40 bg-muted/5' : ''} ${isSelected ? 'bg-indigo-50/50 dark:bg-indigo-900/10 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.5)] z-10' : ''} ${idx % 7 !== 6 ? 'border-r' : ''}`}>
                     <div className="flex items-center justify-between">
-                      <span className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${isToday(day) ? 'bg-violet-600 text-white shadow-sm' : isSelected ? 'bg-violet-200 text-violet-900 dark:bg-violet-800 dark:text-violet-100' : 'text-foreground'}`}>
+                      <span className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${isToday(day) ? 'bg-indigo-600 text-white shadow-sm' : isSelected ? 'bg-indigo-200 text-indigo-900 dark:bg-indigo-800 dark:text-indigo-100' : 'text-foreground'}`}>
                         {format(day, 'd')}
                       </span>
                     </div>
                     <div className="flex-1 overflow-y-auto space-y-1 mt-0.5 pr-1 no-scrollbar">
                       {dayReminders.slice(0, 3).map(r => (
-                        <div key={r.id} className={`text-[10px] font-medium px-1.5 py-1 rounded truncate flex items-center gap-1 border border-transparent ${r.isActive ? 'bg-violet-100/60 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 hover:border-violet-200' : 'bg-muted/50 text-muted-foreground'}`}>
-                          <div className={`w-1 h-1 rounded-full flex-shrink-0 ${r.isActive ? 'bg-violet-500' : 'bg-muted-foreground'}`} />
+                        <div key={r.id} className={`text-[10px] font-medium px-1.5 py-1 rounded truncate flex items-center gap-1 border border-transparent ${r.isActive ? 'bg-indigo-100/60 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 hover:border-indigo-200' : 'bg-muted/50 text-muted-foreground'}`}>
+                          <div className={`w-1 h-1 rounded-full flex-shrink-0 ${r.isActive ? 'bg-indigo-500' : 'bg-muted-foreground'}`} />
                           <span className="truncate">{format(parseISO(r.remindAt), 'h:mma')} - {r.title}</span>
                         </div>
                       ))}
@@ -380,15 +380,15 @@ export default function Reminders() {
         <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center mb-4">
-              <BellOff className="w-7 h-7 text-violet-400" />
+            <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center mb-4">
+              <BellOff className="w-7 h-7 text-indigo-400" />
             </div>
             <p className="text-sm font-semibold text-foreground">No reminders found</p>
             <p className="text-xs text-muted-foreground mt-1">
               {search ? 'Try a different search term.' : 'Hit "New Reminder" to create your first one.'}
             </p>
             {!search && (
-              <button onClick={openCreate} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-full bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition-colors">
+              <button onClick={openCreate} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors">
                 <Plus className="w-4 h-4" /> Create Reminder
               </button>
             )}
@@ -412,7 +412,7 @@ export default function Reminders() {
                         ? 'bg-red-50/50 dark:bg-red-950/20 border-red-200/60 dark:border-red-900/40'
                         : rel.tone === 'today'
                           ? 'bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-200/60 dark:border-indigo-900/30'
-                          : 'bg-card border-border hover:border-violet-200/60 hover:shadow-sm'
+                          : 'bg-card border-border hover:border-indigo-200/60 hover:shadow-sm'
                   }`}>
 
                   {/* Card header row */}
@@ -421,12 +421,12 @@ export default function Reminders() {
                     {/* Status dot */}
                     <div className={`mt-0.5 w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
                       rel.tone === 'overdue' ? 'bg-red-100 dark:bg-red-900/30' :
-                      rem.isActive ? 'bg-violet-100 dark:bg-violet-900/20' : 'bg-muted'
+                      rem.isActive ? 'bg-indigo-100 dark:bg-indigo-900/20' : 'bg-muted'
                     }`}>
                       {rel.tone === 'overdue'
                         ? <AlertCircle className="w-4.5 h-4.5 text-red-500" />
                         : rem.isActive
-                          ? <Bell className="w-4.5 h-4.5 text-violet-500" />
+                          ? <Bell className="w-4.5 h-4.5 text-indigo-500" />
                           : <BellOff className="w-4.5 h-4.5 text-muted-foreground" />
                       }
                     </div>
@@ -445,14 +445,14 @@ export default function Reminders() {
                         <div className="flex items-center gap-0.5 flex-shrink-0 ml-2">
                           <button onClick={() => setSelected(isSelected ? null : rem)}
                             title="View details"
-                            className={`p-1.5 rounded-lg transition-colors ${isSelected ? 'bg-violet-100 text-violet-600' : 'text-muted-foreground hover:bg-muted'}`}>
+                            className={`p-1.5 rounded-lg transition-colors ${isSelected ? 'bg-indigo-100 text-indigo-600' : 'text-muted-foreground hover:bg-muted'}`}>
                             <Eye className="w-3.5 h-3.5" />
                           </button>
                           {isOwner && (
                             <>
                               <button onClick={() => toggleReminderActive(rem.id)}
                                 title={rem.isActive ? 'Pause' : 'Resume'}
-                                className={`p-1.5 rounded-lg transition-colors ${rem.isActive ? 'text-violet-500 hover:bg-violet-50' : 'text-muted-foreground hover:bg-muted'}`}>
+                                className={`p-1.5 rounded-lg transition-colors ${rem.isActive ? 'text-indigo-500 hover:bg-indigo-50' : 'text-muted-foreground hover:bg-muted'}`}>
                                 {rem.isActive ? <ToggleRight className="w-3.5 h-3.5" /> : <ToggleLeft className="w-3.5 h-3.5" />}
                               </button>
                               <button onClick={() => openEdit(rem)} title="Edit"
@@ -552,7 +552,7 @@ export default function Reminders() {
                           {isOwner && (
                             <div className="col-span-2 sm:col-span-4 flex gap-2 pt-1 border-t border-border/40">
                               <button onClick={() => openEdit(rem)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-700 text-white transition-colors">
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
                                 <Edit3 className="w-3 h-3" /> Edit Reminder
                               </button>
                             </div>
@@ -585,8 +585,8 @@ export default function Reminders() {
 
               {/* Modal header */}
               <div className="flex items-center gap-3 px-6 py-4 border-b border-border flex-shrink-0">
-                <div className="w-9 h-9 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-                  <Bell className="w-4 h-4 text-violet-600" />
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                  <Bell className="w-4 h-4 text-indigo-600" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-base font-semibold text-foreground">{editingId ? 'Edit Reminder' : 'New Reminder'}</h3>
@@ -636,7 +636,7 @@ export default function Reminders() {
                   <div className="grid grid-cols-3 gap-2">
                     {(['once','hourly','every_6_hours','daily','weekly','monthly'] as ReminderFrequency[]).map(f => (
                       <button key={f} type="button" onClick={() => setForm(p => ({ ...p, frequency: f }))}
-                        className={`py-2 rounded-xl text-xs font-semibold border-2 transition-all ${form.frequency === f ? 'border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-900/20' : 'border-border text-muted-foreground hover:border-violet-300 hover:text-foreground'}`}>
+                        className={`py-2 rounded-xl text-xs font-semibold border-2 transition-all ${form.frequency === f ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20' : 'border-border text-muted-foreground hover:border-indigo-300 hover:text-foreground'}`}>
                         {FREQ_LABELS[f]}
                       </button>
                     ))}
@@ -662,12 +662,12 @@ export default function Reminders() {
                             const sel = form.recipientIds.includes(u.id);
                             return (
                               <button key={u.id} type="button" onClick={() => toggleRecipient(u.id)}
-                                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors ${sel ? 'bg-violet-50/50 dark:bg-violet-900/10' : ''}`}>
+                                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors ${sel ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}`}>
                                 <div className={`w-6 h-6 rounded-full ${u.avatarColor} flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0`}>
                                   {u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                                 </div>
                                 <span className="flex-1 text-left font-medium text-foreground text-xs">{u.name}</span>
-                                {sel && <Check className="w-3.5 h-3.5 text-violet-600 flex-shrink-0" />}
+                                {sel && <Check className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />}
                               </button>
                             );
                           })}
@@ -681,9 +681,9 @@ export default function Reminders() {
                         const u = activeUsers.find(u => u.id === id);
                         if (!u) return null;
                         return (
-                          <span key={id} className="flex items-center gap-1 px-2 py-0.5 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 rounded-full text-[11px] font-medium border border-violet-200 dark:border-violet-800">
+                          <span key={id} className="flex items-center gap-1 px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded-full text-[11px] font-medium border border-indigo-200 dark:border-indigo-800">
                             {u.name.split(' ')[0]}
-                            <button type="button" onClick={() => toggleRecipient(id)} className="hover:text-violet-500"><X className="w-3 h-3" /></button>
+                            <button type="button" onClick={() => toggleRecipient(id)} className="hover:text-indigo-500"><X className="w-3 h-3" /></button>
                           </span>
                         );
                       })}
@@ -708,7 +708,7 @@ export default function Reminders() {
                     <p className="text-[11px] text-muted-foreground">Also send email when this fires</p>
                   </div>
                   <button type="button" onClick={() => setForm(p => ({ ...p, sendEmail: !p.sendEmail }))} className="flex-shrink-0">
-                    {form.sendEmail ? <ToggleRight className="w-7 h-7 text-violet-600" /> : <ToggleLeft className="w-7 h-7 text-muted-foreground" />}
+                    {form.sendEmail ? <ToggleRight className="w-7 h-7 text-indigo-600" /> : <ToggleLeft className="w-7 h-7 text-muted-foreground" />}
                   </button>
                 </div>
 
@@ -721,14 +721,14 @@ export default function Reminders() {
 
                 {/* Footer */}
                 <div className="flex items-center justify-end gap-2 pt-1 pb-1">
-                  <button type="button" onClick={() => setShowForm(false)}
-                    className="px-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors">
+                  <Button type="button" onClick={() => setShowForm(false)}
+                    className="px-4 h-auto py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground bg-transparent hover:bg-muted transition-colors">
                     Cancel
-                  </button>
-                  <button type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors shadow-sm flex items-center gap-2">
+                  </Button>
+                  <Button type="submit"
+                    className="px-5 h-auto py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm flex items-center gap-2">
                     {editingId ? <><CheckCircle2 className="w-4 h-4" /> Save Changes</> : <><Plus className="w-4 h-4" /> Create</>}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </motion.div>

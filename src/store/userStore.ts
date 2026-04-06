@@ -91,6 +91,7 @@ export interface AppUser {
   email: string;
   password: string; // Not used with Supabase auth, kept for interface compat
   avatar?: string;
+  workspaceId: string;
   privileges: UserPrivileges;
   isActive: boolean;
   createdAt: string;
@@ -278,6 +279,7 @@ export const useUserStore = create<UserStore>()(
         if (merged.users) {
           merged.users = merged.users.map((u: AppUser) => ({
             ...u,
+            workspaceId: u.workspaceId || 'dcel-team',
             privileges: deepMergePrivileges(NO_ACCESS, u.privileges),
           }));
         }

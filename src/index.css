@@ -30,8 +30,8 @@
    ══════════════════════════════════════════════════════════════════════ */
 .rdp-day-fully button { background-color: #10b981 !important; color: #fff !important; border-radius: 9999px !important; font-weight: 600 !important; }
 .rdp-day-fully button:hover { background-color: #059669 !important; }
-.rdp-day-special button { background-color: #8b5cf6 !important; color: #fff !important; border-radius: 9999px !important; font-weight: 600 !important; }
-.rdp-day-special button:hover { background-color: #7c3aed !important; }
+.rdp-day-special button { background-color: var(--color-indigo-500, #3b82f6) !important; color: #fff !important; border-radius: 9999px !important; font-weight: 600 !important; }
+.rdp-day-special button:hover { background-color: var(--color-indigo-600, #2563eb) !important; }
 .rdp-day-partial button { background-color: #f59e0b !important; color: #1c1917 !important; border-radius: 9999px !important; font-weight: 600 !important; }
 .rdp-day-partial button:hover { background-color: #d97706 !important; }
 
@@ -250,44 +250,7 @@
   --color-indigo-950: #020617;
 }
 
-/* ══════════════════════════════════════════════════════════════════════
-   DARK MODE OVERRIDES
-   ══════════════════════════════════════════════════════════════════════ */
 
-/* ── Dark mode: surface overrides for pages that use plain Tailwind classes ── */
-.dark .bg-white          { background-color: rgb(30 41 59)  !important; }  /* slate-800 */
-.dark .bg-slate-50       { background-color: rgb(15 23 42)  !important; }  /* slate-950 */
-.dark .bg-slate-100      { background-color: rgb(30 41 59)  !important; }  /* slate-800 */
-.dark .border-slate-200  { border-color: rgb(51 65 85)      !important; }  /* slate-700 */
-.dark .border-slate-100  { border-color: rgb(51 65 85 / 60%) !important; } /* slate-700/60 */
-
-/* Text contrasts */
-.dark .text-slate-900    { color: rgb(241 245 249) !important; }  /* slate-100 */
-.dark .text-slate-800    { color: rgb(226 232 240) !important; }  /* slate-200 */
-.dark .text-slate-700    { color: rgb(203 213 225) !important; }  /* slate-300 */
-.dark .text-slate-600    { color: rgb(148 163 184) !important; }  /* slate-400 */
-
-/* Inputs / selects */
-.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-.dark select,
-.dark textarea {
-  background-color: rgb(30 41 59)  !important;  /* slate-800 */
-  border-color:     rgb(51 65 85)  !important;  /* slate-700 */
-  color:            rgb(226 232 240) !important; /* slate-200 */
-}
-
-/* Tables */
-.dark table          { color: rgb(226 232 240) !important; }
-.dark thead tr       { background-color: rgb(15 23 42) !important; }
-.dark tbody tr:hover { background-color: rgb(51 65 85 / 40%) !important; }
-
-/* Dialogs / modals */
-.dark [role="dialog"],
-.dark [data-radix-popper-content-wrapper] {
-  background-color: rgb(30 41 59) !important;
-  border-color:     rgb(51 65 85) !important;
-  color:            rgb(226 232 240) !important;
-}
 
 /* ══════════════════════════════════════════════════════════════════════
    SEMANTIC COLOR TOKENS — Tailwind v4

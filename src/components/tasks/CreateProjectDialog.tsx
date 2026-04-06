@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { X, FolderOpen, Plus, Trash2, Building2 } from "lucide-react";
 import type { AppUser } from "@/src/types/tasks";
 import { useAppStore } from "@/src/store/appStore";
+import { Button } from "@/src/components/ui/button";
 
 export function CreateProjectDialog({ 
   onClose, 
@@ -270,17 +271,17 @@ export function CreateProjectDialog({
           </div>
 
           <div className="flex justify-end gap-3 px-6 py-4 bg-muted/30 border-t border-border rounded-b-2xl flex-shrink-0">
-            <button type="button" onClick={onClose}
-              className="px-5 py-2 rounded-xl border border-input bg-background text-sm font-medium text-muted-foreground hover:bg-muted transition-colors shadow-sm">Cancel</button>
-            <button type="submit" 
+            <Button type="button" onClick={onClose}
+              className="px-5 py-2 h-auto rounded-xl border border-input bg-background text-sm font-medium text-muted-foreground hover:bg-muted transition-colors shadow-sm">Cancel</Button>
+            <Button type="submit" 
               disabled={
                 !name.trim() || 
                 (projectStatus !== 'Pending' && (!startDate || !durationDays)) || 
                 (projectStatus === 'Ended' && !endDate)
               }
-              className="px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+              className="px-5 py-2 h-auto rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
               {isEditing ? "Save Changes" : "Create Project Note"}
-            </button>
+            </Button>
           </div>
         </form>
       </motion.div>

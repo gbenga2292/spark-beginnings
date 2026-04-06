@@ -15,7 +15,7 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 const MODULE_COLORS: Record<string, string> = {
   Dashboard:   'bg-indigo-100 text-indigo-700',
   HR:          'bg-teal-100 text-teal-700',
-  Clients:     'bg-violet-100 text-violet-700',
+  Clients:     'bg-indigo-100 text-indigo-700',
   Account:     'bg-amber-100 text-amber-700',
   Tasks:       'bg-blue-100 text-blue-700',
   Operations:  'bg-orange-100 text-orange-700',

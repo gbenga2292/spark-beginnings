@@ -70,7 +70,7 @@ function urgencyScore(sub: { deadline?: string; status: string }) {
 }
 
 /* ─── Router ──────────────────────────────────────────────────────────────── */
-export default function Dashboard() {
+export function TaskDashboard() {
   const { user: currentUser } = useAuth();
   const { isPersonal } = useWorkspace();
   if (isPersonal) return <PersonalSpaceDashboard />;

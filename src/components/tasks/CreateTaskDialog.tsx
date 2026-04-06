@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/src/components/task_ui/dialog";
 import { X } from "lucide-react";
+import { Button } from "@/src/components/ui/button";
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -144,20 +145,20 @@ export function CreateTaskDialog({ open, onOpenChange, onSubmit }: CreateTaskDia
 
           {/* Actions */}
           <div className="flex gap-3 pt-2">
-            <button
+            <Button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="flex-1 py-2 rounded-full border border-border bg-card text-muted-foreground text-sm font-medium hover:bg-muted transition-colors"
+              className="flex-1 h-auto py-2 rounded-full border border-border bg-card text-muted-foreground text-sm font-medium hover:bg-muted transition-colors"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={!title.trim() || !assignee.trim()}
-              className="flex-1 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+              className="flex-1 h-auto py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
             >
               Create Task
-            </button>
+            </Button>
           </div>
         </form>
       </DialogContent>

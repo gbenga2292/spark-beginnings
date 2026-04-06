@@ -80,7 +80,7 @@ const PRIV_GROUPS: PG[] = [
     ],
   },
   {
-    name: 'Clients', icon: Building2, color: 'violet',
+    name: 'Clients', icon: Building2, color: 'indigo',
     pages: [
       { key: 'sites', label: 'Sites & Clients', parentKey: 'sites', masterField: 'canView',
         fields: [
@@ -130,7 +130,6 @@ const PRIV_GROUPS: PG[] = [
 const COLORS: Record<string, { bg: string; text: string; border: string; badge: string }> = {
   indigo:  { bg: 'bg-indigo-50',  text: 'text-indigo-700',  border: 'border-indigo-200',  badge: 'bg-indigo-100 text-indigo-700' },
   teal:    { bg: 'bg-teal-50',    text: 'text-teal-700',    border: 'border-teal-200',    badge: 'bg-teal-100 text-teal-700' },
-  violet:  { bg: 'bg-violet-50',  text: 'text-violet-700',  border: 'border-violet-200',  badge: 'bg-violet-100 text-violet-700' },
   amber:   { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   badge: 'bg-amber-100 text-amber-700' },
   emerald: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700' },
   blue:    { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200',    badge: 'bg-blue-100 text-blue-700' },
@@ -165,7 +164,7 @@ export function UserForm() {
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
 
-  const { users, presets, addUser, updateUser, addPreset } = useUserStore();
+  const { users, presets, addUser, updateUser, addPreset, getCurrentUser } = useUserStore();
   const { employees } = useAppStore();
   const editingUser = isEdit ? users.find((u) => u.id === id) ?? null : null;
 
@@ -268,6 +267,7 @@ export function UserForm() {
             name, 
             email, 
             password: '', 
+            workspaceId: getCurrentUser()?.workspaceId || 'dcel-team',
             privileges, 
             isActive, 
             createdAt: new Date().toISOString() 

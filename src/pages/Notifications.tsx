@@ -27,7 +27,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   system: 'System',
 };
 
-export default function Notifications() {
+export function NotificationsPage() {
   useSetPageTitle('Notifications', 'All notifications and alerts');
   const navigate = useNavigate();
   const { updateReminder } = useAppData();
