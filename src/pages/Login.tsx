@@ -49,6 +49,13 @@ export function Login() {
     setError('');
     setIsLoading(true);
 
+    // Domain validation
+    if (!email.toLowerCase().endsWith('@dewaterconstruct.com')) {
+      setError('Only @dewaterconstruct.com email addresses are allowed.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const { error: authError } = await signIn(email, password);
       if (authError) {

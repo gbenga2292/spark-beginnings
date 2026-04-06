@@ -7,6 +7,7 @@ import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice
 import { generateId } from '@/src/lib/utils';
 import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
 import { useNetworkStore } from '@/src/store/networkStore';
+import { toast } from '@/src/components/ui/toast';
 
 /** Fills in any missing privilege sections using NO_ACCESS defaults. */
 function backfillPrivileges(
@@ -437,7 +438,7 @@ export function useRealtimeData(isAuthenticated: boolean) {
                   // Case 1: User was deactivated → immediate sign-out
                   if (newRow.is_active === false) {
                     console.warn('[Auth] Current user was deactivated. Signing out.');
-                    alert('⚠️ Your account has been deactivated by an administrator. You will be signed out.');
+                    toast.error('⚠️ Your account has been deactivated by an administrator. You will be signed out.');
                     supabase.auth.signOut();
                     return;
                   }

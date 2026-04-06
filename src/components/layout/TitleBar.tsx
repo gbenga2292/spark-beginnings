@@ -4,6 +4,7 @@ import { useTheme } from '@/src/hooks/useTheme';
 import { useUserStore } from '@/src/store/userStore';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useNavigate as useRRNavigate } from 'react-router-dom';
+import { showConfirm } from '@/src/components/ui/toast';
 
 const getElectronAPI = () => (window as any).electronAPI;
 
@@ -174,8 +175,8 @@ export function TitleBar() {
           {/* Sign Out Button */}
           {isLoggedIn && (
             <button
-              onClick={() => {
-                if (window.confirm('Are you sure you want to sign out?')) {
+              onClick={async () => {
+                if (await showConfirm('Are you sure you want to sign out?')) {
                   signOut();
                 }
               }}

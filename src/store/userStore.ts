@@ -67,7 +67,7 @@ export interface FinancialReportsPriv {
 export interface LedgerPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canImport: boolean; canExport: boolean; }
 
 // ─── Settings ────────────────────────────────────────────────
-export interface VariablesPriv { canView: boolean; canEdit: boolean; canImport: boolean; canExport: boolean; }
+export interface VariablesPriv { canView: boolean; canEdit: boolean; canImport: boolean; canExport: boolean; canBackup: boolean; canRestore: boolean; }
 export interface UsersPriv     { canView: boolean; canManage: boolean; }
 export interface ActivityLogPriv { canView: boolean; canExport: boolean; }
 
@@ -144,7 +144,7 @@ export const FULL_ACCESS: UserPrivileges = {
   payroll:          { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true, canViewWithholdingSchedule: true },
   financialReports: { canView: true, canExport: true, canViewAmounts: true, canViewPayrollSummary: true, canViewLoansAndAdvances: true },
   ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
-  variables:        { canView: true, canEdit: true, canImport: true, canExport: true },
+  variables:        { canView: true, canEdit: true, canImport: true, canExport: true, canBackup: true, canRestore: true },
   users:            { canView: true, canManage: true },
   tasks:            { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: true },
   operations:       { canView: true, canViewAnalytics: true },
@@ -176,7 +176,7 @@ export const NO_ACCESS: UserPrivileges = {
   payroll:          { canView: false, canGenerate: false, canViewAmounts: false, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false, canViewWithholdingSchedule: false },
   financialReports: { canView: false, canExport: false, canViewAmounts: false, canViewPayrollSummary: false, canViewLoansAndAdvances: false },
   ledger:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
-  variables:        { canView: false, canEdit: false, canImport: false, canExport: false },
+  variables:        { canView: false, canEdit: false, canImport: false, canExport: false, canBackup: false, canRestore: false },
   users:            { canView: false, canManage: false },
   tasks:            { canView: false, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false },
   operations:       { canView: false, canViewAnalytics: false },

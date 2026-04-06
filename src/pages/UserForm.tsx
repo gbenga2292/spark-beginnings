@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useUserStore, AppUser, UserPrivileges, FULL_ACCESS, NO_ACCESS, PrivilegePreset } from '@/src/store/userStore';
 import { useAppStore } from '@/src/store/appStore';
+import { toast } from '@/src/components/ui/toast';
 import { supabase } from '@/src/integrations/supabase/client';
 import { generateId } from '@/src/lib/utils';
 
@@ -150,6 +151,8 @@ const PRIV_GROUPS: PG[] = [
           { key: 'canEdit', label: 'Edit Variables' },
           { key: 'canImport', label: 'Import' },
           { key: 'canExport', label: 'Export' },
+          { key: 'canBackup', label: 'Backup (Full System)' },
+          { key: 'canRestore', label: 'Restore (Full System)' },
         ] },
       { key: 'activityLog', label: 'Activity Logs', parentKey: 'activityLog', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View Logs' }, { key: 'canExport', label: 'Export' }] },
@@ -270,12 +273,26 @@ export function UserForm() {
 
   const handleSave = async () => {
     if (!name.trim() || !email.trim()) return;
+    
+    // Domain validation
+    if (!email.toLowerCase().endsWith('@dewaterconstruct.com')) {
+      toast.error('Only @dewaterconstruct.com email addresses are allowed.');
+      return;
+    }
+
     setIsSaving(true);
     try {
       if (isEdit && editingUser) {
         const data: Partial<AppUser> = { name, email, privileges, isActive };
         if (password.trim()) data.password = password;
         updateUser(editingUser.id, data);
+        
+        // Sync back to employee if name matches
+        const emp = employees.find(e => `${e.firstname} ${e.surname}`.trim() === name);
+        if (emp && emp.email !== email) {
+          useAppStore.getState().updateEmployee(emp.id, { email });
+        }
+        
         navigate('/users');
       } else {
         if (!password.trim()) {
@@ -302,6 +319,13 @@ export function UserForm() {
             isActive, 
             createdAt: new Date().toISOString() 
           });
+
+          // Sync back to employee
+          const emp = employees.find(e => `${e.firstname} ${e.surname}`.trim() === name);
+          if (emp && emp.email !== email) {
+            useAppStore.getState().updateEmployee(emp.id, { email });
+          }
+
           navigate('/users');
         } else {
           throw new Error('User creation response was empty');
@@ -309,7 +333,7 @@ export function UserForm() {
       }
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'An error occurred while creating the user');
+      toast.error(err.message || 'An error occurred while creating the user');
     } finally {
       setIsSaving(false);
     }
@@ -346,18 +370,33 @@ export function UserForm() {
             <label className="text-xs font-semibold text-slate-600">Full Name *</label>
             <select
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                const selectedName = e.target.value;
+                setName(selectedName);
+                const emp = employees.find(emp => `${emp.firstname} ${emp.surname}`.trim() === selectedName);
+                if (emp?.email) {
+                  setEmail(emp.email);
+                }
+              }}
               className="flex w-full h-9 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
             >
               <option value="" disabled>Select Employee...</option>
-              {employees.map(emp => {
-                const fullName = `${emp.firstname} ${emp.surname}`.trim();
-                return (
-                  <option key={emp.id} value={fullName}>
-                    {fullName} {emp.employeeCode ? `(${emp.employeeCode})` : ''}
-                  </option>
-                );
-              })}
+              {employees
+                .filter(emp => {
+                  const fullName = `${emp.firstname} ${emp.surname}`.trim();
+                  // If we are editing, always show the current user's name
+                  if (isEdit && editingUser && editingUser.name === fullName) return true;
+                  // Otherwise, only show employees who don't have an account yet
+                  return !users.some(u => u.name === fullName);
+                })
+                .map(emp => {
+                  const fullName = `${emp.firstname} ${emp.surname}`.trim();
+                  return (
+                    <option key={emp.id} value={fullName}>
+                      {fullName} {emp.employeeCode ? `(${emp.employeeCode})` : ''}
+                    </option>
+                  );
+                })}
               {name && !employees.find(e => `${e.firstname} ${e.surname}`.trim() === name) && (
                 <option value={name}>{name}</option>
               )}
@@ -365,13 +404,13 @@ export function UserForm() {
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-600">Email Address *</label>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jane@company.com" className="h-9 text-sm" />
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@dewaterconstruct.com" className="h-9 text-sm" autoComplete="off" />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <label className="text-xs font-semibold text-slate-600">{isEdit ? 'New Password (leave blank to keep)' : 'Password *'}</label>
             <div className="relative max-w-sm flex items-center gap-4">
               <div className="relative flex-1">
-                <Input type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="********" className="h-9 text-sm pr-9" />
+                <Input type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="********" className="h-9 text-sm pr-9" autoComplete="new-password" />
                 <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600">
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>

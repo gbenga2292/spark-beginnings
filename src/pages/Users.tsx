@@ -10,6 +10,7 @@ import {
 import { useUserStore, AppUser, UserPrivileges } from '@/src/store/userStore';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { toast, showConfirm } from '@/src/components/ui/toast';
 
 /* ── Color map for module badges ──────────────────────────────── */
 const MODULE_COLORS: Record<string, string> = {
@@ -71,7 +72,8 @@ export function Users() {
 
   const handleDeleteUser = async (u: AppUser, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm(`Are you sure you want to completely delete the user ${u.name}? This action cannot be reversed.`)) return;
+    const ok = await showConfirm(`Are you sure you want to completely delete the user ${u.name}? This action cannot be reversed.`);
+    if (!ok) return;
     
     setIsDeleting(u.id);
     try {
@@ -83,9 +85,10 @@ export function Users() {
 
       // Successfully completely severed from Supabase, now remove locally
       deleteUser(u.id);
+      toast.success('User deleted successfully.');
     } catch (err: any) {
       console.error(err);
-      alert('Failed to delete user: ' + err.message);
+      toast.error('Failed to delete user: ' + err.message);
     } finally {
       setIsDeleting(null);
     }

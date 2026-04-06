@@ -28,7 +28,7 @@ import {
   CalendarDays
 } from 'lucide-react';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
-
+import { toast, showConfirm } from '@/src/components/ui/toast';
 
 const THEME_OPTIONS: { id: ColorTheme; label: string; swatches: string[] }[] = [
   { id: 'default', label: 'Indigo',  swatches: ['#4f46e5', '#6366f1', '#818cf8'] },
@@ -141,7 +141,8 @@ export function Profile() {
   };
 
   const handleUnenrollMfa = async () => {
-    if (!window.confirm("Are you sure you want to disable Two-Factor Authentication? This makes your account less secure.")) return;
+    const ok = await showConfirm("Are you sure you want to disable Two-Factor Authentication? This makes your account less secure.");
+    if (!ok) return;
     try {
       for (const factor of factors) {
         await supabase.auth.mfa.unenroll({ factorId: factor.id });

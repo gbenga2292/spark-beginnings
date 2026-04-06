@@ -1214,7 +1214,7 @@ function FilesFeed({ subtask, getSubtaskComments, users }: { subtask: any; getSu
     const api = (window as any).electronAPI;
     if (api?.shellOpenPath) api.shellOpenPath(filePath);
     else if (api?.showInFolder) api.showInFolder(filePath);
-    else { navigator.clipboard.writeText(filePath).catch(() => {}); alert(`Path copied to clipboard:\n${filePath}`); }
+    else { navigator.clipboard.writeText(filePath).catch(() => {}); toast.success(`Path copied to clipboard:\n${filePath}`); }
   };
 
   return (

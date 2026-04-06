@@ -13,6 +13,7 @@ import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
 
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { toast } from '@/src/components/ui/toast';
 
 export function CheckoutManager() {
   const { assets } = useOperations();
@@ -152,7 +153,7 @@ export function CheckoutManager() {
                 onClick={() => {
                   if(activeStep < 2) setActiveStep(prev => prev + 1);
                   else {
-                    alert('Checkout Processed Successfully!');
+                    toast.success('Checkout Processed Successfully!');
                     setActiveStep(0);
                     setSelectedAssetId('');
                     setEmployeeName('');

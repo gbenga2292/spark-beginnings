@@ -17,6 +17,7 @@ import { toast } from '@/src/components/ui/toast';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { exportFullAppToExcel, restoreFullAppFromExcel } from '@/src/lib/excelBackup';
+import { usePriv } from '@/src/hooks/usePriv';
 
 interface CompanyInfo {
   name: string;
@@ -91,6 +92,7 @@ export function Settings() {
   const state = useAppStore();
   const userState = useUserStore();
   const taskState = useAppData();
+  const priv = usePriv('variables');
 
   useEffect(() => {
     if (isElectron && ((window as any).electronAPI as any)?.getVersion) {
@@ -175,6 +177,7 @@ export function Settings() {
 
   /* ── Manual backup to file ───────────────────────────────── */
   const handleManualBackup = async (overrideBasePath?: string) => {
+    if (!priv.canBackup) return;
     setIsBackingUp(true);
     try {
       const backup = createBackupData();
@@ -213,6 +216,7 @@ export function Settings() {
 
   /* ── Restore from file ───────────────────────────────────── */
   const handleRestoreFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!priv.canRestore) return;
     const file = e.target.files?.[0];
     if (!file) return;
     setIsRestoring(true);
@@ -274,6 +278,7 @@ export function Settings() {
 
   /* ── Export full App state to Excel ──────────────────────── */
   const handleExportExcel = async (overrideBasePath?: string) => {
+    if (!priv.canBackup) return;
     setIsExportingExcel(true);
     try {
       const backupData = createBackupData();
@@ -300,6 +305,7 @@ export function Settings() {
 
   /* ── Restore full App state from Excel ───────────────────── */
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!priv.canRestore) return;
     const file = e.target.files?.[0];
     if (!file) return;
     setIsRestoringExcel(true);
@@ -395,6 +401,7 @@ export function Settings() {
   }, [backupSettings]);
 
   const selectBackupLocation = async () => {
+    if (!priv.canBackup && !priv.canEdit) return;
     if ((window as any).electronAPI?.openPathDialog) {
       const path = await (window as any).electronAPI.openPathDialog({ folder: true, title: 'Select Backup Folder' });
       if (path) {
@@ -413,7 +420,7 @@ export function Settings() {
     }
   };
 
-  const handleEditStart = () => { setDraft({ ...saved }); setIsEditing(true); };
+  const handleEditStart = () => { if (!priv.canEdit) return; setDraft({ ...saved }); setIsEditing(true); };
   const handleCancel    = () => { setDraft({ ...saved }); setIsEditing(false); };
   const handleSave      = async () => {
     setIsSavingDB(true);
@@ -466,9 +473,11 @@ export function Settings() {
           <TabsTrigger active={activeTab === 'general'}      onClick={() => setActiveTab('general')}      className="w-32">
             <Building       className="mr-2 h-4 w-4" /> General
           </TabsTrigger>
-          <TabsTrigger active={activeTab === 'backup'}       onClick={() => setActiveTab('backup')}       className="w-40">
-            <DatabaseBackup className="mr-2 h-4 w-4" /> Backup &amp; Restore
-          </TabsTrigger>
+          {priv.canBackup || priv.canRestore ? (
+            <TabsTrigger active={activeTab === 'backup'}       onClick={() => setActiveTab('backup')}       className="w-40">
+              <DatabaseBackup className="mr-2 h-4 w-4" /> Backup &amp; Restore
+            </TabsTrigger>
+          ) : null}
           <TabsTrigger active={activeTab === 'integrations'} onClick={() => setActiveTab('integrations')} className="w-36">
             <LinkIcon       className="mr-2 h-4 w-4" /> Integrations
           </TabsTrigger>
@@ -513,9 +522,11 @@ export function Settings() {
                       </Button>
                     </>
                   ) : (
-                    <Button variant="outline" size="sm" onClick={handleEditStart} className="gap-1.5 border-slate-300 hover:border-indigo-400 hover:text-indigo-600 h-9">
-                      <Pencil className="h-4 w-4" /> Edit
-                    </Button>
+                    priv.canEdit && (
+                      <Button variant="outline" size="sm" onClick={handleEditStart} className="gap-1.5 border-slate-300 hover:border-indigo-400 hover:text-indigo-600 h-9">
+                        <Pencil className="h-4 w-4" /> Edit
+                      </Button>
+                    )
                   )}
                 </div>
               </div>
@@ -617,7 +628,7 @@ export function Settings() {
                     </div>
                     <Button
                       onClick={() => handleManualBackup()}
-                      disabled={isBackingUp}
+                      disabled={isBackingUp || !priv.canBackup}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-11 rounded-xl shadow-sm"
                     >
                       {isBackingUp
@@ -650,7 +661,7 @@ export function Settings() {
                     />
                     <Button
                       variant="outline"
-                      disabled={isRestoring}
+                      disabled={isRestoring || !priv.canRestore}
                       onClick={() => restoreInputRef.current?.click()}
                       className="border-amber-300 text-amber-700 hover:bg-amber-50 gap-2 h-11 rounded-xl"
                     >
@@ -694,7 +705,7 @@ export function Settings() {
                     </div>
                     <Button
                       onClick={() => handleExportExcel()}
-                      disabled={isExportingExcel}
+                      disabled={isExportingExcel || !priv.canBackup}
                       className="bg-teal-600 hover:bg-teal-700 text-white gap-2 h-11 rounded-xl shadow-sm mt-2"
                     >
                       {isExportingExcel
@@ -727,7 +738,7 @@ export function Settings() {
                     />
                     <Button
                       variant="outline"
-                      disabled={isRestoringExcel}
+                      disabled={isRestoringExcel || !priv.canRestore}
                       onClick={() => restoreExcelInputRef.current?.click()}
                       className="border-amber-300 text-amber-700 hover:bg-amber-50 gap-2 h-11 rounded-xl mt-2"
                     >
@@ -761,9 +772,10 @@ export function Settings() {
                     {/* Toggle switch */}
                     <button
                       onClick={() => saveBackupSettings({ ...backupSettings, autoBackupEnabled: !backupSettings.autoBackupEnabled })}
+                      disabled={!priv.canEdit}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
                         backupSettings.autoBackupEnabled ? 'bg-emerald-500' : 'bg-slate-300'
-                      }`}
+                      } ${!priv.canEdit ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
                         backupSettings.autoBackupEnabled ? 'translate-x-6' : 'translate-x-1'
@@ -773,7 +785,7 @@ export function Settings() {
                 </div>
               </CardHeader>
               <CardContent className="px-6 py-6">
-                <div className={`grid md:grid-cols-2 lg:grid-cols-4 gap-5 transition-opacity ${backupSettings.autoBackupEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                <div className={`grid md:grid-cols-2 lg:grid-cols-4 gap-5 transition-opacity ${backupSettings.autoBackupEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'} ${!priv.canEdit ? 'pointer-events-none opacity-80' : ''}`}>
                   {/* Interval */}
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Backup Frequency</label>
