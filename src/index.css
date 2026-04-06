@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* ── Class-based dark mode (Tailwind v4) ─────────────────────────────
+   Without this, Tailwind v4 dark: variants respond to the OS
+   prefers-color-scheme media query, ignoring the .dark class that
+   our useTheme hook sets on <html>. This single line makes every
+   dark: utility across the entire app respect the theme toggle.
+   ─────────────────────────────────────────────────────────────────── */
+@variant dark (&:where(.dark, .dark *));
+
 /* ── Visible scrollbars — slim & tasteful ───────────────────────────── */
 * {
   scrollbar-width: thin;                     /* Firefox */
@@ -334,6 +342,68 @@
 .dark .text-muted-foreground { color: rgb(100 116 139) !important; }
 .dark .text-popover-foreground { color: rgb(226 232 240) !important; }
 .dark .border-border    { border-color: rgb(51 65 85)  !important; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   GLOBAL DARK MODE SURFACE & TEXT OVERRIDES
+   Many pages use hardcoded bg-white / text-slate-* without dark: variants.
+   These rules ensure all surfaces and text adapt correctly in dark mode
+   without requiring per-page edits.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── White & light-grey surfaces → dark slate ──────────────────────── */
+.dark .bg-white {
+  background-color: rgb(30 41 59) !important;        /* slate-800 */
+}
+.dark .bg-slate-50 {
+  background-color: rgb(15 23 42) !important;        /* slate-950 */
+}
+/* Handles bg-slate-50/50 and similar opacity variants */
+.dark [class*="bg-slate-50"] {
+  background-color: rgb(15 23 42 / 0.85) !important;
+}
+.dark .bg-slate-100 {
+  background-color: rgb(30 41 59) !important;        /* slate-800 */
+}
+.dark .bg-slate-200 {
+  background-color: rgb(51 65 85) !important;        /* slate-700 */
+}
+
+/* ── Text that would be invisible on dark surfaces ──────────────────── */
+/* These classes are widely used in table cells and form labels */
+.dark .text-slate-900 { color: rgb(226 232 240) !important; }  /* → slate-200 */
+.dark .text-slate-800 { color: rgb(203 213 225) !important; }  /* → slate-300 */
+.dark .text-slate-700 { color: rgb(148 163 184) !important; }  /* → slate-400 */
+/* slate-600 and below retain their own colour — readable on dark too */
+
+/* ── Borders that disappear on dark surfaces ────────────────────────── */
+.dark .border-slate-100 { border-color: rgb(51 65 85)  !important; }  /* slate-700 */
+.dark .border-slate-200 { border-color: rgb(51 65 85)  !important; }
+.dark .divide-slate-100 { border-color: rgb(51 65 85)  !important; }
+.dark .divide-slate-200 { border-color: rgb(51 65 85)  !important; }
+
+/* ── Form inputs / selects / textareas without dark: variants ───────── */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+.dark select,
+.dark textarea {
+  background-color: rgb(15 23 42)  !important;       /* slate-950 */
+  border-color:     rgb(51 65 85)  !important;       /* slate-700 */
+  color:            rgb(226 232 240) !important;     /* slate-200 */
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: rgb(71 85 105) !important;                  /* slate-600 */
+}
+
+/* ── Table rows / cells — prevent dark-text-on-dark blending ────────── */
+.dark table { color: rgb(203 213 225); }             /* slate-300 base */
+.dark thead tr,
+.dark .dark-thead { background-color: rgb(15 23 42) !important; } /* slate-950 */
+.dark tbody tr:hover { background-color: rgb(30 41 59 / 0.5) !important; }
+
+/* ── Ring-based focus outlines on dark inputs ───────────────────────── */
+.dark .ring-1 { --tw-ring-color: rgb(51 65 85); }
+.dark .ring-slate-100 { --tw-ring-color: rgb(51 65 85) !important; }
+.dark .ring-slate-200 { --tw-ring-color: rgb(51 65 85) !important; }
 
 /* ══════════════════════════════════════════════════════════════════════
    UI Layout Theme Systems

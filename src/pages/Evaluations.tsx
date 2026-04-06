@@ -13,8 +13,10 @@ import { useUserStore } from '@/src/store/userStore';
 import { Avatar, AvatarFallback } from '@/src/components/ui/avatar';
 import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { useTheme } from '@/src/hooks/useTheme';
 
 export function Evaluations() {
+  const { isDark } = useTheme();
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
@@ -87,13 +89,13 @@ export function Evaluations() {
   };
 
   const renderForm = () => (
-    <div className="flex flex-col h-full bg-slate-50 overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm shrink-0">
+    <div className={`flex flex-col h-full overflow-y-auto ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
+      <div className={`border-b px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm shrink-0 ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => { setIsAdding(false); setIsEditing(false); setFormData(emptyForm); }} className="hover:bg-slate-100 rounded-full h-8 w-8">
             <ArrowLeft className="h-4 w-4 text-slate-600" />
           </Button>
-          <h2 className="text-xl font-bold text-slate-900">
+          <h2 className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
             {isEditing ? 'Edit Evaluation' : 'New Performance Evaluation'}
           </h2>
         </div>
@@ -170,13 +172,13 @@ export function Evaluations() {
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] gap-4">
 
-      <div className="flex flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className={`flex flex-1 min-h-0 rounded-2xl shadow-sm border overflow-hidden ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
         {/* Left Sidebar */}
         {!(isAdding || isEditing) && !sidebarCollapsed && (
-        <div className="w-80 flex-shrink-0 border-r border-slate-200 flex flex-col bg-slate-50/50">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 space-y-3">
+        <div className={`w-80 flex-shrink-0 border-r flex flex-col ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-50/50 border-slate-200'}`}>
+          <div className={`p-4 border-b space-y-3 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
             <div className="flex justify-between items-center">
-              <h2 className="font-bold text-slate-800 flex items-center gap-2">
+              <h2 className={`font-bold flex items-center gap-2 ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
                 <UserCheck className="h-5 w-5 text-indigo-600" />
                 Active Directory
               </h2>
@@ -187,7 +189,7 @@ export function Evaluations() {
               <Input placeholder="Search employee..." className="pl-9 bg-slate-50 h-9" value={employeeSearch} onChange={e => setEmployeeSearch(e.target.value)} />
             </div>
             <select 
-              className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-sm focus:ring-indigo-500/20"
+              className={`h-9 w-full rounded-md border px-3 text-sm focus:ring-indigo-500/20 ${isDark ? 'bg-slate-700 border-slate-600 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-800'}`}
               value={filterDepartment}
               onChange={e => setFilterDepartment(e.target.value)}
             >
@@ -208,17 +210,29 @@ export function Evaluations() {
                   <div 
                     key={emp.id} 
                     onClick={() => { setSelectedEmployeeId(emp.id); setIsAdding(false); setIsEditing(false); }}
-                    className={`p-3 border-b border-slate-100 cursor-pointer transition-colors flex items-center justify-between ${isSelected ? 'bg-indigo-50 border-l-4 border-l-indigo-600' : 'hover:bg-slate-50 border-l-4 border-l-transparent bg-white dark:bg-slate-900'}`}
+                    className={`p-3 border-b cursor-pointer transition-colors flex items-center justify-between ${
+                      isSelected
+                        ? 'bg-indigo-50 border-l-4 border-l-indigo-600'
+                        : `border-l-4 border-l-transparent ${isDark ? 'bg-slate-900 border-slate-700/50 hover:bg-slate-800' : 'bg-white border-slate-100 hover:bg-slate-50'}`
+                    }`}
                   >
                     <div className="flex items-center gap-3">
-                        <Avatar className="h-9 w-9 border border-slate-200">
-                          <AvatarFallback className={`${isSelected ? 'bg-indigo-200 text-indigo-800' : 'bg-slate-100 text-slate-600'} font-bold text-[10px]`}>
+                        <Avatar className={`h-9 w-9 border ${isDark ? 'border-slate-600' : 'border-slate-200'}`}>
+                          <AvatarFallback className={`font-bold text-[10px] ${
+                            isSelected
+                              ? 'bg-indigo-200 text-indigo-800'
+                              : isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
+                          }`}>
                             {emp.firstname.charAt(0)}{emp.surname.charAt(0)}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <h4 className={`text-sm font-bold truncate max-w-[160px] ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{emp.surname} {emp.firstname}</h4>
-                          <p className={`text-[10px] font-medium uppercase mt-0.5 ${isSelected ? 'text-indigo-600' : 'text-slate-500'}`}>{emp.position}</p>
+                          <h4 className={`text-sm font-bold truncate max-w-[160px] ${
+                            isSelected ? 'text-indigo-900' : isDark ? 'text-slate-200' : 'text-slate-700'
+                          }`}>{emp.surname} {emp.firstname}</h4>
+                          <p className={`text-[10px] font-medium uppercase mt-0.5 ${
+                            isSelected ? 'text-indigo-600' : isDark ? 'text-slate-400' : 'text-slate-500'
+                          }`}>{emp.position}</p>
                         </div>
                     </div>
                     {hasReviewEvent && (
@@ -236,7 +250,7 @@ export function Evaluations() {
         )}
 
         {/* Right Content Area */}
-        <div className="flex-1 flex flex-col bg-slate-50/50 overflow-hidden">
+        <div className={`flex-1 flex flex-col overflow-hidden ${isDark ? 'bg-slate-950' : 'bg-slate-50/50'}`}>
           {!selectedEmployeeId ? (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-4 p-8">
                 <div className="h-24 w-24 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 shadow-sm">
@@ -251,9 +265,9 @@ export function Evaluations() {
             renderForm()
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="bg-white dark:bg-slate-900 border-b border-slate-200 p-6 flex justify-between items-center shrink-0 shadow-sm">
+                <div className={`border-b p-6 flex justify-between items-center shrink-0 shadow-sm ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{selectedEmp?.surname} {selectedEmp?.firstname}</h2>
+                    <h2 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{selectedEmp?.surname} {selectedEmp?.firstname}</h2>
                     <p className="text-sm font-medium text-slate-500 mt-1 uppercase tracking-wider text-[11px]">{selectedEmp?.position} &bull; {selectedEmp?.department}</p>
                   </div>
                   {priv.canAdd && (
@@ -265,15 +279,15 @@ export function Evaluations() {
                 
                 <div className="flex-1 overflow-y-auto p-6">
                   {empRecords.length === 0 ? (
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center shadow-sm">
+                    <div className={`border border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center shadow-sm ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
                         <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mb-4 border border-slate-200">
                           <ClipboardList className="h-8 w-8 text-slate-400" />
                         </div>
-                        <h3 className="font-bold text-slate-800 text-lg">No Evaluations</h3>
+                        <h3 className={`font-bold text-lg ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>No Evaluations</h3>
                         <p className="text-slate-500 text-sm mt-2 max-w-sm leading-relaxed">This employee does not have any recorded performance evaluations yet.</p>
                     </div>
                   ) : (
-                    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className={`rounded-xl shadow-sm border overflow-hidden ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
                         <Table>
                           <TableHeader>
                               <TableRow className="bg-slate-50/80">
