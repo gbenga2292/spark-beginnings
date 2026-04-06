@@ -91,6 +91,8 @@ export interface AppUser {
   email: string;
   password: string; // Not used with Supabase auth, kept for interface compat
   avatar?: string;
+  avatarColor?: string;
+  role?: string;
   workspaceId: string;
   privileges: UserPrivileges;
   isActive: boolean;

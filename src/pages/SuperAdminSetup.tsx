@@ -99,6 +99,7 @@ export function SuperAdminSetup() {
         name: form.name,
         email: form.email,
         password: '', // Not stored
+        workspaceId: 'dcel-team',
         privileges: FULL_ACCESS,
         isActive: true,
         createdAt: new Date().toISOString(),

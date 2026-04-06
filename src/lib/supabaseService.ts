@@ -797,41 +797,41 @@ export const db = {
       const { error } = await supabase
         .from('pending_sites')
         .upsert(sites.map(pendingSiteToDb), { onConflict: 'id' });
-      if (error) { console.error(); throw error; }
+      if (error) { console.error('Database error:', error); throw error; }
     }
   },
 
   // Clients
   async insertClient(name: string) {
     const { error } = await supabase.from('clients').insert({ name });
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteClient(name: string) {
     const { error } = await supabase.from('clients').delete().eq('name', name);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Positions
   async insertPosition(p: Position) {
     const { error } = await supabase.from('positions').insert({ id: p.id, title: p.title, department_id: p.departmentId });
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updatePosition(id: string, p: Partial<Position>) {
     const update: any = {};
     if (p.title !== undefined) update.title = p.title;
     if (p.departmentId !== undefined) update.department_id = p.departmentId;
     const { error } = await supabase.from('positions').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deletePosition(id: string) {
     const { error } = await supabase.from('positions').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Departments
   async insertDepartment(d: Department) {
     const { error } = await supabase.from('departments').insert({ id: d.id, name: d.name, staff_type: d.staffType, work_days_per_week: d.workDaysPerWeek, parent_department_id: d.parentDepartmentId || null });
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateDepartment(id: string, d: Partial<Department>) {
     const update: any = {};
@@ -840,11 +840,11 @@ export const db = {
     if (d.workDaysPerWeek !== undefined) update.work_days_per_week = d.workDaysPerWeek;
     if (d.parentDepartmentId !== undefined) update.parent_department_id = d.parentDepartmentId || null;
     const { error } = await supabase.from('departments').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteDepartment(id: string) {
     const { error } = await supabase.from('departments').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Employees
@@ -917,11 +917,11 @@ export const db = {
     if (e.startMonthOfPay !== undefined) update.start_month_of_pay = e.startMonthOfPay;
 
     const { error } = await supabase.from('employees').update(update).in('id', ids);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteEmployee(id: string) {
     const { error } = await supabase.from('employees').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Attendance
@@ -963,7 +963,7 @@ export const db = {
   // Invoices
   async insertInvoice(i: Invoice) {
     const { error } = await supabase.from('invoices').insert(invoiceToDb(i));
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateInvoice(id: string, i: Partial<Invoice>) {
     const update: any = {};
@@ -991,7 +991,7 @@ export const db = {
   // Pending Invoices
   async insertPendingInvoice(p: PendingInvoice) {
     const { error } = await supabase.from('pending_invoices').insert(pendingInvoiceToDb(p));
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updatePendingInvoice(id: string, p: Partial<PendingInvoice>) {
     const update: any = {};
@@ -1009,17 +1009,17 @@ export const db = {
       update[map[k] || k] = v;
     });
     const { error } = await supabase.from('pending_invoices').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deletePendingInvoice(id: string) {
     const { error } = await supabase.from('pending_invoices').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Salary Advances
   async insertSalaryAdvance(a: SalaryAdvance) {
     const { error } = await supabase.from('salary_advances').insert(salaryAdvanceToDb(a));
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateSalaryAdvance(id: string, a: Partial<SalaryAdvance>) {
     const update: any = {};
@@ -1034,17 +1034,17 @@ export const db = {
     if (a.approvedAt !== undefined) update.approved_at = a.approvedAt;
     if (a.rejectionNote !== undefined) update.rejection_note = a.rejectionNote;
     const { error } = await supabase.from('salary_advances').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteSalaryAdvance(id: string) {
     const { error } = await supabase.from('salary_advances').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Loans
   async insertLoan(l: Loan) {
     const { error } = await supabase.from('loans').insert(loanToDb(l));
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateLoan(id: string, l: Partial<Loan>) {
     const update: any = {};
@@ -1064,17 +1064,17 @@ export const db = {
     if (l.approvedAt !== undefined) update.approved_at = l.approvedAt;
     if (l.rejectionNote !== undefined) update.rejection_note = l.rejectionNote;
     const { error } = await supabase.from('loans').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteLoan(id: string) {
     const { error } = await supabase.from('loans').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Payments
   async insertPayment(p: Payment) {
     const { error } = await supabase.from('payments').insert(paymentToDb(p));
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updatePayment(id: string, p: Partial<Payment>) {
     const update: any = {};
@@ -1088,41 +1088,41 @@ export const db = {
     if (p.vat !== undefined) update.vat = p.vat;
     if (p.amountForVat !== undefined) update.amount_for_vat = p.amountForVat;
     const { error } = await supabase.from('payments').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deletePayment(id: string) {
     const { error } = await supabase.from('payments').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // VAT Payments
   async insertVatPayment(v: VatPayment) {
     const { error } = await supabase.from('vat_payments').insert(vatPaymentToDb(v));
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateVatPayment(id: string, v: Partial<VatPayment>) {
     const { error } = await supabase.from('vat_payments').update(v).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteVatPayment(id: string) {
     const { error } = await supabase.from('vat_payments').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Public Holidays
   async insertPublicHoliday(h: { id: string; date: string; name: string }) {
     const { error } = await supabase.from('public_holidays').insert(h);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deletePublicHoliday(id: string) {
     const { error } = await supabase.from('public_holidays').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Disciplinary
   async insertDisciplinaryRecord(d: DisciplinaryRecord) {
     const { error } = await supabase.from('disciplinary_records').insert(disciplinaryToDb(d));
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateDisciplinaryRecord(id: string, d: Partial<DisciplinaryRecord>) {
     const update: any = {};
@@ -1153,17 +1153,17 @@ export const db = {
     if (d.points !== undefined) update.points = d.points;
 
     const { error } = await supabase.from('disciplinary_records').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteDisciplinaryRecord(id: string) {
     const { error } = await supabase.from('disciplinary_records').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Evaluations
   async insertEvaluation(e: EvaluationRecord) {
     const { error } = await supabase.from('evaluations').insert(evaluationToDb(e));
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateEvaluation(id: string, e: Partial<EvaluationRecord>) {
     const update: any = {};
@@ -1178,11 +1178,11 @@ export const db = {
     if (e.employeeComment !== undefined) update.employee_comment = e.employeeComment;
     if (e.createdBy !== undefined) update.created_by = e.createdBy;
     const { error } = await supabase.from('evaluations').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteEvaluation(id: string) {
     const { error } = await supabase.from('evaluations').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Department Tasks
@@ -1192,13 +1192,13 @@ export const db = {
       onboarding_tasks: dt.onboardingTasks,
       offboarding_tasks: dt.offboardingTasks,
     }, { onConflict: 'department' });
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Leaves
   async insertLeave(l: LeaveRecord) {
     const { error } = await supabase.from('leaves').insert(leaveToDb(l));
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateLeave(id: string, l: Partial<LeaveRecord>) {
     const update: any = {};
@@ -1221,21 +1221,21 @@ export const db = {
     if (l.rejectionNote !== undefined) update.rejection_note = l.rejectionNote;
     if (l.approvalStatus !== undefined) update.approval_status = l.approvalStatus;
     const { error } = await supabase.from('leaves').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteLeave(id: string) {
     const { error } = await supabase.from('leaves').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Leave Types
   async insertLeaveType(name: string) {
     const { error } = await supabase.from('leave_types').insert({ name });
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteLeaveType(name: string) {
     const { error } = await supabase.from('leave_types').delete().eq('name', name);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Settings
@@ -1260,93 +1260,93 @@ export const db = {
     
     if (existingData) {
       const { error } = await supabase.from('app_settings').update(update).eq('id', existingData.id);
-      if (error) { console.error(); throw error; }
+      if (error) { console.error('Database error:', error); throw error; }
     } else {
       const { error } = await supabase.from('app_settings').insert([update]);
-      if (error) { console.error(); throw error; }
+      if (error) { console.error('Database error:', error); throw error; }
     }
   },
 
   // Profiles / Users
   async updateProfile(id: string, data: Partial<{ name: string; email: string; avatar: string; privileges: any; is_active: boolean }>) {
     const { error } = await supabase.from('profiles').update(data).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Presets
   async insertPreset(p: PrivilegePreset) {
     const { error } = await supabase.from('privilege_presets').insert({ id: p.id, name: p.name, privileges: p.privileges });
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updatePreset(id: string, p: Partial<PrivilegePreset>) {
     const update: any = {};
     if (p.name !== undefined) update.name = p.name;
     if (p.privileges !== undefined) update.privileges = p.privileges;
     const { error } = await supabase.from('privilege_presets').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deletePreset(id: string) {
     const { error } = await supabase.from('privilege_presets').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Ledger
   async insertLedgerCategory(cat: LedgerCategory) {
     const { error } = await supabase.from('ledger_categories').insert({ id: cat.id, name: cat.name });
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateLedgerCategory(id: string, cat: Partial<LedgerCategory>) {
     const { error } = await supabase.from('ledger_categories').update(cat).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteLedgerCategory(id: string) {
     const { error } = await supabase.from('ledger_categories').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   async insertLedgerVendor(v: LedgerVendor) {
     const { error } = await supabase.from('ledger_vendors').insert({ id: v.id, name: v.name, tin_number: v.tinNumber });
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateLedgerVendor(id: string, v: Partial<LedgerVendor>) {
     const update: any = {};
     if (v.name !== undefined) update.name = v.name;
     if (v.tinNumber !== undefined) update.tin_number = v.tinNumber;
     const { error } = await supabase.from('ledger_vendors').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteLedgerVendor(id: string) {
     const { error } = await supabase.from('ledger_vendors').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   async insertLedgerBank(b: LedgerBank) {
     const { error } = await supabase.from('ledger_banks').insert({ id: b.id, name: b.name });
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateLedgerBank(id: string, b: Partial<LedgerBank>) {
     const { error } = await supabase.from('ledger_banks').update(b).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteLedgerBank(id: string) {
     const { error } = await supabase.from('ledger_banks').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   async insertLedgerBeneficiaryBank(b: LedgerBeneficiaryBank) {
     const { error } = await supabase.from('ledger_beneficiary_banks').insert(ledgerBeneficiaryBankToDb(b));
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateLedgerBeneficiaryBank(id: string, b: Partial<LedgerBeneficiaryBank>) {
     const update: any = {};
     if (b.name !== undefined) update.name = b.name;
     if (b.accountNo !== undefined) update.account_no = b.accountNo;
     const { error } = await supabase.from('ledger_beneficiary_banks').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteLedgerBeneficiaryBank(id: string) {
     const { error } = await supabase.from('ledger_beneficiary_banks').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   async insertLedgerEntry(e: LedgerEntry) {
@@ -1393,7 +1393,7 @@ export const db = {
     if (update.enteredBy) mappedUpdate.entered_by = update.enteredBy;
 
     const { error } = await supabase.from('ledger_entries').update(mappedUpdate).in('id', ids);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async bulkInsertLedgerEntries(entries: LedgerEntry[]) {
     if (entries.length === 0) return;
@@ -1409,7 +1409,7 @@ export const db = {
   // Company Expenses
   async insertCompanyExpense(e: CompanyExpense) {
     const { error } = await supabase.from('company_expenses').insert(companyExpenseToDb(e));
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateCompanyExpense(id: string, e: Partial<CompanyExpense>) {
     const update: any = {};
@@ -1422,17 +1422,17 @@ export const db = {
       update[map[k] || k] = v;
     });
     const { error } = await supabase.from('company_expenses').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteCompanyExpense(id: string) {
     const { error } = await supabase.from('company_expenses').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Communication Logs
   async insertCommLog(l: CommLog) {
     const { error } = await supabase.from('comm_logs').insert(commLogToDb(l));
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateCommLog(id: string, l: Partial<CommLog>) {
     const update: any = {};
@@ -1452,17 +1452,17 @@ export const db = {
     if (l.followUpDone !== undefined) update.follow_up_done = l.followUpDone;
     update.updated_at = new Date().toISOString();
     const { error } = await supabase.from('comm_logs').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteCommLog(id: string) {
     const { error } = await supabase.from('comm_logs').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Staff Merit Records
   async insertStaffMeritRecord(r: StaffMeritRecord) {
     const { error } = await supabase.from('staff_merit_record').insert(staffMeritToDb(r));
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateStaffMeritRecord(id: string, r: Partial<StaffMeritRecord>) {
     const update: any = {};
@@ -1479,18 +1479,18 @@ export const db = {
     if (r.hrNotified !== undefined) update.hr_notified = r.hrNotified;
     if (r.incidentDate !== undefined) update.incident_date = r.incidentDate;
     const { error } = await supabase.from('staff_merit_record').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteStaffMeritRecord(id: string) {
     const { error } = await supabase.from('staff_merit_record').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async setPositions(positions: Position[]) {
     const NIL_UUID = '00000000-0000-0000-0000-000000000000';
     await supabase.from('positions').delete().neq('id', NIL_UUID);
     if (positions.length > 0) {
       const { error } = await supabase.from('positions').insert(positions.map(p => ({ id: p.id, title: p.title, department_id: p.departmentId })));
-      if (error) { console.error(); throw error; }
+      if (error) { console.error('Database error:', error); throw error; }
     }
   },
   async setDepartments(departments: Department[]) {
@@ -1501,14 +1501,14 @@ export const db = {
         id: d.id, name: d.name, staff_type: d.staffType, 
         work_days_per_week: d.workDaysPerWeek, parent_department_id: d.parentDepartmentId || null 
       })));
-      if (error) { console.error(); throw error; }
+      if (error) { console.error('Database error:', error); throw error; }
     }
   },
   async setClients(clientsNames: string[]) {
     await supabase.from('clients').delete().neq('name', '');
     if (clientsNames.length > 0) {
       const { error } = await supabase.from('clients').insert(clientsNames.map(name => ({ name })));
-      if (error) { console.error(); throw error; }
+      if (error) { console.error('Database error:', error); throw error; }
     }
   },
   async setPublicHolidays(holidays: { id: string, date: string, name: string }[]) {
@@ -1516,14 +1516,14 @@ export const db = {
     await supabase.from('public_holidays').delete().neq('id', NIL_UUID);
     if (holidays.length > 0) {
       const { error } = await supabase.from('public_holidays').insert(holidays.map(h => ({ id: h.id, date: h.date, name: h.name })));
-      if (error) { console.error(); throw error; }
+      if (error) { console.error('Database error:', error); throw error; }
     }
   },
   async setLeaveTypes(types: string[]) {
     await supabase.from('leave_types').delete().neq('name', '');
     if (types.length > 0) {
       const { error } = await supabase.from('leave_types').insert(types.map(name => ({ name })));
-      if (error) { console.error(); throw error; }
+      if (error) { console.error('Database error:', error); throw error; }
     }
   },
   async setLedgerCategories(cats: LedgerCategory[]) {
@@ -1531,7 +1531,7 @@ export const db = {
     await supabase.from('ledger_categories').delete().neq('id', NIL_UUID);
     if (cats.length > 0) {
       const { error } = await supabase.from('ledger_categories').insert(cats.map(c => ({ id: c.id, name: c.name })));
-      if (error) { console.error(); throw error; }
+      if (error) { console.error('Database error:', error); throw error; }
     }
   },
   async setLedgerVendors(vendors: LedgerVendor[]) {
@@ -1539,7 +1539,7 @@ export const db = {
     await supabase.from('ledger_vendors').delete().neq('id', NIL_UUID);
     if (vendors.length > 0) {
       const { error } = await supabase.from('ledger_vendors').insert(vendors.map(v => ({ id: v.id, name: v.name, tin_number: v.tinNumber })));
-      if (error) { console.error(); throw error; }
+      if (error) { console.error('Database error:', error); throw error; }
     }
   },
   async setLedgerBanks(banks: LedgerBank[]) {
@@ -1547,7 +1547,7 @@ export const db = {
     await supabase.from('ledger_banks').delete().neq('id', NIL_UUID);
     if (banks.length > 0) {
       const { error } = await supabase.from('ledger_banks').insert(banks.map(b => ({ id: b.id, name: b.name })));
-      if (error) { console.error(); throw error; }
+      if (error) { console.error('Database error:', error); throw error; }
     }
   },
   async setLedgerBeneficiaryBanks(banks: LedgerBeneficiaryBank[]) {
@@ -1555,7 +1555,7 @@ export const db = {
     await supabase.from('ledger_beneficiary_banks').delete().neq('id', NIL_UUID);
     if (banks.length > 0) {
       const { error } = await supabase.from('ledger_beneficiary_banks').insert(banks.map(b => ({ id: b.id, name: b.name, account_no: b.accountNo })));
-      if (error) { console.error(); throw error; }
+      if (error) { console.error('Database error:', error); throw error; }
     }
   },
   async setDepartmentTasksList(list: DepartmentTasks[]) {
@@ -1566,7 +1566,7 @@ export const db = {
         onboarding_tasks: d.onboardingTasks,
         offboarding_tasks: d.offboardingTasks
       })));
-      if (error) { console.error(); throw error; }
+      if (error) { console.error('Database error:', error); throw error; }
     }
   },
   async updateAttendanceRecord(id: string, a: Partial<AttendanceRecord>) {
@@ -1579,12 +1579,12 @@ export const db = {
     if (a.day !== undefined) update.day = a.day;
     if (a.night !== undefined) update.night = a.night;
     const { error } = await supabase.from('attendance_records').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   // Vehicles
   async insertVehicle(v: Vehicle) {
     const { error } = await supabase.from('vehicles').insert(vehicleToDb(v));
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async updateVehicle(id: string, v: Partial<Vehicle>) {
     const update: any = {};
@@ -1593,16 +1593,16 @@ export const db = {
     if (v.registration_number !== undefined) update.registration_number = v.registration_number;
     if (v.status !== undefined) update.status = v.status;
     const { error } = await supabase.from('vehicles').update(update).eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteVehicle(id: string) {
     const { error } = await supabase.from('vehicles').delete().eq('id', id);
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   },
 
   // Vehicle Trip Logs
   async insertVehicleTripRecords(logs: any[]) {
     const { error } = await supabase.from('vehicle_movement_log').insert(logs.map(vehicleMovementToDb));
-    if (error) { console.error(); throw error; }
+    if (error) { console.error('Database error:', error); throw error; }
   }
 };
