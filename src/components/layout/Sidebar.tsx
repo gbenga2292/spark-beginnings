@@ -90,7 +90,7 @@ const navigation: NavCategory[] = [
     items: [
       { name: 'Task Dashboard', href: '/tasks/dashboard', icon: BarChart2, privKey: 'tasks', privField: 'canViewDashboard' },
       { name: 'Task', href: '/tasks', icon: ClipboardCheck, privKey: 'tasks', privField: 'canViewMyTasks' },
-      { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'sites', privField: 'canView' },
+      { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'commLog', privField: 'canView' },
       { name: 'Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'tasks', privField: 'canViewReminders' },
       { name: 'Reports', href: '/tasks/reports', icon: BarChart3, privKey: 'tasks', privField: 'canViewReports' },
     ],
@@ -116,12 +116,12 @@ const navigation: NavCategory[] = [
     icon: Package,
     items: [
       { name: 'Overview', href: '/operations', icon: LayoutDashboard, privKey: 'operations', privField: 'canView' },
-      { name: 'Inventory', href: '/operations/assets', icon: Package, privKey: 'operations', privField: 'canManageAssets' },
-      { name: 'Waybills', href: '/operations/waybills', icon: FileText, privKey: 'operations', privField: 'canManageWaybills' },
-      { name: 'Quick Checkout', href: '/operations/checkout', icon: ShoppingCart, privKey: 'operations', privField: 'canManageLogistics' },
-      { name: 'Maintenance', href: '/operations/maintenance', icon: Activity, privKey: 'operations', privField: 'canManageAssets' },
-      { name: 'Vehicles', href: '/operations/vehicles', icon: Truck, privKey: 'operations', privField: 'canManageLogistics' },
-      { name: 'Sites', href: '/operations/sites', icon: MapPin, privKey: 'operations', privField: 'canView' },
+      { name: 'Inventory', href: '/operations/assets', icon: Package, privKey: 'opsInventory', privField: 'canView' },
+      { name: 'Waybills', href: '/operations/waybills', icon: FileText, privKey: 'opsWaybills', privField: 'canView' },
+      { name: 'Quick Checkout', href: '/operations/checkout', icon: ShoppingCart, privKey: 'opsCheckout', privField: 'canView' },
+      { name: 'Maintenance', href: '/operations/maintenance', icon: Activity, privKey: 'opsMaintenance', privField: 'canView' },
+      { name: 'Vehicles', href: '/operations/vehicles', icon: Truck, privKey: 'opsVehicles', privField: 'canView' },
+      { name: 'Sites', href: '/operations/sites', icon: MapPin, privKey: 'opsSites', privField: 'canView' },
     ],
   },
   // ── Clients ───────────────────────────────────────────────────────────────
@@ -139,7 +139,7 @@ const navigation: NavCategory[] = [
     items: [
       { name: 'Client Accounts', href: '/client-accounts', icon: ReceiptText, privKey: 'custom', privField: '', visible: (user: any) => user?.privileges?.billing?.canView || user?.privileges?.payments?.canView || user?.privileges?.payments?.canViewVat },
       { name: 'Payroll', href: '/payroll', icon: Wallet, privKey: 'payroll', privField: 'canView' },
-      { name: 'Non-Employee Directory', href: '/beneficiaries', icon: Users, privKey: 'payroll', privField: 'canView' },
+      { name: 'Non-Employee Directory', href: '/beneficiaries', icon: Users, privKey: 'beneficiaries', privField: 'canView' },
       { name: 'Ledger', href: '/ledger', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
       { name: 'Company Expenses', href: '/company-expenses', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
       { name: 'Account Reports', href: '/financial-reports', icon: BarChart3, privKey: 'financialReports', privField: 'canView' },
@@ -151,7 +151,7 @@ const navigation: NavCategory[] = [
     items: [
       { name: 'User Management', href: '/users', icon: ShieldCheck, privKey: 'users', privField: 'canView' },
       { name: 'Settings', href: '/settings', icon: Settings, privKey: 'variables', privField: 'canView' },
-      { name: 'Activity Log', href: '/activity-log', icon: History, privKey: 'variables', privField: 'canView' },
+      { name: 'Activity Log', href: '/activity-log', icon: History, privKey: 'activityLog', privField: 'canView' },
     ],
   },
 ];
@@ -201,15 +201,6 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       
       let pagePriv = (currentUser.privileges[item.privKey] as unknown) as Record<string, boolean>;
       
-      // Fallback for Operations module: If user has 'sites' view access, grant them full 'operations' menu visibility.
-      // This ensures existing admin sessions can see all new features immediately.
-      if (item.privKey === 'operations' && currentUser.privileges['sites']?.canView) {
-        if (!pagePriv || !pagePriv.canView || !pagePriv[item.privField]) {
-           // Allow all operations fields if they have site access
-           return true; 
-        }
-      }
-
       if (item.privField !== 'canView' && pagePriv?.['canView'] !== true) return false;
       return pagePriv?.[item.privField] === true;
     });

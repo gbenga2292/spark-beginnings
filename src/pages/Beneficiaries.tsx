@@ -1452,7 +1452,7 @@ export function Beneficiaries() {
               <Download className="h-4 w-4 text-slate-500" /> Export CSV
             </Button>
           )}
-          {priv.canAdd && (
+          {priv.canImport && (
             <label className="flex items-center gap-2 bg-white text-slate-700 hover:bg-slate-50 shadow-sm border border-slate-200 rounded-md h-9 px-4 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap">
               <Upload className="h-4 w-4 text-slate-500" /> Import Data
               <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />

@@ -25,12 +25,7 @@ export function ProtectedRoute({ children, requiredModule }: ProtectedRouteProps
   // Check privileges if a specific module is required
   if (requiredModule && appUser) {
     const privs = appUser.privileges as any;
-    // Fallback for Operations module: If user has 'sites' view access, grant them 'operations' access.
-    // This matches the Sidebar visibility logic for consistent UX.
-    let hasAccess = privs?.[requiredModule]?.canView;
-    if (requiredModule === 'operations' && !hasAccess && privs?.['sites']?.canView) {
-      hasAccess = true;
-    }
+    const hasAccess = privs?.[requiredModule]?.canView;
 
     if (hasAccess === false) {
       console.warn(`Access denied to module: ${requiredModule}`);

@@ -132,7 +132,7 @@ function AppContent() {
         <Route index element={<Page label="Dashboard"><ProtectedRoute requiredModule="dashboard"><Dashboard /></ProtectedRoute></Page>} />
         <Route path="attendance" element={<Page label="Attendance"><ProtectedRoute requiredModule="attendance"><Attendance /></ProtectedRoute></Page>} />
         <Route path="employees" element={<Page label="Employees"><ProtectedRoute requiredModule="employees"><Employees /></ProtectedRoute></Page>} />
-        <Route path="beneficiaries" element={<Page label="Beneficiaries"><ProtectedRoute requiredModule="payroll"><Beneficiaries /></ProtectedRoute></Page>} />
+        <Route path="beneficiaries" element={<Page label="Beneficiaries"><ProtectedRoute requiredModule="beneficiaries"><Beneficiaries /></ProtectedRoute></Page>} />
         <Route path="organogram" element={<Page label="Organogram"><ProtectedRoute requiredModule="employees"><Organogram /></ProtectedRoute></Page>} />
         <Route path="sites" element={<Page label="Sites"><ProtectedRoute requiredModule="sites"><Sites /></ProtectedRoute></Page>} />
         <Route path="sites/onboarding/:id" element={<Page label="Site Onboarding"><ProtectedRoute requiredModule="sites"><SiteOnboarding /></ProtectedRoute></Page>} />
@@ -167,7 +167,7 @@ function AppContent() {
         <Route path="tasks/reminders" element={<Page label="Task Reminders"><ProtectedRoute requiredModule="tasks"><TaskReminders /></ProtectedRoute></Page>} />
         <Route path="tasks/reports" element={<Page label="Task Reports"><ProtectedRoute requiredModule="tasks"><TaskReports /></ProtectedRoute></Page>} />
 
-        <Route path="comm-log" element={<Page label="Communication Log"><ProtectedRoute requiredModule="sites"><CommLog /></ProtectedRoute></Page>} />
+        <Route path="comm-log" element={<Page label="Communication Log"><ProtectedRoute requiredModule="commLog"><CommLog /></ProtectedRoute></Page>} />
 
         {/* Operations Module */}
         <Route path="operations/*" element={
@@ -176,12 +176,12 @@ function AppContent() {
               <OperationsProvider>
                 <Routes>
                   <Route index element={<OperationsDashboard />} />
-                  <Route path="assets" element={<AssetManager />} />
-                  <Route path="waybills" element={<WaybillManager />} />
-                  <Route path="checkout" element={<QuickCheckout />} />
-                  <Route path="maintenance" element={<MaintenanceManager />} />
-                  <Route path="vehicles" element={<VehicleManager />} />
-                  <Route path="sites" element={<SiteManager />} />
+                  <Route path="assets" element={<ProtectedRoute requiredModule="opsInventory"><AssetManager /></ProtectedRoute>} />
+                  <Route path="waybills" element={<ProtectedRoute requiredModule="opsWaybills"><WaybillManager /></ProtectedRoute>} />
+                  <Route path="checkout" element={<ProtectedRoute requiredModule="opsCheckout"><QuickCheckout /></ProtectedRoute>} />
+                  <Route path="maintenance" element={<ProtectedRoute requiredModule="opsMaintenance"><MaintenanceManager /></ProtectedRoute>} />
+                  <Route path="vehicles" element={<ProtectedRoute requiredModule="opsVehicles"><VehicleManager /></ProtectedRoute>} />
+                  <Route path="sites" element={<ProtectedRoute requiredModule="opsSites"><SiteManager /></ProtectedRoute>} />
                   <Route path="*" element={<Navigate to="/operations" replace />} />
                 </Routes>
               </OperationsProvider>
@@ -189,7 +189,8 @@ function AppContent() {
           </Page>
         } />
 
-        <Route path="activity-log" element={<Page label="Activity Log"><ProtectedRoute requiredModule="variables"><ActivityLog /></ProtectedRoute></Page>} />
+
+        <Route path="activity-log" element={<Page label="Activity Log"><ProtectedRoute requiredModule="activityLog"><ActivityLog /></ProtectedRoute></Page>} />
         <Route path="notifications" element={<Page label="Notifications"><ProtectedRoute><NotificationsPage /></ProtectedRoute></Page>} />
         <Route path="employee-analytics" element={<Page label="Employee Analytics"><ProtectedRoute requiredModule="employees"><EmployeeAnalytics /></ProtectedRoute></Page>} />
 

@@ -43,13 +43,18 @@ const PRIV_GROUPS: PG[] = [
           { key: 'canDeleteTasks', label: 'Delete Tasks', danger: true },
         ]
       },
+      { key: 'commLog', label: 'External Communications', parentKey: 'commLog', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add/Log' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canExport', label: 'Export' }
+        ]
+      },
     ],
   },
   {
     name: 'HR', icon: UsersIcon, color: 'teal',
     pages: [
       { key: 'employees', label: 'Employees', parentKey: 'employees', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewSalary', label: 'View Salary', special: true }, { key: 'canExport', label: 'Export' }] },
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewSalary', label: 'View Salary', special: true }, { key: 'canViewAnalytics', label: 'Analytics' }, { key: 'canViewOrganogram', label: 'Organogram' }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
       { key: 'onboarding', label: 'Onboarding', parentKey: 'onboarding', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
       { key: 'attendance', label: 'Daily Register', parentKey: 'attendance', masterField: 'canView',
@@ -69,14 +74,35 @@ const PRIV_GROUPS: PG[] = [
   {
     name: 'Operations', icon: Package, color: 'orange',
     pages: [
-      { key: 'operations', label: 'Operations Module', parentKey: 'operations', masterField: 'canView',
+      { key: 'operations', label: 'Operations Overview', parentKey: 'operations', masterField: 'canView',
         fields: [
-          { key: 'canView', label: 'Overview & Sites' },
-          { key: 'canManageAssets', label: 'Inventory & Maintenance' },
-          { key: 'canManageWaybills', label: 'Waybills' },
-          { key: 'canManageLogistics', label: 'Quick Checkout' },
+          { key: 'canView', label: 'View Dashboard' },
           { key: 'canViewAnalytics', label: 'Analytics', special: true },
         ] },
+      { key: 'opsInventory', label: 'Inventory (Assets)', parentKey: 'opsInventory', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true },
+          { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' },
+        ] },
+      { key: 'opsWaybills', label: 'Waybills', parentKey: 'opsWaybills', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true },
+          { key: 'canExport', label: 'Export' },
+        ] },
+      { key: 'opsCheckout', label: 'Quick Checkout / Logistics', parentKey: 'opsCheckout', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Process Checkout' },
+        ] },
+      { key: 'opsMaintenance', label: 'Maintenance', parentKey: 'opsMaintenance', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Log Maintenance' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true },
+        ] },
+      { key: 'opsVehicles', label: 'Vehicles', parentKey: 'opsVehicles', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true },
+        ] },
+      { key: 'opsSites', label: 'Ops Site Manager', parentKey: 'opsSites', masterField: 'canView',
+        fields: [{ key: 'canView', label: 'View Assigned Sites' }] },
     ],
   },
   {
@@ -105,10 +131,12 @@ const PRIV_GROUPS: PG[] = [
           { key: 'canViewPayeSchedule', label: 'PAYE Schedule' }, { key: 'canViewPensionSchedule', label: 'Pension Schedule' },
           { key: 'canViewNsitfSchedule', label: 'NSITF Schedule' }, { key: 'canViewWithholdingSchedule', label: 'Withholding Tax Schedule' },
         ] },
+      { key: 'beneficiaries', label: 'Non-Employee Directory', parentKey: 'beneficiaries', masterField: 'canView',
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
       { key: 'financialReports', label: 'Financial Reports', parentKey: 'financialReports', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canExport', label: 'Export' }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canViewPayrollSummary', label: 'Payroll Summary Tab' }, { key: 'canViewLoansAndAdvances', label: 'Loans & Advances Tab' }] },
       { key: 'ledger', label: 'Financial Ledger & Expenses', parentKey: 'ledger', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Record Entries' }, { key: 'canEdit', label: 'Edit Variables' }, { key: 'canDelete', label: 'Delete Entries', danger: true }, { key: 'canExport', label: 'Export' }] },
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Record Entries' }, { key: 'canEdit', label: 'Edit Variables' }, { key: 'canDelete', label: 'Delete Entries', danger: true }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
     ],
   },
   {
@@ -118,11 +146,13 @@ const PRIV_GROUPS: PG[] = [
         fields: [{ key: 'canView', label: 'View Users' }, { key: 'canManage', label: 'Add / Edit Users', danger: true }] },
       { key: 'variables', label: 'App Settings & Variables', parentKey: 'variables', masterField: 'canView',
         fields: [
-          { key: 'canView', label: 'View (also grants Settings page & Activity Log access)' },
+          { key: 'canView', label: 'View Settings' },
           { key: 'canEdit', label: 'Edit Variables' },
           { key: 'canImport', label: 'Import' },
           { key: 'canExport', label: 'Export' },
         ] },
+      { key: 'activityLog', label: 'Activity Logs', parentKey: 'activityLog', masterField: 'canView',
+        fields: [{ key: 'canView', label: 'View Logs' }, { key: 'canExport', label: 'Export' }] },
     ],
   },
 ];

@@ -1909,15 +1909,17 @@ export function Employees() {
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-        {priv.canAdd && (
+        {priv.canImport && (
           <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
             <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
             <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
           </label>
         )}
-        <Button variant="outline" size="sm" className="gap-2 h-9" onClick={() => navigate('/organogram')}>
-          <Network className="h-4 w-4" /> Organogram
-        </Button>
+        {priv.canViewOrganogram && (
+          <Button variant="outline" size="sm" className="gap-2 h-9" onClick={() => navigate('/organogram')}>
+            <Network className="h-4 w-4" /> Organogram
+          </Button>
+        )}
         {priv.canAdd && (
           <Button size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'OFFICE', level: 10, status: 'Active', payeTax: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
             <Plus className="h-4 w-4" /> Add Employee
@@ -1948,9 +1950,11 @@ export function Employees() {
               <Plus className="h-4 w-4" /> Add Employee
             </Button>
           )}
-          <Button variant="outline" className="flex-1 gap-2" onClick={() => navigate('/organogram')}>
-            <Network className="h-4 w-4" /> Organogram
-          </Button>
+          {priv.canViewOrganogram && (
+            <Button variant="outline" className="flex-1 gap-2" onClick={() => navigate('/organogram')}>
+              <Network className="h-4 w-4" /> Organogram
+            </Button>
+          )}
         </div>
         <div className="flex gap-2">
           {priv.canExport && (
@@ -1958,7 +1962,7 @@ export function Employees() {
               <Upload className="h-4 w-4 text-emerald-500" /> Export CSV
             </Button>
           )}
-          {priv.canAdd && (
+          {priv.canImport && (
             <label className="flex-1 flex items-center justify-center gap-2 px-4 h-10 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50">
               <Download className="h-4 w-4 text-indigo-500" /> Import
               <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />

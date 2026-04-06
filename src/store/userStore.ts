@@ -18,7 +18,7 @@ export interface TasksPriv {
 }
 
 // ─── HR ──────────────────────────────────────────────────────
-export interface EmployeesPriv   { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canViewSalary: boolean; canExport: boolean; }
+export interface EmployeesPriv   { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canViewSalary: boolean; canViewAnalytics: boolean; canViewOrganogram: boolean; canImport: boolean; canExport: boolean; }
 export interface DisciplinaryPriv{ canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; }
 export interface EvaluationsPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; }
 export interface OnboardingPriv  { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; }
@@ -33,17 +33,25 @@ export interface SitesPriv {
   canAddSite: boolean; canEditSite: boolean; canDeleteSite: boolean;
   canAddClient: boolean; canEditClient: boolean; canDeleteClient: boolean;
   canViewClientSummary: boolean;
-  canImport: boolean; canExport: boolean;
+  canImport: boolean;
+  canExport: boolean;
 }
 
 // ─── Operations ──────────────────────────────────────────────
-export interface OperationsPriv {
-  canView: boolean;
-  canManageAssets: boolean;
-  canManageWaybills: boolean;
-  canManageLogistics: boolean;
-  canViewAnalytics: boolean;
-}
+// Overview / Dashboard
+export interface OperationsPriv { canView: boolean; canViewAnalytics: boolean; }
+// Inventory (Assets)
+export interface OpsInventoryPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canImport: boolean; canExport: boolean; }
+// Waybills
+export interface OpsWaybillsPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean; }
+// Quick Checkout / Logistics
+export interface OpsCheckoutPriv { canView: boolean; canAdd: boolean; }
+// Maintenance
+export interface OpsMaintenancePriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; }
+// Vehicles
+export interface OpsVehiclesPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; }
+// Ops Site Manager
+export interface OpsSitesPriv { canView: boolean; }
 
 // ─── Account ─────────────────────────────────────────────────
 export interface BillingPriv  { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canViewAmounts: boolean; canImport: boolean; canExport: boolean; }
@@ -56,11 +64,16 @@ export interface FinancialReportsPriv {
   canView: boolean; canExport: boolean; canViewAmounts: boolean;
   canViewPayrollSummary: boolean; canViewLoansAndAdvances: boolean;
 }
-export interface LedgerPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean; }
+export interface LedgerPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canImport: boolean; canExport: boolean; }
 
 // ─── Settings ────────────────────────────────────────────────
 export interface VariablesPriv { canView: boolean; canEdit: boolean; canImport: boolean; canExport: boolean; }
 export interface UsersPriv     { canView: boolean; canManage: boolean; }
+export interface ActivityLogPriv { canView: boolean; canExport: boolean; }
+
+// ─── Missing Bundled Pages ───────────────────────────────────
+export interface CommLogPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean; }
+export interface BeneficiariesPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canImport: boolean; canExport: boolean; }
 
 // ─── Master interface ─────────────────────────────────────────
 export interface UserPrivileges {
@@ -83,6 +96,15 @@ export interface UserPrivileges {
   users:             UsersPriv;
   tasks:             TasksPriv;
   operations:        OperationsPriv;
+  opsInventory:      OpsInventoryPriv;
+  opsWaybills:       OpsWaybillsPriv;
+  opsCheckout:       OpsCheckoutPriv;
+  opsMaintenance:    OpsMaintenancePriv;
+  opsVehicles:       OpsVehiclesPriv;
+  opsSites:          OpsSitesPriv;
+  activityLog:       ActivityLogPriv;
+  commLog:           CommLogPriv;
+  beneficiaries:     BeneficiariesPriv;
 }
 
 export interface AppUser {
@@ -108,7 +130,7 @@ export interface PrivilegePreset {
 // ─── FULL ACCESS ─────────────────────────────────────────────
 export const FULL_ACCESS: UserPrivileges = {
   dashboard:        { canView: true },
-  employees:        { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewSalary: true, canExport: true },
+  employees:        { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewSalary: true, canViewAnalytics: true, canViewOrganogram: true, canImport: true, canExport: true },
   disciplinary:     { canView: true, canAdd: true, canEdit: true, canDelete: true },
   evaluations:      { canView: true, canAdd: true, canEdit: true, canDelete: true },
   onboarding:       { canView: true, canAdd: true, canEdit: true, canDelete: true },
@@ -121,17 +143,26 @@ export const FULL_ACCESS: UserPrivileges = {
   payments:         { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewAmounts: true, canViewVat: true, canManageVat: true, canImport: true, canExport: true },
   payroll:          { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true, canViewWithholdingSchedule: true },
   financialReports: { canView: true, canExport: true, canViewAmounts: true, canViewPayrollSummary: true, canViewLoansAndAdvances: true },
-  ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
+  ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
   variables:        { canView: true, canEdit: true, canImport: true, canExport: true },
   users:            { canView: true, canManage: true },
   tasks:            { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: true },
-  operations:       { canView: true, canManageAssets: true, canManageWaybills: true, canManageLogistics: true, canViewAnalytics: true },
+  operations:       { canView: true, canViewAnalytics: true },
+  opsInventory:     { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
+  opsWaybills:      { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
+  opsCheckout:      { canView: true, canAdd: true },
+  opsMaintenance:   { canView: true, canAdd: true, canEdit: true, canDelete: true },
+  opsVehicles:      { canView: true, canAdd: true, canEdit: true, canDelete: true },
+  opsSites:         { canView: true },
+  activityLog:      { canView: true, canExport: true },
+  commLog:          { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
+  beneficiaries:    { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
 };
 
 // ─── NO ACCESS ───────────────────────────────────────────────
 export const NO_ACCESS: UserPrivileges = {
   dashboard:        { canView: false },
-  employees:        { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewSalary: false, canExport: false },
+  employees:        { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewSalary: false, canViewAnalytics: false, canViewOrganogram: false, canImport: false, canExport: false },
   disciplinary:     { canView: false, canAdd: false, canEdit: false, canDelete: false },
   evaluations:      { canView: false, canAdd: false, canEdit: false, canDelete: false },
   onboarding:       { canView: false, canAdd: false, canEdit: false, canDelete: false },
@@ -144,11 +175,20 @@ export const NO_ACCESS: UserPrivileges = {
   payments:         { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewAmounts: false, canViewVat: false, canManageVat: false, canImport: false, canExport: false },
   payroll:          { canView: false, canGenerate: false, canViewAmounts: false, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false, canViewWithholdingSchedule: false },
   financialReports: { canView: false, canExport: false, canViewAmounts: false, canViewPayrollSummary: false, canViewLoansAndAdvances: false },
-  ledger:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
+  ledger:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
   variables:        { canView: false, canEdit: false, canImport: false, canExport: false },
   users:            { canView: false, canManage: false },
   tasks:            { canView: false, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false },
-  operations:       { canView: false, canManageAssets: false, canManageWaybills: false, canManageLogistics: false, canViewAnalytics: false },
+  operations:       { canView: false, canViewAnalytics: false },
+  opsInventory:     { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
+  opsWaybills:      { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
+  opsCheckout:      { canView: false, canAdd: false },
+  opsMaintenance:   { canView: false, canAdd: false, canEdit: false, canDelete: false },
+  opsVehicles:      { canView: false, canAdd: false, canEdit: false, canDelete: false },
+  opsSites:         { canView: false },
+  activityLog:      { canView: false, canExport: false },
+  commLog:          { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
+  beneficiaries:    { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
 };
 
 // ─── DEFAULT PRESETS ─────────────────────────────────────────
@@ -159,7 +199,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
     privileges: {
       ...NO_ACCESS,
       dashboard:   { canView: true },
-      employees:   { canView: true, canAdd: true, canEdit: true, canDelete: false, canViewSalary: true, canExport: true },
+      employees:   { canView: true, canAdd: true, canEdit: true, canDelete: false, canViewSalary: true, canViewAnalytics: true, canViewOrganogram: true, canImport: true, canExport: true },
       disciplinary:{ canView: true, canAdd: true, canEdit: true, canDelete: false },
       evaluations: { canView: true, canAdd: true, canEdit: true, canDelete: false },
       onboarding:  { canView: true, canAdd: true, canEdit: true, canDelete: false },
@@ -169,6 +209,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       reports:     { canView: true, canExport: true },
       payroll:     { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true, canViewWithholdingSchedule: true },
       tasks:       { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: false },
+      beneficiaries:{ canView: true, canAdd: true, canEdit: true, canDelete: false, canImport: true, canExport: true },
     },
   },
   {
@@ -181,7 +222,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       payments:         { canView: true, canAdd: true, canEdit: true, canDelete: false, canViewAmounts: true, canViewVat: true, canManageVat: false, canImport: true, canExport: true },
       payroll:          { canView: true, canGenerate: false, canViewAmounts: true, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false, canViewWithholdingSchedule: false },
       financialReports: { canView: true, canExport: true, canViewAmounts: true, canViewPayrollSummary: true, canViewLoansAndAdvances: true },
-      ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: false, canExport: true },
+      ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: false, canImport: true, canExport: true },
       reports:          { canView: true, canExport: true },
       tasks:            { canView: false, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false },
     },
@@ -191,7 +232,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
     privileges: {
       ...NO_ACCESS,
       dashboard:        { canView: true },
-      employees:        { canView: true, canAdd: false, canEdit: false, canDelete: false, canViewSalary: false, canExport: false },
+      employees:        { canView: true, canAdd: false, canEdit: false, canDelete: false, canViewSalary: false, canViewAnalytics: false, canViewOrganogram: false, canImport: false, canExport: false },
       onboarding:       { canView: true, canAdd: false, canEdit: false, canDelete: false },
       attendance:       { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
       leaves:           { canView: true, canAdd: false, canEdit: false, canDelete: false, canViewSummary: true },
@@ -202,8 +243,18 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       payments:         { canView: true, canAdd: false, canEdit: false, canDelete: false, canViewAmounts: false, canViewVat: true, canManageVat: false, canImport: false, canExport: false },
       payroll:          { canView: true, canGenerate: false, canViewAmounts: false, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false, canViewWithholdingSchedule: false },
       financialReports: { canView: true, canExport: false, canViewAmounts: false, canViewPayrollSummary: false, canViewLoansAndAdvances: false },
-      ledger:           { canView: true, canAdd: false, canEdit: false, canDelete: false, canExport: false },
+      ledger:           { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
       tasks:            { canView: true, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false },
+      operations:       { canView: true, canViewAnalytics: false },
+      opsInventory:     { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
+      opsWaybills:      { canView: true, canAdd: false, canEdit: false, canDelete: false, canExport: false },
+      opsCheckout:      { canView: true, canAdd: false },
+      opsMaintenance:   { canView: true, canAdd: false, canEdit: false, canDelete: false },
+      opsVehicles:      { canView: true, canAdd: false, canEdit: false, canDelete: false },
+      opsSites:         { canView: true },
+      activityLog:      { canView: true, canExport: false },
+      commLog:          { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
+      beneficiaries:    { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
     },
   },
 ];
@@ -294,11 +345,6 @@ export const useUserStore = create<UserStore>()(
 function deepMergePrivileges(defaults: UserPrivileges, stored: Partial<UserPrivileges>): UserPrivileges {
   const result = { ...defaults };
   for (const key of Object.keys(defaults) as (keyof UserPrivileges)[]) {
-    // If operations is missing, default it to sites privileges if they exist
-    if (key === 'operations' && !stored[key] && stored['sites']) {
-      result[key] = { ...defaults[key], ...stored['sites'] } as any;
-      continue;
-    }
     result[key] = { ...defaults[key], ...(stored[key] ?? {}) } as any;
   }
   return result;

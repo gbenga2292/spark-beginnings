@@ -422,6 +422,8 @@ export function useRealtimeData(isAuthenticated: boolean) {
             case 'profiles': {
               const userStoreState = useUserStore.getState();
               const currentUsers = userStoreState.users;
+              const currentUserId = userStoreState.currentUserId;
+
               if (eventType === 'INSERT') {
                 if (!currentUsers.some(u => u.id === newRow.id)) {
                   useUserStore.setState({ users: [...currentUsers, dbToProfile(newRow)] });
@@ -429,8 +431,34 @@ export function useRealtimeData(isAuthenticated: boolean) {
               } else if (eventType === 'UPDATE') {
                 const updated = dbToProfile(newRow);
                 useUserStore.setState({ users: currentUsers.map(u => u.id === updated.id ? updated : u) });
+
+                // ── Real-time revocation: affects the currently logged-in user ──
+                if (updated.id === currentUserId) {
+                  // Case 1: User was deactivated → immediate sign-out
+                  if (newRow.is_active === false) {
+                    console.warn('[Auth] Current user was deactivated. Signing out.');
+                    alert('⚠️ Your account has been deactivated by an administrator. You will be signed out.');
+                    supabase.auth.signOut();
+                    return;
+                  }
+
+                  // Case 2: Privileges were changed → update store (ProtectedRoute
+                  // automatically re-checks on next render). Show a notification.
+                  if (newRow.privileges) {
+                    console.warn('[Auth] Current user privileges were updated by an admin.');
+                    // Dispatch a browser custom event so the UI can show a toast/banner
+                    window.dispatchEvent(new CustomEvent('privileges-updated', {
+                      detail: { userId: updated.id }
+                    }));
+                  }
+                }
               } else if (eventType === 'DELETE') {
                 useUserStore.setState({ users: currentUsers.filter(u => u.id !== oldRow.id) });
+                // If the deleted profile is the current user, sign out
+                if (oldRow.id === currentUserId) {
+                  console.warn('[Auth] Current user profile was deleted. Signing out.');
+                  supabase.auth.signOut();
+                }
               }
               break;
             }
