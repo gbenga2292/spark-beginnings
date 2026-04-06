@@ -45,13 +45,8 @@ export function FinancialReports() {
   const rawVatPayments = useAppStore(state => state.vatPayments);
   const sites = useAppStore(state => state.sites);
 
-  const employees = useAppStore(state => state.employees).filter(e => e.status === 'Active' || e.status === 'On Leave');
-  const attendanceRecords = useAppStore(state => state.attendanceRecords);
   const loans = useAppStore(state => state.loans);
   const salaryAdvances = useAppStore(state => state.salaryAdvances);
-  const holidays = useAppStore(state => state.publicHolidays);
-  const monthValues = useAppStore(state => state.monthValues);
-  const payrollVariables = useAppStore(state => state.payrollVariables);
   const ledgerEntries = useAppStore(state => state.ledgerEntries);
   const [accountsTab, setAccountsTab] = useState<'payroll' | 'loans'>('payroll');
   const [payrollYear, setPayrollYear] = useState<number>(new Date().getFullYear());
@@ -100,69 +95,26 @@ export function FinancialReports() {
 
   const { calculatePayrollForMonth, MONTHS } = usePayrollCalculator();
 
-  function computeWorkDays(year: number, monthNum: number, holidayDates: string[]): number {
-    const startDate = new Date(year, monthNum - 1, 1);
-    const endDate = new Date(year, monthNum, 0);
-    let days = 0;
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-      const dayOfWeek = d.getDay();
-      if (dayOfWeek === 0) continue;
-      const isHoliday = holidayDates.some(hd => {
-        const hDate = new Date(hd);
-        return hDate.getDate() === d.getDate() && hDate.getMonth() === d.getMonth() && hDate.getFullYear() === d.getFullYear();
-      });
-      if (!isHoliday) days++;
-    }
-    return days;
-  }
-
   const hideAmounts = priv.canViewAmounts === false;
   const fm = (n: number) => hideAmounts ? '***' : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmRaw = (n: number) => hideAmounts ? '***' : '₦' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  // Payroll Exposure calculations
+  // Payroll Exposure calculations — delegates to the canonical payroll calculator
   const payrollStats = useMemo(() => {
     let totalGrossExposure = 0;
     let totalStatutory = 0;
     let totalOvertimeCost = 0;
-    const monthsToProcess = payrollMonth ? [payrollMonth] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const monthsToProcess = payrollMonth
+      ? [MONTHS_LIST.find(m => m.value === payrollMonth)?.key || 'jan']
+      : MONTHS.map(m => m.key);
 
-    employees.filter(e => e.status === 'Active').forEach(emp => {
-      monthsToProcess.forEach(targetMonth => {
-        const targetMonthKey = MONTHS_LIST.find(m => m.value === targetMonth)?.key || 'jan';
-        const standardSalary = (emp.monthlySalaries[targetMonthKey as keyof typeof emp.monthlySalaries] as number) || 0;
-        const officialWorkdays = computeWorkDays(payrollYear, targetMonth, holidays.map(h => h.date));
-        const monthConfig = monthValues[targetMonthKey] || { workDays: officialWorkdays, overtimeRate: 0.5 };
-        const otRate = monthConfig.overtimeRate;
-        let daysWorked = 0, daysAbsent = 0, otInstances = 0;
-        for (const r of attendanceRecords) {
-          if (r.staffId === emp.id && r.mth === targetMonth && r.date.startsWith(payrollYear.toString())) {
-            if (r.day?.toLowerCase() === 'yes') { daysWorked++; if (r.ot > 0) otInstances++; }
-            else if (r.day?.toLowerCase() === 'no') { daysAbsent++; }
-          }
-        }
-        if (daysWorked > officialWorkdays) daysWorked = officialWorkdays;
-        let salary = 0, overtime = 0;
-        if (standardSalary > 0 && officialWorkdays > 0) {
-          const dailyRate = standardSalary / officialWorkdays;
-          const isOperations = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase());
-          if (isOperations) { salary = dailyRate * daysWorked; }
-          else { salary = standardSalary - (dailyRate * daysAbsent); if (salary < 0) salary = 0; }
-          overtime = otInstances * (dailyRate * (1 + otRate));
-          totalOvertimeCost += overtime;
-        }
-        const grossPay = salary + overtime;
-        totalGrossExposure += grossPay;
-        if (emp.payeTax) {
-          const basic = salary * (payrollVariables.basic / 100);
-          const housing = salary * (payrollVariables.housing / 100);
-          const transport = salary * (payrollVariables.transport / 100);
-          const pensionSum = basic + housing + transport;
-          const pension = pensionSum * (payrollVariables.employeePensionRate / 100);
-          const employerPension = pensionSum * (payrollVariables.employerPensionRate / 100);
-          const nsitf = grossPay * ((payrollVariables.nsitfRate || 1) / 100);
-          const estimatedPAYE = grossPay > 60000 ? (grossPay * 0.10) : 0;
-          totalStatutory += (pension + employerPension + nsitf + estimatedPAYE);
+    monthsToProcess.forEach(monthKey => {
+      const rows = calculatePayrollForMonth(monthKey);
+      rows.forEach(row => {
+        totalGrossExposure += row.grossPay;
+        totalOvertimeCost += row.overtime;
+        if (row.pension > 0 || row.employerPension > 0) {
+          totalStatutory += (row.pension + row.employerPension + row.nsitf + row.paye);
         }
       });
     });
@@ -172,39 +124,20 @@ export function FinancialReports() {
     loans.forEach(l => { if (l.status === 'Active') outstandingLoans += l.remainingBalance; });
 
     return { totalGrossExposure, totalStatutory, totalOvertimeCost, outstandingLoans };
-  }, [employees, attendanceRecords, holidays, payrollVariables, monthValues, payrollMonth, payrollYear, salaryAdvances, loans]);
+  }, [calculatePayrollForMonth, MONTHS, payrollMonth, salaryAdvances, loans]);
 
-  // Annual Payroll & Overtime Trend
+  // Annual Payroll & Overtime Trend — uses the same canonical calculator
   const payrollChartData = useMemo(() => {
-    return MONTHS_LIST.map((m) => {
+    return MONTHS.map((m) => {
+      const rows = calculatePayrollForMonth(m.key);
       let totalPayroll = 0, totalOvertime = 0;
-      const officialWorkdays = computeWorkDays(payrollYear, m.value, holidays.map(h => h.date));
-      const monthConfig = monthValues[m.key] || { workDays: officialWorkdays, overtimeRate: 0.5 };
-      const otRate = monthConfig.overtimeRate;
-      employees.filter(e => e.status === 'Active').forEach(emp => {
-        const standardSalary = emp.monthlySalaries[m.key as keyof typeof emp.monthlySalaries] || 0;
-        let daysWorked = 0, daysAbsent = 0, otInstances = 0;
-        for (const r of attendanceRecords) {
-          if (r.staffId === emp.id && r.mth === m.value && r.date.startsWith(payrollYear.toString())) {
-            if (r.day?.toLowerCase() === 'yes') { daysWorked++; if (r.ot > 0) otInstances++; }
-            else if (r.day?.toLowerCase() === 'no') { daysAbsent++; }
-          }
-        }
-        if (daysWorked > officialWorkdays) daysWorked = officialWorkdays;
-        let salary = 0, overtime = 0;
-        if (standardSalary > 0 && officialWorkdays > 0) {
-          const dailyRate = standardSalary / officialWorkdays;
-          const isOperations = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase());
-          if (isOperations) { salary = dailyRate * daysWorked; }
-          else { salary = standardSalary - (dailyRate * daysAbsent); if (salary < 0) salary = 0; }
-          overtime = otInstances * (dailyRate * (1 + otRate));
-        }
-        totalPayroll += (salary + overtime);
-        totalOvertime += overtime;
+      rows.forEach(row => {
+        totalPayroll += row.grossPay;
+        totalOvertime += row.overtime;
       });
       return { name: m.label.substring(0, 3), Payroll: totalPayroll, Overtime: totalOvertime };
     });
-  }, [employees, attendanceRecords, holidays, monthValues, payrollYear]);
+  }, [calculatePayrollForMonth, MONTHS]);
   const [filterYear, setFilterYear] = useState<string>('All');
   const [filterClient, setFilterClient] = useState<string>('All');
   const [summaryTab, setSummaryTab] = useState<'client' | 'site'>('client');

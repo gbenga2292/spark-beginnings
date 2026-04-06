@@ -1,8 +1,7 @@
 import { useCallback } from 'react';
 import { useAppStore } from '@/src/store/appStore';
 import { computeWorkDays } from '@/src/lib/workdays';
-
-const OPERATIONS_DEPARTMENTS = ['OPERATIONS', 'ENGINEERING'];
+import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
 
 const MONTHS = [
   { key: 'jan', label: 'January' },
@@ -31,14 +30,12 @@ export function usePayrollCalculator() {
 
   const currentYear = new Date().getFullYear();
 
-  const calculatePayrollForMonth = useCallback((monthKey: string) => {
+  const calculatePayrollForMonth = useCallback((monthKey: string, year: number = currentYear) => {
     const mKey = monthKey as keyof typeof employees[0]['monthlySalaries'];
     const selectedMonthIndex = MONTHS.findIndex(m => m.key === monthKey) + 1;
 
-    // Auto-compute workdays for this month from public holidays
     const holidayDates = publicHolidays.map(h => h.date);
-    // Keep a generic 6-day default for month config fallback
-    const fallbackWorkdays = computeWorkDays(currentYear, selectedMonthIndex, holidayDates, 6);
+    const fallbackWorkdays = computeWorkDays(year, selectedMonthIndex, holidayDates, 6);
 
     const monthConfig = monthValues[mKey as keyof typeof monthValues] || { workDays: fallbackWorkdays, overtimeRate: 0.5 };
     const otRate = monthConfig.overtimeRate;
@@ -46,42 +43,92 @@ export function usePayrollCalculator() {
     let snCounter = 1;
 
     return employees
-      .filter(e => e.status === 'Active')
+      .filter(e => {
+        // Date-based eligibility — match Payroll.tsx
+        const startOfViewingMonth = new Date(year, selectedMonthIndex - 1, 1);
+        const endOfViewingMonth = new Date(year, selectedMonthIndex, 0);
+
+        if (e.startDate) {
+          const empStart = new Date(e.startDate);
+          if (empStart > endOfViewingMonth) return false;
+        }
+        if (e.endDate) {
+          const empEnd = new Date(e.endDate);
+          if (empEnd < startOfViewingMonth) return false;
+        }
+
+        // Non-Active employees: only include if they have an endDate
+        if (e.status !== 'Active') {
+          if (!e.endDate) return false;
+        }
+
+        // Frequency logic for NON-EMPLOYEE (Quarterly/Half Year/Yearly)
+        if (e.staffType === 'NON-EMPLOYEE') {
+          const cycle = (e as any).typeOfPay || 'Monthly';
+          const startMonthLabel = (e as any).startMonthOfPay || 'January';
+          const startIdx = MONTHS.findIndex(m => m.label === startMonthLabel);
+          const currentIdx = MONTHS.findIndex(m => m.key === monthKey);
+
+          if (startIdx !== -1 && currentIdx !== -1) {
+            const diff = currentIdx - startIdx;
+            if (diff < 0) return false;
+
+            if (cycle === 'Quarterly') return diff % 3 === 0;
+            if (cycle === 'Half Year') return diff % 6 === 0;
+            if (cycle === 'Yearly') return diff % 12 === 0;
+          }
+        }
+        return true;
+      })
       .map((emp) => {
         const standardSalary = emp.monthlySalaries[mKey] || 0;
 
-        // Per-department workdays per week (defaults: Ops/Engineering = 6, others = 5)
-        const defaultDays = OPERATIONS_DEPARTMENTS.includes(emp.department.toUpperCase()) ? 6 : 5;
+        // Per-department workdays per week (defaults: FIELD = 6, others = 5)
+        const defaultDays = emp.staffType === 'FIELD' ? 6 : 5;
         const empWorkDaysPerWeek = payrollVariables.departmentWorkDays?.[emp.department] ?? defaultDays;
-        const empOfficialWorkdays = computeWorkDays(currentYear, selectedMonthIndex, holidayDates, empWorkDaysPerWeek);
+        const empOfficialWorkdays = computeWorkDays(year, selectedMonthIndex, holidayDates, empWorkDaysPerWeek);
 
-        // ── Attendance tallies ────────────────────────────────────────────
+        // Attendance tallies — filter by BOTH year and month to match Payroll.tsx
         let daysWorked = 0;
         let daysAbsent = 0;
         let totalOTInstances = 0;
 
         for (const r of attendanceRecords) {
-          if (r.staffId === emp.id && r.mth === selectedMonthIndex) {
+          if (!r.date) continue;
+          const [yStr, mStr] = r.date.split('-');
+          const recordYear = parseInt(yStr, 10);
+          const recordMonth = parseInt(mStr, 10);
+
+          if (r.staffId === emp.id && recordMonth === selectedMonthIndex && recordYear === year) {
+            // Use calculateAttendanceMetrics for accurate OT detection
+            const metrics = calculateAttendanceMetrics(r, holidayDates, payrollVariables, monthValues as any, attendanceRecords);
+
+            if (metrics.ot > 0) totalOTInstances += 1;
+
             if (r.day?.toLowerCase() === 'yes') {
               daysWorked += 1;
-              if (r.ot > 0) totalOTInstances += 1;
             } else if (r.day?.toLowerCase() === 'no') {
-              daysAbsent += 1;
+              // Only count real absences, matching Payroll.tsx logic
+              const st = (r as any).absentStatus?.toUpperCase() || '';
+              const isRealAbsence = ['ABSENT', 'NO WORK', 'ABSENT WITHOUT PERMIT', 'SUSPENSION', 'OFF DUTY'].includes(st);
+              if (isRealAbsence) {
+                daysAbsent += 1;
+              }
             }
           }
         }
 
         if (daysWorked > empOfficialWorkdays) daysWorked = empOfficialWorkdays;
 
-        // ── Salary calculation (two-mode) ─────────────────────────────────
+        // Salary calculation — uses staffType (not department) to match Payroll.tsx
         let salary = 0;
         let overtime = 0;
 
         if (standardSalary > 0 && empOfficialWorkdays > 0) {
           const dailyRate = standardSalary / empOfficialWorkdays;
-          const isOperations = OPERATIONS_DEPARTMENTS.includes(emp.department.toUpperCase());
+          const isFieldStaff = emp.staffType === 'FIELD';
 
-          if (isOperations) {
+          if (isFieldStaff) {
             salary = dailyRate * daysWorked;
           } else {
             salary = standardSalary - (dailyRate * daysAbsent);
@@ -138,8 +185,9 @@ export function usePayrollCalculator() {
           if (a.status !== 'Approved' && a.status !== 'Deducted') return false;
           if (!a.requestDate) return false;
           const dateParts = a.requestDate.split('-');
+          const advanceYear = parseInt(dateParts[0], 10);
           const advanceMonth = parseInt(dateParts[1], 10);
-          return advanceMonth === selectedMonthIndex;
+          return advanceYear === year && advanceMonth === selectedMonthIndex;
         });
         const advanceDeduction = empAdvances.reduce((sum, a) => sum + a.amount, 0);
 
@@ -151,7 +199,7 @@ export function usePayrollCalculator() {
           const startYear = parseInt(dateParts[0], 10);
           const startMonth = parseInt(dateParts[1], 10);
 
-          const monthsElapsed = (currentYear - startYear) * 12 + (selectedMonthIndex - startMonth);
+          const monthsElapsed = (year - startYear) * 12 + (selectedMonthIndex - startMonth);
           return monthsElapsed >= 0 && monthsElapsed < l.duration;
         });
         const loanDeduction = empLoans.reduce((sum, l) => sum + l.monthlyDeduction, 0);
@@ -193,3 +241,4 @@ export function usePayrollCalculator() {
 
   return { calculatePayrollForMonth, MONTHS };
 }
+
