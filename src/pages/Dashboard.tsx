@@ -15,7 +15,7 @@ import {
     Tooltip, XAxis, YAxis, Legend, PieChart, Pie, Cell, LabelList
 } from 'recharts';
 
-function computeWorkDays(year: number, monthNum: number, holidayDates: string[], empStartDate?: string, empEndDate?: string): number {
+function computeWorkDays(year: number, monthNum: number, holidayDates: string[], workDaysPerWeek: number = 6, empStartDate?: string, empEndDate?: string): number {
     const startDate = new Date(year, monthNum - 1, 1);
     const endDate = new Date(year, monthNum, 0);
 
@@ -37,8 +37,9 @@ function computeWorkDays(year: number, monthNum: number, holidayDates: string[],
 
     let days = 0;
     for (let d = new Date(actualStart); d <= actualEnd; d.setDate(d.getDate() + 1)) {
-        const dayOfWeek = d.getDay();
-        if (dayOfWeek === 0) continue;
+        const dow = d.getDay();
+        if (dow === 0) continue; // Sunday
+        if (workDaysPerWeek < 6 && dow === 6) continue; // Saturday
         const isHoliday = holidayDates.some(hd => {
             const hDate = new Date(hd);
             return hDate.getDate() === d.getDate() && hDate.getMonth() === d.getMonth() && hDate.getFullYear() === d.getFullYear();
@@ -74,16 +75,22 @@ export function Dashboard() {
     const salaryAdvances = useAppStore((state) => state.salaryAdvances);
     const loans = useAppStore((state) => state.loans);
     const sites = useAppStore((state) => state.sites);
+    const payrollVariables = useAppStore((state) => state.payrollVariables);
     const { reminders } = useAppData();
 
     const currentDate = new Date();
 
     const [filterYear, setFilterYear] = useState<number>(currentDate.getFullYear());
     const [filterMonth, setFilterMonth] = useState<number | null>(currentDate.getMonth() + 1);
+    const [chartViewMode, setChartViewMode] = useState<'capacity' | 'efficiency' | 'employee'>('capacity');
 
     // ── TOP KPI CARDS ──
     const kpiStats = useMemo(() => {
-        const activeStaff = employees.filter(e => e.status === 'Active');
+        const historicallyActiveStaff = employees.filter(e => {
+            if (e.status !== 'Active' && !e.endDate) return false;
+            if (e.staffType === 'NON-EMPLOYEE') return false; 
+            return true;
+        });
         const onLeave = employees.filter(e => e.status === 'On Leave');
         const monthsToProcess = filterMonth ? [filterMonth] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
@@ -93,31 +100,61 @@ export function Dashboard() {
         let totalPresentDays = 0;
         let totalPossibleDays = 0;
 
-        activeStaff.forEach(emp => {
+        historicallyActiveStaff.forEach(emp => {
+            const wDays = payrollVariables?.departmentWorkDays?.[emp.department || ''] || (emp.staffType === 'OFFICE' ? 5 : 6);
+
             monthsToProcess.forEach(targetMonth => {
-                const officialWorkdays = computeWorkDays(filterYear, targetMonth, holidays.map(h => h.date), emp.startDate, emp.endDate);
-                totalPossibleDays += officialWorkdays;
-                let present = 0, absent = 0, ot = 0;
-                for (const r of attendanceRecords) {
-                    if (!r.date) continue;
-                    const recMonth = parseInt(r.date.split('-')[1], 10);
-                    if (r.staffId === emp.id && recMonth === targetMonth && r.date.startsWith(filterYear.toString())) {
+                const startOfViewingMonth = new Date(filterYear, targetMonth - 1, 1);
+                const endOfViewingMonth = new Date(filterYear, targetMonth, 0);
+
+                if (emp.startDate && new Date(emp.startDate) > endOfViewingMonth) return;
+                if (emp.endDate && new Date(emp.endDate) < startOfViewingMonth) return;
+
+                const daysInMth = endOfViewingMonth.getDate();
+
+                for (let day = 1; day <= daysInMth; day++) {
+                    const dateStr = `${filterYear}-${String(targetMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const dDate = new Date(filterYear, targetMonth - 1, day);
+                    
+                    if (emp.startDate && new Date(emp.startDate) > dDate) continue;
+                    if (emp.endDate && new Date(emp.endDate) < dDate) continue;
+
+                    const isSun = dDate.getDay() === 0;
+                    const isSat = dDate.getDay() === 6;
+                    const isHol = holidays.some(h => h.date === dateStr);
+                    
+                    let shouldBeWorking = !isSun && !isHol;
+                    if (wDays < 6 && isSat) shouldBeWorking = false;
+
+                    if (shouldBeWorking) totalPossibleDays++;
+
+                    const r = attendanceRecords.find(x => x.date === dateStr && x.staffId === emp.id);
+
+                    if (r) {
                         const isDay = r.day?.toLowerCase() === 'yes';
                         const isNight = r.night?.toLowerCase() === 'yes';
-                        const hasOt = (r.overtimeDetails && r.overtimeDetails.trim() !== '') || (r.ot || 0) > 0;
-                        
-                        if (isDay || isNight) { 
-                            present++; 
-                            if (hasOt) ot++; 
+                        const worked = isDay || isNight;
+                        const isOffDay = !shouldBeWorking; // true if Sunday, Holiday, or 5-day-Sat
+                        const hasOt = (r.overtimeDetails && r.overtimeDetails.trim() !== '') || (r.ot || 0) > 0 || (isOffDay && worked) || (isDay && isNight);
+
+                        if (worked) {
+                            if (shouldBeWorking) {
+                                totalPresentDays++;
+                            }
+                            if (hasOt) totalOTInstances++;
+                        } else if (r.day?.toLowerCase() === 'no' || r.night?.toLowerCase() === 'no') {
+                            if (shouldBeWorking) {
+                                totalAbsentDays++;
+                            }
+                        } else if (emp.staffType === 'OFFICE' && shouldBeWorking) {
+                            totalPresentDays++;
                         }
-                        else if (r.day?.toLowerCase() === 'no' || r.night?.toLowerCase() === 'no') { 
-                            absent++; 
+                    } else {
+                        if (emp.staffType === 'OFFICE' && shouldBeWorking) {
+                            totalPresentDays++;
                         }
                     }
                 }
-                totalPresentDays += present;
-                totalAbsentDays += absent;
-                totalOTInstances += ot;
             });
         });
 
@@ -139,7 +176,7 @@ export function Dashboard() {
         const activeSites = sites.filter(s => s.status === 'Active').length;
 
         return {
-            totalActive: activeStaff.length,
+            totalActive: historicallyActiveStaff.length,
             totalOnLeave: onLeave.length,
             totalAbsentDays,
             totalOTInstances,
@@ -152,7 +189,7 @@ export function Dashboard() {
             activeLoans,
             activeSites,
         };
-    }, [employees, attendanceRecords, holidays, filterMonth, filterYear, invoices, leaves, salaryAdvances, loans, sites]);
+    }, [employees, attendanceRecords, holidays, filterMonth, filterYear, invoices, leaves, salaryAdvances, loans, sites, payrollVariables]);
 
     // ── DEPARTMENT BREAKDOWN ──
     const deptData = useMemo(() => {
@@ -164,43 +201,193 @@ export function Dashboard() {
         return Object.entries(deptMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
     }, [employees]);
 
-    // ── MONTHLY ATTENDANCE & OT TREND ──
+    // ── DYNAMIC ATTENDANCE & OT TREND ──
     const attendanceTrend = useMemo(() => {
-        return MONTHS.map(m => {
-            const activeStaff = employees.filter(e => e.status === 'Active');
-            const officialWorkdays = computeWorkDays(filterYear, m.value, holidays.map(h => h.date));
-            let present = 0, absent = 0, overtime = 0;
+        const historicallyActiveStaff = employees.filter(e => {
+            if (e.status !== 'Active' && !e.endDate) return false;
+            if (e.staffType === 'NON-EMPLOYEE') return false; 
+            return true;
+        });
+        const activeCount = historicallyActiveStaff.length || 1;
 
-            activeStaff.forEach(emp => {
-                for (const r of attendanceRecords) {
-                    if (!r.date) continue;
-                    const recMonth = parseInt(r.date.split('-')[1], 10);
-                    if (r.staffId === emp.id && recMonth === m.value && r.date.startsWith(filterYear.toString())) {
+        if (filterMonth) {
+            // --> 1. SPECIFIC MONTH SELECTED: Show Day-by-Day exact Headcount
+            const daysInMonth = new Date(filterYear, filterMonth, 0).getDate();
+            const dailyData = [];
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${filterYear}-${String(filterMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                let present = 0, absent = 0, overtime = 0;
+                
+                // Track how many employees were actually employed and supposed to work on this specific day
+                let expectedStaffForDay = 0;
+                const dDate = new Date(filterYear, filterMonth - 1, day);
+                
+                // Exclude Sundays and Holidays from expectations
+                const isSun = dDate.getDay() === 0;
+                const isSat = dDate.getDay() === 6;
+                const isHol = holidays.some(h => h.date === dateStr);
+
+                historicallyActiveStaff.forEach(emp => {
+                    if (emp.startDate && new Date(emp.startDate) > dDate) return;
+                    if (emp.endDate && new Date(emp.endDate) < dDate) return;
+
+                    const wDays = payrollVariables?.departmentWorkDays?.[emp.department || ''] || (emp.staffType === 'OFFICE' ? 5 : 6);
+                    
+                    let shouldBeWorking = !isSun && !isHol;
+                    if (wDays < 6 && isSat) shouldBeWorking = false;
+                    
+                    if (shouldBeWorking) expectedStaffForDay++;
+
+                    const r = attendanceRecords.find(x => x.date === dateStr && x.staffId === emp.id);
+                    if (r) {
                         const isDay = r.day?.toLowerCase() === 'yes';
                         const isNight = r.night?.toLowerCase() === 'yes';
-                        const hasOt = (r.overtimeDetails && r.overtimeDetails.trim() !== '') || (r.ot || 0) > 0;
+                        const worked = isDay || isNight;
+                        const isOffDay = !shouldBeWorking;
+                        const hasOt = (r.overtimeDetails && r.overtimeDetails.trim() !== '') || (r.ot || 0) > 0 || (isOffDay && worked) || (isDay && isNight);
 
-                        if (isDay || isNight) { 
-                            present++; 
-                            if (hasOt) overtime++; 
+                        if (worked) {
+                            if (shouldBeWorking) {
+                                present++;
+                            }
+                            if (hasOt) overtime++;
+                        } else if (r.day?.toLowerCase() === 'no' || r.night?.toLowerCase() === 'no') {
+                            if (shouldBeWorking) {
+                                absent++;
+                            }
+                        } else if (emp.staffType === 'OFFICE' && shouldBeWorking) {
+                            present++;
                         }
-                        else if (r.day?.toLowerCase() === 'no' || r.night?.toLowerCase() === 'no') { 
-                            absent++; 
+                    } else {
+                        if (emp.staffType === 'OFFICE' && shouldBeWorking) {
+                            present++;
                         }
                     }
-                }
-            });
+                });
 
-            return { name: m.label.substring(0, 3), Present: present, Absent: absent, Overtime: overtime };
-        });
-    }, [employees, attendanceRecords, holidays, filterYear]);
+                // Force minimum 1 to avoid division by zero
+                const dailyActiveCount = expectedStaffForDay || 1;
+                
+                let p = present, a = absent, o = overtime;
+                
+                if (chartViewMode === 'efficiency') {
+                    p = Math.round((present / dailyActiveCount) * 100);
+                    a = Math.round((absent / dailyActiveCount) * 100);
+                    o = present > 0 ? Math.round((overtime / present) * 100) : 0;
+                } else if (chartViewMode === 'employee') {
+                    p = Number((present / dailyActiveCount).toFixed(2));
+                    a = Number((absent / dailyActiveCount).toFixed(2));
+                    o = Number((overtime / dailyActiveCount).toFixed(2));
+                }
+
+                dailyData.push({ name: `${day}`, Present: p, Absent: a, Overtime: o });
+            }
+            return dailyData;
+            
+        } else {
+            // --> 2. ALL MONTHS SELECTED: Yearly View
+            return MONTHS.map(m => {
+                let present = 0, absent = 0, overtime = 0;
+                let exactMonthlyPossibleDays = 0;
+                let aggregateBaseWorkdays = 0; // The theoretical maximum capacity if everyone worked their respective days
+                let monthlyActiveCount = 0; // Track how many staff were actually eligible to work this month
+
+                historicallyActiveStaff.forEach(emp => {
+                    const startOfViewingMonth = new Date(filterYear, m.value - 1, 1);
+                    const endOfViewingMonth = new Date(filterYear, m.value, 0);
+
+                    if (emp.startDate && new Date(emp.startDate) > endOfViewingMonth) return;
+                    if (emp.endDate && new Date(emp.endDate) < startOfViewingMonth) return;
+
+                    monthlyActiveCount++;
+
+                    const wDays = payrollVariables?.departmentWorkDays?.[emp.department || ''] || (emp.staffType === 'OFFICE' ? 5 : 6);
+                    
+                    // Daily iteration for precise monthly tracking (matching kpiStats)
+                    const daysInMth = endOfViewingMonth.getDate();
+                    for (let day = 1; day <= daysInMth; day++) {
+                        const dateStr = `${filterYear}-${String(m.value).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                        const dDate = new Date(filterYear, m.value - 1, day);
+                        
+                        if (emp.startDate && new Date(emp.startDate) > dDate) continue;
+                        if (emp.endDate && new Date(emp.endDate) < dDate) continue;
+
+                        const isSun = dDate.getDay() === 0;
+                        const isSat = dDate.getDay() === 6;
+                        const isHol = holidays.some(h => h.date === dateStr);
+                        
+                        let shouldBeWorking = !isSun && !isHol;
+                        if (wDays < 6 && isSat) shouldBeWorking = false;
+
+                        if (shouldBeWorking) {
+                            aggregateBaseWorkdays++;
+                            exactMonthlyPossibleDays++;
+                        }
+
+                        const r = attendanceRecords.find(x => x.date === dateStr && x.staffId === emp.id);
+
+                        if (r) {
+                            const isDay = r.day?.toLowerCase() === 'yes';
+                            const isNight = r.night?.toLowerCase() === 'yes';
+                            const worked = isDay || isNight;
+                            const isOffDay = !shouldBeWorking;
+                            const hasOt = (r.overtimeDetails && r.overtimeDetails.trim() !== '') || (r.ot || 0) > 0 || (isOffDay && worked) || (isDay && isNight);
+
+                            if (worked) {
+                                if (shouldBeWorking) {
+                                    present++;
+                                }
+                                if (hasOt) overtime++;
+                            } else if (r.day?.toLowerCase() === 'no' || r.night?.toLowerCase() === 'no') {
+                                if (shouldBeWorking) {
+                                    absent++;
+                                }
+                            } else if (emp.staffType === 'OFFICE' && shouldBeWorking) {
+                                present++;
+                            }
+                        } else {
+                            if (emp.staffType === 'OFFICE' && shouldBeWorking) {
+                                present++;
+                            }
+                        }
+                    }
+                });
+
+                let p = 0, a = 0, o = 0;
+                const dynamicCurrentActive = exactMonthlyPossibleDays > 0 ? (exactMonthlyPossibleDays / (aggregateBaseWorkdays / (monthlyActiveCount || 1))) || 1 : 1;
+                
+                if (chartViewMode === 'capacity') {
+                    // Show exact total Man-Days for the month
+                    p = present;
+                    a = absent;
+                    o = overtime;
+                } else if (chartViewMode === 'efficiency') {
+                    p = exactMonthlyPossibleDays > 0 ? Math.round((present / exactMonthlyPossibleDays) * 100) : 0;
+                    a = exactMonthlyPossibleDays > 0 ? Math.round((absent / exactMonthlyPossibleDays) * 100) : 0;
+                    o = present > 0 ? Math.round((overtime / present) * 100) : 0;
+                } else if (chartViewMode === 'employee') {
+                    p = Number((present / dynamicCurrentActive).toFixed(1));
+                    a = Number((absent / dynamicCurrentActive).toFixed(1));
+                    o = Number((overtime / dynamicCurrentActive).toFixed(1));
+                }
+
+                return { name: m.label.substring(0, 3), Present: p, Absent: a, Overtime: o };
+            });
+        }
+    }, [employees, attendanceRecords, holidays, filterYear, filterMonth, chartViewMode, payrollVariables]);
 
     // ── HEADCOUNT GROWTH ──
     const headcountChartData = useMemo(() => {
         return MONTHS.map((m) => {
+            const startOfMonthTimestamp = new Date(filterYear, m.value - 1, 1).getTime();
             const endOfMonthTimestamp = new Date(filterYear, m.value, 0).getTime();
             let count = 0;
             employees.forEach(emp => {
+                if (emp.staffType !== 'FIELD' && emp.staffType !== 'OFFICE') return;
+                
+                if (emp.endDate && new Date(emp.endDate).getTime() < startOfMonthTimestamp) return;
+
                 if (emp.startDate) {
                     if (new Date(emp.startDate).getTime() <= endOfMonthTimestamp) count++;
                 } else {
@@ -356,7 +543,18 @@ export function Dashboard() {
                     <CardHeader className="border-b bg-slate-50/50 pb-4">
                         <CardTitle className="text-lg flex items-center justify-between gap-2 text-slate-800">
                             <span className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-indigo-600" /> Attendance & Overtime Trend</span>
-                            <Badge variant="outline" className="font-normal text-xs bg-white text-slate-500">{filterYear}</Badge>
+                            <div className="flex items-center gap-2">
+                                <select 
+                                    className="text-xs font-medium bg-slate-100 border border-slate-200 text-slate-700 py-1 px-2 rounded outline-none cursor-pointer hover:bg-slate-200 transition-colors"
+                                    value={chartViewMode}
+                                    onChange={(e) => setChartViewMode(e.target.value as any)}
+                                >
+                                    <option value="capacity">Operational Capacity</option>
+                                    <option value="efficiency">Efficiency Rate (%)</option>
+                                    <option value="employee">Per Employee Average</option>
+                                </select>
+                                <Badge variant="outline" className="font-normal text-xs bg-white text-slate-500">{filterYear}</Badge>
+                            </div>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-6">
@@ -369,13 +567,13 @@ export function Dashboard() {
                                     <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                                     <Legend wrapperStyle={{ paddingTop: '10px' }} />
                                     <Bar dataKey="Present" fill="#10b981" radius={[4, 4, 0, 0]}>
-                                        <LabelList dataKey="Present" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? v : ''} />
+                                        <LabelList dataKey="Present" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
                                     </Bar>
                                     <Bar dataKey="Absent" fill="#ef4444" radius={[4, 4, 0, 0]}>
-                                        <LabelList dataKey="Absent" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#ef4444' }} formatter={(v: any) => v > 0 ? v : ''} />
+                                        <LabelList dataKey="Absent" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#ef4444' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
                                     </Bar>
                                     <Bar dataKey="Overtime" fill="#8b5cf6" radius={[4, 4, 0, 0]}>
-                                        <LabelList dataKey="Overtime" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#8b5cf6' }} formatter={(v: any) => v > 0 ? v : ''} />
+                                        <LabelList dataKey="Overtime" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#8b5cf6' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
                                     </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
