@@ -88,7 +88,7 @@ export function Evaluations() {
 
   const renderForm = () => (
     <div className="flex flex-col h-full bg-slate-50 overflow-y-auto">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm shrink-0">
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm shrink-0">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => { setIsAdding(false); setIsEditing(false); setFormData(emptyForm); }} className="hover:bg-slate-100 rounded-full h-8 w-8">
             <ArrowLeft className="h-4 w-4 text-slate-600" />
@@ -120,7 +120,7 @@ export function Evaluations() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Evaluation Type</label>
-              <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-indigo-500/20" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
+              <select className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-indigo-500/20" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
                 <option value="Probation">Probation Review</option>
                 <option value="Annual">Annual Review</option>
                 <option value="Quarterly">Quarterly Check-In</option>
@@ -133,7 +133,7 @@ export function Evaluations() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Review Status</label>
-              <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-indigo-500/20" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}>
+              <select className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-indigo-500/20" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}>
                 <option value="Draft">Draft</option>
                 <option value="Review">In Review</option>
                 <option value="Acknowledged">Acknowledged by Employee</option>
@@ -141,7 +141,7 @@ export function Evaluations() {
             </div>
             <div className="space-y-2 md:col-span-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Manager Notes</label>
-              <textarea className="flex w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" rows={5} value={formData.managerNotes} onChange={e => setFormData({ ...formData, managerNotes: e.target.value })} placeholder="Provide constructive feedback, areas of improvement, and goals..." />
+              <textarea className="flex w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" rows={5} value={formData.managerNotes} onChange={e => setFormData({ ...formData, managerNotes: e.target.value })} placeholder="Provide constructive feedback, areas of improvement, and goals..." />
             </div>
           </CardContent>
         </Card>
@@ -174,7 +174,7 @@ export function Evaluations() {
         {/* Left Sidebar */}
         {!(isAdding || isEditing) && !sidebarCollapsed && (
         <div className="w-80 flex-shrink-0 border-r border-slate-200 flex flex-col bg-slate-50/50">
-          <div className="p-4 border-b border-slate-200 bg-white space-y-3">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 space-y-3">
             <div className="flex justify-between items-center">
               <h2 className="font-bold text-slate-800 flex items-center gap-2">
                 <UserCheck className="h-5 w-5 text-indigo-600" />
@@ -208,7 +208,7 @@ export function Evaluations() {
                   <div 
                     key={emp.id} 
                     onClick={() => { setSelectedEmployeeId(emp.id); setIsAdding(false); setIsEditing(false); }}
-                    className={`p-3 border-b border-slate-100 cursor-pointer transition-colors flex items-center justify-between ${isSelected ? 'bg-indigo-50 border-l-4 border-l-indigo-600' : 'hover:bg-slate-50 border-l-4 border-l-transparent bg-white'}`}
+                    className={`p-3 border-b border-slate-100 cursor-pointer transition-colors flex items-center justify-between ${isSelected ? 'bg-indigo-50 border-l-4 border-l-indigo-600' : 'hover:bg-slate-50 border-l-4 border-l-transparent bg-white dark:bg-slate-900'}`}
                   >
                     <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9 border border-slate-200">
@@ -251,7 +251,7 @@ export function Evaluations() {
             renderForm()
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="bg-white border-b border-slate-200 p-6 flex justify-between items-center shrink-0 shadow-sm">
+                <div className="bg-white dark:bg-slate-900 border-b border-slate-200 p-6 flex justify-between items-center shrink-0 shadow-sm">
                   <div>
                     <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{selectedEmp?.surname} {selectedEmp?.firstname}</h2>
                     <p className="text-sm font-medium text-slate-500 mt-1 uppercase tracking-wider text-[11px]">{selectedEmp?.position} &bull; {selectedEmp?.department}</p>
@@ -265,7 +265,7 @@ export function Evaluations() {
                 
                 <div className="flex-1 overflow-y-auto p-6">
                   {empRecords.length === 0 ? (
-                    <div className="bg-white border border-slate-200 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center shadow-sm">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center shadow-sm">
                         <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mb-4 border border-slate-200">
                           <ClipboardList className="h-8 w-8 text-slate-400" />
                         </div>
@@ -273,7 +273,7 @@ export function Evaluations() {
                         <p className="text-slate-500 text-sm mt-2 max-w-sm leading-relaxed">This employee does not have any recorded performance evaluations yet.</p>
                     </div>
                   ) : (
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <Table>
                           <TableHeader>
                               <TableRow className="bg-slate-50/80">

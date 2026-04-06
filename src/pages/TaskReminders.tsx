@@ -334,13 +334,13 @@ export function TaskReminders() {
 
   /* ─── Render ─────────────────────────────────────────────────────────── */
   return (
-    <div className="h-full flex flex-col min-h-0 bg-slate-50 overflow-hidden">
+    <div className="h-full flex flex-col min-h-0 bg-slate-50 dark:bg-slate-950 overflow-hidden">
       <div className="flex-1 flex flex-col h-full animate-in fade-in duration-300">
         
         {/* Unified Controls Toolbar */}
-        <div className="px-6 py-4 bg-white border-b border-slate-200 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div className="px-6 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1 hidden sm:inline">Status:</span>
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mr-1 hidden sm:inline">Status:</span>
             {(['all','active','inactive'] as const).map(f => (
               <Button 
                 key={f} 
@@ -359,7 +359,7 @@ export function TaskReminders() {
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input 
                 placeholder="Search reminders..." 
-                className="pl-10 h-9 text-xs border-slate-200 bg-slate-50 hover:bg-white focus:bg-white transition-all shadow-sm rounded-lg w-full" 
+                className="pl-10 h-9 text-xs border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-white dark:hover:bg-slate-700 focus:bg-white dark:focus:bg-slate-700 text-slate-900 dark:text-slate-100 transition-all shadow-sm rounded-lg w-full" 
                 value={search} 
                 onChange={e => setSearch(e.target.value)} 
               />

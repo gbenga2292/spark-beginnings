@@ -401,7 +401,7 @@ export function Leaves() {
         {priv.canViewSummary && (
           <Button
             variant="outline"
-            className="flex-1 gap-2 border-slate-200 text-slate-700 bg-white shadow-sm"
+            className="flex-1 gap-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 shadow-sm"
             onClick={() => navigate('/leave-summary')}
           >
             <CalendarClock className="h-4 w-4" /> Summary
@@ -411,7 +411,7 @@ export function Leaves() {
 
       {/* ── Leave Form Overlay ── */}
       {showForm && (
-        <Card className="border-none shadow-2xl ring-1 ring-black/5 bg-white relative overflow-hidden animate-in slide-in-from-top-4 fade-in duration-300 z-10 w-full max-w-2xl mx-auto">
+        <Card className="border-none shadow-2xl ring-1 ring-black/5 bg-white dark:bg-slate-900 relative overflow-hidden animate-in slide-in-from-top-4 fade-in duration-300 z-10 w-full max-w-2xl mx-auto">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 to-emerald-400" />
           <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-5 pt-6 px-6 sm:px-8 flex flex-row justify-between items-center">
             <div>
@@ -432,7 +432,7 @@ export function Leaves() {
               <div className="sm:col-span-2 space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Staff <span className="text-rose-500">*</span></label>
                 <select
-                  className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
+                  className="flex h-11 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
                   value={staffId} onChange={e => setStaffId(e.target.value)} disabled={!!formId}
                 >
                   <option value="" disabled>— Select Staff Member —</option>
@@ -446,7 +446,7 @@ export function Leaves() {
               <div className="sm:col-span-2 space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Leave Type <span className="text-rose-500">*</span></label>
                 <select
-                  className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
+                  className="flex h-11 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
                   value={leaveType} onChange={e => setLeaveType(e.target.value)}
                 >
                   <option value="" disabled>— Select Leave Type —</option>
@@ -492,7 +492,7 @@ export function Leaves() {
                   </div>
                 ) : (
                   <select
-                    className="flex h-11 w-full rounded-md border border-slate-200 bg-slate-50 focus:bg-white px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
+                    className="flex h-11 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
                     value={approverId} onChange={e => setApproverId(e.target.value)} disabled={!!formId}
                   >
                     <option value="">— Select Approver —</option>
@@ -522,7 +522,7 @@ export function Leaves() {
               <div className="sm:col-span-2 space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Reason for Leave <span className="text-rose-500">*</span></label>
                 <textarea
-                  className="w-full text-sm rounded-md border border-slate-200 bg-slate-50 p-3 h-24 focus:bg-white focus:ring-2 focus:ring-teal-500/20 outline-none transition-all resize-none"
+                  className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 p-3 h-24 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all resize-none"
                   value={reason} onChange={e => setReason(e.target.value)} placeholder="Enter details..."
                 />
               </div>
@@ -574,7 +574,7 @@ export function Leaves() {
       )}
 
       {/* ─── Leave Records Table ─── */}
-      <Card className="border-none shadow-sm overflow-hidden bg-white flex-1 flex flex-col min-h-[500px]">
+      <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
         <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
           <div className="flex items-center gap-2 ml-1">
             <div className="h-8 w-8 rounded-lg bg-teal-100 flex items-center justify-center text-teal-600">
@@ -588,14 +588,14 @@ export function Leaves() {
               {(['All', 'Active', 'Completed', 'Cancelled'] as const).map(tab => (
                 <button
                   key={tab}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${filterView === tab ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${filterView === tab ? 'bg-white dark:bg-slate-700 text-teal-700 dark:text-teal-300 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                   onClick={() => setFilterView(tab)}
                 >{tab}</button>
               ))}
             </div>
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <Input placeholder="Search staff or reason..." className="pl-9 bg-white border-slate-200 h-9 text-sm focus-visible:ring-teal-500/50 rounded-lg shadow-sm" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+              <Input placeholder="Search staff or reason..." className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 h-9 text-sm focus-visible:ring-teal-500/50 rounded-lg shadow-sm" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
             </div>
           </div>
         </div>
@@ -711,7 +711,7 @@ export function Leaves() {
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40 bg-white">
+                          <DropdownMenuContent align="end" className="w-40 bg-white dark:bg-slate-900 dark:border-slate-700">
                             <DropdownMenuItem className="text-slate-600 cursor-pointer gap-2" onClick={() => openPrintPreview(leave)}>
                               <Printer className="h-4 w-4" /> Print Preview
                             </DropdownMenuItem>
@@ -754,7 +754,7 @@ export function Leaves() {
         const leaveTypeOptions = ['Annual', 'Emergency', 'Maternity/Paternity', 'Study', 'Others'];
         return (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white max-w-4xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
+            <div className="bg-white dark:bg-slate-900 max-w-4xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                   <Printer className="h-5 w-5 text-teal-600" /> Staff Annual Leave Application Form — Preview
@@ -933,7 +933,7 @@ export function Leaves() {
       {/* ─── Uploaded File Preview Modal ─── */}
       {filePreviewLeave && filePreviewLeave.uploadedFile && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setFilePreviewLeave(null)}>
-          <div className="bg-white max-w-3xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-900 max-w-3xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <FileText className="h-5 w-5 text-indigo-600" /> {filePreviewLeave.uploadedFileName || 'Uploaded File'}

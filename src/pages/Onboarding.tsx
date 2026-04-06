@@ -125,7 +125,7 @@ function Section({
         <span className="flex items-center gap-2"><Icon className="h-4 w-4" />{label}</span>
         {open ? <ChevronUp className="h-4 w-4 opacity-60" /> : <ChevronDown className="h-4 w-4 opacity-60" />}
       </button>
-      {open && <div className="p-4 bg-white space-y-3">{children}</div>}
+      {open && <div className="p-4 bg-white dark:bg-slate-900 space-y-3">{children}</div>}
     </div>
   );
 }
@@ -159,7 +159,7 @@ function SubSection({
         </span>
         {open ? <ChevronUp className="h-3 w-3 opacity-50" /> : <ChevronDown className="h-3 w-3 opacity-50" />}
       </button>
-      {open && <div className="p-3 space-y-2 bg-white">{children}</div>}
+      {open && <div className="p-3 space-y-2 bg-white dark:bg-slate-900">{children}</div>}
     </div>
   );
 }
@@ -173,7 +173,7 @@ function CheckRow({ label, checked, onChange, disabled, hint }: {
       <label className={`flex items-center gap-3 cursor-pointer group ${disabled ? 'opacity-40 pointer-events-none' : ''}`}>
         <div
           className={`h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors
-            ${checked ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 bg-white group-hover:border-indigo-400'}
+            ${checked ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 bg-white dark:bg-slate-800 group-hover:border-indigo-400'}
             ${disabled ? 'border-slate-200 bg-slate-50' : ''}`}
           onClick={() => !disabled && onChange(!checked)}
         >
@@ -200,7 +200,7 @@ function LabeledInput({ label, value, onChange, placeholder, type = 'text', disa
       <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</label>
       <Input
         type={type}
-        className="h-9 text-sm bg-slate-50 border-slate-200 focus:bg-white"
+        className="h-9 text-sm bg-slate-50 dark:bg-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-700"
         placeholder={placeholder}
         value={value ?? ''}
         onChange={e => onChange(e.target.value)}
@@ -690,7 +690,7 @@ export function Onboarding() {
           { label: 'Pending Hires', value: pendingEmployees.length, icon: CalendarDays, color: 'text-amber-600', bg: 'bg-amber-50' },
           { label: 'Terminated', value: terminatedEmployees.length, icon: UserMinus, color: 'text-rose-600', bg: 'bg-rose-50' },
         ].map((stat, i) => (
-          <Card key={i} className="border-none shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 bg-white">
+          <Card key={i} className="border-none shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 bg-white dark:bg-slate-900">
             <CardContent className="p-5 flex items-center justify-between">
               <div><p className="text-sm font-medium text-slate-500 mb-1">{stat.label}</p><h3 className="text-3xl font-black text-slate-900">{stat.value}</h3></div>
               <div className={`h-12 w-12 rounded-xl flex items-center justify-center shadow-inner ${stat.bg} ${stat.color}`}><stat.icon className="h-6 w-6" /></div>
@@ -703,7 +703,7 @@ export function Onboarding() {
       <div className="grid gap-6 md:grid-cols-12 items-start">
 
         {/* ── Left Column ────────────────────────────────── */}
-        <Card className="md:col-span-5 lg:col-span-4 border-none shadow-sm bg-white overflow-hidden flex flex-col h-[720px]">
+        <Card className="md:col-span-5 lg:col-span-4 border-none shadow-sm bg-white dark:bg-slate-900 overflow-hidden flex flex-col h-[720px]">
           <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4 px-5 space-y-3">
             <CardTitle className="text-base font-bold text-slate-800 flex items-center justify-between">
               <span>{leftTab === 'Terminated' ? 'Offboarding' : leftTab} Directory</span>
@@ -742,7 +742,7 @@ export function Onboarding() {
             <div className="flex p-1 bg-slate-200/50 rounded-lg">
               {(['Active', 'Pending', 'Terminated'] as const).map(tab => (
                 <button key={tab}
-                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors relative ${leftTab === tab ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors relative ${leftTab === tab ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-700 dark:text-indigo-300' : 'text-slate-500 hover:text-slate-700'}`}
                   onClick={() => setLeftTab(tab)}
                 >
                   {tab === 'Terminated' ? 'Offboarding' : tab}
@@ -893,8 +893,8 @@ export function Onboarding() {
         </Card>
 
         {/* ── Right Column ───────────────────────────────── */}
-        <Card className="md:col-span-7 lg:col-span-8 border-none shadow-lg bg-white overflow-hidden min-h-[720px] flex flex-col ring-1 ring-slate-100">
-          <CardHeader className="border-b border-slate-100 bg-white/50 sticky top-0 z-10 p-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <Card className="md:col-span-7 lg:col-span-8 border-none shadow-lg bg-white dark:bg-slate-900 overflow-hidden min-h-[720px] flex flex-col ring-1 ring-slate-100">
+          <CardHeader className="border-b border-slate-100 bg-white/50 dark:bg-slate-900/80 sticky top-0 z-10 p-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div className="space-y-1 flex-1">
               <Badge variant="outline" className={`rounded-md font-bold text-[10px] tracking-widest uppercase border-0 text-white ${isHistory ? 'bg-emerald-500' : isOffboarding ? 'bg-rose-500' : isOnboarding ? 'bg-indigo-500' : 'bg-slate-400'}`}>
                 {activeTaskType || 'Action Center'}
@@ -950,7 +950,7 @@ export function Onboarding() {
                           variant="outline" 
                           size="sm" 
                           onClick={() => setChecklistEditMode(!checklistEditMode)} 
-                          className={`gap-1.5 transition-colors h-8 text-xs font-semibold shadow-sm ${checklistEditMode ? 'bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200 hover:text-amber-900 focus:bg-amber-200' : 'bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}
+                          className={`gap-1.5 transition-colors h-8 text-xs font-semibold shadow-sm ${checklistEditMode ? 'bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200 hover:text-amber-900 focus:bg-amber-200' : 'bg-white dark:bg-slate-800 border-emerald-200 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/20'}`}
                         >
                           {checklistEditMode ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
                           {checklistEditMode ? 'Done Editing' : 'Edit Checklist'}
@@ -1061,7 +1061,7 @@ export function Onboarding() {
                     {cl.guarantors.map((g, i) => {
                       const inputsFilled = g.name.trim() !== '' && g.phone.trim() !== '';
                       return (
-                        <div key={i} className={`p-3 rounded-lg border space-y-2 mt-2 transition-colors ${g.verified ? 'bg-emerald-50/50 border-emerald-200' : inputsFilled ? 'bg-sky-50/30 border-sky-200' : 'bg-white border-slate-200'}`}>
+                        <div key={i} className={`p-3 rounded-lg border space-y-2 mt-2 transition-colors ${g.verified ? 'bg-emerald-50/50 border-emerald-200' : inputsFilled ? 'bg-sky-50/30 border-sky-200' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'}`}>
                           <div className="flex items-center justify-between">
                             <p className="text-xs font-bold text-sky-700">Guarantor {i + 1}</p>
                             {g.verified
@@ -1081,7 +1081,7 @@ export function Onboarding() {
                                 type="tel"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
-                                className="h-9 text-sm bg-slate-50 border-slate-200 focus:bg-white"
+                                className="h-9 text-sm bg-slate-50 dark:bg-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-700"
                                 placeholder="e.g. 08012345678"
                                 value={g.phone}
                                 onChange={e => {
@@ -1141,7 +1141,7 @@ export function Onboarding() {
                           type="tel"
                           inputMode="numeric"
                           pattern="[0-9]*"
-                          className="h-9 text-sm bg-slate-50 border-slate-200 focus:bg-white"
+                          className="h-9 text-sm bg-slate-50 dark:bg-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-700"
                           placeholder="0123456789"
                           value={cl.accountNo}
                           onChange={e => updateCL({ accountNo: e.target.value.replace(/\D/g, '') })}
@@ -1340,7 +1340,7 @@ export function Onboarding() {
                       <Package className="h-4 w-4 text-slate-500" /> Additional Tasks ({selectedEmployee.department})
                     </h3>
                     {selectedEmployee.onboardingTasks.map(task => (
-                      <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg bg-white border border-slate-200 shadow-sm transition-shadow mb-2">
+                      <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-sm transition-shadow mb-2">
                         <button
                           className={`h-5 w-5 rounded border-[1.5px] p-0 flex items-center justify-center shrink-0 transition-colors ${
                             task.status === 'Completed' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 hover:border-emerald-400'
@@ -1392,7 +1392,7 @@ export function Onboarding() {
                       <Section key={group} label={group} color="bg-rose-50 text-rose-700" defaultOpen={true} icon={Lock}>
                         <div className="space-y-2 mt-1">
                           {groupTasks.map(task => (
-                            <div key={task.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-white border border-slate-100 hover:shadow-sm transition-shadow">
+                            <div key={task.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:shadow-sm transition-shadow">
                               <button
                                 className={`h-5 w-5 rounded border-[1.5px] p-0 flex items-center justify-center shrink-0 transition-colors ${
                                   task.status === 'Completed' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 hover:border-emerald-400'
@@ -1439,7 +1439,7 @@ export function Onboarding() {
       {/* ── Edit Modal ────────────────────────────────────── */}
       {editEmp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-indigo-600">Edit New Hire Details</p>

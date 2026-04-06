@@ -990,18 +990,18 @@ export function Attendance() {
                     value={registerDate}
                     max={format(new Date(), 'yyyy-MM-dd')}
                     onChange={(e) => setRegisterDate(e.target.value)}
-                    className="h-9 pl-9 text-xs bg-white shadow-sm border-slate-200 hover:border-slate-300 transition-colors uppercase font-medium text-slate-700 w-full"
+                    className="h-9 pl-9 text-xs bg-white dark:bg-slate-800 shadow-sm border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition-colors uppercase font-medium text-slate-700 dark:text-slate-200 w-full"
                   />
                   <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
                 </div>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 bg-white flex-shrink-0 shadow-sm hover:bg-slate-50 transition-colors" title="Attendance Calendar Overview">
+                    <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex-shrink-0 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors" title="Attendance Calendar Overview">
                       <CalendarIcon className="h-4 w-4 text-indigo-500" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent align="start" className="w-auto p-3 z-50 bg-white border border-slate-200 shadow-xl rounded-xl">
-                     <div className="mb-2 text-xs font-semibold text-slate-700">Attendance Overview</div>
+                  <PopoverContent align="start" className="w-auto p-3 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl rounded-xl">
+                     <div className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-300">Attendance Overview</div>
                      <DayPicker
                         defaultMonth={parseISO(registerDate)}
                         onDayClick={(date) => { setRegisterDate(format(date, 'yyyy-MM-dd')) }}
@@ -1027,7 +1027,7 @@ export function Attendance() {
                           special: { backgroundColor: '#e0e7ff', color: '#3730a3', fontWeight: 'bold', borderRadius: '4px' },
                           missing: { border: '2px solid #ef4444', borderRadius: '50%' },
                         }}
-                        className="bg-white"
+                        className="bg-white dark:bg-slate-900"
                      />
                      <div className="mt-3 text-[10px] flex flex-col gap-1.5">
                        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#d1fae5]"></div> Attendance Entered</div>
@@ -1046,7 +1046,7 @@ export function Attendance() {
               <select
                 value={staffTypeFilter}
                 onChange={(e) => setStaffTypeFilter(e.target.value as any)}
-                className="h-9 pl-9 pr-8 text-[11px] font-bold uppercase tracking-tight rounded-md border border-slate-200 bg-white shadow-sm appearance-none cursor-pointer hover:bg-slate-50 transition-all focus:ring-2 focus:ring-slate-900/5 outline-none text-slate-700"
+                className="h-9 pl-9 pr-8 text-[11px] font-bold uppercase tracking-tight rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-sm appearance-none cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-all focus:ring-2 focus:ring-slate-900/5 outline-none"
               >
                 <option value="OFFICE">OFFICE STAFF</option>
                 <option value="FIELD">FIELD STAFF</option>
@@ -1060,7 +1060,7 @@ export function Attendance() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <Input
                 placeholder="Search..."
-                className="h-9 pl-9 text-xs bg-white shadow-sm border-slate-200 hover:border-slate-300 transition-colors"
+                className="h-9 pl-9 text-xs bg-white dark:bg-slate-800 shadow-sm border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -1069,9 +1069,9 @@ export function Attendance() {
             <div className="flex-1" />
 
             {/* Stats pill */}
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 rounded-full px-3 py-1 border border-slate-100">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 rounded-full px-3 py-1 border border-slate-100 dark:border-slate-700">
               <Users className="h-3 w-3" />
-              <span className="font-medium text-slate-700">{filledCount}</span>
+              <span className="font-medium text-slate-700 dark:text-slate-200">{filledCount}</span>
               <span>/</span>
               <span>{filteredEmployees.length}</span>
               <span className="hidden sm:inline">filled</span>
@@ -1097,7 +1097,7 @@ export function Attendance() {
           </div>
 
           {/* Compact entry table */}
-          <div className="rounded-lg border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
+          <div className="rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
             <div className="overflow-y-auto flex-1">
               <table className="w-full text-sm">
                 <thead className="bg-slate-900 text-white sticky top-0 z-10">
@@ -1115,7 +1115,7 @@ export function Attendance() {
                     )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                   {filteredEmployees.length === 0 ? (
                     <tr>
                       <td colSpan={isFieldStaff ? 3 : 2} className="text-center py-8 text-slate-400 text-sm">No employees match your filters.</td>
@@ -1130,30 +1130,30 @@ export function Attendance() {
                       return (
                         <tr
                           key={employee.id}
-                          className={`transition-colors ${isAbsent ? 'bg-red-50/50' :
-                            hasEntry ? 'bg-emerald-50/40' :
-                              idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
-                            } hover:bg-slate-100/60`}
+                          className={`transition-colors ${isAbsent ? 'bg-red-50/50 dark:bg-red-900/10' :
+                            hasEntry ? 'bg-emerald-50/40 dark:bg-emerald-900/10' :
+                              idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-800/50'
+                            } hover:bg-slate-100/60 dark:hover:bg-slate-700/40`}
                         >
                           <td className="py-1 px-3">
                             <div className="flex items-center gap-2">
                               <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isAbsent ? 'bg-red-400' : hasEntry ? 'bg-emerald-400' : 'bg-slate-300'
                                 }`} />
-                              <span className="font-medium text-slate-800 text-xs truncate">
+                              <span className="font-medium text-slate-800 dark:text-slate-200 text-xs truncate">
                                 {employee.surname} {employee.firstname}
                               </span>
-                              <span className="text-[10px] text-slate-400 bg-slate-100 rounded px-1 py-0.5 flex-shrink-0 hidden sm:inline">
+                              <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 rounded px-1 py-0.5 flex-shrink-0 hidden sm:inline">
                                 {employee.department}
                               </span>
                             </div>
                           </td>
-                          <td className="py-1 px-2 border-l border-slate-100">
+                          <td className="py-1 px-2 border-l border-slate-100 dark:border-slate-700">
                             <select
                               className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${dayVal && !isAbsentStatus(dayVal)
                                 ? 'border-emerald-300 bg-emerald-50 text-emerald-800 font-medium'
                                 : dayVal && isAbsentStatus(dayVal)
                                   ? 'border-red-300 bg-red-50 text-red-700 font-medium'
-                                  : 'border-slate-200 bg-white text-slate-700'
+                                  : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'
                                 } focus:ring-1 focus:ring-slate-400`}
                               value={dayVal}
                               onChange={(e) => handleSelectChange(employee.id, 'day', e.target.value)}
@@ -1170,13 +1170,13 @@ export function Attendance() {
                             </select>
                           </td>
                           {isFieldStaff ? (
-                            <td className="py-1 px-2 border-l border-slate-100">
+                            <td className="py-1 px-2 border-l border-slate-100 dark:border-slate-700">
                               <select
                                 className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${nightVal && !isAbsentStatus(nightVal)
                                   ? 'border-indigo-300 bg-indigo-50 text-indigo-800 font-medium'
                                   : nightVal && isAbsentStatus(nightVal)
                                     ? 'border-red-300 bg-red-50 text-red-700 font-medium'
-                                    : 'border-slate-200 bg-white text-slate-700'
+                                    : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'
                                   } focus:ring-1 focus:ring-slate-400`}
                                 value={nightVal}
                                 onChange={(e) => handleSelectChange(employee.id, 'night', e.target.value)}
@@ -1239,12 +1239,12 @@ export function Attendance() {
         </TabsContent>
 
         <TabsContent active={activeTab === 'database'} className="flex-1 flex flex-col min-h-0 mt-0">
-          <div className="flex flex-wrap items-center gap-2 py-1 px-0 bg-white">
+          <div className="flex flex-wrap items-center gap-2 py-1 px-0">
             <div className="relative">
               <select
                 value={dbStaffTypeFilter}
                 onChange={(e) => setDbStaffTypeFilter(e.target.value as any)}
-                className="h-8 pl-7 pr-3 text-xs rounded-lg border border-slate-200 bg-white shadow-sm appearance-none cursor-pointer focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none"
+                className="h-8 pl-7 pr-3 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-sm appearance-none cursor-pointer focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none"
               >
                 <option value="All">All Types</option>
                 <option value="OFFICE">OFFICE</option>
@@ -1257,7 +1257,7 @@ export function Attendance() {
               <select
                 value={dbSiteFilter}
                 onChange={(e) => setDbSiteFilter(e.target.value)}
-                className="h-8 pl-7 pr-3 text-xs rounded-lg border border-slate-200 bg-white shadow-sm appearance-none cursor-pointer focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none max-w-[140px] truncate"
+                className="h-8 pl-7 pr-3 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-sm appearance-none cursor-pointer focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none max-w-[140px] truncate"
               >
                 <option value="All">All Sites</option>
                 {sites.filter(s => s.status === 'Active').map(site => (
@@ -1271,7 +1271,7 @@ export function Attendance() {
               <select
                 value={dbShiftFilter}
                 onChange={(e) => setDbShiftFilter(e.target.value)}
-                className="h-8 pl-7 pr-3 text-xs rounded-lg border border-slate-200 bg-white shadow-sm appearance-none cursor-pointer focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none"
+                className="h-8 pl-7 pr-3 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-sm appearance-none cursor-pointer focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none"
               >
                 <option value="All">All Shifts</option>
                 <option value="Day">Day</option>
@@ -1284,7 +1284,7 @@ export function Attendance() {
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <Input
                 placeholder="Search Database..."
-                className="h-8 pl-7 text-xs bg-white shadow-sm"
+                className="h-8 pl-7 text-xs bg-white dark:bg-slate-800 shadow-sm"
                 value={dbSearchTerm}
                 onChange={(e) => setDbSearchTerm(e.target.value)}
               />
@@ -1295,7 +1295,7 @@ export function Attendance() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className={`h-8 px-3 text-xs font-medium flex items-center justify-between gap-2 rounded-lg border-slate-200 shadow-sm hover:bg-slate-50 transition-colors ${dbDateFilter ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white text-slate-600'}`}
+                    className={`h-8 px-3 text-xs font-medium flex items-center justify-between gap-2 rounded-lg border-slate-200 dark:border-slate-700 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${dbDateFilter ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}
                   >
                     <div className="flex items-center gap-2">
                        <CalendarIcon className={`h-3.5 w-3.5 ${dbDateFilter ? 'text-indigo-500' : 'text-slate-400'}`} />
@@ -1330,10 +1330,10 @@ export function Attendance() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
+          <div className="rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
             <div className="overflow-auto flex-1 h-full max-h-[calc(100vh-250px)]">
               <table className="w-full text-[11px] whitespace-nowrap">
-                <thead className="bg-slate-100 sticky top-0 shadow-sm z-10">
+                <thead className="bg-slate-100 dark:bg-slate-800 sticky top-0 shadow-sm z-10">
                   <tr>
                     <th className="py-2 px-2 border-b border-slate-200">
                       <input
@@ -1371,7 +1371,7 @@ export function Attendance() {
                       return (
                         <th 
                           key={h.key} 
-                          className="text-left font-semibold text-slate-600 py-2 px-2 border-b border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition-colors group"
+                          className="text-left font-semibold text-slate-600 dark:text-slate-400 py-2 px-2 border-b border-slate-200 dark:border-slate-700 cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors group"
                           onClick={(e) => handleSort(h.key, e)}
                           title="Click to sort, Shift+Click to sort by multiple columns"
                         >
@@ -1388,7 +1388,7 @@ export function Attendance() {
                     })}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                   {filteredDbRecords.length === 0 ? (
                     <tr>
                       <td colSpan={19} className="text-center py-8 text-slate-400 text-sm">

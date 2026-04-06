@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useNetworkStore, type ConnectionStatus } from '@/src/store/networkStore';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/src/components/task_ui/tooltip';
+import { OfflineCapabilitiesModal } from './OfflineCapabilitiesModal';
 
 const dotColors: Record<ConnectionStatus, string> = {
   online: 'bg-emerald-500',
@@ -16,12 +18,16 @@ const labels: Record<ConnectionStatus, string> = {
 export function StatusIndicator() {
   const status = useNetworkStore((s) => s.connectionStatus);
   const lastSynced = useNetworkStore((s) => s.lastSyncedAt);
+  const [modalOpen, setModalOpen] = useState(false);
 
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button className={`
+    <>
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button 
+              onClick={() => setModalOpen(true)}
+              className={`
             relative flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-all duration-200
             ${status === 'online' 
               ? 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/20' 
@@ -52,5 +58,7 @@ export function StatusIndicator() {
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
+    <OfflineCapabilitiesModal open={modalOpen} onOpenChange={setModalOpen} />
+    </>
   );
 }

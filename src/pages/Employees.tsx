@@ -689,7 +689,7 @@ export function Employees() {
   // Render Employee Form (Add or Edit)
   const renderEmployeeForm = (isEdit: boolean) => (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 gap-4">
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <Button variant="ghost" size="icon" onClick={() => { setIsAdding(false); setIsEditing(false); }} className="hover:bg-slate-100 rounded-full h-10 w-10 shrink-0">
             <ArrowLeft className="h-5 w-5 text-slate-600" />
@@ -717,19 +717,19 @@ export function Employees() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Surname</label>
-                  <Input value={formData.surname || ''} onChange={e => setFormData({ ...formData, surname: e.target.value })} placeholder="e.g. DAVIES" className="bg-slate-50 focus:bg-white" />
+                  <Input value={formData.surname || ''} onChange={e => setFormData({ ...formData, surname: e.target.value })} placeholder="e.g. DAVIES" className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Firstname</label>
-                  <Input value={formData.firstname || ''} onChange={e => setFormData({ ...formData, firstname: e.target.value })} placeholder="e.g. HUBERT" className="bg-slate-50 focus:bg-white" />
+                  <Input value={formData.firstname || ''} onChange={e => setFormData({ ...formData, firstname: e.target.value })} placeholder="e.g. HUBERT" className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Employee Code</label>
-                  <Input value={formData.employeeCode || ''} onChange={e => setFormData({ ...formData, employeeCode: e.target.value })} placeholder="e.g. EMP-001 (Auto-generated if empty)" className="bg-slate-50 focus:bg-white font-mono" />
+                  <Input value={formData.employeeCode || ''} onChange={e => setFormData({ ...formData, employeeCode: e.target.value })} placeholder="e.g. EMP-001 (Auto-generated if empty)" className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 font-mono" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Position</label>
-                  <select className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                  <select className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none" 
                     value={formData.position || ''} 
                     onChange={e => {
                       const newPos = e.target.value;
@@ -764,7 +764,7 @@ export function Employees() {
                     {departments
                       .filter(d => d.name !== formData.department && d.staffType !== 'NON-EMPLOYEE')
                       .map(dept => (
-                      <label key={dept.id} className="flex items-center gap-2 bg-white px-2 py-1 rounded border border-slate-200 text-xs font-semibold cursor-pointer hover:bg-indigo-50 transition-colors">
+                      <label key={dept.id} className="flex items-center gap-2 bg-white dark:bg-slate-800 dark:text-slate-200 px-2 py-1 rounded border border-slate-200 dark:border-slate-700 text-xs font-semibold cursor-pointer hover:bg-indigo-50 transition-colors">
                         <input 
                           type="checkbox" 
                           checked={formData.secondaryDepartments?.includes(dept.name) || false} 
@@ -786,7 +786,7 @@ export function Employees() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Staff Type</label>
                   <select 
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none" 
                     value={formData.staffType || 'OFFICE'} 
                     onChange={e => setFormData({ ...formData, staffType: e.target.value as any })}
                   >
@@ -797,7 +797,7 @@ export function Employees() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Employee Level</label>
                   <select 
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none" 
                     value={formData.level || 10} 
                     onChange={e => setFormData({ ...formData, level: parseInt(e.target.value) })}
                   >
@@ -810,7 +810,7 @@ export function Employees() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Line Manager</label>
                     <select 
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none" 
                       value={formData.lineManager || ''} 
                       onChange={e => setFormData({ ...formData, lineManager: e.target.value || undefined })}
                     >
@@ -825,16 +825,16 @@ export function Employees() {
                 )}
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Phone</label>
-                  <Input value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="e.g. +234 801 234 5678" className="bg-slate-50 focus:bg-white" />
+                  <Input value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="e.g. +234 801 234 5678" className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Email Address</label>
-                  <Input type="email" value={formData.email || ''} onChange={e => setFormData({ ...formData, email: e.target.value })} placeholder="e.g. john@company.com" className="bg-slate-50 focus:bg-white" />
+                  <Input type="email" value={formData.email || ''} onChange={e => setFormData({ ...formData, email: e.target.value })} placeholder="e.g. john@company.com" className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
                   <select 
-                    className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none ${normalizeDate(formData.endDate) ? 'opacity-70 cursor-not-allowed' : ''}`} 
+                    className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none ${normalizeDate(formData.endDate) ? 'opacity-70 cursor-not-allowed' : ''}`} 
                     value={formData.status} 
                     onChange={e => {
                       const newStatus = e.target.value;
@@ -853,15 +853,15 @@ export function Employees() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Yearly Leave (Days)</label>
-                  <Input type="number" value={formData.yearlyLeave || ''} onChange={e => setFormData({ ...formData, yearlyLeave: parseInt(e.target.value) || 0 })} className="bg-slate-50 focus:bg-white" />
+                  <Input type="number" value={formData.yearlyLeave || ''} onChange={e => setFormData({ ...formData, yearlyLeave: parseInt(e.target.value) || 0 })} className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Date</label>
-                  <Input type="date" value={normalizeDate(formData.startDate)} onChange={e => setFormData({ ...formData, startDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
+                  <Input type="date" value={normalizeDate(formData.startDate)} onChange={e => setFormData({ ...formData, startDate: e.target.value })} className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">End Date</label>
-                  <Input type="date" value={normalizeDate(formData.endDate)} onChange={e => setFormData({ ...formData, endDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
+                  <Input type="date" value={normalizeDate(formData.endDate)} onChange={e => setFormData({ ...formData, endDate: e.target.value })} className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
               </div>
             </CardContent>
@@ -874,7 +874,7 @@ export function Employees() {
                   <CardTitle className="text-slate-800">Monthly Salary Matrix (₦)</CardTitle>
                   <CardDescription className="mt-1">Define gross monthly salary dynamically. Subject to revision.</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" className="bg-white shadow-sm" onClick={() => {
+                <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800 dark:text-slate-200 shadow-sm" onClick={() => {
                   const janVal = formData.monthlySalaries?.jan || 0;
                   setFormData({
                     ...formData,
@@ -895,7 +895,7 @@ export function Employees() {
                       <label className="text-xs font-bold uppercase text-slate-500">{month}</label>
                       <div className="relative">
                         <span className="absolute left-3 top-2 text-slate-400 font-medium">₦</span>
-                        <Input type="number" value={formData.monthlySalaries?.[month as keyof MonthlySalary] || ''} onChange={e => setFormData({ ...formData, monthlySalaries: { ...formData.monthlySalaries!, [month]: parseFloat(e.target.value) || 0 } })} className="font-mono text-sm pl-7 bg-slate-50 focus:bg-white" />
+                        <Input type="number" value={formData.monthlySalaries?.[month as keyof MonthlySalary] || ''} onChange={e => setFormData({ ...formData, monthlySalaries: { ...formData.monthlySalaries!, [month]: parseFloat(e.target.value) || 0 } })} className="font-mono text-sm pl-7 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                       </div>
                     </div>
                   ))}
@@ -920,7 +920,7 @@ export function Employees() {
               </Avatar>
               <div className="flex gap-2 w-full justify-center">
                 <label className="cursor-pointer">
-                  <span className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-sm h-9 px-4 py-2">
+                  <span className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-sm h-9 px-4 py-2">
                     <Upload className="h-4 w-4 mr-2 text-slate-500" /> Upload Image
                   </span>
                   <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
@@ -981,7 +981,7 @@ export function Employees() {
                               setFormData({ ...formData, onboardingChecklist: { ...cl, guarantors: next } as any });
                             }}
                             placeholder="Full Name"
-                            className="h-8 text-xs bg-white"
+                            className="h-8 text-xs bg-white dark:bg-slate-800 dark:text-slate-100"
                           />
                         </div>
                         <div className="space-y-1">
@@ -995,7 +995,7 @@ export function Employees() {
                               setFormData({ ...formData, onboardingChecklist: { ...cl, guarantors: next } as any });
                             }}
                             placeholder="Phone"
-                            className="h-8 text-xs bg-white font-mono"
+                            className="h-8 text-xs bg-white dark:bg-slate-800 dark:text-slate-100 font-mono"
                           />
                         </div>
                         <label className="flex items-center gap-2 cursor-pointer pt-1">
@@ -1028,33 +1028,33 @@ export function Employees() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Bank Name</label>
-                  <Input value={formData.bankName || ''} onChange={e => setFormData({ ...formData, bankName: e.target.value })} placeholder="e.g. STANBIC" className="bg-slate-50 focus:bg-white" />
+                  <Input value={formData.bankName || ''} onChange={e => setFormData({ ...formData, bankName: e.target.value })} placeholder="e.g. STANBIC" className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Account No.</label>
-                  <Input value={formData.accountNo || ''} onChange={e => setFormData({ ...formData, accountNo: e.target.value })} className="font-mono bg-slate-50 focus:bg-white" />
+                  <Input value={formData.accountNo || ''} onChange={e => setFormData({ ...formData, accountNo: e.target.value })} className="font-mono bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Tax ID</label>
-                  <Input value={formData.taxId || ''} onChange={e => setFormData({ ...formData, taxId: e.target.value })} className="font-mono bg-slate-50 focus:bg-white" />
+                  <Input value={formData.taxId || ''} onChange={e => setFormData({ ...formData, taxId: e.target.value })} className="font-mono bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Pension Number</label>
-                  <Input value={formData.pensionNumber || ''} onChange={e => setFormData({ ...formData, pensionNumber: e.target.value })} className="font-mono bg-slate-50 focus:bg-white" />
+                  <Input value={formData.pensionNumber || ''} onChange={e => setFormData({ ...formData, pensionNumber: e.target.value })} className="font-mono bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">LASHMA Policy Number</label>
-                    <Input value={formData.lashmaPolicyNumber || ''} onChange={e => setFormData({ ...formData, lashmaPolicyNumber: e.target.value })} placeholder="Enter policy number" className="bg-slate-50 focus:bg-white font-mono" />
+                    <Input value={formData.lashmaPolicyNumber || ''} onChange={e => setFormData({ ...formData, lashmaPolicyNumber: e.target.value })} placeholder="Enter policy number" className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 font-mono" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-500">LASHMA Registration Date</label>
-                      <Input type="date" value={normalizeDate(formData.lashmaRegistrationDate)} onChange={e => setFormData({ ...formData, lashmaRegistrationDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
+                      <Input type="date" value={normalizeDate(formData.lashmaRegistrationDate)} onChange={e => setFormData({ ...formData, lashmaRegistrationDate: e.target.value })} className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-500">LASHMA Expiry Date</label>
-                      <Input type="date" value={normalizeDate(formData.lashmaExpiryDate)} onChange={e => setFormData({ ...formData, lashmaExpiryDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
+                      <Input type="date" value={normalizeDate(formData.lashmaExpiryDate)} onChange={e => setFormData({ ...formData, lashmaExpiryDate: e.target.value })} className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                     </div>
                   </div>
                 </div>
@@ -1062,7 +1062,7 @@ export function Employees() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Rent (₦)</label>
-                    <Input type="number" value={formData.rent || 0} onChange={e => setFormData({ ...formData, rent: Number(e.target.value) })} className="font-mono bg-slate-50 focus:bg-white" />
+                    <Input type="number" value={formData.rent || 0} onChange={e => setFormData({ ...formData, rent: Number(e.target.value) })} className="font-mono bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                   </div>
                 </div>
               </div>
@@ -1107,7 +1107,7 @@ export function Employees() {
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           <div className="sticky top-0 bg-indigo-600 p-4 flex justify-between items-center rounded-t-lg">
             <h3 className="text-white font-bold text-lg">Employee Details</h3>
             <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={closeViewModal}>
@@ -1144,7 +1144,7 @@ export function Employees() {
                 {['Overview', 'Attendance', 'Leaves', 'Conduct', 'Evaluations', 'Reminders'].map(tab => (
                   <button
                     key={tab}
-                    className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-md transition-all ${detailTab === tab ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-md transition-all ${detailTab === tab ? 'bg-white dark:bg-slate-900 dark:bg-slate-900 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     onClick={() => setDetailTab(tab as any)}
                   >
                     {tab === 'Conduct' ? 'Merits & Incidents' : tab}
@@ -1157,7 +1157,7 @@ export function Employees() {
                   <select
                     value={activeTabMonth}
                     onChange={(e) => setActiveTabMonth(e.target.value)}
-                    className="h-8 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 px-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none"
                   >
                     <option value="All">All Months</option>
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
@@ -1167,7 +1167,7 @@ export function Employees() {
                   <select
                     value={activeTabYear}
                     onChange={(e) => setActiveTabYear(e.target.value)}
-                    className="h-8 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 px-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none"
                   >
                     <option value="All">All Years</option>
                     {Array.from({ length: 5 }, (_, i) => {
@@ -1238,11 +1238,11 @@ export function Employees() {
                return (
                  <div className="space-y-4">
                    {empReminders.length === 0 ? (
-                     <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                     <div className="text-center py-8 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 shadow-inner">
                         <p className="text-slate-500 font-medium">No system reminders tied to this employee.</p>
                      </div>
                    ) : (
-                     <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
                        <Table>
                          <TableHeader>
                            <TableRow className="bg-slate-50/50">
@@ -1295,11 +1295,11 @@ export function Employees() {
                      <span>Overtime: {overtimeHours} hrs</span>
                   </div>
                   {empAtt.length === 0 ? (
-                    <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                    <div className="text-center py-8 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 shadow-inner">
                       <p className="text-slate-500 font-medium">No attendance records found for selected period.</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-slate-50/50">
@@ -1351,11 +1351,11 @@ export function Employees() {
                      <span>Remaining: {remaining}</span>
                   </div>
                   {empLeaves.length === 0 ? (
-                    <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                    <div className="text-center py-8 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 shadow-inner">
                       <p className="text-slate-500 font-medium">No leave records found for selected period.</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-slate-50/50">
@@ -1415,12 +1415,12 @@ export function Employees() {
                    </div>
 
                    {empEvents.length === 0 ? (
-                     <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                     <div className="text-center py-8 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 shadow-inner">
                         <p className="text-slate-500 font-medium">No professional conduct events for selected period.</p>
                         <p className="text-xs text-slate-400 mt-1">Clean record and good standing.</p>
                      </div>
                    ) : (
-                     <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
                        <Table>
                          <TableHeader>
                            <TableRow className="bg-slate-50/50">
@@ -1478,12 +1478,12 @@ export function Employees() {
                return (
                  <div className="space-y-4">
                    {empEvals.length === 0 ? (
-                     <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                     <div className="text-center py-8 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 shadow-inner">
                         <p className="text-slate-500 font-medium">No evaluation records found for selected period.</p>
                         <p className="text-xs text-slate-400 mt-1">Schedule a review to get started.</p>
                      </div>
                    ) : (
-                     <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
                        <Table>
                          <TableHeader>
                            <TableRow className="bg-slate-50/50">
@@ -1615,7 +1615,7 @@ export function Employees() {
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
           <div className="sticky top-0 bg-indigo-600 p-4 flex justify-between items-center rounded-t-lg">
             <h3 className="text-white font-bold text-lg">Bulk Edit Employees ({selectedIds.length})</h3>
             <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={() => setIsBulkEditing(false)}>
@@ -1630,7 +1630,7 @@ export function Employees() {
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                   value={bulkFormData.status || ''}
                   onChange={e => setBulkFormData({ ...bulkFormData, status: e.target.value as any })}
                 >
@@ -1644,7 +1644,7 @@ export function Employees() {
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Staff Type</label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                   value={bulkFormData.staffType || ''}
                   onChange={e => setBulkFormData({ ...bulkFormData, staffType: e.target.value as any })}
                 >
@@ -1659,7 +1659,7 @@ export function Employees() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Position</label>
                     <select
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                       value={bulkFormData.position || ''}
                       onChange={e => {
                         const newPos = e.target.value;
@@ -1683,7 +1683,7 @@ export function Employees() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Department</label>
                     <select
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                       value={bulkFormData.department || ''}
                       onChange={e => setBulkFormData({ ...bulkFormData, department: e.target.value })}
                     >
@@ -1695,7 +1695,7 @@ export function Employees() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Employee Level</label>
                     <select
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                       value={bulkFormData.level || ''}
                       onChange={e => setBulkFormData({ ...bulkFormData, level: parseInt(e.target.value) || undefined })}
                     >
@@ -1709,7 +1709,7 @@ export function Employees() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Line Manager</label>
                     <select
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                       value={bulkFormData.lineManager || ''}
                       onChange={e => setBulkFormData({ ...bulkFormData, lineManager: e.target.value || undefined })}
                     >
@@ -1764,7 +1764,7 @@ export function Employees() {
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsLoggingPerformance(false)} />
-        <div className="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-lg border border-slate-200 overflow-hidden font-sans">
+        <div className="relative bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl w-full max-w-lg border border-slate-200 overflow-hidden font-sans">
           <div className={`p-6 bg-gradient-to-r ${(performanceRecord.points || 0) > 0 ? 'from-emerald-600 to-teal-600' : (performanceRecord.points || 0) < 0 ? 'from-rose-600 to-pink-600' : 'from-indigo-600 to-blue-600'}`}>
              <div className="flex items-center justify-between mb-2">
                 <h3 className="text-xl font-black text-white uppercase tracking-tighter">Log Professional Event</h3>
@@ -1979,17 +1979,17 @@ export function Employees() {
         )}
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-[500px]">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-[500px]">
         <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
           <div className="flex bg-slate-200/50 p-1 rounded-lg">
             <button
-              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Active' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Active' ? 'bg-white dark:bg-slate-900 dark:bg-slate-900 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               onClick={() => setActiveTab('Active')}
             >
               Active Personnel
             </button>
             <button
-              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Delisted' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Delisted' ? 'bg-white dark:bg-slate-900 dark:bg-slate-900 text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               onClick={() => setActiveTab('Delisted')}
             >
               Delisted

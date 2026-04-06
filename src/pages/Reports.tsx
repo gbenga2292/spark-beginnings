@@ -612,28 +612,29 @@ export function Reports() {
     {
       group: 'Identity',
       color: 'indigo',
-      fields: ['Employee ID', 'Full Name', 'Surname', 'Firstname'],
+      fields: ['Employee ID', 'Full Name', 'Surname', 'Firstname', 'Phone', 'Email'],
     },
     {
       group: 'Employment',
       color: 'emerald',
-      fields: ['Department', 'Position', 'Staff Type', 'Status', 'Start Date', 'End Date'],
+      fields: ['Department', 'Secondary Departments', 'Position', 'Staff Type', 'Level', 'Status', 'Start Date', 'End Date', 'Probation Period', 'Tentative Start Date', 'Verified Start Date', 'Line Manager'],
     },
-    {
-      group: 'Financial',
-      color: 'amber',
-      fields: ['Bank Name', 'Account Number', 'Pension Number', 'Tax ID'],
-    },
+
     {
       group: 'HR',
       color: 'rose',
-      fields: ['Yearly Leave Balance', 'Leave Status', 'Leave Days Taken', 'Leave Days Remaining', 'Currently On Leave'],
+      fields: ['Yearly Leave Balance', 'Leave Status', 'Leave Days Taken', 'Leave Days Remaining', 'Currently On Leave', 'No of Guarantors'],
     },
     {
       group: 'Compliance',
       color: 'violet',
-      fields: ['Tax Type', 'Withholding Tax', 'PAYE Tax'],
+      fields: ['Tax Type', 'Withholding Tax', 'Withholding Tax Rate', 'PAYE Tax', 'PAYE Number'],
     },
+    {
+      group: 'Health',
+      color: 'sky',
+      fields: ['LASHMA Policy', 'LASHMA Reg Date', 'LASHMA Expiry'],
+    }
   ];
 
   const ALL_REPORT_FIELDS = REPORT_FIELD_GROUPS.flatMap(g => g.fields);
@@ -650,24 +651,46 @@ export function Reports() {
       case 'Full Name':             return `${emp.surname} ${emp.firstname}`;
       case 'Surname':               return emp.surname;
       case 'Firstname':             return emp.firstname;
+      case 'Phone':                 return emp.phone || 'N/A';
+      case 'Email':                 return emp.email || 'N/A';
       case 'Department':            return emp.department || 'N/A';
+      case 'Secondary Departments': return emp.secondaryDepartments?.join(', ') || 'N/A';
       case 'Position':              return emp.position || 'N/A';
       case 'Staff Type':            return emp.staffType || 'N/A';
+      case 'Level':                 return emp.level ?? 'N/A';
       case 'Status':                return emp.status;
       case 'Start Date':            return formatDisplayDate(emp.startDate) || 'N/A';
       case 'End Date':              return formatDisplayDate(emp.endDate) || 'N/A';
+      case 'Probation Period':      return emp.probationPeriod ? `${emp.probationPeriod} days` : 'N/A';
+      case 'Tentative Start Date':  return emp.tentativeStartDate ? formatDisplayDate(emp.tentativeStartDate) : 'N/A';
+      case 'Verified Start Date':   return emp.verifiedStartDate ? formatDisplayDate(emp.verifiedStartDate) : 'N/A';
+      case 'Line Manager': {
+        if (!emp.lineManager) return 'N/A';
+        const manager = employees.find(e => e.id === emp.lineManager);
+        if (manager) return `${manager.surname} ${manager.firstname}`;
+        return emp.lineManager;
+      }
       case 'Bank Name':             return emp.bankName || 'N/A';
       case 'Account Number':        return emp.accountNo || 'N/A';
       case 'Pension Number':        return emp.pensionNumber || 'N/A';
       case 'Tax ID':                return emp.taxId || 'N/A';
+      case 'Payee Type':            return emp.payeeType || 'N/A';
+      case 'Type of Pay':           return emp.typeOfPay || 'N/A';
+      case 'Start Month of Pay':    return emp.startMonthOfPay || 'N/A';
       case 'Yearly Leave Balance':  return emp.yearlyLeave ?? 'N/A';
       case 'Leave Status':          return emp.status === 'On Leave' ? 'On Leave' : 'Not on Leave';
       case 'Leave Days Taken':      return totalTaken;
       case 'Leave Days Remaining':  return remaining;
       case 'Currently On Leave':    return emp.status === 'On Leave' ? 'Yes' : 'No';
+      case 'No of Guarantors':      return emp.noOfGuarantors ?? 'N/A';
       case 'Tax Type':              return emp.payeTax ? 'PAYE' : (emp.withholdingTax ? 'Withholding' : 'None');
       case 'Withholding Tax':       return emp.withholdingTax ? 'Yes' : 'No';
+      case 'Withholding Tax Rate':  return emp.withholdingTaxRate ? `${(emp.withholdingTaxRate * 100).toFixed(1)}%` : 'N/A';
       case 'PAYE Tax':              return emp.payeTax ? 'Yes' : 'No';
+      case 'PAYE Number':           return emp.payeNumber || 'N/A';
+      case 'LASHMA Policy':         return emp.lashmaPolicyNumber || 'N/A';
+      case 'LASHMA Reg Date':       return emp.lashmaRegistrationDate ? formatDisplayDate(emp.lashmaRegistrationDate) : 'N/A';
+      case 'LASHMA Expiry':         return emp.lashmaExpiryDate ? formatDisplayDate(emp.lashmaExpiryDate) : 'N/A';
       default: return '';
     }
   };

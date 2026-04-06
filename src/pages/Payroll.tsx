@@ -709,7 +709,7 @@ export function Payroll() {
       'Manage salaries, taxes, generate payslips, and handle staff advances and loans',
       <div className="hidden sm:flex items-center gap-2">
         <select
-          className="h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20"
+          className="h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20"
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
         >
@@ -719,7 +719,7 @@ export function Payroll() {
         </select>
 
         <select
-          className="h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20 mr-2"
+          className="h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20 mr-2"
           value={selectedYear}
           onChange={(e) => setSelectedYear(Number(e.target.value))}
         >
@@ -736,7 +736,7 @@ export function Payroll() {
         {finRepPriv?.canExport && activeTab === 'processing' && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50">
+              <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700">
                 <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export CSV <ChevronDown className="h-3 w-3 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
@@ -769,7 +769,7 @@ export function Payroll() {
       <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
 
         {/* COMPACT TABS */}
-        <div className="flex bg-white p-2 rounded-xl shadow-sm border border-slate-100 items-center overflow-x-auto no-scrollbar gap-2">
+        <div className="flex bg-white dark:bg-slate-900 p-2 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 items-center overflow-x-auto no-scrollbar gap-2">
           <div className="flex gap-1">
             {[
               { id: 'processing', label: 'Payroll Processing' },
@@ -802,7 +802,7 @@ export function Payroll() {
 
              {/* COMPACT METRICS BAR FOR PROCESSING */}
              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-             <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
+             <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-center relative overflow-hidden">
                    <div className="absolute right-0 top-0 bottom-0 w-1/4 bg-gradient-to-l from-slate-50/50 to-transparent pointer-events-none" />
                    <div className="flex justify-between items-center mb-1">
                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Gross Pay</span>
@@ -815,7 +815,7 @@ export function Payroll() {
                 </div>
 
 
-                <div className="bg-white p-4 rounded-xl border border-red-50 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-red-50 dark:border-red-900/30 shadow-sm flex flex-col justify-center relative overflow-hidden">
                    <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-red-50/50 to-transparent pointer-events-none" />
                    <div className="flex justify-between items-center mb-1 relative z-10">
                      <span className="text-xs font-semibold text-red-500 uppercase tracking-wider">Total Deductions</span>
@@ -830,7 +830,7 @@ export function Payroll() {
                    </div>
                 </div>
 
-                <div className="bg-white p-4 rounded-xl border border-emerald-50 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-emerald-50 dark:border-emerald-900/30 shadow-sm flex flex-col justify-center relative overflow-hidden">
                    <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-emerald-50/50 to-transparent pointer-events-none" />
                    <div className="flex justify-between items-center mb-1 relative z-10">
                      <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Net Payroll</span>
@@ -849,7 +849,7 @@ export function Payroll() {
                 <div className="flex items-center gap-2">
                   {showFilterPanel && (
                     <select
-                      className="h-8 rounded-md border border-slate-200 bg-white px-2 py-1 text-sm"
+                      className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-200 px-2 py-1 text-sm"
                       value={filterDept}
                       onChange={(e) => setFilterDept(e.target.value)}
                     >
@@ -903,10 +903,10 @@ export function Payroll() {
                   <TableBody>
                     {payrollData.filter(r => !filterDept || r.department === filterDept).map((record) => (
                       <TableRow key={record.id} className="hover:bg-slate-50/50 transition-colors">
-                        <TableCell className="sticky left-0 z-10 bg-white border-r border-transparent" style={{minWidth:'48px'}}>{record.sn}</TableCell>
-                        <TableCell className="font-medium sticky z-10 bg-white" style={{left:'48px',minWidth:'110px'}}>{record.surname}</TableCell>
-                        <TableCell className="sticky z-10 bg-white" style={{left:'158px',minWidth:'110px'}}>{record.firstname}</TableCell>
-                        <TableCell className="sticky z-10 bg-white border-r border-slate-300" style={{left:'268px',minWidth:'180px'}}>{record.position}</TableCell>
+                        <TableCell className="sticky left-0 z-10 bg-white dark:bg-slate-900 border-r border-transparent" style={{minWidth:'48px'}}>{record.sn}</TableCell>
+                        <TableCell className="font-medium sticky z-10 bg-white dark:bg-slate-900" style={{left:'48px',minWidth:'110px'}}>{record.surname}</TableCell>
+                        <TableCell className="sticky z-10 bg-white dark:bg-slate-900" style={{left:'158px',minWidth:'110px'}}>{record.firstname}</TableCell>
+                        <TableCell className="sticky z-10 bg-white dark:bg-slate-900 border-r border-slate-300 dark:border-slate-700" style={{left:'268px',minWidth:'180px'}}>{record.position}</TableCell>
                         <TableCell>{record.bankName}</TableCell>
                         <TableCell className="font-mono">{record.accountNo}</TableCell>
                         <TableCell className="font-mono text-indigo-700 bg-indigo-50/30">₦{priv?.canViewAmounts === false ? '***' : record.salary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
@@ -1172,7 +1172,7 @@ export function Payroll() {
 
               <div className="flex flex-1 overflow-hidden print-hide">
                 {/* Filter Sidebar */}
-                <div className="w-1/3 max-w-[300px] border-r border-slate-200 bg-white p-4 overflow-y-auto flex flex-col gap-6 hide-on-print shadow-sm z-10">
+                <div className="w-1/3 max-w-[300px] border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 overflow-y-auto flex flex-col gap-6 hide-on-print shadow-sm z-10">
                   {/* Schedule type selector */}
                   <div>
                     <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1">Schedule Type</h4>
@@ -1375,7 +1375,7 @@ export function Payroll() {
                     </div>
                   ) : printType === 'PAYSLIPS' ? (
                     payslipsToPrint.map((slip, i) => (
-                      <div key={`${slip.monthKey}-${slip.record.id}`} className="bg-white p-10 mb-8 mx-auto shadow-sm max-w-3xl rounded-sm print-break">
+                      <div key={`${slip.monthKey}-${slip.record.id}`} className="bg-white dark:bg-slate-900 p-10 mb-8 mx-auto shadow-sm max-w-3xl rounded-sm print-break">
                         {/* Company Header */}
                         <div className="border-b-2 border-indigo-600 pb-4 mb-6">
                           <img src={logoSrc} alt="Company Logo" className="h-12 w-auto mb-2" />
@@ -1550,7 +1550,7 @@ export function Payroll() {
                     const colIsNumeric = (id: string) => !['sn','employee_name','month','bank_name','account_number','paye_id','pension_pin','tin'].includes(id);
 
                     return (
-                      <div className="bg-white mx-auto shadow-lg max-w-5xl rounded-sm print-break" id="print-area-content"
+                      <div className="bg-white dark:bg-slate-900 mx-auto shadow-lg max-w-5xl rounded-sm print-break" id="print-area-content"
                         style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", overflow: 'hidden' }}>
 
                         {/* ── Premium print-safe header ── */}

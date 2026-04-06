@@ -178,7 +178,7 @@ export function PerformanceConduct() {
 
   const renderForm = () => (
     <div className="flex flex-col h-full bg-slate-50 overflow-y-auto w-full relative">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm shrink-0">
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm shrink-0">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => { setIsAdding(false); setIsEditing(false); setFormData(emptyForm); }} className="hover:bg-slate-100 rounded-full h-8 w-8">
             <ArrowLeft className="h-4 w-4 text-slate-600" />
@@ -219,7 +219,7 @@ export function PerformanceConduct() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Incident Type</label>
-              <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-indigo-500/20" value={formData.type} onChange={e => {
+              <select className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-indigo-500/20" value={formData.type} onChange={e => {
                 const newType = e.target.value;
                 const isPositive = newType === 'Accolade';
                 setFormData({ 
@@ -263,7 +263,7 @@ export function PerformanceConduct() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Action/Sanction Level</label>
-              <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-indigo-500/20" value={formData.severity} onChange={e => setFormData({ ...formData, severity: e.target.value })}>
+              <select className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-indigo-500/20" value={formData.severity} onChange={e => setFormData({ ...formData, severity: e.target.value })}>
                 {formData.type === 'Accolade' || (formData.points && formData.points > 0) ? (
                   <>
                     <option value="Commendation">Commendation Letter</option>
@@ -276,7 +276,7 @@ export function PerformanceConduct() {
             </div>
             <div className="space-y-2 md:col-span-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Description of Incident</label>
-              <textarea className="flex w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500/20 outline-none" rows={4} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Provide a highly detailed narrative of the infraction..." />
+              <textarea className="flex w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500/20 outline-none" rows={4} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Provide a highly detailed narrative of the infraction..." />
             </div>
           </CardContent>
         </Card>
@@ -315,7 +315,7 @@ export function PerformanceConduct() {
               {formData.queryReplied && (
                 <div className="space-y-2 md:col-span-2 mt-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Employee's Reply / Defense Statement</label>
-                  <textarea className="flex w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500/20 outline-none" rows={3} value={formData.queryReplyText || ''} onChange={e => setFormData({ ...formData, queryReplyText: e.target.value })} placeholder="Document the employee's written response to the query here..." />
+                  <textarea className="flex w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500/20 outline-none" rows={3} value={formData.queryReplyText || ''} onChange={e => setFormData({ ...formData, queryReplyText: e.target.value })} placeholder="Document the employee's written response to the query here..." />
                 </div>
               )}
             </CardContent>
@@ -333,7 +333,7 @@ export function PerformanceConduct() {
           <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-5 px-6 pb-6">
             <div className="space-y-2 md:col-span-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Disciplinary Verdict</label>
-              <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-rose-500/20 font-bold" value={formData.initialResult || 'Pending'} onChange={e => setFormData({ ...formData, initialResult: e.target.value as any })}>
+              <select className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-rose-500/20 font-bold" value={formData.initialResult || 'Pending'} onChange={e => setFormData({ ...formData, initialResult: e.target.value as any })}>
                 <option value="Pending" disabled>-- Select Verdict --</option>
                 <option value="Warning">Warning (Verbal/Written)</option>
                 <option value="Committee">Escalate to Disciplinary Committee</option>
@@ -355,7 +355,7 @@ export function PerformanceConduct() {
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Final Committee Result</label>
-                      <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-rose-500/20 font-bold" value={formData.finalResult || 'Pending'} onChange={e => setFormData({ ...formData, finalResult: e.target.value as any })}>
+                      <select className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-rose-500/20 font-bold" value={formData.finalResult || 'Pending'} onChange={e => setFormData({ ...formData, finalResult: e.target.value as any })}>
                         <option value="Pending" disabled>-- Awaiting Outcome --</option>
                         <option value="Warning">Warning Issued</option>
                         <option value="Suspension">Suspension</option>
@@ -390,7 +390,7 @@ export function PerformanceConduct() {
 
             <div className="space-y-2 md:col-span-2 mt-4">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Final Administration Notes</label>
-              <textarea className="flex w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500/20 outline-none" rows={2} value={formData.actionTaken || ''} onChange={e => setFormData({ ...formData, actionTaken: e.target.value })} placeholder="Any concluding formal remarks on the resolution..." />
+              <textarea className="flex w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500/20 outline-none" rows={2} value={formData.actionTaken || ''} onChange={e => setFormData({ ...formData, actionTaken: e.target.value })} placeholder="Any concluding formal remarks on the resolution..." />
             </div>
 
           </CardContent>
@@ -412,7 +412,7 @@ export function PerformanceConduct() {
       <Button 
         variant="outline" 
         size="sm"
-        className={`relative h-9 ${showNotices ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white'}`} 
+        className={`relative h-9 ${showNotices ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white dark:bg-slate-900 dark:bg-slate-900'}`} 
         onClick={() => { setShowNotices(!showNotices); setSelectedEmployeeId(null); setIsAdding(false); setIsEditing(false); setSidebarCollapsed(false); }}
       >
         <BellRing className="h-4 w-4 mr-2" />
@@ -438,7 +438,7 @@ export function PerformanceConduct() {
         {/* Left Sidebar Layout */}
         {!(isAdding || isEditing) && !sidebarCollapsed && (
           <div className={`w-80 flex-shrink-0 border-r border-slate-200 flex flex-col transition-colors ${showNotices ? 'bg-amber-50/30' : 'bg-slate-50/50'}`}>
-            <div className="p-4 border-b border-slate-200 bg-white space-y-3">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 space-y-3">
               <div className="flex justify-between items-center">
                 <h2 className={`font-bold flex items-center gap-2 ${showNotices ? 'text-amber-700' : 'text-slate-800'}`}>
                   {showNotices ? <BellRing className="h-5 w-5" /> : <ShieldAlert className="h-5 w-5 text-rose-600" />}
@@ -506,7 +506,7 @@ export function PerformanceConduct() {
                       <div
                         key={emp.id}
                         onClick={() => { setSelectedEmployeeId(emp.id); setIsAdding(false); setIsEditing(false); }}
-                        className={`p-3 border-b border-slate-100 cursor-pointer transition-colors flex items-center justify-between ${isSelected ? 'bg-rose-50 border-l-4 border-l-rose-500' : 'hover:bg-slate-50 border-l-4 border-l-transparent bg-white'}`}
+                        className={`p-3 border-b border-slate-100 cursor-pointer transition-colors flex items-center justify-between ${isSelected ? 'bg-rose-50 border-l-4 border-l-rose-500' : 'hover:bg-slate-50 border-l-4 border-l-transparent bg-white dark:bg-slate-900'}`}
                       >
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9 border border-slate-200">
@@ -559,7 +559,7 @@ export function PerformanceConduct() {
             renderForm()
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="bg-white border-b border-slate-200 p-6 flex justify-between items-center shrink-0 shadow-sm">
+              <div className="bg-white dark:bg-slate-900 border-b border-slate-200 p-6 flex justify-between items-center shrink-0 shadow-sm">
                 <div>
                   <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{selectedEmp?.surname} {selectedEmp?.firstname}</h2>
                   <p className="text-sm font-medium text-slate-500 mt-1 uppercase tracking-wider text-[11px]">{selectedEmp?.position} &bull; {selectedEmp?.department}</p>
@@ -573,7 +573,7 @@ export function PerformanceConduct() {
 
               <div className="flex-1 overflow-y-auto p-6">
                 {empRecords.length === 0 ? (
-                  <div className="bg-white border border-slate-200 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center shadow-sm">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center shadow-sm">
                     <div className="h-16 w-16 rounded-full bg-green-50 flex items-center justify-center mb-4 border border-green-100">
                       <AlertTriangle className="h-8 w-8 text-green-500" />
                     </div>
@@ -581,7 +581,7 @@ export function PerformanceConduct() {
                     <p className="text-slate-500 text-sm mt-2 max-w-sm leading-relaxed">There are currently no disciplinary logs or actions recorded for this employee. They are in good standing.</p>
                   </div>
                 ) : (
-                  <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+                  <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xs border border-slate-200 overflow-hidden">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-slate-50/80">
@@ -666,7 +666,7 @@ export function PerformanceConduct() {
                   <h5 className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-2">Query Issued</h5>
                   <p className="text-amber-800 mb-2">Deadline: {viewingRecord.queryDeadline ? new Date(viewingRecord.queryDeadline).toLocaleString() : 'Not Set'}</p>
                   {viewingRecord.queryReplied ? (
-                    <div className="bg-white p-3 rounded border border-amber-200 mt-2">
+                    <div className="bg-white dark:bg-slate-900 p-3 rounded border border-amber-200 mt-2">
                       <p className="text-xs font-bold text-slate-500 mb-1">Employee Reply:</p>
                       <p className="text-slate-700 whitespace-pre-wrap">{viewingRecord.queryReplyText}</p>
                     </div>

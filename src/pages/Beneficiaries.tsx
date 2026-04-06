@@ -548,7 +548,7 @@ export function Beneficiaries() {
   // Render Employee Form (Add or Edit)
   const renderEmployeeForm = (isEdit: boolean) => (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 gap-4">
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <Button variant="ghost" size="icon" onClick={() => { setIsAdding(false); setIsEditing(false); }} className="hover:bg-slate-100 rounded-full h-10 w-10 shrink-0">
             <ArrowLeft className="h-5 w-5 text-slate-600" />
@@ -576,16 +576,16 @@ export function Beneficiaries() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Surname</label>
-                  <Input value={formData.surname || ''} onChange={e => setFormData({ ...formData, surname: e.target.value })} placeholder="e.g. John" className="bg-slate-50 focus:bg-white" />
+                  <Input value={formData.surname || ''} onChange={e => setFormData({ ...formData, surname: e.target.value })} placeholder="e.g. John" className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Firstname</label>
-                  <Input value={formData.firstname || ''} onChange={e => setFormData({ ...formData, firstname: e.target.value })} placeholder="e.g. Doe" className="bg-slate-50 focus:bg-white" />
+                  <Input value={formData.firstname || ''} onChange={e => setFormData({ ...formData, firstname: e.target.value })} placeholder="e.g. Doe" className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Payee Type</label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                     value={formData.payeeType || ''}
                     onChange={e => setFormData({ ...formData, payeeType: e.target.value })}
                   >
@@ -597,12 +597,12 @@ export function Beneficiaries() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Non-Employee ID</label>
-                  <Input value={formData.employeeCode || ''} onChange={e => setFormData({ ...formData, employeeCode: e.target.value })} placeholder="e.g. NE-001" className="bg-slate-50 focus:bg-white font-mono" />
+                  <Input value={formData.employeeCode || ''} onChange={e => setFormData({ ...formData, employeeCode: e.target.value })} placeholder="e.g. NE-001" className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 font-mono" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
                   <select
-                    className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none ${normalizeDate(formData.endDate) ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none ${normalizeDate(formData.endDate) ? 'opacity-70 cursor-not-allowed' : ''}`}
                     value={formData.status}
                     onChange={e => {
                       const newStatus = e.target.value;
@@ -622,7 +622,7 @@ export function Beneficiaries() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Type of Pay</label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                     value={formData.typeOfPay || ''}
                     onChange={e => setFormData({ ...formData, typeOfPay: e.target.value })}
                   >
@@ -636,7 +636,7 @@ export function Beneficiaries() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Month of Payment</label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                     value={formData.startMonthOfPay || ''}
                     onChange={e => setFormData({ ...formData, startMonthOfPay: e.target.value })}
                   >
@@ -649,7 +649,7 @@ export function Beneficiaries() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Department</label>
                   <select 
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none" 
                     value={formData.department || ''} 
                     onChange={e => setFormData({ ...formData, department: e.target.value })}
                   >
@@ -663,11 +663,11 @@ export function Beneficiaries() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Date</label>
-                  <Input type="date" value={normalizeDate(formData.startDate)} onChange={e => setFormData({ ...formData, startDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
+                  <Input type="date" value={normalizeDate(formData.startDate)} onChange={e => setFormData({ ...formData, startDate: e.target.value })} className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">End Date</label>
-                  <Input type="date" value={normalizeDate(formData.endDate)} onChange={e => setFormData({ ...formData, endDate: e.target.value })} className="bg-slate-50 focus:bg-white" />
+                  <Input type="date" value={normalizeDate(formData.endDate)} onChange={e => setFormData({ ...formData, endDate: e.target.value })} className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
               </div>
             </CardContent>
@@ -680,7 +680,7 @@ export function Beneficiaries() {
                   <CardTitle className="text-slate-800">Stipend Matrix (₦)</CardTitle>
                   <CardDescription className="mt-1">Define gross monthly stipend dynamically. Subject to revision.</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" className="bg-white shadow-sm" onClick={() => {
+                <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800 dark:text-slate-200 shadow-sm" onClick={() => {
                   const janVal = formData.monthlySalaries?.jan || 0;
                   setFormData({
                     ...formData,
@@ -720,7 +720,7 @@ export function Beneficiaries() {
                             disabled={!isPayMonth}
                             value={formData.monthlySalaries?.[month as keyof MonthlySalary] || ''} 
                             onChange={e => setFormData({ ...formData, monthlySalaries: { ...formData.monthlySalaries!, [month]: parseFloat(e.target.value) || 0 } })} 
-                            className={`font-mono text-sm pl-7 ${!isPayMonth ? 'bg-slate-100 cursor-not-allowed border-dashed' : 'bg-slate-50 focus:bg-white'}`} 
+                            className={`font-mono text-sm pl-7 ${!isPayMonth ? 'bg-slate-100 cursor-not-allowed border-dashed' : 'bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-700 dark:text-slate-100 dark:bg-slate-900'}`} 
                           />
                         </div>
                       </div>
@@ -773,7 +773,7 @@ export function Beneficiaries() {
               </Avatar>
               <div className="flex gap-2 w-full justify-center">
                 <label className="cursor-pointer">
-                  <span className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-sm h-9 px-4 py-2">
+                  <span className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-sm h-9 px-4 py-2">
                     <Upload className="h-4 w-4 mr-2 text-slate-500" /> Upload Image
                   </span>
                   <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
@@ -795,17 +795,17 @@ export function Beneficiaries() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Bank Name</label>
-                  <Input value={formData.bankName || ''} onChange={e => setFormData({ ...formData, bankName: e.target.value })} placeholder="e.g. STANBIC" className="bg-slate-50 focus:bg-white" />
+                  <Input value={formData.bankName || ''} onChange={e => setFormData({ ...formData, bankName: e.target.value })} placeholder="e.g. STANBIC" className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Account No.</label>
-                  <Input value={formData.accountNo || ''} onChange={e => setFormData({ ...formData, accountNo: e.target.value })} className="font-mono bg-slate-50 focus:bg-white" />
+                  <Input value={formData.accountNo || ''} onChange={e => setFormData({ ...formData, accountNo: e.target.value })} className="font-mono bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                   <div className="grid grid-cols-2 gap-3 pt-2">
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Withholding Tax</label>
                       <select
-                        className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                        className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                         value={formData.withholdingTax ? 'Yes' : 'No'}
                         onChange={e => {
                           const isWht = e.target.value === 'Yes';
@@ -828,7 +828,7 @@ export function Beneficiaries() {
                           step="0.1"
                           value={(formData.withholdingTaxRate || 0.05) * 100} 
                           onChange={e => setFormData({ ...formData, withholdingTaxRate: Number(e.target.value) / 100 })} 
-                          className="bg-slate-50 focus:bg-white font-mono" 
+                          className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 font-mono" 
                         />
                       </div>
                     )}
@@ -836,7 +836,7 @@ export function Beneficiaries() {
                   {formData.withholdingTax && (
                     <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200 pt-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Tax Identification Number (TIN)</label>
-                      <Input value={formData.taxId || ''} onChange={e => setFormData({ ...formData, taxId: e.target.value })} placeholder="e.g. 12345678-0001" className="bg-slate-50 focus:bg-white font-mono" />
+                      <Input value={formData.taxId || ''} onChange={e => setFormData({ ...formData, taxId: e.target.value })} placeholder="e.g. 12345678-0001" className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 font-mono" />
                     </div>
                   )}
               </div>
@@ -871,7 +871,7 @@ export function Beneficiaries() {
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           <div className="sticky top-0 bg-indigo-600 p-4 flex justify-between items-center rounded-t-lg">
             <h3 className="text-white font-bold text-lg">Non-Employee Details</h3>
             <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={closeViewModal}>
@@ -901,7 +901,7 @@ export function Beneficiaries() {
                 {['Overview', 'Reminders'].map(tab => (
                   <button
                     key={tab}
-                    className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-md transition-all ${detailTab === tab ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-md transition-all ${detailTab === tab ? 'bg-white dark:bg-slate-900 dark:bg-slate-900 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     onClick={() => setDetailTab(tab as any)}
                   >
                     {tab}
@@ -914,7 +914,7 @@ export function Beneficiaries() {
                   <select
                     value={activeTabMonth}
                     onChange={(e) => setActiveTabMonth(e.target.value)}
-                    className="h-8 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 px-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none"
                   >
                     <option value="All">All Months</option>
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
@@ -924,7 +924,7 @@ export function Beneficiaries() {
                   <select
                     value={activeTabYear}
                     onChange={(e) => setActiveTabYear(e.target.value)}
-                    className="h-8 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 px-3 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none"
                   >
                     <option value="All">All Years</option>
                     {Array.from({ length: 5 }, (_, i) => {
@@ -1009,11 +1009,11 @@ export function Beneficiaries() {
               return (
                 <div className="space-y-4">
                   {empReminders.length === 0 ? (
-                    <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                    <div className="text-center py-8 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 shadow-inner">
                       <p className="text-slate-500 font-medium">No system reminders tied to this employee.</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-slate-50/50">
@@ -1066,11 +1066,11 @@ export function Beneficiaries() {
                     <span>Overtime: {overtimeHours} hrs</span>
                   </div>
                   {empAtt.length === 0 ? (
-                    <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                    <div className="text-center py-8 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 shadow-inner">
                       <p className="text-slate-500 font-medium">No attendance records found for selected period.</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-slate-50/50">
@@ -1122,11 +1122,11 @@ export function Beneficiaries() {
                     <span>Remaining: {remaining}</span>
                   </div>
                   {empLeaves.length === 0 ? (
-                    <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                    <div className="text-center py-8 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 shadow-inner">
                       <p className="text-slate-500 font-medium">No leave records found for selected period.</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-slate-50/50">
@@ -1166,12 +1166,12 @@ export function Beneficiaries() {
               return (
                 <div className="space-y-4">
                   {empDiscip.length === 0 ? (
-                    <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                    <div className="text-center py-8 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 shadow-inner">
                       <p className="text-slate-500 font-medium">No active disciplinary events for selected period.</p>
                       <p className="text-xs text-slate-400 mt-1">Good standing.</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-slate-50/50">
@@ -1213,12 +1213,12 @@ export function Beneficiaries() {
               return (
                 <div className="space-y-4">
                   {empEvals.length === 0 ? (
-                    <div className="text-center py-8 bg-white rounded-lg border border-slate-100 shadow-inner">
+                    <div className="text-center py-8 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 shadow-inner">
                       <p className="text-slate-500 font-medium">No evaluation records found for selected period.</p>
                       <p className="text-xs text-slate-400 mt-1">Schedule a review to get started.</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-slate-50/50">
@@ -1330,7 +1330,7 @@ export function Beneficiaries() {
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
           <div className="sticky top-0 bg-indigo-600 p-4 flex justify-between items-center rounded-t-lg">
             <h3 className="text-white font-bold text-lg">Bulk Edit Non-Employees ({selectedIds.length})</h3>
             <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={() => setIsBulkEditing(false)}>
@@ -1345,7 +1345,7 @@ export function Beneficiaries() {
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                   value={bulkFormData.status || ''}
                   onChange={e => setBulkFormData({ ...bulkFormData, status: e.target.value as any })}
                 >
@@ -1358,7 +1358,7 @@ export function Beneficiaries() {
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Payee Type</label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                   value={bulkFormData.payeeType || ''}
                   onChange={e => setBulkFormData({ ...bulkFormData, payeeType: e.target.value })}
                 >
@@ -1373,7 +1373,7 @@ export function Beneficiaries() {
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Department</label>
                 <select 
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none" 
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none" 
                   value={bulkFormData.department || ''} 
                   onChange={e => setBulkFormData({ ...bulkFormData, department: e.target.value })}
                 >
@@ -1387,7 +1387,7 @@ export function Beneficiaries() {
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Payment Cycle</label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                   value={bulkFormData.typeOfPay || ''}
                   onChange={e => setBulkFormData({ ...bulkFormData, typeOfPay: e.target.value as any })}
                 >
@@ -1484,17 +1484,17 @@ export function Beneficiaries() {
   // Main list view
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-[500px]">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-[500px]">
         <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
           <div className="flex bg-slate-200/50 p-1 rounded-lg">
             <button
-              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Active' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Active' ? 'bg-white dark:bg-slate-900 dark:bg-slate-900 dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               onClick={() => setActiveTab('Active')}
             >
               Active Personnel
             </button>
             <button
-              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Delisted' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'Delisted' ? 'bg-white dark:bg-slate-900 dark:bg-slate-900 text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               onClick={() => setActiveTab('Delisted')}
             >
               Delisted
@@ -1511,7 +1511,7 @@ export function Beneficiaries() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <select className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
+            <select className="h-9 px-3 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
               <option value="dateAdded">Sort By: Default</option>
               <option value="name">Sort By: Name</option>
               <option value="department">Sort By: Department</option>
