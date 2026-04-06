@@ -388,9 +388,15 @@ export function VehicleManager() {
                           <Badge variant="outline" className="capitalize text-[10px] bg-slate-50 dark:bg-slate-800">{v.type}</Badge>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-1.5 font-bold text-[10px] uppercase text-emerald-500">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Available
-                          </div>
+                          {v.status === 'active' ? (
+                            <div className="flex items-center gap-1.5 font-bold text-[10px] uppercase text-emerald-500">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 font-bold text-[10px] uppercase text-rose-500">
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> Inactive
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

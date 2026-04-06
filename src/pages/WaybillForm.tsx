@@ -1,187 +1,373 @@
 import { useState } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
+import { useAppStore } from '@/src/store/appStore';
 import { 
-  X, Plus, Trash2, Truck, ArrowRightLeft, 
-  MapPin, Package, Search, CheckCircle2, AlertCircle, User
+  X, Plus, Trash2, Truck, FileText,
+  MapPin, Package, Search, CheckCircle2, ChevronDown
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
-import { useTheme } from '@/src/hooks/useTheme';
 import { WaybillType } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/src/components/ui/dialog';
+import { Label } from '@/src/components/ui/label';
+import { Dialog, DialogContent, DialogClose } from '@/src/components/ui/dialog';
+import { toast } from '@/src/components/ui/toast';
 
 interface WaybillFormProps {
   onClose: () => void;
   initialType?: WaybillType;
+  prefillSiteName?: string;
 }
 
-export function WaybillForm({ onClose, initialType = 'waybill' }: WaybillFormProps) {
-  const { assets, createWaybill } = useOperations();
-  const { isDark } = useTheme();
+const SERVICES = ['Dewatering', 'Waterproofing', 'Jetting', 'Tiling', 'General'] as const;
 
-  const [type, setType] = useState<WaybillType>(initialType);
-  const [siteName, setSiteName] = useState('');
+export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName = '' }: WaybillFormProps) {
+  const { assets, createWaybill, vehicles } = useOperations();
+  const { sites, employees } = useAppStore();
+
+  const [purpose, setPurpose] = useState('Operational Activities');
+  const [siteName, setSiteName] = useState(prefillSiteName);
   const [driverName, setDriverName] = useState('');
-  const [vehicle, setVehicle] = useState('');
-  const [items, setItems] = useState<{ assetId: string; assetName: string; quantity: number }[]>([]);
+  const [vehicleName, setVehicleName] = useState('');
+  const [service, setService] = useState('Dewatering');
+  const [expectedReturnDate, setExpectedReturnDate] = useState('');
+  const [items, setItems] = useState<{ assetId: string; assetName: string; quantity: number; type: string }[]>([]);
   const [searchAsset, setSearchAsset] = useState('');
   const [selectedAssetId, setSelectedAssetId] = useState('');
+  const [itemMode, setItemMode] = useState<'single' | 'bulk'>('single');
+  const [bulkText, setBulkText] = useState('');
+
+  const driverOptions = [
+    ...employees.filter(e => ['Driver', 'Foreman', 'Site Supervisor', 'Assistant Supervisor'].includes(e.position || ''))
+      .map(e => `${e.firstname} ${e.surname}`),
+  ];
+  const uniqueDrivers = Array.from(new Set(driverOptions));
+
+  const vehicleOptions = vehicles.map(v => v.name);
+  const siteOptions = sites.map(s => s.name);
+
+  const filteredAssets = assets.filter(a =>
+    a.name.toLowerCase().includes(searchAsset.toLowerCase()) &&
+    !items.find(i => i.assetId === a.id)
+  );
 
   const addItem = () => {
     const asset = assets.find(a => a.id === selectedAssetId);
     if (asset) {
-      if (items.find(i => i.assetId === asset.id)) return;
-      setItems([...items, { assetId: asset.id, assetName: asset.name, quantity: 1 }]);
+      setItems([...items, { assetId: asset.id, assetName: asset.name, quantity: 1, type: asset.type }]);
       setSelectedAssetId('');
       setSearchAsset('');
     }
   };
 
-  const removeItem = (id: string) => setItems(items.filter(i => i.assetId !== id));
-  const updateQuantity = (id: string, qty: number) => setItems(items.map(i => i.assetId === id ? { ...i, quantity: Math.max(1, qty) } : i));
-
-  const handleSubmit = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!siteName || !driverName || items.length === 0) return;
-    createWaybill({
-      siteId: 'site-' + Math.random().toString(36).substr(2, 5),
-      siteName, type,
-      issueDate: new Date().toISOString(),
-      driverName, vehicle, items
+  const addBulkItems = () => {
+    const lines = bulkText.split('\n').filter(l => l.trim());
+    const newItems: typeof items = [];
+    lines.forEach(line => {
+      const match = line.match(/^(.+?)\s+[x×]\s*(\d+)/i) || line.match(/^(\d+)\s+(.+)/);
+      if (match) {
+        const name = (match[1] || match[2]).trim();
+        const qty = parseInt(match[2] || match[1]);
+        const asset = assets.find(a => a.name.toLowerCase().includes(name.toLowerCase()));
+        if (asset && !items.find(i => i.assetId === asset.id)) {
+          newItems.push({ assetId: asset.id, assetName: asset.name, quantity: qty || 1, type: asset.type });
+        } else {
+          // Add as manual item
+          newItems.push({ assetId: `manual-${Date.now()}-${Math.random()}`, assetName: name, quantity: qty || 1, type: 'consumable' });
+        }
+      }
     });
+    if (newItems.length) {
+      setItems(prev => [...prev, ...newItems]);
+      setBulkText('');
+      setItemMode('single');
+    }
+  };
+
+  const removeItem = (id: string) => setItems(items.filter(i => i.assetId !== id));
+  const updateQuantity = (id: string, qty: number) =>
+    setItems(items.map(i => i.assetId === id ? { ...i, quantity: Math.max(1, qty) } : i));
+
+  const handleSubmit = () => {
+    if (!siteName || !driverName) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    if (items.length === 0) {
+      toast.error('Add at least one item to the waybill');
+      return;
+    }
+    createWaybill({
+      siteId: sites.find(s => s.name === siteName)?.id || `site-${Date.now()}`,
+      siteName,
+      type: initialType,
+      issueDate: new Date().toISOString(),
+      driverName,
+      vehicle: vehicleName,
+      items: items.map(i => ({ assetId: i.assetId, assetName: i.assetName, quantity: i.quantity })),
+    });
+    toast.success(`Waybill created successfully for ${siteName}`);
     onClose();
   };
 
-  const filteredAssets = assets.filter(a => 
-    a.name.toLowerCase().includes(searchAsset.toLowerCase()) && 
-    !items.find(i => i.assetId === a.id)
-  );
-
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent aria-describedby={undefined} className="max-w-3xl p-0 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900">
-        <DialogHeader className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between space-y-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-600 rounded-xl text-white shadow-sm">
-              {type === 'waybill' ? <Truck className="h-5 w-5" /> : <ArrowRightLeft className="h-5 w-5" />}
-            </div>
-            <div>
-              <DialogTitle className="text-lg font-bold">Generate New {type === 'waybill' ? 'Waybill' : 'Return Sheet'}</DialogTitle>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Asset Movement & Logistics</p>
-            </div>
+      <DialogContent
+        aria-describedby={undefined}
+        className="max-w-3xl p-0 overflow-hidden rounded-2xl border-0 shadow-2xl bg-white dark:bg-slate-900"
+      >
+        {/* Header */}
+        <div className="flex flex-col items-center pt-8 pb-4 px-8 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
+          <div className="h-14 w-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg mb-3">
+            <FileText className="h-7 w-7" />
           </div>
-          <DialogClose className="h-9 w-9 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400">
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white">
+            {initialType === 'waybill' ? 'Create Waybill' : 'Create Return Sheet'}
+          </h2>
+          <p className="text-sm text-slate-400 mt-1">Issue assets for delivery to project sites</p>
+          <DialogClose className="absolute top-4 right-4 h-8 w-8 rounded-lg bg-white dark:bg-slate-700 hover:bg-slate-100 flex items-center justify-center text-slate-400 shadow-sm border border-slate-100 dark:border-slate-700">
             <X className="h-4 w-4" />
           </DialogClose>
-        </DialogHeader>
+        </div>
 
-        <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[65vh] no-scrollbar p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Left Column */}
-            <div className="space-y-5">
-              <h3 className="text-xs font-black uppercase text-blue-600 tracking-wider">Logistics Details</h3>
-              
+        <div className="overflow-y-auto max-h-[70vh] p-6 space-y-6">
+          {/* Waybill Information */}
+          <div>
+            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-4">Waybill Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Purpose */}
+              <div className="space-y-1.5 md:col-span-1 row-span-2">
+                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Purpose *</Label>
+                <textarea
+                  value={purpose}
+                  onChange={e => setPurpose(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  placeholder="e.g. Operational Activities"
+                />
+              </div>
+
+              {/* Driver Name */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Destination Site *</label>
+                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Driver Name *</Label>
                 <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
-                  <Input value={siteName} onChange={e => setSiteName(e.target.value)} required placeholder="e.g. Dangote Refinery Project"
-                    className="pl-10 h-11 rounded-xl bg-slate-50/50 dark:bg-slate-950 border-transparent focus-visible:ring-blue-500 font-medium text-sm" />
+                  <select
+                    value={driverName}
+                    onChange={e => setDriverName(e.target.value)}
+                    className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none"
+                  >
+                    <option value="">Select Driver</option>
+                    {uniqueDrivers.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Driver Name *</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
-                    <Input value={driverName} onChange={e => setDriverName(e.target.value)} required placeholder="Full Name"
-                      className="pl-10 h-11 rounded-xl bg-slate-50/50 dark:bg-slate-950 border-transparent font-medium text-sm" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Vehicle Plate</label>
-                  <div className="relative">
-                    <Truck className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
-                    <Input value={vehicle} onChange={e => setVehicle(e.target.value)} placeholder="ABC-123-XY"
-                      className="pl-10 h-11 rounded-xl bg-slate-50/50 dark:bg-slate-950 border-transparent font-medium text-sm" />
-                  </div>
+              {/* Vehicle */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Vehicle *</Label>
+                <div className="relative">
+                  <select
+                    value={vehicleName}
+                    onChange={e => setVehicleName(e.target.value)}
+                    className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none"
+                  >
+                    <option value="">Select Vehicle</option>
+                    {vehicleOptions.map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800 flex items-start gap-3">
-                <AlertCircle className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-blue-700 dark:text-blue-300 font-medium leading-relaxed">
-                  This waybill will mark selected assets as "On Site" and release them from central inventory once confirmed.
-                </p>
+              {/* Site */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Site *</Label>
+                <div className="relative">
+                  <select
+                    value={siteName}
+                    onChange={e => setSiteName(e.target.value)}
+                    className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none"
+                  >
+                    <option value="">Select Site</option>
+                    {siteOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Expected Return Date */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Expected Return Date</Label>
+                <Input
+                  type="date"
+                  value={expectedReturnDate}
+                  onChange={e => setExpectedReturnDate(e.target.value)}
+                  className="h-10 rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm"
+                />
+              </div>
+
+              {/* Service */}
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Service *</Label>
+                <div className="relative">
+                  <select
+                    value={service}
+                    onChange={e => setService(e.target.value)}
+                    className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none max-w-xs"
+                  >
+                    {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Items to Issue */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Items to Issue</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="text-xs text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1 px-2 py-1 rounded border border-slate-200 dark:border-slate-700 hover:border-blue-300"
+                >
+                  <FileText className="h-3 w-3" /> Add from Request
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setItemMode('single')}
+                  className={cn(
+                    "text-xs font-semibold px-3 py-1.5 rounded transition-all",
+                    itemMode === 'single' ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  )}
+                >
+                  Single Item
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setItemMode('bulk')}
+                  className={cn(
+                    "text-xs font-semibold px-3 py-1.5 rounded transition-all",
+                    itemMode === 'bulk' ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  )}
+                >
+                  Bulk Input
+                </button>
+                <button
+                  type="button"
+                  onClick={addItem}
+                  disabled={!selectedAssetId}
+                  className="flex items-center gap-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition-all disabled:opacity-40"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Item
+                </button>
               </div>
             </div>
 
-            {/* Right Column */}
-            <div className="space-y-5">
-              <h3 className="text-xs font-black uppercase text-blue-600 tracking-wider">Asset Selection</h3>
-              
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
-                  <Input value={searchAsset} onChange={e => setSearchAsset(e.target.value)} placeholder="Search inventory..."
-                    className="pl-10 h-11 rounded-xl bg-slate-50/50 dark:bg-slate-950 border-transparent font-medium text-sm" />
-                  
-                  {searchAsset && filteredAssets.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 z-20 max-h-48 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-1">
-                      {filteredAssets.map(a => (
-                        <button key={a.id} type="button"
-                          onClick={() => { setSelectedAssetId(a.id); setSearchAsset(a.name); }}
-                          className="w-full text-left p-2.5 rounded-lg text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-between">
-                          <span className="text-slate-700 dark:text-slate-200">{a.name}</span>
-                          <span className="text-[10px] text-slate-400">STOCK: {a.availableQuantity}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <Button type="button" onClick={addItem} disabled={!selectedAssetId} size="icon"
-                  className="h-11 w-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl disabled:opacity-50">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="space-y-2">
-                {items.map(item => (
-                  <div key={item.assetId} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Package className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                      <span className="text-sm font-bold truncate text-slate-700 dark:text-slate-200">{item.assetName}</span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="flex bg-white dark:bg-slate-900 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700 shadow-xs">
-                        <button type="button" onClick={() => updateQuantity(item.assetId, item.quantity - 1)} className="w-6 h-6 flex items-center justify-center font-bold text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-sm">-</button>
-                        <span className="w-7 h-6 flex items-center justify-center text-xs font-black text-blue-600">{item.quantity}</span>
-                        <button type="button" onClick={() => updateQuantity(item.assetId, item.quantity + 1)} className="w-6 h-6 flex items-center justify-center font-bold text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded text-sm">+</button>
-                      </div>
-                      <button type="button" onClick={() => removeItem(item.assetId)} className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors">
-                        <Trash2 className="h-3.5 w-3.5" />
+            {/* Single item search */}
+            {itemMode === 'single' && (
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
+                <Input
+                  value={searchAsset}
+                  onChange={e => { setSearchAsset(e.target.value); setSelectedAssetId(''); }}
+                  placeholder="Search inventory by name..."
+                  className="pl-10 h-10 rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm"
+                />
+                {searchAsset && filteredAssets.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 z-20 max-h-48 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl p-1">
+                    {filteredAssets.map(a => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => { setSelectedAssetId(a.id); setSearchAsset(a.name); }}
+                        className="w-full text-left p-2.5 rounded-lg text-xs font-medium hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-between"
+                      >
+                        <div>
+                          <span className="font-bold text-slate-700 dark:text-slate-200">{a.name}</span>
+                          <span className="ml-2 text-slate-400 capitalize">{a.type}</span>
+                        </div>
+                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded font-bold text-slate-500">
+                          {a.availableQuantity} {a.unitOfMeasurement}
+                        </span>
                       </button>
-                    </div>
-                  </div>
-                ))}
-                {items.length === 0 && (
-                  <div className="py-10 text-center border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-xl">
-                    <Package className="h-8 w-8 text-slate-200 dark:text-slate-700 mx-auto mb-2" />
-                    <p className="text-xs text-slate-400 italic">No assets selected yet.</p>
+                    ))}
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Bulk input */}
+            {itemMode === 'bulk' && (
+              <div className="mb-3 space-y-2">
+                <textarea
+                  value={bulkText}
+                  onChange={e => setBulkText(e.target.value)}
+                  rows={4}
+                  placeholder={"Enter items, one per line:\nBlind Pipes x 10\nSuction Pipe x 5\nTee Connectors x 2"}
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+                <Button type="button" size="sm" onClick={addBulkItems} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-8">
+                  Parse & Add Items
+                </Button>
+              </div>
+            )}
+
+            {/* Items list */}
+            <div className="rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden min-h-[120px]">
+              {items.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-slate-300 dark:text-slate-600">
+                  <FileText className="h-10 w-10 mb-2" />
+                  <p className="text-sm font-medium">No items added yet</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {items.map((item, idx) => (
+                    <div key={item.assetId} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-8 w-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0">
+                          <Package className="h-4 w-4 text-blue-500" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{item.assetName}</p>
+                          <p className="text-[10px] text-slate-400 capitalize">{item.type}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="flex bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                          <button type="button" onClick={() => updateQuantity(item.assetId, item.quantity - 1)}
+                            className="w-7 h-7 flex items-center justify-center text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold text-sm">−</button>
+                          <span className="w-8 h-7 flex items-center justify-center text-xs font-black text-blue-600 border-x border-slate-200 dark:border-slate-700">
+                            {item.quantity}
+                          </span>
+                          <button type="button" onClick={() => updateQuantity(item.assetId, item.quantity + 1)}
+                            className="w-7 h-7 flex items-center justify-center text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold text-sm">+</button>
+                        </div>
+                        <button type="button" onClick={() => removeItem(item.assetId)}
+                          className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-        </form>
+        </div>
 
-        <div className="p-6 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-800/20">
-          <Button variant="outline" onClick={onClose} className="h-10 px-6 rounded-xl font-bold text-xs uppercase text-slate-500">Cancel</Button>
-          <Button onClick={() => handleSubmit()} disabled={items.length === 0 || !siteName || !driverName}
-            className="h-10 px-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase gap-2 shadow-sm disabled:opacity-50">
-            <CheckCircle2 className="h-4 w-4" /> Finalize Document
+        {/* Footer */}
+        <div className="p-5 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-800/20">
+          <Button variant="outline" onClick={onClose} className="h-10 px-6 rounded-xl font-semibold text-xs uppercase text-slate-500">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={items.length === 0 || !siteName || !driverName}
+            className="h-10 px-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase gap-2 shadow-sm disabled:opacity-50"
+          >
+            <CheckCircle2 className="h-4 w-4" /> Create Waybill
           </Button>
         </div>
       </DialogContent>

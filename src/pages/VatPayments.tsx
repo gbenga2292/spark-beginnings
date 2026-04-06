@@ -18,7 +18,7 @@ const MONTHS = [
 
 const YEARS = Array.from({ length: 11 }, (_, i) => (new Date().getFullYear() - 5 + i).toString());
 
-export function VatPayments({ setPreviewModal }: { setPreviewModal?: (val: any) => void }) {
+export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewModal?: (val: any) => void; searchTerm?: string }) {
     const sites = useAppStore((state) => state.sites);
     const payments = useAppStore((state) => state.payments);
     const vatPayments = useAppStore((state) => state.vatPayments);
@@ -283,7 +283,7 @@ export function VatPayments({ setPreviewModal }: { setPreviewModal?: (val: any) 
     }, [sites]);
 
     const totalsData = useMemo(() => {
-        const data = uniqueClients.map(client => {
+        let data = uniqueClients.map(client => {
             const clientPayments = payments.filter(p => p.client === client && p.vat > 0);
             const totalPaid = clientPayments.reduce((sum, p) => sum + p.amount, 0);
             const totalVat = clientPayments.reduce((sum, p) => sum + p.vat, 0);
@@ -304,6 +304,11 @@ export function VatPayments({ setPreviewModal }: { setPreviewModal?: (val: any) 
             };
         });
 
+        if (searchTerm) {
+            const lowerSearch = searchTerm.toLowerCase();
+            data = data.filter(d => d.client.toLowerCase().includes(lowerSearch));
+        }
+
         return data.sort((a, b) => {
             let valA: any = (a as any)[totalsSortField];
             let valB: any = (b as any)[totalsSortField];
@@ -318,7 +323,17 @@ export function VatPayments({ setPreviewModal }: { setPreviewModal?: (val: any) 
     }, [uniqueClients, payments, vatPayments, totalsSortField, totalsSortOrder]);
 
     const sortedVatPayments = useMemo(() => {
-        return [...vatPayments].sort((a, b) => {
+        let filtered = vatPayments;
+        if (searchTerm) {
+            const lowerSearch = searchTerm.toLowerCase();
+            filtered = vatPayments.filter(p => 
+                p.client.toLowerCase().includes(lowerSearch) ||
+                (p.month && p.month.toLowerCase().includes(lowerSearch)) ||
+                (p.year && p.year.toLowerCase().includes(lowerSearch))
+            );
+        }
+
+        return [...filtered].sort((a, b) => {
             let valA: any = (a as any)[entriesSortField];
             let valB: any = (b as any)[entriesSortField];
             if (entriesSortField === 'amount') {
@@ -332,7 +347,7 @@ export function VatPayments({ setPreviewModal }: { setPreviewModal?: (val: any) 
             if (valA > valB) return entriesSortOrder === 'asc' ? 1 : -1;
             return 0;
         });
-    }, [vatPayments, entriesSortField, entriesSortOrder]);
+    }, [vatPayments, entriesSortField, entriesSortOrder, searchTerm]);
 
     const handleEntriesSort = (field: string) => {
         if (entriesSortField === field) {

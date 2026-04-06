@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { useOperations } from '../contexts/OperationsContext';
 import { 
-  Plus, MapPin, Building2, Search, Eye, Package, FileText, Trash2,
+  Plus, MapPin, Building2, Search, Eye, Package, FileText,
   Info, Calendar, Phone, User, Activity, ChevronDown, ListFilter
 } from 'lucide-react';
 import { Card, CardContent } from '@/src/components/ui/card';
@@ -14,35 +14,40 @@ import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { SiteInventoryView } from './SiteInventoryView';
 
 export function SiteManager() {
   const sites = useAppStore(s => s.sites);
   const pendingSites = useAppStore(s => s.pendingSites);
-  const deleteSite = useAppStore(s => s.deleteSite);
   const { waybills, getSiteAnalytics } = useOperations();
   const { isDark } = useTheme();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
   const [selectedSite, setSelectedSite] = useState<{ site: Site; q: SiteQuestionnaire | null } | null>(null);
+  const [inventorySite, setInventorySite] = useState<{ site: Site; q: SiteQuestionnaire | null } | null>(null);
 
   const activeCount = sites.filter(s => s.status === 'Active').length;
   const totalCount = sites.length;
 
   useSetPageTitle(
     'Site Management',
-    `${activeCount} of ${totalCount} sites currently active`,
-    <div className="hidden sm:flex items-center gap-2">
-      <Button size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9">
-        <Plus className="h-4 w-4" /> New Site
-      </Button>
-    </div>
+    `${activeCount} of ${totalCount} sites currently active`
   );
 
   const filteredSites = sites.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           s.client.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || s.status.toLowerCase() === statusFilter.toLowerCase();
+    
+    let matchesStatus = false;
+    if (statusFilter === 'All') {
+      matchesStatus = true;
+    } else if (statusFilter === 'Inactive') {
+      matchesStatus = s.status.toLowerCase() === 'inactive' || s.status.toLowerCase() === 'ended';
+    } else {
+      matchesStatus = s.status.toLowerCase() === statusFilter.toLowerCase();
+    }
+
     return matchesSearch && matchesStatus;
   });
 
@@ -52,15 +57,21 @@ export function SiteManager() {
     return { waybills: siteWaybills.length, items: uniqueItemsCount };
   };
 
+  if (inventorySite) {
+    return (
+      <SiteInventoryView
+        site={inventorySite.site}
+        questionnaire={inventorySite.q}
+        onBack={() => {
+          setSelectedSite(inventorySite);
+          setInventorySite(null);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      {/* Mobile Actions */}
-      <div className="flex sm:hidden flex-wrap gap-2 px-1">
-        <Button className="flex-1 gap-2 bg-teal-600 hover:bg-teal-700 text-white shadow-sm">
-          <Plus className="h-4 w-4" /> New Site
-        </Button>
-      </div>
-
       {/* Filter Bar */}
       <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
         <div className="border-b border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50 dark:bg-slate-800/30">
@@ -120,7 +131,7 @@ export function SiteManager() {
                   </Badge>
                 </div>
 
-                <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed line-clamp-2 italic mb-4">
+                <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed line-clamp-2 mb-4">
                   {q?.phase4?.scopeOfWorkSummary || "Project assessment and technical proposal pending detailed documentation."}
                 </p>
 
@@ -137,12 +148,8 @@ export function SiteManager() {
                   </div>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-all"
-                      onClick={() => setSelectedSite({ site, q: q || null })}>
+                      onClick={(e) => { e.stopPropagation(); setSelectedSite({ site, q: q || null }); }}>
                       <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-red-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all"
-                      onClick={() => deleteSite(site.id)}>
-                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -166,9 +173,9 @@ export function SiteManager() {
                   <p className="text-slate-400 font-semibold text-xs">{selectedSite.site.client}</p>
                 </div>
               </div>
-              <DialogClose className="h-10 w-10 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 transition-all">
+              <button onClick={() => setSelectedSite(null)} className="h-10 w-10 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 transition-all">
                 <Plus className="h-5 w-5 rotate-45" />
-              </DialogClose>
+              </button>
             </DialogHeader>
 
             <div className="p-6 sm:p-8 space-y-6 max-h-[60vh] overflow-y-auto">
@@ -191,7 +198,7 @@ export function SiteManager() {
 
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-teal-500 flex items-center gap-2"><Info className="h-3 w-3" /> Scope of Work</label>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed italic border-l-4 border-teal-500 pl-4 py-2 bg-teal-50/20 dark:bg-teal-900/10 rounded-r-xl">
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed border-l-4 border-teal-500 pl-4 py-2 bg-teal-50/20 dark:bg-teal-900/10 rounded-r-xl">
                   {selectedSite.q?.phase4?.scopeOfWorkSummary || "Detailed proposal and engineering assessment pending."}
                 </p>
               </div>
@@ -213,8 +220,14 @@ export function SiteManager() {
             </div>
 
             <div className="p-6 border-t border-slate-100 dark:border-slate-800">
-              <Button className="w-full h-11 rounded-xl bg-teal-600 text-white font-semibold text-sm hover:bg-teal-700 transition-all">
-                Edit Site Specifications
+              <Button 
+                onClick={() => {
+                  setInventorySite(selectedSite);
+                  setSelectedSite(null);
+                }}
+                className="w-full h-11 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all gap-2"
+              >
+                <Package className="h-4 w-4" /> View Site Inventory
               </Button>
             </div>
           </DialogContent>

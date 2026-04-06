@@ -5,7 +5,7 @@ import { Payments } from './Payments';
 import { VatPayments } from './VatPayments';
 import { useTheme } from '../hooks/useTheme';
 import { cn } from '../lib/utils';
-import { ReceiptText, Landmark } from 'lucide-react';
+import { ReceiptText, Landmark, Search } from 'lucide-react';
 import { NairaSign } from '@/src/components/ui/naira-sign';
 
 export function ClientAccounts() {
@@ -25,6 +25,7 @@ export function ClientAccounts() {
   if (canViewVat) tabs.push({ id: 'vat', label: 'VAT', icon: Landmark, component: <VatPayments /> });
 
   const [activeTab, setActiveTab] = useState(tabs.length > 0 ? tabs[0].id : '');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // If permissions change and active tab is no longer available, switch to first available
   useEffect(() => {
@@ -49,32 +50,49 @@ export function ClientAccounts() {
     <div className={cn("flex flex-col h-full", isDark ? "bg-slate-950" : "bg-slate-50")}>
       {/* Tabs Header */}
       <div className={cn(
-          "flex items-center gap-2 px-6 pt-4 pb-0 mb-4 border-b",
+          "flex items-center justify-between gap-4 px-6 pt-4 pb-0 mb-4 border-b",
           isDark ? "border-slate-800 bg-slate-900/50" : "bg-white border-slate-200"
       )}>
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "flex items-center gap-2 px-4 py-3 text-sm font-semibold transition-colors border-b-2 -mb-[1px]",
-                isActive 
-                  ? (isDark ? "border-indigo-400 text-indigo-400" : "border-indigo-600 text-indigo-700") 
-                  : (isDark ? "border-transparent text-slate-400 hover:text-slate-300 hover:border-slate-600" : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300")
-              )}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          );
-        })}
+        <div className="flex items-center gap-2">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-3 text-sm font-semibold transition-colors border-b-2 -mb-[1px] whitespace-nowrap",
+                  isActive 
+                    ? (isDark ? "border-indigo-400 text-indigo-400" : "border-indigo-600 text-indigo-700") 
+                    : (isDark ? "border-transparent text-slate-400 hover:text-slate-300 hover:border-slate-600" : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300")
+                )}
+              >
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="relative w-full max-w-sm mb-3 mt-1 sm:mt-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search clients, sites..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className={cn(
+              "w-full pl-9 pr-4 py-2 text-sm rounded-lg border outline-none transition-all",
+              isDark 
+                ? "bg-slate-900 border-slate-700 text-slate-200 placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" 
+                : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 font-medium focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            )}
+          />
+        </div>
       </div>
 
       {/* Tab Content */}
       <div className="flex-1 w-full overflow-y-auto px-6">
-        {ActiveComponent}
+        {ActiveComponent ? React.cloneElement(ActiveComponent as React.ReactElement, { searchTerm } as any) : null}
       </div>
     </div>
   );

@@ -29,6 +29,7 @@ export function QuickCheckout() {
   const [returnDays, setReturnDays] = useState<number>(7);
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [hoveredCheckout, setHoveredCheckout] = useState<string | null>(null);
+  const [activityFilter, setActivityFilter] = useState('all');
 
   useSetPageTitle(
     view === 'checkout' ? 'Quick Checkout' : 'Checkout Activity',
@@ -87,6 +88,21 @@ export function QuickCheckout() {
     setReturnDays(7);
   };
 
+  const handleUpdateStatus = (c: Checkout) => {
+    const qtyStr = window.prompt(`How many of ${c.assetName} are being returned? (Max ${c.quantity - c.returnedQuantity})`, `${c.quantity - c.returnedQuantity}`);
+    if (qtyStr !== null) {
+      const returned = parseInt(qtyStr, 10);
+      if (!isNaN(returned) && returned > 0 && returned <= (c.quantity - c.returnedQuantity)) {
+        const totalReturned = c.returnedQuantity + returned;
+        const newStatus = totalReturned >= c.quantity ? 'returned' : 'outstanding';
+        updateCheckoutStatus(c.id, { returnedQuantity: totalReturned, status: newStatus as any });
+        toast.success(`Updated checkout status for ${c.assetName}`);
+      } else {
+        toast.error('Invalid quantity entered');
+      }
+    }
+  };
+
   if (view === 'activity') {
     return (
       <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
@@ -98,7 +114,8 @@ export function QuickCheckout() {
             </div>
             <select 
               className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold px-3 py-1.5 outline-none shadow-sm"
-              defaultValue="all"
+              value={activityFilter}
+              onChange={(e) => setActivityFilter(e.target.value)}
             >
               <option value="all">All ({checkouts.length})</option>
               <option value="outstanding">Outstanding</option>
@@ -113,7 +130,7 @@ export function QuickCheckout() {
                   <span className="font-medium text-sm">No activity recorded</span>
                 </div>
               ) : (
-                checkouts.map((c) => (
+                checkouts.filter(c => activityFilter === 'all' || c.status === activityFilter).map((c) => (
                   <div key={c.id} className="flex items-center justify-between p-5 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
                     <div className="flex flex-col">
                       <span className="font-semibold text-slate-800 dark:text-white text-sm">{c.assetName}</span>
@@ -252,7 +269,8 @@ export function QuickCheckout() {
 
                   {hoveredCheckout === c.id && (
                     <div className="flex items-center gap-2 mt-3 animate-in fade-in duration-200">
-                      <Button variant="outline" className="flex-1 h-9 rounded-lg font-semibold text-slate-600 dark:text-slate-300 text-xs gap-2">
+                      <Button variant="outline" className="flex-1 h-9 rounded-lg font-semibold text-slate-600 dark:text-slate-300 text-xs gap-2"
+                        onClick={() => handleUpdateStatus(c)}>
                         <RotateCcw className="h-3.5 w-3.5" /> Update Status
                       </Button>
                       <Button variant="ghost" size="icon" className="h-9 w-9 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg"

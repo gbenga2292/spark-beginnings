@@ -8,6 +8,7 @@ import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 import { Waybill, WaybillStatus } from '../types/operations';
 import { WaybillDetailView } from './WaybillDetailView';
+import { WaybillForm } from './WaybillForm';
 
 import { Card } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -65,6 +66,7 @@ export function WaybillManager() {
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+      {showCreateModal && <WaybillForm onClose={() => setShowCreateModal(false)} />}
       {viewingWaybill && <WaybillDetailView waybill={viewingWaybill} onClose={() => setViewingWaybill(null)} />}
 
       {/* Mobile Actions */}

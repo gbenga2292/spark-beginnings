@@ -14,7 +14,7 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { generateId } from '@/src/lib/utils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/src/components/ui/dropdown-menu';
 
-export function Billing() {
+export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
   const sites = useAppStore((state) => state.sites);
   const pendingSites = useAppStore((state) => state.pendingSites);
   const pendingInvoices = useAppStore((state) => state.pendingInvoices);
@@ -710,6 +710,16 @@ export function Billing() {
       list = [...pendingInvoices];
     }
     
+    if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
+      list = list.filter(item => {
+        const clientMatch = item.client?.toLowerCase().includes(lowerSearch);
+        const siteMatch = (item.siteName || item.site)?.toLowerCase().includes(lowerSearch);
+        const invMatch = (item.invoiceNo || item.invoiceNumber)?.toString().toLowerCase().includes(lowerSearch);
+        return clientMatch || siteMatch || invMatch;
+      });
+    }
+
     if (activeTab === 'completed' || activeTab === 'unpaid') return []; // Handled separately
     return list.sort((a: any, b: any) => {
       let valA: any = '';
@@ -760,7 +770,7 @@ export function Billing() {
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [activeTab, invoices, pendingInvoices, sortField, sortOrder, sites]);
+  }, [activeTab, invoices, pendingInvoices, sortField, sortOrder, sites, searchTerm]);
 
   const siteStats = useMemo(() => {
     return sites.map(site => {
@@ -787,8 +797,29 @@ export function Billing() {
     });
   }, [sites, invoices, payments]);
 
-  const completedSites = useMemo(() => siteStats.filter(s => s.isCompleted), [siteStats]);
-  const unpaidSites = useMemo(() => siteStats.filter(s => s.isUnpaid), [siteStats]);
+  const completedSites = useMemo(() => {
+    let list = siteStats.filter(s => s.isCompleted);
+    if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
+      list = list.filter(s => 
+        s.client.toLowerCase().includes(lowerSearch) || 
+        s.name.toLowerCase().includes(lowerSearch)
+      );
+    }
+    return list;
+  }, [siteStats, searchTerm]);
+
+  const unpaidSites = useMemo(() => {
+    let list = siteStats.filter(s => s.isUnpaid);
+    if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
+      list = list.filter(s => 
+        s.client.toLowerCase().includes(lowerSearch) || 
+        s.name.toLowerCase().includes(lowerSearch)
+      );
+    }
+    return list;
+  }, [siteStats, searchTerm]);
 
   const tableSums = useMemo(() => {
     if (activeTab === 'completed' || activeTab === 'unpaid') {

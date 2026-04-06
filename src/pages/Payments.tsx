@@ -10,7 +10,7 @@ import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { generateId } from '@/src/lib/utils';
 
-export function Payments() {
+export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
     const sites = useAppStore((state) => state.sites);
     const payments = useAppStore((state) => state.payments);
     const addPayment = useAppStore((state) => state.addPayment);
@@ -308,7 +308,17 @@ export function Payments() {
     };
 
     const sortedPayments = useMemo(() => {
-        return [...payments].sort((a, b) => {
+        let filtered = payments;
+        if (searchTerm) {
+            const lowerSearch = searchTerm.toLowerCase();
+            filtered = payments.filter(p => 
+                (p.client && p.client.toLowerCase().includes(lowerSearch)) ||
+                (p.site && p.site.toLowerCase().includes(lowerSearch)) ||
+                (p.id && p.id.toLowerCase().includes(lowerSearch))
+            );
+        }
+
+        return [...filtered].sort((a, b) => {
             let valA: any = '';
             let valB: any = '';
             if (sortField === 'date') { valA = a.date || ''; valB = b.date || ''; }
@@ -324,17 +334,17 @@ export function Payments() {
             if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
             return 0;
         });
-    }, [payments, sortField, sortOrder]);
+    }, [payments, sortField, sortOrder, searchTerm]);
 
     const tableSums = useMemo(() => {
-        return payments.reduce((acc, p) => ({
+        return sortedPayments.reduce((acc, p) => ({
             amount: acc.amount + (p.amount || 0),
             wht: acc.wht + (p.withholdingTax || 0),
             discount: acc.discount + (p.discount || 0),
             vat: acc.vat + (p.vat || 0),
             amtForVat: acc.amtForVat + (p.amountForVat || 0),
         }), { amount: 0, wht: 0, discount: 0, vat: 0, amtForVat: 0 });
-    }, [payments]);
+    }, [sortedPayments]);
 
     const formatSum = (val: number) => {
         if (priv?.canViewAmounts === false) return '***';

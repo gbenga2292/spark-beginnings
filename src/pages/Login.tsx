@@ -59,7 +59,17 @@ export function Login() {
     try {
       const { error: authError } = await signIn(email, password);
       if (authError) {
-        setError(authError.message || 'Login failed.');
+        const isOffline =
+          !navigator.onLine ||
+          authError.message === 'Failed to fetch' ||
+          authError.message?.toLowerCase().includes('network') ||
+          authError.message?.toLowerCase().includes('fetch');
+          
+        setError(
+          isOffline
+            ? 'No internet connection. Please check your network and try again.'
+            : authError.message || 'Login failed.'
+        );
         setIsLoading(false);
         return;
       }

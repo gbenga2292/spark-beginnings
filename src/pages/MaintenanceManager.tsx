@@ -22,6 +22,7 @@ import { cn } from '@/src/lib/utils';
 import { MaintenanceDashboard } from '@/src/pages/MaintenanceDashboard';
 import { MaintenanceAssetGrid } from '@/src/pages/MaintenanceAssetGrid';
 import { LogMaintenanceForm } from '@/src/pages/LogMaintenanceForm';
+import { toast } from '@/src/components/ui/toast';
 
 type MaintenanceTab = 'dashboard' | 'machines' | 'vehicles' | 'log';
 
@@ -34,6 +35,27 @@ export function MaintenanceManager() {
   const machinesCount = maintenanceAssets.filter(a => a.category === 'machine').length;
   const vehiclesCount = maintenanceAssets.filter(a => a.category === 'vehicle').length;
 
+  const handleExport = () => {
+    const headers = ['Name', 'Category', 'Description', 'Status', 'Last Service Date', 'Next Service Date'];
+    const rows = maintenanceAssets.map(a => [
+      a.name, 
+      a.category || '', 
+      a.description ? `"${a.description.replace(/"/g, '""')}"` : '',
+      a.status || '', 
+      a.lastServiceDate || '', 
+      a.nextServiceDate || ''
+    ].join(','));
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `maintenance_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Export downloaded successfully');
+  };
+
   useSetPageTitle(
     'Equipment Maintenance',
     'Track and manage heavy machinery and vehicle service schedules',
@@ -42,6 +64,7 @@ export function MaintenanceManager() {
          variant="outline" 
          size="sm" 
          className="gap-2 h-9 border-slate-200"
+         onClick={handleExport}
        >
          <FileDown className="h-4 w-4" /> Export
        </Button>
