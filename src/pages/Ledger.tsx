@@ -59,6 +59,7 @@ export function Ledger() {
   const [activeVoucherNo, setActiveVoucherNo] = useState<string>('');
   const [paidFrom, setPaidFrom] = useState('');
   const [items, setItems] = useState<EntryItem[]>(Array(8).fill(null).map(() => getEmptyItem()));
+  const [originalItemsJSON, setOriginalItemsJSON] = useState<string>(() => JSON.stringify(Array(8).fill(null).map(() => getEmptyItem())));
 
   // For navigating vouchers
   const distinctVouchers = useMemo(() => {
@@ -69,8 +70,17 @@ export function Ledger() {
   const pendingLedgerEntries = useAppStore((state) => state.pendingLedgerEntries);
   const clearPendingLedgerEntries = useAppStore((state) => state.clearPendingLedgerEntries);
   const updateCompanyExpense = useAppStore((state) => state.updateCompanyExpense);
+  const setLedgerDirty = useAppStore((state) => state.setLedgerDirty);
 
   const [hasUnsavedPending, setHasUnsavedPending] = useState(false);
+
+  const isLedgerDirty = useMemo(() => {
+    return JSON.stringify(items) !== originalItemsJSON || hasUnsavedPending;
+  }, [items, originalItemsJSON, hasUnsavedPending]);
+
+  useEffect(() => {
+    setLedgerDirty(isLedgerDirty);
+  }, [isLedgerDirty, setLedgerDirty]);
 
   // Derived Voucher No matching "VNYY-MM-DD-SEQ" if creating new
   const generatedVoucherNo = useMemo(() => {
@@ -126,14 +136,14 @@ export function Ledger() {
 
   // Warn on tab close/reload
   useEffect(() => {
-    if (!hasUnsavedPending) return;
+    if (!isLedgerDirty) return;
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = '';
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedPending]);
+  }, [isLedgerDirty]);
 
   // Load a voucher into the form
   const loadVoucher = (vNo: string) => {
@@ -164,6 +174,7 @@ export function Ledger() {
       }
     });
     setItems(loadedItems);
+    setOriginalItemsJSON(JSON.stringify(loadedItems));
   };
 
   const getCurrentVoucherSeq = () => {
@@ -209,7 +220,9 @@ export function Ledger() {
       return;
     }
     setActiveVoucherNo('');
-    setItems(Array(8).fill(null).map(() => getEmptyItem()));
+    const newItems = Array(8).fill(null).map(() => getEmptyItem());
+    setItems(newItems);
+    setOriginalItemsJSON(JSON.stringify(newItems));
     setPaidFrom('');
   };
 
@@ -840,7 +853,23 @@ export function Ledger() {
                     <td className={tdClass}>
                       <div className="flex items-center px-2 relative group-focus-within:text-indigo-600">
                         <span className="text-slate-400 absolute left-2 text-xs">₦</span>
-                        <input type="number" min="0" step="0.01" className={`w-full h-8 pl-4 pr-1 text-sm bg-transparent outline-none font-medium`} value={item.amount} onChange={e => setItemField(idx, 'amount', e.target.value)} />
+                        <input 
+                          type="text" 
+                          className={`w-full h-8 pl-4 pr-1 text-sm bg-transparent outline-none font-medium`} 
+                          value={
+                            item.amount 
+                              ? item.amount.split('.').length > 1
+                                ? Number(item.amount.split('.')[0]).toLocaleString() + '.' + item.amount.split('.')[1]
+                                : Number(item.amount).toLocaleString()
+                              : ''
+                          } 
+                          onChange={e => {
+                            const v = e.target.value.replace(/,/g, '').replace(/[^0-9.]/g, '');
+                            const parts = v.split('.');
+                            const cleanV = parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
+                            setItemField(idx, 'amount', cleanV);
+                          }} 
+                        />
                       </div>
                     </td>
                     <td className={tdClass}>

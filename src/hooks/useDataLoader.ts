@@ -86,23 +86,18 @@ export function useDataLoader(isAuthenticated: boolean) {
         ]);
 
         // Auto-initialize standard client & site — only if not already in the fetched data.
-        // Check permissions first to avoid auto-inserting if arrays are empty due to lack of view permissions.
-        const isAdmin = userPrivs?.users?.canManage === true;
-        const canViewSites = isAdmin || (userPrivs && userPrivs.sites && userPrivs.sites.canView === true);
-
-        if (canViewSites) {
-          if (!appData.clients.some((c: string) => c.toLowerCase() === 'dcel')) {
-            appData.clients.push('DCEL');
-            db.insertClient('DCEL').catch(err => console.warn('Auto-insert DCEL client ignored:', err));
-          }
-          const hasDcelOffice = appData.sites.some(
-            (s: any) => s.name.toLowerCase().trim() === 'office' && s.client.toLowerCase().trim() === 'dcel'
-          );
-          if (!hasDcelOffice) {
-            const officeSite = { id: generateId(), name: 'Office', client: 'DCEL', status: 'Active' as const, vat: 'No' as const };
-            appData.sites.push(officeSite);
-            db.insertSite(officeSite).catch(err => console.warn('Auto-insert Office site ignored:', err));
-          }
+        // Sites always load for all users now (needed cross-functionally), so no permission guard needed here.
+        if (!appData.clients.some((c: string) => c.toLowerCase() === 'dcel')) {
+          appData.clients.push('DCEL');
+          db.insertClient('DCEL').catch(err => console.warn('Auto-insert DCEL client ignored:', err));
+        }
+        const hasDcelOffice = appData.sites.some(
+          (s: any) => s.name.toLowerCase().trim() === 'office' && s.client.toLowerCase().trim() === 'dcel'
+        );
+        if (!hasDcelOffice) {
+          const officeSite = { id: generateId(), name: 'Office', client: 'DCEL', status: 'Active' as const, vat: 'No' as const };
+          appData.sites.push(officeSite);
+          db.insertSite(officeSite).catch(err => console.warn('Auto-insert Office site ignored:', err));
         }
 
         // Get pendingSites from localStorage as a fallback

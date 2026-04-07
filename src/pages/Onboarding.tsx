@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
@@ -223,6 +223,7 @@ export function Onboarding() {
   const updateEmployee = useAppStore(s => s.updateEmployee);
   const departments = useAppStore(s => s.departments);
   const positions = useAppStore(s => s.positions);
+  const ledgerBeneficiaryBanks = useAppStore(s => s.ledgerBeneficiaryBanks);
   const priv = usePriv('onboarding');
   const privUsers = usePriv('users');
   const isAdmin = privUsers.canManage;
@@ -231,6 +232,10 @@ export function Onboarding() {
   const { user } = useAuth();
   const hrVariables = useAppStore(s => s.hrVariables);
   const l = hrVariables.onboardingStageLabels || {};
+
+  // Local buffer for account number to avoid keystroke-delete bug (store update on every key causes re-render)
+  const [localAccountNo, setLocalAccountNo] = useState('');
+  const accountNoInitialized = useRef(false);
 
   const [leftTab, setLeftTab] = useState<'Active' | 'Pending' | 'Terminated'>('Active');
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
@@ -329,6 +334,18 @@ export function Onboarding() {
 
     return { ...defaultCl, ...storedCl, guarantors: syncedGuarantors };
   }, [selectedEmployee]);
+
+  // Sync localAccountNo whenever the selected employee changes
+  useEffect(() => {
+    accountNoInitialized.current = false;
+  }, [selectedEmployeeId]);
+
+  useEffect(() => {
+    if (!accountNoInitialized.current) {
+      setLocalAccountNo(cl.accountNo ?? '');
+      accountNoInitialized.current = true;
+    }
+  }, [cl.accountNo]);
 
   const updateCL = (patch: Partial<OnboardingChecklist>) => {
     if (!selectedEmployee) return;
@@ -1134,7 +1151,28 @@ export function Onboarding() {
                   <SubSection label="3.2 — Account Details" done={t32AccDone}>
                     <p className="text-[11px] text-slate-500">Enter bank details — these will be saved to the employee record on activation. Verified checkbox is advisory.</p>
                     <div className={`p-3 rounded-lg border grid grid-cols-2 gap-3 transition-colors ${cl.bankName.trim() && cl.accountNo.trim() ? 'border-sky-200 bg-sky-50/20' : 'border-slate-200'}`}>
-                      <LabeledInput label="Bank Name *" value={cl.bankName} onChange={v => updateCL({ bankName: v })} placeholder="e.g. First Bank" />
+                      {/* Bank Name — dropdown from Variables > Beneficiary Banks */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Bank Name *</label>
+                        <select
+                          className="w-full h-9 px-2.5 rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-400 transition-colors"
+                          value={cl.bankName}
+                          onChange={e => updateCL({ bankName: e.target.value })}
+                        >
+                          <option value="">-- Select Bank --</option>
+                          {ledgerBeneficiaryBanks.map(b => (
+                            <option key={b.id} value={b.name}>{b.name}</option>
+                          ))}
+                          {/* Allow a manually entered value to persist even if not in list */}
+                          {cl.bankName && !ledgerBeneficiaryBanks.some(b => b.name === cl.bankName) && (
+                            <option value={cl.bankName}>{cl.bankName}</option>
+                          )}
+                        </select>
+                        {ledgerBeneficiaryBanks.length === 0 && (
+                          <p className="text-[10px] text-amber-600">No banks configured — add them in Variables → Beneficiary Banks.</p>
+                        )}
+                      </div>
+                      {/* Account Number — buffered locally to prevent keystroke-delete bug */}
                       <div className="space-y-1">
                         <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Account Number *</label>
                         <Input
@@ -1143,8 +1181,9 @@ export function Onboarding() {
                           pattern="[0-9]*"
                           className="h-9 text-sm bg-slate-50 dark:bg-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-700"
                           placeholder="0123456789"
-                          value={cl.accountNo}
-                          onChange={e => updateCL({ accountNo: e.target.value.replace(/\D/g, '') })}
+                          value={localAccountNo}
+                          onChange={e => setLocalAccountNo(e.target.value.replace(/\D/g, ''))}
+                          onBlur={() => updateCL({ accountNo: localAccountNo })}
                         />
                       </div>
                     </div>

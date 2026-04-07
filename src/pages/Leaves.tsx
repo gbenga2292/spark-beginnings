@@ -75,6 +75,11 @@ export function Leaves() {
   const [uploadedFileName, setUploadedFileName] = useState<string | undefined>(undefined);
   const [approverId, setApproverId] = useState('');
 
+  // Calculate if form is locked due to leave start date reached
+  const isStartDateReached = !!formId && !!startDate && new Date(startDate).setHours(0, 0, 0, 0) <= new Date().setHours(0, 0, 0, 0);
+  const hasAllPermissions = priv.canAdd && priv.canEdit && priv.canDelete;
+  const isFormLockedForUser = isStartDateReached && !hasAllPermissions;
+
   /* ── print / preview state ── */
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [previewLeave, setPreviewLeave] = useState<LeaveRecord | null>(null);
@@ -431,8 +436,8 @@ export function Leaves() {
               <div className="sm:col-span-2 space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Staff <span className="text-rose-500">*</span></label>
                 <select
-                  className="flex h-11 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
-                  value={staffId} onChange={e => setStaffId(e.target.value)} disabled={!!formId}
+                  className={`flex h-11 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 px-3 text-sm transition-colors outline-none ${(!!formId || isFormLockedForUser) ? 'cursor-not-allowed text-slate-500 opacity-80' : 'focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-teal-500/20'}`}
+                  value={staffId} onChange={e => setStaffId(e.target.value)} disabled={!!formId || isFormLockedForUser}
                 >
                   <option value="" disabled>— Select Staff Member —</option>
                   {internalEmployees.map(emp => (
@@ -445,8 +450,8 @@ export function Leaves() {
               <div className="sm:col-span-2 space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Leave Type <span className="text-rose-500">*</span></label>
                 <select
-                  className="flex h-11 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
-                  value={leaveType} onChange={e => setLeaveType(e.target.value)}
+                  className={`flex h-11 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 px-3 text-sm transition-colors outline-none ${isFormLockedForUser ? 'cursor-not-allowed text-slate-500 opacity-80' : 'focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-teal-500/20'}`}
+                  value={leaveType} onChange={e => setLeaveType(e.target.value)} disabled={isFormLockedForUser}
                 >
                   <option value="" disabled>— Select Leave Type —</option>
                   {(() => {
@@ -491,8 +496,8 @@ export function Leaves() {
                   </div>
                 ) : (
                   <select
-                    className="flex h-11 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 px-3 text-sm transition-colors outline-none focus:ring-2 focus:ring-teal-500/20"
-                    value={approverId} onChange={e => setApproverId(e.target.value)} disabled={!!formId}
+                    className={`flex h-11 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 px-3 text-sm transition-colors outline-none ${(!!formId || isFormLockedForUser) ? 'cursor-not-allowed text-slate-500 opacity-80' : 'focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-teal-500/20'}`}
+                    value={approverId} onChange={e => setApproverId(e.target.value)} disabled={!!formId || isFormLockedForUser}
                   >
                     <option value="">— Select Approver —</option>
                     {approverOptions.map((u: any) => (
@@ -505,11 +510,11 @@ export function Leaves() {
               {/* Dates */}
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start of Leave <span className="text-rose-500">*</span></label>
-                <Input type="date" className="h-11 bg-slate-50 border-slate-200 focus-visible:ring-teal-500/30" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                <Input type="date" className={`h-11 bg-slate-50 border-slate-200 focus-visible:ring-teal-500/30 ${isFormLockedForUser ? 'cursor-not-allowed opacity-80 text-slate-500' : ''}`} value={startDate} onChange={e => setStartDate(e.target.value)} disabled={isFormLockedForUser} />
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Duration (Days) <span className="text-rose-500">*</span></label>
-                <Input type="number" min="1" className="h-11 bg-slate-50 border-slate-200 focus-visible:ring-teal-500/30" value={duration} onChange={e => setDuration(e.target.value)} placeholder="e.g. 5" />
+                <Input type="number" min="1" className={`h-11 bg-slate-50 border-slate-200 focus-visible:ring-teal-500/30 ${isFormLockedForUser ? 'cursor-not-allowed opacity-80 text-slate-500' : ''}`} value={duration} onChange={e => setDuration(e.target.value)} placeholder="e.g. 5" disabled={isFormLockedForUser} />
               </div>
 
               <div className="sm:col-span-2 space-y-2">
@@ -521,8 +526,8 @@ export function Leaves() {
               <div className="sm:col-span-2 space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Reason for Leave <span className="text-rose-500">*</span></label>
                 <textarea
-                  className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 p-3 h-24 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all resize-none"
-                  value={reason} onChange={e => setReason(e.target.value)} placeholder="Enter details..."
+                  className={`w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 p-3 h-24 outline-none transition-all resize-none ${isFormLockedForUser ? 'cursor-not-allowed text-slate-500 opacity-80' : 'focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-teal-500/20'}`}
+                  value={reason} onChange={e => setReason(e.target.value)} placeholder="Enter details..." disabled={isFormLockedForUser}
                 />
               </div>
 
@@ -535,7 +540,7 @@ export function Leaves() {
               </div>
               <div className="space-y-3">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block">Can be contacted?</label>
-                <div className="flex gap-4">
+                <div className={`flex gap-4 ${isFormLockedForUser ? 'opacity-80 pointer-events-none' : ''}`}>
                   <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
                     <input type="radio" className="accent-teal-600 w-4 h-4" checked={canBeContacted === 'Yes'} onChange={() => setCanBeContacted('Yes')} /> Yes
                   </label>
@@ -548,12 +553,12 @@ export function Leaves() {
               {/* File Upload */}
               <div className="sm:col-span-2 space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Upload Leave Form (JPG / PDF)</label>
-                <label className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-slate-200 rounded-lg cursor-pointer hover:border-teal-400 hover:bg-teal-50/30 transition-all">
+                <label className={`flex items-center gap-3 px-4 py-3 border-2 border-dashed border-slate-200 rounded-lg transition-all ${isFormLockedForUser ? 'opacity-70 cursor-not-allowed bg-slate-50' : 'cursor-pointer hover:border-teal-400 hover:bg-teal-50/30'}`}>
                   <Upload className="h-5 w-5 text-teal-500" />
                   <span className="text-sm text-slate-600">
                     {uploadedFileName ? <span className="font-semibold text-teal-700">{uploadedFileName}</span> : 'Click to upload a signed leave form'}
                   </span>
-                  <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => handleFileUpload(e)} />
+                  <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => handleFileUpload(e)} disabled={isFormLockedForUser} />
                 </label>
               </div>
             </div>
@@ -679,13 +684,21 @@ export function Leaves() {
                       )}
                     </td>
                     <td className="px-5 py-4 text-center whitespace-nowrap">
-                      <Badge className={
-                        leave.status === 'Cancelled' ? 'bg-rose-100 text-rose-700 border-rose-200' :
-                        leave.dateReturned ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-                        'bg-amber-100 text-amber-700 border-amber-200'
-                      } variant="outline">
-                        {leave.status === 'Cancelled' ? 'Cancelled' : leave.dateReturned ? 'Completed' : 'On Leave'}
-                      </Badge>
+                      {(() => {
+                        const isUpcoming = leave.startDate && new Date(leave.startDate).setHours(0, 0, 0, 0) > new Date().setHours(0, 0, 0, 0);
+                        const statusLabel = leave.status === 'Cancelled' ? 'Cancelled' : leave.dateReturned ? 'Completed' : isUpcoming ? 'Upcoming' : 'On Leave';
+                        let badgeClass = '';
+                        if (statusLabel === 'Cancelled') badgeClass = 'bg-rose-100 text-rose-700 border-rose-200';
+                        else if (statusLabel === 'Completed') badgeClass = 'bg-emerald-100 text-emerald-700 border-emerald-200';
+                        else if (statusLabel === 'Upcoming') badgeClass = 'bg-blue-100 text-blue-700 border-blue-200';
+                        else badgeClass = 'bg-amber-100 text-amber-700 border-amber-200';
+
+                        return (
+                          <Badge className={badgeClass} variant="outline">
+                            {statusLabel}
+                          </Badge>
+                        );
+                      })()}
                     </td>
                     <td className="px-5 py-4 text-center">
                       {leave.uploadedFile ? (

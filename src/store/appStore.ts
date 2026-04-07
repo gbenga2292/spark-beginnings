@@ -668,6 +668,8 @@ interface AppState {
   removeLeaveType: (type: string) => void;
   isVariablesDirty: boolean;
   setVariablesDirty: (val: boolean) => void;
+  isLedgerDirty: boolean;
+  setLedgerDirty: (val: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -678,6 +680,8 @@ export const useAppStore = create<AppState>()(
       leaves: [],
       isVariablesDirty: false,
       setVariablesDirty: (val) => set({ isVariablesDirty: val }),
+      isLedgerDirty: false,
+      setLedgerDirty: (val) => set({ isLedgerDirty: val }),
       sites: [],
       pendingSites: [],
       clients: [],

@@ -118,13 +118,15 @@ function useNotifications() {
     });
 
     // 2. Pending Approvals (Priority: 2)
-    leaves.filter(l => l.approvalStatus === 'Pending' && l.status !== 'Cancelled').forEach(l => {
+    const currentUserId = currentUser?.id || useAuthStore.getState().user?.id;
+    
+    leaves.filter(l => l.approvalStatus === 'Pending' && l.status !== 'Cancelled' && l.approvedById === currentUserId).forEach(l => {
       notifs.push({ id: `leave-${l.id}`, icon: CalendarClock, text: `Leave Request: ${l.employeeName}`, time: l.startDate, color: 'text-amber-500', url: '/leaves', priority: 2 });
     });
-    salaryAdvances.filter(s => s.status === 'Pending').forEach(s => {
+    salaryAdvances.filter(s => s.status === 'Pending' && s.approvedById === currentUserId).forEach(s => {
       notifs.push({ id: `adv-${s.id}`, icon: Wallet, text: `Salary Advance: ${s.employeeName}`, time: s.requestDate, color: 'text-amber-500', url: '/salary-loans', priority: 2 });
     });
-    loans.filter(l => l.status === 'Pending').forEach(l => {
+    loans.filter(l => l.status === 'Pending' && l.approvedById === currentUserId).forEach(l => {
       notifs.push({ id: `loan-${l.id}`, icon: Landmark, text: `Loan Request: ${l.employeeName}`, time: l.startDate, color: 'text-amber-500', url: '/salary-loans', priority: 2 });
     });
 

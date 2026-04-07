@@ -790,7 +790,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
               </Button>
               <Button
                 onClick={handleSubmit}
-                className="flex-1 h-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-base shadow-lg shadow-indigo-200 transition-all hover:shadow-indigo-300 hover:-translate-y-0.5"
+                className="flex-1 h-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-base transition-all hover:-translate-y-0.5"
               >
                 Submit for Approval
               </Button>

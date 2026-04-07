@@ -166,11 +166,21 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleLinkClick = async (e: React.MouseEvent, href: string) => {
-    const { isVariablesDirty, setVariablesDirty } = useAppStore.getState();
+    const { isVariablesDirty, setVariablesDirty, isLedgerDirty, setLedgerDirty } = useAppStore.getState();
 
-    if (location.pathname === '/ledger' && pendingLedgerEntries.length > 0 && href !== '/ledger') {
+    if (location.pathname === '/ledger' && (pendingLedgerEntries.length > 0 || isLedgerDirty) && href !== '/ledger') {
       e.preventDefault();
-      toast.error('You have unsaved pending ledger entries. Please save before leaving.');
+      const ok = await showConfirm('You have unsaved entries in the ledger. Do you want to discard them and leave?', {
+        title: 'Unsaved Changes',
+        confirmLabel: 'Discard & Leave',
+        cancelLabel: 'Stay Here',
+        variant: 'danger'
+      });
+      if (ok) {
+        setLedgerDirty(false);
+        setIsOpen?.(false);
+        navigate(href);
+      }
       return;
     }
 

@@ -3,7 +3,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { useAppStore, AttendanceRecord } from '@/src/store/appStore';
-import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown } from 'lucide-react';
+import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { format } from 'date-fns';
@@ -983,7 +983,7 @@ export function Attendance() {
           {/* Toolbar: date, filters, search, actions — all in one row */}
           <div className="flex flex-wrap items-end gap-2 py-1 px-0">
             {/* Date controls */}
-            <div className="flex flex-col gap-1.5 flex-none w-[260px]">
+            <div className="flex flex-col gap-1.5 flex-none w-[320px]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest px-0.5">
@@ -1004,6 +1004,15 @@ export function Attendance() {
                 )}
               </div>
               <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setRegisterDate(getNextDayStr(registerDate, -1))}
+                  className="h-9 w-9 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex-shrink-0 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  title="Previous Day"
+                >
+                  <ChevronLeft className="h-4 w-4 text-slate-500" />
+                </Button>
                 <div className="relative flex-1">
                   <Input
                     type="date"
@@ -1014,6 +1023,21 @@ export function Attendance() {
                   />
                   <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
                 </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    const nextDate = getNextDayStr(registerDate, 1);
+                    if (nextDate <= format(new Date(), 'yyyy-MM-dd')) {
+                      setRegisterDate(nextDate);
+                    }
+                  }}
+                  disabled={registerDate >= format(new Date(), 'yyyy-MM-dd')}
+                  className="h-9 w-9 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex-shrink-0 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Next Day"
+                >
+                  <ChevronRight className="h-4 w-4 text-slate-500" />
+                </Button>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex-shrink-0 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors" title="Attendance Calendar Overview">
