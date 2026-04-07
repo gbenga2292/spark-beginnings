@@ -70,9 +70,13 @@ export function useDataLoader(isAuthenticated: boolean) {
 
         const { data: { user: authUser } } = await supabase.auth.getUser();
         let userPrivs: any = null;
+        let currentUserProfile: any = null;
         if (authUser) {
-           const { data: profile } = await supabase.from('profiles').select('privileges').eq('id', authUser.id).single();
-           userPrivs = profile?.privileges;
+           const { data: profile } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
+           if (profile) {
+             userPrivs = profile.privileges;
+             currentUserProfile = dbToProfile(profile);
+           }
         }
 
         const [appData, users, presets] = await Promise.all([
@@ -81,18 +85,24 @@ export function useDataLoader(isAuthenticated: boolean) {
           fetchPresets(),
         ]);
 
-        // Auto-initialize standard client & site — only if not already in the fetched data
-        if (!appData.clients.some((c: string) => c.toLowerCase() === 'dcel')) {
-          appData.clients.push('DCEL');
-          db.insertClient('DCEL');
-        }
-        const hasDcelOffice = appData.sites.some(
-          (s: any) => s.name.toLowerCase().trim() === 'office' && s.client.toLowerCase().trim() === 'dcel'
-        );
-        if (!hasDcelOffice) {
-          const officeSite = { id: generateId(), name: 'Office', client: 'DCEL', status: 'Active' as const, vat: 'No' as const };
-          appData.sites.push(officeSite);
-          db.insertSite(officeSite);
+        // Auto-initialize standard client & site — only if not already in the fetched data.
+        // Check permissions first to avoid auto-inserting if arrays are empty due to lack of view permissions.
+        const isAdmin = userPrivs?.users?.canManage === true;
+        const canViewSites = isAdmin || (userPrivs && userPrivs.sites && userPrivs.sites.canView === true);
+
+        if (canViewSites) {
+          if (!appData.clients.some((c: string) => c.toLowerCase() === 'dcel')) {
+            appData.clients.push('DCEL');
+            db.insertClient('DCEL').catch(err => console.warn('Auto-insert DCEL client ignored:', err));
+          }
+          const hasDcelOffice = appData.sites.some(
+            (s: any) => s.name.toLowerCase().trim() === 'office' && s.client.toLowerCase().trim() === 'dcel'
+          );
+          if (!hasDcelOffice) {
+            const officeSite = { id: generateId(), name: 'Office', client: 'DCEL', status: 'Active' as const, vat: 'No' as const };
+            appData.sites.push(officeSite);
+            db.insertSite(officeSite).catch(err => console.warn('Auto-insert Office site ignored:', err));
+          }
         }
 
         // Get pendingSites from localStorage as a fallback
@@ -180,8 +190,16 @@ export function useDataLoader(isAuthenticated: boolean) {
         // ── Set currentUserId to the logged-in Supabase user ────────
         const currentSupabaseId = authUser?.id ?? useUserStore.getState().currentUserId;
 
+        let finalUsers = [...mergedUsers, ...localOnlyUsers];
+        if (currentUserProfile && !finalUsers.some((u) => u.id === currentUserProfile.id)) {
+          finalUsers.push({
+            ...currentUserProfile,
+            privileges: backfillPrivileges(NO_ACCESS, currentUserProfile.privileges ?? {})
+          });
+        }
+
         const userStatePayload = {
-          users: [...mergedUsers, ...localOnlyUsers],
+          users: finalUsers,
           presets: presets.length > 0 ? presets : useUserStore.getState().presets,
           superAdminCreated: appData.superAdminCreated,
           superAdminSignupEnabled: appData.superAdminSignupEnabled,

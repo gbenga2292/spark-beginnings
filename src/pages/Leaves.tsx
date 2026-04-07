@@ -756,7 +756,7 @@ export function Leaves() {
             <div className="bg-white dark:bg-slate-900 max-w-4xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  <Printer className="h-5 w-5 text-teal-600" /> Staff Annual Leave Application Form — Preview
+                  <Printer className="h-5 w-5 text-teal-600" /> Staff Leave Application Form — Preview
                 </h2>
                 <div className="flex gap-2">
                   <Button onClick={handlePrint} className="bg-teal-600 hover:bg-teal-700 text-white gap-2 h-9 text-sm">
@@ -773,14 +773,14 @@ export function Leaves() {
                 <div ref={printRef}>
 
                   {/* â•â•â•â•â•â•â•â•â•â• PAGE 1 â•â•â•â•â•â•â•â•â•â• */}
-                  <div className="a4-page bg-white shadow-lg mx-auto" style={{ width: 794, padding: '24px 32px', fontFamily: 'Arial, sans-serif', fontSize: 11, color: '#111' }}>
+                  <div className="a4-page bg-white shadow-lg mx-auto" style={{ width: 794, padding: '16px 24px', fontFamily: 'Arial, sans-serif', fontSize: 11, color: '#111' }}>
 
                     {/* Header */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <img src="/logo/logo-2.png" alt="logo" style={{ height: 52 }} />
                       <img src="/logo/logo-2.png" alt="logo" style={{ height: 52, opacity: 0 }} />
                     </div>
-                    <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 'bold', textTransform: 'uppercase', margin: '10px 0 20px', letterSpacing: '0.6px', borderBottom: '2px solid #111', paddingBottom: 6 }}>STAFF ANNUAL LEAVE APPLICATION FORM</div>
+                    <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 'bold', textTransform: 'uppercase', margin: '5px 0 10px', letterSpacing: '0.6px', borderBottom: '2px solid #111', paddingBottom: 6 }}>STAFF LEAVE APPLICATION FORM</div>
 
                     {/* 1. Employee Details */}
                     <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', marginBottom: 8, padding: '3px 6px', background: '#f0f0f0', borderLeft: '3px solid #333' }}>1. Employee Details</div>
