@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showMenu: (menuId, x, y) => ipcRenderer.send('show-menu', { id: menuId, x, y }),
 
   // Window custom controls
+  windowHideToTray: () => ipcRenderer.send('window-hide-to-tray'),
   windowMinimize: () => ipcRenderer.send('window-minimize'),
   windowMaximize: () => ipcRenderer.send('window-maximize'),
   windowClose: () => ipcRenderer.send('window-close'),

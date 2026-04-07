@@ -15,7 +15,7 @@ export function Dialog({ open, onOpenChange, onClose, title, children, className
   // If title is provided, act as the simple legacy Dialog
   if (title) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-30 flex items-center justify-center p-4">
         <div 
           className="absolute inset-0 bg-black/50 backdrop-blur-sm"
           onClick={() => handleClose?.(false)}
@@ -42,7 +42,7 @@ export function Dialog({ open, onOpenChange, onClose, title, children, className
 
   // Otherwise, act as the Root container for the component-based API
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-30 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => handleClose?.(false)} />
       {children}
     </div>

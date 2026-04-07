@@ -1,9 +1,10 @@
-const { app, BrowserWindow, Menu, dialog, shell, ipcMain, Notification } = require('electron');
+const { app, BrowserWindow, Menu, dialog, shell, ipcMain, Notification, Tray } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
 /* ─── Globals ──────────────────────────────────────────────────── */
 let mainWindow = null;
+let tray = null;
 const isDev = !app.isPackaged;
 
 /* ─── Auto‑Updater Setup ──────────────────────────────────────── */
@@ -279,6 +280,10 @@ function initIPC() {
     }
   });
 
+  ipcMain.on('window-hide-to-tray', () => {
+    if (mainWindow) mainWindow.hide();
+  });
+
   ipcMain.on('window-minimize', () => {
     if (mainWindow) mainWindow.minimize();
   });
@@ -366,6 +371,37 @@ function initIPC() {
   });
 }
 
+/* ─── Tray Setup ───────────────────────────────────────────────── */
+function initTray() {
+  const iconPath = path.join(__dirname, '..', 'logo', 'logo-2.png');
+  tray = new Tray(iconPath);
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Open DCEL Office Suite', click: () => {
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    } },
+    { type: 'separator' },
+    { label: 'Quit', click: () => {
+      app.isQuitting = true;
+      app.quit();
+    } }
+  ]);
+  tray.setToolTip('DCEL Office Suite');
+  tray.setContextMenu(contextMenu);
+
+  tray.on('click', () => {
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        mainWindow.focus();
+      } else {
+        mainWindow.show();
+      }
+    }
+  });
+}
+
 /* ─── Main Window ──────────────────────────────────────────────── */
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -407,6 +443,7 @@ function createWindow() {
 app.whenReady().then(() => {
   initIPC();
   createWindow();
+  initTray();
   initAutoUpdater();
 
   // macOS re-activate

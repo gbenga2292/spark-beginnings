@@ -17,6 +17,7 @@ interface ElectronAPI {
   getVersion: () => Promise<string>;
   checkForUpdates: () => void;
   showMenu: (menuId: string, x: number, y: number) => void;
+  windowHideToTray: () => void;
   windowMinimize: () => void;
   windowMaximize: () => void;
   windowClose: () => void;

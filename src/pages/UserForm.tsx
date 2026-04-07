@@ -4,11 +4,12 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import {
   ArrowLeft, Save, Eye, EyeOff, Shield, ChevronDown, ChevronRight,
-  CheckCircle2, X, BookmarkPlus,
+  CheckCircle2, X, BookmarkPlus, Trash2,
   LayoutDashboard, Users as UsersIcon, Building2, Landmark, Settings, Package, Library, History, ListTodo,
 } from 'lucide-react';
 import { useUserStore, AppUser, UserPrivileges, FULL_ACCESS, NO_ACCESS, PrivilegePreset } from '@/src/store/userStore';
 import { useAppStore } from '@/src/store/appStore';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { toast } from '@/src/components/ui/toast';
 import { supabase } from '@/src/integrations/supabase/client';
 import { generateId } from '@/src/lib/utils';
@@ -197,7 +198,7 @@ export function UserForm() {
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
 
-  const { users, presets, addUser, updateUser, addPreset, getCurrentUser } = useUserStore();
+  const { users, presets, addUser, updateUser, addPreset, deletePreset, getCurrentUser } = useUserStore();
   const { employees } = useAppStore();
   const editingUser = isEdit ? users.find((u) => u.id === id) ?? null : null;
 
@@ -339,6 +340,18 @@ export function UserForm() {
     }
   };
 
+  // Set page title and header buttons
+  useSetPageTitle(
+    isEdit ? 'Edit User' : 'Create User',
+    isEdit ? `Modifying ${editingUser?.name || 'user details'}` : 'Assign system permissions',
+    <div className="flex items-center gap-2">
+      <Button variant="outline" onClick={() => navigate('/users')} className="h-8 text-xs">Cancel</Button>
+      <Button disabled={isSaving} onClick={handleSave} className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 shadow-sm">
+        <Save className="h-3 w-3" /> {isEdit ? 'Save Changes' : (isSaving ? 'Creating...' : 'Create User')}
+      </Button>
+    </div>
+  );
+
   const handleSavePreset = () => {
     if (!presetName.trim()) return;
     addPreset({ id: generateId(), name: presetName.trim(), privileges: JSON.parse(JSON.stringify(privileges)) });
@@ -346,21 +359,7 @@ export function UserForm() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-8">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => navigate('/users')} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold text-slate-900">{isEdit ? `Edit User - ${editingUser?.name}` : 'Create New User'}</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{isEdit ? 'Modify user details and permissions' : 'Fill in details and assign permissions'}</p>
-        </div>
-        <Button variant="outline" onClick={() => navigate('/users')} className="h-9 text-sm">Cancel</Button>
-        <Button disabled={isSaving} onClick={handleSave} className="h-9 text-sm bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5">
-          <Save className="h-3.5 w-3.5" /> {isEdit ? 'Save Changes' : (isSaving ? 'Creating...' : 'Create User')}
-        </Button>
-      </div>
+    <div className="max-w-4xl mx-auto pb-8 pt-2">
 
       {/* User Details Card */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-6">
@@ -445,10 +444,20 @@ export function UserForm() {
         </div>
         <div className="flex flex-wrap gap-1.5">
           {presets.map((p) => (
-            <button key={p.id} onClick={() => setPrivileges(JSON.parse(JSON.stringify(p.privileges)))}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-300 transition-all shadow-sm">
-              {p.name}
-            </button>
+            <div key={p.id} className="group relative flex items-center">
+              <button onClick={() => setPrivileges(JSON.parse(JSON.stringify(p.privileges)))}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-300 transition-all shadow-sm">
+                {p.name}
+              </button>
+              {!p.id.startsWith('preset-') && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); deletePreset(p.id); toast.success('Preset deleted'); }}
+                  className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-red-100 text-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white shadow-sm"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              )}
+            </div>
           ))}
         </div>
         {showPresetSave && (

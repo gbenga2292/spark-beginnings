@@ -31,7 +31,7 @@ import {
 } from "@/src/components/task_ui/popover";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
-import { parseISO, isSunday } from 'date-fns';
+import { parseISO, isSunday, isWithinInterval } from 'date-fns';
 import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
 
 
@@ -44,6 +44,7 @@ export function Attendance() {
   const addAttendanceRecords = useAppStore((state) => state.addAttendanceRecords);
   const removeAttendanceRecordsByDate = useAppStore((state) => state.removeAttendanceRecordsByDate);
   const deleteAttendanceRecords = useAppStore((state) => state.deleteAttendanceRecords);
+  const leaves = useAppStore((state) => state.leaves);
 
   const publicHolidaysStore = useAppStore((state) => state.publicHolidays);
   const monthValues = useAppStore((state) => state.monthValues);
@@ -182,6 +183,24 @@ export function Attendance() {
     "Absent with Permit",
     "On Leave"
   ];
+
+  const employeesOnLeaveForRegisterDate = useMemo(() => {
+    const regDateObj = parseISO(registerDate);
+    const set = new Set<string>();
+    leaves.forEach(leave => {
+      if (leave.status === 'Cancelled') return;
+      if (!leave.startDate || !leave.expectedEndDate) return;
+      try {
+        if (isWithinInterval(regDateObj, {
+          start: parseISO(leave.startDate),
+          end: parseISO(leave.expectedEndDate),
+        })) {
+          set.add(leave.employeeId);
+        }
+      } catch (e) {}
+    });
+    return set;
+  }, [leaves, registerDate]);
 
   const activeSitesForDate = useMemo(() => {
     return sites.filter(s => {
@@ -770,8 +789,9 @@ export function Attendance() {
     const rawRecords: RawRecord[] = [];
 
     employees.forEach(emp => {
-      const formDaySite = attendanceData[emp.id]?.day || '';
-      const formNightSite = attendanceData[emp.id]?.night || '';
+      const onLeave = employeesOnLeaveForRegisterDate.has(emp.id);
+      const formDaySite = onLeave ? 'On Leave' : (attendanceData[emp.id]?.day || '');
+      const formNightSite = onLeave ? 'On Leave' : (attendanceData[emp.id]?.night || '');
 
       let staffHasWorkEntry = false;
       if (formDaySite && !isAbsentStatus(formDaySite)) staffHasWorkEntry = true;
@@ -1122,8 +1142,9 @@ export function Attendance() {
                     </tr>
                   ) : (
                     filteredEmployees.map((employee, idx) => {
-                      const dayVal = attendanceData[employee.id]?.day || '';
-                      const nightVal = attendanceData[employee.id]?.night || '';
+                      const onLeave = employeesOnLeaveForRegisterDate.has(employee.id);
+                      const dayVal = onLeave ? 'On Leave' : (attendanceData[employee.id]?.day || '');
+                      const nightVal = onLeave ? 'On Leave' : (attendanceData[employee.id]?.night || '');
                       const hasEntry = dayVal || nightVal;
                       const isAbsent = dayVal && isAbsentStatus(dayVal);
 
@@ -1149,7 +1170,9 @@ export function Attendance() {
                           </td>
                           <td className="py-1 px-2 border-l border-slate-100 dark:border-slate-700">
                             <select
-                              className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${dayVal && !isAbsentStatus(dayVal)
+                              className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all ${
+                                onLeave ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
+                              } ${dayVal && !isAbsentStatus(dayVal)
                                 ? 'border-emerald-300 bg-emerald-50 text-emerald-800 font-medium'
                                 : dayVal && isAbsentStatus(dayVal)
                                   ? 'border-red-300 bg-red-50 text-red-700 font-medium'
@@ -1157,6 +1180,7 @@ export function Attendance() {
                                 } focus:ring-1 focus:ring-slate-400`}
                               value={dayVal}
                               onChange={(e) => handleSelectChange(employee.id, 'day', e.target.value)}
+                              disabled={onLeave}
                             >
                               <option value="">&mdash; Select &mdash;</option>
                               <optgroup label="Sites">
@@ -1172,7 +1196,9 @@ export function Attendance() {
                           {isFieldStaff ? (
                             <td className="py-1 px-2 border-l border-slate-100 dark:border-slate-700">
                               <select
-                                className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all cursor-pointer ${nightVal && !isAbsentStatus(nightVal)
+                                className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all ${
+                                  onLeave ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
+                                } ${nightVal && !isAbsentStatus(nightVal)
                                   ? 'border-indigo-300 bg-indigo-50 text-indigo-800 font-medium'
                                   : nightVal && isAbsentStatus(nightVal)
                                     ? 'border-red-300 bg-red-50 text-red-700 font-medium'
@@ -1180,6 +1206,7 @@ export function Attendance() {
                                   } focus:ring-1 focus:ring-slate-400`}
                                 value={nightVal}
                                 onChange={(e) => handleSelectChange(employee.id, 'night', e.target.value)}
+                                disabled={onLeave}
                               >
                                 <option value="">&mdash; Select &mdash;</option>
                                 <optgroup label="Sites">
@@ -1201,15 +1228,16 @@ export function Attendance() {
                                   const wd = payrollVariables.departmentWorkDays?.[employee.department] ?? defaultDays;
                                   const isWorkday = (dow <= wd) && !isHoliday(registerDate);
 
+                                  const disabledOt = isWorkday || onLeave;
                                   return (
                                     <>
-                                      <label className={`flex items-center gap-1 ${isWorkday ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} title={isWorkday ? "Overtime disabled on regular workdays" : ""}>
+                                      <label className={`flex items-center gap-1 ${disabledOt ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} title={isWorkday ? "Overtime disabled on regular workdays" : (onLeave ? "On leave" : "")}>
                                         <input
                                           type="checkbox"
                                           className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                                          checked={!isWorkday && (attendanceData[employee.id]?.overtime || false)}
+                                          checked={!disabledOt && (attendanceData[employee.id]?.overtime || false)}
                                           onChange={(e) => handleOvertimeToggle(employee.id, e.target.checked)}
-                                          disabled={isWorkday}
+                                          disabled={disabledOt}
                                         />
                                         <span className="text-xs text-slate-600 font-medium">Overtime</span>
                                       </label>

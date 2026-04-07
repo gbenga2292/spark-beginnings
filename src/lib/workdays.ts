@@ -40,9 +40,52 @@ export function computeWorkDays(
     return count;
 }
 
-/** Month key → 1-indexed month number */
 export const MONTH_INDEX: Record<string, number> = {
     jan: 1, feb: 2, mar: 3, apr: 4,
     may: 5, jun: 6, jul: 7, aug: 8,
     sep: 9, oct: 10, nov: 11, dec: 12,
 };
+
+/**
+ * Calculates the end date after adding a certain number of working days to a start date.
+ * Skips Sundays, and potentially Saturdays depending on workDaysPerWeek.
+ * Also skips public holidays.
+ *
+ * @param startDate "YYYY-MM-DD" or ISO string
+ * @param duration Number of working days (leave days)
+ * @param publicHolidayDates Array of "YYYY-MM-DD" strings that are public holidays
+ * @param workDaysPerWeek Number of work days per week
+ * @returns "YYYY-MM-DD" of the expected end date
+ */
+export function addWorkDays(
+    startDate: string | Date,
+    duration: number,
+    publicHolidayDates: string[],
+    workDaysPerWeek: number = 6
+): string {
+    if (!startDate || !duration || duration < 1) return '';
+
+    const holidaySet = new Set(publicHolidayDates);
+    const date = new Date(startDate);
+    
+    let daysAdded = 0;
+    while (daysAdded < duration) {
+        // If duration is 1, it means 1 full day of leave.
+        // We usually add the days one by one.
+        date.setDate(date.getDate() + 1);
+
+        const dow = date.getDay(); // 0 = Sun, 1 = Mon … 6 = Sat
+        if (dow === 0) continue; // Sunday
+        if (workDaysPerWeek < 6 && dow === 6) continue; // Saturday off
+        if (workDaysPerWeek < 7 && dow === 0) continue; // Sunday off (redundant)
+        if (dow > workDaysPerWeek) continue; // safety fallback
+
+        const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        if (holidaySet.has(iso)) continue;
+
+        daysAdded++;
+    }
+
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+

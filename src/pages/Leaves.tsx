@@ -15,12 +15,9 @@ import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { addWorkDays } from '@/src/lib/workdays';
 
 /* ─────────────────────────────────── helpers ─── */
-function calcExpectedEnd(startDate: string, duration: number): string {
-  if (!startDate || !duration || duration < 1) return '';
-  return format(addDays(parseISO(startDate), duration), 'yyyy-MM-dd');
-}
 
 function isOnLeave(leave: LeaveRecord, date: Date): boolean {
   if (leave.status === 'Cancelled') return false;
@@ -39,11 +36,11 @@ export function Leaves() {
   const { users, createMainTask, addSubtask } = useAppData();
   const {
     employees, leaves, addLeave, updateLeave, deleteLeave,
-    leaveTypes, updateEmployee, departments,
+    leaveTypes, updateEmployee, departments, publicHolidays
   } = useAppStore();
 
-  // Approver options — all active system users except current user
-  const approverOptions = users.filter((u: any) => u.id !== currentUser?.id && !u.isDeleted);
+  // Approver options — all active system users
+  const approverOptions = users.filter((u: any) => !u.isDeleted);
 
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('leaves');
@@ -87,10 +84,11 @@ export function Leaves() {
   /* ── file upload preview ── */
   const [filePreviewLeave, setFilePreviewLeave] = useState<LeaveRecord | null>(null);
 
-  const expectedEndDate = useMemo(
-    () => calcExpectedEnd(startDate, parseInt(duration) || 0),
-    [startDate, duration]
-  );
+  const expectedEndDate = useMemo(() => {
+    const holidayDates = (publicHolidays || []).map((h: any) => h.date);
+    // Use 5 days per week to exclude Sat/Sun, as well as public holidays.
+    return addWorkDays(startDate, parseInt(duration) || 0, holidayDates, 5);
+  }, [startDate, duration, publicHolidays]);
 
   /* ── derived data ── */
   const filteredLeaves = useMemo(() => {

@@ -187,8 +187,20 @@ export function TitleBar() {
             </button>
           )}
           <button
+            onClick={() => getElectronAPI()?.windowHideToTray?.()}
+            className={`h-full w-11 flex justify-center items-center transition-colors hover:bg-slate-500/20 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}
+            title="Minimize to Tray"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 14v4a2 2 0 0 0 2 2h4"/>
+              <path d="M16 4l-8 8"/>
+              <path d="M14 12h-6v-6"/>
+            </svg>
+          </button>
+          <button
             onClick={() => getElectronAPI()?.windowMinimize()}
             className={`h-full w-11 flex justify-center items-center transition-colors hover:bg-slate-500/20 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}
+            title="Minimize"
           >
             <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0" y="5" width="10" height="1" fill="currentColor"/></svg>
           </button>

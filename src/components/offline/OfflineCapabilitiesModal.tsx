@@ -12,7 +12,7 @@ export function OfflineCapabilitiesModal({ open, onOpenChange }: Props) {
   const status = useNetworkStore((s) => s.connectionStatus);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} className="z-30">
       <DialogContent className="max-w-2xl bg-slate-50 dark:bg-slate-900 border-none p-0 overflow-hidden shadow-2xl">
         <div className="absolute top-4 right-4 z-10">
           <DialogClose onClick={() => onOpenChange(false)} className="bg-white/10 hover:bg-white/20 text-slate-500 dark:text-slate-400" />
