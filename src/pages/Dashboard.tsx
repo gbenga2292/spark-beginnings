@@ -91,7 +91,7 @@ export function Dashboard() {
             if (e.staffType === 'NON-EMPLOYEE') return false; 
             return true;
         });
-        const onLeave = employees.filter(e => e.status === 'On Leave');
+
         const monthsToProcess = filterMonth ? [filterMonth] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
         // Absent count & OT count for filtered period
@@ -163,8 +163,29 @@ export function Dashboard() {
         // Unpaid invoices count
         const unpaidInvoices = invoices.filter(inv => inv.status !== 'Paid').length;
 
-        // Pending leave requests (leaves without a return date are considered pending)
-        const pendingLeaves = leaves.filter(l => !l.dateReturned || l.dateReturned === '').length;
+        // --- Leave logic ---
+        const todayMidnight = new Date();
+        todayMidnight.setHours(0, 0, 0, 0);
+
+        // "On Leave Now": leave has started on/before today, not yet past expectedEndDate, and employee hasn't returned
+        const currentlyOnLeave = leaves.filter(l => {
+            if (l.status === 'Cancelled') return false;
+            if (l.dateReturned && l.dateReturned !== '') return false;
+            const start = new Date(l.startDate);
+            const end = new Date(l.expectedEndDate);
+            start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
+            return start <= todayMidnight && end >= todayMidnight;
+        }).length;
+
+        // "Pending Leaves": not yet started (future) AND no dateReturned — excludes anyone currently mid-leave
+        const pendingLeaves = leaves.filter(l => {
+            if (l.status === 'Cancelled') return false;
+            if (l.dateReturned && l.dateReturned !== '') return false;
+            const start = new Date(l.startDate);
+            start.setHours(0, 0, 0, 0);
+            return start > todayMidnight;
+        }).length;
 
         // Pending salary advance requests
         const pendingAdvances = salaryAdvances.filter(a => a.status === 'Pending').length;
@@ -177,7 +198,7 @@ export function Dashboard() {
 
         return {
             totalActive: historicallyActiveStaff.length,
-            totalOnLeave: onLeave.length,
+            totalOnLeave: currentlyOnLeave,
             totalAbsentDays,
             totalOTInstances,
             totalPresentDays,

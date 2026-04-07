@@ -195,7 +195,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
 
   const getVisibleItems = (items: NavItem[]) => {
     return items.filter((item) => {
-      if (!currentUser) return true;
+      if (!currentUser) return false;
       if (item.visible) return item.visible(currentUser);
       if (item.privKey === 'custom') return false;
       

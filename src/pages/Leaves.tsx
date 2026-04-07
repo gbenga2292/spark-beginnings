@@ -50,12 +50,11 @@ export function Leaves() {
     [employees]
   );
 
-  // Internal staff only (no Adhoc) – used for Staff, Supervisor, Management dropdowns and Leave Summary
+  // All permanent/regular staff (no Adhoc, no Non-Employee) – used for Staff dropdowns and Leave Summary
   const internalEmployees = useMemo(() => {
-    const internalDeptNames = departments.filter(d => d.staffType === 'OFFICE').map(d => d.name);
-    const filtered = activeEmployees.filter(e => e.position !== 'Adhoc Staff' && internalDeptNames.includes(e.department));
+    const filtered = activeEmployees.filter(e => e.position !== 'Adhoc Staff' && e.staffType !== 'NON-EMPLOYEE');
     return filterAndSortEmployeesExcludingCEO(filtered);
-  }, [activeEmployees, departments]);
+  }, [activeEmployees]);
 
   /* ── filter state ── */
   const [searchQuery, setSearchQuery] = useState('');
@@ -86,9 +85,11 @@ export function Leaves() {
 
   const expectedEndDate = useMemo(() => {
     const holidayDates = (publicHolidays || []).map((h: any) => h.date);
-    // Use 5 days per week to exclude Sat/Sun, as well as public holidays.
-    return addWorkDays(startDate, parseInt(duration) || 0, holidayDates, 5);
-  }, [startDate, duration, publicHolidays]);
+    const selectedEmp = activeEmployees.find(e => e.id === staffId);
+    const selectedDept = departments.find(d => d.name === selectedEmp?.department);
+    const workDays = selectedDept?.workDaysPerWeek || 5;
+    return addWorkDays(startDate, parseInt(duration) || 0, holidayDates, workDays);
+  }, [startDate, duration, publicHolidays, staffId, activeEmployees, departments]);
 
   /* ── derived data ── */
   const filteredLeaves = useMemo(() => {
@@ -315,8 +316,8 @@ export function Leaves() {
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: Arial, sans-serif; font-size: 11px; color: #111; background: white; }
-        .a4-page { width: 210mm; min-height: 297mm; padding: 20mm 18mm; page-break-after: always; }
-        .a4-page:last-child { page-break-after: auto; }
+        .a4-page { width: 210mm; padding: 20mm 18mm; break-after: page; }
+        .a4-page:last-of-type { break-after: auto; }
         .logo-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
         .logo-header img { height: 52px; }
         .form-title { text-align: center; font-size: 14px; font-weight: bold; text-transform: uppercase; margin: 12px 0 20px; letter-spacing: 0.6px; border-bottom: 2px solid #111; padding-bottom: 6px; }
@@ -338,9 +339,9 @@ export function Leaves() {
         .hr-title { font-size: 10px; font-weight: bold; margin-bottom: 8px; }
         .ack-text { font-size: 10px; line-height: 1.7; margin-bottom: 8px; }
         @media print {
-          body { -webkit-print-color-adjust: exact; }
-          .a4-page { page-break-after: always; }
-          .a4-page:last-child { page-break-after: auto; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .a4-page { break-after: page; }
+          .a4-page:last-of-type { break-after: auto; }
         }
       </style></head><body>
       ${content.innerHTML}
@@ -772,7 +773,7 @@ export function Leaves() {
                 <div ref={printRef}>
 
                   {/* â•â•â•â•â•â•â•â•â•â• PAGE 1 â•â•â•â•â•â•â•â•â•â• */}
-                  <div className="a4-page bg-white shadow-lg mx-auto" style={{ width: 794, minHeight: 1123, padding: '40px 48px', fontFamily: 'Arial, sans-serif', fontSize: 11, color: '#111' }}>
+                  <div className="a4-page bg-white shadow-lg mx-auto" style={{ width: 794, padding: '24px 32px', fontFamily: 'Arial, sans-serif', fontSize: 11, color: '#111' }}>
 
                     {/* Header */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -814,7 +815,7 @@ export function Leaves() {
                     </div>
 
                     <div style={{ fontSize: 10, marginBottom: 4 }}>Reason For Leave:</div>
-                    <div contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ border: '1px solid #111', minHeight: 56, padding: 4, fontSize: 10, marginBottom: 12 }}>{lv.reason}</div>
+                    <div contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ border: '1px solid #111', minHeight: 40, padding: 4, fontSize: 10, marginBottom: 12 }}>{lv.reason}</div>
 
                     {[['Leave Start Date', lv.startDate ? format(parseISO(lv.startDate), 'dd/MM/yyyy') : ''], ['Leave End Date', lv.expectedEndDate ? format(parseISO(lv.expectedEndDate), 'dd/MM/yyyy') : ''], ['Date Returning to Work', lv.dateReturned ? format(parseISO(lv.dateReturned), 'dd/MM/yyyy') : '']].map(([label, val]) => (
                       <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 11 }}>
@@ -848,7 +849,7 @@ export function Leaves() {
                   </div>
 
                   {/* â•â•â•â•â•â•â•â•â•â• PAGE 2 â•â•â•â•â•â•â•â•â•â• */}
-                  <div className="a4-page bg-white shadow-lg mx-auto" style={{ width: 794, minHeight: 1123, padding: '40px 48px', fontFamily: 'Arial, sans-serif', fontSize: 11, color: '#111' }}>
+                  <div className="a4-page bg-white shadow-lg mx-auto" style={{ width: 794, padding: '24px 32px', fontFamily: 'Arial, sans-serif', fontSize: 11, color: '#111' }}>
 
                     {/* Header */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -868,7 +869,7 @@ export function Leaves() {
                     </div>
 
                     {(["Supervisor's", "Management's"] as const).map(who => (
-                      <div key={who} style={{ marginBottom: 16, padding: '10px 12px', border: '1px solid #ddd', borderRadius: 4 }}>
+                      <div key={who} style={{ marginBottom: 12, padding: '10px 12px', border: '1px solid #ddd', borderRadius: 4 }}>
                         <div style={{ display: 'flex', gap: 8, fontSize: 10, marginBottom: 8 }}>
                           <span style={{ flexShrink: 0 }}>{who} Approval:</span>
                           <span>Approved</span>
@@ -886,7 +887,7 @@ export function Leaves() {
                     ))}
 
                     {/* HR Section */}
-                    <div style={{ borderTop: '1px solid #555', margin: '24px 0 12px' }} />
+                    <div style={{ borderTop: '1px solid #555', margin: '16px 0 8px' }} />
                     <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 10 }}>To be Completed by Human Resources</div>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 11, fontSize: 10 }}>
                       <span style={{ flexShrink: 0 }}>Leave approved from:</span>
@@ -902,7 +903,7 @@ export function Leaves() {
                     ))}
 
                     {/* Leave Acknowledgement */}
-                    <div style={{ borderTop: '1px solid #555', margin: '24px 0 12px' }} />
+                    <div style={{ borderTop: '1px solid #555', margin: '16px 0 8px' }} />
                     <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 10 }}>Leave Acknowledgement:</div>
                     <div style={{ fontSize: 10, lineHeight: 1.7, marginBottom: 10 }}>
                       I <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', display: 'inline-block', minWidth: 120, marginBottom: -2 }}>&nbsp;</span> hereby notify the Human Resources and Administrative department that I have resumed duty as of:

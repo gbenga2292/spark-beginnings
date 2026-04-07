@@ -685,7 +685,7 @@ export function Onboarding() {
       {/* Stats */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {[
-          { label: 'Total Employed', value: employees.length, icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: 'Total Employed', value: employees.filter(e => e.staffType === 'FIELD' || e.staffType === 'OFFICE').length, icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
           { label: 'Active Staff', value: activeEmployees.length, icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'Pending Hires', value: pendingEmployees.length, icon: CalendarDays, color: 'text-amber-600', bg: 'bg-amber-50' },
           { label: 'Terminated', value: terminatedEmployees.length, icon: UserMinus, color: 'text-rose-600', bg: 'bg-rose-50' },

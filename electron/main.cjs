@@ -78,13 +78,9 @@ function can(page, field) {
 function buildMenus() {
   /* ── FILE ──────────────────────────────────────────────────── */
   const fileActions = [
-    can('billing',   'canCreate') && {
-      label: '⊕  New Invoice',
-      click: () => mainWindow?.webContents.send('navigate', '/invoices'),
-    },
-    can('employees', 'canAdd') && {
-      label: '⊕  New Employee',
-      click: () => mainWindow?.webContents.send('navigate', '/employees'),
+    can('ledger',   'canAdd') && {
+      label: '⊕  New Voucher',
+      click: () => mainWindow?.webContents.send('navigate', '/ledger'),
     },
     can('leaves',    'canAdd') && {
       label: '⊕  New Leave Request',
