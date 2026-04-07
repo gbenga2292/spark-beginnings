@@ -749,8 +749,8 @@ export function Ledger() {
     );
   }
 
-  const tdClass = "p-1.5 border border-slate-200 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:bg-indigo-50/20 transition-all";
-  const inputClass = "w-full h-8 px-2 text-sm bg-transparent outline-none disabled:opacity-50 disabled:cursor-not-allowed font-medium text-slate-700";
+  const tdClass = "p-0 text-xs border border-slate-200 focus-within:ring-1 focus-within:ring-indigo-500 focus-within:border-indigo-500 focus-within:bg-indigo-50/10 transition-all relative";
+  const inputClass = "w-full h-9 px-3 text-xs bg-transparent outline-none disabled:opacity-50 disabled:cursor-not-allowed font-medium text-slate-700";
   
   return (
     <div className="flex flex-col gap-6">
@@ -825,10 +825,10 @@ export function Ledger() {
                       <input type="date" className={inputClass} value={item.transactionDate} onChange={e => setItemField(idx, 'transactionDate', e.target.value)} />
                     </td>
                     <td className={tdClass}>
-                      <div className="flex items-center w-full">
+                      <div className="flex items-center w-full h-9">
                         <input
                           type="text"
-                          className={inputClass + ' flex-1 min-w-0'}
+                          className={inputClass + ' flex-1 min-w-0 pr-1'}
                           value={item.description}
                           onChange={e => setItemField(idx, 'description', e.target.value)}
                           placeholder="Description..."
@@ -837,7 +837,7 @@ export function Ledger() {
                         <button
                           type="button"
                           onClick={() => setDescDialog({ idx, value: item.description })}
-                          className="shrink-0 px-1.5 text-slate-300 hover:text-indigo-500 transition-colors"
+                          className="shrink-0 px-2 text-slate-300 hover:text-indigo-500 transition-colors bg-transparent border-none outline-none"
                           title="View full description"
                         >
                           <BookOpen className="h-3.5 w-3.5" />
@@ -851,11 +851,11 @@ export function Ledger() {
                       </select>
                     </td>
                     <td className={tdClass}>
-                      <div className="flex items-center px-2 relative group-focus-within:text-indigo-600">
-                        <span className="text-slate-400 absolute left-2 text-xs">₦</span>
+                      <div className="flex items-center relative h-9 group-focus-within:text-indigo-600">
+                        <span className="text-slate-400 absolute left-3 text-xs pointer-events-none">₦</span>
                         <input 
                           type="text" 
-                          className={`w-full h-8 pl-4 pr-1 text-sm bg-transparent outline-none font-medium`} 
+                          className={`w-full h-9 pl-7 pr-3 text-xs bg-transparent outline-none font-medium`} 
                           value={
                             item.amount 
                               ? item.amount.split('.').length > 1

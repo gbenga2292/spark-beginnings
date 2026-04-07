@@ -59,7 +59,7 @@ export function Reports() {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [summaryYear, setSummaryYear] = useState<number>(currentYear);
-  const [siteChartView, setSiteChartView] = useState<'table' | 'gantt'>('table');
+  const [siteChartView, setSiteChartView] = useState<'table' | 'gantt'>('gantt');
   const [summaryChartView, setSummaryChartView] = useState<'table' | 'heatmap' | 'bar'>('table');
 
   const [meritFilter, setMeritFilter] = useState<'All Time' | 'Year' | 'Month'>('All Time');
