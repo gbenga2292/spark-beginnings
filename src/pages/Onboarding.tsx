@@ -460,6 +460,51 @@ export function Onboarding() {
       lashmaExpiryDate: cl.lashmaExpiryDate || selectedEmployee.lashmaExpiryDate,
       onboardingChecklist: cl,
     });
+
+    // ── Generate Auto Task for Unverified Items ──
+    try {
+      const subtasksToCreate: any[] = [];
+      
+      if (!cl.addressVerification) {
+        subtasksToCreate.push({ title: 'Verify Address', assignedTo: user?.id, priority: 'High' });
+      }
+      if (!cl.accountDetailsVerified) {
+        subtasksToCreate.push({ title: 'Verify Bank Account Details', assignedTo: user?.id, priority: 'High' });
+      }
+      if (!cl.pensionVerified) {
+        subtasksToCreate.push({ title: 'Verify Pension Information', assignedTo: user?.id, priority: 'Medium' });
+      }
+      if (!cl.payeVerified) {
+        subtasksToCreate.push({ title: 'Verify PAYE Information', assignedTo: user?.id, priority: 'Medium' });
+      }
+      if (!cl.lashmaVerified) {
+        subtasksToCreate.push({ title: 'Verify LASHMA Policy', assignedTo: user?.id, priority: 'Medium' });
+      }
+      cl.guarantors.forEach((g, i) => {
+        if (!g.verified) {
+          subtasksToCreate.push({ title: `Verify Guarantor ${i + 1}${g.name ? ': ' + g.name : ''}`, assignedTo: user?.id, priority: 'High' });
+        }
+      });
+
+      if (subtasksToCreate.length > 0) {
+        const d = new Date(startDate);
+        const day = d.getDay(); // 0(Sun) to 6(Sat)
+        const diff = day === 0 ? 5 : 5 - day;
+        d.setDate(d.getDate() + diff);
+        const dueFriday = d.toISOString();
+
+        await createMainTask({
+          title: `Post-Onboarding Verification: ${selectedEmployee.firstname} ${selectedEmployee.surname}`,
+          description: `Verification tasks pending for ${selectedEmployee.firstname} ${selectedEmployee.surname} after activation.`,
+          deadline: dueFriday,
+          assignedTo: user?.id,
+          priority: 'High',
+        }, subtasksToCreate);
+      }
+    } catch (err) {
+      console.error("Failed to generate post-onboarding tasks", err);
+    }
+
     toast.success(`${selectedEmployee.firstname} ${selectedEmployee.surname} is now ACTIVE! ðŸŽ‰`);
   };
 

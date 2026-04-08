@@ -817,6 +817,9 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
             const createdAt = c.createdAt || c.created_at || new Date().toISOString();
             const author = users.find((u: any) => u.id === authorId);
             const isAuthor = authorId === currentUser?.id;
+            const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'co-admin';
+            const isPast24Hours = (new Date().getTime() - new Date(createdAt).getTime()) > 24 * 60 * 60 * 1000;
+            const canEdit = isAdmin || (isAuthor && !isPast24Hours);
             const renderText = (t: string) => {
               return t.split(/(@\w+|#\S+)/g).map((part: string, i: number) => {
                 if (part.startsWith('@')) return <span key={i} className="font-semibold text-primary bg-primary/10 px-1 rounded">{part}</span>;
@@ -863,7 +866,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
                   <div className="flex items-center gap-1">
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
                       <button onClick={() => setReplyingTo(c)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors" title="Reply"><Reply className="w-3 h-3" /></button>
-                      {isAuthor && <button onClick={() => { setEditingId(c.id); setEditTextContent(c.text); }} className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors" title="Edit"><Pencil className="w-3 h-3" /></button>}
+                      {canEdit && <button onClick={() => { setEditingId(c.id); setEditTextContent(c.text); }} className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors" title="Edit"><Pencil className="w-3 h-3" /></button>}
                     </div>
                     <span className="text-[10px] text-slate-400 flex-shrink-0">
                       {format(new Date(createdAt), "h:mm a")}
@@ -880,7 +883,16 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
                     />
                     <div className="flex gap-1.5 mt-1 justify-end">
                       <button onClick={() => setEditingId(null)} className="text-[10px] font-semibold text-slate-500 hover:bg-slate-100 px-2.5 py-1 rounded-md transition-colors">Cancel</button>
-                      <button onClick={() => { updateComment(c.id, editTextContent); setEditingId(null); }} className="text-[10px] font-bold bg-primary text-white px-3 py-1 rounded-md hover:bg-primary/90 transition-colors shadow-sm">Save</button>
+                      <button onClick={() => { 
+                        if (c.text !== editTextContent) {
+                          if (!isAuthor || isPast24Hours) {
+                            const mainTaskId = (subtask as any).main_task_id || subtask.mainTaskId;
+                            postComment(c.subtask_id || c.subtaskId || subtask.id, mainTaskId, currentUser.id, `⚙️ **Admin Edit Log:** Update by @${author?.name?.split(' ')[0] || 'user'} was edited.\n\n**Original:**\n${c.text}\n\n**New:**\n${editTextContent}`);
+                          }
+                          updateComment(c.id, editTextContent); 
+                        }
+                        setEditingId(null); 
+                      }} className="text-[10px] font-bold bg-primary text-white px-3 py-1 rounded-md hover:bg-primary/90 transition-colors shadow-sm">Save</button>
                     </div>
                   </div>
                 ) : (
