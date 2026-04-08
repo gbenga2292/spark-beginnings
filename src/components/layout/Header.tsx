@@ -94,6 +94,8 @@ function useNotifications() {
       const remDate = new Date(r.remindAt);
       const isPast = remDate < now;
       
+      const isNewTask = r.title === 'New Task Created';
+      
       if (isMention) {
           notifs.push({
             id: `rem-${r.id}`,
@@ -103,6 +105,16 @@ function useNotifications() {
             color: 'text-indigo-500',
             url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
             priority: 1
+          });
+      } else if (isNewTask) {
+          notifs.push({
+            id: `rem-${r.id}`,
+            icon: FileText,
+            text: `New Task: ${r.body || 'Task'}`,
+            time: r.createdAt ? r.createdAt.slice(0, 10) : 'New',
+            color: 'text-emerald-500',
+            url: r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
+            priority: 2
           });
       } else {
           notifs.push({ 

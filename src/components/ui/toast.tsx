@@ -18,10 +18,16 @@ import { CheckCircle, XCircle, Info, AlertTriangle, X } from 'lucide-react';
 // ── Types ─────────────────────────────────────────────────────────────────
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
+interface ToastAction {
+    label: string;
+    onClick: () => void;
+}
+
 interface Toast {
     id: string;
     type: ToastType;
-    message: string;
+    message: string | React.ReactNode;
+    action?: ToastAction;
 }
 
 // ── Global event bus (no context needed) ──────────────────────────────────
@@ -38,10 +44,10 @@ function makeId() {
 
 // ── Public API ─────────────────────────────────────────────────────────────
 export const toast = {
-    success: (message: string) => emit({ id: makeId(), type: 'success', message }),
-    error: (message: string) => emit({ id: makeId(), type: 'error', message }),
-    info: (message: string) => emit({ id: makeId(), type: 'info', message }),
-    warning: (message: string) => emit({ id: makeId(), type: 'warning', message }),
+    success: (message: string | React.ReactNode, action?: ToastAction) => emit({ id: makeId(), type: 'success', message, action }),
+    error: (message: string | React.ReactNode, action?: ToastAction) => emit({ id: makeId(), type: 'error', message, action }),
+    info: (message: string | React.ReactNode, action?: ToastAction) => emit({ id: makeId(), type: 'info', message, action }),
+    warning: (message: string | React.ReactNode, action?: ToastAction) => emit({ id: makeId(), type: 'warning', message, action }),
 };
 
 // useToast hook – returns the same toast object for convenience
@@ -80,7 +86,17 @@ function ToastItem({ t, onDismiss }: { t: Toast; onDismiss: (id: string) => void
             style={{ animation: 'slideInRight 0.25s ease-out' }}
         >
             {ICONS[t.type]}
-            <p className="text-sm text-slate-800 flex-1 leading-snug">{t.message}</p>
+            <div className="flex-1 min-w-0">
+                <div className="text-sm text-slate-800 leading-snug">{t.message}</div>
+                {t.action && (
+                    <button 
+                        onClick={() => { t.action!.onClick(); onDismiss(t.id); }}
+                        className="mt-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                    >
+                        {t.action.label}
+                    </button>
+                )}
+            </div>
             <button
                 onClick={() => onDismiss(t.id)}
                 className="text-slate-400 hover:text-slate-600 ml-1 mt-0.5 shrink-0"

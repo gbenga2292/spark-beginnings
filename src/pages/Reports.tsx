@@ -28,8 +28,15 @@ const getBase64ImageFromUrl = async (imageUrl: string) => {
 
 export function Reports() {
   const priv = usePriv('reports');
-  const employees = useAppStore((state) => state.employees).filter(e => e.status === 'Active' || e.status === 'On Leave');
-  const sites = useAppStore((state) => state.sites);
+  const departments = useAppStore((state) => state.departments);
+  const nonEmployeeDeptNames = useMemo(() => new Set(departments.filter(d => d.staffType === 'NON-EMPLOYEE').map(d => d.name)), [departments]);
+
+  const employees = useAppStore((state) => state.employees).filter(e => 
+    (e.status === 'Active' || e.status === 'On Leave') && 
+    e.staffType?.toUpperCase() !== 'NON-EMPLOYEE' && e.staffType?.toUpperCase() !== 'NON EMPLOYEE' &&
+    (!e.department || !nonEmployeeDeptNames.has(e.department))
+  );
+  const sites = useAppStore((state) => state.sites).filter(s => s.name?.toUpperCase() !== 'DCEL' && s.name?.toUpperCase() !== 'OFFICE');
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const leaves = useAppStore((state) => state.leaves);
   const disciplinaryRecords = useAppStore((state) => state.disciplinaryRecords);

@@ -265,6 +265,9 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
                           </div>
                           <input type="date" value={sub.deadline} onChange={e => updateRow(i, "deadline", e.target.value)}
                             className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/20 shadow-sm" />
+                          <input type="time" value={sub.deadlineTime} onChange={e => updateRow(i, "deadlineTime", e.target.value)}
+                            disabled={!sub.deadline}
+                            className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/20 shadow-sm disabled:opacity-50" />
                           <select value={sub.priority ?? ''} onChange={e => updateRow(i, "priority", e.target.value ? e.target.value as TaskPriority : undefined)}
                             className="px-2.5 py-1.5 rounded-lg border border-border text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/20 shadow-sm">
                             <option value="">No Priority</option>

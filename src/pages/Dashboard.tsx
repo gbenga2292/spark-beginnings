@@ -67,14 +67,21 @@ const MONTHS = [
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
 export function Dashboard() {
-    const employees = useAppStore((state) => state.employees).filter(e => e.status === 'Active' || e.status === 'On Leave');
+    const departments = useAppStore((state) => state.departments);
+    const nonEmployeeDeptNames = useMemo(() => new Set(departments.filter(d => d.staffType === 'NON-EMPLOYEE').map(d => d.name)), [departments]);
+
+    const employees = useAppStore((state) => state.employees).filter(e => 
+        (e.status === 'Active' || e.status === 'On Leave') && 
+        e.staffType?.toUpperCase() !== 'NON-EMPLOYEE' && e.staffType?.toUpperCase() !== 'NON EMPLOYEE' &&
+        (!e.department || !nonEmployeeDeptNames.has(e.department))
+    );
     const attendanceRecords = useAppStore((state) => state.attendanceRecords);
     const leaves = useAppStore((state) => state.leaves);
     const holidays = useAppStore((state) => state.publicHolidays);
     const invoices = useAppStore((state) => state.invoices);
     const salaryAdvances = useAppStore((state) => state.salaryAdvances);
     const loans = useAppStore((state) => state.loans);
-    const sites = useAppStore((state) => state.sites);
+    const sites = useAppStore((state) => state.sites).filter(s => s.name?.toUpperCase() !== 'DCEL' && s.name?.toUpperCase() !== 'OFFICE');
     const payrollVariables = useAppStore((state) => state.payrollVariables);
     const { reminders } = useAppData();
 
@@ -587,11 +594,11 @@ export function Dashboard() {
                                     <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                                     <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid rgba(148,163,184,0.2)', backgroundColor: 'rgba(30,41,59,0.95)', color: '#f1f5f9', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.4)' }} />
                                     <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                    <Bar dataKey="Present" fill="#10b981" radius={[4, 4, 0, 0]}>
-                                        <LabelList dataKey="Present" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
-                                    </Bar>
                                     <Bar dataKey="Absent" fill="#ef4444" radius={[4, 4, 0, 0]}>
                                         <LabelList dataKey="Absent" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#ef4444' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
+                                    </Bar>
+                                    <Bar dataKey="Present" fill="#10b981" radius={[4, 4, 0, 0]}>
+                                        <LabelList dataKey="Present" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />
                                     </Bar>
                                     <Bar dataKey="Overtime" fill="#8b5cf6" radius={[4, 4, 0, 0]}>
                                         <LabelList dataKey="Overtime" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#8b5cf6' }} formatter={(v: any) => v > 0 ? (chartViewMode === 'efficiency' ? `${v}%` : v) : ''} />

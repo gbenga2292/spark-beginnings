@@ -18,14 +18,16 @@ export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSu
   const [desc, setDesc] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [deadlineTime, setDeadlineTime] = useState("");
   const { user: currentUser } = useAuth();
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
 
   const handleAdd = () => {
     if (!title.trim()) return;
     const assignee = isPersonal ? (currentUser?.id ?? null) : (assignedTo || null);
-    onAdd({ mainTaskId, title: title.trim(), description: desc.trim(), assignedTo: assignee, status: "not_started", deadline: deadline || undefined, priority });
-    setTitle(""); setDesc(""); setAssignedTo(""); setDeadline(""); setPriority(undefined); setOpen(false);
+    const combinedDeadline = deadline ? (deadlineTime ? `${deadline}T${deadlineTime}` : deadline) : undefined;
+    onAdd({ mainTaskId, title: title.trim(), description: desc.trim(), assignedTo: assignee, status: "not_started", deadline: combinedDeadline, priority });
+    setTitle(""); setDesc(""); setAssignedTo(""); setDeadline(""); setDeadlineTime(""); setPriority(undefined); setOpen(false);
   };
 
   const accentColor = isPersonal ? 'text-indigo-600 hover:text-indigo-700' : 'text-primary hover:text-primary/80';
@@ -44,7 +46,7 @@ export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSu
         className={`w-full px-3 py-2 rounded-lg border text-sm bg-card text-foreground focus:outline-none focus:ring-2 ${accentRing}`} />
       <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Description (optional)"
         className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-muted focus:outline-none focus:ring-2 focus:ring-primary/20" />
-      <div className={`grid grid-cols-1 sm:grid-cols-2 ${!isPersonal ? 'md:grid-cols-3' : ''} gap-3`}>
+      <div className={`grid grid-cols-2 md:grid-cols-4 gap-3`}>
         {!isPersonal && (
           <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}
             className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/20">
@@ -54,6 +56,9 @@ export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSu
         )}
         <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
           className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/20" />
+        <input type="time" value={deadlineTime} onChange={e => setDeadlineTime(e.target.value)}
+          disabled={!deadline}
+          className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50" />
         <select value={priority ?? ''} onChange={e => setPriority(e.target.value ? e.target.value as TaskPriority : undefined)}
           className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/20">
           <option value="">Priority…</option>

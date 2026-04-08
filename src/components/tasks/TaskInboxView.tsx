@@ -533,11 +533,25 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                   </div>
                 </div>
 
+                {/* Task Narration (Main Task Description) */}
+                {activeMainTask.description && (
+                  <div className="mb-6">
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Task Narration (Project Context)</h3>
+                    <div className="flex items-start gap-3 p-4 rounded-2xl border border-emerald-100 bg-emerald-50/50 shadow-sm">
+                      <FileText className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
+                      <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{activeMainTask.description}</p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Description card */}
                 {activeSubtask.description && (
-                  <div className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 bg-white shadow-sm mb-8">
-                    <MessageSquare className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{activeSubtask.description}</p>
+                  <div className="mb-8">
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Subtask Details</h3>
+                    <div className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                      <MessageSquare className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
+                      <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{activeSubtask.description}</p>
+                    </div>
                   </div>
                 )}
 

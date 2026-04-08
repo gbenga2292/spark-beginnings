@@ -60,8 +60,10 @@ export function NotificationsPage() {
       return true;
     }).forEach(r => {
       const isMention = r.title?.startsWith('Mentioned');
+      const isNewTask = r.title === 'New Task Created';
       const remDate = new Date(r.remindAt);
       const isPast = remDate < now;
+      
       if (isMention) {
         notifs.push({
           id: `rem-${r.id}`, icon: AtSign, text: r.body || r.title,
@@ -69,6 +71,14 @@ export function NotificationsPage() {
           color: 'text-indigo-500', bg: 'bg-indigo-50',
           url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
           priority: 1, category: 'mention',
+        });
+      } else if (isNewTask) {
+        notifs.push({
+          id: `rem-${r.id}`, icon: FileText, text: `New Task: ${r.body || 'Task'}`,
+          time: r.createdAt ? format(new Date(r.createdAt), 'MMM d, h:mm a') : 'New',
+          color: 'text-emerald-500', bg: 'bg-emerald-50',
+          url: r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
+          priority: 2, category: 'system',
         });
       } else {
         notifs.push({

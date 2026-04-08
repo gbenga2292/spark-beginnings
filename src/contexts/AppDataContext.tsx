@@ -229,9 +229,20 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 setReminders(prev => {
                     if (prev.some(r => r.id === camel.id)) return prev;
                     
-                    if (camel.recipientIds && camel.recipientIds.includes(user?.id)) {
-                        toast.info(`Reminder: ${camel.title}`);
-                        showNativeNotification("Reminder", camel.title);
+                    const isGlobal = !camel.recipientIds || camel.recipientIds.length === 0;
+                    const isRecipient = isGlobal || (camel.recipientIds && camel.recipientIds.includes(user?.id));
+                    const isCreator = camel.createdBy === user?.id;
+
+                    if (isRecipient && !isCreator) {
+                        const title = camel.title === 'New Task Created' ? 'New Task' : 'Reminder';
+                        
+                        const actionObj = camel.mainTaskId ? {
+                            label: 'Click to see',
+                            onClick: () => { window.location.href = `/tasks?openTask=${camel.mainTaskId}`; }
+                        } : undefined;
+
+                        toast.info(`${title}: ${camel.title === 'New Task Created' ? camel.body : camel.title}`, actionObj);
+                        showNativeNotification(title, camel.title === 'New Task Created' ? camel.body || '' : camel.title);
                     }
                     
                     return [...prev, camel];
@@ -294,6 +305,21 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     setSubtasks(prev => [...prev, ...insertedSubs]);
                 }
             }
+
+            // Create global reminder for all users
+            const remPayload = {
+                title: 'New Task Created',
+                body: data.title,
+                remind_at: new Date().toISOString(),
+                end_at: null,
+                frequency: 'once',
+                recipient_ids: null, // null/empty means everyone
+                is_active: true,
+                created_by: user?.id,
+                main_task_id: data.id,
+            };
+            const { error: remErr } = await supabase.from('reminders').insert(remPayload);
+            if (remErr) console.error('Error creating new task reminder:', remErr);
         }
         return data;
     }, [user?.id]);

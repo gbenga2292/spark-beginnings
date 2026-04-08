@@ -414,7 +414,7 @@ function PersonalTasksView() {
                               </div>
 
                               <div className="px-5 py-3 border-t border-indigo-100 dark:border-indigo-900/30 flex items-center justify-between gap-2">
-                                <AddSubtaskInline mainTaskId={mt.id} users={[]} onAdd={sub => addSubtask(sub)} isPersonal />
+                                <AddSubtaskInline mainTaskId={mt.id} users={users} onAdd={sub => addSubtask(sub)} isPersonal />
                                 <DeleteTaskButton onConfirm={() => deleteMainTask(mt.id)} />
                               </div>
                             </div>
@@ -436,7 +436,7 @@ function PersonalTasksView() {
         <CreateTaskDialog
           onClose={() => setShowCreate(false)}
           onSubmit={createMainTask}
-          users={[]}
+          users={users}
           currentUserId={currentUser?.id ?? ""}
           teamId={workspace?.id ?? ""}
           workspaceId={workspace?.id ?? ""}
