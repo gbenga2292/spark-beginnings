@@ -10,6 +10,7 @@ import { useAppStore, Employee, MonthlySalary, DisciplinaryRecord } from '@/src/
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
+import { useAuth } from '@/src/hooks/useAuth';
 import { useRedaction } from '@/src/hooks/useRedaction';
 import { Dialog } from '@/src/components/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/src/components/ui/dropdown-menu';
@@ -64,6 +65,7 @@ export function Employees() {
     description: '',
   });
 
+  const { user: currentUser } = useAuth();
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('employees');
   const canSeeSalary = useRedaction('employees');
@@ -228,7 +230,7 @@ export function Employees() {
           title,
           body: `Health insurance (LASHMA) for ${newEmployee.firstname} ${newEmployee.surname} expires on ${newEmployee.lashmaExpiryDate}. Please initiate renewal.`,
           remindAt: remindAt.toISOString(),
-          recipientIds: [], // HR/Admin usually get notifications by default if left empty or if they created it
+          recipientIds: currentUser?.id ? [currentUser.id] : [],
           frequency: 'once',
           isActive: true
         });
@@ -329,7 +331,7 @@ export function Employees() {
           title,
           body: `Health insurance (LASHMA) for ${formData.firstname} ${formData.surname} expires on ${formData.lashmaExpiryDate}. Please initiate renewal.`,
           remindAt: remindAt.toISOString(),
-          recipientIds: [], 
+          recipientIds: currentUser?.id ? [currentUser.id] : [], 
           frequency: 'once',
           isActive: true
         });

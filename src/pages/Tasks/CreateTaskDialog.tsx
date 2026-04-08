@@ -21,6 +21,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
 
   const [title, setTitle] = useState("");
   const [description, setDesc] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [assignedTo, setAssignedTo] = useState<string[]>([]);
   const [deadline, setDeadline] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("");
@@ -59,7 +60,8 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || isSubmitting) return;
+    setIsSubmitting(true);
     const validSubs = subtasks.filter(s => s.title.trim());
     const combinedDeadline = deadline
       ? deadlineTime ? `${deadline}T${deadlineTime}` : deadline
@@ -98,6 +100,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
       });
     }
 
+    setIsSubmitting(false);
     onClose();
   };
 
@@ -338,9 +341,9 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
           <div className="flex justify-end gap-3 pt-1">
             <Button type="button" onClick={onClose}
               className="px-5 h-auto py-2.5 rounded-xl border border-border bg-card text-sm text-muted-foreground hover:bg-muted transition-colors">Cancel</Button>
-            <Button type="submit" disabled={!title.trim() || (enableReminder && !reminderAt)}
+            <Button type="submit" disabled={!title.trim() || (enableReminder && !reminderAt) || isSubmitting}
               className="px-5 h-auto py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-              Create Task
+              {isSubmitting ? 'Creating...' : 'Create Task'}
             </Button>
           </div>
         </form>

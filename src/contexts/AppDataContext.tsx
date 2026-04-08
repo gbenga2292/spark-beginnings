@@ -18,6 +18,7 @@ interface AppDataContextType {
     updateReminder: (...args: any[]) => Promise<void>;
     deleteReminder: (...args: any[]) => Promise<void>;
     toggleReminderActive: (...args: any[]) => Promise<void>;
+    snoozeReminder: (id: string, untilDate: string) => Promise<void>;
     createProject: (...args: any[]) => Promise<void>;
     createMainTask: (task: any, subs?: any[]) => Promise<any>;
     updateMainTask: (id: string, p: any) => Promise<void>;
@@ -82,6 +83,8 @@ export function mapReminderToCamel(r: any) {
         createdAt: r.created_at,
         updatedAt: r.updated_at,
         lastSentAt: r.last_sent_at,
+        snoozedUntil: r.snoozed_until,
+        sourceRef: r.source_ref,
     };
 }
 
@@ -420,14 +423,39 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const updateSubtaskStatus = useCallback(async (id: string, status: string, _userId?: string) => {
-        const { data, error } = await supabase.from('subtasks').update({ status }).eq('id', id).select().single();
+        const now = new Date().toISOString();
+        const updatePayload: any = { status };
+        if (status === 'completed') updatePayload.completed_at = now;
+
+        const { data, error } = await supabase.from('subtasks').update(updatePayload).eq('id', id).select().single();
         if (error) {
             console.error('updateSubtaskStatus error:', error);
             toast.error('Failed to update status.');
             return;
         }
-        if (data) setSubtasks(prev => prev.map(s => s.id === id ? data : s));
-    }, []);
+        if (data) {
+            setSubtasks(prev => prev.map(s => s.id === id ? data : s));
+
+            // Notify the main task creator when a subtask is completed
+            if (status === 'completed') {
+                const mainTaskId = data.main_task_id || data.mainTaskId;
+                const mainTask = mainTasks.find(m => m.id === mainTaskId);
+                if (mainTask && mainTask.createdBy && mainTask.createdBy !== (user?.id ?? _userId)) {
+                    // Leave a comment notifying the creator
+                    const actorId = _userId || user?.id;
+                    if (actorId) {
+                        const { data: cData } = await supabase.from('task_updates').insert({
+                            subtask_id: id,
+                            main_task_id: mainTaskId,
+                            text: `✅ Subtask **"${data.title}"** marked as completed.`,
+                            author_id: actorId,
+                        }).select().single();
+                        if (cData) setComments(prev => prev.some(c => c.id === cData.id) ? prev : [...prev, cData]);
+                    }
+                }
+            }
+        }
+    }, [mainTasks, user]);
 
     const approveSubtask = useCallback(async (id: string, userId?: string, note?: string) => {
         // Update task itself
@@ -725,6 +753,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     const toggleReminderActive = useCallback(async (id: string) => {
         const current = reminders.find(r => r.id === id);
         if (!current) return;
+
+        // For recurring reminders being paused (deactivated), warn — but still allow
         const { data, error } = await supabase.from('reminders').update({ is_active: !current.isActive }).eq('id', id).select().single();
         if (error) {
             console.error('toggleReminder error:', error);
@@ -733,6 +763,24 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         }
         if (data) setReminders(prev => prev.map(r => r.id === id ? mapReminderToCamel(data) : r));
     }, [reminders]);
+
+    const snoozeReminder = useCallback(async (id: string, untilDate: string) => {
+        const { data, error } = await supabase
+            .from('reminders')
+            .update({ snoozed_until: untilDate })
+            .eq('id', id)
+            .select()
+            .single();
+        if (error) {
+            console.error('snoozeReminder error:', error);
+            toast.error('Failed to snooze reminder.');
+            return;
+        }
+        if (data) {
+            setReminders(prev => prev.map(r => r.id === id ? mapReminderToCamel(data) : r));
+            toast.success('Reminder snoozed ⏳');
+        }
+    }, []);
 
     // ── Memoize context value to prevent unnecessary re-renders ───────────────
     const value = useMemo<AppDataContextType>(() => ({
@@ -747,6 +795,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         updateReminder,
         deleteReminder,
         toggleReminderActive,
+        snoozeReminder,
         createProject: async (projectData: any) => {
             const taskPayload = {
                 title: projectData.name,
@@ -815,7 +864,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         addSubtask, updateSubtask, deleteSubtask, assignSubtask,
         updateSubtaskStatus, approveSubtask, rejectSubtask,
         postComment, updateComment, getMainTaskComments, getSubtaskComments, getMainTaskWorkflow,
-        addReminder, updateReminder, deleteReminder, toggleReminderActive]);
+        addReminder, updateReminder, deleteReminder, toggleReminderActive, snoozeReminder]);
 
     return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;
 }

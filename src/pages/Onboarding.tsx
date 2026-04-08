@@ -374,7 +374,7 @@ export function Onboarding() {
           title,
           body: `Health insurance (LASHMA) for ${selectedEmployee.firstname} ${selectedEmployee.surname} expires on ${patch.lashmaExpiryDate}. Please initiate renewal.`,
           remindAt: remindAt.toISOString(),
-          recipientIds: [], 
+          recipientIds: user?.id ? [user.id] : [], 
           frequency: 'once', 
           isActive: true
         });

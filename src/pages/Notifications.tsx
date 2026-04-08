@@ -30,8 +30,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 export function NotificationsPage() {
   useSetPageTitle('Notifications', 'All notifications and alerts');
   const navigate = useNavigate();
-  const { updateReminder } = useAppData();
-  const { reminders } = useAppData();
+  const { updateReminder, reminders, subtasks } = useAppData();
   const {
     employees, attendanceRecords, leaves, pendingInvoices, invoices,
     salaryAdvances, loans, sites, disciplinaryRecords, evaluations, commLogs,
@@ -87,7 +86,7 @@ export function NotificationsPage() {
           time: isPast ? 'Overdue' : format(remDate, 'MMM d, h:mm a'),
           color: isPast ? 'text-rose-500' : 'text-indigo-500',
           bg: isPast ? 'bg-rose-50' : 'bg-indigo-50',
-          url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : undefined,
+          url: r.subtaskId ? `/tasks?open=${r.subtaskId}` : r.mainTaskId ? `/tasks?openTask=${r.mainTaskId}` : '/tasks/reminders',
           priority: isPast ? 0 : 2, category: 'reminder',
         });
       }
@@ -114,7 +113,10 @@ export function NotificationsPage() {
 
     // 4. HR Alerts
     employees.filter(e => e.status === 'Active' && e.lashmaExpiryDate && isWithinDays(e.lashmaExpiryDate, 7)).forEach(e => {
-      notifs.push({ id: `lashma-${e.id}`, icon: ShieldCheck, text: `LASHMA Expiring: ${e.firstname} ${e.surname}`, time: e.lashmaExpiryDate!, color: 'text-amber-600', bg: 'bg-amber-50', url: '/employees', priority: 1, category: 'hr' });
+      notifs.push({ id: `lashma-${e.id}`, icon: ShieldCheck, text: `LASHMA Expiring Soon: ${e.firstname} ${e.surname}`, time: e.lashmaExpiryDate!, color: 'text-amber-600', bg: 'bg-amber-50', url: '/tasks/reminders', priority: 1, category: 'hr' });
+    });
+    employees.filter(e => e.status === 'Active' && e.lashmaExpiryDate && isPastOrToday(e.lashmaExpiryDate)).forEach(e => {
+      notifs.push({ id: `lashma-overdue-${e.id}`, icon: ShieldCheck, text: `LASHMA Expired: ${e.firstname} ${e.surname} — renew immediately`, time: e.lashmaExpiryDate!, color: 'text-rose-600', bg: 'bg-rose-50', url: '/tasks/reminders', priority: 0, category: 'hr' });
     });
     commLogs.filter(c => c.followUpDate && !c.followUpDone && isPastOrToday(c.followUpDate)).forEach(c => {
       notifs.push({ id: `comm-${c.id}`, icon: Clock, text: `Follow-up due: ${c.subject || 'Communication'}`, time: c.followUpDate!, color: 'text-indigo-400', bg: 'bg-indigo-50', url: '/sites', priority: 2, category: 'hr' });
@@ -136,6 +138,19 @@ export function NotificationsPage() {
       const endStr = end.toISOString().split('T')[0];
       if (isWithinDays(endStr, 14)) {
         notifs.push({ id: `prob-${e.id}`, icon: Users, text: `Probation ending: ${e.firstname} ${e.surname}`, time: endStr, color: 'text-indigo-400', bg: 'bg-indigo-50', url: '/employees', priority: 3, category: 'hr' });
+      }
+    });
+
+    // 4b. Subtask deadline alerts (for tasks assigned to current user)
+    const mySubtasks = subtasks.filter(s =>
+      s.status !== 'completed' && s.deadline &&
+      (currentUser && (s.assignedTo === currentUser.id || s.assigned_to === currentUser.id))
+    );
+    mySubtasks.forEach(s => {
+      if (isPastOrToday(s.deadline.split('T')[0])) {
+        notifs.push({ id: `sub-overdue-${s.id}`, icon: AlertCircle, text: `Overdue subtask: ${s.title}`, time: s.deadline, color: 'text-rose-600', bg: 'bg-rose-50', url: `/tasks?open=${s.id}`, priority: 0, category: 'reminder' });
+      } else if (isWithinDays(s.deadline.split('T')[0], 1)) {
+        notifs.push({ id: `sub-due-${s.id}`, icon: Clock, text: `Due tomorrow: ${s.title}`, time: s.deadline, color: 'text-amber-600', bg: 'bg-amber-50', url: `/tasks?open=${s.id}`, priority: 1, category: 'reminder' });
       }
     });
 
