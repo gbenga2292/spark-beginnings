@@ -1520,7 +1520,7 @@ function UserTasksView() {
   const teamSubtaskIds = new Set(teamTasks.map(mt => mt.id));
   const teamSubtasks = subtasks.filter(s => teamSubtaskIds.has(s.mainTaskId));
   const allSubs = teamSubtasks;
-  const mySubs = teamSubtasks.filter(s => s.assignedTo === currentUser?.id);
+  const mySubs = teamSubtasks.filter(s => s.assignedTo?.split(',').includes(currentUser?.id || ''));
 
   const [scope, setScope] = useState<'mine' | 'all'>('mine');
   const pool = scope === 'mine' ? mySubs : allSubs;

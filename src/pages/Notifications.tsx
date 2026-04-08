@@ -144,7 +144,10 @@ export function NotificationsPage() {
     // 4b. Subtask deadline alerts (for tasks assigned to current user)
     const mySubtasks = subtasks.filter(s =>
       s.status !== 'completed' && s.deadline &&
-      (currentUser && (s.assignedTo === currentUser.id || s.assigned_to === currentUser.id))
+      (currentUser && (
+        (s.assignedTo?.split(',').includes(currentUser.id)) ||
+        ((s as any).assigned_to?.split(',').includes(currentUser.id))
+      ))
     );
     mySubtasks.forEach(s => {
       if (isPastOrToday(s.deadline.split('T')[0])) {

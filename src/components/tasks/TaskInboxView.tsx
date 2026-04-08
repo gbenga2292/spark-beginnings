@@ -231,7 +231,8 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                                 const newStatus = sub.status === 'completed' ? 'not_started' : 'completed';
                                 const mtId = (sub as any).main_task_id || sub.mainTaskId;
                                 const mainT = mainTasks.find(m => m.id === mtId);
-                                const canChange = currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || mainT?.createdBy === currentUser?.id;
+                                const isAssignee = sub.assignedTo?.split(',').includes(currentUser?.id || '');
+                                const canChange = currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || mainT?.createdBy === currentUser?.id || isAssignee;
                                 if (canChange && currentUser) {
                                   updateSubtaskStatus(sub.id!, newStatus, currentUser.id);
                                 } else {
@@ -408,7 +409,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                     }
 
                     if (isApprovalTask) {
-                      const isApprover = currentUser?.id === activeSubtask.assignedTo;
+                      const isApprover = activeSubtask.assignedTo?.split(',').includes(currentUser?.id || '');
                       const hasActed = activeSubtask.status === 'completed' || !!(activeSubtask as any).rejectedAt;
                       
                       return (
@@ -448,7 +449,8 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                       const sc = statusConfig[s];
                       const SIcon = sc.icon;
                       const isActive = activeSubtask.status === s;
-                      const canChangeStatus = currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || activeMainTask?.createdBy === currentUser?.id;
+                      const isAssignee = activeSubtask.assignedTo?.split(',').includes(currentUser?.id || '');
+                      const canChangeStatus = currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || activeMainTask?.createdBy === currentUser?.id || isAssignee;
                       return (
                         <button
                           key={s}
@@ -497,7 +499,8 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                                 'text-slate-400'
                               }`}
                           onClick={() => {
-                              const canChangeStatus = currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || activeMainTask?.createdBy === currentUser?.id;
+                              const isAssignee = activeSubtask.assignedTo?.split(',').includes(currentUser?.id || '');
+                              const canChangeStatus = currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || activeMainTask?.createdBy === currentUser?.id || isAssignee;
                               if (canChangeStatus && currentUser) updateSubtaskStatus(activeSubtask.id!, status, currentUser.id);
                             }}
                           >
