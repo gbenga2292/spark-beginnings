@@ -314,7 +314,10 @@
 .text-popover-foreground { color: rgb(var(--color-popover-foreground)) !important; }
 .border-border  { border-color: rgb(var(--color-border))          !important; }
 .ring-ring      { --tw-ring-color: rgb(var(--color-ring));                      }
-/* bg-primary / text-primary keep TW defaults — they already resolve fine via indigo palette */
+.bg-primary     { background-color: rgb(var(--color-primary))     !important; }
+.text-primary   { color: rgb(var(--color-primary))                !important; }
+.border-primary { border-color: rgb(var(--color-primary))         !important; }
+/* primary shadow/opacity variants might fall back, but explicit bg/text fixes most components */
 
 /* ── Dark mode token overrides ──────────────────────────────────────── */
 .dark {

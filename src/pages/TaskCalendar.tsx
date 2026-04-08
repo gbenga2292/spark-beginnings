@@ -105,11 +105,14 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
       
       // Calculate main task status based on subtasks
       const taskSubs = subtasks.filter(s => s.main_task_id === m.id || s.mainTaskId === m.id);
-      let mStatus = 'not_started';
+      
+      // If the main task has subtasks, skip adding it to the calendar
+      // to prevent duplicate visual clutter since the subtasks will be rendered.
       if (taskSubs.length > 0) {
-        if (taskSubs.every(s => s.status === 'completed')) mStatus = 'completed';
-        else if (taskSubs.some(s => s.status === 'in_progress' || s.status === 'completed' || s.status === 'pending_approval')) mStatus = 'in_progress';
+        return;
       }
+      
+      let mStatus = 'not_started';
 
       const isOverdue = mStatus !== 'completed' && isBefore(deadline, today);
       const statusKey = mStatus === 'completed' ? 'completed' : (isOverdue ? 'overdue' : mStatus);

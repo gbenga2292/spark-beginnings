@@ -286,8 +286,22 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         if (data) {
             setMainTasks(prev => [...prev, data]);
             toast.success('Task created successfully');
-            if (subs.length) {
-                const subTasksPayload = subs.map(s => ({
+            let targetSubs = subs;
+            
+            // Auto-generate a default subtask if none were provided and it's a standard task (not purely a project wrapper)
+            if (targetSubs.length === 0 && !payload.is_project) {
+                targetSubs = [{
+                    title: payload.title,
+                    description: payload.description,
+                    assignedTo: payload.assignedTo,
+                    status: 'not_started',
+                    deadline: payload.deadline,
+                    priority: payload.priority,
+                }];
+            }
+
+            if (targetSubs.length > 0) {
+                const subTasksPayload = targetSubs.map(s => ({
                     title: s.title,
                     description: s.description || null,
                     assignedTo: s.assignedTo || null,

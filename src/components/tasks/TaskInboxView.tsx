@@ -11,7 +11,7 @@ import {
   User, Calendar, Clock, ChevronDown, ChevronRight,
   MessageSquare, Hash, Paperclip, Send, FolderOpen, X,
   ArrowRight, ArrowLeft, Plus, Hourglass, FileText, FileSpreadsheet, Presentation,
-  Pencil, Reply, Link as LinkIcon
+  Pencil, Reply, Link as LinkIcon, Check
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/src/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
@@ -89,16 +89,6 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
     }
   }, [activeMainTaskId]);
 
-  // Flatten EVERYTHING bypassing search filter for Prev/Next navigation strictly structurally
-  const allFlatSubtasks = useMemo(() => {
-    const sortedMain = [...mainTasks].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-    const result: SubTask[] = [];
-    sortedMain.forEach(m => {
-      const ms = subtasks.filter(s => ((s as any).main_task_id || s.mainTaskId) === m.id);
-      result.push(...ms);
-    });
-    return result;
-  }, [mainTasks, subtasks]);
 
   // Flatten only the currently searched groups for display count
   const flatSubtasks = useMemo(() => groupedTasks.flatMap(g => g.subs), [groupedTasks]);
@@ -120,11 +110,16 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
 
 
   const activeMainTask = activeMainTaskId ? mainTasks.find(m => m.id === activeMainTaskId) ?? null : null;
-  const activeAssignee = activeSubtask?.assignedTo ? users.find(u => u.id === activeSubtask.assignedTo) ?? null : null;
+  const assigneesStrs = typeof activeSubtask?.assignedTo === 'string' 
+    ? activeSubtask.assignedTo.split(',').map((id: string) => id.trim()).filter(Boolean)
+    : Array.isArray(activeSubtask?.assignedTo) 
+      ? activeSubtask.assignedTo as string[] 
+      : [];
+  const activeAssignees = assigneesStrs.map((id: string) => users.find(u => u.id === id)).filter(Boolean) as AppUser[];
 
-  const activeIndex = activeSubtask ? allFlatSubtasks.findIndex(s => s.id === activeSubtask.id) : -1;
+  const activeIndex = activeSubtask ? flatSubtasks.findIndex(s => s.id === activeSubtask.id) : -1;
   const navigateSubtask = (dir: 1 | -1) => {
-    const nextItem = allFlatSubtasks[activeIndex + dir];
+    const nextItem = flatSubtasks[activeIndex + dir];
     if (nextItem?.id) onSelectSubtask(nextItem.id!);
   };
 
@@ -230,10 +225,27 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
 
                           <div className="flex items-center gap-2.5 min-w-0">
                             {/* Checkbox */}
-                            <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors
-                              ${sub.status === 'completed' ? (isActive ? 'bg-orange-500 border-orange-500' : 'bg-primary border-primary') : (isActive ? 'border-orange-400 bg-white' : 'border-slate-300 group-hover:border-primary/60')}
+                            <div 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const newStatus = sub.status === 'completed' ? 'not_started' : 'completed';
+                                const mtId = (sub as any).main_task_id || sub.mainTaskId;
+                                const mainT = mainTasks.find(m => m.id === mtId);
+                                const canChange = currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || mainT?.createdBy === currentUser?.id;
+                                if (canChange && currentUser) {
+                                  updateSubtaskStatus(sub.id!, newStatus, currentUser.id);
+                                } else {
+                                  toast.error("You don't have permission to change this task's status");
+                                }
+                              }}
+                              className={`w-4 h-4 mx-0.5 rounded border-[1.5px] flex-shrink-0 flex items-center justify-center transition-all cursor-pointer shadow-sm
+                              ${sub.status === 'completed' 
+                                ? (isActive ? 'bg-orange-500 border-orange-500 shadow-orange-500/20' : 'bg-primary border-primary shadow-primary/20') 
+                                : (isActive 
+                                    ? 'border-orange-400 bg-white/50 dark:bg-slate-800/80 hover:bg-orange-200 dark:hover:bg-orange-900/40' 
+                                    : 'border-slate-300 dark:border-slate-500 group-hover:border-primary/60 dark:bg-slate-800/50')}
                             `}>
-                              {sub.status === 'completed' && <CheckCircle2 className="w-2.5 h-2.5 text-white" />}
+                              {sub.status === 'completed' && <Check className="w-3 h-3 text-white stroke-[3] translate-px" />}
                             </div>
                             <div className="min-w-0">
                               <p className={`text-[13px] font-medium truncate ${
@@ -268,13 +280,13 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
         <div className="flex-1 flex overflow-hidden min-w-0">
 
           {/* MIDDLE: Task Detail */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-[#f7f7f8]">
+          <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
             {/* Top nav */}
             <div className="h-16 border-b border-border bg-slate-50/50 flex items-center justify-between px-6 flex-shrink-0">
               <button
                 onClick={() => navigateSubtask(-1)}
                 disabled={activeIndex <= 0}
-                className="relative flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-slate-700 text-sm font-bold shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] hover:bg-slate-50 active:translate-y-[3px] active:shadow-[0_0_0_1px_#e2e8f0,0_0_0_0_#cbd5e1] transition-colors disabled:opacity-40 disabled:active:translate-y-0 disabled:active:shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] disabled:cursor-not-allowed after:absolute after:-inset-4 after:content-[''] select-none"
+                className="relative flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-slate-700 text-sm font-bold shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] hover:bg-slate-50 active:translate-y-[3px] active:shadow-[0_0_0_1px_#e2e8f0,0_0_0_0_#cbd5e1] transition-colors disabled:opacity-40 disabled:active:translate-y-0 disabled:active:shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] disabled:cursor-not-allowed select-none"
               >
                 <ArrowLeft className="w-4 h-4 text-slate-400" /> Previous Task
               </button>
@@ -285,8 +297,8 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
 
               <button
                 onClick={() => navigateSubtask(1)}
-                disabled={activeIndex >= allFlatSubtasks.length - 1 || activeIndex === -1}
-                className="relative flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-slate-700 text-sm font-bold shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] hover:bg-slate-50 active:translate-y-[3px] active:shadow-[0_0_0_1px_#e2e8f0,0_0_0_0_#cbd5e1] transition-colors disabled:opacity-40 disabled:active:translate-y-0 disabled:active:shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] disabled:cursor-not-allowed after:absolute after:-inset-4 after:content-[''] select-none"
+                disabled={activeIndex >= flatSubtasks.length - 1 || activeIndex === -1}
+                className="relative flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-slate-700 text-sm font-bold shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] hover:bg-slate-50 active:translate-y-[3px] active:shadow-[0_0_0_1px_#e2e8f0,0_0_0_0_#cbd5e1] transition-colors disabled:opacity-40 disabled:active:translate-y-0 disabled:active:shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] disabled:cursor-not-allowed select-none"
               >
                 Next Task <ArrowRight className="w-4 h-4 text-slate-400" />
               </button>
@@ -380,7 +392,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                 {/* Action Pills */}
                 <div className="flex items-center gap-3 flex-wrap mb-8">
                   {activeSubtask.deadline && isPast(new Date(activeSubtask.deadline)) && activeSubtask.status !== 'completed' && (
-                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 border border-red-200">
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50">
                       <AlertTriangle className="w-3.5 h-3.5" /> Overdue
                     </span>
                   )}
@@ -503,17 +515,19 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                 {/* Meta Fields */}
                 <div className="grid grid-cols-[110px_1fr] gap-y-4 text-sm mb-8 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
                   <span className="font-semibold text-slate-500 flex items-center">Assigned:</span>
-                  <div className="flex items-center gap-2 font-medium text-slate-800">
-                    {activeAssignee ? (
-                      <>
-                        <Avatar className="w-5 h-5">
-                          <AvatarImage src={activeAssignee.avatarUrl} />
-                          <AvatarFallback className={`text-[9px] text-white ${activeAssignee.avatarColor}`}>
-                            {activeAssignee.name.substring(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        {activeAssignee.name}
-                      </>
+                  <div className="flex items-center gap-2 font-medium text-slate-800 flex-wrap">
+                    {activeAssignees.length > 0 ? (
+                      activeAssignees.map(assignee => (
+                        <div key={assignee.id} className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
+                          <Avatar className="w-5 h-5">
+                            <AvatarImage src={assignee.avatarUrl} />
+                            <AvatarFallback className={`text-[9px] text-white ${assignee.avatarColor || 'bg-slate-500'}`}>
+                              {assignee.name.substring(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-xs">{assignee.name}</span>
+                        </div>
+                      ))
                     ) : "Unassigned"}
                   </div>
 
@@ -537,9 +551,9 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                 {activeMainTask.description && (
                   <div className="mb-6">
                     <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Task Narration (Project Context)</h3>
-                    <div className="flex items-start gap-3 p-4 rounded-2xl border border-emerald-100 bg-emerald-50/50 shadow-sm">
-                      <FileText className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{activeMainTask.description}</p>
+                    <div className="flex items-start gap-3 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-900/20 shadow-sm">
+                      <FileText className="w-5 h-5 text-emerald-500 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
+                      <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{activeMainTask.description}</p>
                     </div>
                   </div>
                 )}

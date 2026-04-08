@@ -152,7 +152,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
               {openMainDropdown && (
                 <>
                   <div className="fixed inset-0 z-[100]" onClick={() => setOpenMainDropdown(false)} />
-                  <div className="absolute top-full left-0 mt-2 w-full max-h-[220px] overflow-y-auto bg-card border border-border rounded-xl shadow-xl z-[101] py-1 hide-scrollbar">
+                  <div className="absolute top-full left-0 mt-2 min-w-full w-max max-w-[350px] max-h-[220px] overflow-y-auto bg-card border border-border rounded-xl shadow-xl z-[101] py-1 hide-scrollbar">
                     <label className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted transition-colors w-full border-b border-border">
                       <input type="checkbox"
                         checked={assignedTo.length === users.length && users.length > 0}
@@ -162,7 +162,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
                         }}
                         className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/20"
                       />
-                      <span className="text-sm font-semibold text-foreground truncate">All staff</span>
+                      <span className="text-sm font-semibold text-foreground whitespace-normal leading-tight">All staff</span>
                     </label>
                     {users.map(u => (
                       <label key={u.id} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-muted transition-colors w-full">
@@ -174,7 +174,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
                           }}
                           className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/20"
                         />
-                        <span className="text-sm text-foreground truncate">{u.name}</span>
+                        <span className="text-sm text-foreground whitespace-normal leading-tight">{u.name}</span>
                       </label>
                     ))}
                   </div>
@@ -246,7 +246,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
                             {openSubDropdown === i && (
                               <>
                                 <div className="fixed inset-0 z-[100]" onClick={() => setOpenSubDropdown(null)} />
-                                <div className="absolute top-full left-0 mt-1 w-[200px] max-h-[200px] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[101] py-1 hide-scrollbar">
+                                <div className="absolute top-full left-0 mt-1 min-w-[200px] w-max max-w-[350px] max-h-[200px] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[101] py-1 hide-scrollbar">
                                   {users.map(u => (
                                     <label key={u.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors">
                                       <input type="checkbox"
@@ -256,7 +256,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
                                           else updateRow(i, "assignedTo", sub.assignedTo.filter(id => id !== u.id));
                                         }}
                                         className="w-3 h-3 rounded" />
-                                      <span className="text-xs text-foreground truncate">{u.name}</span>
+                                      <span className="text-xs text-foreground whitespace-normal leading-tight">{u.name}</span>
                                     </label>
                                   ))}
                                 </div>

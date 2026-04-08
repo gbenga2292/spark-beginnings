@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { Calendar as CalendarIcon, X } from 'lucide-react';
 import CalendarPage from '@/src/pages/TaskCalendar';
 import { useTheme } from '@/src/hooks/useTheme';
@@ -44,22 +44,31 @@ export function DesktopFloatingCalendar() {
     return () => window.removeEventListener('resize', updateOverlay);
   }, [open, isDark]);
 
+  const dragControls = useDragControls();
+  const constraintsRef = useRef<HTMLDivElement>(null);
+
   return (
     <>
+      <div ref={constraintsRef} className="fixed inset-y-8 right-0 w-16 pointer-events-none z-[140]" />
       {/* Minimal edge-docked tab — expands on hover */}
       <motion.button
+        drag="y"
+        dragConstraints={constraintsRef}
+        dragElastic={0}
+        dragMomentum={false}
+        onDragStart={() => setHovered(false)}
         onClick={() => setOpen(true)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        className={`pointer-events-auto fixed bottom-8 right-0 z-[150] flex items-center gap-2 overflow-hidden rounded-l-xl border border-r-0 shadow-lg backdrop-blur-sm transition-colors ${
+        className={`pointer-events-auto fixed bottom-8 right-0 z-[150] flex items-center gap-2 overflow-hidden rounded-l-xl border border-r-0 shadow-lg backdrop-blur-sm cursor-grab active:cursor-grabbing ${
           isDark
             ? 'bg-slate-800/90 border-slate-700 text-slate-300 hover:bg-slate-700/90 hover:text-white'
             : 'bg-white/90 border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
         }`}
         animate={{ width: hovered ? 140 : 44, paddingRight: hovered ? 16 : 0 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
-        title="Open Calendar"
-        style={{ height: 44 }}
+        title="Drag up/down, click to open Calendar"
+        style={{ height: 44, touchAction: "none" }}
       >
         <div className="flex items-center justify-center w-[44px] h-[44px] shrink-0">
           <CalendarIcon className="w-[18px] h-[18px]" />

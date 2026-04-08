@@ -579,10 +579,16 @@ function AdminTasksView() {
   const employees = useAppStore(state => state.employees);
   const activeEmpIds = new Set(employees.filter(e => e.status === 'Active' || e.status === 'On Leave').map(e => e.id));
   
-  const activeUsers = wsMembers.filter(m => activeEmpIds.has(m.id));
+  const activeUsers = wsMembers;
   const teamSubtaskIds = new Set(teamTasks.map(mt => mt.id));
   const teamSubtasks = subtasks.filter(s => teamSubtaskIds.has(s.mainTaskId));
-  const mySubs = teamSubtasks.filter(s => s.assignedTo === currentUser?.id);
+  const mySubs = teamSubtasks.filter(s => {
+    if (!s.assignedTo || !currentUser?.id) return false;
+    const assignees = typeof s.assignedTo === 'string' 
+      ? s.assignedTo.split(',').map(id => id.trim()) 
+      : Array.isArray(s.assignedTo) ? s.assignedTo : [];
+    return assignees.includes(currentUser.id);
+  });
   const pendingApprovalSubs = teamSubtasks.filter(s => s.status === 'pending_approval');
 
   // Status Tabs Definition

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus } from 'lucide-react';
+import { Plus, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/src/hooks/useAuth';
 import type { SubTask, AppUser, TaskPriority } from "@/src/types/tasks";
 import { PRIORITY_ORDER, PRIORITY_CONFIG } from "@/src/components/tasks/TasksShared";
@@ -14,9 +14,10 @@ interface AddSubtaskInlineProps {
 
 export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSubtaskInlineProps) {
   const [open, setOpen] = useState(false);
+  const [openSubDrop, setOpenSubDrop] = useState(false);
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
-  const [assignedTo, setAssignedTo] = useState("");
+  const [assignedTo, setAssignedTo] = useState<string[]>([]);
   const [deadline, setDeadline] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("");
   const { user: currentUser } = useAuth();
@@ -24,10 +25,10 @@ export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSu
 
   const handleAdd = () => {
     if (!title.trim()) return;
-    const assignee = isPersonal ? (currentUser?.id ?? null) : (assignedTo || null);
+    const assignee = isPersonal ? (currentUser?.id ?? null) : (assignedTo.length > 0 ? assignedTo.join(',') : null);
     const combinedDeadline = deadline ? (deadlineTime ? `${deadline}T${deadlineTime}` : deadline) : undefined;
     onAdd({ mainTaskId, title: title.trim(), description: desc.trim(), assignedTo: assignee, status: "not_started", deadline: combinedDeadline, priority });
-    setTitle(""); setDesc(""); setAssignedTo(""); setDeadline(""); setDeadlineTime(""); setPriority(undefined); setOpen(false);
+    setTitle(""); setDesc(""); setAssignedTo([]); setDeadline(""); setDeadlineTime(""); setPriority(undefined); setOpen(false);
   };
 
   const accentColor = isPersonal ? 'text-indigo-600 hover:text-indigo-700' : 'text-primary hover:text-primary/80';
@@ -48,14 +49,46 @@ export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSu
         className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-muted focus:outline-none focus:ring-2 focus:ring-primary/20" />
       <div className={`grid grid-cols-2 md:grid-cols-4 gap-3`}>
         {!isPersonal && (
-          <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/20">
-            <option value="">Unassigned</option>
-            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-          </select>
+          <div className="relative">
+            <button type="button" onClick={() => setOpenSubDrop(!openSubDrop)}
+              className="w-full px-3 py-2 flex items-center justify-between gap-2 rounded-lg border border-border text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer overflow-hidden">
+              <span className="truncate">{assignedTo.length > 0 ? `${assignedTo.length} selected` : 'Assign...'}</span>
+              <ChevronDown className="w-3.5 h-3.5 text-muted-foreground opacity-50 shrink-0" />
+            </button>
+            {openSubDrop && (
+              <>
+                <div className="fixed inset-0 z-[100]" onClick={() => setOpenSubDrop(false)} />
+                <div className="absolute top-full left-0 mt-1 min-w-[200px] w-max max-w-[350px] max-h-[200px] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[101] py-1 hide-scrollbar">
+                  <label className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors border-b border-border">
+                    <input type="checkbox"
+                      checked={assignedTo.length === users.length && users.length > 0}
+                      onChange={(e) => {
+                        if (e.target.checked) setAssignedTo(users.map(u => u.id));
+                        else setAssignedTo([]);
+                      }}
+                      className="w-3 h-3 rounded text-primary focus:ring-primary/20" />
+                    <span className="text-xs font-semibold text-foreground whitespace-normal leading-tight">All staff</span>
+                  </label>
+                  {users.map(u => (
+                    <label key={u.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted transition-colors">
+                      <input type="checkbox"
+                        checked={assignedTo.includes(u.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setAssignedTo(prev => [...prev, u.id]);
+                          else setAssignedTo(prev => prev.filter(id => id !== u.id));
+                        }}
+                        className="w-3 h-3 rounded" />
+                      <span className="text-xs text-foreground whitespace-normal leading-tight">{u.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         )}
         <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
-          className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/20" />
+          className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm" />
+
         <input type="time" value={deadlineTime} onChange={e => setDeadlineTime(e.target.value)}
           disabled={!deadline}
           className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50" />
