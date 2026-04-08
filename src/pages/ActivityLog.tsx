@@ -84,14 +84,17 @@ export function ActivityLog() {
       loans: 'Loan',
       payments: 'Payment',
       sites: 'Site',
-      clients: 'Client'
+      clients: 'Client',
+      main_tasks: 'Main Task',
+      subtasks: 'Subtask',
+      task_updates: 'Task Update'
     };
     return map[name] || name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
   const getRecordIdentifier = (data: any) => {
     if (!data) return 'N/A';
-    const idDesc = data.name || data.email || data.title || data.invoice_number || data.employee_code ||
+    const idDesc = data.name || data.email || data.title || data.invoice_number || data.employee_code || data.text ||
       (data.firstname && data.surname ? `${data.firstname} ${data.surname}` : null);
     if (idDesc) return idDesc;
     if (data.id) return String(data.id).slice(0, 8) + '...';
