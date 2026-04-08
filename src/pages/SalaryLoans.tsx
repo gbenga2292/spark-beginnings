@@ -45,9 +45,12 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
   const salaryAdvances = useAppStore((state) => state.salaryAdvances);
   const loans = useAppStore((state) => state.loans);
 
-  // Compute internal employees only
+  // Compute internal employees (Office and Field)
   const internalEmployees = employees.filter(e => {
-    const internalDeptNames = departments.filter(d => d.staffType === 'OFFICE').map(d => d.name);
+    const internalDeptNames = departments
+      .filter(d => d.staffType === 'OFFICE' || d.staffType === 'FIELD')
+      .map(d => d.name);
+
     return e.position !== 'Adhoc Staff' && internalDeptNames.includes(e.department);
   });
 
@@ -211,7 +214,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
 
   const handleExportCSV = async (mode: 'bare' | 'detailed') => {
     try {
-      const headers = mode === 'bare' 
+      const headers = mode === 'bare'
         ? ['Type', 'Employee', 'Amount', 'Date', 'Status']
         : ['id', 'Type', 'Employee ID', 'Employee Name', 'Amount', 'Date', 'Pay Start Date', 'Duration', 'Monthly Deduction', 'Remaining Balance', 'Approver', 'Status'];
 
@@ -303,7 +306,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
           title: `Preview Financial Entries (${mode === 'bare' ? 'Summary' : 'Detailed'})`,
           filename: fileName,
           headers: headers.map(h => h.toUpperCase()),
-          data: [...advanceRows, ...loanRows].map(row => 
+          data: [...advanceRows, ...loanRows].map(row =>
             row.map(cell => typeof cell === 'number' ? `₦${cell.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : String(cell))
           ),
           onConfirm
@@ -353,7 +356,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
 
         let advCount = 0;
         let loanCount = 0;
-        
+
         const headers = parseCSVRow(lines[0]).map(h => h.trim().toLowerCase());
         const getIdx = (key: string) => headers.indexOf(key.toLowerCase());
 
@@ -450,7 +453,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      <Button 
+      <Button
         variant={viewMode ? "default" : "outline"}
         size="sm"
         className={viewMode ? "bg-indigo-600 hover:bg-indigo-700 h-9 text-xs" : "border-slate-200 h-9 text-xs"}
