@@ -8,8 +8,13 @@ import { usePriv } from '@/src/hooks/usePriv';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 
-export function SiteSummary() {
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+export function SiteSummary({ filterYear, filterMonth }: { filterYear?: string, filterMonth?: string } = {}) {
+  const [internalMonth, setInternalMonth] = useState(new Date().getMonth() + 1);
+  const [internalYear, setInternalYear] = useState(new Date().getFullYear().toString());
+
+  const selectedMonth = filterMonth && filterMonth !== 'All' ? parseInt(filterMonth, 10) : internalMonth;
+  const selectedYear = filterYear && filterYear !== 'All' ? filterYear : internalYear;
+
   const monthValues = useAppStore(s => s.monthValues);
   const attendanceRecords = useAppStore(s => s.attendanceRecords);
   const employees = useAppStore(s => s.employees);
@@ -48,7 +53,11 @@ export function SiteSummary() {
       salaryDict[emp.id] = emp.monthlySalaries[currentMonthKey] || 0;
     });
 
-    const monthRecords = attendanceRecords.filter(r => r.mth === selectedMonth);
+    const monthRecords = attendanceRecords.filter(r => {
+      if (r.mth !== selectedMonth) return false;
+      if (r.date && !r.date.startsWith(selectedYear)) return false;
+      return true;
+    });
 
     sites.forEach(site => {
       const siteName = site.name.toLowerCase().trim();
@@ -107,7 +116,7 @@ export function SiteSummary() {
     })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Site Summary");
-    XLSX.writeFile(wb, `Site_Summary_${monthNames[selectedMonth - 1]}_${format(new Date(), 'yyyy')}.xlsx`);
+    XLSX.writeFile(wb, `Site_Summary_${monthNames[selectedMonth - 1]}_${selectedYear}.xlsx`);
   };
 
   return (
@@ -115,15 +124,28 @@ export function SiteSummary() {
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col">
         <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <select
-              value={selectedMonth}
-              onChange={e => setSelectedMonth(Number(e.target.value))}
-              className="h-9 px-3 border border-slate-200 rounded-md bg-white text-sm font-medium"
-            >
-              {monthNames.map((m, i) => (
-                <option key={m} value={i + 1}>{m}</option>
-              ))}
-            </select>
+            {(!filterYear || !filterMonth) && (
+              <>
+                <select
+                  value={selectedYear}
+                  onChange={e => setInternalYear(e.target.value)}
+                  className="h-9 px-3 border border-slate-200 rounded-md bg-white text-sm font-medium"
+                >
+                  {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(y => (
+                    <option key={y} value={y.toString()}>{y}</option>
+                  ))}
+                </select>
+                <select
+                  value={selectedMonth}
+                  onChange={e => setInternalMonth(Number(e.target.value))}
+                  className="h-9 px-3 border border-slate-200 rounded-md bg-white text-sm font-medium"
+                >
+                  {monthNames.map((m, i) => (
+                    <option key={m} value={i + 1}>{m}</option>
+                  ))}
+                </select>
+              </>
+            )}
             <div className="text-sm text-slate-500">
               Work Days: <span className="font-semibold text-slate-700">{workDays}</span> |
               Overtime Rate: <span className="font-semibold text-slate-700">{overtimeRate}</span>

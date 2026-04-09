@@ -450,6 +450,18 @@ function leaveToDb(l: LeaveRecord) {
     expected_end_date: l.expectedEndDate, reason: l.reason,
     date_returned: l.dateReturned, can_be_contacted: l.canBeContacted,
     status: l.status, uploaded_file: l.uploadedFile, uploaded_file_name: l.uploadedFileName,
+    nas_file_path: l.nasFilePath,
+    person_responsible_during_absence: l.personResponsibleDuringAbsence,
+    person_responsible_id: l.personResponsibleId,
+    key_duties: l.keyDuties,
+    form_date_returned: l.formDateReturned,
+    employee_signature: l.employeeSignature,
+    supervisor_signature: l.supervisorSignature,
+    management_signature: l.managementSignature,
+    hr_signature: l.hrSignature,
+    hr_approved_from: l.hrApprovedFrom,
+    hr_approved_to: l.hrApprovedTo,
+    leave_number: l.leaveNumber,
     supervisor: l.supervisor, management: l.management,
     approved_by_id: l.approvedById || null,
     approved_by_name: l.approvedByName || null,
@@ -1214,6 +1226,20 @@ export const db = {
     if (l.status !== undefined) update.status = l.status;
     if (l.uploadedFile !== undefined) update.uploaded_file = l.uploadedFile;
     if (l.uploadedFileName !== undefined) update.uploaded_file_name = l.uploadedFileName;
+    if (l.nasFilePath !== undefined) update.nas_file_path = l.nasFilePath;
+    if (l.personResponsibleDuringAbsence !== undefined) update.person_responsible_during_absence = l.personResponsibleDuringAbsence;
+    if (l.personResponsibleId !== undefined) update.person_responsible_id = l.personResponsibleId;
+    if (l.keyDuties !== undefined) update.key_duties = l.keyDuties;
+    if (l.formDateReturned !== undefined) update.form_date_returned = l.formDateReturned;
+    if (l.employeeSignature !== undefined) update.employee_signature = l.employeeSignature;
+    if (l.supervisorSignature !== undefined) update.supervisor_signature = l.supervisorSignature;
+    if (l.managementSignature !== undefined) update.management_signature = l.managementSignature;
+    if (l.hrSignature !== undefined) update.hr_signature = l.hrSignature;
+    if (l.hrApprovedFrom !== undefined) update.hr_approved_from = l.hrApprovedFrom;
+    if (l.hrApprovedTo !== undefined) update.hr_approved_to = l.hrApprovedTo;
+    if (l.leaveNumber !== undefined) update.leave_number = l.leaveNumber;
+    if (l.supervisor !== undefined) update.supervisor = l.supervisor;
+    if (l.management !== undefined) update.management = l.management;
     if (l.approvedById !== undefined) update.approved_by_id = l.approvedById;
     if (l.approvedByName !== undefined) update.approved_by_name = l.approvedByName;
     if (l.approvalTaskId !== undefined) update.approval_task_id = l.approvalTaskId;

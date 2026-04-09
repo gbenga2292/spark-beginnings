@@ -1,16 +1,17 @@
 
 import { useState, useMemo, useRef } from 'react';
+import logoSrc from '/logo/logo-2.png';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
-import { CalendarDays, Filter, ChevronDown, CheckCircle2, UserCheck, Mail, Phone, Download, Printer, Eye, X, Upload, Plus, Edit, Trash2, Ban, Search, ListFilter, CalendarClock, FileText, ShieldCheck, Clock, XCircle, MoreVertical } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Printer, Eye, X, Plus, Edit, Trash2, Ban, Search, ListFilter, CalendarClock, FileText, ShieldCheck, Clock, XCircle, MoreVertical } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
 import { useAppStore, LeaveRecord } from '@/src/store/appStore';
 import { useNavigate } from 'react-router-dom';
 import { usePriv } from '@/src/hooks/usePriv';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import { addDays, parseISO, format, isWithinInterval } from 'date-fns';
+import { parseISO, format, isWithinInterval } from 'date-fns';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
@@ -71,9 +72,23 @@ export function Leaves() {
   const [dateReturned, setDateReturned] = useState('');
   const [canBeContacted, setCanBeContacted] = useState<'Yes' | 'No'>('No');
   const [supervisor, setSupervisor] = useState('');
-  const [uploadedFile, setUploadedFile] = useState<string | undefined>(undefined);
-  const [uploadedFileName, setUploadedFileName] = useState<string | undefined>(undefined);
+  const [nasFilePath, setNasFilePath] = useState<string>('');
   const [approverId, setApproverId] = useState('');
+
+  /* ── preview form editable state (savable) ── */
+  const [previewPersonResponsibleId, setPreviewPersonResponsibleId] = useState('');
+  const [previewKeyDuties, setPreviewKeyDuties] = useState<[string, string, string]>(['', '', '']);
+  const [previewEmpSigStatus, setPreviewEmpSigStatus] = useState<'Signed' | 'Unsigned'>('Unsigned');
+  const [previewEmpSigDate, setPreviewEmpSigDate] = useState('');
+  const [previewSupSigStatus, setPreviewSupSigStatus] = useState<'Signed' | 'Unsigned'>('Unsigned');
+  const [previewSupSigDate, setPreviewSupSigDate] = useState('');
+  const [previewMgmtSigStatus, setPreviewMgmtSigStatus] = useState<'Signed' | 'Unsigned'>('Unsigned');
+  const [previewMgmtSigDate, setPreviewMgmtSigDate] = useState('');
+  const [previewHrFrom, setPreviewHrFrom] = useState('');
+  const [previewHrTo, setPreviewHrTo] = useState('');
+  const [previewHrSigStatus, setPreviewHrSigStatus] = useState<'Signed' | 'Unsigned'>('Unsigned');
+  const [previewHrSigDate, setPreviewHrSigDate] = useState('');
+  const [previewFormDateReturned, setPreviewFormDateReturned] = useState('');
 
   // Calculate if form is locked due to leave start date reached
   const isStartDateReached = !!formId && !!startDate && new Date(startDate).setHours(0, 0, 0, 0) <= new Date().setHours(0, 0, 0, 0);
@@ -85,8 +100,6 @@ export function Leaves() {
   const [previewLeave, setPreviewLeave] = useState<LeaveRecord | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
-  /* ── file upload preview ── */
-  const [filePreviewLeave, setFilePreviewLeave] = useState<LeaveRecord | null>(null);
 
   const expectedEndDate = useMemo(() => {
     const holidayDates = (publicHolidays || []).map((h: any) => h.date);
@@ -130,8 +143,24 @@ export function Leaves() {
   const resetForm = () => {
     setFormId(null); setStaffId(''); setLeaveType(''); setStartDate('');
     setDuration(''); setReason(''); setDateReturned(''); setCanBeContacted('No');
-    setSupervisor(''); setApproverId('');
-    setUploadedFile(undefined); setUploadedFileName(undefined);
+    setSupervisor(''); setApproverId(''); setNasFilePath('');
+  };
+
+  const resetPreviewFormState = (leave?: LeaveRecord | null) => {
+    setPreviewPersonResponsibleId(leave?.personResponsibleId || '');
+    const kd = leave?.keyDuties || [];
+    setPreviewKeyDuties([kd[0]||'', kd[1]||'', kd[2]||'']);
+    setPreviewEmpSigStatus(leave?.employeeSignature?.signed || 'Unsigned');
+    setPreviewEmpSigDate(leave?.employeeSignature?.date || '');
+    setPreviewSupSigStatus(leave?.supervisorSignature?.signed || 'Unsigned');
+    setPreviewSupSigDate(leave?.supervisorSignature?.date || '');
+    setPreviewMgmtSigStatus(leave?.managementSignature?.signed || 'Unsigned');
+    setPreviewMgmtSigDate(leave?.managementSignature?.date || '');
+    setPreviewHrFrom(leave?.hrApprovedFrom || '');
+    setPreviewHrTo(leave?.hrApprovedTo || '');
+    setPreviewHrSigStatus(leave?.hrSignature?.signed || 'Unsigned');
+    setPreviewHrSigDate(leave?.hrSignature?.date || '');
+    setPreviewFormDateReturned(leave?.formDateReturned || '');
   };
 
   const handleEdit = (leave: LeaveRecord) => {
@@ -145,8 +174,7 @@ export function Leaves() {
     setCanBeContacted(leave.canBeContacted);
     setSupervisor(leave.supervisor || '');
     setApproverId(leave.approvedById || '');
-    setUploadedFile(leave.uploadedFile);
-    setUploadedFileName(leave.uploadedFileName);
+    setNasFilePath(leave.nasFilePath || '');
     setShowForm(true);
   };
 
@@ -182,7 +210,7 @@ export function Leaves() {
       updateLeave(formId, {
         leaveType, startDate, duration: parseInt(duration),
         expectedEndDate: endDate, reason, dateReturned, canBeContacted,
-        uploadedFile, uploadedFileName, supervisor, management: approverName,
+        nasFilePath, supervisor, management: approverName,
       });
       toast.success('Leave entry updated!');
       setTimeout(() => syncEmployeeStatus(staffId), 100);
@@ -199,7 +227,7 @@ export function Leaves() {
         leaveType, startDate, duration: parseInt(duration),
         expectedEndDate: endDate, reason, dateReturned,
         canBeContacted, status: 'Active',
-        uploadedFile, uploadedFileName, supervisor, management: approverName,
+        nasFilePath, supervisor, management: approverName,
         approvedById: approverId,
         approvedByName: approverName,
         approvalStatus: 'Pending',
@@ -292,22 +320,68 @@ export function Leaves() {
     toast.success('Leave cancelled.');
   };
 
-  /* ── file upload ── */
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, leaveId?: string) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result as string;
-      if (leaveId) {
-        updateLeave(leaveId, { uploadedFile: base64, uploadedFileName: file.name });
-        toast.success('File uploaded and saved.');
-      } else {
-        setUploadedFile(base64);
-        setUploadedFileName(file.name);
+  /* ── NAS file path picker ── */
+  const handleNasFileSelect = (e: React.ChangeEvent<HTMLInputElement>, leaveId?: string) => {
+    // We only capture the file name/path — no base64 encoding.
+    // On Windows/NAS the `e.target.value` gives the local/UNC path entered by the user.
+    // Using a regular text input for the path keeps us storage-safe.
+    const path = e.target.value;
+    if (leaveId) {
+      updateLeave(leaveId, { nasFilePath: path });
+      toast.success('NAS file path saved.');
+    } else {
+      setNasFilePath(path);
+    }
+  };
+
+  /* Open NAS file from stored path */
+  const handleOpenNasFile = (path: string) => {
+    if (!path) return;
+    // On company PCs a UNC path like \\server\folder\file.pdf opens in Windows Explorer
+    window.open(path, '_blank', 'noopener,noreferrer');
+  };
+
+  /* Save the preview form's signature & detail data back to the leave record */
+  const handleSavePreviewData = () => {
+    if (!previewLeave?.id) return;
+
+    let nextLeaveNumber = previewLeave.leaveNumber;
+    if (!nextLeaveNumber && previewLeave.startDate) {
+      const dateObj = new Date(previewLeave.startDate);
+      if (!isNaN(dateObj.getTime())) {
+        const yy = format(dateObj, 'yy');
+        const mm = format(dateObj, 'MM');
+        const leavesInMonth = leaves.filter(l => {
+          const d = new Date(l.startDate);
+          return !isNaN(d.getTime()) && format(d, 'yy-MM') === `${yy}-${mm}`;
+        });
+        let maxSeq = 0;
+        leavesInMonth.forEach(l => {
+          if (l.leaveNumber && l.leaveNumber.startsWith(`LA${yy}-${mm}-`)) {
+            const seqStr = l.leaveNumber.split('-')[2];
+            const seq = parseInt(seqStr, 10);
+            if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+          }
+        });
+        nextLeaveNumber = `LA${yy}-${mm}-${String(maxSeq + 1).padStart(2, '0')}`;
       }
-    };
-    reader.readAsDataURL(file);
+    }
+
+    updateLeave(previewLeave.id, {
+      personResponsibleId: previewPersonResponsibleId,
+      keyDuties: previewKeyDuties,
+      formDateReturned: previewFormDateReturned,
+      employeeSignature: { signed: previewEmpSigStatus, date: previewEmpSigDate },
+      supervisorSignature: { signed: previewSupSigStatus, date: previewSupSigDate },
+      managementSignature: { signed: previewMgmtSigStatus, date: previewMgmtSigDate },
+      hrSignature: { signed: previewHrSigStatus, date: previewHrSigDate },
+      hrApprovedFrom: previewHrFrom,
+      hrApprovedTo: previewHrTo,
+      leaveNumber: nextLeaveNumber
+    });
+    
+    setPreviewLeave(prev => prev ? { ...prev, leaveNumber: nextLeaveNumber } : null);
+    toast.success('Form details saved!');
   };
 
   /* ── print ── */
@@ -359,6 +433,7 @@ export function Leaves() {
 
   const openPrintPreview = (leave: LeaveRecord) => {
     setPreviewLeave(leave);
+    resetPreviewFormState(leave);
     setShowPrintPreview(true);
   };
 
@@ -550,16 +625,29 @@ export function Leaves() {
                 </div>
               </div>
 
-              {/* File Upload */}
+              {/* NAS File Path */}
               <div className="sm:col-span-2 space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Upload Leave Form (JPG / PDF)</label>
-                <label className={`flex items-center gap-3 px-4 py-3 border-2 border-dashed border-slate-200 rounded-lg transition-all ${isFormLockedForUser ? 'opacity-70 cursor-not-allowed bg-slate-50' : 'cursor-pointer hover:border-teal-400 hover:bg-teal-50/30'}`}>
-                  <Upload className="h-5 w-5 text-teal-500" />
-                  <span className="text-sm text-slate-600">
-                    {uploadedFileName ? <span className="font-semibold text-teal-700">{uploadedFileName}</span> : 'Click to upload a signed leave form'}
-                  </span>
-                  <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => handleFileUpload(e)} disabled={isFormLockedForUser} />
-                </label>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">NAS File Reference (Path or UNC)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. \\\\NAS\\HR\\Leaves\\JohnDoe_Leave.pdf"
+                    className={`flex-1 h-11 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 px-3 text-sm outline-none transition-colors ${isFormLockedForUser ? 'cursor-not-allowed opacity-80 text-slate-500' : 'focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-teal-500/20'}`}
+                    value={nasFilePath}
+                    onChange={e => setNasFilePath(e.target.value)}
+                    disabled={isFormLockedForUser}
+                  />
+                  {nasFilePath && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenNasFile(nasFilePath)}
+                      className="px-3 h-11 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 flex items-center gap-1 shrink-0"
+                    >
+                      <Eye className="h-3.5 w-3.5" /> Open
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-400">Enter the full UNC or network path to the physical leave form stored on the company NAS. Click "Open" to launch the file on your PC.</p>
               </div>
             </div>
 
@@ -701,18 +789,15 @@ export function Leaves() {
                       })()}
                     </td>
                     <td className="px-5 py-4 text-center">
-                      {leave.uploadedFile ? (
+                      {leave.nasFilePath ? (
                         <button
                           className="text-indigo-600 hover:text-indigo-800 flex items-center justify-center gap-1 mx-auto text-xs font-semibold"
-                          onClick={() => setFilePreviewLeave(leave)}
+                          onClick={() => handleOpenNasFile(leave.nasFilePath!)}
                         >
-                          <Eye className="h-4 w-4" /> View
+                          <Eye className="h-4 w-4" /> Open
                         </button>
                       ) : (
-                        <label className="cursor-pointer text-slate-400 hover:text-teal-600 flex items-center justify-center gap-1 mx-auto text-xs font-semibold transition-colors">
-                          <Upload className="h-4 w-4" /> Upload
-                          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => handleFileUpload(e, leave.id)} />
-                        </label>
+                        <span className="text-slate-300 text-xs">—</span>
                       )}
                     </td>
                     <td className="px-5 py-4">
@@ -759,19 +844,69 @@ export function Leaves() {
 
 
 
-      {/* ─── Print Preview Modal ─── */}
+      {/* --- Print Preview Modal --- */}
       {showPrintPreview && previewLeave && (() => {
         const lv = previewLeave;
         const emp = employees.find(e => e.id === lv.employeeId);
+        const lineManagerEmp = emp?.lineManager ? employees.find(e => e.id === emp.lineManager) : null;
+        const lineManagerName = lineManagerEmp
+          ? `${lineManagerEmp.surname} ${lineManagerEmp.firstname}`
+          : (lv.supervisor || '');
         const leaveTypeOptions = ['Annual', 'Emergency', 'Maternity/Paternity', 'Study', 'Others'];
+        const isLeaveElapsed = lv.expectedEndDate
+          ? new Date(lv.expectedEndDate).setHours(23, 59, 59, 999) < Date.now()
+          : false;
+        const isPreviewLocked = isLeaveElapsed && !hasAllPermissions;
+
+        const SigBlock = ({ label, status, setStatus, date, setDate }: {
+          label: string;
+          status: 'Signed' | 'Unsigned';
+          setStatus: (v: 'Signed' | 'Unsigned') => void;
+          date: string;
+          setDate: (v: string) => void;
+        }) => (
+          <div style={{ marginBottom: 7, padding: '7px 10px', border: '1px solid #ddd', borderRadius: 4 }}>
+            <div className="flex items-center gap-3 flex-wrap">
+              <span style={{ fontSize: 10, flexShrink: 0 }}>{label}:</span>
+              {isPreviewLocked ? (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${status === 'Signed' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{status}</span>
+              ) : (
+                <select value={status} onChange={e => setStatus(e.target.value as 'Signed' | 'Unsigned')} className="text-[10px] border border-slate-200 rounded px-2 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400">
+                  <option value="Unsigned">Unsigned</option>
+                  <option value="Signed">Signed</option>
+                </select>
+              )}
+              <span style={{ fontSize: 10, flexShrink: 0, marginLeft: 8 }}>Date:</span>
+              {isPreviewLocked ? (
+                <span style={{ fontSize: 10 }}>{date ? format(parseISO(date), 'dd/MM/yyyy') : '\u2014'}</span>
+              ) : (
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} className="text-[10px] border border-slate-200 rounded px-2 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400" />
+              )}
+            </div>
+          </div>
+        );
+
         return (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-slate-900 max-w-4xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
+              {/* Modal header */}
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  <Printer className="h-5 w-5 text-teal-600" /> Staff Leave Application Form — Preview
+                  <Printer className="h-5 w-5 text-teal-600" /> Staff Leave Application Form
+                  {isPreviewLocked && (
+                    <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-600">LOCKED \u2014 Leave Elapsed</span>
+                  )}
                 </h2>
                 <div className="flex gap-2">
+                  {!isPreviewLocked && (
+                    <button
+                      type="button"
+                      onClick={handleSavePreviewData}
+                      className="flex items-center gap-1.5 px-3 h-9 rounded-lg border border-teal-300 bg-teal-50 hover:bg-teal-100 text-teal-700 text-xs font-bold"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Save Details
+                    </button>
+                  )}
                   <Button onClick={handlePrint} className="bg-teal-600 hover:bg-teal-700 text-white gap-2 h-9 text-sm">
                     <Printer className="h-4 w-4" /> Print
                   </Button>
@@ -781,34 +916,32 @@ export function Leaves() {
                 </div>
               </div>
 
-              {/* Scrollable preview area — two A4 sheets */}
+              {/* Scrollable A4 area */}
               <div className="overflow-y-auto flex-1 bg-gray-300 p-6 flex flex-col gap-6">
                 <div ref={printRef}>
-
-                  {/* â•â•â•â•â•â•â•â•â•â• PAGE 1 â•â•â•â•â•â•â•â•â•â• */}
                   <div className="a4-page bg-white shadow-lg mx-auto" style={{ width: 794, padding: '12px 24px 16px', fontFamily: 'Arial, sans-serif', fontSize: 11, color: '#111' }}>
 
                     {/* Header */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <img src="/logo/logo-2.png" alt="logo" style={{ height: 44 }} />
-                      <img src="/logo/logo-2.png" alt="logo" style={{ height: 44, opacity: 0 }} />
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <img src={logoSrc} alt="logo" style={{ height: 44, objectFit: 'contain' }} />
+                      <div style={{ textAlign: 'right', fontSize: 10, fontWeight: 'bold' }}>
+                        Form No: {lv.leaveNumber || 'Unassigned'}
+                      </div>
                     </div>
                     <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 'bold', textTransform: 'uppercase', margin: '4px 0 8px', letterSpacing: '0.6px', borderBottom: '2px solid #111', paddingBottom: 4 }}>STAFF LEAVE APPLICATION FORM</div>
 
-                    {/* 1. Employee Details */}
+                    {/* 1. Employee Details - auto-populated */}
                     <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', marginBottom: 6, padding: '2px 6px', background: '#f0f0f0', borderLeft: '3px solid #333' }}>1. Employee Details</div>
-                    {[['Employee Full Name', lv.employeeName], ['Supervisor / Line Manager', lv.supervisor || ''], ['Management Staff', lv.management || '']].map(([label, val]) => (
+                    {([
+                      ['Employee Full Name', lv.employeeName],
+                      ['Supervisor / Line Manager', lineManagerName],
+                      ['Management Staff', lv.management || ''],
+                      ['Phone Number', emp?.phone || ''],
+                      ['Email Address', emp?.email || ''],
+                    ] as [string, string][]).map(([label, val]) => (
                       <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 7 }}>
                         <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}:</span>
-                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{val}</span>
-                      </div>
-                    ))}
-
-                    {/* Phone & Email */}
-                    {[['Phone Number', ''], ['Email Address', '']].map(([label]) => (
-                      <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 7 }}>
-                        <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}:</span>
-                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
+                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{val}</span>
                       </div>
                     ))}
 
@@ -820,20 +953,21 @@ export function Leaves() {
                         const matched = (lv.leaveType || '').toLowerCase().includes(opt.toLowerCase());
                         return (
                           <span key={opt} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10 }}>
-                            <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: matched ? '#111' : 'white', color: 'white', fontSize: 8 }}>{matched ? '✓' : ''}</span>
+                            <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: matched ? '#111' : 'white', color: 'white', fontSize: 8 }}>{matched ? '\u2713' : ''}</span>
                             {opt}
                           </span>
                         );
                       })}
                     </div>
-
                     <div style={{ fontSize: 10, marginBottom: 4 }}>Reason For Leave:</div>
-                    <div contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ border: '1px solid #111', minHeight: 32, padding: 4, fontSize: 10, marginBottom: 8 }}>{lv.reason}</div>
-
-                    {[['Leave Start Date', lv.startDate ? format(parseISO(lv.startDate), 'dd/MM/yyyy') : ''], ['Leave End Date', lv.expectedEndDate ? format(parseISO(lv.expectedEndDate), 'dd/MM/yyyy') : ''], ['Date Returning to Work', lv.dateReturned ? format(parseISO(lv.dateReturned), 'dd/MM/yyyy') : '']].map(([label, val]) => (
+                    <div style={{ border: '1px solid #111', minHeight: 32, padding: 4, fontSize: 10, marginBottom: 8 }}>{lv.reason}</div>
+                    {([
+                      ['Leave Start Date', lv.startDate ? format(parseISO(lv.startDate), 'dd/MM/yyyy') : ''],
+                      ['Date returning', lv.expectedEndDate ? format(parseISO(lv.expectedEndDate), 'dd/MM/yyyy') : ''],
+                    ] as [string, string][]).map(([label, val]) => (
                       <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 7 }}>
                         <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}:</span>
-                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{val}</span>
+                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{val}</span>
                       </div>
                     ))}
 
@@ -841,11 +975,41 @@ export function Leaves() {
                     <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '10px 0 6px', padding: '2px 6px', background: '#f0f0f0', borderLeft: '3px solid #333' }}>3. Handover Details</div>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 7 }}>
                       <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>Person Responsible During Absence:</span>
-                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
+                      {isPreviewLocked ? (
+                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>
+                          {employees.find(e => e.id === previewPersonResponsibleId)?.surname} {employees.find(e => e.id === previewPersonResponsibleId)?.firstname}
+                        </span>
+                      ) : (
+                        <select
+                          value={previewPersonResponsibleId}
+                          onChange={e => setPreviewPersonResponsibleId(e.target.value)}
+                          style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, outline: 'none', background: 'transparent', fontSize: 10, paddingBottom: 1, appearance: 'none' }}
+                        >
+                          <option value="">Select an employee...</option>
+                          {employees.map(e => (
+                            <option key={e.id} value={e.id}>{e.surname} {e.firstname} ({e.position})</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                     <div style={{ fontSize: 10, marginBottom: 4 }}>Key Duties Handed Over:</div>
-                    {[1, 2, 3].map(i => (
-                      <div key={i} contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', marginBottom: 7, minHeight: 13 }}></div>
+                    {[0, 1, 2].map(i => (
+                      <div key={i} style={{ marginBottom: 4 }}>
+                        {isPreviewLocked ? (
+                          <div style={{ borderBottom: '1px solid #111', minHeight: 14, fontSize: 10 }}>{previewKeyDuties[i]}</div>
+                        ) : (
+                          <input
+                            type="text"
+                            value={previewKeyDuties[i]}
+                            onChange={e => {
+                              const newDuties = [...previewKeyDuties] as [string, string, string];
+                              newDuties[i] = e.target.value;
+                              setPreviewKeyDuties(newDuties);
+                            }}
+                            style={{ border: 'none', borderBottom: '1px solid #111', width: '100%', outline: 'none', background: 'transparent', fontSize: 10 }}
+                          />
+                        )}
+                      </div>
                     ))}
 
                     {/* 5. Contact During Leave */}
@@ -854,7 +1018,7 @@ export function Leaves() {
                       <span>Can be Contacted:</span>
                       {(['Yes', 'No'] as const).map(opt => (
                         <span key={opt} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: lv.canBeContacted === opt ? '#111' : 'white', color: 'white', fontSize: 8 }}>{lv.canBeContacted === opt ? '✓' : ''}</span>
+                          <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: lv.canBeContacted === opt ? '#111' : 'white', color: 'white', fontSize: 8 }}>{lv.canBeContacted === opt ? '\u2713' : ''}</span>
                           {opt}
                         </span>
                       ))}
@@ -862,66 +1026,57 @@ export function Leaves() {
 
                     {/* 6. Signatures */}
                     <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '10px 0 6px', padding: '2px 6px', background: '#f0f0f0', borderLeft: '3px solid #333' }}>6. Signatures</div>
-
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 8 }}>
-                      <span style={{ fontSize: 10, flexShrink: 0 }}>Employee Signature:</span>
-                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }}></span>
-                      <span style={{ fontSize: 10, flexShrink: 0 }}>Date:</span>
-                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                    </div>
-
-                    {(["Supervisor's", "Management's"] as const).map(who => (
-                      <div key={who} style={{ marginBottom: 7, padding: '7px 10px', border: '1px solid #ddd', borderRadius: 4 }}>
-                        <div style={{ display: 'flex', gap: 8, fontSize: 10, marginBottom: 6 }}>
-                          <span style={{ flexShrink: 0 }}>{who} Approval:</span>
-                          <span>Approved</span>
-                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 13 }}></span>
-                          <span style={{ flexShrink: 0 }}>Not Approved</span>
-                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 13 }}></span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10 }}>
-                          <span style={{ flexShrink: 0 }}>{who.replace("'s", '')} Signature:</span>
-                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }}></span>
-                          <span style={{ fontSize: 10, flexShrink: 0 }}>Date:</span>
-                          <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                        </div>
-                      </div>
-                    ))}
+                    <SigBlock label="Employee Signature" status={previewEmpSigStatus} setStatus={setPreviewEmpSigStatus} date={previewEmpSigDate} setDate={setPreviewEmpSigDate} />
+                    <SigBlock label="Supervisor's Approval" status={previewSupSigStatus} setStatus={setPreviewSupSigStatus} date={previewSupSigDate} setDate={setPreviewSupSigDate} />
+                    <SigBlock label="Management's Approval" status={previewMgmtSigStatus} setStatus={setPreviewMgmtSigStatus} date={previewMgmtSigDate} setDate={setPreviewMgmtSigDate} />
 
                     {/* HR Section */}
                     <div style={{ borderTop: '1px solid #555', margin: '10px 0 6px' }} />
                     <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 6 }}>To be Completed by Human Resources</div>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 7, fontSize: 10 }}>
-                      <span style={{ flexShrink: 0 }}>Leave approved from:</span>
-                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                      <span style={{ flexShrink: 0 }}>to</span>
-                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <span style={{ fontSize: 10, flexShrink: 0 }}>Leave approved from:</span>
+                      {isPreviewLocked
+                        ? <span style={{ borderBottom: '1px solid #111', minWidth: 70, fontSize: 10 }}>{previewHrFrom ? format(parseISO(previewHrFrom), 'dd/MM/yyyy') : '\u2014'}</span>
+                        : <input type="date" value={previewHrFrom} onChange={e => setPreviewHrFrom(e.target.value)} className="text-[10px] border border-slate-200 rounded px-2 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                      }
+                      <span style={{ fontSize: 10 }}>to</span>
+                      {isPreviewLocked
+                        ? <span style={{ borderBottom: '1px solid #111', minWidth: 70, fontSize: 10 }}>{previewHrTo ? format(parseISO(previewHrTo), 'dd/MM/yyyy') : '\u2014'}</span>
+                        : <input type="date" value={previewHrTo} onChange={e => setPreviewHrTo(e.target.value)} className="text-[10px] border border-slate-200 rounded px-2 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                      }
                     </div>
-                    {[['Human Resource & Admin Manager', ''], ['Date', '']].map(([label]) => (
-                      <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 7, fontSize: 10 }}>
-                        <span style={{ flexShrink: 0 }}>{label}:</span>
-                        <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                      </div>
-                    ))}
+                    <SigBlock label="HR & Admin Manager Signature" status={previewHrSigStatus} setStatus={setPreviewHrSigStatus} date={previewHrSigDate} setDate={setPreviewHrSigDate} />
 
                     {/* Leave Acknowledgement */}
                     <div style={{ borderTop: '1px solid #555', margin: '10px 0 6px' }} />
                     <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 6 }}>Leave Acknowledgement:</div>
                     <div style={{ fontSize: 10, lineHeight: 1.6, marginBottom: 7 }}>
-                      I <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', display: 'inline-block', minWidth: 120, marginBottom: -2 }}>&nbsp;</span> hereby notify the Human Resources and Administrative department that I have resumed duty as of:
+                      I <span style={{ borderBottom: '1px solid #111', display: 'inline-block', minWidth: 130, marginBottom: -2 }}>{lv.employeeName}</span> hereby notify the Human Resources and Administrative department that I have resumed duty as of:
                     </div>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10, marginBottom: 8 }}>
-                      <span style={{ flexShrink: 0 }}>Employee's Signature:</span>
-                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }}></span>
-                      <span style={{ flexShrink: 0 }}>Date:</span>
-                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
+                      <span style={{ flexShrink: 0 }}>Date Returned:</span>
+                      {isPreviewLocked ? (
+                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{previewFormDateReturned ? format(parseISO(previewFormDateReturned), 'dd/MM/yyyy') : ''}</span>
+                      ) : (
+                        <input type="date" value={previewFormDateReturned} onChange={e => setPreviewFormDateReturned(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', cursor: 'pointer' }} />
+                      )}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10 }}>
-                      <span style={{ flexShrink: 0 }}>Head of Dept/Line Manager Signature:</span>
-                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 2, minHeight: 14 }}></span>
-                      <span style={{ flexShrink: 0 }}>Date:</span>
-                      <span contentEditable suppressContentEditableWarning className="outline-none hover:bg-slate-200/50 cursor-text" style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14 }}></span>
-                    </div>
+
+                    {/* NAS File Reference */}
+                    {lv.nasFilePath && (
+                      <div className="mt-3 flex items-center gap-2 p-2 rounded bg-indigo-50 border border-indigo-200">
+                        <FileText className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                        <span style={{ fontSize: 9, color: '#444' }}>NAS: {lv.nasFilePath}</span>
+                        <button type="button" onClick={() => handleOpenNasFile(lv.nasFilePath!)} className="ml-auto text-[9px] font-bold text-indigo-600 hover:underline">Open on PC</button>
+                      </div>
+                    )}
+
+                    {/* Elapsed lock notice */}
+                    {isPreviewLocked && (
+                      <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 text-xs font-semibold">
+                        <Ban className="h-3.5 w-3.5" /> This form is read-only. The leave period has elapsed. Contact an admin to edit.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -929,29 +1084,6 @@ export function Leaves() {
           </div>
         );
       })()}
-
-      {/* ─── Uploaded File Preview Modal ─── */}
-      {filePreviewLeave && filePreviewLeave.uploadedFile && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setFilePreviewLeave(null)}>
-          <div className="bg-white dark:bg-slate-900 max-w-3xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <FileText className="h-5 w-5 text-indigo-600" /> {filePreviewLeave.uploadedFileName || 'Uploaded File'}
-              </h2>
-              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setFilePreviewLeave(null)}>
-                <X className="h-5 w-5 text-slate-500" />
-              </Button>
-            </div>
-            <div className="p-4 overflow-auto flex-1 flex items-center justify-center bg-slate-100">
-              {filePreviewLeave.uploadedFile.startsWith('data:image') ? (
-                <img src={filePreviewLeave.uploadedFile} alt="Uploaded leave form" className="max-w-full max-h-[70vh] rounded-lg shadow-lg" />
-              ) : (
-                <iframe src={filePreviewLeave.uploadedFile} className="w-full h-[70vh] rounded-lg border border-slate-200" title="PDF Preview" />
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

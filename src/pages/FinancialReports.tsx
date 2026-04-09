@@ -27,6 +27,13 @@ import { SiteSummary } from './SiteSummary';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
+const MONTHS_LIST = [
+  { value: 1, label: 'January' }, { value: 2, label: 'February' }, { value: 3, label: 'March' },
+  { value: 4, label: 'April' }, { value: 5, label: 'May' }, { value: 6, label: 'June' },
+  { value: 7, label: 'July' }, { value: 8, label: 'August' }, { value: 9, label: 'September' },
+  { value: 10, label: 'October' }, { value: 11, label: 'November' }, { value: 12, label: 'December' },
+];
+
 const getBase64ImageFromUrl = async (imageUrl: string) => {
   const res = await fetch(imageUrl);
   const blob = await res.blob();
@@ -49,11 +56,11 @@ export function FinancialReports() {
   const salaryAdvances = useAppStore(state => state.salaryAdvances);
   const ledgerEntries = useAppStore(state => state.ledgerEntries);
   const [accountsTab, setAccountsTab] = useState<'payroll' | 'loans'>('payroll');
-  const [payrollYear, setPayrollYear] = useState<number>(new Date().getFullYear());
-  const [payrollMonth, setPayrollMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [filterYear, setFilterYear] = useState<string>(String(new Date().getFullYear()));
+  const [filterMonth, setFilterMonth] = useState<string>('All');
+  const [filterClient, setFilterClient] = useState<string>('All');
   const [mainTab, setMainTab] = useState<'client-account' | 'payroll-summary' | 'site-summary' | 'ledger-summary'>('client-account');
   const sitesPriv = usePriv('sites');
-  const [ledgerSummaryYear, setLedgerSummaryYear] = useState<string>(String(new Date().getFullYear()));
   const [ledgerSummaryView, setLedgerSummaryView] = useState<'category' | 'bank' | 'client' | 'site'>('category');
 
   // Dynamic titles and subtitles for the header
@@ -104,8 +111,8 @@ export function FinancialReports() {
     let totalGrossExposure = 0;
     let totalStatutory = 0;
     let totalOvertimeCost = 0;
-    const monthsToProcess = payrollMonth
-      ? [MONTHS_LIST.find(m => m.value === payrollMonth)?.key || 'jan']
+    const monthsToProcess = (filterMonth === "All" ? null : parseInt(filterMonth, 10))
+      ? [MONTHS_LIST.find(m => m.value === (filterMonth === "All" ? null : parseInt(filterMonth, 10)))?.key || 'jan']
       : MONTHS.map(m => m.key);
 
     monthsToProcess.forEach(monthKey => {
@@ -124,7 +131,7 @@ export function FinancialReports() {
     loans.forEach(l => { if (l.status === 'Active') outstandingLoans += l.remainingBalance; });
 
     return { totalGrossExposure, totalStatutory, totalOvertimeCost, outstandingLoans };
-  }, [calculatePayrollForMonth, MONTHS, payrollMonth, salaryAdvances, loans]);
+  }, [calculatePayrollForMonth, MONTHS, (filterMonth === "All" ? null : parseInt(filterMonth, 10)), salaryAdvances, loans]);
 
   // Annual Payroll & Overtime Trend — uses the same canonical calculator
   const payrollChartData = useMemo(() => {
@@ -138,9 +145,7 @@ export function FinancialReports() {
       return { name: m.label.substring(0, 3), Payroll: totalPayroll, Overtime: totalOvertime };
     });
   }, [calculatePayrollForMonth, MONTHS]);
-  const [filterYear, setFilterYear] = useState<string>('All');
-  const [filterMonth, setFilterMonth] = useState<string>('All');
-  const [filterClient, setFilterClient] = useState<string>('All');
+
   const [summaryTab, setSummaryTab] = useState<'client' | 'site'>('client');
   const [debtorView, setDebtorView] = useState<'client' | 'site'>('client');
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
@@ -370,9 +375,9 @@ export function FinancialReports() {
   const exportInvoiceReport = async (mode: 'bare' | 'detailed' = 'detailed') => {
     let headers: string[] = [];
     if (mode === 'bare') {
-      headers = ['ID', 'Client', 'Site', 'Date', 'Amount', 'Status'];
+      headers = ['Client', 'Site', 'Date', 'Amount', 'Status'];
     } else {
-      headers = ['ID', 'Invoice Number', 'Client', 'Site', 'Project', 'Amount', 'Date', 'Due Date', 'Status', 'Billing Cycle', 'Duration', 'Machines', 'VAT Inc', 'Total Charge'];
+      headers = ['Invoice Number', 'Client', 'Site', 'Project', 'Amount', 'Date', 'Due Date', 'Status', 'Billing Cycle', 'Duration', 'Machines', 'VAT Inc', 'Total Charge'];
     }
 
     const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
@@ -381,7 +386,6 @@ export function FinancialReports() {
       let data: any[] = [];
       if (mode === 'bare') {
         data = [
-          inv.id,
           inv.client,
           inv.siteName,
           formatDisplayDate(inv.date),
@@ -390,7 +394,6 @@ export function FinancialReports() {
         ];
       } else {
         data = [
-          inv.id,
           inv.invoiceNumber,
           inv.client,
           inv.siteName || '',
@@ -459,9 +462,9 @@ export function FinancialReports() {
   };
 
   const exportPaymentReport = async () => {
-    const headers = ["Payment ID", "Client", "Site", "Date", "Amount", "WHT", "VAT", "Discount"];
+    const headers = ["Client", "Site", "Date", "Amount", "WHT", "VAT", "Discount"];
     const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
-    const data = payments.map(p => [p.id, p.client, p.site, formatDisplayDate(p.date), p.amount, p.withholdingTax || 0, p.vat || 0, p.discount || 0]);
+    const data = payments.map(p => [ p.client, p.site, formatDisplayDate(p.date), p.amount, p.withholdingTax || 0, p.vat || 0, p.discount || 0]);
     const csvData = [headers.join(','), ...data.map(row => row.map(extractCSV).join(','))].join('\n');
     const fileName = "payment_report.csv";
 
@@ -496,8 +499,8 @@ export function FinancialReports() {
   };
 
   const exportPaymentPdf = () => {
-    const head = [["Payment ID", "Client", "Site", "Date", "Amount (₦)", "WHT (₦)", "VAT (₦)"]];
-    const body = payments.map(p => [p.id, p.client, p.site, formatDisplayDate(p.date), (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), (p.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), (p.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })]);
+    const head = [["Client", "Site", "Date", "Amount (₦)", "WHT (₦)", "VAT (₦)"]];
+    const body = payments.map(p => [ p.client, p.site, formatDisplayDate(p.date), (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), (p.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), (p.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })]);
     
     setPreviewModal({
       isOpen: true,
@@ -511,9 +514,9 @@ export function FinancialReports() {
   };
 
   const exportVatReport = async () => {
-    const headers = ["VAT ID", "Client", "Date", "Month", "Year", "Amount"];
+    const headers = ["Client", "Date", "Month", "Year", "Amount"];
     const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
-    const data = vatPayments.map(v => [v.id, v.client, formatDisplayDate(v.date), v.month || '', v.year || '', v.amount]);
+    const data = vatPayments.map(v => [v.client, formatDisplayDate(v.date), v.month || '', v.year || '', v.amount]);
     const csvData = [headers.join(','), ...data.map(row => row.map(extractCSV).join(','))].join('\n');
     const fileName = "vat_report.csv";
 
@@ -603,13 +606,13 @@ export function FinancialReports() {
     const previewHeaders = ['Module', 'Scope', 'Status'];
 
     if (selectedFields.includes('Invoice Summary')) {
-      const data = invoices.map(i => ({ ID: i.id, Client: i.client, Site: i.siteName, Date: formatDisplayDate(i.date), Amount: i.amount, Status: i.status, DueDate: formatDisplayDate(i.dueDate) || '', BillingCycle: i.billingCycle || '' }));
+      const data = invoices.map(i => ({ Client: i.client, Site: i.siteName, Date: formatDisplayDate(i.date), Amount: i.amount, Status: i.status, DueDate: formatDisplayDate(i.dueDate) || '', BillingCycle: i.billingCycle || '' }));
       const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Invoices');
       previewRows.push({ Module: 'Invoice Summary', Scope: `${data.length} invoices`, Status: 'Included' });
     }
     if (selectedFields.includes('Payment Summary')) {
-      const data = payments.map(p => ({ ID: p.id, Client: p.client, Site: p.site, Date: formatDisplayDate(p.date), Amount: p.amount, WHT: p.withholdingTax || 0, VAT: p.vat || 0, Discount: p.discount || 0 }));
+      const data = payments.map(p => ({ Client: p.client, Site: p.site, Date: formatDisplayDate(p.date), Amount: p.amount, WHT: p.withholdingTax || 0, VAT: p.vat || 0, Discount: p.discount || 0 }));
       const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Payments');
       previewRows.push({ Module: 'Payment Summary', Scope: `${data.length} payments`, Status: 'Included' });
@@ -622,13 +625,13 @@ export function FinancialReports() {
     }
     if (selectedFields.includes('Overdue Invoices')) {
       const today = new Date().toISOString().split('T')[0];
-      const data = rawInvoices.filter(i => i.status !== 'Paid' && i.dueDate && i.dueDate < today).map(i => ({ ID: i.id, Client: i.client, Site: i.siteName, Amount: i.amount, DueDate: formatDisplayDate(i.dueDate), Status: i.status }));
+      const data = rawInvoices.filter(i => i.status !== 'Paid' && i.dueDate && i.dueDate < today).map(i => ({ Client: i.client, Site: i.siteName, Amount: i.amount, DueDate: formatDisplayDate(i.dueDate), Status: i.status }));
       const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Overdue Invoices');
       previewRows.push({ Module: 'Overdue Invoices', Scope: `${data.length} overdue`, Status: 'Included' });
     }
     if (selectedFields.includes('VAT Remittance')) {
-      const data = vatPayments.map(v => ({ ID: v.id, Client: v.client, Date: formatDisplayDate(v.date), Month: v.month || '', Year: v.year || '', Amount: v.amount }));
+      const data = vatPayments.map(v => ({ Client: v.client, Date: formatDisplayDate(v.date), Month: v.month || '', Year: v.year || '', Amount: v.amount }));
       const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'VAT Remittance');
       previewRows.push({ Module: 'VAT Remittance', Scope: `${data.length} entries`, Status: 'Included' });
@@ -900,7 +903,51 @@ export function FinancialReports() {
         </div>
       )}
       <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
-        
+
+        {/* ── GLOBAL FILTERS BAR ────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-4 bg-white rounded-xl shadow-sm border border-slate-100 px-4 py-3">
+          <div className="flex items-center gap-2 text-slate-700">
+            <Filter className="w-4 h-4 text-indigo-500" />
+            <span className="text-xs font-bold uppercase tracking-wide">Report Filters</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Year */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase">Year</span>
+              <select value={filterYear} onChange={e => setFilterYear(e.target.value)}
+                className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[110px]">
+                <option value="All">All Years</option>
+                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+            {/* Month */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase">Month</span>
+              <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+                className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[130px]">
+                <option value="All">All Months</option>
+                {MONTHS_LIST.map(m => <option key={m.value} value={String(m.value)}>{m.label}</option>)}
+              </select>
+            </div>
+            {/* Client */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase">Client</span>
+              <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
+                className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[140px]">
+                <option value="All">All Clients</option>
+                {availableClients.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            {/* Reset */}
+            {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All') && (
+              <button onClick={() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); }}
+                className="flex items-center gap-1.5 text-xs font-semibold text-rose-500 hover:text-rose-700 px-2 py-1 rounded-md hover:bg-rose-50 transition-colors">
+                <X className="w-3.5 h-3.5" /> Reset
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Tab switcher - compact implementation */}
         <div className="flex bg-white p-2 rounded-xl shadow-sm border border-slate-100 items-center justify-between overflow-x-auto no-scrollbar gap-2">
           <div className="flex gap-1">
@@ -932,7 +979,7 @@ export function FinancialReports() {
         </div>
 
       {mainTab === 'site-summary' ? (
-        <SiteSummary />
+        <SiteSummary filterYear={filterYear} filterMonth={filterMonth} />
       ) : mainTab === 'ledger-summary' ? (
         /* ─────────────────────────────────────────────────────────────
            LEDGER SUMMARY TAB — monthly breakdown of ledger expenses
@@ -946,7 +993,22 @@ export function FinancialReports() {
 
           const filteredLedger = ledgerEntries.filter(e => {
             if (!e.date) return false;
-            if (ledgerSummaryYear !== 'All' && !e.date.startsWith(ledgerSummaryYear)) return false;
+            if (filterYear !== 'All' && !e.date.startsWith(filterYear)) return false;
+            // Handle month filtering
+            if (filterMonth !== 'All') {
+               const d = new Date(e.date);
+               if (!isNaN(d.getTime()) && String(d.getMonth() + 1) !== filterMonth) return false;
+            }
+            if (filterClient !== 'All') {
+               // Determine client for ledger entry
+               let entryClient = '';
+               if (ledgerSummaryView === 'site') {
+                 entryClient = sites.find(s => s.name === e.site)?.client || '';
+               } else if (ledgerSummaryView === 'client') {
+                 entryClient = e.client || '';
+               }
+               if (entryClient !== filterClient) return false;
+            }
             return true;
           });
 
@@ -982,7 +1044,7 @@ export function FinancialReports() {
               <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-500 uppercase">Year</span>
-                  <select value={ledgerSummaryYear} onChange={e => setLedgerSummaryYear(e.target.value)}
+                  <select value={filterYear} onChange={e => setFilterYear(e.target.value)}
                     className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
                     <option value="All">All Years</option>
                     {ledgerYears.map(y => <option key={y} value={y}>{y}</option>)}
@@ -1006,7 +1068,7 @@ export function FinancialReports() {
               {/* Monthly breakdown table */}
               <Card className="shadow-sm border-slate-200 overflow-hidden">
                 <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-3 px-4">
-                  <CardTitle className="text-slate-800 text-base capitalize">By {ledgerSummaryView} — Monthly Breakdown ({ledgerSummaryYear})</CardTitle>
+                  <CardTitle className="text-slate-800 text-base capitalize">By {ledgerSummaryView} — Monthly Breakdown ({filterYear === 'All' ? 'All Time' : filterYear}{filterMonth !== 'All' ? ` - Month ${filterMonth}` : ''})</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
@@ -1014,9 +1076,10 @@ export function FinancialReports() {
                       <thead className="bg-indigo-700 text-white">
                         <tr>
                           <th className="py-2.5 px-4 text-left font-semibold capitalize">{ledgerSummaryView}</th>
-                          {MONTH_NAMES.map(m => (
+                          {MONTH_NAMES.map((m, mi) => { if (filterMonth !== "All" && String(mi + 1) !== filterMonth) return null; return (
                             <th key={m} className="py-2.5 px-2 text-right font-semibold whitespace-nowrap">{m}</th>
-                          ))}
+                                  ); })}
+
                           <th className="py-2.5 px-4 text-right font-semibold">Total</th>
                         </tr>
                       </thead>
@@ -1029,7 +1092,7 @@ export function FinancialReports() {
                           return (
                             <tr key={grp} className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${gi % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
                               <td className="py-2 px-4 font-medium text-slate-700 whitespace-nowrap">{grp || '—'}</td>
-                              {MONTH_NAMES.map((_, mi) => {
+                              {MONTH_NAMES.map((_, mi) => { if (filterMonth !== "All" && String(mi + 1) !== filterMonth) return null;
                                 const val = mthMap.get(mi) || 0;
                                 return (
                                   <td key={mi} className={`py-2 px-2 text-right tabular-nums text-xs ${
@@ -1049,7 +1112,7 @@ export function FinancialReports() {
                         {groups.length > 0 && (
                           <tr className="bg-indigo-50 border-t-2 border-indigo-200 font-bold">
                             <td className="py-2.5 px-4 text-slate-800">TOTAL</td>
-                            {MONTH_NAMES.map((_, mi) => {
+                            {MONTH_NAMES.map((_, mi) => { if (filterMonth !== "All" && String(mi + 1) !== filterMonth) return null;
                               const colTotal = filteredLedger
                                 .filter(e => { const d = new Date(e.date); return !isNaN(d.getTime()) && d.getMonth() === mi; })
                                 .reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -1112,22 +1175,7 @@ export function FinancialReports() {
               <h2 className="text-sm font-bold uppercase tracking-wide">Filters</h2>
             </div>
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Year</span>
-            <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}
-              className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 w-32">
-              <option value="All">All Years</option>
-              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Month</span>
-            <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}
-              className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 w-32">
-              <option value="All">All Months</option>
-              {MONTHS_LIST.map(m => <option key={m.value} value={String(m.value)}>{m.label}</option>)}
-            </select>
-          </div>
+          
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-500 uppercase">Client</span>
             <select value={filterClient} onChange={(e) => setFilterClient(e.target.value)}
@@ -1518,15 +1566,7 @@ export function FinancialReports() {
           <NairaSign className="w-5 h-5 text-indigo-600" /> Payroll & Statutory Overview
         </h2>
         <div className="flex items-center gap-2">
-          <select value={payrollMonth ?? ''} onChange={e => setPayrollMonth(e.target.value === '' ? null : Number(e.target.value))}
-            className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
-            <option value="">All Months</option>
-            {MONTHS_LIST.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-          <select value={payrollYear} onChange={e => setPayrollYear(Number(e.target.value))}
-            className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
-            {[currentYear, currentYear - 1, currentYear - 2].map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <span className="text-xs text-slate-400">Filtered by global filters above</span>
         </div>
       </div>
 
@@ -1535,7 +1575,7 @@ export function FinancialReports() {
           <div className="absolute right-0 top-0 opacity-10"><NairaSign className="w-32 h-32 -mt-4 -mr-4" /></div>
           <CardHeader className="pb-2 relative z-10">
             <CardTitle className="text-sm font-medium text-indigo-200 uppercase tracking-widest flex justify-between">
-              Payroll Exposure <Badge variant="outline" className="text-[10px] text-white/60 border-white/20">{payrollMonth ? MONTHS_LIST.find(m => m.value === payrollMonth)?.label : 'All Months'} {payrollYear}</Badge>
+              Payroll Exposure <Badge variant="outline" className="text-[10px] text-white/60 border-white/20">{(filterMonth === "All" ? null : parseInt(filterMonth, 10)) ? MONTHS_LIST.find(m => m.value === (filterMonth === "All" ? null : parseInt(filterMonth, 10)))?.label : 'All Months'} {(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="relative z-10">
@@ -1572,7 +1612,7 @@ export function FinancialReports() {
         <CardHeader className="bg-slate-50/50 border-b pb-4">
           <CardTitle className="text-lg flex items-center justify-between gap-2 text-slate-800">
             <span className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-indigo-600" /> Annual Payroll & Overtime Trend (Gross)</span>
-            <Badge variant="outline" className="font-normal text-xs bg-white text-slate-500">{payrollYear} Performance</Badge>
+            <Badge variant="outline" className="font-normal text-xs bg-white text-slate-500">{(filterYear === "All" ? currentYear : parseInt(filterYear, 10))} Performance</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
@@ -1679,11 +1719,11 @@ export function FinancialReports() {
                 data.forEach(row => {
                   csv += row.map(val => `"${val}"`).join(',') + '\n';
                 });
-                const fileName = `payroll_summary_${payrollYear}.csv`;
+                const fileName = `payroll_summary_${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}.csv`;
 
                 setPreviewModal({
                   isOpen: true,
-                  title: `Payroll Summary ${payrollYear}`,
+                  title: `Payroll Summary ${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}`,
                   type: 'csv',
                   data: data,
                   headers: headers,
@@ -1723,12 +1763,12 @@ export function FinancialReports() {
 
                 setPreviewModal({
                   isOpen: true,
-                  title: `Payroll Summary ${payrollYear}`,
+                  title: `Payroll Summary ${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}`,
                   type: 'pdf',
                   data: body,
                   headers: head[0],
-                  filename: `payroll_summary_${payrollYear}.pdf`,
-                  onConfirm: () => generatePdf(`Payroll Summary ${payrollYear}`, head, body, `payroll_summary_${payrollYear}.pdf`)
+                  filename: `payroll_summary_${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}.pdf`,
+                  onConfirm: () => generatePdf(`Payroll Summary ${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}`, head, body, `payroll_summary_${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}.pdf`)
                 });
               };
 
@@ -1737,9 +1777,10 @@ export function FinancialReports() {
                   <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                     <div className="flex items-center gap-2">
                       <label className="text-sm font-medium text-slate-700">Year:</label>
-                      <select value={payrollYear} onChange={e => setPayrollYear(Number(e.target.value))}
+                      <select value={filterYear === 'All' ? String(currentYear) : filterYear} onChange={e => setFilterYear(e.target.value)}
                         className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20">
-                        {years.map(y => <option key={y} value={y}>{y}</option>)}
+                        <option value="All">All Years</option>
+                        {years.map(y => <option key={y} value={String(y)}>{y}</option>)}
                       </select>
                     </div>
                     {priv.canExport && (

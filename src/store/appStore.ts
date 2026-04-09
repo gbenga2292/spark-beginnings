@@ -148,6 +148,7 @@ export interface LeaveRecord {
   status: 'Active' | 'Cancelled';
   uploadedFile?: string;
   uploadedFileName?: string;
+  nasFilePath?: string;
   supervisor?: string;
   management?: string;
   approvedById?: string;
@@ -156,6 +157,17 @@ export interface LeaveRecord {
   approvedAt?: string;
   rejectionNote?: string;
   approvalStatus?: 'Pending' | 'Approved' | 'Rejected';
+  personResponsibleDuringAbsence?: string;
+  personResponsibleId?: string;
+  keyDuties?: string[];
+  formDateReturned?: string;
+  employeeSignature?: { signed: 'Signed' | 'Unsigned'; date?: string };
+  supervisorSignature?: { signed: 'Signed' | 'Unsigned'; date?: string };
+  managementSignature?: { signed: 'Signed' | 'Unsigned'; date?: string };
+  hrSignature?: { signed: 'Signed' | 'Unsigned'; date?: string };
+  hrApprovedFrom?: string;
+  hrApprovedTo?: string;
+  leaveNumber?: string;
 }
 
 export interface MonthlySalary {
