@@ -40,7 +40,8 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
     // Sorting state for Totals table
     const [totalsSortField, setTotalsSortField] = useState<string>('client');
     const [totalsSortOrder, setTotalsSortOrder] = useState<'asc' | 'desc'>('asc');
-    const [filterMonthYear, setFilterMonthYear] = useState<string>('');
+    const [filterFromMonth, setFilterFromMonth] = useState<string>('');
+    const [filterToMonth, setFilterToMonth] = useState<string>('');
 
     const initialForm = {
         client: '',
@@ -289,16 +290,22 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
             let clientPayments = payments.filter(p => p.client === client && p.vat > 0);
             let clientVatPayments = vatPayments.filter(vp => vp.client === client);
 
-            if (filterMonthYear) {
-                const [fYear, fMonth] = filterMonthYear.split('-');
+            if (filterFromMonth || filterToMonth) {
                 const checkDate = (d: string) => {
                     if (!d) return false;
-                    if (d.startsWith(filterMonthYear)) return true;
-                    const parts = d.split('/');
-                    if (parts.length === 3) {
-                        return parts[1] === fMonth && parts[2] === fYear;
+                    let dateYM = '';
+                    if (d.includes('-')) {
+                        dateYM = d.substring(0, 7);
+                    } else {
+                        const parts = d.split('/');
+                        if (parts.length === 3) {
+                            dateYM = `${parts[2]}-${parts[1]}`;
+                        }
                     }
-                    return false;
+                    if (!dateYM) return false;
+                    if (filterFromMonth && dateYM < filterFromMonth) return false;
+                    if (filterToMonth && dateYM > filterToMonth) return false;
+                    return true;
                 };
                 clientPayments = clientPayments.filter(p => checkDate(p.date));
                 clientVatPayments = clientVatPayments.filter(vp => checkDate(vp.date));
@@ -337,20 +344,26 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
             if (valA > valB) return totalsSortOrder === 'asc' ? 1 : -1;
             return 0;
         });
-    }, [uniqueClients, payments, vatPayments, totalsSortField, totalsSortOrder, filterMonthYear]);
+    }, [uniqueClients, payments, vatPayments, totalsSortField, totalsSortOrder, filterFromMonth, filterToMonth]);
 
     const sortedVatPayments = useMemo(() => {
         let filtered = vatPayments;
-        if (filterMonthYear) {
+        if (filterFromMonth || filterToMonth) {
             filtered = filtered.filter(p => {
                 const d = p.date || '';
-                if (d.startsWith(filterMonthYear)) return true;
-                const parts = d.split('/');
-                if (parts.length === 3) {
-                   const [fYear, fMonth] = filterMonthYear.split('-');
-                   return parts[1] === fMonth && parts[2] === fYear;
+                let dateYM = '';
+                if (d.includes('-')) {
+                    dateYM = d.substring(0, 7);
+                } else {
+                    const parts = d.split('/');
+                    if (parts.length === 3) {
+                        dateYM = `${parts[2]}-${parts[1]}`;
+                    }
                 }
-                return false;
+                if (!dateYM) return false;
+                if (filterFromMonth && dateYM < filterFromMonth) return false;
+                if (filterToMonth && dateYM > filterToMonth) return false;
+                return true;
             });
         }
         if (searchTerm) {
@@ -376,7 +389,7 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
             if (valA > valB) return entriesSortOrder === 'asc' ? 1 : -1;
             return 0;
         });
-    }, [vatPayments, entriesSortField, entriesSortOrder, searchTerm, filterMonthYear]);
+    }, [vatPayments, entriesSortField, entriesSortOrder, searchTerm, filterFromMonth, filterToMonth]);
 
     const handleEntriesSort = (field: string) => {
         if (entriesSortField === field) {
@@ -491,20 +504,25 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                 <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
                                     {/* Filter input */}
                                     <div className="flex items-center gap-2 sm:border-r border-slate-200 sm:pr-4">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">Filter Date</span>
-                                        <div className="flex items-center gap-1">
-                                            <Input 
-                                                type="month" 
-                                                value={filterMonthYear} 
-                                                onChange={(e) => setFilterMonthYear(e.target.value)} 
-                                                className="h-8 w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
-                                            />
-                                            {filterMonthYear && (
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => setFilterMonthYear('')} title="Clear filter">
-                                                    <X className="h-3.5 w-3.5"/>
-                                                </Button>
-                                            )}
-                                        </div>
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">From</span>
+                                        <Input 
+                                            type="month" 
+                                            value={filterFromMonth} 
+                                            onChange={(e) => setFilterFromMonth(e.target.value)} 
+                                            className="h-8 w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
+                                        />
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">To</span>
+                                        <Input 
+                                            type="month" 
+                                            value={filterToMonth} 
+                                            onChange={(e) => setFilterToMonth(e.target.value)} 
+                                            className="h-8 w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
+                                        />
+                                        {(filterFromMonth || filterToMonth) && (
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => { setFilterFromMonth(''); setFilterToMonth(''); }} title="Clear filter">
+                                                <X className="h-3.5 w-3.5"/>
+                                            </Button>
+                                        )}
                                     </div>
 
                                     {/* Toggle for Actions Column */}
@@ -841,4 +859,3 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
         </div>
     );
 }
-

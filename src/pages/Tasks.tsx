@@ -585,7 +585,7 @@ function AdminTasksView() {
   const mySubs = teamSubtasks.filter(s => {
     if (!s.assignedTo || !currentUser?.id) return false;
     const assignees = typeof s.assignedTo === 'string' 
-      ? s.assignedTo.split(',').map(id => id.trim()) 
+      ? s.assignedTo.split(',').map((id: string) => id.trim()) 
       : Array.isArray(s.assignedTo) ? s.assignedTo : [];
     return assignees.includes(currentUser.id);
   });

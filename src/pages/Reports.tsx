@@ -316,7 +316,7 @@ export function Reports() {
         const month = rec.mth || new Date(rec.date).getMonth() + 1;
         if (month >= 1 && month <= 12) {
           if (rec.day === 'Yes') {
-            if (rec.ot > 0) {
+            if ((rec.ot ?? 0) > 0) {
               summaryData[empId].months[month].otDays += 1;
             } else {
               summaryData[empId].months[month].daysWorked += 1;
@@ -610,7 +610,7 @@ export function Reports() {
   const exportAttendancePdf = () => {
     if (attendanceRecords.length === 0) { toast.error('No attendance records found.'); return; }
     const head = [["Date", "Staff Name", "Day Site", "Night Site", "Present", "OT"]];
-    const body = attendanceRecords.slice(0, 100).map(rec => [formatDisplayDate(rec.date), rec.staffName, rec.daySite, rec.nightSite, rec.isPresent, rec.ot]);
+    const body = attendanceRecords.slice(0, 100).map(rec => [formatDisplayDate(rec.date), rec.staffName, rec.daySite, rec.nightSite, rec.isPresent, rec.ot ?? 0] as (string | number)[]);
     generatePdf("Attendance Report (Recent)", head, body, "attendance_report.pdf");
   };
 

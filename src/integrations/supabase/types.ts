@@ -1375,6 +1375,7 @@ export type Database = {
         Row: {
           assigned_to: string | null
           assignedTo: string | null
+          completed_at: string | null
           created_at: string | null
           created_by: string | null
           createdBy: string | null
@@ -1392,6 +1393,7 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           assignedTo?: string | null
+          completed_at?: string | null
           created_at?: string | null
           created_by?: string | null
           createdBy?: string | null
@@ -1409,6 +1411,7 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           assignedTo?: string | null
+          completed_at?: string | null
           created_at?: string | null
           created_by?: string | null
           createdBy?: string | null
@@ -2001,9 +2004,12 @@ export type Database = {
           is_active: boolean | null
           last_sent_at: string | null
           main_task_id: string | null
+          next_remind_at: string | null
           recipient_ids: string[] | null
           remind_at: string
           send_email: boolean | null
+          snoozed_until: string | null
+          source_ref: string | null
           subtask_id: string | null
           title: string
           updated_at: string | null
@@ -2018,9 +2024,12 @@ export type Database = {
           is_active?: boolean | null
           last_sent_at?: string | null
           main_task_id?: string | null
+          next_remind_at?: string | null
           recipient_ids?: string[] | null
           remind_at: string
           send_email?: boolean | null
+          snoozed_until?: string | null
+          source_ref?: string | null
           subtask_id?: string | null
           title: string
           updated_at?: string | null
@@ -2035,9 +2044,12 @@ export type Database = {
           is_active?: boolean | null
           last_sent_at?: string | null
           main_task_id?: string | null
+          next_remind_at?: string | null
           recipient_ids?: string[] | null
           remind_at?: string
           send_email?: boolean | null
+          snoozed_until?: string | null
+          source_ref?: string | null
           subtask_id?: string | null
           title?: string
           updated_at?: string | null
@@ -2370,6 +2382,7 @@ export type Database = {
           approvedBy: string | null
           assigned_to: string | null
           assignedTo: string | null
+          completed_at: string | null
           created_at: string | null
           deadline: string | null
           description: string | null
@@ -2388,6 +2401,7 @@ export type Database = {
           approvedBy?: string | null
           assigned_to?: string | null
           assignedTo?: string | null
+          completed_at?: string | null
           created_at?: string | null
           deadline?: string | null
           description?: string | null
@@ -2406,6 +2420,7 @@ export type Database = {
           approvedBy?: string | null
           assigned_to?: string | null
           assignedTo?: string | null
+          completed_at?: string | null
           created_at?: string | null
           deadline?: string | null
           description?: string | null

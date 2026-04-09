@@ -40,7 +40,7 @@ export function MaintenanceManager() {
     const rows = maintenanceAssets.map(a => [
       a.name, 
       a.category || '', 
-      a.description ? `"${a.description.replace(/"/g, '""')}"` : '',
+      (a as any).description ? `"${String((a as any).description).replace(/"/g, '""')}"` : '',
       a.status || '', 
       a.lastServiceDate || '', 
       a.nextServiceDate || ''

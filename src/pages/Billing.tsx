@@ -45,7 +45,8 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [sortField, setSortField] = useState<string>('startDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [filterMonthYear, setFilterMonthYear] = useState<string>('');
+  const [filterFromMonth, setFilterFromMonth] = useState<string>('');
+  const [filterToMonth, setFilterToMonth] = useState<string>('');
   const [showActions, setShowActions] = useState(false);
 
   // ── Master Site Registry ────────────────────────────────────
@@ -722,16 +723,22 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       });
     }
 
-    if (filterMonthYear) {
+    if (filterFromMonth || filterToMonth) {
       list = list.filter(item => {
         const d = ('startDate' in item ? item.startDate : item.date) || '';
-        if (d.startsWith(filterMonthYear)) return true;
-        const parts = d.split('/');
-        if (parts.length === 3) {
-           const [fYear, fMonth] = filterMonthYear.split('-');
-           return parts[1] === fMonth && parts[2] === fYear;
+        let dateYM = '';
+        if (d.includes('-')) {
+          dateYM = d.substring(0, 7);
+        } else {
+          const parts = d.split('/');
+          if (parts.length === 3) {
+            dateYM = `${parts[2]}-${parts[1]}`;
+          }
         }
-        return false;
+        if (!dateYM) return false;
+        if (filterFromMonth && dateYM < filterFromMonth) return false;
+        if (filterToMonth && dateYM > filterToMonth) return false;
+        return true;
       });
     }
 
@@ -785,7 +792,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [activeTab, invoices, pendingInvoices, sortField, sortOrder, sites, searchTerm, filterMonthYear]);
+  }, [activeTab, invoices, pendingInvoices, sortField, sortOrder, sites, searchTerm, filterFromMonth, filterToMonth]);
 
   const siteStats = useMemo(() => {
     return sites.map(site => {
@@ -1025,20 +1032,25 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
               <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
                 {/* Filter input */}
                 <div className="flex items-center gap-2 sm:border-r border-slate-200 sm:pr-4">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">Filter Date</span>
-                    <div className="flex items-center gap-1">
-                        <Input 
-                            type="month" 
-                            value={filterMonthYear} 
-                            onChange={(e) => setFilterMonthYear(e.target.value)} 
-                            className="h-8 w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
-                        />
-                        {filterMonthYear && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => setFilterMonthYear('')} title="Clear filter">
-                                <X className="h-3.5 w-3.5"/>
-                            </Button>
-                        )}
-                    </div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">From</span>
+                    <Input 
+                        type="month" 
+                        value={filterFromMonth} 
+                        onChange={(e) => setFilterFromMonth(e.target.value)} 
+                        className="h-8 w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
+                    />
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">To</span>
+                    <Input 
+                        type="month" 
+                        value={filterToMonth} 
+                        onChange={(e) => setFilterToMonth(e.target.value)} 
+                        className="h-8 w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
+                    />
+                    {(filterFromMonth || filterToMonth) && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => { setFilterFromMonth(''); setFilterToMonth(''); }} title="Clear filter">
+                            <X className="h-3.5 w-3.5"/>
+                        </Button>
+                    )}
                 </div>
 
                 {/* Toggle for Actions Column */}

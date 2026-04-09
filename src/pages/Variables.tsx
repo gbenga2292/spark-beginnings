@@ -51,7 +51,7 @@ export function Variables() {
   const [localMonthVals, setLocalMonthVals] = useState(storeMonthValues);
   const [localHrVars, setLocalHrVars] = useState(storeHrVariables);
   const [isDirty, setIsDirty] = useState(false);
-  const setVariablesDirty = useAppStore((state) => state.setVariablesDirty || ((val) => setIsDirty(val))); // fallback
+  const setVariablesDirty = useAppStore((state) => state.setVariablesDirty || ((val: boolean) => setIsDirty(val))); // fallback
 
   const [editingVar, setEditingVar] = useState<{
     type: 'department' | 'position' | 'client' | 'leaveType' | 'holiday' | 'ledgerCategory' | 'ledgerVendor' | 'ledgerBank' | 'ledgerBenBank' | 'ledgerVendorTIN';
@@ -893,7 +893,7 @@ export function Variables() {
               const task = { title: String(row.Title || ''), assignee: String(row.Assignee || '') };
               const isOnboarding = String(row.Type).toLowerCase() === 'onboarding';
               const targetList = isOnboarding ? list.onboardingTasks : list.offboardingTasks;
-              const exists = targetList.some(t => t.title === task.title && t.assignee === task.assignee);
+              const exists = targetList.some((t: any) => t.title === task.title && t.assignee === task.assignee);
               if (!exists) targetList.push(task);
             });
           }
@@ -907,7 +907,7 @@ export function Variables() {
                 list = { department: sName, onboardingTasks: [], offboardingTasks: [] };
                 newTaskLists.push(list);
               }
-              const exists = list.onboardingTasks.some(t => t.title === String(row.TaskTitle) && t.assignee === String(row.Assignee));
+              const exists = list.onboardingTasks.some((t: any) => t.title === String(row.TaskTitle) && t.assignee === String(row.Assignee));
               if (!exists) list.onboardingTasks.push({ title: String(row.TaskTitle), assignee: String(row.Assignee) });
             });
           }
@@ -2634,7 +2634,7 @@ function RenameVariableDialog({ isOpen, onClose, editingVar, renameInput, setRen
               <Input 
                 type="date"
                 value={renameDateInput}
-                onChange={e => setRenameDateInput(e.target.value)}
+                onChange={e => setRenameDateInput?.(e.target.value)}
                 className="h-10"
               />
             </div>

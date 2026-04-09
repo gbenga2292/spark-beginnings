@@ -28,7 +28,8 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
     const [showActions, setShowActions] = useState(false);
     const [sortField, setSortField] = useState<string>('date');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-    const [filterMonthYear, setFilterMonthYear] = useState<string>('');
+    const [filterFromMonth, setFilterFromMonth] = useState<string>('');
+    const [filterToMonth, setFilterToMonth] = useState<string>('');
 
     const initialForm = {
         date: '',
@@ -58,7 +59,7 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
         if (payVat === 'Yes') {
             vat = (amount / (100 + vatRate)) * vatRate;
         } else if (payVat === 'Add') {
-            vat = amount * (vatRate / 100);
+            vat = (amount / (100 + vatRate)) * vatRate;
         }
 
         let amountForVat = 0;
@@ -86,7 +87,7 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
         if (payVat === 'Yes') {
             vat = (amount / (100 + vatRate)) * vatRate;
         } else if (payVat === 'Add') {
-            vat = amount * (vatRate / 100);
+            vat = (amount / (100 + vatRate)) * vatRate;
         }
 
         let amountForVat = 0;
@@ -213,7 +214,7 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
                         if (payVat === 'Yes') {
                             vat = (amount / (100 + vatRate)) * vatRate;
                         } else if (payVat === 'Add') {
-                            vat = amount * (vatRate / 100);
+                            vat = (amount / (100 + vatRate)) * vatRate;
                         }
 
                         let amountForVat = 0;
@@ -312,13 +313,15 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
 
     const sortedPayments = useMemo(() => {
         let filtered = payments;
-        if (filterMonthYear) {
-            const [fYear, fMonth] = filterMonthYear.split('-');
+        if (filterFromMonth || filterToMonth) {
             filtered = filtered.filter(p => {
                 if (!p.date) return false;
                 const parts = p.date.split('/');
                 if (parts.length === 3) {
-                    return parts[1] === fMonth && parts[2] === fYear;
+                    const dateYM = `${parts[2]}-${parts[1]}`;
+                    if (filterFromMonth && dateYM < filterFromMonth) return false;
+                    if (filterToMonth && dateYM > filterToMonth) return false;
+                    return true;
                 }
                 return false;
             });
@@ -352,7 +355,7 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
             if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
             return 0;
         });
-    }, [payments, sortField, sortOrder, searchTerm, filterMonthYear]);
+    }, [payments, sortField, sortOrder, searchTerm, filterFromMonth, filterToMonth]);
 
     const tableSums = useMemo(() => {
         return sortedPayments.reduce((acc, p) => ({
@@ -424,20 +427,25 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
                         <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
                             {/* Filter input */}
                             <div className="flex items-center gap-2 sm:border-r border-slate-200 sm:pr-4">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">Filter Date</span>
-                                <div className="flex items-center gap-1">
-                                    <Input 
-                                        type="month" 
-                                        value={filterMonthYear} 
-                                        onChange={(e) => setFilterMonthYear(e.target.value)} 
-                                        className="h-8 w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
-                                    />
-                                    {filterMonthYear && (
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => setFilterMonthYear('')} title="Clear filter">
-                                            <X className="h-3.5 w-3.5"/>
-                                        </Button>
-                                    )}
-                                </div>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">From</span>
+                                <Input 
+                                    type="month" 
+                                    value={filterFromMonth} 
+                                    onChange={(e) => setFilterFromMonth(e.target.value)} 
+                                    className="h-8 w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
+                                />
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">To</span>
+                                <Input 
+                                    type="month" 
+                                    value={filterToMonth} 
+                                    onChange={(e) => setFilterToMonth(e.target.value)} 
+                                    className="h-8 w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
+                                />
+                                {(filterFromMonth || filterToMonth) && (
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => { setFilterFromMonth(''); setFilterToMonth(''); }} title="Clear filter">
+                                        <X className="h-3.5 w-3.5"/>
+                                    </Button>
+                                )}
                             </div>
 
                             {/* Toggle for Actions Column */}
