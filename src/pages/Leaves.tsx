@@ -864,27 +864,41 @@ export function Leaves() {
           setStatus: (v: 'Signed' | 'Unsigned') => void;
           date: string;
           setDate: (v: string) => void;
-        }) => (
-          <div style={{ marginBottom: 7, padding: '7px 10px', border: '1px solid #ddd', borderRadius: 4 }}>
-            <div className="flex items-center gap-3 flex-wrap">
-              <span style={{ fontSize: 10, flexShrink: 0 }}>{label}:</span>
+        }) => {
+          return (
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 12 }}>
+              <span style={{ fontSize: 10, flexShrink: 0, paddingBottom: 1, whiteSpace: 'nowrap' }}>{label}:</span>
               {isPreviewLocked ? (
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${status === 'Signed' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{status}</span>
+                <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1, color: status === 'Signed' ? '#047857' : 'inherit', fontWeight: status === 'Signed' ? 'bold' : 'normal', paddingLeft: 4 }}>
+                  {status === 'Signed' ? 'Signed' : 'Unsigned'}
+                </span>
               ) : (
-                <select value={status} onChange={e => setStatus(e.target.value as 'Signed' | 'Unsigned')} className="text-[10px] border border-slate-200 rounded px-2 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400">
+                <select
+                  value={status}
+                  onChange={e => setStatus(e.target.value as 'Signed' | 'Unsigned')}
+                  style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1, color: status === 'Signed' ? '#047857' : 'inherit', fontWeight: status === 'Signed' ? 'bold' : 'normal' }}
+                >
                   <option value="Unsigned">Unsigned</option>
                   <option value="Signed">Signed</option>
                 </select>
               )}
-              <span style={{ fontSize: 10, flexShrink: 0, marginLeft: 8 }}>Date:</span>
+              
+              <span style={{ fontSize: 10, flexShrink: 0, paddingBottom: 1, marginLeft: 16 }}>Date:</span>
               {isPreviewLocked ? (
-                <span style={{ fontSize: 10 }}>{date ? format(parseISO(date), 'dd/MM/yyyy') : '\u2014'}</span>
+                <span style={{ borderBottom: '1px solid #111', flex: 0.6, minHeight: 14, fontSize: 10, paddingBottom: 1, paddingLeft: 4 }}>
+                  {date ? format(parseISO(date), 'dd/MM/yyyy') : ''}
+                </span>
               ) : (
-                <input type="date" value={date} onChange={e => setDate(e.target.value)} className="text-[10px] border border-slate-200 rounded px-2 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                <input
+                  type="date"
+                  value={date}
+                  onChange={e => setDate(e.target.value)}
+                  style={{ border: 'none', borderBottom: '1px solid #111', flex: 0.6, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1 }}
+                />
               )}
             </div>
-          </div>
-        );
+          );
+        };
 
         return (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1025,40 +1039,40 @@ export function Leaves() {
                     </div>
 
                     {/* 6. Signatures */}
-                    <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '10px 0 6px', padding: '2px 6px', background: '#f0f0f0', borderLeft: '3px solid #333' }}>6. Signatures</div>
+                    <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '16px 0 10px', padding: '2px 6px', background: '#f0f0f0', borderLeft: '3px solid #333' }}>6. Signatures</div>
                     <SigBlock label="Employee Signature" status={previewEmpSigStatus} setStatus={setPreviewEmpSigStatus} date={previewEmpSigDate} setDate={setPreviewEmpSigDate} />
                     <SigBlock label="Supervisor's Approval" status={previewSupSigStatus} setStatus={setPreviewSupSigStatus} date={previewSupSigDate} setDate={setPreviewSupSigDate} />
                     <SigBlock label="Management's Approval" status={previewMgmtSigStatus} setStatus={setPreviewMgmtSigStatus} date={previewMgmtSigDate} setDate={setPreviewMgmtSigDate} />
 
                     {/* HR Section */}
-                    <div style={{ borderTop: '1px solid #555', margin: '10px 0 6px' }} />
-                    <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 6 }}>To be Completed by Human Resources</div>
-                    <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <span style={{ fontSize: 10, flexShrink: 0 }}>Leave approved from:</span>
+                    <div style={{ borderTop: '1px solid #555', margin: '16px 0 10px' }} />
+                    <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 8 }}>To be Completed by Human Resources</div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 12 }}>
+                      <span style={{ fontSize: 10, flexShrink: 0, paddingBottom: 1, whiteSpace: 'nowrap' }}>Leave approved from:</span>
                       {isPreviewLocked
-                        ? <span style={{ borderBottom: '1px solid #111', minWidth: 70, fontSize: 10 }}>{previewHrFrom ? format(parseISO(previewHrFrom), 'dd/MM/yyyy') : '\u2014'}</span>
-                        : <input type="date" value={previewHrFrom} onChange={e => setPreviewHrFrom(e.target.value)} className="text-[10px] border border-slate-200 rounded px-2 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                        ? <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1, paddingLeft: 4 }}>{previewHrFrom ? format(parseISO(previewHrFrom), 'dd/MM/yyyy') : ''}</span>
+                        : <input type="date" value={previewHrFrom} onChange={e => setPreviewHrFrom(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1 }} />
                       }
-                      <span style={{ fontSize: 10 }}>to</span>
+                      <span style={{ fontSize: 10, flexShrink: 0, paddingBottom: 1 }}>to</span>
                       {isPreviewLocked
-                        ? <span style={{ borderBottom: '1px solid #111', minWidth: 70, fontSize: 10 }}>{previewHrTo ? format(parseISO(previewHrTo), 'dd/MM/yyyy') : '\u2014'}</span>
-                        : <input type="date" value={previewHrTo} onChange={e => setPreviewHrTo(e.target.value)} className="text-[10px] border border-slate-200 rounded px-2 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                        ? <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1, paddingLeft: 4 }}>{previewHrTo ? format(parseISO(previewHrTo), 'dd/MM/yyyy') : ''}</span>
+                        : <input type="date" value={previewHrTo} onChange={e => setPreviewHrTo(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1 }} />
                       }
                     </div>
                     <SigBlock label="HR & Admin Manager Signature" status={previewHrSigStatus} setStatus={setPreviewHrSigStatus} date={previewHrSigDate} setDate={setPreviewHrSigDate} />
 
                     {/* Leave Acknowledgement */}
-                    <div style={{ borderTop: '1px solid #555', margin: '10px 0 6px' }} />
-                    <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 6 }}>Leave Acknowledgement:</div>
-                    <div style={{ fontSize: 10, lineHeight: 1.6, marginBottom: 7 }}>
-                      I <span style={{ borderBottom: '1px solid #111', display: 'inline-block', minWidth: 130, marginBottom: -2 }}>{lv.employeeName}</span> hereby notify the Human Resources and Administrative department that I have resumed duty as of:
+                    <div style={{ borderTop: '1px solid #555', margin: '16px 0 10px' }} />
+                    <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 8 }}>Leave Acknowledgement:</div>
+                    <div style={{ fontSize: 10, lineHeight: 1.6, marginBottom: 10 }}>
+                      I <span style={{ borderBottom: '1px solid #111', display: 'inline-block', minWidth: 130, marginBottom: -2, padding: '0 4px', fontWeight: 'bold' }}>{lv.employeeName}</span> hereby notify the Human Resources and Administrative department that I have resumed duty as of:
                     </div>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10, marginBottom: 8 }}>
-                      <span style={{ flexShrink: 0 }}>Date Returned:</span>
+                      <span style={{ flexShrink: 0, paddingBottom: 1 }}>Date Returned:</span>
                       {isPreviewLocked ? (
-                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{previewFormDateReturned ? format(parseISO(previewFormDateReturned), 'dd/MM/yyyy') : ''}</span>
+                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1, paddingLeft: 4 }}>{previewFormDateReturned ? format(parseISO(previewFormDateReturned), 'dd/MM/yyyy') : ''}</span>
                       ) : (
-                        <input type="date" value={previewFormDateReturned} onChange={e => setPreviewFormDateReturned(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', cursor: 'pointer' }} />
+                        <input type="date" value={previewFormDateReturned} onChange={e => setPreviewFormDateReturned(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1 }} />
                       )}
                     </div>
 
