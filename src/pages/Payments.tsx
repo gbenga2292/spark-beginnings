@@ -10,6 +10,7 @@ import { Badge } from '@/src/components/ui/badge';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { generateId } from '@/src/lib/utils';
+import { NumericFormat } from 'react-number-format';
 
 export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
     const sites = useAppStore((state) => state.sites);
@@ -269,7 +270,7 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
                 return;
             }
             const headers = ['id', 'client', 'site', 'date', 'amount', 'withholdingTax', 'discount', 'payVat', 'vat', 'amountForVat'];
-            const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
+            const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
 
             const rows = payments.map(pay => {
                 const data = [
@@ -621,7 +622,7 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Amount (₦)</label>
-                                    <Input type="number" min="0" value={form.amount} onChange={e => handleChange('amount', e.target.value)} className="bg-slate-50 font-mono font-semibold text-lg text-emerald-700 h-11" />
+                                    <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.amount} onValueChange={(v) => handleChange('amount', v.value || '')} className="bg-slate-50 font-mono font-semibold text-lg text-emerald-700 h-11" />
                                 </div>
                             </div>
 
@@ -654,11 +655,11 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
                             <div className="grid grid-cols-2 gap-5 pt-3 border-t border-slate-100">
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Withholding Tax</label>
-                                    <Input type="number" min="0" value={form.withholdingTax} onChange={e => handleChange('withholdingTax', e.target.value)} className="bg-slate-50 h-11" />
+                                    <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.withholdingTax} onValueChange={(v) => handleChange('withholdingTax', v.value || '')} className="bg-slate-50 h-11" />
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Discount</label>
-                                    <Input type="number" min="0" value={form.discount} onChange={e => handleChange('discount', e.target.value)} className="bg-slate-50 h-11" />
+                                    <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.discount} onValueChange={(v) => handleChange('discount', v.value || '')} className="bg-slate-50 h-11" />
                                 </div>
                             </div>
 

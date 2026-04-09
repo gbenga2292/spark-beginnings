@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { NumericFormat } from 'react-number-format';
 
 const MONTHS = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -210,7 +211,7 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                 return;
             }
             const headers = ['id', 'client', 'date', 'month', 'year', 'amount'];
-            const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
+            const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
 
             const rows = vatPayments.map(pay => {
                 const data = [
@@ -791,7 +792,7 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
 
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Amount Paid (₦)</label>
-                                    <Input type="number" min="0" value={form.amount} onChange={e => handleChange('amount', e.target.value)} className="font-mono bg-slate-50 font-bold text-lg text-indigo-700 h-11" />
+                                    <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.amount} onValueChange={(v) => handleChange('amount', v.value || '')} className="font-mono bg-slate-50 font-bold text-lg text-indigo-700 h-11" />
                                 </div>
                             </div>
 

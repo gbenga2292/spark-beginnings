@@ -13,6 +13,7 @@ import { useAuth } from '@/src/hooks/useAuth';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { generateId } from '@/src/lib/utils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/src/components/ui/dropdown-menu';
+import { NumericFormat } from 'react-number-format';
 
 export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
   const sites = useAppStore((state) => state.sites);
@@ -69,7 +70,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
 
 
   const initialForm = {
-    destination: 'Pending' as 'Pending' | 'Active',
+    destination: 'Active' as 'Pending' | 'Active',
     startDate: '',
     duration: '',
     invoiceNo: '',
@@ -626,7 +627,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       let headers: string[] = [];
       let rows: string[] = [];
       const currentListForExport = (activeTab === 'all' || activeTab === 'active' || activeTab === 'unpaid') ? invoices : pendingInvoices;
-      const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
+      const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
 
       if (activeTab !== 'quotations') {
         if (format === 'basic') {
@@ -1445,7 +1446,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Daily R. Cost</label>
-                    <Input type="number" min="0" value={form.dailyRentalCost} onChange={e => handleChange('dailyRentalCost', e.target.value)} className="bg-slate-50" />
+                    <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.dailyRentalCost} onValueChange={(v) => handleChange('dailyRentalCost', v.value || '')} className="bg-slate-50" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Technicians</label>
@@ -1453,7 +1454,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Daily Tech Rate</label>
-                    <Input type="number" min="0" value={form.techniciansDailyRate} onChange={e => handleChange('techniciansDailyRate', e.target.value)} className="bg-slate-50" />
+                    <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.techniciansDailyRate} onValueChange={(v) => handleChange('techniciansDailyRate', v.value || '')} className="bg-slate-50" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Daily Usage (L)</label>
@@ -1461,7 +1462,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Diesel Cost/ Ltr</label>
-                    <Input type="number" min="0" value={form.dieselCostPerLtr} onChange={e => handleChange('dieselCostPerLtr', e.target.value)} className="bg-slate-50" />
+                    <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.dieselCostPerLtr} onValueChange={(v) => handleChange('dieselCostPerLtr', v.value || '')} className="bg-slate-50" />
                   </div>
                 </div>
 
@@ -1470,15 +1471,15 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                   <div className="grid grid-cols-3 gap-5">
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Mob/Demob</label>
-                      <Input type="number" min="0" value={form.mobDemob} onChange={e => handleChange('mobDemob', e.target.value)} className="bg-slate-50" />
+                      <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.mobDemob} onValueChange={(v) => handleChange('mobDemob', v.value || '')} className="bg-slate-50" />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Install</label>
-                      <Input type="number" min="0" value={form.installation} onChange={e => handleChange('installation', e.target.value)} className="bg-slate-50" />
+                      <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.installation} onValueChange={(v) => handleChange('installation', v.value || '')} className="bg-slate-50" />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Damages</label>
-                      <Input type="number" min="0" value={form.damages} onChange={e => handleChange('damages', e.target.value)} className="bg-slate-50" />
+                      <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.damages} onValueChange={(v) => handleChange('damages', v.value || '')} className="bg-slate-50" />
                     </div>
                   </div>
                 </div>

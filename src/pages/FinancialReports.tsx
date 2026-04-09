@@ -375,7 +375,7 @@ export function FinancialReports() {
       headers = ['ID', 'Invoice Number', 'Client', 'Site', 'Project', 'Amount', 'Date', 'Due Date', 'Status', 'Billing Cycle', 'Duration', 'Machines', 'VAT Inc', 'Total Charge'];
     }
 
-    const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
+    const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
 
     const rows = invoices.map(inv => {
       let data: any[] = [];
@@ -460,7 +460,7 @@ export function FinancialReports() {
 
   const exportPaymentReport = async () => {
     const headers = ["Payment ID", "Client", "Site", "Date", "Amount", "WHT", "VAT", "Discount"];
-    const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
+    const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
     const data = payments.map(p => [p.id, p.client, p.site, formatDisplayDate(p.date), p.amount, p.withholdingTax || 0, p.vat || 0, p.discount || 0]);
     const csvData = [headers.join(','), ...data.map(row => row.map(extractCSV).join(','))].join('\n');
     const fileName = "payment_report.csv";
@@ -512,7 +512,7 @@ export function FinancialReports() {
 
   const exportVatReport = async () => {
     const headers = ["VAT ID", "Client", "Date", "Month", "Year", "Amount"];
-    const extractCSV = (str: any) => `"${String(str || '').replace(/"/g, '""')}"`;
+    const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
     const data = vatPayments.map(v => [v.id, v.client, formatDisplayDate(v.date), v.month || '', v.year || '', v.amount]);
     const csvData = [headers.join(','), ...data.map(row => row.map(extractCSV).join(','))].join('\n');
     const fileName = "vat_report.csv";
@@ -825,9 +825,17 @@ export function FinancialReports() {
                   <TableBody>
                     {previewModal.data.slice(0, 10).map((row, ri) => (
                       <TableRow key={ri} className={ri % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
-                        {Object.values(row).map((val: any, ci) => (
-                          <TableCell key={ci} className="px-4 py-2.5 font-medium text-slate-700 border-r border-slate-100 last:border-0">{String(val || '-')}</TableCell>
-                        ))}
+                        {Object.values(row).map((val: any, ci) => {
+                          let display: string;
+                          if (typeof val === 'number' && !isNaN(val)) {
+                            display = val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                          } else {
+                            display = String(val ?? '') || '-';
+                          }
+                          return (
+                            <TableCell key={ci} className="px-4 py-2.5 font-medium text-slate-700 border-r border-slate-100 last:border-0">{display}</TableCell>
+                          );
+                        })}
                       </TableRow>
                     ))}
                     {previewModal.data.length > 10 && (
