@@ -139,6 +139,7 @@ export function FinancialReports() {
     });
   }, [calculatePayrollForMonth, MONTHS]);
   const [filterYear, setFilterYear] = useState<string>('All');
+  const [filterMonth, setFilterMonth] = useState<string>('All');
   const [filterClient, setFilterClient] = useState<string>('All');
   const [summaryTab, setSummaryTab] = useState<'client' | 'site'>('client');
   const [debtorView, setDebtorView] = useState<'client' | 'site'>('client');
@@ -183,23 +184,50 @@ export function FinancialReports() {
   const invoices = useMemo(() => rawInvoices.filter(i => {
     const normalized = normalizeDate(i.date);
     const matchY = filterYear === 'All' || (normalized && normalized.startsWith(filterYear));
+    let matchM = filterMonth === 'All';
+    if (!matchM) {
+      if (normalized) {
+        matchM = parseInt(normalized.substring(5, 7), 10) === parseInt(filterMonth, 10);
+      } else if (i.date && i.date.includes('/')) {
+        const parts = i.date.split('/');
+        if (parts.length === 3) matchM = parseInt(parts[1], 10) === parseInt(filterMonth, 10);
+      }
+    }
     const matchC = filterClient === 'All' || i.client === filterClient;
-    return matchY && matchC;
-  }), [rawInvoices, filterYear, filterClient]);
+    return matchY && matchM && matchC;
+  }), [rawInvoices, filterYear, filterMonth, filterClient]);
 
   const payments = useMemo(() => rawPayments.filter(p => {
     const normalized = normalizeDate(p.date);
     const matchY = filterYear === 'All' || (normalized && normalized.startsWith(filterYear));
+    let matchM = filterMonth === 'All';
+    if (!matchM) {
+      if (normalized) {
+        matchM = parseInt(normalized.substring(5, 7), 10) === parseInt(filterMonth, 10);
+      } else if (p.date && p.date.includes('/')) {
+        const parts = p.date.split('/');
+        if (parts.length === 3) matchM = parseInt(parts[1], 10) === parseInt(filterMonth, 10);
+      }
+    }
     const matchC = filterClient === 'All' || p.client === filterClient;
-    return matchY && matchC;
-  }), [rawPayments, filterYear, filterClient]);
+    return matchY && matchM && matchC;
+  }), [rawPayments, filterYear, filterMonth, filterClient]);
 
   const vatPayments = useMemo(() => rawVatPayments.filter(v => {
     const normalized = normalizeDate(v.date);
     const matchY = filterYear === 'All' || (normalized && normalized.startsWith(filterYear));
+    let matchM = filterMonth === 'All';
+    if (!matchM) {
+      if (normalized) {
+        matchM = parseInt(normalized.substring(5, 7), 10) === parseInt(filterMonth, 10);
+      } else if (v.date && v.date.includes('/')) {
+        const parts = v.date.split('/');
+        if (parts.length === 3) matchM = parseInt(parts[1], 10) === parseInt(filterMonth, 10);
+      }
+    }
     const matchC = filterClient === 'All' || v.client === filterClient;
-    return matchY && matchC;
-  }), [rawVatPayments, filterYear, filterClient]);
+    return matchY && matchM && matchC;
+  }), [rawVatPayments, filterYear, filterMonth, filterClient]);
 
   // Core Metrics
   const globalStats = useMemo(() => {
@@ -1082,6 +1110,14 @@ export function FinancialReports() {
               className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 w-32">
               <option value="All">All Years</option>
               {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase">Month</span>
+            <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}
+              className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 w-32">
+              <option value="All">All Months</option>
+              {MONTHS_LIST.map(m => <option key={m.value} value={String(m.value)}>{m.label}</option>)}
             </select>
           </div>
           <div className="flex items-center gap-2">

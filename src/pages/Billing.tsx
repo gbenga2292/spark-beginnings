@@ -44,6 +44,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [sortField, setSortField] = useState<string>('startDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [filterMonthYear, setFilterMonthYear] = useState<string>('');
   const [showActions, setShowActions] = useState(false);
 
   // ── Master Site Registry ────────────────────────────────────
@@ -720,6 +721,19 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       });
     }
 
+    if (filterMonthYear) {
+      list = list.filter(item => {
+        const d = ('startDate' in item ? item.startDate : item.date) || '';
+        if (d.startsWith(filterMonthYear)) return true;
+        const parts = d.split('/');
+        if (parts.length === 3) {
+           const [fYear, fMonth] = filterMonthYear.split('-');
+           return parts[1] === fMonth && parts[2] === fYear;
+        }
+        return false;
+      });
+    }
+
     if (activeTab === 'completed' || activeTab === 'unpaid') return []; // Handled separately
     return list.sort((a: any, b: any) => {
       let valA: any = '';
@@ -770,7 +784,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [activeTab, invoices, pendingInvoices, sortField, sortOrder, sites, searchTerm]);
+  }, [activeTab, invoices, pendingInvoices, sortField, sortOrder, sites, searchTerm, filterMonthYear]);
 
   const siteStats = useMemo(() => {
     return sites.map(site => {
@@ -1007,19 +1021,39 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
             <div className="flex items-center gap-6">
               {activeTab === 'quotations' && <p className="hidden md:block text-xs text-slate-500">Double click row to transition to Active.</p>}
               
-              {/* Toggle for Actions Column */}
-              <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Show Actions</span>
-                  <button
-                      onClick={() => setShowActions(!showActions)}
-                      className="group relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none"
-                  >
-                      <span className={`absolute h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${showActions ? 'bg-indigo-600' : 'bg-slate-200'}`} />
-                      <span
-                          className={`absolute left-0 inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
-                          style={{ transform: `translateX(${showActions ? '20px' : '2px'})` }}
-                      />
-                  </button>
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
+                {/* Filter input */}
+                <div className="flex items-center gap-2 sm:border-r border-slate-200 sm:pr-4">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">Filter Date</span>
+                    <div className="flex items-center gap-1">
+                        <Input 
+                            type="month" 
+                            value={filterMonthYear} 
+                            onChange={(e) => setFilterMonthYear(e.target.value)} 
+                            className="h-8 w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
+                        />
+                        {filterMonthYear && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => setFilterMonthYear('')} title="Clear filter">
+                                <X className="h-3.5 w-3.5"/>
+                            </Button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Toggle for Actions Column */}
+                <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Show Actions</span>
+                    <button
+                        onClick={() => setShowActions(!showActions)}
+                        className="group relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none"
+                    >
+                        <span className={`absolute h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${showActions ? 'bg-indigo-600' : 'bg-slate-200'}`} />
+                        <span
+                            className={`absolute left-0 inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                            style={{ transform: `translateX(${showActions ? '20px' : '2px'})` }}
+                        />
+                    </button>
+                </div>
               </div>
             </div>
           </div>

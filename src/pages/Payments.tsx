@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { normalizeDate, formatDisplayDate } from '@/src/lib/dateUtils';
 import { useAppStore, Payment } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { Trash2, Edit, CheckCircle, Plus, X, Upload, Download, ChevronUp, ChevronDown } from 'lucide-react';
@@ -26,6 +27,7 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
     const [showActions, setShowActions] = useState(false);
     const [sortField, setSortField] = useState<string>('date');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    const [filterMonthYear, setFilterMonthYear] = useState<string>('');
 
     const initialForm = {
         date: '',
@@ -94,7 +96,7 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
         return {
             client: form.client,
             site: form.site,
-            date: form.date,
+            date: formatDisplayDate(form.date), // always store as dd/mm/yyyy
             amount,
             withholdingTax,
             discount,
@@ -122,7 +124,7 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
     const handleEdit = (pay: Payment) => {
         setSelectedId(pay.id);
         setForm({
-            date: pay.date,
+            date: normalizeDate(pay.date),
             client: pay.client,
             site: pay.site,
             amount: pay.amount.toString(),
@@ -222,7 +224,7 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
                             id: idToUse,
                             client: siteObj && siteObj.name === client ? site : client, // Restore correct client if swapped
                             site: siteObj && siteObj.name === client ? client : site, // Restore correct site if swapped
-                            date: vals[3],
+                            date: formatDisplayDate(normalizeDate(vals[3])), // store as dd/mm/yyyy
                             amount,
                             withholdingTax: parseFloat(vals[5]) || 0,
                             discount: parseFloat(vals[6]) || 0,
@@ -271,7 +273,7 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
 
             const rows = payments.map(pay => {
                 const data = [
-                    pay.id, pay.client, pay.site, pay.date, pay.amount, pay.withholdingTax, pay.discount, pay.payVat, pay.vat, pay.amountForVat
+                    pay.id, pay.client, pay.site, formatDisplayDate(pay.date), pay.amount, pay.withholdingTax, pay.discount, pay.payVat, pay.vat, pay.amountForVat
                 ];
                 return data.map(extractCSV).join(',');
             });
@@ -309,6 +311,17 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
 
     const sortedPayments = useMemo(() => {
         let filtered = payments;
+        if (filterMonthYear) {
+            const [fYear, fMonth] = filterMonthYear.split('-');
+            filtered = filtered.filter(p => {
+                if (!p.date) return false;
+                const parts = p.date.split('/');
+                if (parts.length === 3) {
+                    return parts[1] === fMonth && parts[2] === fYear;
+                }
+                return false;
+            });
+        }
         if (searchTerm) {
             const lowerSearch = searchTerm.toLowerCase();
             filtered = payments.filter(p => 
@@ -321,7 +334,11 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
         return [...filtered].sort((a, b) => {
             let valA: any = '';
             let valB: any = '';
-            if (sortField === 'date') { valA = a.date || ''; valB = b.date || ''; }
+            if (sortField === 'date') { 
+                // Convert dd/mm/yyyy to yyyy-mm-dd for correct string comparison
+                valA = a.date ? a.date.split('/').reverse().join('-') : ''; 
+                valB = b.date ? b.date.split('/').reverse().join('-') : ''; 
+            }
             else if (sortField === 'client') { valA = (a.client || '').toLowerCase(); valB = (b.client || '').toLowerCase(); }
             else if (sortField === 'site') { valA = (a.site || '').toLowerCase(); valB = (b.site || '').toLowerCase(); }
             else if (sortField === 'amount') { valA = a.amount || 0; valB = b.amount || 0; }
@@ -334,7 +351,7 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
             if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
             return 0;
         });
-    }, [payments, sortField, sortOrder, searchTerm]);
+    }, [payments, sortField, sortOrder, searchTerm, filterMonthYear]);
 
     const tableSums = useMemo(() => {
         return sortedPayments.reduce((acc, p) => ({
@@ -403,18 +420,38 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
                             <Badge variant="secondary" className="ml-2 font-mono bg-emerald-100 text-emerald-800 border-emerald-200">{payments.length}</Badge>
                         </div>
 
-                        {/* Toggle for Actions Column */}
-                        <div className="flex items-center gap-3">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Show Actions</span>
-                            <button
-                                onClick={() => setShowActions(!showActions)}
-                                className={`group relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none`}
-                            >
-                                <span className={`absolute h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${showActions ? 'bg-indigo-600' : 'bg-slate-200'}`} />
-                                <span
-                                    className={`absolute left-0 inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${showActions ? 'translate-x-5' : 'translate-x-0.5'}`}
-                                />
-                            </button>
+                        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
+                            {/* Filter input */}
+                            <div className="flex items-center gap-2 sm:border-r border-slate-200 sm:pr-4">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">Filter Date</span>
+                                <div className="flex items-center gap-1">
+                                    <Input 
+                                        type="month" 
+                                        value={filterMonthYear} 
+                                        onChange={(e) => setFilterMonthYear(e.target.value)} 
+                                        className="h-8 w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
+                                    />
+                                    {filterMonthYear && (
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => setFilterMonthYear('')} title="Clear filter">
+                                            <X className="h-3.5 w-3.5"/>
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Toggle for Actions Column */}
+                            <div className="flex items-center gap-3">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Show Actions</span>
+                                <button
+                                    onClick={() => setShowActions(!showActions)}
+                                    className={`group relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none`}
+                                >
+                                    <span className={`absolute h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${showActions ? 'bg-indigo-600' : 'bg-slate-200'}`} />
+                                    <span
+                                        className={`absolute left-0 inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${showActions ? 'translate-x-5' : 'translate-x-0.5'}`}
+                                    />
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -509,7 +546,7 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
                             <TableBody>
                                 {sortedPayments.map((p: Payment) => (
                                     <TableRow key={p.id} className={`hover:bg-slate-50 transition-colors ${selectedId === p.id ? 'bg-indigo-50/50' : ''}`}>
-                                        <TableCell className="px-4 py-3 text-slate-500">{p.date}</TableCell>
+                                        <TableCell className="px-4 py-3 text-slate-500">{formatDisplayDate(p.date)}</TableCell>
                                         <TableCell className="px-4 py-3 font-semibold text-slate-800">{p.client}</TableCell>
                                         <TableCell className="px-4 py-3 text-slate-600">{p.site}</TableCell>
                                         <TableCell className="px-4 py-3 text-right font-mono font-bold text-slate-900">
