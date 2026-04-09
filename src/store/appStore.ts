@@ -454,8 +454,8 @@ export interface Payment {
   withholdingTax: number;
   discount: number;
   payVat: 'Yes' | 'No' | 'Add';
-  vat: number;
-  amountForVat: number;
+  vat?: number;
+  amountForVat?: number;
 }
 
 export interface VatPayment {

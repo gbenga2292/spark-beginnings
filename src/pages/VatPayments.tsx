@@ -26,6 +26,8 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
     const addVatPayment = useAppStore((state) => state.addVatPayment);
     const updateVatPayment = useAppStore((state) => state.updateVatPayment);
     const deleteVatPayment = useAppStore((state) => state.deleteVatPayment);
+    const payrollVariables = useAppStore((state) => state.payrollVariables);
+    const vatRate = payrollVariables?.vatRate ?? 7.5;
 
     // ─── Permissions ───────────────────────────────────────────
     const priv = usePriv('payments');
@@ -287,7 +289,7 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
 
     const totalsData = useMemo(() => {
         let data = uniqueClients.map(client => {
-            let clientPayments = payments.filter(p => p.client === client && p.vat > 0);
+            let clientPayments = payments.filter(p => p.client === client && p.payVat && p.payVat !== 'No');
             let clientVatPayments = vatPayments.filter(vp => vp.client === client);
 
             if (filterFromMonth || filterToMonth) {
@@ -311,8 +313,13 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                 clientVatPayments = clientVatPayments.filter(vp => checkDate(vp.date));
             }
 
-            const totalPaid = clientPayments.reduce((sum, p) => sum + p.amount, 0);
-            const totalVat = clientPayments.reduce((sum, p) => sum + p.vat, 0);
+            const totalPaid = clientPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+            const totalVat = clientPayments.reduce((sum, p) => {
+                const vatValue = p.payVat === 'Add' ? Math.round(((p.amount * 7.5) / 107.5) * 100) / 100 
+                               : p.payVat === 'Yes' ? Math.round(((p.amount / (100 + vatRate)) * vatRate) * 100) / 100 
+                               : 0;
+                return sum + vatValue;
+            }, 0);
             const vatPaid = clientVatPayments.reduce((sum, vp) => sum + vp.amount, 0);
 
             const vatBalanceToPay = totalVat - vatPaid;

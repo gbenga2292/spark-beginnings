@@ -12,7 +12,15 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { generateId } from '@/src/lib/utils';
 import { NumericFormat } from 'react-number-format';
 
-export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
+const getVatDetails = (amount: number, payVat: string, vatRate: number) => {
+    const vat = payVat === 'Add' ? Math.round(((amount * 7.5) / 107.5) * 100) / 100 
+              : payVat === 'Yes' ? Math.round(((amount / (100 + vatRate)) * vatRate) * 100) / 100 
+              : 0;
+    const amountForVat = payVat !== 'No' ? amount - vat : amount;
+    return { vat, amountForVat };
+};
+
+export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal?: (val: any) => void; searchTerm?: string }) {
     const sites = useAppStore((state) => state.sites);
     const payments = useAppStore((state) => state.payments);
     const addPayment = useAppStore((state) => state.addPayment);
@@ -55,17 +63,7 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
         const siteObj = sites.find(s => s.name === form.site && s.client === form.client);
         const payVat = siteObj ? siteObj.vat : 'No';
 
-        let vat = 0;
-        if (payVat === 'Yes') {
-            vat = (amount / (100 + vatRate)) * vatRate;
-        } else if (payVat === 'Add') {
-            vat = (amount / (100 + vatRate)) * vatRate;
-        }
-
-        let amountForVat = 0;
-        if (payVat !== 'No') {
-            amountForVat = amount - vat;
-        }
+        const { vat, amountForVat } = getVatDetails(amount, payVat, vatRate);
 
         return { amount, vat, payVat, amountForVat };
     }, [form.amount, form.site, form.client, sites, vatRate]);
@@ -76,35 +74,21 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
             return null;
         }
 
-        const amount = parseFloat(form.amount) || 0;
-        const withholdingTax = parseFloat(form.withholdingTax) || 0;
-        const discount = parseFloat(form.discount) || 0;
-
+        const amount = parseFloat(form.amount.replace(/,/g, '')) || 0;
+        const withholdingTax = parseFloat(form.withholdingTax.replace(/,/g, '')) || 0;
+        const discount = parseFloat(form.discount.replace(/,/g, '')) || 0;
+        
         const siteObj = sites.find(s => s.name === form.site && s.client === form.client);
         const payVat = siteObj ? siteObj.vat : 'No';
-
-        let vat = 0;
-        if (payVat === 'Yes') {
-            vat = (amount / (100 + vatRate)) * vatRate;
-        } else if (payVat === 'Add') {
-            vat = (amount / (100 + vatRate)) * vatRate;
-        }
-
-        let amountForVat = 0;
-        if (payVat !== 'No') {
-            amountForVat = amount - vat;
-        }
 
         return {
             client: form.client,
             site: form.site,
-            date: formatDisplayDate(form.date), // always store as dd/mm/yyyy
+            date: formatDisplayDate(form.date),
             amount,
             withholdingTax,
             discount,
             payVat,
-            vat,
-            amountForVat,
         };
     };
 
@@ -214,7 +198,7 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
                         if (payVat === 'Yes') {
                             vat = (amount / (100 + vatRate)) * vatRate;
                         } else if (payVat === 'Add') {
-                            vat = (amount / (100 + vatRate)) * vatRate;
+                            vat = Math.round(((amount * 7.5) / 107.5) * 100) / 100;
                         }
 
                         let amountForVat = 0;
@@ -231,8 +215,6 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
                             withholdingTax: parseFloat(vals[5]) || 0,
                             discount: parseFloat(vals[6]) || 0,
                             payVat,
-                            vat,
-                            amountForVat,
                         };
                         const existing = payments.find(e => e.id === parsedPayment.id);
                         if (existing && mode !== 'append') { 
@@ -274,8 +256,10 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
             const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
 
             const rows = payments.map(pay => {
+                const { vat, amountForVat: amtForVat } = getVatDetails(pay.amount || 0, pay.payVat, vatRate);
+                
                 const data = [
-                    pay.id, pay.client, pay.site, formatDisplayDate(pay.date), pay.amount, pay.withholdingTax, pay.discount, pay.payVat, pay.vat, pay.amountForVat
+                    pay.id, pay.client, pay.site, formatDisplayDate(pay.date), pay.amount, pay.withholdingTax, pay.discount, pay.payVat, vat, amtForVat
                 ];
                 return data.map(extractCSV).join(',');
             });
@@ -358,14 +342,19 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
     }, [payments, sortField, sortOrder, searchTerm, filterFromMonth, filterToMonth]);
 
     const tableSums = useMemo(() => {
-        return sortedPayments.reduce((acc, p) => ({
-            amount: acc.amount + (p.amount || 0),
-            wht: acc.wht + (p.withholdingTax || 0),
-            discount: acc.discount + (p.discount || 0),
-            vat: acc.vat + (p.vat || 0),
-            amtForVat: acc.amtForVat + (p.amountForVat || 0),
-        }), { amount: 0, wht: 0, discount: 0, vat: 0, amtForVat: 0 });
-    }, [sortedPayments]);
+        return sortedPayments.reduce((acc, p) => {
+            // LIVE VAT CALCULATION
+            const { vat, amountForVat: amtForVat } = getVatDetails(p.amount || 0, p.payVat, vatRate);
+
+            return {
+                amount: acc.amount + (p.amount || 0),
+                wht: acc.wht + (p.withholdingTax || 0),
+                discount: acc.discount + (p.discount || 0),
+                vat: acc.vat + vat,
+                amtForVat: acc.amtForVat + amtForVat,
+            };
+        }, { amount: 0, wht: 0, discount: 0, vat: 0, amtForVat: 0 });
+    }, [sortedPayments, vatRate]);
 
     const formatSum = (val: number) => {
         if (priv?.canViewAmounts === false) return '***';
@@ -573,10 +562,16 @@ export function Payments({ searchTerm = '' }: { searchTerm?: string }) {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-right text-indigo-600 font-mono font-medium">
-                                            {priv?.canViewAmounts === false ? '***' : (p.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {priv?.canViewAmounts === false ? '***' : (() => {
+                                                const { vat } = getVatDetails(p.amount || 0, p.payVat, vatRate);
+                                                return vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                            })()}
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-right text-emerald-600 font-mono font-medium">
-                                            {priv?.canViewAmounts === false ? '***' : (p.amountForVat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {priv?.canViewAmounts === false ? '***' : (() => {
+                                                const { amountForVat } = getVatDetails(p.amount || 0, p.payVat, vatRate);
+                                                return amountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                            })()}
                                         </TableCell>
                                         {showActions && (
                                             <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
