@@ -97,6 +97,13 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Helper: wrap a lazy page in its own Suspense + scoped error boundary
+const Page = ({ children, label }: { children: React.ReactNode; label?: string }) => (
+  <PageErrorBoundary label={label}>
+    <Suspense fallback={<PageLoader />}>{children}</Suspense>
+  </PageErrorBoundary>
+);
+
 function AppContent() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -116,13 +123,6 @@ function AppContent() {
     window.addEventListener('electron-navigate', handler);
     return () => window.removeEventListener('electron-navigate', handler);
   }, [navigate]);
-
-  // Helper: wrap a lazy page in its own Suspense + scoped error boundary
-  const Page = ({ children, label }: { children: React.ReactNode; label?: string }) => (
-    <PageErrorBoundary label={label}>
-      <Suspense fallback={<PageLoader />}>{children}</Suspense>
-    </PageErrorBoundary>
-  );
 
   return (
     <Routes>
