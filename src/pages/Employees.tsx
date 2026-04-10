@@ -762,8 +762,6 @@ export function Employees() {
   // Render Employee Form (Add or Edit)
   const renderEmployeeForm = (isEdit: boolean) => (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-<<<<<<< HEAD
-=======
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 gap-4">
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <Button variant="ghost" size="icon" onClick={async () => {
@@ -795,7 +793,7 @@ export function Employees() {
         </Button>
       </div>
 
->>>>>>> 7368f23c84d49817eca9ad181161a17ac040ee27
+
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
         {/* --- LEFT COLUMN: Primary Details --- */}
         <div className="xl:col-span-2 flex flex-col gap-6">

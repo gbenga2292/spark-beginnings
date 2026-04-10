@@ -174,8 +174,6 @@ export function Attendance() {
   const isFieldStaff = staffTypeFilter === 'FIELD';
   const isOfficeStaff = staffTypeFilter === 'OFFICE';
 
-  const departments = useAppStore((state) => state.departments);
-
   // State for the current form
   const [attendanceData, setAttendanceData] = useState<Record<string, { day: string, night: string, overtime: boolean, overtimeDetails: string }>>({});
 
