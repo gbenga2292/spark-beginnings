@@ -2219,9 +2219,8 @@ export function Variables() {
                   ))}
                 </select>
                 {monthConfigDept && (() => {
-                  const configuredDays = localPayrollVars.departmentWorkDays?.[monthConfigDept];
-                  const defaultDays = ['OPERATIONS', 'ENGINEERING'].includes(monthConfigDept.toUpperCase()) ? 6 : 5;
-                  const effective = configuredDays ?? defaultDays;
+                  const deptObj = departments.find(d => d.name === monthConfigDept);
+                  const effective = deptObj?.workDaysPerWeek ?? (deptObj?.staffType === 'FIELD' ? 6 : 5);
                   return <span className="text-xs text-indigo-600 font-medium bg-indigo-50 rounded-full px-2 py-0.5">{effective} days/week</span>;
                 })()}
               </div>
@@ -2242,13 +2241,11 @@ export function Variables() {
                       const startDate = new Date(payrollYear, monthNum - 1, 1);
                       const endDate = new Date(payrollYear, monthNum, 0);
 
-                      // Compute workdays for selected department
+                      // Compute workdays using the department's workDaysPerWeek from the departments table
                       const selectedDefaultDays = monthConfigDept
-                        ? (['OPERATIONS', 'ENGINEERING'].includes(monthConfigDept.toUpperCase()) ? 6 : 5)
+                        ? (() => { const d = departments.find(dep => dep.name === monthConfigDept); return d?.workDaysPerWeek ?? (d?.staffType === 'FIELD' ? 6 : 5); })()
                         : 6;
-                      const deptWorkDaysPerWeek = monthConfigDept
-                        ? (localPayrollVars.departmentWorkDays?.[monthConfigDept] ?? selectedDefaultDays)
-                        : 6;
+                      const deptWorkDaysPerWeek = monthConfigDept ? selectedDefaultDays : 6;
                       const computedWorkDays = computeWorkDays(payrollYear, monthNum, holidayDateStrings, deptWorkDaysPerWeek);
 
                       const data = localMonthVals[key] || { workDays: 0, overtimeRate: 0.5 };

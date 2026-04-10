@@ -27,6 +27,7 @@ export function usePayrollCalculator() {
   const monthValues = useAppStore((state) => state.monthValues);
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const publicHolidays = useAppStore((state) => state.publicHolidays);
+  const departments = useAppStore((state) => state.departments);
 
   const currentYear = new Date().getFullYear();
 
@@ -83,9 +84,10 @@ export function usePayrollCalculator() {
       .map((emp) => {
         const standardSalary = emp.monthlySalaries[mKey] || 0;
 
-        // Per-department workdays per week (defaults: FIELD = 6, others = 5)
+        // Use workDaysPerWeek from the departments table (set in Variables page) as the authoritative source
         const defaultDays = emp.staffType === 'FIELD' ? 6 : 5;
-        const empWorkDaysPerWeek = payrollVariables.departmentWorkDays?.[emp.department] ?? defaultDays;
+        const deptRecord = departments.find(d => d.name === emp.department);
+        const empWorkDaysPerWeek = deptRecord?.workDaysPerWeek ?? defaultDays;
         const empOfficialWorkdays = computeWorkDays(year, selectedMonthIndex, holidayDates, empWorkDaysPerWeek);
 
         // Attendance tallies — filter by BOTH year and month to match Payroll.tsx
@@ -237,7 +239,7 @@ export function usePayrollCalculator() {
           status: 'Pending' as const,
         };
       });
-  }, [employees, salaryAdvances, loans, payrollVariables, payeTaxVariables, monthValues, attendanceRecords, publicHolidays, currentYear]);
+  }, [employees, salaryAdvances, loans, payrollVariables, payeTaxVariables, monthValues, attendanceRecords, publicHolidays, departments, currentYear]);
 
   return { calculatePayrollForMonth, MONTHS };
 }

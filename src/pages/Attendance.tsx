@@ -41,6 +41,7 @@ export function Attendance() {
   const sites = useAppStore((state) => state.sites);
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const payrollVariables = useAppStore((state) => state.payrollVariables);
+  const departments = useAppStore((state) => state.departments);
   const addAttendanceRecords = useAppStore((state) => state.addAttendanceRecords);
   const removeAttendanceRecordsByDate = useAppStore((state) => state.removeAttendanceRecordsByDate);
   const deleteAttendanceRecords = useAppStore((state) => state.deleteAttendanceRecords);
@@ -1248,8 +1249,9 @@ export function Attendance() {
                               <div className="flex items-center gap-2">
                                 {(() => {
                                   const dow = getDOW(registerDate);
-                                  const defaultDays = ['OPERATIONS', 'ENGINEERING'].includes(employee.department.toUpperCase()) ? 6 : 5;
-                                  const wd = payrollVariables.departmentWorkDays?.[employee.department] ?? defaultDays;
+                                  const deptObj = departments.find(d => d.name === employee.department);
+                                  const defaultDays = employee.staffType === 'FIELD' ? 6 : 5;
+                                  const wd = deptObj?.workDaysPerWeek ?? defaultDays;
                                   const isWorkday = (dow <= wd) && !isHoliday(registerDate);
 
                                   const disabledOt = isWorkday || onLeave;

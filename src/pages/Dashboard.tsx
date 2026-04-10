@@ -108,7 +108,9 @@ export function Dashboard() {
         let totalPossibleDays = 0;
 
         historicallyActiveStaff.forEach(emp => {
-            const wDays = payrollVariables?.departmentWorkDays?.[emp.department || ''] || (emp.staffType === 'OFFICE' ? 5 : 6);
+                    const deptObj = departments.find(d => d.name === (emp.department || ''));
+                    const wDays = deptObj?.workDaysPerWeek ?? (emp.staffType === 'OFFICE' ? 5 : 6);
+
 
             monthsToProcess.forEach(targetMonth => {
                 const startOfViewingMonth = new Date(filterYear, targetMonth - 1, 1);
@@ -217,7 +219,7 @@ export function Dashboard() {
             activeLoans,
             activeSites,
         };
-    }, [employees, attendanceRecords, holidays, filterMonth, filterYear, invoices, leaves, salaryAdvances, loans, sites, payrollVariables]);
+    }, [employees, attendanceRecords, holidays, filterMonth, filterYear, invoices, leaves, salaryAdvances, loans, sites, departments]);
 
     // ── DEPARTMENT BREAKDOWN ──
     const deptData = useMemo(() => {
@@ -260,7 +262,9 @@ export function Dashboard() {
                     if (emp.startDate && new Date(emp.startDate) > dDate) return;
                     if (emp.endDate && new Date(emp.endDate) < dDate) return;
 
-                    const wDays = payrollVariables?.departmentWorkDays?.[emp.department || ''] || (emp.staffType === 'OFFICE' ? 5 : 6);
+                            const deptObj = departments.find(d => d.name === (emp.department || ''));
+                    const wDays = deptObj?.workDaysPerWeek ?? (emp.staffType === 'OFFICE' ? 5 : 6);
+
                     
                     let shouldBeWorking = !isSun && !isHol;
                     if (wDays < 6 && isSat) shouldBeWorking = false;
@@ -330,7 +334,9 @@ export function Dashboard() {
 
                     monthlyActiveCount++;
 
-                    const wDays = payrollVariables?.departmentWorkDays?.[emp.department || ''] || (emp.staffType === 'OFFICE' ? 5 : 6);
+                            const deptObj = departments.find(d => d.name === (emp.department || ''));
+                    const wDays = deptObj?.workDaysPerWeek ?? (emp.staffType === 'OFFICE' ? 5 : 6);
+
                     
                     // Daily iteration for precise monthly tracking (matching kpiStats)
                     const daysInMth = endOfViewingMonth.getDate();
@@ -403,7 +409,7 @@ export function Dashboard() {
                 return { name: m.label.substring(0, 3), Present: p, Absent: a, Overtime: o };
             });
         }
-    }, [employees, attendanceRecords, holidays, filterYear, filterMonth, chartViewMode, payrollVariables]);
+    }, [employees, attendanceRecords, holidays, filterYear, filterMonth, chartViewMode, departments]);
 
     // ── HEADCOUNT GROWTH ──
     const headcountChartData = useMemo(() => {
