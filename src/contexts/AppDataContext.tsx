@@ -293,7 +293,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             let targetSubs = subs;
             
             // Auto-generate a default subtask if none were provided and it's a standard task (not purely a project wrapper)
-            if (targetSubs.length === 0 && !payload.is_project) {
+            if (targetSubs.length === 0 && !payload.is_project && !task.skipAutoSubtask) {
                 targetSubs = [{
                     title: payload.title,
                     description: payload.description,

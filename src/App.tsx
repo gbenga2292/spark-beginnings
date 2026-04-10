@@ -44,6 +44,7 @@ const LeaveSummary = lazy(() => import('./pages/LeaveSummary').then(m => ({ defa
 const Users = lazy(() => import('./pages/Users').then(m => ({ default: m.Users })));
 const UserForm = lazy(() => import('./pages/UserForm').then(m => ({ default: m.UserForm })));
 const SalaryLoans = lazy(() => import('./pages/SalaryLoans').then(m => ({ default: m.SalaryLoans })));
+const HmoManagement = lazy(() => import('./pages/HmoManagement').then(m => ({ default: m.HmoManagement })));
 const PerformanceConduct = lazy(() => import('./pages/PerformanceConduct').then(m => ({ default: m.PerformanceConduct })));
 const Evaluations = lazy(() => import('./pages/Evaluations').then(m => ({ default: m.Evaluations })));
 const Ledger = lazy(() => import('./pages/Ledger').then(m => ({ default: m.Ledger })));
@@ -156,6 +157,7 @@ function AppContent() {
         <Route path="users/new" element={<Page label="New User"><ProtectedRoute requiredModule="users"><UserForm /></ProtectedRoute></Page>} />
         <Route path="users/:id/edit" element={<Page label="Edit User"><ProtectedRoute requiredModule="users"><UserForm /></ProtectedRoute></Page>} />
         <Route path="salary-loans" element={<Page label="Salary & Loans"><ProtectedRoute requiredModule="salaryLoans"><SalaryLoans /></ProtectedRoute></Page>} />
+        <Route path="hmo" element={<Page label="HMO Management"><ProtectedRoute requiredModule="hmo"><HmoManagement /></ProtectedRoute></Page>} />
         <Route path="performance-conduct" element={<Page label="Performance & Conduct"><ProtectedRoute requiredModule="disciplinary"><PerformanceConduct /></ProtectedRoute></Page>} />
         <Route path="evaluations" element={<Page label="Evaluations"><ProtectedRoute requiredModule="evaluations"><Evaluations /></ProtectedRoute></Page>} />
         <Route path="ledger" element={<Page label="Ledger"><ProtectedRoute requiredModule="ledger"><Ledger /></ProtectedRoute></Page>} />

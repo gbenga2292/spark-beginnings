@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from '@/src/hooks/useAuth';
 import { useUserStore, UserPrivileges } from '@/src/store/userStore';
 import { useAppData } from '@/src/contexts/AppDataContext';
+import { useAppStore } from '@/src/store/appStore';
 import {
   Search, Circle, Loader2, CheckCircle2, AlertTriangle,
   User, Calendar, Clock, ChevronDown, ChevronRight,
@@ -47,11 +48,21 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const subUser = useUserStore((s) => s.getCurrentUser());
+  const { updateEmployee } = useAppStore();
   const { updateSubtaskStatus, postComment, getSubtaskComments, addSubtask, assignSubtask, getMainTaskWorkflow, approveSubtask, rejectSubtask, addReminder } = useAppData();
 
   const [search, setSearch] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [rightTab, setRightTab] = useState<"updates" | "workflow" | "files">("updates");
+  
+  // Custom HMO UI Prompt State
+  const [hmoPrompt, setHmoPrompt] = useState<{ isOpen: boolean; duration: string; startDate: string; employeeId: string; subtaskId: string | null }>({
+    isOpen: false,
+    duration: '12',
+    startDate: new Date().toISOString().split('T')[0],
+    employeeId: '',
+    subtaskId: null
+  });
 
   // Group subtasks under their MainTasks — normalize snake_case from Supabase
   const groupedTasks = useMemo(() => {
@@ -324,7 +335,15 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
 
                     try {
                       const meta = JSON.parse(activeSubtask.description || '{}');
+                      const privs = subUser?.privileges as UserPrivileges;
                       if (meta.refType === 'leave') { link = '/leaves'; label = 'View Leaves'; privKey = 'leaves'; }
+                      if (meta.refType === 'hmo') {
+                          if (privs?.hmo) {
+                             link = '/hmo'; label = 'View HMO Panel'; privKey = 'hmo';
+                          } else {
+                             link = '';
+                          }
+                      }
                       if (meta.refType === 'salary_advance' || meta.refType === 'loan') { link = '/salary-loans'; label = 'View Loan'; privKey = 'salaryLoans'; }
                       if (meta.refId && (meta.refType === 'site' || mtTitle.includes('onboard'))) { link = `/sites/onboarding/${meta.refId}`; label = 'View Onboarding'; privKey = 'sites'; }
                     } catch(e) {}
@@ -403,7 +422,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                     let isApprovalTask = false;
                     try {
                       const meta = JSON.parse(activeSubtask.description || '{}');
-                      if (meta.refType) isApprovalTask = true;
+                      if (meta.refType && meta.refType !== 'hmo') isApprovalTask = true;
                     } catch (e) {
                       // Normal text description
                     }
@@ -454,7 +473,33 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                       return (
                         <button
                           key={s}
-                          onClick={() => canChangeStatus && currentUser && updateSubtaskStatus(activeSubtask.id!, s, currentUser.id)}
+                          onClick={() => {
+                            if (!canChangeStatus || !currentUser) return;
+                            
+                            // Special intercept logic for HMO tasks
+                            let isHmo = false;
+                            let hmoEmpId = "";
+                            try {
+                              const meta = JSON.parse(activeSubtask.description || '{}');
+                              if (meta.refType === 'hmo') {
+                                isHmo = true;
+                                hmoEmpId = meta.employeeId;
+                              }
+                            } catch (e) {}
+
+                            if (isHmo && s === 'completed' && hmoEmpId) {
+                               setHmoPrompt({
+                                  isOpen: true,
+                                  duration: '12',
+                                  startDate: new Date().toISOString().split('T')[0],
+                                  employeeId: hmoEmpId,
+                                  subtaskId: activeSubtask.id || null
+                               });
+                               return;
+                            }
+
+                            updateSubtaskStatus(activeSubtask.id!, s, currentUser.id);
+                          }}
                           disabled={!canChangeStatus}
                           title={!canChangeStatus ? 'Only admins and the task creator can change status' : undefined}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
@@ -628,6 +673,57 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
           </div>
           <p className="text-lg font-semibold text-slate-600 mb-1">Select a task</p>
           <p className="text-sm text-slate-400">Choose a task from the sidebar to view details</p>
+        </div>
+      )}
+
+      {hmoPrompt.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-sm border border-slate-200 dark:border-slate-800">
+             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                 <h3 className="text-[15px] font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                   <AlertTriangle className="w-5 h-5 text-indigo-500" /> HMO Policy Renewal
+                 </h3>
+                 <button onClick={() => setHmoPrompt(p => ({ ...p, isOpen: false }))} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+             </div>
+             <div className="p-5 space-y-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Renewal Start Date</label>
+                  <input 
+                    type="date" 
+                    value={hmoPrompt.startDate} 
+                    onChange={e => setHmoPrompt(p => ({ ...p, startDate: e.target.value }))}
+                    className="w-full h-10 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Duration (Months)</label>
+                  <input 
+                    type="number" 
+                    value={hmoPrompt.duration} 
+                    onChange={e => setHmoPrompt(p => ({ ...p, duration: e.target.value }))}
+                    className="w-full h-10 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                  />
+                </div>
+             </div>
+             <div className="p-5 bg-slate-50 dark:bg-slate-800/50 rounded-b-xl flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                <button onClick={() => setHmoPrompt(p => ({ ...p, isOpen: false }))} className="px-4 py-2 rounded-lg text-sm font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button 
+                  onClick={() => {
+                     if (!hmoPrompt.duration || !hmoPrompt.startDate) return;
+                     updateEmployee(hmoPrompt.employeeId, {
+                        lashmaRegistrationDate: hmoPrompt.startDate,
+                        lashmaDuration: parseInt(hmoPrompt.duration) || 12,
+                     });
+                     if (hmoPrompt.subtaskId) updateSubtaskStatus(hmoPrompt.subtaskId, 'completed', currentUser?.id);
+                     toast.success("HMO Policy renewed successfully!");
+                     setHmoPrompt(p => ({ ...p, isOpen: false }));
+                  }}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-2"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Confirm
+                </button>
+             </div>
+          </div>
         </div>
       )}
     </div>

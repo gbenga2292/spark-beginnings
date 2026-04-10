@@ -65,6 +65,8 @@ const PRIV_GROUPS: PG[] = [
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewSummary', label: 'View Summary Page' }] },
       { key: 'salaryLoans', label: 'Salary Advances & Loans', parentKey: 'salaryLoans', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Approve / Delete', danger: true }, { key: 'canViewAmounts', label: 'View Amounts', special: true }] },
+      { key: 'hmo', label: 'HMO Management', parentKey: 'hmo', masterField: 'canView',
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add/Process' }, { key: 'canEdit', label: 'Edit' }, { key: 'canExport', label: 'Export' }] },
       { key: 'evaluations', label: 'Evaluations', parentKey: 'evaluations', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
       { key: 'disciplinary', label: 'Performance & Conduct', parentKey: 'disciplinary', masterField: 'canView',

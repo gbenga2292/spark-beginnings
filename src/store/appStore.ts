@@ -298,6 +298,7 @@ export interface Employee {
   lashmaPolicyNumber?: string;
   lashmaRegistrationDate?: string;
   lashmaExpiryDate?: string;
+  lashmaDuration?: number;
   secondaryDepartments?: string[];
 }
 

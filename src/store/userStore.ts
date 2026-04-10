@@ -26,6 +26,7 @@ export interface AttendancePriv  { canView: boolean; canAdd: boolean; canEdit: b
 export interface LeavesPriv      { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canViewSummary: boolean; }
 export interface SalaryLoansPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canViewAmounts: boolean; }
 export interface ReportsPriv     { canView: boolean; canExport: boolean; }
+export interface HmoPriv         { canView: boolean; canAdd: boolean; canEdit: boolean; canExport: boolean; }
 
 // ─── Admin ───────────────────────────────────────────────────
 export interface SitesPriv {
@@ -85,6 +86,7 @@ export interface UserPrivileges {
   attendance:        AttendancePriv;
   leaves:            LeavesPriv;
   salaryLoans:       SalaryLoansPriv;
+  hmo:               HmoPriv;
   reports:           ReportsPriv;
   sites:             SitesPriv;
   billing:           BillingPriv;
@@ -137,6 +139,7 @@ export const FULL_ACCESS: UserPrivileges = {
   attendance:       { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
   leaves:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewSummary: true },
   salaryLoans:      { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewAmounts: true },
+  hmo:              { canView: true, canAdd: true, canEdit: true, canExport: true },
   reports:          { canView: true, canExport: true },
   sites:            { canView: true, canAddSite: true, canEditSite: true, canDeleteSite: true, canAddClient: true, canEditClient: true, canDeleteClient: true, canViewClientSummary: true, canImport: true, canExport: true },
   billing:          { canView: true, canCreate: true, canEdit: true, canDelete: true, canViewAmounts: true, canImport: true, canExport: true },
@@ -169,6 +172,7 @@ export const NO_ACCESS: UserPrivileges = {
   attendance:       { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
   leaves:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewSummary: false },
   salaryLoans:      { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewAmounts: false },
+  hmo:              { canView: false, canAdd: false, canEdit: false, canExport: false },
   reports:          { canView: false, canExport: false },
   sites:            { canView: false, canAddSite: false, canEditSite: false, canDeleteSite: false, canAddClient: false, canEditClient: false, canDeleteClient: false, canViewClientSummary: false, canImport: false, canExport: false },
   billing:          { canView: false, canCreate: false, canEdit: false, canDelete: false, canViewAmounts: false, canImport: false, canExport: false },
@@ -206,6 +210,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       attendance:  { canView: true, canAdd: true, canEdit: true, canDelete: false, canImport: true, canExport: true },
       leaves:      { canView: true, canAdd: true, canEdit: true, canDelete: false, canViewSummary: true },
       salaryLoans: { canView: true, canAdd: true, canEdit: false, canDelete: false, canViewAmounts: true },
+      hmo:         { canView: true, canAdd: true, canEdit: true, canExport: true },
       reports:     { canView: true, canExport: true },
       payroll:     { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true, canViewWithholdingSchedule: true },
       tasks:       { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: false },
