@@ -14,7 +14,7 @@ import { toast, showConfirm } from '@/src/components/ui/toast';
 import { parseISO, format, isWithinInterval } from 'date-fns';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
-import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
+import { filterAndSortEmployeesExcludingCEO, getPositionIndex } from '@/src/lib/hierarchy';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { addWorkDays } from '@/src/lib/workdays';
 
@@ -53,7 +53,7 @@ export function Leaves() {
 
   // All permanent/regular staff (no Adhoc, no Non-Employee) – used for Staff dropdowns and Leave Summary
   const internalEmployees = useMemo(() => {
-    const filtered = activeEmployees.filter(e => e.position !== 'Adhoc Staff' && e.staffType !== 'NON-EMPLOYEE');
+    const filtered = activeEmployees.filter(e => e.staffType === 'FIELD' || e.staffType === 'OFFICE');
     return filterAndSortEmployeesExcludingCEO(filtered);
   }, [activeEmployees]);
 
@@ -62,7 +62,7 @@ export function Leaves() {
   const [filterView, setFilterView] = useState<'All' | 'Active' | 'Completed' | 'Cancelled'>('All');
 
   /* ── form state ── */
-  const [showForm, setShowForm] = useState(false);
+  
   const [formId, setFormId] = useState<string | null>(null);
   const [staffId, setStaffId] = useState('');
   const [leaveType, setLeaveType] = useState('');
@@ -96,8 +96,8 @@ export function Leaves() {
   const isFormLockedForUser = isStartDateReached && !hasAllPermissions;
 
   /* ── print / preview state ── */
-  const [showPrintPreview, setShowPrintPreview] = useState(false);
-  const [previewLeave, setPreviewLeave] = useState<LeaveRecord | null>(null);
+  const [showFormOverlay, setShowFormOverlay] = useState(false);
+  const [previewLeaveFormNumber, setPreviewLeaveFormNumber] = useState('');
   const printRef = useRef<HTMLDivElement>(null);
 
 
@@ -147,6 +147,7 @@ export function Leaves() {
   };
 
   const resetPreviewFormState = (leave?: LeaveRecord | null) => {
+    setPreviewLeaveFormNumber(leave?.leaveNumber || '');
     setPreviewPersonResponsibleId(leave?.personResponsibleId || '');
     const kd = leave?.keyDuties || [];
     setPreviewKeyDuties([kd[0]||'', kd[1]||'', kd[2]||'']);
@@ -175,7 +176,8 @@ export function Leaves() {
     setSupervisor(leave.supervisor || '');
     setApproverId(leave.approvedById || '');
     setNasFilePath(leave.nasFilePath || '');
-    setShowForm(true);
+    resetPreviewFormState(leave);
+    setShowFormOverlay(true);
   };
 
   /* auto-sync employee status when a leave is added/updated */
@@ -206,19 +208,88 @@ export function Leaves() {
     const empName = `${emp.surname} ${emp.firstname}`;
 
     if (formId) {
-      // Editing: don't change approval workflow
+      const existing = leaves.find(l => l.id === formId);
+      let nextLeaveNumber = existing?.leaveNumber || previewLeaveFormNumber;
+      if (!nextLeaveNumber && startDate) {
+        const dateObj = new Date(startDate);
+        if (!isNaN(dateObj.getTime())) {
+          const yy = format(dateObj, 'yy');
+          const mm = format(dateObj, 'MM');
+          const leavesInMonth = leaves.filter(l => {
+            const d = new Date(l.startDate);
+            return !isNaN(d.getTime()) && format(d, 'yy-MM') === `${yy}-${mm}`;
+          });
+          let maxSeq = 0;
+          leavesInMonth.forEach(l => {
+            if (l.leaveNumber && l.leaveNumber.startsWith(`LA${yy}-${mm}-`)) {
+              const seqStr = l.leaveNumber.split('-')[2];
+              const seq = parseInt(seqStr, 10);
+              if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+            }
+          });
+          nextLeaveNumber = `LA${yy}-${mm}-${String(maxSeq + 1).padStart(2, '0')}`;
+        }
+      }
+
       updateLeave(formId, {
         leaveType, startDate, duration: parseInt(duration),
         expectedEndDate: endDate, reason, dateReturned, canBeContacted,
         nasFilePath, supervisor, management: approverName,
+        approvedById: approverId || undefined,
+
+        personResponsibleId: previewPersonResponsibleId,
+        keyDuties: previewKeyDuties as any,
+        formDateReturned: previewFormDateReturned,
+        employeeSignature: { signed: previewEmpSigStatus, date: previewEmpSigDate },
+        supervisorSignature: { signed: previewSupSigStatus, date: previewSupSigDate },
+        managementSignature: { signed: previewMgmtSigStatus, date: previewMgmtSigDate },
+        hrSignature: { signed: previewHrSigStatus, date: previewHrSigDate },
+        hrApprovedFrom: previewHrFrom,
+        hrApprovedTo: previewHrTo,
+        leaveNumber: nextLeaveNumber
       });
       toast.success('Leave entry updated!');
       setTimeout(() => syncEmployeeStatus(staffId), 100);
+      setShowFormOverlay(false);
     } else {
       if (!approverId) {
         toast.error('Please select an approver before submitting.');
         return;
       }
+
+      let nextLeaveNumber = '';
+      if (startDate) {
+        const dateObj = new Date(startDate);
+        if (!isNaN(dateObj.getTime())) {
+          const yy = format(dateObj, 'yy');
+          const mm = format(dateObj, 'MM');
+          const leavesInMonth = leaves.filter(l => {
+            const d = new Date(l.startDate);
+            return !isNaN(d.getTime()) && format(d, 'yy-MM') === `${yy}-${mm}`;
+          });
+          let maxSeq = 0;
+          leavesInMonth.forEach(l => {
+            if (l.leaveNumber && l.leaveNumber.startsWith(`LA${yy}-${mm}-`)) {
+              const seqStr = l.leaveNumber.split('-')[2];
+              const seq = parseInt(seqStr, 10);
+              if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+            }
+          });
+          nextLeaveNumber = `LA${yy}-${mm}-${String(maxSeq + 1).padStart(2, '0')}`;
+        }
+      }
+
+      // Resolve HoD: highest-ranked employee in same dept (lowest index = most senior)
+      const empDept = emp.department;
+      const deptPeers = employees.filter(e => e.department === empDept && e.id !== staffId && e.status === 'Active' && e.position !== 'CEO');
+      const hodEmp = deptPeers.sort((a, b) => getPositionIndex(a.position) - getPositionIndex(b.position))[0];
+
+      // Find if line manager is a system user
+      const lmEmp = emp.lineManager ? employees.find(e => e.id === emp.lineManager) : null;
+      const lmSystemUser = lmEmp ? approverOptions.find((u: any) =>
+        u.name?.toLowerCase().includes(lmEmp.firstname.toLowerCase()) ||
+        u.name?.toLowerCase().includes(lmEmp.surname.toLowerCase())
+      ) : null;
 
       const newLeave: LeaveRecord = {
         id: crypto.randomUUID(),
@@ -231,77 +302,69 @@ export function Leaves() {
         approvedById: approverId,
         approvedByName: approverName,
         approvalStatus: 'Pending',
+        leaveNumber: nextLeaveNumber,
+        workflowStep: 1,
+        hodEmployeeId: hodEmp?.id,
+
+        personResponsibleId: previewPersonResponsibleId,
+        keyDuties: previewKeyDuties as any,
+        formDateReturned: previewFormDateReturned,
+        employeeSignature: { signed: previewEmpSigStatus, date: previewEmpSigDate },
+        hrApprovedFrom: previewHrFrom,
+        hrApprovedTo: previewHrTo,
       };
       addLeave(newLeave);
       setTimeout(() => syncEmployeeStatus(staffId), 100);
 
-      // Create approval task for the selected approver
       try {
         const today430 = new Date();
         today430.setHours(16, 30, 0, 0);
 
+        // Create the main approval task (parent)
         const mainTask = await createMainTask({
-          title: `Approve Leave Request for ${empName}`,
-          description: `${leaveType} leave (${duration} days from ${startDate}) — submitted by ${currentUser?.user_metadata?.name || 'HR'}.`,
+          title: `Leave Approval Workflow — ${empName} (${leaveType}, ${duration} days)`,
+          description: `Sequential 4-step approval: LM → HoD → Management → HR.\nSubmitted by ${currentUser?.user_metadata?.name || 'HR'} on ${format(new Date(), 'dd/MM/yyyy')}.`,
           createdBy: currentUser?.id,
           teamId: 'dcel-team',
           workspaceId: 'dcel-team',
-          assignedTo: approverId,
+          assignedTo: lmSystemUser?.id || approverId,
           deadline: today430.toISOString(),
         });
+
         if (mainTask?.id) {
-          const subtaskDesc = JSON.stringify({ refType: 'leave', refId: newLeave.id, employeeName: empName, leaveType, duration });
-          const sub = await addSubtask({
-            title: `Approve: ${empName} — ${duration}-day ${leaveType} Leave`,
-            description: subtaskDesc,
+          // Step 1: Line Manager subtask
+          const lmDesc = JSON.stringify({
+            refType: 'leave',
+            refId: newLeave.id,
+            workflowStep: 1,
+            empName,
+            leaveType,
+            duration,
+            hodUserId: hodEmp?.id,  // pass HoD so step 1 approval can create step 2
+          });
+          const lmSub = await addSubtask({
+            title: `[Step 1/4] Line Manager Approval — ${empName} ${leaveType} Leave`,
+            description: lmDesc,
             mainTaskId: mainTask.id,
-            assignedTo: approverId,
+            assignedTo: lmSystemUser?.id || null,
             status: 'not_started',
             priority: 'high',
             deadline: today430.toISOString(),
           });
-          if ((sub as any)?.id) {
-            updateLeave(newLeave.id, { approvalTaskId: (sub as any).id });
+          if ((lmSub as any)?.id) {
+            updateLeave(newLeave.id, {
+              approvalTaskId: mainTask.id,
+              lineManagerTaskId: (lmSub as any).id,
+            });
           }
         }
       } catch (e) {
         console.error('Failed to create leave approval task:', e);
       }
 
-      toast.success(`Leave filed! Pending approval from ${approverName}.`);
-      // Offer immediate print preview
-      setPreviewLeave(newLeave);
-      setShowPrintPreview(true);
+      toast.success(`Leave filed! Step 1 of 4 — awaiting Line Manager approval.`);
+      setShowFormOverlay(false);
     }
-    setShowForm(false);
-    resetForm();
-  };
-
-  const handlePreviewCurrentForm = () => {
-    if (!staffId) {
-      toast.error('Please select an employee first to preview the form.');
-      return;
-    }
-    const emp = employees.find(e => e.id === staffId);
-    
-    // Construct a temporary leave object for preview
-    const tempLeave: LeaveRecord = {
-      id: formId || `PREVIEW`,
-      employeeId: staffId,
-      employeeName: emp ? `${emp.surname} ${emp.firstname}` : '',
-      leaveType: leaveType || '',
-      startDate: startDate || '',
-      duration: duration ? parseInt(duration) : 0,
-      expectedEndDate: expectedEndDate || '',
-      reason: reason || '',
-      dateReturned: dateReturned || '',
-      canBeContacted: canBeContacted || 'Yes',
-      status: 'Active',
-      supervisor, management: approverId ? approverOptions.find((u: any) => u.id === approverId)?.name || '' : '',
-    };
-    
-    setPreviewLeave(tempLeave);
-    setShowPrintPreview(true);
   };
 
   const handleDelete = async (leave: LeaveRecord) => {
@@ -342,48 +405,6 @@ export function Leaves() {
   };
 
   /* Save the preview form's signature & detail data back to the leave record */
-  const handleSavePreviewData = () => {
-    if (!previewLeave?.id) return;
-
-    let nextLeaveNumber = previewLeave.leaveNumber;
-    if (!nextLeaveNumber && previewLeave.startDate) {
-      const dateObj = new Date(previewLeave.startDate);
-      if (!isNaN(dateObj.getTime())) {
-        const yy = format(dateObj, 'yy');
-        const mm = format(dateObj, 'MM');
-        const leavesInMonth = leaves.filter(l => {
-          const d = new Date(l.startDate);
-          return !isNaN(d.getTime()) && format(d, 'yy-MM') === `${yy}-${mm}`;
-        });
-        let maxSeq = 0;
-        leavesInMonth.forEach(l => {
-          if (l.leaveNumber && l.leaveNumber.startsWith(`LA${yy}-${mm}-`)) {
-            const seqStr = l.leaveNumber.split('-')[2];
-            const seq = parseInt(seqStr, 10);
-            if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
-          }
-        });
-        nextLeaveNumber = `LA${yy}-${mm}-${String(maxSeq + 1).padStart(2, '0')}`;
-      }
-    }
-
-    updateLeave(previewLeave.id, {
-      personResponsibleId: previewPersonResponsibleId,
-      keyDuties: previewKeyDuties,
-      formDateReturned: previewFormDateReturned,
-      employeeSignature: { signed: previewEmpSigStatus, date: previewEmpSigDate },
-      supervisorSignature: { signed: previewSupSigStatus, date: previewSupSigDate },
-      managementSignature: { signed: previewMgmtSigStatus, date: previewMgmtSigDate },
-      hrSignature: { signed: previewHrSigStatus, date: previewHrSigDate },
-      hrApprovedFrom: previewHrFrom,
-      hrApprovedTo: previewHrTo,
-      leaveNumber: nextLeaveNumber
-    });
-    
-    setPreviewLeave(prev => prev ? { ...prev, leaveNumber: nextLeaveNumber } : null);
-    toast.success('Form details saved!');
-  };
-
   /* ── print ── */
   const handlePrint = () => {
     const content = printRef.current;
@@ -432,9 +453,7 @@ export function Leaves() {
   };
 
   const openPrintPreview = (leave: LeaveRecord) => {
-    setPreviewLeave(leave);
-    resetPreviewFormState(leave);
-    setShowPrintPreview(true);
+    handleEdit(leave);
   };
 
   useSetPageTitle(
@@ -455,7 +474,7 @@ export function Leaves() {
         <Button
           size="sm"
           className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9"
-          onClick={() => { resetForm(); setShowForm(true); }}
+          onClick={() => { resetForm(); resetPreviewFormState(); setShowFormOverlay(true); }}
         >
           <Plus className="h-4 w-4" /> File Leave
         </Button>
@@ -472,7 +491,7 @@ export function Leaves() {
         {priv.canAdd && (
           <Button
             className="flex-1 gap-2 bg-teal-600 hover:bg-teal-700 text-white shadow-sm"
-            onClick={() => { resetForm(); setShowForm(true); }}
+            onClick={() => { resetForm(); resetPreviewFormState(); setShowFormOverlay(true); }}
           >
             <Plus className="h-4 w-4" /> File Leave
           </Button>
@@ -487,183 +506,6 @@ export function Leaves() {
           </Button>
         )}
       </div>
-
-      {/* ── Leave Form Overlay ── */}
-      {showForm && (
-        <Card className="border-none shadow-2xl ring-1 ring-black/5 bg-white dark:bg-slate-900 relative overflow-hidden animate-in slide-in-from-top-4 fade-in duration-300 z-10 w-full max-w-2xl mx-auto">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 to-emerald-400" />
-          <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-5 pt-6 px-6 sm:px-8 flex flex-row justify-between items-center">
-            <div>
-              <CardTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <CalendarDays className="h-5 w-5 text-teal-500" />
-                {formId ? 'Edit Leave Form' : 'New Leave Form'}
-              </CardTitle>
-              <CardDescription className="mt-1">Fill out this form to log an employee absence.</CardDescription>
-            </div>
-            <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200" onClick={() => { setShowForm(false); resetForm(); }}>
-              <X className="h-5 w-5 text-slate-500" />
-            </Button>
-          </CardHeader>
-          <CardContent className="p-6 sm:p-8 space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-
-              {/* Staff Selector */}
-              <div className="sm:col-span-2 space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Staff <span className="text-rose-500">*</span></label>
-                <select
-                  className={`flex h-11 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 px-3 text-sm transition-colors outline-none ${(!!formId || isFormLockedForUser) ? 'cursor-not-allowed text-slate-500 opacity-80' : 'focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-teal-500/20'}`}
-                  value={staffId} onChange={e => setStaffId(e.target.value)} disabled={!!formId || isFormLockedForUser}
-                >
-                  <option value="" disabled>— Select Staff Member —</option>
-                  {internalEmployees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.surname} {emp.firstname} ({emp.department})</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Leave Type */}
-              <div className="sm:col-span-2 space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Leave Type <span className="text-rose-500">*</span></label>
-                <select
-                  className={`flex h-11 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 px-3 text-sm transition-colors outline-none ${isFormLockedForUser ? 'cursor-not-allowed text-slate-500 opacity-80' : 'focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-teal-500/20'}`}
-                  value={leaveType} onChange={e => setLeaveType(e.target.value)} disabled={isFormLockedForUser}
-                >
-                  <option value="" disabled>— Select Leave Type —</option>
-                  {(() => {
-                    const DEFAULT_LEAVE_TYPES = ['Annual', 'Emergency', 'Maternity/Paternity', 'Study', 'Others'];
-                    const extras = leaveTypes.filter(t => !DEFAULT_LEAVE_TYPES.includes(t));
-                    return [...DEFAULT_LEAVE_TYPES, ...extras].map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ));
-                  })()}
-                </select>
-              </div>
-
-              {/* Supervisor / Line Manager - auto-filled from employee record */}
-              <div className="sm:col-span-2 space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Supervisor / Line Manager</label>
-                {(() => {
-                  const selectedEmp = internalEmployees.find(e => e.id === staffId);
-                  const lineManagerEmp = selectedEmp?.lineManager
-                    ? internalEmployees.find(e => e.id === selectedEmp.lineManager)
-                    : null;
-                  const lineManagerName = lineManagerEmp
-                    ? `${lineManagerEmp.surname} ${lineManagerEmp.firstname} (${lineManagerEmp.position})`
-                    : '';
-                  return (
-                    <div className={`flex h-11 w-full items-center rounded-md border px-3 text-sm ${
-                      lineManagerName
-                        ? 'border-slate-200 bg-slate-100 text-slate-700 cursor-not-allowed'
-                        : 'border-dashed border-slate-200 bg-slate-50 text-slate-400'
-                    }`}>
-                      {lineManagerName || (staffId ? 'No line manager set for this employee' : '— Select staff first —')}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Management / Approver */}
-              <div className="sm:col-span-2 space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Management / Approver <span className="text-rose-500">*</span></label>
-                {formId && approverId ? (
-                  <div className="flex h-11 w-full items-center rounded-md border border-slate-200 bg-slate-100 px-3 text-sm text-slate-700 cursor-not-allowed">
-                     {approverOptions.find((u: any) => u.id === approverId)?.name || 'Unknown'}
-                  </div>
-                ) : (
-                  <select
-                    className={`flex h-11 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 px-3 text-sm transition-colors outline-none ${(!!formId || isFormLockedForUser) ? 'cursor-not-allowed text-slate-500 opacity-80' : 'focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-teal-500/20'}`}
-                    value={approverId} onChange={e => setApproverId(e.target.value)} disabled={!!formId || isFormLockedForUser}
-                  >
-                    <option value="">— Select Approver —</option>
-                    {approverOptions.map((u: any) => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {/* Dates */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start of Leave <span className="text-rose-500">*</span></label>
-                <Input type="date" className={`h-11 bg-slate-50 border-slate-200 focus-visible:ring-teal-500/30 ${isFormLockedForUser ? 'cursor-not-allowed opacity-80 text-slate-500' : ''}`} value={startDate} onChange={e => setStartDate(e.target.value)} disabled={isFormLockedForUser} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Duration (Days) <span className="text-rose-500">*</span></label>
-                <Input type="number" min="1" className={`h-11 bg-slate-50 border-slate-200 focus-visible:ring-teal-500/30 ${isFormLockedForUser ? 'cursor-not-allowed opacity-80 text-slate-500' : ''}`} value={duration} onChange={e => setDuration(e.target.value)} placeholder="e.g. 5" disabled={isFormLockedForUser} />
-              </div>
-
-              <div className="sm:col-span-2 space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Expected End of Leave</label>
-                <Input className="h-11 bg-slate-100 border-slate-200 text-slate-500 font-medium cursor-not-allowed" value={expectedEndDate} disabled readOnly placeholder="Auto-calculated..." />
-              </div>
-
-              {/* Reason */}
-              <div className="sm:col-span-2 space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Reason for Leave <span className="text-rose-500">*</span></label>
-                <textarea
-                  className={`w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 p-3 h-24 outline-none transition-all resize-none ${isFormLockedForUser ? 'cursor-not-allowed text-slate-500 opacity-80' : 'focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-teal-500/20'}`}
-                  value={reason} onChange={e => setReason(e.target.value)} placeholder="Enter details..." disabled={isFormLockedForUser}
-                />
-              </div>
-
-              {/* Return Date + Contactable */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-                  Date Returned <span className="px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-700 text-[10px] font-bold">OPTIONAL</span>
-                </label>
-                <Input type="date" className="h-11 bg-slate-50 border-slate-200 focus-visible:ring-teal-500/30" value={dateReturned} onChange={e => setDateReturned(e.target.value)} />
-              </div>
-              <div className="space-y-3">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block">Can be contacted?</label>
-                <div className={`flex gap-4 ${isFormLockedForUser ? 'opacity-80 pointer-events-none' : ''}`}>
-                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
-                    <input type="radio" className="accent-teal-600 w-4 h-4" checked={canBeContacted === 'Yes'} onChange={() => setCanBeContacted('Yes')} /> Yes
-                  </label>
-                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
-                    <input type="radio" className="accent-teal-600 w-4 h-4" checked={canBeContacted === 'No'} onChange={() => setCanBeContacted('No')} /> No
-                  </label>
-                </div>
-              </div>
-
-              {/* NAS File Path */}
-              <div className="sm:col-span-2 space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">NAS File Reference (Path or UNC)</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="e.g. \\\\NAS\\HR\\Leaves\\JohnDoe_Leave.pdf"
-                    className={`flex-1 h-11 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 px-3 text-sm outline-none transition-colors ${isFormLockedForUser ? 'cursor-not-allowed opacity-80 text-slate-500' : 'focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-teal-500/20'}`}
-                    value={nasFilePath}
-                    onChange={e => setNasFilePath(e.target.value)}
-                    disabled={isFormLockedForUser}
-                  />
-                  {nasFilePath && (
-                    <button
-                      type="button"
-                      onClick={() => handleOpenNasFile(nasFilePath)}
-                      className="px-3 h-11 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 flex items-center gap-1 shrink-0"
-                    >
-                      <Eye className="h-3.5 w-3.5" /> Open
-                    </button>
-                  )}
-                </div>
-                <p className="text-[10px] text-slate-400">Enter the full UNC or network path to the physical leave form stored on the company NAS. Click "Open" to launch the file on your PC.</p>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 pt-6 border-t border-slate-100">
-              <Button variant="ghost" className="text-rose-600 hover:bg-rose-50 font-medium sm:mr-auto h-11" onClick={resetForm}>Clear Form</Button>
-              <Button variant="outline" className="text-slate-600 h-11" onClick={() => setShowForm(false)}>View Entries</Button>
-              <Button onClick={handlePreviewCurrentForm} className="bg-slate-800 hover:bg-slate-900 text-white font-semibold h-11 px-6 shadow-sm gap-2">
-                <Printer className="h-4 w-4" /> Preview Form
-              </Button>
-              <Button onClick={handleCreateOrUpdate} className="bg-teal-600 hover:bg-teal-700 text-white font-semibold h-11 px-8 shadow-md gap-2">
-                <FileText className="h-4 w-4" /> {formId ? 'Update Entry' : 'Submit for Approval'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* ─── Leave Records Table ─── */}
       <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
@@ -845,56 +687,67 @@ export function Leaves() {
 
 
       {/* --- Print Preview Modal --- */}
-      {showPrintPreview && previewLeave && (() => {
-        const lv = previewLeave;
-        const emp = employees.find(e => e.id === lv.employeeId);
+      {showFormOverlay && (() => {
+        const emp = employees.find(e => e.id === staffId);
         const lineManagerEmp = emp?.lineManager ? employees.find(e => e.id === emp.lineManager) : null;
         const lineManagerName = lineManagerEmp
           ? `${lineManagerEmp.surname} ${lineManagerEmp.firstname}`
-          : (lv.supervisor || '');
-        const leaveTypeOptions = ['Annual', 'Emergency', 'Maternity/Paternity', 'Study', 'Others'];
-        const isLeaveElapsed = lv.expectedEndDate
-          ? new Date(lv.expectedEndDate).setHours(23, 59, 59, 999) < Date.now()
-          : false;
-        const isPreviewLocked = isLeaveElapsed && !hasAllPermissions;
+          : (supervisor || '');
+        
+        // Resolve live leave record (for workflow step display when viewing existing)
+        const liveLeave = formId ? leaves.find(l => l.id === formId) : null;
+        const wfStep = liveLeave?.workflowStep ?? (formId ? 1 : 0);
+        const wfRejected = wfStep === -1;
 
-        const SigBlock = ({ label, status, setStatus, date, setDate }: {
-          label: string;
-          status: 'Signed' | 'Unsigned';
-          setStatus: (v: 'Signed' | 'Unsigned') => void;
-          date: string;
-          setDate: (v: string) => void;
+        const leaveTypeOptions = ['Annual', 'Emergency', 'Maternity/Paternity', 'Study', 'Others'];
+        const isLeaveElapsed = expectedEndDate
+          ? new Date(expectedEndDate).setHours(23, 59, 59, 999) < Date.now()
+          : false;
+        const isPreviewLocked = (!!formId && isLeaveElapsed && !hasAllPermissions) || isFormLockedForUser;
+        const isLocked = isPreviewLocked;
+
+        /** Helper: render a workflow approval row */
+        const WfSigRow = ({
+          label, stepNum, sigData, isManual = false,
+          manualSigned, setManualSigned, manualDate, setManualDate,
+        }: {
+          label: string; stepNum: number;
+          sigData?: { signed: 'Signed' | 'Unsigned'; date?: string };
+          isManual?: boolean;
+          manualSigned?: 'Signed' | 'Unsigned'; setManualSigned?: (v: 'Signed' | 'Unsigned') => void;
+          manualDate?: string; setManualDate?: (v: string) => void;
         }) => {
+          const isSigned = sigData?.signed === 'Signed' || manualSigned === 'Signed';
+          const sigDate = sigData?.date || manualDate || '';
+          const isPendingStep = !wfRejected && wfStep === stepNum && !!formId;
+          const isFutureStep = !wfRejected && wfStep < stepNum && !!formId;
+          const bgColor = wfRejected ? '#fff1f1' : isSigned ? '#f0fdf4' : isPendingStep ? '#fffbeb' : '#fafafa';
+          const borderColor = wfRejected ? '#fca5a5' : isSigned ? '#86efac' : isPendingStep ? '#fcd34d' : '#d1d5db';
+          const statusText = wfRejected ? '— Rejected' : isSigned ? 'Signed ✓' : isPendingStep ? 'Awaiting Approval…' : isFutureStep ? 'Pending' : 'Unsigned';
+          const statusColor = wfRejected ? '#dc2626' : isSigned ? '#16a34a' : isPendingStep ? '#d97706' : '#9ca3af';
+
           return (
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 12 }}>
-              <span style={{ fontSize: 10, flexShrink: 0, paddingBottom: 1, whiteSpace: 'nowrap' }}>{label}:</span>
-              {isPreviewLocked ? (
-                <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1, color: status === 'Signed' ? '#047857' : 'inherit', fontWeight: status === 'Signed' ? 'bold' : 'normal', paddingLeft: 4 }}>
-                  {status === 'Signed' ? 'Signed' : 'Unsigned'}
-                </span>
-              ) : (
-                <select
-                  value={status}
-                  onChange={e => setStatus(e.target.value as 'Signed' | 'Unsigned')}
-                  style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1, color: status === 'Signed' ? '#047857' : 'inherit', fontWeight: status === 'Signed' ? 'bold' : 'normal' }}
-                >
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 10, padding: '5px 8px', background: bgColor, border: `1px solid ${borderColor}`, borderRadius: 4 }}>
+              <span style={{ fontSize: 9, fontWeight: 'bold', flexShrink: 0, paddingBottom: 1, whiteSpace: 'nowrap' }}>{label}:</span>
+              {isManual && !isPreviewLocked ? (
+                <select value={manualSigned} onChange={e => setManualSigned!(e.target.value as 'Signed' | 'Unsigned')}
+                  style={{ border: 'none', flex: 1, minHeight: 14, fontSize: 9, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1, color: statusColor, fontWeight: isSigned ? 'bold' : 'normal' }}>
                   <option value="Unsigned">Unsigned</option>
                   <option value="Signed">Signed</option>
                 </select>
-              )}
-              
-              <span style={{ fontSize: 10, flexShrink: 0, paddingBottom: 1, marginLeft: 16 }}>Date:</span>
-              {isPreviewLocked ? (
-                <span style={{ borderBottom: '1px solid #111', flex: 0.6, minHeight: 14, fontSize: 10, paddingBottom: 1, paddingLeft: 4 }}>
-                  {date ? format(parseISO(date), 'dd/MM/yyyy') : ''}
-                </span>
               ) : (
-                <input
-                  type="date"
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
-                  style={{ border: 'none', borderBottom: '1px solid #111', flex: 0.6, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1 }}
-                />
+                <span style={{ flex: 1, minHeight: 14, fontSize: 9, paddingBottom: 1, color: statusColor, fontWeight: isSigned ? 'bold' : 'normal', fontStyle: isPendingStep ? 'italic' : 'normal' }}>
+                  {statusText}
+                </span>
+              )}
+              <span style={{ fontSize: 9, flexShrink: 0, paddingBottom: 1, marginLeft: 8 }}>Date:</span>
+              {isManual && !isPreviewLocked ? (
+                <input type="date" value={manualDate} onChange={e => setManualDate!(e.target.value)}
+                  style={{ border: 'none', borderBottom: '1px solid #999', width: 90, fontSize: 9, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1 }} />
+              ) : (
+                <span style={{ fontSize: 9, minWidth: 80, paddingBottom: 1, color: '#555' }}>
+                  {sigDate ? format(parseISO(sigDate), 'dd/MM/yyyy') : ''}
+                </span>
               )}
             </div>
           );
@@ -908,23 +761,29 @@ export function Leaves() {
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                   <Printer className="h-5 w-5 text-teal-600" /> Staff Leave Application Form
                   {isPreviewLocked && (
-                    <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-600">LOCKED \u2014 Leave Elapsed</span>
+                    <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-600">LOCKED — Leave Elapsed</span>
+                  )}
+                  {wfRejected && (
+                    <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">REJECTED</span>
+                  )}
+                  {wfStep === 5 && (
+                    <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">FULLY APPROVED ✓</span>
+                  )}
+                  {formId && wfStep > 0 && wfStep < 5 && !wfRejected && (
+                    <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Step {wfStep}/4 Pending</span>
                   )}
                 </h2>
                 <div className="flex gap-2">
                   {!isPreviewLocked && (
-                    <button
-                      type="button"
-                      onClick={handleSavePreviewData}
-                      className="flex items-center gap-1.5 px-3 h-9 rounded-lg border border-teal-300 bg-teal-50 hover:bg-teal-100 text-teal-700 text-xs font-bold"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Save Details
+                    <button type="button" onClick={handleCreateOrUpdate}
+                      className="flex items-center gap-1.5 px-3 h-9 rounded-lg border border-teal-300 bg-teal-50 hover:bg-teal-100 text-teal-700 text-xs font-bold">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> {formId ? 'Update Leave' : 'Submit Application'}
                     </button>
                   )}
                   <Button onClick={handlePrint} className="bg-teal-600 hover:bg-teal-700 text-white gap-2 h-9 text-sm">
                     <Printer className="h-4 w-4" /> Print
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowPrintPreview(false)}>
+                  <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowFormOverlay(false)}>
                     <X className="h-5 w-5 text-slate-500" />
                   </Button>
                 </div>
@@ -939,17 +798,28 @@ export function Leaves() {
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
                       <img src={logoSrc} alt="logo" style={{ height: 44, objectFit: 'contain' }} />
                       <div style={{ textAlign: 'right', fontSize: 10, fontWeight: 'bold' }}>
-                        Form No: {lv.leaveNumber || 'Unassigned'}
+                        Form No: {previewLeaveFormNumber || 'Unassigned'}
                       </div>
                     </div>
                     <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 'bold', textTransform: 'uppercase', margin: '4px 0 8px', letterSpacing: '0.6px', borderBottom: '2px solid #111', paddingBottom: 4 }}>STAFF LEAVE APPLICATION FORM</div>
 
                     {/* 1. Employee Details - auto-populated */}
                     <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', marginBottom: 6, padding: '2px 6px', background: '#f0f0f0', borderLeft: '3px solid #333' }}>1. Employee Details</div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 7 }}>
+                      <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>Employee Full Name:</span>
+                      {isLocked ? (
+                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{emp?.surname} {emp?.firstname}</span>
+                      ) : (
+                        <select value={staffId} onChange={e => setStaffId(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', paddingBottom: 1, appearance: 'none' }}>
+                          <option value="">Select Staff...</option>
+                          {internalEmployees.map((e: any) => (
+                            <option key={e.id} value={e.id}>{e.surname} {e.firstname} ({e.position})</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                     {([
-                      ['Employee Full Name', lv.employeeName],
                       ['Supervisor / Line Manager', lineManagerName],
-                      ['Management Staff', lv.management || ''],
                       ['Phone Number', emp?.phone || ''],
                       ['Email Address', emp?.email || ''],
                     ] as [string, string][]).map(([label, val]) => (
@@ -958,32 +828,63 @@ export function Leaves() {
                         <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{val}</span>
                       </div>
                     ))}
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 7 }}>
+                      <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>Management Staff:</span>
+                      {isLocked ? (
+                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{approverOptions.find((u: any) => u.id === approverId)?.name || ''}</span>
+                      ) : (
+                        <select value={approverId} onChange={e => setApproverId(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', paddingBottom: 1, appearance: 'none', cursor: 'pointer' }}>
+                          <option value="">Select Approver...</option>
+                          {approverOptions.map((u: any) => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
 
                     {/* 2. Leave Details */}
                     <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '10px 0 6px', padding: '2px 6px', background: '#f0f0f0', borderLeft: '3px solid #333' }}>2. Leave Details</div>
                     <div style={{ fontSize: 10, marginBottom: 6 }}>Type of Leave:</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                       {leaveTypeOptions.map(opt => {
-                        const matched = (lv.leaveType || '').toLowerCase().includes(opt.toLowerCase());
+                        const matched = (leaveType || '').toLowerCase().includes(opt.toLowerCase());
                         return (
-                          <span key={opt} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10 }}>
+                          <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, cursor: isLocked ? 'default' : 'pointer' }}>
+                            <input type="radio" checked={matched} onChange={() => !isLocked && setLeaveType(opt)} style={{ display: 'none' }} />
                             <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: matched ? '#111' : 'white', color: 'white', fontSize: 8 }}>{matched ? '\u2713' : ''}</span>
                             {opt}
-                          </span>
+                          </label>
                         );
                       })}
                     </div>
                     <div style={{ fontSize: 10, marginBottom: 4 }}>Reason For Leave:</div>
-                    <div style={{ border: '1px solid #111', minHeight: 32, padding: 4, fontSize: 10, marginBottom: 8 }}>{lv.reason}</div>
-                    {([
-                      ['Leave Start Date', lv.startDate ? format(parseISO(lv.startDate), 'dd/MM/yyyy') : ''],
-                      ['Date returning', lv.expectedEndDate ? format(parseISO(lv.expectedEndDate), 'dd/MM/yyyy') : ''],
-                    ] as [string, string][]).map(([label, val]) => (
-                      <div key={label} style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 7 }}>
-                        <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}:</span>
-                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{val}</span>
+                    {isLocked ? (
+                      <div style={{ border: '1px solid #111', minHeight: 32, padding: 4, fontSize: 10, marginBottom: 8 }}>{reason}</div>
+                    ) : (
+                      <textarea value={reason} onChange={e => setReason(e.target.value)} style={{ width: '100%', border: '1px solid #111', minHeight: 32, padding: 4, fontSize: 10, marginBottom: 8, resize: 'none', background: 'transparent' }} />
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 20, marginBottom: 7 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, flex: 1 }}>
+                        <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>Leave Start Date:</span>
+                        {isLocked ? (
+                          <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{startDate ? format(parseISO(startDate), 'dd/MM/yyyy') : ''}</span>
+                        ) : (
+                          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1 }} />
+                        )}
                       </div>
-                    ))}
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, flex: 0.5 }}>
+                        <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>Duration (Days):</span>
+                        {isLocked ? (
+                          <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{duration}</span>
+                        ) : (
+                          <input type="number" min="1" value={duration} onChange={e => setDuration(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1 }} />
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, flex: 1 }}>
+                        <span style={{ fontSize: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>Date returning:</span>
+                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1, color: '#444' }}>{expectedEndDate ? format(parseISO(expectedEndDate), 'dd/MM/yyyy') : ''}</span>
+                      </div>
+                    </div>
 
                     {/* 3. Handover Details */}
                     <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '10px 0 6px', padding: '2px 6px', background: '#f0f0f0', borderLeft: '3px solid #333' }}>3. Handover Details</div>
@@ -1031,18 +932,39 @@ export function Leaves() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 10, marginBottom: 8 }}>
                       <span>Can be Contacted:</span>
                       {(['Yes', 'No'] as const).map(opt => (
-                        <span key={opt} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: lv.canBeContacted === opt ? '#111' : 'white', color: 'white', fontSize: 8 }}>{lv.canBeContacted === opt ? '\u2713' : ''}</span>
+                        <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: isLocked ? 'default' : 'pointer' }}>
+                          <input type="radio" checked={canBeContacted === opt} onChange={() => !isLocked && setCanBeContacted(opt)} style={{ display: 'none' }} />
+                          <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: canBeContacted === opt ? '#111' : 'white', color: 'white', fontSize: 8 }}>{canBeContacted === opt ? '\u2713' : ''}</span>
                           {opt}
-                        </span>
+                        </label>
                       ))}
                     </div>
 
-                    {/* 6. Signatures */}
+                    {/* 6. Signatures — sequential approval workflow */}
                     <div style={{ fontWeight: 'bold', fontSize: 10, textTransform: 'uppercase', margin: '16px 0 10px', padding: '2px 6px', background: '#f0f0f0', borderLeft: '3px solid #333' }}>6. Signatures</div>
-                    <SigBlock label="Employee Signature" status={previewEmpSigStatus} setStatus={setPreviewEmpSigStatus} date={previewEmpSigDate} setDate={setPreviewEmpSigDate} />
-                    <SigBlock label="Supervisor's Approval" status={previewSupSigStatus} setStatus={setPreviewSupSigStatus} date={previewSupSigDate} setDate={setPreviewSupSigDate} />
-                    <SigBlock label="Management's Approval" status={previewMgmtSigStatus} setStatus={setPreviewMgmtSigStatus} date={previewMgmtSigDate} setDate={setPreviewMgmtSigDate} />
+                    <div style={{ fontSize: 9, color: '#555', marginBottom: 8, fontStyle: 'italic' }}>
+                      Approval workflow: Employee → Line Manager → Head of Department → Management → HR
+                    </div>
+
+                    {/* Step 0: Employee — always manual */}
+                    <WfSigRow label="Employee Signature" stepNum={0} isManual={true}
+                      sigData={liveLeave?.employeeSignature}
+                      manualSigned={previewEmpSigStatus} setManualSigned={setPreviewEmpSigStatus}
+                      manualDate={previewEmpSigDate} setManualDate={setPreviewEmpSigDate} />
+
+                    {/* Step 1: Line Manager — manual (LM may not be a system user) */}
+                    <WfSigRow label="Line Manager / Supervisor Approval" stepNum={1} isManual={true}
+                      sigData={liveLeave?.supervisorSignature}
+                      manualSigned={previewSupSigStatus} setManualSigned={setPreviewSupSigStatus}
+                      manualDate={previewSupSigDate} setManualDate={setPreviewSupSigDate} />
+
+                    {/* Step 2: Head of Department — auto-driven by task */}
+                    <WfSigRow label="Head of Department Approval" stepNum={2}
+                      sigData={liveLeave?.hodSignature} />
+
+                    {/* Step 3: Management — auto-driven by task */}
+                    <WfSigRow label="Management Approval" stepNum={3}
+                      sigData={liveLeave?.managementSignature} />
 
                     {/* HR Section */}
                     <div style={{ borderTop: '1px solid #555', margin: '16px 0 10px' }} />
@@ -1059,13 +981,16 @@ export function Leaves() {
                         : <input type="date" value={previewHrTo} onChange={e => setPreviewHrTo(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1 }} />
                       }
                     </div>
-                    <SigBlock label="HR & Admin Manager Signature" status={previewHrSigStatus} setStatus={setPreviewHrSigStatus} date={previewHrSigDate} setDate={setPreviewHrSigDate} />
+
+                    {/* Step 4: HR — auto-driven by task */}
+                    <WfSigRow label="HR &amp; Admin Manager Signature" stepNum={4}
+                      sigData={liveLeave?.hrSignature} />
 
                     {/* Leave Acknowledgement */}
                     <div style={{ borderTop: '1px solid #555', margin: '16px 0 10px' }} />
                     <div style={{ fontWeight: 'bold', fontSize: 10, marginBottom: 8 }}>Leave Acknowledgement:</div>
                     <div style={{ fontSize: 10, lineHeight: 1.6, marginBottom: 10 }}>
-                      I <span style={{ borderBottom: '1px solid #111', display: 'inline-block', minWidth: 130, marginBottom: -2, padding: '0 4px', fontWeight: 'bold' }}>{lv.employeeName}</span> hereby notify the Human Resources and Administrative department that I have resumed duty as of:
+                      I <span style={{ borderBottom: '1px solid #111', display: 'inline-block', minWidth: 130, marginBottom: -2, padding: '0 4px', fontWeight: 'bold' }}>{emp?.surname} {emp?.firstname}</span> hereby notify the Human Resources and Administrative department that I have resumed duty as of:
                     </div>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10, marginBottom: 8 }}>
                       <span style={{ flexShrink: 0, paddingBottom: 1 }}>Date Returned:</span>
@@ -1077,11 +1002,11 @@ export function Leaves() {
                     </div>
 
                     {/* NAS File Reference */}
-                    {lv.nasFilePath && (
+                    {nasFilePath && (
                       <div className="mt-3 flex items-center gap-2 p-2 rounded bg-indigo-50 border border-indigo-200">
                         <FileText className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
-                        <span style={{ fontSize: 9, color: '#444' }}>NAS: {lv.nasFilePath}</span>
-                        <button type="button" onClick={() => handleOpenNasFile(lv.nasFilePath!)} className="ml-auto text-[9px] font-bold text-indigo-600 hover:underline">Open on PC</button>
+                        <span style={{ fontSize: 9, color: '#444' }}>NAS: {nasFilePath}</span>
+                        <button type="button" onClick={() => handleOpenNasFile(nasFilePath!)} className="ml-auto text-[9px] font-bold text-indigo-600 hover:underline">Open on PC</button>
                       </div>
                     )}
 

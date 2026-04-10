@@ -314,6 +314,36 @@ export function Employees() {
     }
 
     const updateData = { ...formData, status: finalStatus };
+
+    // Sync pension, paye, and LASHMA fields back into the onboarding checklist
+    // so both the Onboarding page and Employee Detail page stay in sync.
+    const existingEmp = employees.find(e => e.id === editingEmployeeId);
+    if (existingEmp) {
+      const updatedChecklist = existingEmp.onboardingChecklist
+        ? {
+            ...existingEmp.onboardingChecklist,
+            ...(formData.pensionNumber !== undefined && {
+              pensionNumberInput: formData.pensionNumber,
+            }),
+            ...(formData.taxId !== undefined && {
+              payeNumberInput: formData.taxId,
+            }),
+            ...(formData.lashmaPolicyNumber !== undefined && {
+              lashmaPolicyNumber: formData.lashmaPolicyNumber,
+            }),
+            ...(formData.lashmaRegistrationDate !== undefined && {
+              lashmaRegistrationDate: formData.lashmaRegistrationDate,
+            }),
+            ...(formData.lashmaExpiryDate !== undefined && {
+              lashmaExpiryDate: formData.lashmaExpiryDate,
+            }),
+          }
+        : undefined;
+      if (updatedChecklist) {
+        (updateData as any).onboardingChecklist = updatedChecklist;
+      }
+    }
+
     updateEmployee(editingEmployeeId, updateData);
     
     // Manage LASHMA Renewal Reminder

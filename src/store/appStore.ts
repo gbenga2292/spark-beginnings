@@ -163,11 +163,20 @@ export interface LeaveRecord {
   formDateReturned?: string;
   employeeSignature?: { signed: 'Signed' | 'Unsigned'; date?: string };
   supervisorSignature?: { signed: 'Signed' | 'Unsigned'; date?: string };
+  hodSignature?: { signed: 'Signed' | 'Unsigned'; date?: string };
   managementSignature?: { signed: 'Signed' | 'Unsigned'; date?: string };
   hrSignature?: { signed: 'Signed' | 'Unsigned'; date?: string };
   hrApprovedFrom?: string;
   hrApprovedTo?: string;
   leaveNumber?: string;
+  // Sequential workflow tracking
+  // workflowStep: 1=LM pending, 2=HoD pending, 3=Mgmt pending, 4=HR pending, 5=Fully approved, -1=Rejected
+  workflowStep?: number;
+  lineManagerTaskId?: string;   // subtask ID for LM approval
+  hodTaskId?: string;           // subtask ID for HoD approval
+  managementTaskId?: string;    // subtask ID for Management approval
+  hrTaskId?: string;            // subtask ID for HR approval
+  hodEmployeeId?: string;       // resolved HoD employee ID
 }
 
 export interface MonthlySalary {

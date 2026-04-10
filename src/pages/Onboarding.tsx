@@ -332,7 +332,25 @@ export function Onboarding() {
       storedGuarantors[i] || { name: '', phone: '', verified: false }
     );
 
-    return { ...defaultCl, ...storedCl, guarantors: syncedGuarantors };
+    // Prefer checklist values, but fall back to direct employee record fields
+    // so data entered on either page (Onboarding or Employee Detail) is always visible.
+    const merged = { ...defaultCl, ...storedCl, guarantors: syncedGuarantors };
+    if (!merged.pensionNumberInput && selectedEmployee.pensionNumber) {
+      merged.pensionNumberInput = selectedEmployee.pensionNumber;
+    }
+    if (!merged.payeNumberInput && selectedEmployee.taxId) {
+      merged.payeNumberInput = selectedEmployee.taxId;
+    }
+    if (!merged.lashmaPolicyNumber && selectedEmployee.lashmaPolicyNumber) {
+      merged.lashmaPolicyNumber = selectedEmployee.lashmaPolicyNumber;
+    }
+    if (!merged.lashmaRegistrationDate && selectedEmployee.lashmaRegistrationDate) {
+      merged.lashmaRegistrationDate = selectedEmployee.lashmaRegistrationDate;
+    }
+    if (!merged.lashmaExpiryDate && selectedEmployee.lashmaExpiryDate) {
+      merged.lashmaExpiryDate = selectedEmployee.lashmaExpiryDate;
+    }
+    return merged;
   }, [selectedEmployee]);
 
   // Sync localAccountNo whenever the selected employee changes
@@ -351,11 +369,14 @@ export function Onboarding() {
     if (!selectedEmployee) return;
     const newCL = { ...cl, ...patch };
     
-    // Sync LASHMA fields to the main employee record if they are being updated
+    // Sync fields to the main employee record if they are being updated
     const syncPatch: any = { onboardingChecklist: newCL };
     if (patch.lashmaPolicyNumber !== undefined) syncPatch.lashmaPolicyNumber = patch.lashmaPolicyNumber;
     if (patch.lashmaRegistrationDate !== undefined) syncPatch.lashmaRegistrationDate = patch.lashmaRegistrationDate;
     if (patch.lashmaExpiryDate !== undefined) syncPatch.lashmaExpiryDate = patch.lashmaExpiryDate;
+    // Sync pension and paye numbers to the employee record in real-time
+    if (patch.pensionNumberInput !== undefined) syncPatch.pensionNumber = patch.pensionNumberInput;
+    if (patch.payeNumberInput !== undefined) syncPatch.taxId = patch.payeNumberInput;
 
     updateEmployee(selectedEmployee.id, syncPatch);
 
@@ -454,7 +475,7 @@ export function Onboarding() {
       bankName: cl.bankName || selectedEmployee.bankName,
       accountNo: cl.accountNo || selectedEmployee.accountNo,
       pensionNumber: cl.pensionNumberInput || selectedEmployee.pensionNumber,
-      payeNumber: cl.payeNumberInput || selectedEmployee.payeNumber,
+      taxId: cl.payeNumberInput || selectedEmployee.taxId,
       lashmaPolicyNumber: cl.lashmaPolicyNumber || selectedEmployee.lashmaPolicyNumber,
       lashmaRegistrationDate: cl.lashmaRegistrationDate || selectedEmployee.lashmaRegistrationDate,
       lashmaExpiryDate: cl.lashmaExpiryDate || selectedEmployee.lashmaExpiryDate,
@@ -534,7 +555,7 @@ export function Onboarding() {
         accountDetailsVerified: true,
         pensionNumberInput: emp.pensionNumber || '',
         pensionVerified: true,
-        payeNumberInput: emp.payeNumber || '',
+        payeNumberInput: emp.taxId || '',
         payeVerified: true,
         lashmaPolicyNumber: emp.lashmaPolicyNumber || '',
         lashmaRegistrationDate: emp.lashmaRegistrationDate || '',
@@ -585,7 +606,7 @@ export function Onboarding() {
       bankName: selectedEmployee.onboardingChecklist?.bankName || selectedEmployee.bankName || '',
       accountNo: selectedEmployee.onboardingChecklist?.accountNo || selectedEmployee.accountNo || '',
       pensionNumberInput: selectedEmployee.onboardingChecklist?.pensionNumberInput || selectedEmployee.pensionNumber || '',
-      payeNumberInput: selectedEmployee.onboardingChecklist?.payeNumberInput || selectedEmployee.payeNumber || '',
+      payeNumberInput: selectedEmployee.onboardingChecklist?.payeNumberInput || selectedEmployee.taxId || '',
       lashmaPolicyNumber: selectedEmployee.onboardingChecklist?.lashmaPolicyNumber || selectedEmployee.lashmaPolicyNumber || '',
       lashmaRegistrationDate: selectedEmployee.onboardingChecklist?.lashmaRegistrationDate || selectedEmployee.lashmaRegistrationDate || '',
       lashmaExpiryDate: selectedEmployee.onboardingChecklist?.lashmaExpiryDate || selectedEmployee.lashmaExpiryDate || '',
@@ -631,7 +652,7 @@ export function Onboarding() {
         bankName: emp.onboardingChecklist?.bankName || emp.bankName || '',
         accountNo: emp.onboardingChecklist?.accountNo || emp.accountNo || '',
         pensionNumberInput: emp.onboardingChecklist?.pensionNumberInput || emp.pensionNumber || '',
-        payeNumberInput: emp.onboardingChecklist?.payeNumberInput || emp.payeNumber || '',
+        payeNumberInput: emp.onboardingChecklist?.payeNumberInput || emp.taxId || '',
         lashmaPolicyNumber: emp.onboardingChecklist?.lashmaPolicyNumber || emp.lashmaPolicyNumber || '',
         lashmaRegistrationDate: emp.onboardingChecklist?.lashmaRegistrationDate || emp.lashmaRegistrationDate || '',
         lashmaExpiryDate: emp.onboardingChecklist?.lashmaExpiryDate || emp.lashmaExpiryDate || '',

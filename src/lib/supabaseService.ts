@@ -149,6 +149,7 @@ export function dbToLeave(r: any): LeaveRecord {
     expectedEndDate: r.expected_end_date, reason: r.reason,
     dateReturned: r.date_returned, canBeContacted: r.can_be_contacted,
     status: r.status, uploadedFile: r.uploaded_file, uploadedFileName: r.uploaded_file_name,
+    nasFilePath: r.nas_file_path || undefined,
     supervisor: r.supervisor, management: r.management,
     approvedById: r.approved_by_id || undefined,
     approvedByName: r.approved_by_name || undefined,
@@ -156,6 +157,25 @@ export function dbToLeave(r: any): LeaveRecord {
     approvedAt: r.approved_at || undefined,
     rejectionNote: r.rejection_note || undefined,
     approvalStatus: r.approval_status || 'Pending',
+    personResponsibleId: r.person_responsible_id || undefined,
+    personResponsibleDuringAbsence: r.person_responsible_during_absence || undefined,
+    keyDuties: r.key_duties || undefined,
+    formDateReturned: r.form_date_returned || undefined,
+    employeeSignature: r.employee_signature || undefined,
+    supervisorSignature: r.supervisor_signature || undefined,
+    hodSignature: r.hod_signature || undefined,
+    managementSignature: r.management_signature || undefined,
+    hrSignature: r.hr_signature || undefined,
+    hrApprovedFrom: r.hr_approved_from || undefined,
+    hrApprovedTo: r.hr_approved_to || undefined,
+    leaveNumber: r.leave_number || undefined,
+    // Workflow tracking
+    workflowStep: r.workflow_step ?? 0,
+    lineManagerTaskId: r.line_manager_task_id || undefined,
+    hodTaskId: r.hod_task_id || undefined,
+    managementTaskId: r.management_task_id || undefined,
+    hrTaskId: r.hr_task_id || undefined,
+    hodEmployeeId: r.hod_employee_id || undefined,
   };
 }
 
@@ -457,6 +477,7 @@ function leaveToDb(l: LeaveRecord) {
     form_date_returned: l.formDateReturned,
     employee_signature: l.employeeSignature,
     supervisor_signature: l.supervisorSignature,
+    hod_signature: l.hodSignature || null,
     management_signature: l.managementSignature,
     hr_signature: l.hrSignature,
     hr_approved_from: l.hrApprovedFrom,
@@ -469,6 +490,13 @@ function leaveToDb(l: LeaveRecord) {
     approved_at: l.approvedAt || null,
     rejection_note: l.rejectionNote || null,
     approval_status: l.approvalStatus || 'Pending',
+    // Workflow tracking
+    workflow_step: l.workflowStep ?? 0,
+    line_manager_task_id: l.lineManagerTaskId || null,
+    hod_task_id: l.hodTaskId || null,
+    management_task_id: l.managementTaskId || null,
+    hr_task_id: l.hrTaskId || null,
+    hod_employee_id: l.hodEmployeeId || null,
   };
 }
 
@@ -1246,6 +1274,13 @@ export const db = {
     if (l.approvedAt !== undefined) update.approved_at = l.approvedAt;
     if (l.rejectionNote !== undefined) update.rejection_note = l.rejectionNote;
     if (l.approvalStatus !== undefined) update.approval_status = l.approvalStatus;
+    if (l.hodSignature !== undefined) update.hod_signature = l.hodSignature;
+    if (l.workflowStep !== undefined) update.workflow_step = l.workflowStep;
+    if (l.lineManagerTaskId !== undefined) update.line_manager_task_id = l.lineManagerTaskId;
+    if (l.hodTaskId !== undefined) update.hod_task_id = l.hodTaskId;
+    if (l.managementTaskId !== undefined) update.management_task_id = l.managementTaskId;
+    if (l.hrTaskId !== undefined) update.hr_task_id = l.hrTaskId;
+    if (l.hodEmployeeId !== undefined) update.hod_employee_id = l.hodEmployeeId;
     const { error } = await supabase.from('leaves').update(update).eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
   },

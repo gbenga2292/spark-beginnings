@@ -4,6 +4,7 @@ import { useAuth } from '@/src/hooks/useAuth';
 import { toast } from '@/src/components/ui/toast';
 import logoSrc from '../../logo/logo-2.png';
 import type { MainTask, SubTask, TaskComment, AppUser, CommentAttachment } from '@/src/types/tasks';
+import { useAppStore } from '@/src/store/appStore';
 
 // ── Typed context interface ──────────────────────────────────────────────────
 interface AppDataContextType {
@@ -471,13 +472,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             if (data?.description) {
                 const meta = JSON.parse(data.description);
                 if (meta.refType && meta.refId) {
-                    // This was an approval task. Post a comment to notify the creator.
+                    // Post a comment
                     const mainTask = mainTasks.find(m => m.id === data.mainTaskId || m.id === data.main_task_id);
                     if (mainTask) {
                         const creator = users.find(u => u.id === mainTask.createdBy);
                         const mention = creator?.name ? `@${creator.name.split(' ')[0].toLowerCase()}` : '';
-                        const text = `**Decision: Approved** ✅\n${mention} Your request has been approved.`;
-                        
+                        const stepLabel = meta.workflowStep === 1 ? 'Line Manager' : meta.workflowStep === 2 ? 'Head of Department' : meta.workflowStep === 3 ? 'Management' : 'HR';
+                        const text = `**${stepLabel} Approved** ✅\n${mention} Step ${meta.workflowStep} of 4 approved.`;
                         const { data: cData, error: cErr } = await supabase.from('task_updates').insert({
                             subtask_id: id,
                             main_task_id: mainTask.id,
@@ -487,21 +488,102 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                         if (cData && !cErr) setComments(prev => [...prev, cData]);
                     }
 
-                    const updatePayload = {
-                        status: 'Approved',
-                        approval_status: meta.refType === 'leave' ? 'Approved' : undefined,
-                        approved_at: new Date().toISOString()
-                    };
-                    
-                    if (meta.refType === 'salary_advance') {
+                    if (meta.refType === 'leave') {
+                        const now = new Date().toISOString();
+                        const step = meta.workflowStep as number;
+                        const mainTaskId = data.mainTaskId || data.main_task_id;
+                        const deadline = new Date(); deadline.setHours(16, 30, 0, 0);
+
+                        if (step === 1) {
+                            // LM approved → create HoD subtask
+                            const { data: leaveRow } = await supabase.from('leaves').select('*').eq('id', meta.refId).single();
+                            const hodUserId = meta.hodUserId; // passed in the subtask description
+                            // Find the HoD system user if any
+                            const hodSystemUser = hodUserId ? users.find((u: any) => u.employeeId === hodUserId || u.id === hodUserId) : null;
+
+                            const hodSubDesc = JSON.stringify({ refType: 'leave', refId: meta.refId, workflowStep: 2, empName: meta.empName, leaveType: meta.leaveType, duration: meta.duration, hodUserId });
+                            const { data: hodSub } = await supabase.from('subtasks').insert({
+                                title: `[Step 2/4] HoD Approval — ${meta.empName} ${meta.leaveType} Leave`,
+                                description: hodSubDesc,
+                                assignedTo: hodSystemUser?.id || null,
+                                status: 'not_started',
+                                priority: 'high',
+                                mainTaskId,
+                                deadline: deadline.toISOString(),
+                            }).select().single();
+                            if (hodSub) setSubtasks(prev => [...prev, hodSub]);
+
+                            useAppStore.getState().updateLeave(meta.refId, {
+                                approvalStatus: 'Pending',
+                                workflowStep: 2,
+                                supervisorSignature: { signed: 'Signed', date: now },
+                                hodTaskId: hodSub?.id,
+                            });
+
+                        } else if (step === 2) {
+                            // HoD approved → create Management subtask
+                            const { data: leaveRow } = await supabase.from('leaves').select('approved_by_id').eq('id', meta.refId).single();
+                            const mgmtUserId = leaveRow?.approved_by_id;
+
+                            const mgmtSubDesc = JSON.stringify({ refType: 'leave', refId: meta.refId, workflowStep: 3, empName: meta.empName, leaveType: meta.leaveType, duration: meta.duration });
+                            const { data: mgmtSub } = await supabase.from('subtasks').insert({
+                                title: `[Step 3/4] Management Approval — ${meta.empName} ${meta.leaveType} Leave`,
+                                description: mgmtSubDesc,
+                                assignedTo: mgmtUserId || null,
+                                status: 'not_started',
+                                priority: 'high',
+                                mainTaskId,
+                                deadline: deadline.toISOString(),
+                            }).select().single();
+                            if (mgmtSub) setSubtasks(prev => [...prev, mgmtSub]);
+
+                            useAppStore.getState().updateLeave(meta.refId, {
+                                workflowStep: 3,
+                                hodSignature: { signed: 'Signed', date: now },
+                                managementTaskId: mgmtSub?.id,
+                            });
+
+                        } else if (step === 3) {
+                            // Management approved → create HR subtask
+                            // Find an HR user (any user whose department is 'HR' or 'Human Resources')
+                            const hrUser = users.find((u: any) =>
+                                (u.department || '').toLowerCase().includes('hr') ||
+                                (u.department || '').toLowerCase().includes('human resource')
+                            );
+
+                            const hrSubDesc = JSON.stringify({ refType: 'leave', refId: meta.refId, workflowStep: 4, empName: meta.empName, leaveType: meta.leaveType, duration: meta.duration });
+                            const { data: hrSub } = await supabase.from('subtasks').insert({
+                                title: `[Step 4/4] HR Processing — ${meta.empName} ${meta.leaveType} Leave`,
+                                description: hrSubDesc,
+                                assignedTo: hrUser?.id || null,
+                                status: 'not_started',
+                                priority: 'high',
+                                mainTaskId,
+                                deadline: deadline.toISOString(),
+                            }).select().single();
+                            if (hrSub) setSubtasks(prev => [...prev, hrSub]);
+
+                            useAppStore.getState().updateLeave(meta.refId, {
+                                workflowStep: 4,
+                                managementSignature: { signed: 'Signed', date: now },
+                                hrTaskId: hrSub?.id,
+                            });
+
+                        } else if (step === 4) {
+                            // HR approved → fully approved!
+                            useAppStore.getState().updateLeave(meta.refId, {
+                                approvalStatus: 'Approved',
+                                approvedAt: now,
+                                workflowStep: 5,
+                                hrSignature: { signed: 'Signed', date: now },
+                            });
+                        }
+                    } else if (meta.refType === 'salary_advance') {
                         const { error: saErr } = await supabase.from('salary_advances').update({ status: 'Approved', approved_at: new Date().toISOString() }).eq('id', meta.refId);
                         if (saErr) console.error('Failed to update salary advance status:', saErr);
                     } else if (meta.refType === 'loan') {
                         const { error: loanErr } = await supabase.from('loans').update({ status: 'Approved', approved_at: new Date().toISOString() }).eq('id', meta.refId);
                         if (loanErr) console.error('Failed to update loan status:', loanErr);
-                    } else if (meta.refType === 'leave') {
-                        const { error: leaveErr } = await supabase.from('leaves').update({ approval_status: 'Approved', approved_at: new Date().toISOString() }).eq('id', meta.refId);
-                        if (leaveErr) console.error('Failed to update leave status:', leaveErr);
                     }
                 }
             }
@@ -527,13 +609,12 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             if (data?.description) {
                 const meta = JSON.parse(data.description);
                 if (meta.refType && meta.refId) {
-                    // This was an approval task. Post a comment to notify the creator.
                     const mainTask = mainTasks.find(m => m.id === data.mainTaskId || m.id === data.main_task_id);
                     if (mainTask) {
                         const creator = users.find(u => u.id === mainTask.createdBy);
                         const mention = creator?.name ? `@${creator.name.split(' ')[0].toLowerCase()}` : '';
-                        const text = `**Decision: Rejected** ❌\n${mention} Your request was rejected.\n\n${note ? `Reason: "${note}"` : ''}`;
-                        
+                        const stepLabel = meta.workflowStep === 1 ? 'Line Manager' : meta.workflowStep === 2 ? 'Head of Department' : meta.workflowStep === 3 ? 'Management' : 'HR';
+                        const text = `**${stepLabel} Rejected** ❌\n${mention} Leave request was rejected at Step ${meta.workflowStep}.\n\n${note ? `Reason: "${note}"` : ''}`;
                         const { data: cData, error: cErr } = await supabase.from('task_updates').insert({
                             subtask_id: id,
                             main_task_id: mainTask.id,
@@ -543,15 +624,19 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                         if (cData && !cErr) setComments(prev => [...prev, cData]);
                     }
 
-                    if (meta.refType === 'salary_advance') {
+                    if (meta.refType === 'leave') {
+                        // Rejection at any step permanently aborts the workflow
+                        useAppStore.getState().updateLeave(meta.refId, {
+                            approvalStatus: 'Rejected',
+                            workflowStep: -1,
+                            rejectionNote: note || `Rejected at step ${meta.workflowStep}`,
+                        });
+                    } else if (meta.refType === 'salary_advance') {
                         const { error: saErr } = await supabase.from('salary_advances').update({ status: 'Rejected', rejection_note: note }).eq('id', meta.refId);
                         if (saErr) console.error('Failed to update salary advance status:', saErr);
                     } else if (meta.refType === 'loan') {
                         const { error: loanErr } = await supabase.from('loans').update({ status: 'Rejected', rejection_note: note }).eq('id', meta.refId);
                         if (loanErr) console.error('Failed to update loan status:', loanErr);
-                    } else if (meta.refType === 'leave') {
-                        const { error: leaveErr } = await supabase.from('leaves').update({ approval_status: 'Rejected', rejection_note: note }).eq('id', meta.refId);
-                        if (leaveErr) console.error('Failed to update leave status:', leaveErr);
                     }
                 }
             }
