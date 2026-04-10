@@ -71,7 +71,10 @@ export function Payroll() {
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const publicHolidays = useAppStore((state) => state.publicHolidays);
 
-  const [selectedMonth, setSelectedMonth] = useState('jan');
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const defaultMonthKey = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'][new Date().getMonth()];
+    return defaultMonthKey;
+  });
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [activeTab, setActiveTab] = useState('processing');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -878,26 +881,26 @@ export function Payroll() {
               >
                 {/* Table mimicking Excel specific columns precisely */}
                 <Table className="whitespace-nowrap w-full text-xs">
-                  <TableHeader className="sticky top-0 z-40 bg-slate-50">
-                    <TableRow className="bg-slate-50">
-                      <TableHead className="font-bold text-slate-900 sticky top-0 left-0 z-30 bg-slate-50 ring-1 ring-slate-200" style={{minWidth:'48px'}}>S/N</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-30 bg-slate-50 ring-1 ring-slate-200" style={{left:'48px',minWidth:'110px'}}>SURNAMES</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-30 bg-slate-50 ring-1 ring-slate-200" style={{left:'158px',minWidth:'110px'}}>FIRNAME</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-30 bg-slate-50 ring-1 ring-slate-200" style={{left:'268px',minWidth:'180px'}}>JOB TITTLE</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-20 bg-slate-50 ring-1 ring-slate-200">BANK</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-20 bg-slate-50 ring-1 ring-slate-200">ACCOUNT NO.</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">SALARY</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-20 bg-slate-50 ring-1 ring-slate-200">Basic Salary</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-20 bg-slate-50 ring-1 ring-slate-200">Housing</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-20 bg-slate-50 ring-1 ring-slate-200">Transport</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-20 bg-slate-50 ring-1 ring-slate-200">Other Allowances</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-20 bg-slate-100 ring-1 ring-slate-200">Total-Allowances</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-20 bg-slate-50 text-amber-700 ring-1 ring-slate-200">OVERTIME</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-20 bg-emerald-50 ring-1 ring-slate-200">GROSS PAY</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-20 bg-slate-50 text-red-600 ring-1 ring-slate-200">PAYE</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-20 bg-slate-50 text-red-600 ring-1 ring-slate-200">LOAN REPAYMENT</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-20 bg-slate-50 text-red-600 ring-1 ring-slate-200">PENSION</TableHead>
-                      <TableHead className="font-bold text-slate-900 sticky top-0 z-20 bg-emerald-100 ring-1 ring-slate-200">TAKE HOME PAY</TableHead>
+                  <TableHeader className="sticky top-0 z-40 bg-slate-50 dark:bg-slate-900">
+                    <TableRow className="bg-slate-50 dark:bg-slate-900">
+                      <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 left-0 z-30 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700" style={{minWidth:'48px'}}>S/N</TableHead>
+                      <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-30 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700" style={{left:'48px',minWidth:'110px'}}>SURNAMES</TableHead>
+                      <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-30 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700" style={{left:'158px',minWidth:'110px'}}>FIRNAME</TableHead>
+                      <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-30 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700" style={{left:'268px',minWidth:'180px'}}>JOB TITTLE</TableHead>
+                      <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">BANK</TableHead>
+                      <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">ACCOUNT NO.</TableHead>
+                      <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-indigo-50 dark:bg-indigo-900/50 ring-1 ring-slate-200 dark:ring-slate-700">SALARY</TableHead>
+                      <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Basic Salary</TableHead>
+                      <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Housing</TableHead>
+                      <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Transport</TableHead>
+                      <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Other Allowances</TableHead>
+                      <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-slate-100 dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-700">Total-Allowances</TableHead>
+                      <TableHead className="font-bold text-amber-700 dark:text-amber-500 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">OVERTIME</TableHead>
+                      <TableHead className="font-bold text-slate-900 dark:text-slate-100 sticky top-0 z-20 bg-emerald-50 dark:bg-emerald-900/40 ring-1 ring-slate-200 dark:ring-slate-700">GROSS PAY</TableHead>
+                      <TableHead className="font-bold text-red-600 dark:text-red-500 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">PAYE</TableHead>
+                      <TableHead className="font-bold text-red-600 dark:text-red-500 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">LOAN REPAYMENT</TableHead>
+                      <TableHead className="font-bold text-red-600 dark:text-red-500 sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">PENSION</TableHead>
+                      <TableHead className="font-bold text-slate-900 dark:text-emerald-400 sticky top-0 z-20 bg-emerald-100 dark:bg-emerald-900/60 ring-1 ring-slate-200 dark:ring-slate-700">TAKE HOME PAY</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -942,17 +945,17 @@ export function Payroll() {
                 <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 cursor-grab">
                   <Table className="whitespace-nowrap w-full text-xs">
                     <TableHeader>
-                      <TableRow className="bg-red-50">
-                        <TableHead className="font-bold sticky top-0 z-20 bg-red-50 ring-1 ring-slate-200">S/N</TableHead>
-                        <TableHead className="font-bold sticky top-0 z-20 bg-red-50 ring-1 ring-slate-200">Surname</TableHead>
-                        <TableHead className="font-bold sticky top-0 z-20 bg-red-50 ring-1 ring-slate-200">Firstname</TableHead>
-                        <TableHead className="font-bold sticky top-0 z-20 bg-red-50 ring-1 ring-slate-200">Department</TableHead>
-                        <TableHead className="font-bold text-right sticky top-0 z-20 bg-red-50 ring-1 ring-slate-200">Basic (₦)</TableHead>
-                        <TableHead className="font-bold text-right sticky top-0 z-20 bg-red-50 ring-1 ring-slate-200">Housing (₦)</TableHead>
-                        <TableHead className="font-bold text-right sticky top-0 z-20 bg-red-50 ring-1 ring-slate-200">Transport (₦)</TableHead>
-                        <TableHead className="font-bold text-right sticky top-0 z-20 bg-red-50 ring-1 ring-slate-200">Other (₦)</TableHead>
-                        <TableHead className="font-bold text-right bg-slate-100 sticky top-0 z-20 ring-1 ring-slate-200">Gross Pay (₦)</TableHead>
-                        <TableHead className="font-bold text-right text-red-600 sticky top-0 z-20 bg-red-50 ring-1 ring-slate-200">PAYE (₦)</TableHead>
+                      <TableRow className="bg-red-50 dark:bg-slate-900">
+                        <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-red-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">S/N</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-red-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Surname</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-red-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Firstname</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-red-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Department</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 text-right sticky top-0 z-20 bg-red-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Basic (₦)</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 text-right sticky top-0 z-20 bg-red-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Housing (₦)</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 text-right sticky top-0 z-20 bg-red-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Transport (₦)</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 text-right sticky top-0 z-20 bg-red-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Other (₦)</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 text-right bg-slate-100 dark:bg-slate-800 sticky top-0 z-20 ring-1 ring-slate-200 dark:ring-slate-700">Gross Pay (₦)</TableHead>
+                        <TableHead className="font-bold text-right text-red-600 dark:text-red-500 sticky top-0 z-20 bg-red-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">PAYE (₦)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1000,15 +1003,15 @@ export function Payroll() {
                 <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 cursor-grab">
                   <Table className="whitespace-nowrap w-full text-xs">
                     <TableHeader>
-                      <TableRow className="bg-amber-50">
-                        <TableHead className="font-bold sticky top-0 z-20 bg-amber-50 ring-1 ring-slate-200">S/N</TableHead>
-                        <TableHead className="font-bold sticky top-0 z-20 bg-amber-50 ring-1 ring-slate-200">Surname</TableHead>
-                        <TableHead className="font-bold sticky top-0 z-20 bg-amber-50 ring-1 ring-slate-200">Firstname</TableHead>
-                        <TableHead className="font-bold sticky top-0 z-20 bg-amber-50 ring-1 ring-slate-200">Department</TableHead>
-                        <TableHead className="font-bold text-right sticky top-0 z-20 bg-amber-50 ring-1 ring-slate-200">Pensionable Sum (₦)</TableHead>
-                        <TableHead className="font-bold text-right text-amber-700 sticky top-0 z-20 bg-amber-50 ring-1 ring-slate-200">Employee (₦)</TableHead>
-                        <TableHead className="font-bold text-right text-indigo-700 sticky top-0 z-20 bg-amber-50 ring-1 ring-slate-200">Employer (₦)</TableHead>
-                        <TableHead className="font-bold text-right text-emerald-700 bg-emerald-50 sticky top-0 z-20 ring-1 ring-slate-200">Total (₦)</TableHead>
+                      <TableRow className="bg-amber-50 dark:bg-slate-900">
+                        <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-amber-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">S/N</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-amber-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Surname</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-amber-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Firstname</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-amber-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Department</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 text-right sticky top-0 z-20 bg-amber-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Pensionable Sum (₦)</TableHead>
+                        <TableHead className="font-bold text-right text-amber-700 dark:text-amber-500 sticky top-0 z-20 bg-amber-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Employee (₦)</TableHead>
+                        <TableHead className="font-bold text-right text-indigo-700 dark:text-indigo-400 sticky top-0 z-20 bg-amber-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Employer (₦)</TableHead>
+                        <TableHead className="font-bold text-right text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 sticky top-0 z-20 ring-1 ring-slate-200 dark:ring-slate-700">Total (₦)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1055,14 +1058,14 @@ export function Payroll() {
                 <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 cursor-grab">
                   <Table className="whitespace-nowrap w-full text-xs">
                     <TableHeader>
-                      <TableRow className="bg-blue-50">
-                        <TableHead className="font-bold sticky top-0 z-20 bg-blue-50 ring-1 ring-slate-200">S/N</TableHead>
-                        <TableHead className="font-bold sticky top-0 z-20 bg-blue-50 ring-1 ring-slate-200">Surname</TableHead>
-                        <TableHead className="font-bold sticky top-0 z-20 bg-blue-50 ring-1 ring-slate-200">Firstname</TableHead>
-                        <TableHead className="font-bold sticky top-0 z-20 bg-blue-50 ring-1 ring-slate-200">Department</TableHead>
-                        <TableHead className="font-bold text-right sticky top-0 z-20 bg-blue-50 ring-1 ring-slate-200">Gross Pay (₦)</TableHead>
-                        <TableHead className="font-bold text-center sticky top-0 z-20 bg-blue-50 ring-1 ring-slate-200">Rate (%)</TableHead>
-                        <TableHead className="font-bold text-right text-blue-700 bg-blue-50 sticky top-0 z-20 ring-1 ring-slate-200">NSITF (₦)</TableHead>
+                      <TableRow className="bg-blue-50 dark:bg-slate-900">
+                        <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-blue-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">S/N</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-blue-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Surname</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-blue-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Firstname</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-blue-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Department</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 text-right sticky top-0 z-20 bg-blue-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Gross Pay (₦)</TableHead>
+                        <TableHead className="font-bold dark:text-slate-100 text-center sticky top-0 z-20 bg-blue-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Rate (%)</TableHead>
+                        <TableHead className="font-bold text-right text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 sticky top-0 z-20 ring-1 ring-slate-200 dark:ring-slate-700">NSITF (₦)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1102,16 +1105,16 @@ export function Payroll() {
               <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 cursor-grab">
                 <Table className="whitespace-nowrap w-full text-xs">
                   <TableHeader>
-                    <TableRow className="bg-indigo-50">
-                      <TableHead className="font-bold sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">S/N</TableHead>
-                      <TableHead className="font-bold sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">Surname</TableHead>
-                      <TableHead className="font-bold sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">Firstname</TableHead>
-                      <TableHead className="font-bold sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">TIN</TableHead>
-                      <TableHead className="font-bold sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">Department</TableHead>
-                      <TableHead className="font-bold text-right sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">Gross Pay (₦)</TableHead>
-                      <TableHead className="font-bold text-center sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">Rate (%)</TableHead>
-                      <TableHead className="font-bold text-right text-indigo-700 bg-indigo-50 sticky top-0 z-20 ring-1 ring-slate-200">Withholding (₦)</TableHead>
-                      <TableHead className="font-medium text-right text-slate-500 sticky top-0 z-20 bg-indigo-50 ring-1 ring-slate-200">Net Pay (₦)</TableHead>
+                    <TableRow className="bg-indigo-50 dark:bg-slate-900">
+                      <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">S/N</TableHead>
+                      <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Surname</TableHead>
+                      <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Firstname</TableHead>
+                      <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">TIN</TableHead>
+                      <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Department</TableHead>
+                      <TableHead className="font-bold dark:text-slate-100 text-right sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Gross Pay (₦)</TableHead>
+                      <TableHead className="font-bold dark:text-slate-100 text-center sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Rate (%)</TableHead>
+                      <TableHead className="font-bold text-right text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-slate-900 sticky top-0 z-20 ring-1 ring-slate-200 dark:ring-slate-700">Withholding (₦)</TableHead>
+                      <TableHead className="font-bold dark:text-slate-100 text-right text-slate-500 sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">Net Pay (₦)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

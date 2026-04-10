@@ -436,11 +436,12 @@ export function Organogram() {
         onMouseLeave={handleMouseLeave}
         onMouseUp={handleMouseUp}
         onMouseMove={handleMouseMove}
-        className={`flex-1 bg-[#f8fafc] border border-slate-200 rounded-2xl overflow-auto relative ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} shadow-inner`}
+        onDragStart={(e) => e.preventDefault()}
+        className={`flex-1 bg-[#f8fafc] dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-auto relative select-none shadow-inner ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       >
         {/* We use an internal container that scales based on zoom. The transform-origin is top center so it grows downwards and outwards symmetrically. */}
         <div 
-          className="min-w-max min-h-full flex justify-center py-16 px-32 transition-transform duration-300 ease-out"
+          className={`min-w-max min-h-full flex justify-center py-16 px-32 transition-transform duration-300 ease-out ${isDragging ? 'pointer-events-none' : ''}`}
           style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
         >
           {/* ROOT CONTAINER */}
