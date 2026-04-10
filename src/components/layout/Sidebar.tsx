@@ -167,7 +167,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleLinkClick = async (e: React.MouseEvent, href: string) => {
-    const { isVariablesDirty, setVariablesDirty, isLedgerDirty, setLedgerDirty } = useAppStore.getState();
+    const { isVariablesDirty, setVariablesDirty, isLedgerDirty, setLedgerDirty, isEmployeeFormDirty, setEmployeeFormDirty } = useAppStore.getState();
 
     if (location.pathname === '/ledger' && (pendingLedgerEntries.length > 0 || isLedgerDirty) && href !== '/ledger') {
       e.preventDefault();
@@ -195,6 +195,22 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       });
       if (ok) {
         setVariablesDirty(false);
+        setIsOpen?.(false);
+        navigate(href);
+      }
+      return;
+    }
+
+    if (location.pathname === '/employees' && isEmployeeFormDirty && href !== '/employees') {
+      e.preventDefault();
+      const ok = await showConfirm('You have unsaved changes in the employee form. Do you want to discard them and leave?', {
+        title: 'Unsaved Changes',
+        confirmLabel: 'Discard & Leave',
+        cancelLabel: 'Stay Here',
+        variant: 'danger'
+      });
+      if (ok) {
+        setEmployeeFormDirty(false);
         setIsOpen?.(false);
         navigate(href);
       }

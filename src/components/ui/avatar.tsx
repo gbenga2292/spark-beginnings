@@ -57,19 +57,21 @@ const AvatarImage = React.forwardRef<HTMLImageElement, React.ImgHTMLAttributes<H
     [onImageLoadingStatusChange, props.onError]
   );
 
+  const handleRef = React.useCallback((node: HTMLImageElement | null) => {
+    internalRef.current = node;
+    if (typeof forwardedRef === 'function') {
+      forwardedRef(node);
+    } else if (forwardedRef) {
+      forwardedRef.current = node;
+    }
+  }, [forwardedRef]);
+
   if (!src || imageLoadingStatus === 'error') return null;
 
   return (
     <img 
-      // Handle both forwardedRef and internalRef
-      ref={(node) => {
-        internalRef.current = node;
-        if (typeof forwardedRef === 'function') {
-          forwardedRef(node);
-        } else if (forwardedRef) {
-          forwardedRef.current = node;
-        }
-      }}
+      // Handle both forwardedRef and internalRef securely
+      ref={handleRef}
       src={src}
       className={cn("aspect-square h-full w-full object-cover", imageLoadingStatus !== 'loaded' && 'hidden', className)} 
       onLoad={handleLoad}

@@ -10,7 +10,7 @@ import { Input } from '../components/ui/input';
 
 export function HmoManagement() {
   const { user } = useAuth();
-  const { employees, bulkUpdateEmployees, updateEmployee } = useAppStore();
+  const { employees, updateEmployee } = useAppStore();
   const taskContext = useContext(TaskContext);
   
   const [searchTerm, setSearchTerm] = useState('');

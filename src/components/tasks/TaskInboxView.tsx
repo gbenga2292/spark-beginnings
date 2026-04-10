@@ -104,12 +104,14 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
   // Flatten only the currently searched groups for display count
   const flatSubtasks = useMemo(() => groupedTasks.flatMap(g => g.subs), [groupedTasks]);
 
-  // Auto-select first task if nothing is selected
+  // Auto-select first task once on initial mount (not on every update)
+  const hasAutoSelected = useRef(false);
   useEffect(() => {
-    if (!activeSubtaskId && flatSubtasks.length > 0 && flatSubtasks[0]?.id) {
+    if (!hasAutoSelected.current && !activeSubtaskId && flatSubtasks.length > 0 && flatSubtasks[0]?.id) {
+      hasAutoSelected.current = true;
       onSelectSubtask(flatSubtasks[0].id!);
     }
-  }, [flatSubtasks]);
+  }, [flatSubtasks, activeSubtaskId, onSelectSubtask]);
 
   const toggleGroup = (id: string) => {
     setExpandedGroups(prev => {
@@ -710,9 +712,13 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                 <button 
                   onClick={() => {
                      if (!hmoPrompt.duration || !hmoPrompt.startDate) return;
+                     const durationVal = parseInt(hmoPrompt.duration) || 12;
+                     const expDate = new Date(hmoPrompt.startDate);
+                     expDate.setMonth(expDate.getMonth() + durationVal);
                      updateEmployee(hmoPrompt.employeeId, {
                         lashmaRegistrationDate: hmoPrompt.startDate,
-                        lashmaDuration: parseInt(hmoPrompt.duration) || 12,
+                        lashmaExpiryDate: expDate.toISOString().split('T')[0],
+                        lashmaDuration: durationVal,
                      });
                      if (hmoPrompt.subtaskId) updateSubtaskStatus(hmoPrompt.subtaskId, 'completed', currentUser?.id);
                      toast.success("HMO Policy renewed successfully!");

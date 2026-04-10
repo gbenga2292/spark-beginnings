@@ -217,14 +217,29 @@ export function urgencyScore(sub: { deadline?: string; status: string }) {
 
 export function applySortToSubs<T extends { title: string; deadline?: string; status: string; createdAt?: string; created_at?: string }>(list: T[], sort: SortOption): T[] {
   const sorted = [...list];
-  switch (sort) {
-    case 'urgency': return sorted.sort((a, b) => urgencyScore(a) - urgencyScore(b));
-    case 'date_asc': return sorted.sort((a, b) => (a.deadline ?? '9999').localeCompare(b.deadline ?? '9999'));
-    case 'date_desc': return sorted.sort((a, b) => (b.deadline ?? '').localeCompare(a.deadline ?? ''));
-    case 'alpha': return sorted.sort((a, b) => a.title.localeCompare(b.title));
-    case 'created_asc': return sorted.sort((a, b) => ((a.createdAt || a.created_at) ?? '9999').localeCompare((b.createdAt || b.created_at) ?? '9999'));
-    case 'created_desc': return sorted.sort((a, b) => ((b.createdAt || b.created_at) ?? '').localeCompare((a.createdAt || a.created_at) ?? ''));
-  }
+  const statusRank: Record<string, number> = { "not_started": 1, "in_progress": 2, "pending_approval": 3, "completed": 4 };
+
+  sorted.sort((a, b) => {
+    // 1. Always group by status first
+    const rankA = statusRank[a.status] || 99;
+    const rankB = statusRank[b.status] || 99;
+    if (rankA !== rankB) {
+      return rankA - rankB;
+    }
+
+    // 2. Then apply the specific sort option
+    switch (sort) {
+      case 'urgency': return urgencyScore(a) - urgencyScore(b);
+      case 'date_asc': return (a.deadline ?? '9999').localeCompare(b.deadline ?? '9999');
+      case 'date_desc': return (b.deadline ?? '').localeCompare(a.deadline ?? '');
+      case 'alpha': return a.title.localeCompare(b.title);
+      case 'created_asc': return ((a.createdAt || a.created_at) ?? '9999').localeCompare((b.createdAt || b.created_at) ?? '9999');
+      case 'created_desc': return ((b.createdAt || b.created_at) ?? '').localeCompare((a.createdAt || a.created_at) ?? '');
+      default: return 0;
+    }
+  });
+  
+  return sorted;
 }
 
 export function loadDefaultSort(): SortOption {

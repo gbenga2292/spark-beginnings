@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
-import { CalendarDays, CheckCircle2, Printer, Eye, X, Plus, Edit, Trash2, Ban, Search, ListFilter, CalendarClock, FileText, ShieldCheck, Clock, XCircle, MoreVertical } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Printer, Eye, X, Plus, Edit, Trash2, Ban, Search, ListFilter, CalendarClock, FileText, ShieldCheck, Clock, XCircle, MoreVertical, ChevronDown } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
 import { useAppStore, LeaveRecord } from '@/src/store/appStore';
 import { useNavigate } from 'react-router-dom';
@@ -406,7 +406,7 @@ export function Leaves() {
 
   /* Save the preview form's signature & detail data back to the leave record */
   /* ── print ── */
-  const handlePrint = () => {
+  const handlePrint = (emptySignatures = false) => {
     const content = printRef.current;
     if (!content) return;
     const printWindow = window.open('', '_blank');
@@ -438,11 +438,19 @@ export function Leaves() {
         .divider { border-top: 1px solid #555; margin: 16px 0; }
         .hr-title { font-size: 10px; font-weight: bold; margin-bottom: 8px; }
         .ack-text { font-size: 10px; line-height: 1.7; margin-bottom: 8px; }
+        .hide-on-print { display: none !important; }
+        .show-on-print { display: inline-block !important; }
         @media print {
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .a4-page { break-after: page; }
           .a4-page:last-of-type { break-after: auto; }
         }
+        ${emptySignatures === true ? `
+          .sig-value, .sig-date { display: none !important; }
+          .sig-empty-dash { display: inline-block !important; }
+        ` : `
+          .sig-empty-dash { display: none !important; }
+        `}
       </style></head><body>
       ${content.innerHTML}
       </body></html>
@@ -730,25 +738,27 @@ export function Leaves() {
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 10, padding: '5px 8px', background: bgColor, border: `1px solid ${borderColor}`, borderRadius: 4 }}>
               <span style={{ fontSize: 9, fontWeight: 'bold', flexShrink: 0, paddingBottom: 1, whiteSpace: 'nowrap' }}>{label}:</span>
               {isManual && !isPreviewLocked ? (
-                <select value={manualSigned} onChange={e => setManualSigned!(e.target.value as 'Signed' | 'Unsigned')}
+                <select className="sig-value" value={manualSigned} onChange={e => setManualSigned!(e.target.value as 'Signed' | 'Unsigned')}
                   style={{ border: 'none', flex: 1, minHeight: 14, fontSize: 9, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1, color: statusColor, fontWeight: isSigned ? 'bold' : 'normal' }}>
                   <option value="Unsigned">Unsigned</option>
                   <option value="Signed">Signed</option>
                 </select>
               ) : (
-                <span style={{ flex: 1, minHeight: 14, fontSize: 9, paddingBottom: 1, color: statusColor, fontWeight: isSigned ? 'bold' : 'normal', fontStyle: isPendingStep ? 'italic' : 'normal' }}>
+                <span className="sig-value" style={{ flex: 1, minHeight: 14, fontSize: 9, paddingBottom: 1, color: statusColor, fontWeight: isSigned ? 'bold' : 'normal', fontStyle: isPendingStep ? 'italic' : 'normal' }}>
                   {statusText}
                 </span>
               )}
+              <span className="sig-empty-dash" style={{ display: 'none', flex: 1, borderBottom: '1px solid #111', minHeight: 14 }}></span>
               <span style={{ fontSize: 9, flexShrink: 0, paddingBottom: 1, marginLeft: 8 }}>Date:</span>
               {isManual && !isPreviewLocked ? (
-                <input type="date" value={manualDate} onChange={e => setManualDate!(e.target.value)}
+                <input className="sig-date" type="date" value={manualDate} onChange={e => setManualDate!(e.target.value)}
                   style={{ border: 'none', borderBottom: '1px solid #999', width: 90, fontSize: 9, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1 }} />
               ) : (
-                <span style={{ fontSize: 9, minWidth: 80, paddingBottom: 1, color: '#555' }}>
+                <span className="sig-date" style={{ fontSize: 9, minWidth: 80, paddingBottom: 1, color: '#555' }}>
                   {sigDate ? format(parseISO(sigDate), 'dd/MM/yyyy') : ''}
                 </span>
               )}
+              <span className="sig-empty-dash" style={{ display: 'none', minWidth: 80, width: 80, borderBottom: '1px solid #111', minHeight: 14 }}></span>
             </div>
           );
         };
@@ -774,15 +784,25 @@ export function Leaves() {
                   )}
                 </h2>
                 <div className="flex gap-2">
-                  {!isPreviewLocked && (
-                    <button type="button" onClick={handleCreateOrUpdate}
-                      className="flex items-center gap-1.5 px-3 h-9 rounded-lg border border-teal-300 bg-teal-50 hover:bg-teal-100 text-teal-700 text-xs font-bold">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> {formId ? 'Update Leave' : 'Submit Application'}
-                    </button>
-                  )}
-                  <Button onClick={handlePrint} className="bg-teal-600 hover:bg-teal-700 text-white gap-2 h-9 text-sm">
-                    <Printer className="h-4 w-4" /> Print
-                  </Button>
+                  <button type="button" onClick={handleCreateOrUpdate}
+                    className="flex items-center gap-1.5 px-3 h-9 rounded-lg border border-teal-300 bg-teal-50 hover:bg-teal-100 text-teal-700 text-xs font-bold">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> {formId ? 'Update Leave' : 'Submit Application'}
+                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-2 h-9 text-sm">
+                        <Printer className="h-4 w-4" /> Print <ChevronDown className="h-3 w-3 ml-1" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                      <DropdownMenuItem onClick={() => handlePrint(false)} className="gap-2 cursor-pointer text-slate-700 dark:text-slate-300">
+                        <Printer className="h-4 w-4" /> Normal Print
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handlePrint(true)} className="gap-2 cursor-pointer text-slate-700 dark:text-slate-300">
+                        <FileText className="h-4 w-4" /> Print (Empty Signatures)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowFormOverlay(false)}>
                     <X className="h-5 w-5 text-slate-500" />
                   </Button>
@@ -810,12 +830,17 @@ export function Leaves() {
                       {isLocked ? (
                         <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{emp?.surname} {emp?.firstname}</span>
                       ) : (
-                        <select value={staffId} onChange={e => setStaffId(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', paddingBottom: 1, appearance: 'none' }}>
-                          <option value="">Select Staff...</option>
-                          {internalEmployees.map((e: any) => (
-                            <option key={e.id} value={e.id}>{e.surname} {e.firstname} ({e.position})</option>
-                          ))}
-                        </select>
+                        <>
+                          <select className="hide-on-print" value={staffId} onChange={e => setStaffId(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', paddingBottom: 1, appearance: 'none' }}>
+                            <option value="">Select Staff...</option>
+                            {internalEmployees.map((e: any) => (
+                              <option key={e.id} value={e.id}>{e.surname} {e.firstname}</option>
+                            ))}
+                          </select>
+                          <span className="show-on-print" style={{ display: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>
+                            {emp ? `${emp.surname} ${emp.firstname}` : ''}
+                          </span>
+                        </>
                       )}
                     </div>
                     {([
@@ -833,12 +858,17 @@ export function Leaves() {
                       {isLocked ? (
                         <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>{approverOptions.find((u: any) => u.id === approverId)?.name || ''}</span>
                       ) : (
-                        <select value={approverId} onChange={e => setApproverId(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', paddingBottom: 1, appearance: 'none', cursor: 'pointer' }}>
-                          <option value="">Select Approver...</option>
-                          {approverOptions.map((u: any) => (
-                            <option key={u.id} value={u.id}>{u.name}</option>
-                          ))}
-                        </select>
+                        <>
+                          <select className="hide-on-print" value={approverId} onChange={e => setApproverId(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', paddingBottom: 1, appearance: 'none', cursor: 'pointer' }}>
+                            <option value="">Select Approver...</option>
+                            {approverOptions.map((u: any) => (
+                              <option key={u.id} value={u.id}>{u.name}</option>
+                            ))}
+                          </select>
+                          <span className="show-on-print" style={{ display: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>
+                            {approverId ? approverOptions.find((u: any) => u.id === approverId)?.name : ''}
+                          </span>
+                        </>
                       )}
                     </div>
 
@@ -895,16 +925,22 @@ export function Leaves() {
                           {employees.find(e => e.id === previewPersonResponsibleId)?.surname} {employees.find(e => e.id === previewPersonResponsibleId)?.firstname}
                         </span>
                       ) : (
-                        <select
-                          value={previewPersonResponsibleId}
-                          onChange={e => setPreviewPersonResponsibleId(e.target.value)}
-                          style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, outline: 'none', background: 'transparent', fontSize: 10, paddingBottom: 1, appearance: 'none' }}
-                        >
-                          <option value="">Select an employee...</option>
-                          {employees.map(e => (
-                            <option key={e.id} value={e.id}>{e.surname} {e.firstname} ({e.position})</option>
-                          ))}
-                        </select>
+                        <>
+                          <select
+                            className="hide-on-print"
+                            value={previewPersonResponsibleId}
+                            onChange={e => setPreviewPersonResponsibleId(e.target.value)}
+                            style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, outline: 'none', background: 'transparent', fontSize: 10, paddingBottom: 1, appearance: 'none' }}
+                          >
+                            <option value="">Select an employee...</option>
+                            {employees.map(e => (
+                              <option key={e.id} value={e.id}>{e.surname} {e.firstname}</option>
+                            ))}
+                          </select>
+                          <span className="show-on-print" style={{ display: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1 }}>
+                            {previewPersonResponsibleId ? `${employees.find(e => e.id === previewPersonResponsibleId)?.surname} ${employees.find(e => e.id === previewPersonResponsibleId)?.firstname}` : ''}
+                          </span>
+                        </>
                       )}
                     </div>
                     <div style={{ fontSize: 10, marginBottom: 4 }}>Key Duties Handed Over:</div>
@@ -994,11 +1030,10 @@ export function Leaves() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, fontSize: 10, marginBottom: 8 }}>
                       <span style={{ flexShrink: 0, paddingBottom: 1 }}>Date Returned:</span>
-                      {isPreviewLocked ? (
-                        <span style={{ borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1, paddingLeft: 4 }}>{previewFormDateReturned ? format(parseISO(previewFormDateReturned), 'dd/MM/yyyy') : ''}</span>
-                      ) : (
-                        <input type="date" value={previewFormDateReturned} onChange={e => setPreviewFormDateReturned(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1 }} />
-                      )}
+                      <input className="hide-on-print" type="date" value={previewFormDateReturned} onChange={e => setPreviewFormDateReturned(e.target.value)} style={{ border: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1 }} />
+                      <span className="show-on-print" style={{ display: 'none', borderBottom: '1px solid #111', flex: 1, minHeight: 14, fontSize: 10, paddingBottom: 1, paddingLeft: 4 }}>
+                        {previewFormDateReturned ? format(parseISO(previewFormDateReturned), 'dd/MM/yyyy') : ''}
+                      </span>
                     </div>
 
                     {/* NAS File Reference */}

@@ -692,6 +692,8 @@ interface AppState {
   setVariablesDirty: (val: boolean) => void;
   isLedgerDirty: boolean;
   setLedgerDirty: (val: boolean) => void;
+  isEmployeeFormDirty: boolean;
+  setEmployeeFormDirty: (val: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -704,6 +706,8 @@ export const useAppStore = create<AppState>()(
       setVariablesDirty: (val) => set({ isVariablesDirty: val }),
       isLedgerDirty: false,
       setLedgerDirty: (val) => set({ isLedgerDirty: val }),
+      isEmployeeFormDirty: false,
+      setEmployeeFormDirty: (val) => set({ isEmployeeFormDirty: val }),
       sites: [],
       pendingSites: [],
       clients: [],
