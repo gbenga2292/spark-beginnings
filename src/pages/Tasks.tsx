@@ -72,6 +72,34 @@ export function Tasks() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
+   HELPER UTILITIES
+═══════════════════════════════════════════════════════════════════════════════ */
+function applySortToMainTasks(tasks: MainTask[], sortBy: SortOption, allSubtasks: SubTask[]) {
+  return [...tasks].sort((a, b) => {
+    const statusRank: Record<string, number> = { "not_started": 1, "in_progress": 2, "pending_approval": 3, "completed": 4 };
+    const statusA = deriveMainTaskStatus(a.id, allSubtasks);
+    const statusB = deriveMainTaskStatus(b.id, allSubtasks);
+
+    if (statusA !== statusB) {
+      return (statusRank[statusA] || 99) - (statusRank[statusB] || 99);
+    }
+    
+    switch (sortBy) {
+      case 'alpha': return (a.title || '').localeCompare(b.title || '');
+      case 'date_asc': return (a.deadline ?? '9999').localeCompare(b.deadline ?? '9999');
+      case 'date_desc': return (b.deadline ?? '').localeCompare(a.deadline ?? '');
+      case 'created_asc': return (a.createdAt || (a as any).created_at || '9999').localeCompare(b.createdAt || (b as any).created_at || '9999');
+      case 'created_desc': return (b.createdAt || (b as any).created_at || '').localeCompare(a.createdAt || (a as any).created_at || '');
+      case 'urgency': {
+        const score = (d?: string) => d ? new Date(d).getTime() : 9999999999999;
+        return score(a.deadline) - score(b.deadline);
+      }
+      default: return 0;
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
    PERSONAL WORKSPACE TASKS
 ═══════════════════════════════════════════════════════════════════════════════ */
 function PersonalTasksView() {
@@ -292,7 +320,7 @@ function PersonalTasksView() {
               </div>
             ) : (
               <div className="space-y-3">
-                {filtered.map(mt => {
+                {applySortToMainTasks(filtered, sortBy, wsSubs).map(mt => {
                   const isExpanded = expanded.has(mt.id);
                   const subs = applySortToSubs(wsSubs.filter(s => s.mainTaskId === mt.id), sortBy) as SubTask[];
                   const progress = getMainTaskProgress(mt.id, wsSubs);
@@ -1185,7 +1213,7 @@ function AdminTasksView() {
             </div>
           ) : (
             <div className="space-y-3">
-              {tabFiltered.map(mt => {
+              {applySortToMainTasks(tabFiltered, sortBy, teamSubtasks).map(mt => {
                 const isExpanded = expanded.has(mt.id);
                 const subs = teamSubtasks.filter(s => s.mainTaskId === mt.id);
                 const progress = getMainTaskProgress(mt.id, teamSubtasks);

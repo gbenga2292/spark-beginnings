@@ -429,29 +429,33 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
         </label>
       )}
       {priv.canAdd && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-9 text-xs">
-              <Download className="h-4 w-4" /> Export
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => handleExportCSV('bare')} className="cursor-pointer">
-              <div className="flex flex-col">
-                <span className="font-medium text-sm">Bare Minimum</span>
-                <span className="text-[10px] text-slate-500">Essential fields for reporting</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExportCSV('detailed')} className="cursor-pointer">
-              <div className="flex flex-col">
-                <span className="font-medium text-sm">Detailed Version</span>
-                <span className="text-[10px] text-slate-500">Full database records</span>
-              </div>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="relative group">
+          <button className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 border border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-9 px-3 text-xs gap-2">
+            <Download className="h-4 w-4" /> Export
+          </button>
+          
+          <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-md shadow-lg border border-slate-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden translate-y-1 group-hover:translate-y-0">
+            <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/50">
+              <span className="font-semibold text-xs text-slate-700">Choose Export Type</span>
+            </div>
+            
+            <button 
+              onClick={() => handleExportCSV('bare')} 
+              className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors flex flex-col border-b border-slate-50"
+            >
+              <span className="font-medium text-sm text-slate-900">Bare Minimum</span>
+              <span className="text-[10px] text-slate-500">Essential fields for reporting</span>
+            </button>
+            
+            <button 
+              onClick={() => handleExportCSV('detailed')} 
+              className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors flex flex-col"
+            >
+              <span className="font-medium text-sm text-slate-900">Detailed Version</span>
+              <span className="text-[10px] text-slate-500">Full database records</span>
+            </button>
+          </div>
+        </div>
       )}
       <Button
         variant={viewMode ? "default" : "outline"}

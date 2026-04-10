@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -54,7 +54,7 @@ export function Employees() {
   const disciplinaryRecords = useAppStore((state) => state.disciplinaryRecords);
   const evaluations = useAppStore((state) => state.evaluations);
   const hrVariables = useAppStore((state) => state.hrVariables);
-  const { addDisciplinaryRecord, deleteDisciplinaryRecord } = useAppStore();
+  const { addDisciplinaryRecord, deleteDisciplinaryRecord, setEmployeeFormDirty } = useAppStore();
   const { reminders, addReminder } = useAppData();
 
   const [isLoggingPerformance, setIsLoggingPerformance] = useState(false);
@@ -130,6 +130,43 @@ export function Employees() {
       }
     }
   }, [formData.endDate, formData.status]);
+
+  // ── Dirty tracking ─────────────────────────────────────────
+  // formLoadedRef prevents the initial population of formData from triggering dirty
+  const formLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (isEditing || isAdding) {
+      formLoadedRef.current = false;
+      const t = setTimeout(() => { formLoadedRef.current = true; }, 80);
+      return () => clearTimeout(t);
+    } else {
+      formLoadedRef.current = false;
+    }
+  }, [isEditing, isAdding]);
+
+  useEffect(() => {
+    if ((isEditing || isAdding) && formLoadedRef.current) {
+      setEmployeeFormDirty(true);
+    }
+  }, [formData]);
+
+  // Clear global dirty flag when unmounting
+  useEffect(() => {
+    return () => setEmployeeFormDirty(false);
+  }, []);
+
+  // Browser reload / tab-close guard
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isAdding || isEditing) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isAdding, isEditing]);
 
   const handleSave = () => {
     if (!formData.surname || !formData.firstname) {
@@ -214,6 +251,7 @@ export function Employees() {
     };
 
     addEmployee(newEmployee);
+    setEmployeeFormDirty(false);
     
     // Manage LASHMA Renewal Reminder
     if (newEmployee.lashmaExpiryDate) {
@@ -255,6 +293,7 @@ export function Employees() {
     setFormData({ ...employee });
     setIsEditing(true);
     setOpenMenuId(null);
+    // Not yet dirty — user hasn't changed anything
   };
 
   const handleUpdate = () => {
@@ -345,6 +384,7 @@ export function Employees() {
     }
 
     updateEmployee(editingEmployeeId, updateData);
+    setEmployeeFormDirty(false);
     
     // Manage LASHMA Renewal Reminder
     if (formData.lashmaExpiryDate) {
@@ -370,6 +410,7 @@ export function Employees() {
 
     setIsEditing(false);
     setEditingEmployeeId(null);
+    setEmployeeFormDirty(false);
     toast.success('Employee updated successfully.');
     setFormData({
       staffType: 'OFFICE',
@@ -723,7 +764,21 @@ export function Employees() {
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 gap-4">
         <div className="flex items-center gap-4 w-full sm:w-auto">
-          <Button variant="ghost" size="icon" onClick={() => { setIsAdding(false); setIsEditing(false); }} className="hover:bg-slate-100 rounded-full h-10 w-10 shrink-0">
+          <Button variant="ghost" size="icon" onClick={async () => {
+            const { isEmployeeFormDirty } = useAppStore.getState();
+            if (isEmployeeFormDirty) {
+              const ok = await showConfirm('You have unsaved changes. Are you sure you want to leave without saving?', {
+                title: 'Unsaved Changes',
+                confirmLabel: 'Discard & Leave',
+                cancelLabel: 'Stay Here',
+                variant: 'danger'
+              });
+              if (!ok) return;
+            }
+            setEmployeeFormDirty(false);
+            setIsAdding(false);
+            setIsEditing(false);
+          }} className="hover:bg-slate-100 rounded-full h-10 w-10 shrink-0">
             <ArrowLeft className="h-5 w-5 text-slate-600" />
           </Button>
           <div>
