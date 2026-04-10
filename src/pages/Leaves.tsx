@@ -517,20 +517,20 @@ export function Leaves() {
 
       {/* ─── Leave Records Table ─── */}
       <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
-        <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
+        <div className="border-b border-slate-100 dark:border-slate-800/60 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50 dark:bg-slate-900/50">
           <div className="flex items-center gap-2 ml-1">
-            <div className="h-8 w-8 rounded-lg bg-teal-100 flex items-center justify-center text-teal-600">
+            <div className="h-8 w-8 rounded-lg bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center text-teal-600 dark:text-teal-400">
               <ListFilter className="h-4 w-4" />
             </div>
-            <p className="font-semibold text-slate-700 text-sm">Leave Records <span className="text-slate-400 font-normal">({filteredLeaves.length})</span></p>
+            <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Leave Records <span className="text-slate-400 dark:text-slate-500 font-normal">({filteredLeaves.length})</span></p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <div className="flex bg-slate-200/50 p-1 rounded-lg">
+            <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-lg">
               {(['All', 'Active', 'Completed', 'Cancelled'] as const).map(tab => (
                 <button
                   key={tab}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${filterView === tab ? 'bg-white dark:bg-slate-700 text-teal-700 dark:text-teal-300 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${filterView === tab ? 'bg-white dark:bg-slate-700 text-teal-700 dark:text-teal-300 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                   onClick={() => setFilterView(tab)}
                 >{tab}</button>
               ))}
@@ -545,7 +545,7 @@ export function Leaves() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-teal-700 border-b border-teal-800 text-teal-50 uppercase text-[11px] tracking-wider font-bold">
+              <tr className="bg-teal-700 border-b border-teal-800 dark:bg-teal-950/40 dark:border-teal-900/40 text-teal-50 dark:text-teal-100 uppercase text-[11px] tracking-wider font-bold">
                 <th className="px-5 py-4 whitespace-nowrap">Name</th>
                 <th className="px-5 py-4 whitespace-nowrap">Leave Type</th>
                 <th className="px-5 py-4 whitespace-nowrap">Start</th>
@@ -561,45 +561,45 @@ export function Leaves() {
                 <th className="px-5 py-4 whitespace-nowrap text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-sm">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
               {filteredLeaves.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="px-5 py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center gap-3">
-                      <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center border">
-                        <CalendarDays className="h-5 w-5 text-slate-400" />
+                      <div className="h-12 w-12 rounded-full bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center border dark:border-slate-700/50">
+                        <CalendarDays className="h-5 w-5 text-slate-400 dark:text-slate-500" />
                       </div>
-                      <p>No leave records found.</p>
+                      <p className="dark:text-slate-400">No leave records found.</p>
                     </div>
                   </td>
                 </tr>
               ) : (
                 filteredLeaves.map(leave => (
-                  <tr key={leave.id} className={`hover:bg-slate-50/80 transition-colors group ${leave.status === 'Cancelled' ? 'opacity-60' : ''}`}>
-                    <td className="px-5 py-4 font-bold text-slate-800 uppercase text-xs">{leave.employeeName}</td>
+                  <tr key={leave.id} className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group ${leave.status === 'Cancelled' ? 'opacity-60' : ''}`}>
+                    <td className="px-5 py-4 font-bold text-slate-800 dark:text-slate-200 uppercase text-xs">{leave.employeeName}</td>
                     <td className="px-5 py-4">
-                      <span className="inline-block px-2 py-1 text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200 rounded-full whitespace-nowrap">
+                      <span className="inline-block px-2 py-1 text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200 dark:bg-teal-500/20 dark:text-teal-400 dark:border-teal-500/30 rounded-full whitespace-nowrap">
                         {leave.leaveType || '—'}
                       </span>
                     </td>
-                    <td className="px-5 py-4 font-medium text-slate-600 whitespace-nowrap">
+                    <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
                       {leave.startDate ? format(parseISO(leave.startDate), 'dd-MMM-yy') : '—'}
                     </td>
-                    <td className="px-5 py-4 font-bold text-slate-700">{leave.duration}</td>
-                    <td className="px-5 py-4 font-medium text-slate-600 whitespace-nowrap">
+                    <td className="px-5 py-4 font-bold text-slate-700 dark:text-slate-200">{leave.duration}</td>
+                    <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
                       {leave.expectedEndDate ? format(parseISO(leave.expectedEndDate), 'dd-MMM-yy') : '—'}
                     </td>
-                    <td className="px-5 py-4 font-medium text-slate-600 whitespace-nowrap">
+                    <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
                       {leave.dateReturned ? format(parseISO(leave.dateReturned), 'dd-MMM-yy') : '—'}
                     </td>
-                    <td className="px-5 py-4 max-w-xs text-slate-700 text-xs">{leave.reason}</td>
+                    <td className="px-5 py-4 max-w-xs text-slate-700 dark:text-slate-300 text-xs">{leave.reason}</td>
                     <td className="px-5 py-4 text-center">
-                      <span className={`text-xs font-bold ${leave.canBeContacted === 'Yes' ? 'text-teal-600' : 'text-slate-400'}`}>{leave.canBeContacted}</span>
+                      <span className={`text-xs font-bold ${leave.canBeContacted === 'Yes' ? 'text-teal-600 dark:text-teal-400' : 'text-slate-400 dark:text-slate-500'}`}>{leave.canBeContacted}</span>
                     </td>
                     {/* Approver column */}
                     <td className="px-5 py-4 text-center whitespace-nowrap">
                       {leave.approvedByName ? (
-                        <div className="flex items-center justify-center gap-1 text-xs text-slate-600">
+                        <div className="flex items-center justify-center gap-1 text-xs text-slate-600 dark:text-slate-300">
                           {leave.approvalStatus === 'Approved'
                             ? <ShieldCheck className="h-3 w-3 text-emerald-500 flex-shrink-0" />
                             : leave.approvalStatus === 'Rejected'
@@ -607,16 +607,15 @@ export function Leaves() {
                             : <Clock className="h-3 w-3 text-amber-500 flex-shrink-0" />}
                           {leave.approvedByName}
                         </div>
-                      ) : <span className="text-slate-300 text-xs">—</span>}
+                      ) : <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>}
                     </td>
-                    {/* Approval Status column */}
                     <td className="px-5 py-4 text-center whitespace-nowrap">
                       {leave.approvalStatus === 'Approved' ? (
-                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200" variant="outline">Approved</Badge>
+                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30" variant="outline">Approved</Badge>
                       ) : leave.approvalStatus === 'Rejected' ? (
-                        <Badge className="bg-red-100 text-red-700 border-red-200" variant="outline">Rejected</Badge>
+                        <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30" variant="outline">Rejected</Badge>
                       ) : leave.approvalStatus === 'Pending' ? (
-                        <Badge className="bg-amber-100 text-amber-700 border-amber-200" variant="outline">Pending</Badge>
+                        <Badge className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30" variant="outline">Pending</Badge>
                       ) : (
                         <span className="text-slate-300 text-xs">—</span>
                       )}
@@ -626,10 +625,10 @@ export function Leaves() {
                         const isUpcoming = leave.startDate && new Date(leave.startDate).setHours(0, 0, 0, 0) > new Date().setHours(0, 0, 0, 0);
                         const statusLabel = leave.status === 'Cancelled' ? 'Cancelled' : leave.dateReturned ? 'Completed' : isUpcoming ? 'Upcoming' : 'On Leave';
                         let badgeClass = '';
-                        if (statusLabel === 'Cancelled') badgeClass = 'bg-rose-100 text-rose-700 border-rose-200';
-                        else if (statusLabel === 'Completed') badgeClass = 'bg-emerald-100 text-emerald-700 border-emerald-200';
-                        else if (statusLabel === 'Upcoming') badgeClass = 'bg-blue-100 text-blue-700 border-blue-200';
-                        else badgeClass = 'bg-amber-100 text-amber-700 border-amber-200';
+                        if (statusLabel === 'Cancelled') badgeClass = 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:border-rose-500/30';
+                        else if (statusLabel === 'Completed') badgeClass = 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30';
+                        else if (statusLabel === 'Upcoming') badgeClass = 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30';
+                        else badgeClass = 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30';
 
                         return (
                           <Badge className={badgeClass} variant="outline">
@@ -647,14 +646,14 @@ export function Leaves() {
                           <Eye className="h-4 w-4" /> Open
                         </button>
                       ) : (
-                        <span className="text-slate-300 text-xs">—</span>
+                        <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>
                       )}
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-center">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-800 hover:bg-slate-100">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>

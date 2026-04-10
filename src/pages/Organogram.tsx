@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useAppStore, Department, Position, Employee } from '@/src/store/appStore';
 import { Button } from '@/src/components/ui/button';
 import { ArrowLeft, Users, Building2, Briefcase, ZoomIn, ZoomOut, Maximize, Network, UserSquare2 } from 'lucide-react';
@@ -24,6 +24,42 @@ type ReportingNode = Employee & {
 export function Organogram() {
   const navigate = useNavigate();
   const departments = useAppStore(state => state.departments);
+
+  // Drag to scroll functionality
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [startY, setStartY] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - scrollRef.current.offsetLeft);
+    setStartY(e.pageY - scrollRef.current.offsetTop);
+    setScrollLeft(scrollRef.current.scrollLeft);
+    setScrollTop(scrollRef.current.scrollTop);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const y = e.pageY - scrollRef.current.offsetTop;
+    const walkX = (x - startX) * 1.5; // Scroll speed multiplier
+    const walkY = (y - startY) * 1.5;
+    scrollRef.current.scrollLeft = scrollLeft - walkX;
+    scrollRef.current.scrollTop = scrollTop - walkY;
+  };
   const positions = useAppStore(state => state.positions);
   const employees = useAppStore(state => state.employees);
 
@@ -394,7 +430,14 @@ export function Organogram() {
     <div className="space-y-4 h-full flex flex-col min-h-[calc(100vh-8rem)]">
 
       {/* CANVAS */}
-      <div className="flex-1 bg-[#f8fafc] border border-slate-200 rounded-2xl overflow-auto relative cursor-grab active:cursor-grabbing shadow-inner">
+      <div 
+        ref={scrollRef}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={handleMouseLeave}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+        className={`flex-1 bg-[#f8fafc] border border-slate-200 rounded-2xl overflow-auto relative ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} shadow-inner`}
+      >
         {/* We use an internal container that scales based on zoom. The transform-origin is top center so it grows downwards and outwards symmetrically. */}
         <div 
           className="min-w-max min-h-full flex justify-center py-16 px-32 transition-transform duration-300 ease-out"
