@@ -1014,6 +1014,7 @@ export function Beneficiaries() {
                     </div>
                   ) : (
                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-slate-50/50">
@@ -1039,6 +1040,7 @@ export function Beneficiaries() {
                           })}
                         </TableBody>
                       </Table>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1071,6 +1073,7 @@ export function Beneficiaries() {
                     </div>
                   ) : (
                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-slate-50/50">
@@ -1095,6 +1098,7 @@ export function Beneficiaries() {
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1127,6 +1131,7 @@ export function Beneficiaries() {
                     </div>
                   ) : (
                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-slate-50/50">
@@ -1151,6 +1156,7 @@ export function Beneficiaries() {
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1172,6 +1178,7 @@ export function Beneficiaries() {
                     </div>
                   ) : (
                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-slate-50/50">
@@ -1198,6 +1205,7 @@ export function Beneficiaries() {
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1219,6 +1227,7 @@ export function Beneficiaries() {
                     </div>
                   ) : (
                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-slate-50/50">
@@ -1247,6 +1256,7 @@ export function Beneficiaries() {
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1520,6 +1530,7 @@ export function Beneficiaries() {
             </select>
           </div>
         </div>
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -1620,6 +1631,7 @@ export function Beneficiaries() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </div>
       {renderBulkEditModal()}
       {renderViewModal()}

@@ -1181,6 +1181,7 @@ export function Variables() {
                 <Button disabled={!priv.canEdit} onClick={() => { if(newCat) { addLedgerCategory({id: generateId(), name: newCat}); setNewCat(''); } }}>Add</Button>
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableBody>
                     {ledgerCategories.map(c => (
@@ -1200,6 +1201,7 @@ export function Variables() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1215,6 +1217,7 @@ export function Variables() {
                 <Button disabled={!priv.canEdit} onClick={() => { if(newBank) { addLedgerBank({id: generateId(), name: newBank}); setNewBank(''); } }}>Add</Button>
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableBody>
                     {ledgerBanks.map(b => (
@@ -1234,6 +1237,7 @@ export function Variables() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1250,6 +1254,7 @@ export function Variables() {
                 <Button disabled={!priv.canEdit} onClick={() => { if(newVendorName) { addLedgerVendor({id: generateId(), name: newVendorName, tinNumber: newVendorTin}); setNewVendorName(''); setNewVendorTin(''); } }}>Add</Button>
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-slate-50"><TableRow><TableHead>Vendor</TableHead><TableHead>TIN</TableHead><TableHead></TableHead></TableRow></TableHeader>
                   <TableBody>
@@ -1278,6 +1283,7 @@ export function Variables() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1293,6 +1299,7 @@ export function Variables() {
                 <Button disabled={!priv.canEdit} onClick={() => { if(newBenBankName) { addLedgerBeneficiaryBank({id: generateId(), name: newBenBankName, accountNo: ''}); setNewBenBankName(''); } }}>Add</Button>
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-slate-50"><TableRow><TableHead>Bank</TableHead><TableHead></TableHead></TableRow></TableHeader>
                   <TableBody>
@@ -1320,6 +1327,7 @@ export function Variables() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1355,6 +1363,7 @@ export function Variables() {
               )}
 
               <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-slate-50 sticky top-0">
                     <TableRow>
@@ -1402,6 +1411,7 @@ export function Variables() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1430,6 +1440,7 @@ export function Variables() {
                 </div>
               )}
               <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto w-full">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-slate-50 sticky top-0">
                     <TableRow>
@@ -1516,6 +1527,7 @@ export function Variables() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1995,6 +2007,7 @@ export function Variables() {
                 <div className="pt-4 border-t border-rose-100 flex flex-col gap-4">
                   <label className="text-xs font-bold text-slate-500 uppercase">Sanction Thresholds (Points based)</label>
                   <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader className="bg-slate-50/80">
                         <TableRow>
@@ -2031,6 +2044,7 @@ export function Variables() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   </div>
                   <p className="text-[10px] text-slate-400 italic">Thresholds define when HR should automatically review and issue the next level of disciplinary action.</p>
                 </div>
@@ -2225,6 +2239,7 @@ export function Variables() {
                 })()}
               </div>
               <div className="border rounded-md overflow-hidden">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-slate-50">
                     <TableRow>
@@ -2275,6 +2290,7 @@ export function Variables() {
                     })}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -2334,6 +2350,7 @@ export function Variables() {
               <div>
                 <p className="text-xs font-bold text-slate-500 uppercase mb-3">Tax Brackets (Annual Taxable Income)</p>
                 <div className="border rounded-md overflow-hidden mb-3">
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader className="bg-slate-50">
                       <TableRow>
@@ -2379,6 +2396,7 @@ export function Variables() {
                         ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </div>
                 {/* Add new bracket row */}
                 <div className="flex gap-2 items-end">
@@ -2431,6 +2449,7 @@ export function Variables() {
                   <p className="text-center text-slate-400 text-sm py-4 border rounded-md">No extra conditions. Add one above.</p>
                 ) : (
                   <div className="border rounded-md overflow-hidden">
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader className="bg-slate-50">
                         <TableRow>
@@ -2465,6 +2484,7 @@ export function Variables() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   </div>
                 )}
               </div>

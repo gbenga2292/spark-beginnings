@@ -288,6 +288,7 @@ export function Evaluations() {
                     </div>
                   ) : (
                     <div className={`rounded-xl shadow-sm border overflow-hidden ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+                        <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
                               <TableRow className="bg-slate-50/80">
@@ -332,6 +333,7 @@ export function Evaluations() {
                               ))}
                           </TableBody>
                         </Table>
+                        </div>
                     </div>
                   )}
                 </div>

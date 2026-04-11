@@ -502,6 +502,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-slate-50">
                     <TableRow>
@@ -553,6 +554,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
 
@@ -564,6 +566,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-slate-50">
                     <TableRow>
@@ -620,6 +623,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -659,7 +663,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
       <div className="w-full max-w-4xl bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden flex flex-col md:flex-row">
 
         {/* Left Side: Gradient Banner */}
-        <div className="md:w-[40%] bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-900 p-10 text-white flex flex-col justify-between relative overflow-hidden">
+        <div className="md:w-[40%] bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-900 p-6 md:p-10 text-white flex flex-col justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
 
           <div className="relative z-10">
@@ -674,7 +678,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
         </div>
 
         {/* Right Side: Form */}
-        <div className="md:w-[60%] p-8 lg:p-12 bg-slate-50/50">
+        <div className="md:w-[60%] p-6 md:p-8 lg:p-12 bg-slate-50/50">
           <div className="space-y-5">
 
             {/* Request Type */}

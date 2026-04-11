@@ -50,10 +50,10 @@ export function ClientAccounts() {
     <div className={cn("flex flex-col h-full", isDark ? "bg-slate-950" : "bg-slate-50")}>
       {/* Tabs Header */}
       <div className={cn(
-          "flex items-center justify-between gap-4 px-6 pt-4 pb-0 mb-4 border-b",
+          "flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 px-4 sm:px-6 pt-4 pb-0 mb-4 border-b",
           isDark ? "border-slate-800 bg-slate-900/50" : "bg-white border-slate-200"
       )}>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto no-scrollbar">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
@@ -73,7 +73,7 @@ export function ClientAccounts() {
             );
           })}
         </div>
-        <div className="relative w-full max-w-sm mb-3 mt-1 sm:mt-0">
+        <div className="relative w-full sm:max-w-sm mb-3 mt-1 sm:mt-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
@@ -91,7 +91,7 @@ export function ClientAccounts() {
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 w-full overflow-y-auto px-6">
+      <div className="flex-1 w-full overflow-y-auto px-4 sm:px-6">
         {ActiveComponent ? React.cloneElement(ActiveComponent as React.ReactElement, { searchTerm } as any) : null}
       </div>
     </div>

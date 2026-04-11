@@ -582,6 +582,7 @@ export function PerformanceConduct() {
                   </div>
                 ) : (
                   <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-slate-50/80">
@@ -635,6 +636,7 @@ export function PerformanceConduct() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   </div>
                 )}
               </div>

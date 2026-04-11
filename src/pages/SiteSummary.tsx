@@ -157,6 +157,7 @@ export function SiteSummary({ filterYear, filterMonth }: { filterYear?: string, 
         </div>
 
         <div className="flex-1 overflow-auto">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -192,6 +193,7 @@ export function SiteSummary({ filterYear, filterMonth }: { filterYear?: string, 
               </tfoot>
             )}
           </Table>
+          </div>
         </div>
       </div>
     </div>

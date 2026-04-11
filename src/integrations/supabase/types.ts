@@ -1116,17 +1116,36 @@ export type Database = {
           duration: number
           employee_id: string
           employee_name: string
+          employee_signature: Json | null
           expected_end_date: string
+          form_date_returned: string | null
+          hod_employee_id: string | null
+          hod_signature: Json | null
+          hod_task_id: string | null
+          hr_approved_from: string | null
+          hr_approved_to: string | null
+          hr_signature: Json | null
+          hr_task_id: string | null
           id: string
+          key_duties: Json | null
+          leave_number: string | null
           leave_type: string
+          line_manager_task_id: string | null
           management: string | null
+          management_signature: Json | null
+          management_task_id: string | null
+          nas_file_path: string | null
+          person_responsible_during_absence: string | null
+          person_responsible_id: string | null
           reason: string
           rejection_note: string | null
           start_date: string
           status: string
           supervisor: string | null
+          supervisor_signature: Json | null
           uploaded_file: string | null
           uploaded_file_name: string | null
+          workflow_step: number | null
         }
         Insert: {
           approval_status?: string | null
@@ -1140,17 +1159,36 @@ export type Database = {
           duration?: number
           employee_id: string
           employee_name?: string
+          employee_signature?: Json | null
           expected_end_date?: string
+          form_date_returned?: string | null
+          hod_employee_id?: string | null
+          hod_signature?: Json | null
+          hod_task_id?: string | null
+          hr_approved_from?: string | null
+          hr_approved_to?: string | null
+          hr_signature?: Json | null
+          hr_task_id?: string | null
           id?: string
+          key_duties?: Json | null
+          leave_number?: string | null
           leave_type?: string
+          line_manager_task_id?: string | null
           management?: string | null
+          management_signature?: Json | null
+          management_task_id?: string | null
+          nas_file_path?: string | null
+          person_responsible_during_absence?: string | null
+          person_responsible_id?: string | null
           reason?: string
           rejection_note?: string | null
           start_date?: string
           status?: string
           supervisor?: string | null
+          supervisor_signature?: Json | null
           uploaded_file?: string | null
           uploaded_file_name?: string | null
+          workflow_step?: number | null
         }
         Update: {
           approval_status?: string | null
@@ -1164,17 +1202,36 @@ export type Database = {
           duration?: number
           employee_id?: string
           employee_name?: string
+          employee_signature?: Json | null
           expected_end_date?: string
+          form_date_returned?: string | null
+          hod_employee_id?: string | null
+          hod_signature?: Json | null
+          hod_task_id?: string | null
+          hr_approved_from?: string | null
+          hr_approved_to?: string | null
+          hr_signature?: Json | null
+          hr_task_id?: string | null
           id?: string
+          key_duties?: Json | null
+          leave_number?: string | null
           leave_type?: string
+          line_manager_task_id?: string | null
           management?: string | null
+          management_signature?: Json | null
+          management_task_id?: string | null
+          nas_file_path?: string | null
+          person_responsible_during_absence?: string | null
+          person_responsible_id?: string | null
           reason?: string
           rejection_note?: string | null
           start_date?: string
           status?: string
           supervisor?: string | null
+          supervisor_signature?: Json | null
           uploaded_file?: string | null
           uploaded_file_name?: string | null
+          workflow_step?: number | null
         }
         Relationships: [
           {

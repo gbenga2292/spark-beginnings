@@ -1162,6 +1162,7 @@ export function Reports() {
             <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <div className="overflow-y-auto" style={{ maxHeight: '420px' }}>
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-gradient-to-r from-slate-800 to-slate-700 sticky top-0 z-10">
@@ -1208,6 +1209,7 @@ export function Reports() {
                       )}
                     </TableBody>
                   </Table>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1418,6 +1420,7 @@ export function Reports() {
             <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <div className="overflow-y-auto" style={{ maxHeight: '420px' }}>
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader className="sticky top-0 z-10">
                       <TableRow className="bg-gradient-to-r from-slate-800 to-slate-700">
@@ -1515,6 +1518,7 @@ export function Reports() {
                       )}
                     </TableBody>
                   </Table>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1962,6 +1966,7 @@ export function Reports() {
             <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <div className="overflow-y-auto" style={{ maxHeight: '420px' }}>
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader className="sticky top-0 z-10">
                       <TableRow className="bg-gradient-to-r from-rose-700 to-rose-600">
@@ -2006,6 +2011,7 @@ export function Reports() {
                       })}
                     </TableBody>
                   </Table>
+                  </div>
                 </div>
               </div>
               <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex items-center gap-4">

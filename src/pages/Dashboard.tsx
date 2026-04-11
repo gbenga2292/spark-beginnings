@@ -509,63 +509,63 @@ export function Dashboard() {
     return (
         <div className="flex flex-col gap-6 pb-10">
             {/* TOP KPI CARDS */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
                 <Card className="shadow-sm">
-                    <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                        <div className="h-10 w-10 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
-                            <UserCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                    <CardContent className="p-3 sm:p-4 flex flex-col items-center text-center gap-1.5 sm:gap-2">
+                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
+                            <UserCheck className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 dark:text-emerald-400" />
                         </div>
-                        <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400">{kpiStats.totalActive}</div>
+                        <div className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400">{kpiStats.totalActive}</div>
                         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Active Staff</div>
                     </CardContent>
                 </Card>
 
                 <Card className="shadow-sm">
-                    <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                        <div className="h-10 w-10 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
-                            <CalendarOff className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    <CardContent className="p-3 sm:p-4 flex flex-col items-center text-center gap-1.5 sm:gap-2">
+                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
+                            <CalendarOff className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 dark:text-amber-400" />
                         </div>
-                        <div className="text-3xl font-black text-amber-600 dark:text-amber-400">{kpiStats.totalOnLeave}</div>
+                        <div className="text-2xl sm:text-3xl font-black text-amber-600 dark:text-amber-400">{kpiStats.totalOnLeave}</div>
                         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">On Leave</div>
                     </CardContent>
                 </Card>
 
                 <Card className="shadow-sm">
-                    <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                        <div className="h-10 w-10 rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center">
-                            <UserX className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                    <CardContent className="p-3 sm:p-4 flex flex-col items-center text-center gap-1.5 sm:gap-2">
+                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center">
+                            <UserX className="w-4 h-4 sm:w-5 sm:h-5 text-rose-600 dark:text-rose-400" />
                         </div>
-                        <div className="text-3xl font-black text-rose-600 dark:text-rose-400">{kpiStats.totalAbsentDays}</div>
+                        <div className="text-2xl sm:text-3xl font-black text-rose-600 dark:text-rose-400">{kpiStats.totalAbsentDays}</div>
                         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Absent Days</div>
                     </CardContent>
                 </Card>
 
                 <Card className="shadow-sm">
-                    <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                        <div className="h-10 w-10 rounded-full bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center">
-                            <Timer className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+                    <CardContent className="p-3 sm:p-4 flex flex-col items-center text-center gap-1.5 sm:gap-2">
+                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center">
+                            <Timer className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600 dark:text-violet-400" />
                         </div>
-                        <div className="text-3xl font-black text-violet-600 dark:text-violet-400">{kpiStats.totalOTInstances}</div>
+                        <div className="text-2xl sm:text-3xl font-black text-violet-600 dark:text-violet-400">{kpiStats.totalOTInstances}</div>
                         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">OT Instances</div>
                     </CardContent>
                 </Card>
 
                 <Card className="shadow-sm">
-                    <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                        <div className="h-10 w-10 rounded-full bg-sky-50 dark:bg-sky-900/30 flex items-center justify-center">
-                            <FileText className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+                    <CardContent className="p-3 sm:p-4 flex flex-col items-center text-center gap-1.5 sm:gap-2">
+                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-sky-50 dark:bg-sky-900/30 flex items-center justify-center">
+                            <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-sky-600 dark:text-sky-400" />
                         </div>
-                        <div className="text-3xl font-black text-sky-600 dark:text-sky-400">{kpiStats.unpaidInvoices}</div>
+                        <div className="text-2xl sm:text-3xl font-black text-sky-600 dark:text-sky-400">{kpiStats.unpaidInvoices}</div>
                         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Unpaid Invoices</div>
                     </CardContent>
                 </Card>
 
                 <Card className="shadow-sm">
-                    <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                        <div className="h-10 w-10 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
-                            <MapPin className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    <CardContent className="p-3 sm:p-4 flex flex-col items-center text-center gap-1.5 sm:gap-2">
+                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
+                            <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 dark:text-indigo-400" />
                         </div>
-                        <div className="text-3xl font-black text-indigo-600 dark:text-indigo-400">{kpiStats.activeSites}</div>
+                        <div className="text-2xl sm:text-3xl font-black text-indigo-600 dark:text-indigo-400">{kpiStats.activeSites}</div>
                         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Active Sites</div>
                     </CardContent>
                 </Card>
@@ -575,10 +575,10 @@ export function Dashboard() {
             <div className="grid gap-6 md:grid-cols-12">
                 <Card className="md:col-span-8 shadow-sm">
                     <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 pb-4">
-                        <CardTitle className="text-lg flex items-center justify-between gap-2 text-slate-800 dark:text-slate-100">
-                            <span className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-indigo-500" /> Attendance & Overtime Trend</span>
+                        <CardTitle className="text-sm sm:text-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-slate-800 dark:text-slate-100">
+                            <span className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-indigo-500" /> <span className="truncate">Attendance & OT Trend</span></span>
                             <div className="flex items-center gap-2">
-                                <select 
+                                <select
                                     className="text-xs font-medium bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 py-1 px-2 rounded outline-none cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
                                     value={chartViewMode}
                                     onChange={(e) => setChartViewMode(e.target.value as any)}

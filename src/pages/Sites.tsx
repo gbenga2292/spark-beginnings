@@ -138,6 +138,7 @@ function ClientSummary() {
       </div>
 
       <div className="flex-1 overflow-auto">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -176,6 +177,7 @@ function ClientSummary() {
             </tfoot>
           )}
         </Table>
+        </div>
       </div>
     </div>
   );
@@ -766,6 +768,7 @@ export function Sites() {
         {activeTab === 'active' ? (
           <div className="flex-1">
             {viewMode === 'table' ? (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
@@ -950,6 +953,7 @@ export function Sites() {
                 )}
               </TableBody>
             </Table>
+            </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-5 bg-slate-50/30">
                 {sortedSites.map(site => {
@@ -1051,6 +1055,7 @@ export function Sites() {
           </div>
         ) : (
           <div className="flex-1">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
@@ -1099,6 +1104,7 @@ export function Sites() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </div>
         )}
       </div>

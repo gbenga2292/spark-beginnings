@@ -1269,7 +1269,7 @@ export function Employees() {
 
             {detailTab === 'Overview' && (
               <>
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
                     <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Personal Info</h4>
                     <div className="space-y-2 text-sm">
@@ -2126,6 +2126,7 @@ export function Employees() {
             </select>
           </div>
         </div>
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -2230,6 +2231,7 @@ export function Employees() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </div>
       {renderBulkEditModal()}
       {renderViewModal()}

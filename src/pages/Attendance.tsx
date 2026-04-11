@@ -982,7 +982,7 @@ export function Attendance() {
           {/* Toolbar: date, filters, search, actions — all in one row */}
           <div className="flex flex-wrap items-end gap-2 py-1 px-0">
             {/* Date controls */}
-            <div className="flex flex-col gap-1.5 flex-none w-[320px]">
+            <div className="flex flex-col gap-1.5 flex-none w-full sm:w-[320px]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest px-0.5">
@@ -1099,7 +1099,7 @@ export function Attendance() {
             </div>
 
             {/* Search */}
-            <div className="relative flex-none w-[200px]">
+            <div className="relative flex-none w-full sm:w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <Input
                 placeholder="Search..."
@@ -1141,8 +1141,8 @@ export function Attendance() {
 
           {/* Compact entry table */}
           <div className="rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
-            <div className="overflow-y-auto flex-1">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto overflow-y-auto flex-1">
+              <table className="w-full text-sm min-w-[500px]">
                 <thead className="bg-slate-900 text-white sticky top-0 z-10">
                   <tr>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 w-[30%]">Staff Name</th>
@@ -1332,7 +1332,7 @@ export function Attendance() {
               <Filter className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
             </div>
 
-            <div className="relative flex-1 min-w-[140px] max-w-[220px]">
+            <div className="relative flex-1 min-w-[100px] max-w-full sm:max-w-[220px]">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <Input
                 placeholder="Search Database..."
