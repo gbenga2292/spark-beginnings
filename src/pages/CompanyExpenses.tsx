@@ -415,7 +415,7 @@ export function CompanyExpenses() {
                           <div className={tab === 'history' ? 'pl-1' : ''}>
                             <div className="flex items-center gap-2 mb-1 flex-wrap">
                               <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md uppercase tracking-wide">
-                                {expense.date}
+                                {expense.date.split('-').reverse().join('/')}
                               </span>
                               <span className="text-xs font-semibold text-slate-400">
                                 By: {expense.enteredBy}

@@ -51,6 +51,15 @@ export function FinancialReports() {
   const rawPayments = useAppStore(state => state.payments);
   const rawVatPayments = useAppStore(state => state.vatPayments);
   const sites = useAppStore(state => state.sites);
+  const vatRate = useAppStore((state) => state.payrollVariables.vatRate);
+
+  const getVatDetails = (amount: number, payVat: string, vatRate: number) => {
+    const vat = payVat === 'Add' ? Math.round(((amount * 7.5) / 107.5) * 100) / 100 
+              : payVat === 'Yes' ? Math.round(((amount / (100 + vatRate)) * vatRate) * 100) / 100 
+              : 0;
+    const amountForVat = payVat !== 'No' ? amount - vat : amount;
+    return { vat, amountForVat };
+  };
 
   const loans = useAppStore(state => state.loans);
   const salaryAdvances = useAppStore(state => state.salaryAdvances);
@@ -462,9 +471,13 @@ export function FinancialReports() {
   };
 
   const exportPaymentReport = async () => {
-    const headers = ["Client", "Site", "Date", "Amount", "WHT", "VAT", "Discount"];
+    const headers = ["Client", "Site", "Date", "Amount", "Amount for VAT", "WHT", "VAT", "Discount"];
     const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
-    const data = payments.map(p => [ p.client, p.site, formatDisplayDate(p.date), p.amount, p.withholdingTax || 0, p.vat || 0, p.discount || 0]);
+    const data = payments.map(p => {
+        const payVat = p.payVat || (sites.find(s => s.name === p.site && s.client === p.client)?.vat as any) || 'No';
+        const { vat, amountForVat } = getVatDetails(p.amount || 0, payVat, vatRate);
+        return [ p.client, p.site, formatDisplayDate(p.date), p.amount, amountForVat, p.withholdingTax || 0, vat || 0, p.discount || 0];
+    });
     const csvData = [headers.join(','), ...data.map(row => row.map(extractCSV).join(','))].join('\n');
     const fileName = "payment_report.csv";
 
@@ -499,8 +512,20 @@ export function FinancialReports() {
   };
 
   const exportPaymentPdf = () => {
-    const head = [["Client", "Site", "Date", "Amount (₦)", "WHT (₦)", "VAT (₦)"]];
-    const body = payments.map(p => [ p.client, p.site, formatDisplayDate(p.date), (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), (p.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), (p.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })]);
+    const head = [["Client", "Site", "Date", "Amount (₦)", "Amount for VAT (₦)", "WHT (₦)", "VAT (₦)"]];
+    const body = payments.map(p => {
+        const payVat = p.payVat || (sites.find(s => s.name === p.site && s.client === p.client)?.vat as any) || 'No';
+        const { vat, amountForVat } = getVatDetails(p.amount || 0, payVat, vatRate);
+        return [
+            p.client, 
+            p.site, 
+            formatDisplayDate(p.date), 
+            (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 
+            (amountForVat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 
+            (p.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 
+            (vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        ];
+    });
     
     setPreviewModal({
       isOpen: true,

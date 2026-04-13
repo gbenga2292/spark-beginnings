@@ -53,7 +53,7 @@ export function ClientAccounts() {
           "flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 px-4 sm:px-6 pt-4 pb-0 mb-4 border-b",
           isDark ? "border-slate-800 bg-slate-900/50" : "bg-white border-slate-200"
       )}>
-        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto no-scrollbar">
+        <div className="flex items-center gap-2 overflow-x-auto overflow-y-hidden w-full sm:w-auto no-scrollbar">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
