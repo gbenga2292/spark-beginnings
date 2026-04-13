@@ -759,48 +759,38 @@ export function Ledger() {
       <TabsContent active={tab === 'entry'} className="m-0 focus-visible:outline-none">
         <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
           {/* Form Header */}
-          <div className="bg-slate-50/80 p-5 flex flex-col md:flex-row gap-8 border-b border-slate-200/60 backdrop-blur-sm">
-            <div className="flex-1 space-y-4">
-              <div className="flex items-center gap-4">
-                <label className="text-sm font-bold text-slate-600 uppercase tracking-widest w-32 shrink-0">Voucher No.</label>
-                <div className="flex items-center gap-2 max-w-sm w-full">
-                  <Input readOnly value={activeVoucherNo || generatedVoucherNo} className="bg-white font-mono text-indigo-700 font-bold tracking-wide shadow-inner border-slate-300" />
-                  <div className="flex shadow-sm rounded-md overflow-hidden shrink-0">
-                    <button onClick={handlePrevVoucher} className="h-10 w-10 bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 flex items-center justify-center transition-colors">
-                      <ChevronLeft className="h-5 w-5" />
-                    </button>
-                    <button onClick={handleNextVoucher} className="h-10 w-10 bg-white border border-slate-300 border-l-0 text-slate-600 hover:bg-slate-50 flex items-center justify-center transition-colors">
-                      <ChevronRight className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <label className="text-sm font-bold text-slate-600 uppercase tracking-widest w-32 shrink-0">Paid From</label>
-                <div className="max-w-sm w-full">
-                  <select className="w-full h-10 px-3 rounded-md border border-slate-300 bg-white text-sm shadow-inner" value={paidFrom} onChange={e => setPaidFrom(e.target.value)}>
-                    <option value="" disabled>Select Bank...</option>
-                    {sortedBanks.map(b => (
-                      <option key={b.id} value={b.name}>{b.name}</option>
-                    ))}
-                  </select>
-                </div>
+          <div className="bg-slate-50/80 p-4 grid grid-cols-2 lg:grid-cols-4 gap-4 border-b border-slate-200/60 backdrop-blur-sm">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Voucher No.</label>
+              <div className="flex rounded-md shadow-sm">
+                <Input readOnly value={activeVoucherNo || generatedVoucherNo} className="bg-white h-9 font-mono text-indigo-700 font-bold tracking-wide border-r-0 rounded-r-none border-slate-300 pointer-events-none" />
+                <button onClick={handlePrevVoucher} className="h-9 w-9 shrink-0 bg-slate-50 border border-slate-300 border-l-0 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors">
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button onClick={handleNextVoucher} className="h-9 w-9 shrink-0 bg-slate-50 border border-slate-300 border-l-0 rounded-r-md text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors">
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
             </div>
-            
-            <div className="flex-1 space-y-4">
-              <div className="flex items-center gap-4">
-                <label className="text-sm font-bold text-slate-600 uppercase tracking-widest w-32 shrink-0">Voucher Date</label>
-                <div className="max-w-[200px] w-full">
-                  <Input type="date" value={voucherDate} onChange={e => handleDateChange(e.target.value)} className="bg-white shadow-inner border-slate-300 font-medium text-slate-700" />
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <label className="text-sm font-bold text-slate-600 uppercase tracking-widest w-32 shrink-0">Entered By</label>
-                <div className="max-w-sm w-full">
-                  <Input readOnly value={currentUser?.name || ''} className="bg-slate-200/50 text-slate-500 font-medium border-slate-300 pointer-events-none" />
-                </div>
-              </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Voucher Date</label>
+              <Input type="date" value={voucherDate} onChange={e => handleDateChange(e.target.value)} className="bg-white h-9 shadow-sm border-slate-300 font-bold text-slate-700 text-xs" />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Paid From</label>
+              <select className="bg-white h-9 px-3 rounded-md border border-slate-300 text-xs font-bold text-slate-700 shadow-sm outline-none" value={paidFrom} onChange={e => setPaidFrom(e.target.value)}>
+                <option value="" disabled>Select Bank...</option>
+                {sortedBanks.map(b => (
+                  <option key={b.id} value={b.name}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Entered By</label>
+              <Input readOnly value={currentUser?.name || ''} className="bg-slate-100/50 h-9 text-xs font-bold text-slate-400 border-slate-200 pointer-events-none shadow-sm" />
             </div>
           </div>
 

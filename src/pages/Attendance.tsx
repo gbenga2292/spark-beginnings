@@ -979,9 +979,9 @@ export function Attendance() {
       <Tabs className="w-full flex-1 flex flex-col min-h-0">
         <TabsContent active={activeTab === 'entry'} className="flex-1 flex flex-col min-h-0 mt-0">
           {/* Toolbar: date, filters, search, actions — all in one row */}
-          <div className="flex flex-wrap items-end gap-2 py-1 px-0">
+          <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-end justify-between gap-2 py-2 px-1">
             {/* Date controls */}
-            <div className="flex flex-col gap-1.5 flex-none w-full sm:w-[320px]">
+            <div className="flex flex-col gap-1.5 w-full sm:w-auto shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest px-0.5">
@@ -1083,8 +1083,9 @@ export function Attendance() {
               </div>
             </div>
 
-            {/* Staff Type filter */}
-            <div className="relative flex-none">
+            <div className="flex flex-wrap items-center gap-2 flex-1 w-full sm:w-auto min-w-[300px]">
+              {/* Staff Type filter */}
+              <div className="relative shrink-0">
               <select
                 value={staffTypeFilter}
                 onChange={(e) => setStaffTypeFilter(e.target.value as any)}
@@ -1097,8 +1098,8 @@ export function Attendance() {
               <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300 pointer-events-none" />
             </div>
 
-            {/* Search */}
-            <div className="relative flex-none w-full sm:w-[200px]">
+              {/* Search */}
+              <div className="relative flex-1 min-w-[120px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <Input
                 placeholder="Search..."
@@ -1108,9 +1109,10 @@ export function Attendance() {
               />
             </div>
 
-            <div className="flex-1" />
-
-            {/* Stats pill */}
+            </div>
+            
+            <div className="flex items-center justify-between w-full sm:w-auto gap-2 shrink-0">
+              {/* Stats pill */}
             <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 rounded-full px-3 py-1 border border-slate-100 dark:border-slate-700">
               <Users className="h-3 w-3" />
               <span className="font-medium text-slate-700 dark:text-slate-200">{filledCount}</span>
@@ -1139,9 +1141,9 @@ export function Attendance() {
           </div>
 
           {/* Compact entry table */}
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
+          <div className="rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0 mt-2">
             <div className="overflow-x-auto overflow-y-auto flex-1">
-              <table className="w-full text-sm min-w-[500px]">
+              <table className="w-full text-sm min-w-[800px]">
                 <thead className="bg-slate-900 text-white sticky top-0 z-10">
                   <tr>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 w-[30%]">Staff Name</th>
