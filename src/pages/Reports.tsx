@@ -1983,7 +1983,7 @@ export function Reports() {
                     <TableBody>
                       {leaves.map((leave, idx) => {
                         const returned = !!leave.dateReturned;
-                        const overdue  = !returned && new Date(leave.expectedEndDate) < new Date();
+                        const overdue  = !returned && new Date(leave.expectedEndDate).setHours(0,0,0,0) <= new Date().setHours(0,0,0,0);
                         return (
                           <TableRow key={leave.id} className={`hover:bg-rose-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
                             <TableCell className="py-1.5 px-3 text-sm font-medium text-slate-800 whitespace-nowrap">{leave.employeeName}</TableCell>
@@ -2016,8 +2016,8 @@ export function Reports() {
               </div>
               <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex items-center gap-4">
                 <span><strong>{leaves.length}</strong> total leave records</span>
-                <span className="text-amber-600"><strong>{leaves.filter(l => !l.dateReturned && new Date(l.expectedEndDate) >= new Date()).length}</strong> currently on leave</span>
-                <span className="text-red-500"><strong>{leaves.filter(l => !l.dateReturned && new Date(l.expectedEndDate) < new Date()).length}</strong> overdue</span>
+                <span className="text-amber-600"><strong>{leaves.filter(l => !l.dateReturned && new Date(l.startDate).setHours(0,0,0,0) <= new Date().setHours(0,0,0,0) && new Date(l.expectedEndDate).setHours(0,0,0,0) > new Date().setHours(0,0,0,0)).length}</strong> currently on leave</span>
+                <span className="text-red-500"><strong>{leaves.filter(l => !l.dateReturned && new Date(l.expectedEndDate).setHours(0,0,0,0) <= new Date().setHours(0,0,0,0)).length}</strong> overdue</span>
                 <span className="text-emerald-600"><strong>{leaves.filter(l => !!l.dateReturned).length}</strong> returned</span>
               </div>
             </div>

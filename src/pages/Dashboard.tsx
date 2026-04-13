@@ -181,10 +181,10 @@ export function Dashboard() {
             if (l.status === 'Cancelled') return false;
             if (l.dateReturned && l.dateReturned !== '') return false;
             const start = new Date(l.startDate);
-            const end = new Date(l.expectedEndDate);
+            const resumptionDate = new Date(l.expectedEndDate);
             start.setHours(0, 0, 0, 0);
-            end.setHours(23, 59, 59, 999);
-            return start <= todayMidnight && end >= todayMidnight;
+            resumptionDate.setHours(0, 0, 0, 0);
+            return start <= todayMidnight && todayMidnight < resumptionDate;
         }).length;
 
         // "Pending Leaves": not yet started (future) AND no dateReturned — excludes anyone currently mid-leave

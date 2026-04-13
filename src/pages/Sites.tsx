@@ -766,9 +766,9 @@ export function Sites() {
         </div>
 
         {activeTab === 'active' ? (
-          <div className="flex-1">
+          <div className="flex-1 flex flex-col min-h-0">
             {viewMode === 'table' ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-auto style-scroll flex-1">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
@@ -955,7 +955,7 @@ export function Sites() {
             </Table>
             </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-5 bg-slate-50/30">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-5 bg-slate-50/30 overflow-y-auto style-scroll flex-1 min-h-0">
                 {sortedSites.map(site => {
                   const q = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
                   
@@ -1054,8 +1054,8 @@ export function Sites() {
             )}
           </div>
         ) : (
-          <div className="flex-1">
-            <div className="overflow-x-auto">
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="overflow-auto style-scroll flex-1">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">

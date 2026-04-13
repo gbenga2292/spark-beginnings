@@ -207,8 +207,8 @@ export function Payroll() {
             if (empEnd < startOfViewingMonth) return false;
           }
 
-          // If current status is not Active, only show if they were active in the viewed month
-          if (e.status !== 'Active') {
+          // If current status is not Active or On Leave, only show if they were active in the viewed month
+          if (e.status !== 'Active' && e.status !== 'On Leave') {
              // For payroll history, we might want to see someone who was active but is now Terminated.
              // If endDate is empty, they should be Active.
              if (!e.endDate) return false;
@@ -491,7 +491,15 @@ export function Payroll() {
       setPrintSelectedMonths([selectedMonth]);
       setPrintSelectedYear(selectedYear);
       // Seed with ALL active employee IDs so all checkboxes appear checked
-      setPrintSelectedEmployees(employees.filter(e => e.status === 'Active').map(e => e.id));
+      const isExcludeNonEmp = type === 'PAYSLIPS' || type === 'PAYE' || type === 'PENSION' || type === 'NSITF';
+      const isOnlyNonEmp = type === 'WITHHOLDING';
+      setPrintSelectedEmployees(employees.filter(e => {
+        if (e.status !== 'Active' && e.status !== 'On Leave') return false;
+        const isNonEmp = e.staffType === 'NON-EMPLOYEE' || e.department?.toUpperCase() === 'NON-EMPLOYEE' || e.department?.toUpperCase() === 'BENEFICIARY';
+        if (isExcludeNonEmp && isNonEmp) return false;
+        if (isOnlyNonEmp && !isNonEmp) return false;
+        return true;
+      }).map(e => e.id));
       setPrintType(type);
       setPrintDialogOpen(true);
       setPrintSelectedColumns(DEFAULT_COLUMNS[type] || []);
@@ -1256,76 +1264,94 @@ export function Payroll() {
                     </div>
                   )}
 
-                  {/* Department filter */}
-                  <div>
-                    <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1 flex items-center justify-between">
-                      Filter by Department
-                      <div className="flex gap-2">
-                        <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => {
-                          const all = [...new Set([...employees.filter(e => e.status === 'Active').map(e => e.department).filter(Boolean), 'Beneficiary'])].sort();
-                          setPrintSelectedDepts(all);
-                          setPrintSelectedEmployees(employees.filter(e => e.status === 'Active' && all.includes(e.department)).map(e => e.id));
-                        }}>All</button>
-                        <span className="text-slate-300">|</span>
-                        <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => { setPrintSelectedDepts([]); setPrintSelectedEmployees([]); }}>None</button>
-                      </div>
-                    </h4>
-                    <div className="space-y-1 mt-2 max-h-[110px] overflow-y-auto">
-                      {[...new Set([...employees.filter(e => e.status === 'Active').map(e => e.department).filter(Boolean), 'Beneficiary'])].sort().map(dept => (
-                        <label key={dept} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="rounded border-slate-300 text-indigo-600"
-                            checked={printSelectedDepts.includes(dept)}
-                            onChange={(e) => {
-                              const newDepts = e.target.checked
-                                ? [...printSelectedDepts, dept]
-                                : printSelectedDepts.filter(d => d !== dept);
-                              setPrintSelectedDepts(newDepts);
-                              // Auto-select employees in checked departments
-                              if (newDepts.length > 0) {
-                                const deptEmployeeIds = employees
-                                  .filter(emp => emp.status === 'Active' && newDepts.includes(emp.department))
-                                  .map(emp => emp.id);
-                                setPrintSelectedEmployees(deptEmployeeIds);
-                              } else {
-                                setPrintSelectedEmployees([]);
-                              }
-                            }}
-                          />
-                          {dept}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
+                  {/* Department & Employee Filters */}
+                  {(() => {
+                    const isExcludeNonEmp = printType === 'PAYSLIPS' || printType === 'PAYE' || printType === 'PENSION' || printType === 'NSITF';
+                    const isOnlyNonEmp = printType === 'WITHHOLDING';
+                    const listStaff = employees.filter(e => {
+                      if (e.status !== 'Active' && e.status !== 'On Leave') return false;
+                      const isNonEmp = e.staffType === 'NON-EMPLOYEE' || e.department?.toUpperCase() === 'NON-EMPLOYEE' || e.department?.toUpperCase() === 'BENEFICIARY';
+                      if (isExcludeNonEmp && isNonEmp) return false;
+                      if (isOnlyNonEmp && !isNonEmp) return false;
+                      return true;
+                    });
+                    const listDepts = [...new Set(listStaff.map(e => e.department).filter(Boolean))].sort();
 
-                  <div>
-                    <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1 flex items-center justify-between">
-                      Select Employees
-                      <div className="flex gap-2">
-                        <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedEmployees(employees.filter(e => e.status === 'Active').map(e => e.id))}>All</button>
-                        <span className="text-slate-300">|</span>
-                        <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedEmployees([])}>None</button>
-                      </div>
-                    </h4>
-                    <div className="space-y-1 mt-2 max-h-[200px] overflow-y-auto pr-2">
-                      {employees.filter(e => e.status === 'Active').sort((a, b) => (a.position || '').localeCompare(b.position || '')).map(emp => (
-                        <label key={emp.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="rounded border-slate-300 text-indigo-600"
-                            checked={printSelectedEmployees.includes(emp.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) setPrintSelectedEmployees(prev => [...prev, emp.id]);
-                              else setPrintSelectedEmployees(prev => prev.filter(id => id !== emp.id));
-                            }}
-                          />
-                          {emp.firstname} {emp.surname}
-                          {emp.department && <span className="text-[10px] text-slate-400 ml-auto shrink-0">{emp.department}</span>}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
+                    return (
+                      <>
+                        {/* Department filter */}
+                        <div>
+                          <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1 flex items-center justify-between">
+                            Filter by Department
+                            <div className="flex gap-2">
+                              <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => {
+                                setPrintSelectedDepts(listDepts);
+                                setPrintSelectedEmployees(listStaff.filter(e => listDepts.includes(e.department)).map(e => e.id));
+                              }}>All</button>
+                              <span className="text-slate-300">|</span>
+                              <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => { setPrintSelectedDepts([]); setPrintSelectedEmployees([]); }}>None</button>
+                            </div>
+                          </h4>
+                          <div className="space-y-1 mt-2 max-h-[110px] overflow-y-auto">
+                            {listDepts.map(dept => (
+                              <label key={dept} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-slate-300 text-indigo-600"
+                                  checked={printSelectedDepts.includes(dept)}
+                                  onChange={(e) => {
+                                    const newDepts = e.target.checked
+                                      ? [...printSelectedDepts, dept]
+                                      : printSelectedDepts.filter(d => d !== dept);
+                                    setPrintSelectedDepts(newDepts);
+                                    // Auto-select employees in checked departments
+                                    if (newDepts.length > 0) {
+                                      const deptEmployeeIds = listStaff
+                                        .filter(emp => newDepts.includes(emp.department))
+                                        .map(emp => emp.id);
+                                      setPrintSelectedEmployees(deptEmployeeIds);
+                                    } else {
+                                      setPrintSelectedEmployees([]);
+                                    }
+                                  }}
+                                />
+                                {dept}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Employee filter */}
+                        <div>
+                          <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1 flex items-center justify-between">
+                            Select Employees
+                            <div className="flex gap-2">
+                              <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedEmployees(listStaff.map(e => e.id))}>All</button>
+                              <span className="text-slate-300">|</span>
+                              <button className="text-xs text-indigo-600 font-medium hover:underline" onClick={() => setPrintSelectedEmployees([])}>None</button>
+                            </div>
+                          </h4>
+                          <div className="space-y-1 mt-2 max-h-[200px] overflow-y-auto pr-2">
+                            {listStaff.sort((a, b) => `${a.firstname} ${a.surname}`.localeCompare(`${b.firstname} ${b.surname}`)).map(emp => (
+                              <label key={emp.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-slate-300 text-indigo-600"
+                                  checked={printSelectedEmployees.includes(emp.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) setPrintSelectedEmployees(prev => [...prev, emp.id]);
+                                    else setPrintSelectedEmployees(prev => prev.filter(id => id !== emp.id));
+                                  }}
+                                />
+                                {emp.firstname} {emp.surname}
+                                {emp.department && <span className="text-[10px] text-slate-400 ml-auto shrink-0">{emp.department}</span>}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
 
                   {/* Columns to Include */}
                   {(() => {

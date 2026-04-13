@@ -708,7 +708,7 @@ export function Leaves() {
 
         const leaveTypeOptions = ['Annual', 'Emergency', 'Maternity/Paternity', 'Study', 'Others'];
         const isLeaveElapsed = expectedEndDate
-          ? new Date(expectedEndDate).setHours(23, 59, 59, 999) < Date.now()
+          ? new Date(expectedEndDate).setHours(0, 0, 0, 0) <= Date.now()
           : false;
         const isPreviewLocked = (!!formId && isLeaveElapsed && !hasAllPermissions) || isFormLockedForUser;
         const isLocked = isPreviewLocked;

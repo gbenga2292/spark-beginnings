@@ -36,11 +36,11 @@ export function LeaveSummary() {
       const remaining = entitlement - totalTaken;
 
       const isCurrentlyOnLeave = empLeaves.some(l => {
-        if (!l.startDate || !l.expectedEndDate || l.status !== 'Active') return false;
-        const now = new Date();
-        const start = new Date(l.startDate);
-        const end = new Date(l.expectedEndDate);
-        return now >= start && now <= end;
+        if (!l.startDate || !l.expectedEndDate || l.status !== 'Active' || l.dateReturned) return false;
+        const todayMidnight = new Date().setHours(0, 0, 0, 0);
+        const start = new Date(l.startDate).setHours(0, 0, 0, 0);
+        const resumptionDate = new Date(l.expectedEndDate).setHours(0, 0, 0, 0);
+        return start <= todayMidnight && todayMidnight < resumptionDate;
       });
 
       return { emp, totalTaken, remaining, entitlement, isCurrentlyOnLeave };

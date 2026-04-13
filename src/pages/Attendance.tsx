@@ -190,10 +190,9 @@ export function Attendance() {
       if (leave.status === 'Cancelled') return;
       if (!leave.startDate || !leave.expectedEndDate) return;
       try {
-        if (isWithinInterval(regDateObj, {
-          start: parseISO(leave.startDate),
-          end: parseISO(leave.expectedEndDate),
-        })) {
+        const start = parseISO(leave.startDate);
+        const resumptionDate = parseISO(leave.expectedEndDate);
+        if (regDateObj >= start && regDateObj < resumptionDate) {
           set.add(leave.employeeId);
         }
       } catch (e) {}

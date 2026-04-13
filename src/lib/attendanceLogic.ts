@@ -75,12 +75,19 @@ export function calculateAttendanceMetrics(
     }
   }
 
+  // Determine if this is a paid absence status that artificially sets 'worked' to true
+  const upperStatus = record.absentStatus?.toUpperCase() || '';
+  const isPaidAbsence = ["ABSENT WITH PERMIT", "ON LEAVE", "SICK LEAVE", "MATERNITY LEAVE", "ANNUAL LEAVE", "PUBLIC HOLIDAY"].includes(upperStatus);
+
   // Overtime Calculation
   let ot = 0;
   if (
-    (isSunday && worked) ||
-    (isHoliday && worked) ||
-    (day && night && ndw === 'Yes') ||
+    (
+      ((isSunday && worked) ||
+      (isHoliday && worked) ||
+      (day && night && ndw === 'Yes')) &&
+      !isPaidAbsence
+    ) ||
     !!record.overtimeDetails
   ) {
     const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
