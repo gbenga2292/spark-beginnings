@@ -99,7 +99,8 @@ const blankForm = (): SiteQuestionnaire => ({
   phase4: {
     quotationSent: false, clientFeedbackReceived: false, proposalAccepted: false,
     clientTaxStatus: '', scopeOfWorkSummary: '', scopeExclusionsSummary: '',
-    timelineConfirmed: false, permittingResponsibilityOutlined: false, tinProvided: false, completed: false
+    timelineConfirmed: false, permittingResponsibilityOutlined: false, tinProvided: false,
+    clientTinNumber: '', completed: false
   },
   phase5: {
     safetyPlanIntegrated: false, stage1AdvanceReceived: false, stage2InstallationComplete: false,
@@ -755,6 +756,14 @@ export function SiteOnboarding() {
                     <PhaseCheck label="Timeline Confirmed" checked={form.phase4.timelineConfirmed} onChange={v => updPhase('phase4', { timelineConfirmed: v })} />
                     <PhaseCheck label="Permitting Responsibility Outlined" checked={form.phase4.permittingResponsibilityOutlined} onChange={v => updPhase('phase4', { permittingResponsibilityOutlined: v })} />
                     <PhaseCheck label="Client TIN Provided" checked={form.phase4.tinProvided} onChange={v => updPhase('phase4', { tinProvided: v })} />
+                    {form.phase4.tinProvided && (
+                      <PhaseTextField
+                        label="Client TIN Number"
+                        value={form.phase4.clientTinNumber || ''}
+                        onChange={v => updPhase('phase4', { clientTinNumber: v })}
+                        placeholder="e.g. 19283746-0001"
+                      />
+                    )}
                   </div>
 
                   <div className="space-y-4">

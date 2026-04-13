@@ -53,6 +53,7 @@ export interface SiteQuestionnaire {
     timelineConfirmed: boolean;
     permittingResponsibilityOutlined: boolean;
     tinProvided: boolean;
+    clientTinNumber?: string;
     completed: boolean;
   };
 

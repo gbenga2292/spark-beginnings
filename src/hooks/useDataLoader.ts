@@ -3,7 +3,7 @@ import { useAppStore, DEFAULT_OFFBOARDING_TASKS } from '@/src/store/appStore';
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile } from '@/src/lib/supabaseService';
 import { generateId } from '@/src/lib/utils';
 import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
 import { useNetworkStore } from '@/src/store/networkStore';
@@ -124,6 +124,7 @@ export function useDataLoader(isAuthenticated: boolean) {
           commLogs: appData.commLogs || [],
           sites: appData.sites,
           clients: appData.clients,
+          clientProfiles: appData.clientProfiles || [],
           employees: appData.employees,
           attendanceRecords: appData.attendanceRecords,
           invoices: appData.invoices,
@@ -543,6 +544,20 @@ export function useRealtimeData(isAuthenticated: boolean) {
                 useAppStore.setState({ pendingSites: current.map((s: any) => s.id === updated.id ? updated : s) });
               } else if (eventType === 'DELETE') {
                 useAppStore.setState({ pendingSites: current.filter((s: any) => s.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'clients': {
+              const current = appState.clientProfiles;
+              if (eventType === 'INSERT') {
+                if (!current.some((c: any) => c.id === newRow.id)) {
+                  useAppStore.setState({ clientProfiles: [...current, dbToClientProfile(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToClientProfile(newRow);
+                useAppStore.setState({ clientProfiles: current.map((c: any) => c.id === updated.id ? updated : c) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ clientProfiles: current.filter((c: any) => c.id !== oldRow.id) });
               }
               break;
             }

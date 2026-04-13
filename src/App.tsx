@@ -23,6 +23,7 @@ const Employees = lazy(() => import('./pages/Employees').then(m => ({ default: m
 const Beneficiaries = lazy(() => import('./pages/Beneficiaries').then(m => ({ default: m.Beneficiaries })));
 const Organogram = lazy(() => import('./pages/Organogram').then(m => ({ default: m.Organogram })));
 const Sites = lazy(() => import('./pages/Sites').then(m => ({ default: m.Sites })));
+const ClientDetails = lazy(() => import('./pages/ClientDetails').then(m => ({ default: m.ClientDetails })));
 const SiteOnboarding = lazy(() => import('./pages/SiteOnboarding').then(m => ({ default: m.SiteOnboarding })));
 const Attendance = lazy(() => import('./pages/Attendance').then(m => ({ default: m.Attendance })));
 const Payroll = lazy(() => import('./pages/Payroll').then(m => ({ default: m.Payroll })));
@@ -162,6 +163,7 @@ function AppContent() {
         <Route path="evaluations" element={<Page label="Evaluations"><ProtectedRoute requiredModule="evaluations"><Evaluations /></ProtectedRoute></Page>} />
         <Route path="ledger" element={<Page label="Ledger"><ProtectedRoute requiredModule="ledger"><Ledger /></ProtectedRoute></Page>} />
         <Route path="company-expenses" element={<Page label="Company Expenses"><ProtectedRoute requiredModule="ledger"><CompanyExpenses /></ProtectedRoute></Page>} />
+        <Route path="clients" element={<Page label="Clients"><ProtectedRoute requiredModule="clients"><ClientDetails /></ProtectedRoute></Page>} />
 
         {/* Task Manager Module */}
         <Route path="tasks" element={<Page label="Tasks"><ProtectedRoute requiredModule="tasks"><Tasks /></ProtectedRoute></Page>} />

@@ -125,12 +125,13 @@ const navigation: NavCategory[] = [
       { name: 'Sites', href: '/operations/sites', icon: MapPin, privKey: 'opsSites', privField: 'canView' },
     ],
   },
-  // ── Clients ───────────────────────────────────────────────────────────────
+  // ── Clients & Sites ───────────────────────────────────────────────────────
   {
-    name: 'Clients',
+    name: 'Clients & Sites',
     icon: Building2,
     items: [
-      { name: 'Sites & Clients', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView' },
+      { name: 'Clients', href: '/clients', icon: Users, privKey: 'clients', privField: 'canView' },
+      { name: 'Sites', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView' },
     ],
   },
   // ── Account ───────────────────────────────────────────────────────────────

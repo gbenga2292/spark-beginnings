@@ -64,6 +64,14 @@ export interface CompanyExpense {
   status?: string;
 }
 
+export interface ClientProfile {
+  id: string; // The supabse ID
+  name: string;
+  tinNumber?: string;
+  startDate?: string;
+  createdAt?: string;
+}
+
 export interface Site {
   id: string;
   name: string;
@@ -502,7 +510,8 @@ interface AppState {
 
   sites: Site[];
   pendingSites: SiteQuestionnaire[];
-  clients: string[];
+  clients: string[]; // Keep this for legacy dropdowns and backward compat
+  clientProfiles: ClientProfile[];
   employees: Employee[];
   attendanceRecords: AttendanceRecord[];
   disciplinaryRecords: DisciplinaryRecord[];
@@ -537,6 +546,12 @@ interface AppState {
 
   addClient: (client: string) => void;
   removeClient: (client: string) => void;
+
+  setClientProfiles: (profiles: ClientProfile[]) => void;
+  addClientProfile: (profile: ClientProfile) => void;
+  updateClientProfile: (id: string, updates: Partial<ClientProfile>) => void;
+  deleteClientProfile: (id: string) => void;
+
   addEmployee: (employee: Employee) => void;
   updateEmployee: (id: string, employee: Partial<Employee>) => void;
   bulkUpdateEmployees: (ids: string[], employee: Partial<Employee>) => void;
@@ -711,6 +726,7 @@ export const useAppStore = create<AppState>()(
       sites: [],
       pendingSites: [],
       clients: [],
+      clientProfiles: [],
       positions: [],
       departments: [],
       employees: [],
@@ -805,6 +821,11 @@ export const useAppStore = create<AppState>()(
       // Clients
       addClient: (client) => { set((s) => ({ clients: s.clients.includes(client) ? s.clients : [...s.clients, client] })); db.insertClient(client); },
       removeClient: (client) => { set((s) => ({ clients: s.clients.filter(c => c !== client) })); db.deleteClient(client); },
+
+      setClientProfiles: (profiles) => { set({ clientProfiles: profiles }); },
+      addClientProfile: (profile) => { set((s) => ({ clientProfiles: [...s.clientProfiles, profile] })); db.insertClientProfile(profile); },
+      updateClientProfile: (id, updates) => { set((s) => ({ clientProfiles: s.clientProfiles.map((p) => p.id === id ? { ...p, ...updates } : p) })); db.updateClientProfile(id, updates); },
+      deleteClientProfile: (id) => { set((s) => ({ clientProfiles: s.clientProfiles.filter((p) => p.id !== id) })); db.deleteClientProfile(id); },
 
       // Employees
       addEmployee: (employee) => { set((s) => ({ employees: [...s.employees, employee] })); db.insertEmployee(employee); },

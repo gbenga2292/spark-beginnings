@@ -29,6 +29,7 @@ export interface ReportsPriv     { canView: boolean; canExport: boolean; }
 export interface HmoPriv         { canView: boolean; canAdd: boolean; canEdit: boolean; canExport: boolean; }
 
 // ─── Admin ───────────────────────────────────────────────────
+export interface ClientsPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; }
 export interface SitesPriv {
   canView: boolean;
   canAddSite: boolean; canEditSite: boolean; canDeleteSite: boolean;
@@ -88,6 +89,7 @@ export interface UserPrivileges {
   salaryLoans:       SalaryLoansPriv;
   hmo:               HmoPriv;
   reports:           ReportsPriv;
+  clients:           ClientsPriv;
   sites:             SitesPriv;
   billing:           BillingPriv;
   payments:          PaymentsPriv;
@@ -141,6 +143,7 @@ export const FULL_ACCESS: UserPrivileges = {
   salaryLoans:      { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewAmounts: true },
   hmo:              { canView: true, canAdd: true, canEdit: true, canExport: true },
   reports:          { canView: true, canExport: true },
+  clients:          { canView: true, canAdd: true, canEdit: true, canDelete: true },
   sites:            { canView: true, canAddSite: true, canEditSite: true, canDeleteSite: true, canAddClient: true, canEditClient: true, canDeleteClient: true, canViewClientSummary: true, canImport: true, canExport: true },
   billing:          { canView: true, canCreate: true, canEdit: true, canDelete: true, canViewAmounts: true, canImport: true, canExport: true },
   payments:         { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewAmounts: true, canViewVat: true, canManageVat: true, canImport: true, canExport: true },
@@ -174,6 +177,7 @@ export const NO_ACCESS: UserPrivileges = {
   salaryLoans:      { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewAmounts: false },
   hmo:              { canView: false, canAdd: false, canEdit: false, canExport: false },
   reports:          { canView: false, canExport: false },
+  clients:          { canView: false, canAdd: false, canEdit: false, canDelete: false },
   sites:            { canView: false, canAddSite: false, canEditSite: false, canDeleteSite: false, canAddClient: false, canEditClient: false, canDeleteClient: false, canViewClientSummary: false, canImport: false, canExport: false },
   billing:          { canView: false, canCreate: false, canEdit: false, canDelete: false, canViewAmounts: false, canImport: false, canExport: false },
   payments:         { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewAmounts: false, canViewVat: false, canManageVat: false, canImport: false, canExport: false },

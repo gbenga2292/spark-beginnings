@@ -112,10 +112,14 @@ const PRIV_GROUPS: PG[] = [
   {
     name: 'Clients', icon: Building2, color: 'indigo',
     pages: [
-      { key: 'sites', label: 'Sites & Clients', parentKey: 'sites', masterField: 'canView',
+      { key: 'clients', label: 'Clients Directory', parentKey: 'clients', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add Client' }, { key: 'canEdit', label: 'Edit Client' }, { key: 'canDelete', label: 'Delete Client', danger: true },
+        ] },
+      { key: 'sites', label: 'Sites Management', parentKey: 'sites', masterField: 'canView',
         fields: [
           { key: 'canView', label: 'View' }, { key: 'canAddSite', label: 'Add Site' }, { key: 'canEditSite', label: 'Edit Site' }, { key: 'canDeleteSite', label: 'Delete Site', danger: true },
-          { key: 'canAddClient', label: 'Add Client' }, { key: 'canEditClient', label: 'Edit Client' }, { key: 'canDeleteClient', label: 'Delete Client', danger: true },
+          { key: 'canAddClient', label: 'Add Client (Legacy)' }, { key: 'canEditClient', label: 'Edit Client (Legacy)' }, { key: 'canDeleteClient', label: 'Delete Client (Legacy)', danger: true },
           { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' },
         ] },
     ],

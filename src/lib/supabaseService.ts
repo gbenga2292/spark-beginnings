@@ -19,6 +19,10 @@ import type { Vehicle, VehicleTripLeg } from '@/src/types/operations';
 
 // ─── Mappers: DB → App ──────────────────────────────────────
 
+export function dbToClientProfile(r: any): any {
+  return { id: r.id, name: r.name, tinNumber: r.tin_number || undefined, startDate: r.start_date || undefined, createdAt: r.created_at };
+}
+
 export function dbToSite(r: any): Site {
   return { id: r.id, name: r.name, client: r.client, vat: r.vat, status: r.status, startDate: r.start_date, endDate: r.end_date };
 }
@@ -341,6 +345,10 @@ export function dbToVehicleMovement(r: any): VehicleTripLeg {
 }
 
 // ─── Mappers: App → DB ──────────────────────────────────────
+
+function clientProfileToDb(c: any) {
+  return { id: c.id, name: c.name, tin_number: c.tinNumber || '', start_date: c.startDate || '' };
+}
 
 function siteToDb(s: Site) {
   return { id: s.id, name: s.name, client: s.client, vat: s.vat, status: s.status, start_date: s.startDate, end_date: s.endDate };
@@ -705,6 +713,7 @@ export async function fetchAllAppData(privs?: any) {
     pendingSites: (pendingSitesRes.data || []).map(dbToPendingSite),
     sites: (sitesRes.data || []).map(dbToSite),
     clients: (clientsRes.data || []).map((c: any) => c.name),
+    clientProfiles: (clientsRes.data || []).map(dbToClientProfile),
     employees: (employeesRes.data || []).map(dbToEmployee),
     attendanceRecords: (attendanceRes.data || []).map(dbToAttendance),
     invoices: (invoicesRes.data || []).map(dbToInvoice),
@@ -810,6 +819,24 @@ export const db = {
       const { error: delErr } = await supabase.from('sites').delete().neq('id', NIL_UUID);
       if (delErr) { console.error('setSites clear all:', delErr); throw delErr; }
     }
+  },
+
+  // Client Profiles
+  async insertClientProfile(c: any) {
+    const { error } = await supabase.from('clients').insert(clientProfileToDb(c));
+    if (error) { console.error('insertClientProfile:', error); throw error; }
+  },
+  async updateClientProfile(id: string, c: Partial<any>) {
+    const update: any = {};
+    if (c.name !== undefined) update.name = c.name;
+    if (c.tinNumber !== undefined) update.tin_number = c.tinNumber;
+    if (c.startDate !== undefined) update.start_date = c.startDate;
+    const { error } = await supabase.from('clients').update(update).eq('id', id);
+    if (error) { console.error('updateClientProfile:', error); throw error; }
+  },
+  async deleteClientProfile(id: string) {
+    const { error } = await supabase.from('clients').delete().eq('id', id);
+    if (error) { console.error('deleteClientProfile:', error); throw error; }
   },
 
   // Pending Sites
