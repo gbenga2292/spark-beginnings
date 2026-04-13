@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '../store/appStore';
+import { useLocation } from 'react-router-dom';
 import { useSetPageTitle } from '../contexts/PageContext';
 import { Users, Building2, Calendar, FileText, Search, MapPin, LayoutGrid, List, ArrowLeft, Phone, Mail, MessageCircle, MessageSquare, Car, ExternalLink, ChevronRight } from 'lucide-react';
 import { Input } from '../components/ui/input';
@@ -11,6 +12,7 @@ export function ClientDetails() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const location = useLocation();
   
   const clientProfiles = useAppStore(s => s.clientProfiles);
   const sites = useAppStore(s => s.sites);
@@ -61,15 +63,31 @@ export function ClientDetails() {
     
     return Array.from(names).map(name => {
       const profile = clientProfiles.find(p => p.name === name);
+
+      // Earliest site start date for this client
+      const clientSiteDates = sites
+        .filter(s => s.client === name && s.startDate)
+        .map(s => s.startDate)
+        .sort();
+      const earliestSiteDate = clientSiteDates[0] || null;
+
       return {
         id: profile?.id || name,
         name,
         tinNumber: profile?.tinNumber || 'Pending',
-        startDate: profile?.startDate || 'Unknown',
+        startDate: earliestSiteDate || profile?.startDate || 'Unknown',
         stats: statsByClient[name] || { totalSites: 0, activeSites: 0, totalRevenue: 0 }
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
-  }, [clientProfiles, statsByClient]);
+  }, [clientProfiles, statsByClient, sites]);
+
+  // Auto-select client when navigated from SiteOnboarding link
+  useEffect(() => {
+    const targetName: string | undefined = (location.state as any)?.selectClient;
+    if (!targetName || !allClients.length) return;
+    const match = allClients.find(c => c.name === targetName);
+    if (match) setSelectedClientId(match.id);
+  }, [location.state, allClients]);
 
   const filteredClients = allClients.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 

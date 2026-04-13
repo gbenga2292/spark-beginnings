@@ -354,8 +354,8 @@ export function Ledger() {
     }
 
     toast.success(`Saved voucher ${targetVoucherNo}.`);
-    // After submit, lock into viewing this voucher
-    loadVoucher(targetVoucherNo);
+    // After submit, clear the form for the next voucher
+    handleClear();
   };
 
   const handleDeleteVoucher = async () => {
@@ -636,8 +636,10 @@ export function Ledger() {
 
 
   useSetPageTitle(
-    'Company Ledger',
-    'Record vouchers, manage expenses, and track financial outflows across banks and sites',
+    tab === 'entry' ? 'Company Ledger' : 'Voucher Records',
+    tab === 'entry'
+      ? 'Record vouchers, manage expenses, and track financial outflows across banks and sites'
+      : `Click any voucher to view its transactions. Showing ${voucherSummaries.length} voucher${voucherSummaries.length !== 1 ? 's' : ''}.`,
     <div className="flex items-center gap-2">
       {/* Tab Toggle */}
       <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60 shadow-sm backdrop-blur-sm">
@@ -735,7 +737,7 @@ export function Ledger() {
         </div>
       )}
     </div>,
-    [tab, priv, hasUnsavedPending, activeVoucherNo, ledgerEntries, voucherDate, paidFrom, items, currentUser]
+    [tab, priv, hasUnsavedPending, activeVoucherNo, ledgerEntries, voucherDate, paidFrom, items, currentUser, voucherSummaries.length]
   );
 
   if (!priv?.canView) {
@@ -990,14 +992,7 @@ export function Ledger() {
       <TabsContent active={tab === 'records'} className="m-0 space-y-4">
         <Card>
           <CardHeader className="pb-4 border-b border-slate-100">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <CardTitle>Voucher Records</CardTitle>
-                <CardDescription>
-                  Click any voucher to view its transactions. Showing {voucherSummaries.length} voucher{voucherSummaries.length !== 1 ? 's' : ''}.
-                </CardDescription>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-3 w-full">
                 <div className="flex flex-wrap items-center gap-2">
                   <select 
                     className="h-9 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-600 font-medium" 
@@ -1032,7 +1027,6 @@ export function Ledger() {
                   </div>
                 </div>
               </div>
-            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">

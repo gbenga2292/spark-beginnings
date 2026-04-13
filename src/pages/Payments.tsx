@@ -23,6 +23,7 @@ const getVatDetails = (amount: number, payVat: string, vatRate: number) => {
 export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal?: (val: any) => void; searchTerm?: string }) {
     const sites = useAppStore((state) => state.sites);
     const payments = useAppStore((state) => state.payments);
+    const clientProfiles = useAppStore((state) => state.clientProfiles);
     const addPayment = useAppStore((state) => state.addPayment);
     const updatePayment = useAppStore((state) => state.updatePayment);
     const deletePayment = useAppStore((state) => state.deletePayment);
@@ -252,14 +253,15 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                 toast.info('No payments to export');
                 return;
             }
-            const headers = ['id', 'client', 'site', 'date', 'amount', 'withholdingTax', 'discount', 'payVat', 'vat', 'amountForVat'];
+            const headers = ['id', 'client', 'tin', 'site', 'date', 'amount', 'withholdingTax', 'discount', 'payVat', 'vat', 'amountForVat'];
             const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
 
             const rows = payments.map(pay => {
                 const { vat, amountForVat: amtForVat } = getVatDetails(pay.amount || 0, pay.payVat, vatRate);
+                const tin = clientProfiles.find(cp => cp.name === pay.client)?.tinNumber || '';
                 
                 const data = [
-                    pay.id, pay.client, pay.site, formatDisplayDate(pay.date), pay.amount, pay.withholdingTax, pay.discount, pay.payVat, vat, amtForVat
+                    pay.id, pay.client, tin, pay.site, formatDisplayDate(pay.date), pay.amount, pay.withholdingTax, pay.discount, pay.payVat, vat, amtForVat
                 ];
                 return data.map(extractCSV).join(',');
             });
@@ -485,6 +487,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                             <span className="text-[10px] font-black uppercase tracking-widest text-indigo-900">Total Sums</span>
                                         </div>
                                     </TableHead>
+                                    <TableHead className="px-4 py-2.5" /> {/* TIN col — no sum */}
                                     <TableHead className="px-4 py-2.5 text-right">
                                         <div className="text-[12px] font-mono font-black text-indigo-700 bg-white px-2 py-1 rounded border border-indigo-100 shadow-sm inline-block">
                                             ₦{formatSum(tableSums.amount)}
@@ -517,6 +520,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                     {([
                                         { field: 'date',           label: 'Date',        align: 'left'   },
                                         { field: 'client',         label: 'Client',      align: 'left'   },
+                                        { field: 'tin',            label: 'TIN',         align: 'left'   },
                                         { field: 'site',           label: 'Site',        align: 'left'   },
                                         { field: 'amount',         label: 'Amount (₦)',  align: 'right'  },
                                         { field: 'withholdingTax', label: 'WHT',         align: 'right'  },
@@ -546,6 +550,9 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                     <TableRow key={p.id} className={`hover:bg-slate-50 transition-colors ${selectedId === p.id ? 'bg-indigo-50/50' : ''}`}>
                                         <TableCell className="px-4 py-3 text-slate-500">{formatDisplayDate(p.date)}</TableCell>
                                         <TableCell className="px-4 py-3 font-semibold text-slate-800">{p.client}</TableCell>
+                                        <TableCell className="px-4 py-3 text-slate-500 font-mono text-xs">
+                                            {clientProfiles.find(cp => cp.name === p.client)?.tinNumber || <span className="text-slate-300">—</span>}
+                                        </TableCell>
                                         <TableCell className="px-4 py-3 text-slate-600">{p.site}</TableCell>
                                         <TableCell className="px-4 py-3 text-right font-mono font-bold text-slate-900">
                                             {priv?.canViewAmounts === false ? '***' : (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -593,7 +600,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                 ))}
                                 {sortedPayments.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={showActions ? 10 : 9} className="px-4 py-12 text-center text-slate-500 font-medium tracking-wide border-b-0">
+                                        <TableCell colSpan={showActions ? 11 : 10} className="px-4 py-12 text-center text-slate-500 font-medium tracking-wide border-b-0">
                                             No payment records found.
                                         </TableCell>
                                     </TableRow>

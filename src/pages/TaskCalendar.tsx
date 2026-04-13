@@ -74,10 +74,12 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
     const now = new Date();
     const today = startOfDay(now);
 
+    const activeMainTaskIds = new Set(mainTasks.filter(m => !m.isDeleted).map(m => m.id));
+
     // Subtasks
     const relevantSubtasks = filterMode === 'all'
-      ? subtasks.filter(s => s.deadline)
-      : subtasks.filter(s => s.deadline && s.assignedTo?.includes(currentUser?.id as string));
+      ? subtasks.filter(s => s.deadline && activeMainTaskIds.has((s as any).main_task_id || s.mainTaskId))
+      : subtasks.filter(s => s.deadline && s.assignedTo?.includes(currentUser?.id as string) && activeMainTaskIds.has((s as any).main_task_id || s.mainTaskId));
 
     relevantSubtasks.forEach(s => {
       const deadline = new Date(s.deadline!);
@@ -97,8 +99,8 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
 
     // Main tasks
     const relevantMainTasks = filterMode === 'all'
-      ? mainTasks.filter(m => m.deadline)
-      : mainTasks.filter(m => m.deadline && (m.assignedTo?.includes(currentUser?.id as string) || m.createdBy === currentUser?.id));
+      ? mainTasks.filter(m => m.deadline && !m.isDeleted)
+      : mainTasks.filter(m => m.deadline && !m.isDeleted && (m.assignedTo?.includes(currentUser?.id as string) || m.createdBy === currentUser?.id));
 
     relevantMainTasks.forEach(m => {
       const deadline = new Date(m.deadline!);
@@ -309,7 +311,6 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
                         className={`${evt.colorClass} text-white text-[8px] sm:text-[10px] leading-tight font-medium px-1 sm:px-1.5 py-0.5 rounded truncate hover:brightness-110 transition-all`}
                       >
                         <span className="hidden sm:inline">{format(evt.time, 'h:mm ')} </span>
-                        {evt.type === 'reminder' ? 'ðŸ”” ' : ''}
                         {evt.title}
                       </div>
                     ))}
@@ -413,7 +414,7 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
                           className={`${evt.colorClass} text-white rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 mb-1 cursor-pointer hover:brightness-110 transition-all`}
                         >
                           <p className="text-xs sm:text-sm font-medium truncate">
-                            {evt.type === 'reminder' ? 'ðŸ”” ' : ''}{evt.title}
+                            {evt.title}
                           </p>
                           <p className="text-[10px] sm:text-[11px] opacity-80">
                             {format(evt.time, 'h:mm a')}

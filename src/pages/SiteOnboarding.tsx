@@ -242,8 +242,7 @@ export function SiteOnboarding() {
             updates.endDate = form.phase5.actualEndDate || '';
           }
           
-          const newVat = ((form.phase4.clientTaxStatus as string) || '').includes('Add') ? 'Add' : 
-                        ((form.phase4.clientTaxStatus as string) || '').includes('Yes') ? 'Yes' : 'No';
+          const newVat = ((form.phase4.clientTaxStatus as string) || '') === 'Yes' ? 'Yes' : 'No';
           
           if (newVat !== matchingSite.vat) {
             updates.vat = newVat;
@@ -283,7 +282,7 @@ export function SiteOnboarding() {
       name: form.siteName,
       client: form.clientName,
       status: 'Active',
-      vat: ((form.phase4.clientTaxStatus as string) || '').includes('Add') ? 'Add' : ((form.phase4.clientTaxStatus as string) || '').includes('Yes') ? 'Yes' : 'No',
+      vat: ((form.phase4.clientTaxStatus as string) || '') === 'Yes' ? 'Yes' : 'No',
       startDate: form.phase1.timelineStartDate || new Date().toISOString().split('T')[0],
       endDate: ''
     });
@@ -360,7 +359,19 @@ export function SiteOnboarding() {
               <div className="p-2 rounded-lg bg-indigo-50 flex-shrink-0">
                 <User className="h-4 w-4 text-indigo-600" />
               </div>
-              <InfoField label="Client" value={form.clientName} />
+              <div className="space-y-0.5">
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Client</p>
+                {form.clientName ? (
+                  <button
+                    onClick={() => navigate('/clients', { state: { selectClient: form.clientName } })}
+                    className="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline underline-offset-2 transition-colors text-left"
+                  >
+                    {form.clientName}
+                  </button>
+                ) : (
+                  <span className="text-slate-300 font-normal italic text-sm">—</span>
+                )}
+              </div>
             </div>
             <div className="flex items-start gap-3">
               <div className="p-2 rounded-lg bg-emerald-50 flex-shrink-0">
@@ -768,18 +779,23 @@ export function SiteOnboarding() {
 
                   <div className="space-y-4">
                     <div className="space-y-1">
-                      <label className="text-sm font-medium text-slate-700">Client Tax Status</label>
+                      <label className="text-sm font-medium text-slate-700">Client Tax Status (VAT)</label>
                       <select
                         className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
                         value={form.phase4.clientTaxStatus || ''}
                         onChange={e => updPhase('phase4', { clientTaxStatus: e.target.value as any })}
                       >
                         <option value="">-- Select --</option>
-                        <option value="Mainland (Add 7.5% VAT)">Mainland (Add 7.5% VAT)</option>
-                        <option value="Mainland (Yes 7.5% VAT)">Mainland (Yes 7.5% VAT)</option>
-                        <option value="Free Trade Zone (0% VAT)">Free Trade Zone (0% VAT)</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
                       </select>
                     </div>
+                    <PhaseTextField
+                      label="Client TIN Number"
+                      value={form.phase4.clientTinNumber || ''}
+                      onChange={v => updPhase('phase4', { clientTinNumber: v })}
+                      placeholder="e.g. 19283746-0001"
+                    />
 
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-slate-700">Scope of Work Summary</label>

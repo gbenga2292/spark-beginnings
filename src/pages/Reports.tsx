@@ -1,5 +1,6 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import React, { useState, useMemo } from 'react';
+import { computeWorkDays } from '@/src/lib/workdays';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -39,6 +40,7 @@ export function Reports() {
   const sites = useAppStore((state) => state.sites).filter(s => s.name?.toUpperCase() !== 'DCEL' && s.name?.toUpperCase() !== 'OFFICE');
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const leaves = useAppStore((state) => state.leaves);
+  const publicHolidays = useAppStore((state) => state.publicHolidays);
   const disciplinaryRecords = useAppStore((state) => state.disciplinaryRecords);
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
@@ -61,13 +63,15 @@ export function Reports() {
     onConfirm: () => {},
   });
 
-  // Filter state for Operations Staff Site Work Report
+  // Filter state for Staff Site Work Report
   const currentYear = new Date().getFullYear();
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [summaryYear, setSummaryYear] = useState<number>(currentYear);
   const [siteChartView, setSiteChartView] = useState<'table' | 'gantt'>('gantt');
   const [summaryChartView, setSummaryChartView] = useState<'table' | 'heatmap' | 'bar'>('table');
+  const [siteStaffTypeFilter, setSiteStaffTypeFilter] = useState<'All' | 'OFFICE' | 'FIELD'>('All');
+  const [summaryStaffTypeFilter, setSummaryStaffTypeFilter] = useState<'All' | 'OFFICE' | 'FIELD'>('All');
 
   const [meritFilter, setMeritFilter] = useState<'All Time' | 'Year' | 'Month'>('All Time');
   const [meritFilterYear, setMeritFilterYear] = useState<number>(currentYear);
@@ -117,10 +121,15 @@ export function Reports() {
   ], [activeEmployees, inactiveEmployees]);
 
 
-  // ── Operations / Field staff for site-work report ──
-  const operationsStaff = useMemo(() =>
-    employees.filter(emp => emp.department === 'OPERATIONS' && emp.staffType === 'FIELD' && emp.status === 'Active'),
+  // ── All staff for site-work report (with optional Office/Field filter) ──
+  const siteReportBaseStaff = useMemo(() =>
+    employees.filter(emp => emp.status === 'Active'),
   [employees]);
+
+  const operationsStaff = useMemo(() => {
+    if (siteStaffTypeFilter === 'All') return siteReportBaseStaff;
+    return siteReportBaseStaff.filter(emp => (emp.staffType?.toUpperCase() || '') === siteStaffTypeFilter);
+  }, [siteReportBaseStaff, siteStaffTypeFilter]);
 
   // ── Gantt data: per-employee, per-day attendance grid ──
   const ganttData = useMemo(() => {
@@ -145,8 +154,34 @@ export function Reports() {
       grid[rec.staffId][day] = { site, isAbsent, isNight };
     });
 
+    // Office staff: default to 'OFFICE' on elapsed workdays with no record
+    const today = new Date();
+    const isCurrentMonth = selectedYear === today.getFullYear() && selectedMonth === today.getMonth() + 1;
+    const lastElapsedDay = isCurrentMonth ? today.getDate() : daysInMonth;
+    const publicHolidaySet = new Set(publicHolidays.map(h => h.date));
+
+    operationsStaff.forEach(emp => {
+      if (emp.staffType?.toUpperCase() === 'OFFICE') {
+        // Find the dept's workDaysPerWeek (default 6 = Mon-Sat)
+        const dept = departments.find(d => d.name === emp.department);
+        const wdpw = dept?.workDaysPerWeek ?? 6;
+
+        days.forEach(d => {
+          if (d > lastElapsedDay) return; // future day — skip
+          if (grid[emp.id][d].site) return; // already has a record
+          const dateObj = new Date(selectedYear, selectedMonth - 1, d);
+          const dow = dateObj.getDay(); // 0=Sun, 6=Sat
+          if (dow === 0) return; // Sunday always off
+          if (wdpw < 6 && dow === 6) return; // Saturday off
+          const iso = `${selectedYear}-${String(selectedMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          if (publicHolidaySet.has(iso)) return; // public holiday
+          grid[emp.id][d] = { site: 'OFFICE', isAbsent: false, isNight: false };
+        });
+      }
+    });
+
     return { grid, days };
-  }, [attendanceRecords, selectedMonth, selectedYear, operationsStaff]);
+  }, [attendanceRecords, selectedMonth, selectedYear, operationsStaff, departments, publicHolidays]);
 
   // ── Active sites for the selected month/year ──
   const activeSitesForMonth = useMemo(() => {
@@ -204,6 +239,8 @@ export function Reports() {
     ];
     const map: Record<string, { bg: string; text: string; border: string }> = {};
     sites.forEach((s, i) => { map[s.name] = palette[i % palette.length]; });
+    // OFFICE is always a fixed slate-blue
+    map['OFFICE'] = { bg: '#334155', text: '#fff', border: '#1e293b' };
     return map;
   }, [sites]);
 
@@ -240,25 +277,36 @@ export function Reports() {
     return Object.values(scores).sort((a, b) => Math.abs(b.points) - Math.abs(a.points)).slice(0, 5);
   }, [staffMeritRecords, meritFilter, meritFilterYear, meritFilterMonth]);
 
-  // Calculate site work data for operations staff
+  // Calculate site work data for all staff
   const operationsStaffSiteData = useMemo(() => {
+    const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+
     const filteredRecords = attendanceRecords.filter(rec => {
       const recDate = new Date(rec.date);
       return recDate.getMonth() + 1 === selectedMonth && recDate.getFullYear() === selectedYear;
     });
 
     const siteCounts: Record<string, Record<string, number>> = {};
+    // Track which calendar days have ANY record per employee
+    const recordedDays: Record<string, Set<number>> = {};
 
     operationsStaff.forEach(emp => {
       siteCounts[emp.id] = {};
+      recordedDays[emp.id] = new Set();
       activeSitesForMonth.forEach(site => {
         siteCounts[emp.id][site.name] = 0;
       });
+      // Office staff always get an OFFICE bucket
+      if (emp.staffType?.toUpperCase() === 'OFFICE') {
+        siteCounts[emp.id]['OFFICE'] = 0;
+      }
     });
 
     filteredRecords.forEach(rec => {
       const empId = rec.staffId;
       if (siteCounts[empId]) {
+        const day = new Date(rec.date).getDate();
+        recordedDays[empId].add(day);
         // Count day site
         if (rec.daySite && rec.day === 'Yes') {
           siteCounts[empId][rec.daySite] = (siteCounts[empId][rec.daySite] || 0) + 1;
@@ -270,18 +318,52 @@ export function Reports() {
       }
     });
 
-    return { siteCounts, totalRecords: filteredRecords.length };
-  }, [attendanceRecords, selectedMonth, selectedYear, operationsStaff, activeSitesForMonth]);
+    // Office staff: unrecorded days count as 'OFFICE' (only elapsed workdays)
+    const today = new Date();
+    const isCurrentMonth = selectedYear === today.getFullYear() && selectedMonth === today.getMonth() + 1;
+    const lastElapsedDay = isCurrentMonth ? today.getDate() : daysInMonth;
+    const publicHolidaySet = new Set(publicHolidays.map(h => h.date));
 
-  // Calculate monthly work summary for Operations internal staff (excluding Engineer and CEO)
-  const operationsInternalStaff = useMemo(() => {
-    return employees.filter(emp => 
-      emp.department === 'OPERATIONS' && 
-      emp.staffType === 'FIELD' &&
+    operationsStaff.forEach(emp => {
+      if (emp.staffType?.toUpperCase() === 'OFFICE' && siteCounts[emp.id]) {
+        const dept = departments.find(d => d.name === emp.department);
+        const wdpw = dept?.workDaysPerWeek ?? 6;
+
+        let validOfficeDays = 0;
+        for (let d = 1; d <= lastElapsedDay; d++) {
+          if (recordedDays[emp.id]?.has(d)) continue; // Day already has a record
+
+          const dateObj = new Date(selectedYear, selectedMonth - 1, d);
+          const dow = dateObj.getDay();
+          if (dow === 0) continue; // Sunday off
+          if (wdpw < 6 && dow === 6) continue; // Saturday off
+
+          const iso = `${selectedYear}-${String(selectedMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          if (publicHolidaySet.has(iso)) continue; // Public holiday
+
+          validOfficeDays++;
+        }
+
+        siteCounts[emp.id]['OFFICE'] = validOfficeDays;
+      }
+    });
+
+    return { siteCounts, totalRecords: filteredRecords.length };
+  }, [attendanceRecords, selectedMonth, selectedYear, operationsStaff, activeSitesForMonth, departments, publicHolidays]);
+
+  // Calculate monthly work summary for all staff (excluding Engineer and CEO), with optional Office/Field filter
+  const summaryBaseStaff = useMemo(() => {
+    return employees.filter(emp =>
+      emp.status === 'Active' &&
       emp.position !== 'Engineer' &&
       emp.position !== 'CEO'
     );
   }, [employees]);
+
+  const operationsInternalStaff = useMemo(() => {
+    if (summaryStaffTypeFilter === 'All') return summaryBaseStaff;
+    return summaryBaseStaff.filter(emp => (emp.staffType?.toUpperCase() || '') === summaryStaffTypeFilter);
+  }, [summaryBaseStaff, summaryStaffTypeFilter]);
 
   const monthlyWorkSummary = useMemo(() => {
     const summaryData: Record<string, { 
@@ -1092,13 +1174,13 @@ export function Reports() {
         </Card>
       </div>
 
-      {/* Operations Staff Site Work Report */}
+      {/* Staff Site Work Report */}
       <Card className="bg-white border-slate-200">
         <CardHeader className="border-b border-slate-100 pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-slate-900 flex items-center gap-2">
               <Building2 className="h-5 w-5 text-indigo-600" />
-              Operations Staff Site Work Report
+              Staff Site Work Report
             </CardTitle>
             {/* View toggle */}
             <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
@@ -1152,6 +1234,18 @@ export function Reports() {
                 ))}
               </select>
             </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-slate-700">Staff Type:</label>
+              <select
+                value={siteStaffTypeFilter}
+                onChange={(e) => setSiteStaffTypeFilter(e.target.value as any)}
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              >
+                <option value="All">All</option>
+                <option value="OFFICE">Office</option>
+                <option value="FIELD">Field</option>
+              </select>
+            </div>
             <div className="ml-auto text-sm text-slate-500">
               {operationsStaffSiteData.totalRecords} attendance records for {months.find(m => m.value === selectedMonth)?.label} {selectedYear}
             </div>
@@ -1159,16 +1253,26 @@ export function Reports() {
 
           {siteChartView === 'table' ? (
             /* ── TABLE VIEW ── */
+            (() => {
+              // Include synthetic 'OFFICE' column when any office staff are shown
+              const hasOfficeStaff = operationsStaff.some(emp => emp.staffType?.toUpperCase() === 'OFFICE');
+              const officeSite = { id: 'OFFICE', name: 'OFFICE' };
+              const tableSites = hasOfficeStaff
+                ? [...activeSitesForMonth, officeSite]
+                : activeSitesForMonth;
+              return (
             <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <div className="overflow-y-auto" style={{ maxHeight: '420px' }}>
-                  <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="max-h-[420px]">
                     <TableHeader>
                       <TableRow className="bg-gradient-to-r from-slate-800 to-slate-700 sticky top-0 z-10">
                         <TableHead className="text-left font-semibold text-white py-2 px-3 whitespace-nowrap">Employee</TableHead>
-                        {activeSitesForMonth.map(site => (
-                          <TableHead key={site.id} className="text-center font-semibold text-white py-2 px-2 whitespace-nowrap">{site.name}</TableHead>
+                        {tableSites.map(site => (
+                          <TableHead
+                            key={site.id}
+                            className={`text-center font-semibold text-white py-2 px-2 whitespace-nowrap ${
+                              site.id === 'OFFICE' ? 'bg-slate-600/60' : ''
+                            }`}
+                          >{site.name}</TableHead>
                         ))}
                         <TableHead className="text-center font-semibold text-white bg-indigo-700/60 py-2 px-3 whitespace-nowrap">Total Days</TableHead>
                       </TableRow>
@@ -1176,27 +1280,44 @@ export function Reports() {
                     <TableBody>
                       {operationsStaff.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={activeSitesForMonth.length + 2} className="text-center py-8 text-slate-500">
-                            No operations staff found.
+                          <TableCell colSpan={tableSites.length + 2} className="text-center py-8 text-slate-500">
+                            No staff found for the selected filter.
                           </TableCell>
                         </TableRow>
                       ) : (
                         operationsStaff.map((emp, idx) => {
                           const empSiteCounts = operationsStaffSiteData.siteCounts[emp.id] || {};
                           const totalDays = Object.values(empSiteCounts).reduce((sum: number, count) => sum + (count as number), 0);
+                          const isOffice = emp.staffType?.toUpperCase() === 'OFFICE';
                           return (
                             <TableRow key={emp.id} className={`hover:bg-indigo-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}`}>
                               <TableCell className="font-medium text-slate-800 py-1.5 px-3">
                                 <div className="text-sm leading-tight">{emp.surname} {emp.firstname}</div>
                                 <div className="text-xs text-slate-400 leading-tight">{emp.position}</div>
                               </TableCell>
-                              {activeSitesForMonth.map(site => {
+                              {tableSites.map(site => {
                                 const days = empSiteCounts[site.name] || 0;
+                                const isOfficeSiteCol = site.id === 'OFFICE';
                                 return (
-                                  <TableCell key={site.id} className={`text-center py-1.5 px-2 text-sm ${days > 0 ? 'font-semibold text-emerald-700' : 'text-slate-300'}`}>
+                                  <TableCell
+                                    key={site.id}
+                                    className={`text-center py-1.5 px-2 text-sm ${
+                                      days > 0
+                                        ? isOfficeSiteCol
+                                          ? 'font-semibold text-slate-700'
+                                          : 'font-semibold text-emerald-700'
+                                        : 'text-slate-300'
+                                    }`}
+                                  >
                                     {days > 0 ? (
-                                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">{days}</span>
-                                    ) : '—'}
+                                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                                        isOfficeSiteCol
+                                          ? 'bg-slate-200 text-slate-700'
+                                          : 'bg-emerald-100 text-emerald-700'
+                                      }`}>{days}</span>
+                                    ) : (isOffice && isOfficeSiteCol ? (
+                                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-400 text-xs font-bold">0</span>
+                                    ) : '—')}
                                   </TableCell>
                                 );
                               })}
@@ -1209,16 +1330,22 @@ export function Reports() {
                       )}
                     </TableBody>
                   </Table>
-                  </div>
-                </div>
-              </div>
             </div>
+              );
+            })()
           ) : (
             /* ── GANTT / SCHEDULE CHART VIEW ── */
             <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               {/* Legend */}
               <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide mr-1">Legend:</span>
+                {/* Show OFFICE chip first if any office staff are visible */}
+                {operationsStaff.some(e => e.staffType?.toUpperCase() === 'OFFICE') && (
+                  <span className="flex items-center gap-1.5 text-xs font-medium" style={{ color: '#334155' }}>
+                    <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: '#334155' }}></span>
+                    OFFICE (default)
+                  </span>
+                )}
                 {activeSitesForMonth.map(site => {
                   const color = SITE_COLORS[site.name];
                   return (
@@ -1275,7 +1402,7 @@ export function Reports() {
 
                     {/* Employee rows */}
                     {operationsStaff.length === 0 ? (
-                      <div className="text-center py-10 text-slate-400 text-sm">No operations staff found.</div>
+                      <div className="text-center py-10 text-slate-400 text-sm">No staff found for the selected filter.</div>
                     ) : (
                       operationsStaff.map((emp, idx) => {
                         const empGrid = ganttData.grid[emp.id] || {};
@@ -1353,13 +1480,13 @@ export function Reports() {
         </CardContent>
       </Card>
 
-      {/* Operations Staff Monthly Work Summary */}
+      {/* Staff Monthly Work Summary */}
       <Card className="bg-white border-slate-200">
         <CardHeader className="border-b border-slate-100 pb-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <CardTitle className="text-slate-900 flex items-center gap-2">
               <CalendarClock className="h-5 w-5 text-indigo-600" />
-              Operations Staff Monthly Work Summary
+              Staff Monthly Work Summary
             </CardTitle>
             {/* View toggle */}
             <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
@@ -1405,6 +1532,18 @@ export function Reports() {
                 ))}
               </select>
             </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-slate-700">Staff Type:</label>
+              <select
+                value={summaryStaffTypeFilter}
+                onChange={(e) => setSummaryStaffTypeFilter(e.target.value as any)}
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              >
+                <option value="All">All</option>
+                <option value="OFFICE">Office</option>
+                <option value="FIELD">Field</option>
+              </select>
+            </div>
             <div className="ml-auto flex gap-2">
               <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportMonthlyWorkSummaryExcel}>
                 <FileSpreadsheet className="h-4 w-4" /> Excel
@@ -1418,10 +1557,7 @@ export function Reports() {
           {summaryChartView === 'table' ? (
             /* ── TABLE VIEW ── */
             <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <div className="overflow-y-auto" style={{ maxHeight: '420px' }}>
-                  <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="max-h-[420px]">
                     <TableHeader className="sticky top-0 z-10">
                       <TableRow className="bg-gradient-to-r from-slate-800 to-slate-700">
                         <TableHead rowSpan={2} className="text-left font-semibold text-white align-middle py-2 px-3 whitespace-nowrap sticky left-0 bg-slate-800 z-20">Full Name</TableHead>
@@ -1446,7 +1582,7 @@ export function Reports() {
                       {operationsInternalStaff.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={40} className="text-center py-8 text-slate-500">
-                            No operations internal staff found (excluding Engineer and CEO positions).
+                            No staff found for the selected filter (excluding Engineer and CEO positions).
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -1518,9 +1654,6 @@ export function Reports() {
                       )}
                     </TableBody>
                   </Table>
-                  </div>
-                </div>
-              </div>
             </div>
           ) : summaryChartView === 'heatmap' ? (
             /* ── HEAT MAP VIEW ── */
@@ -1601,7 +1734,7 @@ export function Reports() {
 
                         {/* Employee rows */}
                         {operationsInternalStaff.length === 0 ? (
-                          <div className="text-center py-10 text-slate-400 text-sm">No operations internal staff found.</div>
+                          <div className="text-center py-10 text-slate-400 text-sm">No staff found for the selected filter.</div>
                         ) : (
                           operationsInternalStaff.map((emp, idx) => {
                             const data = monthlyWorkSummary[emp.id];
@@ -1964,10 +2097,7 @@ export function Reports() {
             <div className="text-center py-12 text-slate-400 text-sm">No leave records found.</div>
           ) : (
             <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <div className="overflow-y-auto" style={{ maxHeight: '420px' }}>
-                  <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="max-h-[420px]">
                     <TableHeader className="sticky top-0 z-10">
                       <TableRow className="bg-gradient-to-r from-rose-700 to-rose-600">
                         <TableHead className="text-white font-semibold py-2 px-3 whitespace-nowrap">Employee</TableHead>
@@ -2011,9 +2141,6 @@ export function Reports() {
                       })}
                     </TableBody>
                   </Table>
-                  </div>
-                </div>
-              </div>
               <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex items-center gap-4">
                 <span><strong>{leaves.length}</strong> total leave records</span>
                 <span className="text-amber-600"><strong>{leaves.filter(l => !l.dateReturned && new Date(l.startDate).setHours(0,0,0,0) <= new Date().setHours(0,0,0,0) && new Date(l.expectedEndDate).setHours(0,0,0,0) > new Date().setHours(0,0,0,0)).length}</strong> currently on leave</span>

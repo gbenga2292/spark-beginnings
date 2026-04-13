@@ -471,14 +471,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                     <p className="text-[11px] text-slate-500 truncate">{currentUser?.email || user?.email}</p>
                   </div>
                 </div>
-                <div className="mt-3 flex gap-2">
-                  <span className="text-[10px] font-medium bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full">
-                    {privCount} permissions
-                  </span>
-                  <span className="text-[10px] font-medium bg-emerald-900/40 text-emerald-400 px-2 py-0.5 rounded-full">
-                    Active
-                  </span>
-                </div>
+
               </div>
 
               {/* Menu Items */}
