@@ -80,13 +80,39 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
       if (!groups[mtId]) groups[mtId] = [];
       groups[mtId].push(sub);
     });
+    const priorityMap: Record<string, number> = { 
+      not_started: 0, 
+      in_progress: 1, 
+      pending_approval: 2, 
+      completed: 3 
+    };
+
     return Object.entries(groups)
-      .map(([mainTaskId, subs]) => ({
-        mainTask: mainTasks.find(m => m.id === mainTaskId),
-        subs,
-      }))
+      .map(([mainTaskId, subs]) => {
+        // 1. Sort subtasks within the group: Not Started -> In Progress -> Review -> Completed
+        const sortedSubs = [...subs].sort((a, b) => {
+          return (priorityMap[a.status] ?? 0) - (priorityMap[b.status] ?? 0);
+        });
+
+        const mainTask = mainTasks.find(m => m.id === mainTaskId);
+        
+        // 2. Determine the group's overall priority based on its "most active" task
+        const minPriority = Math.min(...subs.map(s => priorityMap[s.status] ?? 0));
+
+        return {
+          mainTask,
+          subs: sortedSubs,
+          minPriority
+        };
+      })
       .filter(g => g.mainTask !== undefined)
-      .sort((a, b) => new Date(b.mainTask!.createdAt || 0).getTime() - new Date(a.mainTask!.createdAt || 0).getTime());
+      // 3. Sort projects: First by "active" status, then by newest project
+      .sort((a, b) => {
+        if (a.minPriority !== b.minPriority) {
+          return a.minPriority - b.minPriority;
+        }
+        return new Date(b.mainTask!.createdAt || 0).getTime() - new Date(a.mainTask!.createdAt || 0).getTime();
+      });
   }, [subtasks, mainTasks, search]);
 
   const activeSubtask = subtasks.find(s => s.id === activeSubtaskId) ?? null;
@@ -143,23 +169,23 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
       <div className="w-72 flex-shrink-0 border-r border-border bg-white flex flex-col">
         {/* Header */}
         <div className="px-4 pt-5 pb-3 border-b border-border">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2 font-bold text-slate-800">
-              <CheckCircle2 className="w-5 h-5 text-primary" />
-              <span>Tasks</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+          <div className="flex items-center gap-3 mb-4">
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="w-9 h-9 flex-shrink-0 rounded-xl bg-slate-100/80 hover:bg-red-50 hover:text-red-600 flex items-center justify-center text-slate-500 transition-all border border-slate-200/50 shadow-sm active:scale-95"
+              >
+                <X className="w-4 h-4 stroke-[2.5]" />
+              </button>
+            )}
+            <div className="flex-1 flex items-center justify-between">
+              <div className="flex items-center gap-2 font-bold text-slate-800">
+                <CheckCircle2 className="w-5 h-5 text-primary" />
+                <span className="text-lg tracking-tight">Tasks</span>
+              </div>
+              <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200/50">
                 {flatSubtasks.length}
               </span>
-              {onClose && (
-                <button
-                  onClick={onClose}
-                  className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors hidden sm:flex"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
             </div>
           </div>
           <div className="relative">
@@ -171,6 +197,16 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
             />
+          </div>
+
+          {/* Status Legend */}
+          <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-4 mb-1 px-1">
+             {Object.entries(statusConfig).map(([key, cfg]) => (
+                <div key={key} className="flex items-center gap-1.5">
+                   <div className={`w-1.5 h-1.5 rounded-full ${cfg.dotColor} shadow-sm`} />
+                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{cfg.label}</span>
+                </div>
+             ))}
           </div>
         </div>
 
