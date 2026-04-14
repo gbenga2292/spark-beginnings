@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useAppStore, DEFAULT_OFFBOARDING_TASKS } from '@/src/store/appStore';
+import { useAppStore, DEFAULT_OFFBOARDING_TASKS, DEFAULT_LEAVE_TYPES } from '@/src/store/appStore';
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
@@ -100,6 +100,12 @@ export function useDataLoader(isAuthenticated: boolean) {
           db.insertSite(officeSite).catch(err => console.warn('Auto-insert Office site ignored:', err));
         }
 
+        // Auto-seed default leave types if completely missing from DB
+        if (appData.leaveTypes.length === 0) {
+          console.log('Seeding default leave types...');
+          db.setLeaveTypes(DEFAULT_LEAVE_TYPES).catch(err => console.warn('Auto-seed leave types ignored:', err));
+        }
+
         // Get pendingSites from localStorage as a fallback
         const localPendingSites = useAppStore.getState().pendingSites;
 
@@ -136,7 +142,19 @@ export function useDataLoader(isAuthenticated: boolean) {
           publicHolidays: appData.publicHolidays,
           departmentTasksList: processedDeptTasks,
           leaves: appData.leaves,
-          leaveTypes: appData.leaveTypes.length > 0 ? appData.leaveTypes : useAppStore.getState().leaveTypes,
+          leaveTypes: (() => {
+            const raw = appData.leaveTypes.length > 0 ? appData.leaveTypes : useAppStore.getState().leaveTypes;
+            // Purge anything that is NOT a clean name or is a stringified JSON object
+            const sanitized = (raw || []).filter(lt => {
+              if (!lt.name) return false;
+              const name = String(lt.name).trim();
+              if (name === '' || name.startsWith('{') || name.startsWith('[')) return false;
+              return true;
+            });
+            // If we have suspicious data OR it's a first-time load, we must ensure defaults exist
+            if (sanitized.length === 0) return [...DEFAULT_LEAVE_TYPES];
+            return sanitized;
+          })(),
           disciplinaryRecords: appData.disciplinaryRecords,
           evaluations: appData.evaluations,
           companyExpenses: appData.companyExpenses,

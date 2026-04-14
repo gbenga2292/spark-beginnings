@@ -5,7 +5,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Plus, Trash2, Save, Download, Upload, BookOpen, Settings2, Briefcase, X, ChevronRight, Edit2 } from 'lucide-react';
-import { useAppStore, Employee, AttendanceRecord, Site, Invoice, PendingInvoice, LeaveRecord, LedgerEntry, CompanyExpense, CommLog } from '@/src/store/appStore';
+import { useAppStore, Employee, AttendanceRecord, Site, Invoice, PendingInvoice, LeaveRecord, LedgerEntry, CompanyExpense, CommLog, DEFAULT_LEAVE_TYPES } from '@/src/store/appStore';
 import { NairaSign } from '@/src/components/ui/naira-sign';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -1680,6 +1680,17 @@ export function Variables() {
                   <Input placeholder="e.g. Compassionate Leave" value={newLeaveType} onChange={(e) => setNewLeaveType(e.target.value)} className="flex-1" />
                   <Button onClick={() => { if (newLeaveType && !leaveTypes.some(lt => lt.name === newLeaveType)) { addLeaveType(newLeaveType); setNewLeaveType(''); } }} variant="outline" className="gap-2">
                     <Plus className="h-4 w-4" /> Add
+                  </Button>
+                  <Button 
+                    onClick={async () => {
+                      const ok = await showConfirm('Reset all leave types to system defaults? This will delete custom types you have added.', { title: 'Reset Defaults' });
+                      if (ok) setLeaveTypes([...DEFAULT_LEAVE_TYPES]);
+                    }} 
+                    variant="ghost" 
+                    size="sm"
+                    className="ml-auto text-slate-400 hover:text-slate-600 text-xs"
+                  >
+                    Reset Defaults
                   </Button>
                 </div>
               )}

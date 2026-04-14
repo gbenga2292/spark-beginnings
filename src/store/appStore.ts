@@ -137,6 +137,17 @@ export const DEFAULT_OFFBOARDING_TASKS = [
   { title: '6. Final HR Sign-Off - Legal compliance confirmed', assignee: 'HR' }
 ];
 
+export const DEFAULT_LEAVE_TYPES: LeaveType[] = [
+  { id: 'lt-1', name: 'Annual', defaultDays: 20 },
+  { id: 'lt-2', name: 'Sick', defaultDays: 14 },
+  { id: 'lt-3', name: 'Maternity', defaultDays: 90 },
+  { id: 'lt-4', name: 'Paternity', defaultDays: 14 },
+  { id: 'lt-5', name: 'Casual', defaultDays: 5 },
+  { id: 'lt-6', name: 'Compassionate', defaultDays: 5 },
+  { id: 'lt-7', name: 'Study Leave', defaultDays: 14 },
+  { id: 'lt-8', name: 'Bereavement', defaultDays: 7 },
+];
+
 export interface ServiceTemplate {
   serviceName: string;
   subtasks: { title: string; assignee: string; description?: string }[];
@@ -746,7 +757,7 @@ export const useAppStore = create<AppState>()(
       vatPayments: [],
       publicHolidays: [],
       departmentTasksList: [],
-      leaveTypes: [],
+      leaveTypes: [...DEFAULT_LEAVE_TYPES],
       disciplinaryRecords: [],
       evaluations: [],
       ledgerCategories: [],
