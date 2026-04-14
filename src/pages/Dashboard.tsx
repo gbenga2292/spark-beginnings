@@ -454,9 +454,6 @@ export function Dashboard() {
         if (kpiStats.pendingAdvances > 0) {
             ALERTS.push({ type: 'warning', msg: `${kpiStats.pendingAdvances} salary advance request(s) pending.` });
         }
-        if (kpiStats.unpaidInvoices > 0) {
-            ALERTS.push({ type: 'info', msg: `${kpiStats.unpaidInvoices} invoice(s) remain unpaid.` });
-        }
 
         const futureHolidays = holidays.map(h => ({ ...h, d: new Date(h.date) })).filter(h => h.d >= currentDate).sort((a, b) => a.d.getTime() - b.d.getTime());
         if (futureHolidays.length > 0) {

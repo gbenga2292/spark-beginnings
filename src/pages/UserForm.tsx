@@ -24,20 +24,13 @@ interface PG { name: string; icon: any; color: string; pages: PP[]; }
 
 const PRIV_GROUPS: PG[] = [
   {
-    name: 'Dashboard', icon: LayoutDashboard, color: 'indigo',
-    pages: [
-      { key: 'dashboard', label: 'Main Dashboard', parentKey: 'dashboard', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'Can View' }] },
-    ],
-  },
-  {
     name: 'Tasks', icon: ListTodo, color: 'blue',
     pages: [
       { key: 'tasks', label: 'Task Management', parentKey: 'tasks', masterField: 'canView',
         fields: [
+          { key: 'canViewDashboard', label: 'Main Task Dashboard' },
           { key: 'canView', label: 'Master View Tasks' },
-          { key: 'canViewMyTasks', label: 'My Tasks Board' },
-          { key: 'canViewDashboard', label: 'Task Dashboard' },
+          { key: 'canViewMyTasks', label: 'Task Register' },
           { key: 'canViewReminders', label: 'Reminders' },
           { key: 'canViewReports', label: 'Task Reports' },
           { key: 'canCreateTasks', label: 'Create Tasks' },
@@ -55,6 +48,8 @@ const PRIV_GROUPS: PG[] = [
   {
     name: 'HR', icon: UsersIcon, color: 'teal',
     pages: [
+      { key: 'dashboard', label: 'HR Dashboard', parentKey: 'dashboard', masterField: 'canView',
+        fields: [{ key: 'canView', label: 'View HR Dashboard' }] },
       { key: 'employees', label: 'Employees', parentKey: 'employees', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewSalary', label: 'View Salary', special: true }, { key: 'canViewAnalytics', label: 'Analytics' }, { key: 'canViewOrganogram', label: 'Organogram' }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
       { key: 'onboarding', label: 'Onboarding', parentKey: 'onboarding', masterField: 'canView',
@@ -223,7 +218,7 @@ export function UserForm() {
     });
     return base;
   });
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Dashboard', 'HR']));
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Tasks', 'HR']));
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [presetName, setPresetName] = useState('');
   const [showPresetSave, setShowPresetSave] = useState(false);

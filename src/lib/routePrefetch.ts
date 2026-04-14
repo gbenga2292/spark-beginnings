@@ -3,7 +3,8 @@
  * When user hovers a sidebar link, we eagerly load the chunk.
  */
 const routeImportMap: Record<string, () => Promise<any>> = {
-  '/': () => import('@/src/pages/Dashboard'),
+  '/': () => import('@/src/pages/TaskDashboard'),
+  '/hr-dashboard': () => import('@/src/pages/Dashboard'),
   '/attendance': () => import('@/src/pages/Attendance'),
   '/employees': () => import('@/src/pages/Employees'),
   '/leaves': () => import('@/src/pages/Leaves'),
@@ -21,7 +22,6 @@ const routeImportMap: Record<string, () => Promise<any>> = {
   '/ledger': () => import('@/src/pages/Ledger'),
   '/company-expenses': () => import('@/src/pages/CompanyExpenses'),
   '/tasks': () => import('@/src/pages/Tasks'),
-  '/tasks/dashboard': () => import('@/src/pages/TaskDashboard'),
   '/tasks/reminders': () => import('@/src/pages/TaskReminders'),
   '/tasks/reports': () => import('@/src/pages/TaskReports'),
   '/comm-log': () => import('@/src/pages/CommLog'),

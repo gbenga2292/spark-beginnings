@@ -131,7 +131,8 @@ function AppContent() {
       <Route path="/login" element={<Login />} />
       <Route path="/setup" element={<SuperAdminSetup />} />
       <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
-        <Route index element={<Page label="Dashboard"><ProtectedRoute requiredModule="dashboard"><Dashboard /></ProtectedRoute></Page>} />
+        <Route index element={<Page label="Task Dashboard"><ProtectedRoute requiredModule="tasks"><TaskDashboard /></ProtectedRoute></Page>} />
+        <Route path="hr-dashboard" element={<Page label="HR Dashboard"><ProtectedRoute requiredModule="dashboard"><Dashboard /></ProtectedRoute></Page>} />
         <Route path="attendance" element={<Page label="Attendance"><ProtectedRoute requiredModule="attendance"><Attendance /></ProtectedRoute></Page>} />
         <Route path="employees" element={<Page label="Employees"><ProtectedRoute requiredModule="employees"><Employees /></ProtectedRoute></Page>} />
         <Route path="beneficiaries" element={<Page label="Beneficiaries"><ProtectedRoute requiredModule="beneficiaries"><Beneficiaries /></ProtectedRoute></Page>} />
@@ -166,8 +167,8 @@ function AppContent() {
         <Route path="clients" element={<Page label="Clients"><ProtectedRoute requiredModule="clients"><ClientDetails /></ProtectedRoute></Page>} />
 
         {/* Task Manager Module */}
-        <Route path="tasks" element={<Page label="Tasks"><ProtectedRoute requiredModule="tasks"><Tasks /></ProtectedRoute></Page>} />
-        <Route path="tasks/dashboard" element={<Page label="Task Dashboard"><ProtectedRoute requiredModule="tasks"><TaskDashboard /></ProtectedRoute></Page>} />
+        <Route path="tasks" element={<Page label="Task Register"><ProtectedRoute requiredModule="tasks"><Tasks /></ProtectedRoute></Page>} />
+        <Route path="tasks/dashboard" element={<Navigate to="/" replace />} />
         <Route path="tasks/reminders" element={<Page label="Task Reminders"><ProtectedRoute requiredModule="tasks"><TaskReminders /></ProtectedRoute></Page>} />
         <Route path="tasks/reports" element={<Page label="Task Reports"><ProtectedRoute requiredModule="tasks"><TaskReports /></ProtectedRoute></Page>} />
 

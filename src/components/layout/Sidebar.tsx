@@ -80,7 +80,7 @@ const navigation: NavCategory[] = [
     standalone: true,
     standaloneHref: '/',
     items: [
-      { name: 'Dashboard', href: '/', icon: LayoutDashboard, privKey: 'dashboard', privField: 'canView' },
+      { name: 'Dashboard', href: '/', icon: LayoutDashboard, privKey: 'tasks', privField: 'canViewDashboard' },
     ],
   },
   // ── Tasks ────────────────────────────────────────────────────────
@@ -88,8 +88,7 @@ const navigation: NavCategory[] = [
     name: 'Tasks',
     icon: ListTodo,
     items: [
-      { name: 'Task Dashboard', href: '/tasks/dashboard', icon: BarChart2, privKey: 'tasks', privField: 'canViewDashboard' },
-      { name: 'Task', href: '/tasks', icon: ClipboardCheck, privKey: 'tasks', privField: 'canViewMyTasks' },
+      { name: 'Task Register', href: '/tasks', icon: ClipboardCheck, privKey: 'tasks', privField: 'canViewMyTasks' },
       { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'commLog', privField: 'canView' },
       { name: 'Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'tasks', privField: 'canViewReminders' },
       { name: 'Reports', href: '/tasks/reports', icon: BarChart3, privKey: 'tasks', privField: 'canViewReports' },
@@ -100,6 +99,7 @@ const navigation: NavCategory[] = [
     name: 'HR',
     icon: Users,
     items: [
+      { name: 'HR Dashboard', href: '/hr-dashboard', icon: LayoutDashboard, privKey: 'dashboard', privField: 'canView' },
       { name: 'Daily Register', href: '/attendance', icon: CalendarClock, privKey: 'attendance', privField: 'canView' },
       { name: 'Employees', href: '/employees', icon: Users, privKey: 'employees', privField: 'canView' },
       { name: 'Onboarding', href: '/onboarding', icon: UserPlus, privKey: 'onboarding', privField: 'canView' },
