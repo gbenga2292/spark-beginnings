@@ -54,7 +54,7 @@ export function Attendance() {
   const [lastEntryDate, setLastEntryDate] = useState(format(new Date(Date.now() - 86400000), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('entry');
-  const [staffTypeFilter, setStaffTypeFilter] = useState<'OFFICE' | 'FIELD'>('FIELD');
+  const [staffTypeFilter, setStaffTypeFilter] = useState<'OFFICE' | 'FIELD' | 'NON-EMPLOYEE'>('FIELD');
   const [importFile, setImportFile] = useState<File | null>(null);
 
   type SortConfig = { key: keyof AttendanceRecord; direction: 'asc' | 'desc' };
@@ -265,7 +265,9 @@ export function Attendance() {
     return employees.filter(emp => {
       const matchesSearch = emp.surname.toLowerCase().includes(searchLow) ||
         emp.firstname.toLowerCase().includes(searchLow);
-      const matchesType = emp.staffType === staffTypeFilter;
+      const matchesType = staffTypeFilter === 'NON-EMPLOYEE' 
+        ? emp.staffType === 'NON-EMPLOYEE' 
+        : emp.staffType === staffTypeFilter;
       const isNotCEO = emp.position !== 'CEO';
       return matchesSearch && matchesType && isNotCEO;
     }).sort((a, b) => {
@@ -1093,6 +1095,7 @@ export function Attendance() {
               >
                 <option value="OFFICE">OFFICE STAFF</option>
                 <option value="FIELD">FIELD STAFF</option>
+                <option value="NON-EMPLOYEE">NON-EMPLOYEE</option>
               </select>
               <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
               <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300 pointer-events-none" />
