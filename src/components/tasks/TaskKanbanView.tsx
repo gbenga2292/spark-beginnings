@@ -49,14 +49,49 @@ function ReminderKanbanCard({ reminder }: { reminder: any }) {
 }
 
 export function SubtaskKanbanView({ subtasks, mainTasks, users, onClickSubtask, hidePendingApproval, reminders }: SubtaskKanbanProps) {
-  const cols = hidePendingApproval ? COLUMNS.filter(c => c.status !== "pending_approval") : COLUMNS;
-  const gridClasses = cols.length === 4 
-    ? (reminders ? "grid-cols-2 lg:grid-cols-5" : "grid-cols-2 lg:grid-cols-4")
-    : (reminders ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-2 lg:grid-cols-3");
+  const allColumns = [
+    { type: 'col', status: 'not_started' },
+    { type: 'col', status: 'in_progress' },
+    { type: 'reminders', status: 'reminders' },
+    { type: 'col', status: 'completed' },
+    { type: 'col', status: 'pending_approval' }
+  ];
+
+  const colsToRender = allColumns.filter(c => {
+    if (c.type === 'reminders') return !!reminders;
+    if (c.status === 'pending_approval' && hidePendingApproval) return false;
+    return true;
+  });
+
+  const numCols = Math.min(5, colsToRender.length);
+  const gridClasses = `grid gap-3 grid-cols-2 lg:grid-cols-${numCols}`;
 
   return (
-    <div className={`grid gap-3 ${gridClasses}`}>
-      {cols.map(col => {
+    <div className={gridClasses}>
+      {colsToRender.map((cConfig) => {
+        if (cConfig.type === 'reminders') {
+          return (
+            <div key="reminders" className="rounded-xl bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100/50 dark:border-indigo-900/30 p-3 min-h-[200px]">
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <Bell className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">Reminders</span>
+                <span className="text-[10px] font-bold bg-card border border-border text-muted-foreground px-1.5 py-0.5 rounded-full ml-auto">
+                  {reminders?.length || 0}
+                </span>
+              </div>
+              <div className="space-y-2">
+                <AnimatePresence mode="popLayout">
+                  {reminders?.map(r => <ReminderKanbanCard key={r.id} reminder={r} />)}
+                </AnimatePresence>
+                {(!reminders || reminders.length === 0) && (
+                  <p className="text-[11px] text-muted-foreground/50 text-center py-8 italic">No active reminders</p>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        const col = COLUMNS.find(x => x.status === cConfig.status)!;
         const items = subtasks.filter(s => s.status === col.status);
         return (
           <div key={col.status} className={`rounded-xl ${col.bg} border border-border/50 p-3 min-h-[200px]`}>
@@ -94,26 +129,6 @@ export function SubtaskKanbanView({ subtasks, mainTasks, users, onClickSubtask, 
           </div>
         );
       })}
-
-      {reminders && (
-        <div key="reminders" className="rounded-xl bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100/50 dark:border-indigo-900/30 p-3 min-h-[200px]">
-          <div className="flex items-center gap-2 mb-3 px-1">
-            <Bell className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-            <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">Reminders</span>
-            <span className="text-[10px] font-bold bg-card border border-border text-muted-foreground px-1.5 py-0.5 rounded-full ml-auto">
-              {reminders.length}
-            </span>
-          </div>
-          <div className="space-y-2">
-            <AnimatePresence mode="popLayout">
-              {reminders.map(r => <ReminderKanbanCard key={r.id} reminder={r} />)}
-            </AnimatePresence>
-            {reminders.length === 0 && (
-              <p className="text-[11px] text-muted-foreground/50 text-center py-8 italic">No active reminders</p>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -128,10 +143,49 @@ interface MainTaskKanbanProps {
 }
 
 export function MainTaskKanbanView({ mainTasks, allSubtasks, users, onClickTask, reminders }: MainTaskKanbanProps) {
+  const allColumns = [
+    { type: 'col', status: 'not_started' },
+    { type: 'col', status: 'in_progress' },
+    { type: 'reminders', status: 'reminders' },
+    { type: 'col', status: 'completed' }
+  ];
+
+  const colsToRender = allColumns.filter(c => {
+    if (c.type === 'reminders') return !!reminders;
+    return true;
+  });
+
+  const numCols = Math.min(4, colsToRender.length);
+  const gridClasses = `grid gap-3 grid-cols-2 lg:grid-cols-${numCols}`;
+
   return (
-    <div className={`grid gap-3 ${reminders ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-2 lg:grid-cols-3"}`}>
-      {MAIN_COLUMNS.map(col => {
+    <div className={gridClasses}>
+      {colsToRender.map((cConfig) => {
+        if (cConfig.type === 'reminders') {
+          return (
+            <div key="reminders" className="rounded-xl bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100/50 dark:border-indigo-900/30 p-3 min-h-[200px]">
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <Bell className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">Reminders</span>
+                <span className="text-[10px] font-bold bg-card border border-border text-muted-foreground px-1.5 py-0.5 rounded-full ml-auto">
+                  {reminders?.length || 0}
+                </span>
+              </div>
+              <div className="space-y-2">
+                <AnimatePresence mode="popLayout">
+                  {reminders?.map(r => <ReminderKanbanCard key={r.id} reminder={r} />)}
+                </AnimatePresence>
+                {(!reminders || reminders.length === 0) && (
+                  <p className="text-[11px] text-muted-foreground/50 text-center py-8 italic">No active reminders</p>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        const col = MAIN_COLUMNS.find(x => x.status === cConfig.status)!;
         const items = mainTasks.filter(mt => deriveMainTaskStatus(mt.id, allSubtasks) === col.status);
+        
         return (
           <div key={col.status} className={`rounded-xl ${col.bg} border border-border/50 p-3 min-h-[200px]`}>
             <div className="flex items-center gap-2 mb-3 px-1">
@@ -164,26 +218,6 @@ export function MainTaskKanbanView({ mainTasks, allSubtasks, users, onClickTask,
           </div>
         );
       })}
-
-      {reminders && (
-        <div key="reminders" className="rounded-xl bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100/50 dark:border-indigo-900/30 p-3 min-h-[200px]">
-          <div className="flex items-center gap-2 mb-3 px-1">
-            <Bell className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-            <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">Reminders</span>
-            <span className="text-[10px] font-bold bg-card border border-border text-muted-foreground px-1.5 py-0.5 rounded-full ml-auto">
-              {reminders.length}
-            </span>
-          </div>
-          <div className="space-y-2">
-            <AnimatePresence mode="popLayout">
-              {reminders.map(r => <ReminderKanbanCard key={r.id} reminder={r} />)}
-            </AnimatePresence>
-            {reminders.length === 0 && (
-              <p className="text-[11px] text-muted-foreground/50 text-center py-8 italic">No active reminders</p>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

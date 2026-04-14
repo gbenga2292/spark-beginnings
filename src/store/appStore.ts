@@ -142,6 +142,12 @@ export interface ServiceTemplate {
   subtasks: { title: string; assignee: string; description?: string }[];
 }
 
+export interface LeaveType {
+  id: string;
+  name: string;
+  defaultDays: number;
+}
+
 export interface LeaveRecord {
   id: string;
   employeeId: string;
@@ -617,7 +623,8 @@ interface AppState {
   setDepartments: (departments: Department[]) => Promise<void>;
   setClients: (clients: string[]) => Promise<void>;
   setPublicHolidays: (holidays: { id: string; date: string; name: string }[]) => Promise<void>;
-  setLeaveTypes: (types: string[]) => Promise<void>;
+  setLeaveTypes: (types: LeaveType[]) => Promise<void>;
+  updateLeaveType: (name: string, defaultDays: number) => Promise<void>;
   setLedgerCategories: (cats: LedgerCategory[]) => Promise<void>;
   setLedgerVendors: (vendors: LedgerVendor[]) => Promise<void>;
   setLedgerBanks: (banks: LedgerBank[]) => Promise<void>;
@@ -700,9 +707,9 @@ interface AppState {
   addLeave: (leave: LeaveRecord) => void;
   updateLeave: (id: string, leave: Partial<LeaveRecord>) => void;
   deleteLeave: (id: string) => void;
-  leaveTypes: string[];
-  addLeaveType: (type: string) => void;
-  removeLeaveType: (type: string) => void;
+  leaveTypes: LeaveType[];
+  addLeaveType: (name: string) => void;
+  removeLeaveType: (name: string) => void;
   isVariablesDirty: boolean;
   setVariablesDirty: (val: boolean) => void;
   isLedgerDirty: boolean;
@@ -1086,14 +1093,28 @@ export const useAppStore = create<AppState>()(
       },
 
       // Leave Types
-      addLeaveType: (type) => { set((s) => ({ leaveTypes: s.leaveTypes.includes(type) ? s.leaveTypes : [...s.leaveTypes, type] })); db.insertLeaveType(type); },
-      removeLeaveType: (type) => { set((s) => ({ leaveTypes: s.leaveTypes.filter(t => t !== type) })); db.deleteLeaveType(type); },
+      addLeaveType: (name) => {
+        const newType = { id: crypto.randomUUID(), name, defaultDays: 0 };
+        set((s) => ({ leaveTypes: [...s.leaveTypes, newType] }));
+        db.insertLeaveType(newType);
+      },
+      removeLeaveType: (name) => {
+        set((s) => ({ leaveTypes: s.leaveTypes.filter((t) => t.name !== name) }));
+        db.deleteLeaveType(name);
+      },
 
       setPositions: async (positions) => { set({ positions }); await db.setPositions(positions); },
       setDepartments: async (departments) => { set({ departments }); await db.setDepartments(departments); },
       setClients: async (clients) => { set({ clients }); await db.setClients(clients); },
       setPublicHolidays: async (publicHolidays) => { set({ publicHolidays }); await db.setPublicHolidays(publicHolidays); },
-      setLeaveTypes: async (leaveTypes) => { set({ leaveTypes }); await db.setLeaveTypes(leaveTypes); },
+      setLeaveTypes: async (types) => { set({ leaveTypes: types }); await db.setLeaveTypes(types); },
+      updateLeaveType: async (name, defaultDays) => {
+        set((s) => ({
+          leaveTypes: s.leaveTypes.map((t) => (t.name === name ? { ...t, defaultDays } : t)),
+        }));
+        const allTypes = get().leaveTypes;
+        await db.setLeaveTypes(allTypes);
+      },
       setLedgerCategories: async (ledgerCategories) => { set({ ledgerCategories }); await db.setLedgerCategories(ledgerCategories); },
       setLedgerVendors: async (ledgerVendors) => { set({ ledgerVendors }); await db.setLedgerVendors(ledgerVendors); },
       setLedgerBanks: async (ledgerBanks) => { set({ ledgerBanks }); await db.setLedgerBanks(ledgerBanks); },

@@ -80,11 +80,7 @@ export const exportFullAppToExcel = async (appStateData: any, appVersion: string
     appendArraySheet('clients', 'Clients');
   }
   
-  if (Array.isArray(appStateData.leaveTypes) && typeof appStateData.leaveTypes[0] === 'string') {
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(appStateData.leaveTypes.map((c: string) => ({ LeaveType: c }))), 'LeaveTypes');
-  } else {
-    appendArraySheet('leaveTypes', 'LeaveTypes');
-  }
+  appendArraySheet('leaveTypes', 'LeaveTypes');
 
   appendArraySheet('publicHolidays', 'PublicHolidays');
   appendObjectSheet('payrollVariables', 'PayrollVariables');
@@ -210,7 +206,17 @@ export const restoreFullAppFromExcel = (file: File): Promise<any> => {
         }
         if (wb.SheetNames.includes('LeaveTypes')) {
             const cData = XLSX.utils.sheet_to_json(wb.Sheets['LeaveTypes']) as any[];
-            restoredData.leaveTypes = cData.map(c => c.LeaveType || Object.values(c)[0] ).filter(Boolean);
+            // Detect if it's the old string-based format or the new object format
+            if (cData.length > 0 && !cData[0].name && !cData[0].id) {
+              // Old format: [{ LeaveType: 'Sick' }] or similar
+              restoredData.leaveTypes = cData.map(c => ({
+                id: crypto.randomUUID(),
+                name: c.LeaveType || Object.values(c)[0],
+                defaultDays: 0
+              })).filter(l => l.name);
+            } else {
+              restoredData.leaveTypes = cData;
+            }
         }
 
         getObject('payrollVariables', 'PayrollVariables');

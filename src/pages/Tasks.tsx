@@ -529,7 +529,7 @@ function AdminTasksView() {
   const [assignDialog, setAssignDialog] = useState<{ subtaskId: string; current: string | null } | null>(null);
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
   
-  const [scope, setScopeState] = useState<'all' | 'mine' | 'pending_review' | 'projects'>(() => (localStorage.getItem('tf_default_scope') as any) || 'all');
+  const [scope, setScopeState] = useState<'all' | 'mine' | 'pending_review' | 'projects'>(() => (localStorage.getItem('tf_default_scope') as any) || 'mine');
   const [viewMode, setViewModeState] = useState<TaskViewMode>(() => (localStorage.getItem('tf_default_view') as TaskViewMode) || loadDefaultView());
 
   const setScope = (s: any) => {
@@ -611,11 +611,20 @@ function AdminTasksView() {
   const teamSubtaskIds = new Set(teamTasks.map(mt => mt.id));
   const teamSubtasks = subtasks.filter(s => teamSubtaskIds.has(s.mainTaskId));
   const mySubs = teamSubtasks.filter(s => {
-    if (!s.assignedTo || !currentUser?.id) return false;
-    const assignees = typeof s.assignedTo === 'string' 
-      ? s.assignedTo.split(',').map((id: string) => id.trim()) 
-      : Array.isArray(s.assignedTo) ? s.assignedTo : [];
-    return assignees.includes(currentUser.id);
+    if (!currentUser?.id) return false;
+    
+    const mt = teamTasks.find(m => m.id === s.mainTaskId);
+    const isCreator = s.createdBy === currentUser.id || mt?.createdBy === currentUser.id;
+    
+    let isAssigned = false;
+    if (s.assignedTo) {
+      const assignees = typeof s.assignedTo === 'string' 
+        ? s.assignedTo.split(',').map((id: string) => id.trim()) 
+        : Array.isArray(s.assignedTo) ? s.assignedTo : [];
+      isAssigned = assignees.includes(currentUser.id);
+    }
+
+    return isCreator || isAssigned;
   });
   const pendingApprovalSubs = teamSubtasks.filter(s => s.status === 'pending_approval');
 

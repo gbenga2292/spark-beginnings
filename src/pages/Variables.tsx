@@ -120,6 +120,7 @@ export function Variables() {
   const leaveTypes = useAppStore((state) => state.leaveTypes);
   const addLeaveType = useAppStore((state) => state.addLeaveType);
   const removeLeaveType = useAppStore((state) => state.removeLeaveType);
+  const updateLeaveType = useAppStore((state) => state.updateLeaveType);
 
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('variables');
@@ -344,7 +345,7 @@ export function Variables() {
           // ... etc for payments, vat, commLogs if functions exist
         }
       } else if (type === 'leaveType') {
-        state.setLeaveTypes(useAppStore.getState().leaveTypes.map(lt => lt === oldValue ? newValue : lt));
+        state.setLeaveTypes(useAppStore.getState().leaveTypes.map(lt => lt.name === oldValue ? { ...lt, name: newValue } : lt));
         if (propagate) {
            (state.leaves || []).filter(l => l.leaveType === oldValue).forEach(l => state.updateLeave?.(l.id, { leaveType: newValue }));
         }
@@ -513,8 +514,8 @@ export function Variables() {
       XLSX.utils.book_append_sheet(wb, clientSheet, 'Clients');
 
       // Leave Types
-      const leaveData = leaveTypes.map(l => ({ LeaveType: l }));
-      const leaveSheet = leaveData.length > 0 ? XLSX.utils.json_to_sheet(leaveData, { header: ['LeaveType'] }) : XLSX.utils.aoa_to_sheet([['LeaveType']]);
+      const leaveData = leaveTypes.map(l => ({ LeaveType: l.name, DefaultDays: l.defaultDays ?? 0 }));
+      const leaveSheet = leaveData.length > 0 ? XLSX.utils.json_to_sheet(leaveData, { header: ['LeaveType', 'DefaultDays'] }) : XLSX.utils.aoa_to_sheet([['LeaveType', 'DefaultDays']]);
       XLSX.utils.book_append_sheet(wb, leaveSheet, 'Leave_Types');
 
       // Public Holidays
@@ -666,7 +667,7 @@ export function Variables() {
           const newDepts: any[] = isOverwrite ? [] : [...departments];
           const newPositions: any[] = isOverwrite ? [] : [...positions];
           const newClients: string[] = isOverwrite ? [] : [...clients];
-          const newLeaveTypes: string[] = isOverwrite ? [] : [...leaveTypes];
+          const newLeaveTypes: { id: string; name: string; defaultDays: number }[] = isOverwrite ? [] : leaveTypes.map(l => ({ ...l }));
           const newHolidays: any[] = isOverwrite ? [] : [...publicHolidays];
           const newLCats: any[] = isOverwrite ? [] : [...ledgerCategories];
           const newLVendors: any[] = isOverwrite ? [] : [...ledgerVendors];
@@ -721,9 +722,10 @@ export function Variables() {
           if (wb.SheetNames.includes('Leave_Types')) {
             const data = XLSX.utils.sheet_to_json<any>(wb.Sheets['Leave_Types']);
             data.forEach(row => {
-              const lt = String(row.LeaveType || row.Leave_Type || '').trim();
-              if (lt && (isOverwrite || !newLeaveTypes.includes(lt))) {
-                newLeaveTypes.push(lt);
+              const name = String(row.LeaveType || row.Leave_Type || '').trim();
+              const defaultDays = Number(row.DefaultDays || row.default_days || 0);
+              if (name && (isOverwrite || !newLeaveTypes.some(lt => lt.name.toLowerCase() === name.toLowerCase()))) {
+                newLeaveTypes.push({ id: generateId(), name, defaultDays });
               }
             });
             await setLeaveTypes(newLeaveTypes);
@@ -1676,27 +1678,53 @@ export function Variables() {
               {priv.canEdit && (
                 <div className="flex gap-2 mb-4">
                   <Input placeholder="e.g. Compassionate Leave" value={newLeaveType} onChange={(e) => setNewLeaveType(e.target.value)} className="flex-1" />
-                  <Button onClick={() => { if (newLeaveType && !leaveTypes.includes(newLeaveType)) { addLeaveType(newLeaveType); setNewLeaveType(''); } }} variant="outline" className="gap-2">
+                  <Button onClick={() => { if (newLeaveType && !leaveTypes.some(lt => lt.name === newLeaveType)) { addLeaveType(newLeaveType); setNewLeaveType(''); } }} variant="outline" className="gap-2">
                     <Plus className="h-4 w-4" /> Add
                   </Button>
                 </div>
               )}
-              <div className="flex flex-wrap gap-2">
-                {leaveTypes.map(lt => (
-                  <div key={lt} className="bg-teal-50 border border-teal-200 rounded-full px-3 py-1 text-sm flex items-center gap-2 text-teal-800">
-                    {lt}
-                    {priv.canEdit && (
-                      <div className="flex items-center gap-1.5 ml-1 pl-1.5 border-l border-teal-200">
-                        <button onClick={() => handleOpenRename('leaveType', lt)} className="text-teal-400 hover:text-indigo-600">
-                          <Edit2 className="h-3 w-3" />
-                        </button>
-                        <button onClick={() => removeLeaveType(lt)} className="text-teal-400 hover:text-rose-500">
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
+              <div className="border border-slate-200 rounded-md overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-slate-50">
+                    <TableRow>
+                      <TableHead>Leave Type</TableHead>
+                      <TableHead className="w-24">Default Days</TableHead>
+                      <TableHead className="w-16 text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {leaveTypes.map(lt => (
+                      <TableRow key={lt.name}>
+                        <TableCell className="font-medium text-slate-700">{lt.name}</TableCell>
+                        <TableCell>
+                          <Input 
+                            type="number" 
+                            value={lt.defaultDays || 0} 
+                            onChange={(e) => updateLeaveType(lt.name, parseInt(e.target.value) || 0)}
+                            className="h-8 w-20 text-center"
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {priv.canEdit && (
+                              <Button variant="ghost" size="icon" onClick={() => handleOpenRename('leaveType', lt.name)} className="h-8 w-8 text-slate-400 hover:text-indigo-600">
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {priv.canEdit && (
+                              <Button variant="ghost" size="icon" onClick={() => removeLeaveType(lt.name)} className="h-8 w-8 text-rose-500 hover:bg-rose-50">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {leaveTypes.length === 0 && (
+                      <TableRow><TableCell colSpan={3} className="text-slate-400 text-center text-sm py-6 italic">No leave types yet.</TableCell></TableRow>
                     )}
-                  </div>
-                ))}
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>

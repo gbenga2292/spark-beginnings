@@ -28,7 +28,7 @@ interface AppDataContextType {
     updateSubtask: (id: string, p: any) => Promise<void>;
     deleteSubtask: (id: string) => Promise<void>;
     assignSubtask: (id: string, userId: string) => Promise<void>;
-    updateSubtaskStatus: (id: string, status: string, userId?: string) => Promise<void>;
+    updateSubtaskStatus: (id: string, status: string, userId?: string, bypassApproval?: boolean) => Promise<void>;
     approveSubtask: (id: string, userId?: string, note?: string) => Promise<void>;
     rejectSubtask: (id: string, userId?: string, note?: string) => Promise<void>;
     postComment: (subId: string, mainId: string, authorId: string, text: string, attachments?: CommentAttachment[], fileLinks?: string[]) => Promise<void>;
@@ -280,6 +280,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             deadline: task.deadline || null,
             priority: task.priority || null,
             is_project: task.is_project || false,
+            requires_approval: task.requiresApproval || false,
         };
         const { data, error } = await supabase.from('main_tasks').insert(payload).select().single();
         if (error) {
@@ -301,6 +302,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     status: 'not_started',
                     deadline: payload.deadline,
                     priority: payload.priority,
+                    requiresApproval: task.requiresApproval || false,
                 }];
             }
 
@@ -312,6 +314,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     status: s.status || 'not_started',
                     deadline: s.deadline || null,
                     priority: s.priority || null,
+                    requires_approval: s.requiresApproval || false,
                     mainTaskId: data.id,
                 }));
                 const { data: insertedSubs, error: subErr } = await supabase.from('subtasks').insert(subTasksPayload).select();
@@ -376,6 +379,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             status: sub.status || 'not_started',
             deadline: sub.deadline || null,
             priority: sub.priority || null,
+            requires_approval: sub.requiresApproval || false,
             mainTaskId: sub.mainTaskId,
         };
         const { data, error } = await supabase.from('subtasks').insert(payload).select().single();
@@ -423,10 +427,22 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    const updateSubtaskStatus = useCallback(async (id: string, status: string, _userId?: string) => {
+    const updateSubtaskStatus = useCallback(async (id: string, status: string, _userId?: string, bypassApproval?: boolean) => {
         const now = new Date().toISOString();
-        const updatePayload: any = { status };
-        if (status === 'completed') updatePayload.completed_at = now;
+        const existing = subtasks.find(s => s.id === id);
+        
+        let finalStatus = status;
+        const updatePayload: any = {};
+        
+        // Intercept 'completed' -> 'pending_approval' ONLY if requiresApproval is set AND not bypassed by an approver
+        if (status === 'completed' && !bypassApproval && (existing?.requiresApproval || (existing as any)?.requires_approval)) {
+            finalStatus = 'pending_approval';
+            updatePayload.pending_approval_since = now;
+        } else if (status === 'completed') {
+            updatePayload.completed_at = now;
+        }
+        
+        updatePayload.status = finalStatus;
 
         const { data, error } = await supabase.from('subtasks').update(updatePayload).eq('id', id).select().single();
         if (error) {
@@ -437,8 +453,24 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         if (data) {
             setSubtasks(prev => prev.map(s => s.id === id ? data : s));
 
-            // Notify the main task creator when a subtask is completed
-            if (status === 'completed') {
+            // Notify the main task creator
+            if (finalStatus === 'pending_approval') {
+                const mainTaskId = data.main_task_id || data.mainTaskId;
+                const mainTask = mainTasks.find(m => m.id === mainTaskId);
+                if (mainTask && mainTask.createdBy && mainTask.createdBy !== (user?.id ?? _userId)) {
+                    toast.info('Task submitted for review');
+                    const actorId = _userId || user?.id;
+                    if (actorId) {
+                        const { data: cData } = await supabase.from('task_updates').insert({
+                            subtask_id: id,
+                            main_task_id: mainTaskId,
+                            text: `⏳ **Review Requested**\nSubtask **"${data.title}"** needs your approval.`,
+                            author_id: actorId,
+                        }).select().single();
+                        if (cData) setComments(prev => prev.some(c => c.id === cData.id) ? prev : [...prev, cData]);
+                    }
+                }
+            } else if (finalStatus === 'completed') {
                 const mainTaskId = data.main_task_id || data.mainTaskId;
                 const mainTask = mainTasks.find(m => m.id === mainTaskId);
                 if (mainTask && mainTask.createdBy && mainTask.createdBy !== (user?.id ?? _userId)) {

@@ -78,6 +78,7 @@ export interface SubTask {
     createdAt?: string;
     updatedAt?: string;
     deadline?: string;
+    requiresApproval?: boolean;
     pendingApprovalSince?: string;
     approvedBy?: string;
     rejectedAt?: string;
@@ -94,6 +95,7 @@ export interface MainTask {
     priority?: TaskPriority;
     isDeleted?: boolean;
     is_project?: boolean;
+    requiresApproval?: boolean;
     createdAt: string;
     updatedAt: string;
     deadline?: string;

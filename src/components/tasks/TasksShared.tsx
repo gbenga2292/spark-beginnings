@@ -243,11 +243,11 @@ export function applySortToSubs<T extends { title: string; deadline?: string; st
 }
 
 export function loadDefaultSort(): SortOption {
-  try { return (localStorage.getItem('tf_default_sort') as SortOption) || 'urgency'; } catch { return 'urgency'; }
+  try { return (localStorage.getItem('tf_default_sort') as SortOption) || 'created_desc'; } catch { return 'created_desc'; }
 }
 
 export function loadDefaultView(): "list" | "compact" | "board" | "focus" | "gantt" {
-  try { return (localStorage.getItem('tf_default_view') as "list" | "compact" | "board" | "focus" | "gantt") || 'list'; } catch { return 'list'; }
+  try { return (localStorage.getItem('tf_default_view') as "list" | "compact" | "board" | "focus" | "gantt") || 'board'; } catch { return 'board'; }
 }
 
 export function ScopePicker({ scope, setScope, myCount, pendingCount }: { scope: 'all' | 'mine' | 'pending_review' | 'projects', setScope: (s: any) => void, myCount: number, pendingCount: number }) {

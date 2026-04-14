@@ -64,6 +64,17 @@ export function FinancialReports() {
   const loans = useAppStore(state => state.loans);
   const salaryAdvances = useAppStore(state => state.salaryAdvances);
   const ledgerEntries = useAppStore(state => state.ledgerEntries);
+  const clientProfiles = useAppStore(state => state.clientProfiles);
+  const pendingSites = useAppStore(state => state.pendingSites);
+
+  // Look up client TIN from clientProfiles first, then fall back to pendingSites phase4
+  const getTin = (clientName: string): string => {
+    const profile = clientProfiles.find(p => p.name === clientName);
+    if (profile?.tinNumber) return profile.tinNumber;
+    // Search pendingSites for a tin number entered during onboarding
+    const site = pendingSites.find(s => s.clientName === clientName && s.phase4?.clientTinNumber);
+    return site?.phase4?.clientTinNumber || '';
+  };
   const [accountsTab, setAccountsTab] = useState<'payroll' | 'loans'>('payroll');
   const [filterYear, setFilterYear] = useState<string>(String(new Date().getFullYear()));
   const [filterMonth, setFilterMonth] = useState<string>('All');
@@ -517,12 +528,12 @@ export function FinancialReports() {
   };
 
   const exportPaymentReport = async () => {
-    const headers = ["Client", "Site", "Date", "Amount", "Amount for VAT", "WHT", "VAT", "Discount"];
+    const headers = ["Client", "Client TIN", "Site", "Date", "Amount", "Amount for VAT", "WHT", "VAT", "Discount"];
     const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
     const data = payments.map(p => {
         const payVat = p.payVat || (sites.find(s => s.name === p.site && s.client === p.client)?.vat as any) || 'No';
         const { vat, amountForVat } = getVatDetails(p.amount || 0, payVat, vatRate);
-        return [ p.client, p.site, formatDisplayDate(p.date), p.amount, amountForVat, p.withholdingTax || 0, vat || 0, p.discount || 0];
+        return [ p.client, getTin(p.client), p.site, formatDisplayDate(p.date), p.amount, amountForVat, p.withholdingTax || 0, vat || 0, p.discount || 0];
     });
     const csvData = [headers.join(','), ...data.map(row => row.map(extractCSV).join(','))].join('\n');
     const fileName = "payment_report.csv";
@@ -558,17 +569,17 @@ export function FinancialReports() {
   };
 
   const exportPaymentPdf = () => {
-    const head = [["Client", "Site", "Date", "Amount (₦)", "Amount for VAT (₦)", "WHT (₦)", "VAT (₦)"]];
+    const head = [["Client", "Client TIN", "Site", "Date", "Amount (₦)", "WHT (₦)", "VAT (₦)"]];
     const body = payments.map(p => {
         const payVat = p.payVat || (sites.find(s => s.name === p.site && s.client === p.client)?.vat as any) || 'No';
-        const { vat, amountForVat } = getVatDetails(p.amount || 0, payVat, vatRate);
+        const { vat } = getVatDetails(p.amount || 0, payVat, vatRate);
         return [
-            p.client, 
-            p.site, 
-            formatDisplayDate(p.date), 
-            (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 
-            (amountForVat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 
-            (p.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 
+            p.client,
+            getTin(p.client),
+            p.site,
+            formatDisplayDate(p.date),
+            (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            (p.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
             (vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         ];
     });
@@ -585,9 +596,9 @@ export function FinancialReports() {
   };
 
   const exportVatReport = async () => {
-    const headers = ["Client", "Date", "Month", "Year", "Amount"];
+    const headers = ["Client", "Client TIN", "Date", "Month", "Year", "Amount"];
     const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
-    const data = vatPayments.map(v => [v.client, formatDisplayDate(v.date), v.month || '', v.year || '', v.amount]);
+    const data = vatPayments.map(v => [v.client, getTin(v.client), formatDisplayDate(v.date), v.month || '', v.year || '', v.amount]);
     const csvData = [headers.join(','), ...data.map(row => row.map(extractCSV).join(','))].join('\n');
     const fileName = "vat_report.csv";
 
@@ -646,6 +657,11 @@ export function FinancialReports() {
 
   const FINANCIAL_REPORT_GROUPS = [
     {
+      group: 'Identity & Master Data',
+      color: 'slate',
+      fields: ['Client Directory', 'Site Directory', 'Client TIN List'],
+    },
+    {
       group: 'Revenue & Billing',
       color: 'indigo',
       fields: ['Invoice Summary', 'Outstanding Balances', 'Client Balances', 'Site Revenue', 'Overdue Invoices'],
@@ -675,6 +691,55 @@ export function FinancialReports() {
     const wb = XLSX.utils.book_new();
     const previewRows: any[] = [];
     const previewHeaders = ['Module', 'Scope', 'Status'];
+
+    // ── Identity & Master Data ──
+    if (selectedFields.includes('Client Directory')) {
+      // Union all client name sources
+      const allClientNames = Array.from(new Set([
+        ...sites.map(s => s.client),
+        ...pendingSites.map(s => s.clientName),
+        ...rawInvoices.map(i => i.client),
+        ...rawPayments.map(p => p.client),
+        ...clientProfiles.map(p => p.name),
+      ])).filter(Boolean).sort();
+      const data = allClientNames.map(name => ({
+        Client: name,
+        TIN: getTin(name),
+        Status: sites.some(s => s.client === name) ? 'Active' : 'Pending/Historic',
+        StartDate: clientProfiles.find(p => p.name === name)?.startDate || sites.find(s => s.client === name)?.startDate || '',
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      XLSX.utils.book_append_sheet(wb, ws, 'Client Directory');
+      previewRows.push({ Module: 'Client Directory', Scope: `${data.length} client(s)`, Status: 'Included' });
+    }
+    if (selectedFields.includes('Site Directory')) {
+      // Active sites + pending onboarding sites
+      const activeSiteRows = sites.map(s => ({
+        Site: s.name, Client: s.client, Type: 'Active', VAT: s.vat, StartDate: s.startDate || '', EndDate: s.endDate || '',
+      }));
+      const pendingSiteRows = pendingSites
+        .filter(s => !sites.some(a => a.name === s.siteName && a.client === s.clientName))
+        .map(s => ({
+          Site: s.siteName, Client: s.clientName, Type: `Pending (${s.status})`, VAT: '', StartDate: s.phase1?.timelineStartDate || '', EndDate: '',
+        }));
+      const data = [...activeSiteRows, ...pendingSiteRows];
+      const ws = XLSX.utils.json_to_sheet(data);
+      XLSX.utils.book_append_sheet(wb, ws, 'Site Directory');
+      previewRows.push({ Module: 'Site Directory', Scope: `${data.length} site(s)`, Status: 'Included' });
+    }
+    if (selectedFields.includes('Client TIN List')) {
+      // All clients from every source
+      const allClientNames = Array.from(new Set([
+        ...sites.map(s => s.client),
+        ...pendingSites.map(s => s.clientName),
+        ...rawInvoices.map(i => i.client),
+        ...clientProfiles.map(p => p.name),
+      ])).filter(Boolean).sort();
+      const data = allClientNames.map(name => ({ Client: name, TIN: getTin(name) })).filter(r => r.TIN);
+      const ws = XLSX.utils.json_to_sheet(data.length > 0 ? data : [{ Client: 'No TIN records found', TIN: '' }]);
+      XLSX.utils.book_append_sheet(wb, ws, 'Client TIN List');
+      previewRows.push({ Module: 'Client TIN List', Scope: `${data.length} record(s) with TIN`, Status: 'Included' });
+    }
 
     if (selectedFields.includes('Invoice Summary')) {
       const data = invoices.map(i => ({ Client: i.client, Site: i.siteName, Date: formatDisplayDate(i.date), Amount: i.amount, Status: i.status, DueDate: formatDisplayDate(i.dueDate) || '', BillingCycle: i.billingCycle || '' }));

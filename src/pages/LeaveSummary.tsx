@@ -1,24 +1,32 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Badge } from '@/src/components/ui/badge';
 import { Input } from '@/src/components/ui/input';
-import { Search, ListFilter } from 'lucide-react';
+import { Search, ListFilter, ArrowLeft } from 'lucide-react';
+import { Button } from '@/src/components/ui/button';
 import { useAppStore } from '@/src/store/appStore';
 import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 export function LeaveSummary() {
+  const navigate = useNavigate();
   const allEmployees = useAppStore((state) => state.employees);
   const leaves = useAppStore((state) => state.leaves);
   const departments = useAppStore((state) => state.departments);
+  const leaveTypes = useAppStore((state) => state.leaveTypes);
 
   const employees = useMemo(() => {
-    const activeEmployees = allEmployees.filter(e => e.status === 'Active' || e.status === 'On Leave');
+    const activeEmployees = allEmployees.filter(e => 
+      (e.status === 'Active' || e.status === 'On Leave') &&
+      (e.staffType === 'OFFICE' || e.staffType === 'FIELD')
+    );
     return filterAndSortEmployeesExcludingCEO(activeEmployees);
   }, [allEmployees]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDept, setFilterDept] = useState('All');
+  const [filterLeaveType, setFilterLeaveType] = useState('All Leaves');
 
   const currentYear = new Date().getFullYear();
 
@@ -27,13 +35,20 @@ export function LeaveSummary() {
     return employees.map(emp => {
       const empLeaves = leaves.filter(l => l.employeeId === emp.id && l.status !== 'Cancelled');
       
-      const totalTaken = empLeaves.reduce((acc, l) => {
-        // Only count valid, non-cancelled leaves
+      const deductibleTaken = empLeaves.reduce((acc, l) => {
+        const typeStr = (l.leaveType || '').toLowerCase();
+        // Maternity and Paternity do not reduce annual leave
+        if (typeStr.includes('maternity') || typeStr.includes('paternity')) return acc;
         return acc + l.duration;
       }, 0);
+
+      // Leaves matching the selected specific leave filter
+      const specificLeaves = filterLeaveType === 'All Leaves' ? [] : empLeaves.filter(l => l.leaveType === filterLeaveType);
+      const timesTakenSpecific = specificLeaves.length;
+      const daysTakenSpecific = specificLeaves.reduce((acc, l) => acc + l.duration, 0);
       
       const entitlement = emp.yearlyLeave || 20;
-      const remaining = entitlement - totalTaken;
+      const remaining = entitlement - deductibleTaken;
 
       const isCurrentlyOnLeave = empLeaves.some(l => {
         if (!l.startDate || !l.expectedEndDate || l.status !== 'Active' || l.dateReturned) return false;
@@ -43,7 +58,7 @@ export function LeaveSummary() {
         return start <= todayMidnight && todayMidnight < resumptionDate;
       });
 
-      return { emp, totalTaken, remaining, entitlement, isCurrentlyOnLeave };
+      return { emp, deductibleTaken, remaining, entitlement, isCurrentlyOnLeave, timesTakenSpecific, daysTakenSpecific };
     });
   }, [employees, leaves, currentYear]);
 
@@ -51,13 +66,23 @@ export function LeaveSummary() {
     return leaveSummary.filter(item => {
       const matchesSearch = `${item.emp.surname} ${item.emp.firstname}`.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesDept = filterDept === 'All' || item.emp.department === filterDept;
+      // We don't filter rows by filterLeaveType, we only change the columns inside them
       return matchesSearch && matchesDept;
     });
-  }, [leaveSummary, searchQuery, filterDept]);
+  }, [leaveSummary, searchQuery, filterDept, filterLeaveType]);
 
   useSetPageTitle(
     'Leave Entitlement Summary',
-    `Overview of all employee leave balances for the year ${currentYear}`
+    `Overview of all employee leave balances for the year ${currentYear}`,
+    <Button 
+      variant="ghost" 
+      size="sm" 
+      onClick={() => navigate(-1)}
+      className="gap-2 text-slate-500 hover:text-slate-800"
+    >
+      <ArrowLeft className="w-4 h-4" />
+      Back
+    </Button>
   );
 
   return (
@@ -73,6 +98,18 @@ export function LeaveSummary() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <div className="flex bg-slate-200/50 p-1 rounded-lg">
+              <select
+                className="bg-transparent border-none text-sm font-semibold text-slate-600 px-2 py-1 outline-none cursor-pointer"
+                value={filterLeaveType}
+                onChange={e => setFilterLeaveType(e.target.value)}
+              >
+                <option value="All Leaves">All Leaves</option>
+                {leaveTypes.map((type) => (
+                  <option key={type.id} value={type.name}>{type.name}</option>
+                ))}
+              </select>
+            </div>
             <div className="flex bg-slate-200/50 p-1 rounded-lg">
               <select
                 className="bg-transparent border-none text-sm font-semibold text-slate-600 px-2 py-1 outline-none cursor-pointer"
@@ -103,9 +140,18 @@ export function LeaveSummary() {
               <tr className="bg-slate-100 text-slate-600 uppercase text-[11px] tracking-wider font-bold">
                 <th className="px-5 py-4">Employee</th>
                 <th className="px-5 py-4">Department</th>
-                <th className="px-5 py-4 text-center">Entitlement</th>
-                <th className="px-5 py-4 text-center">Days Taken</th>
-                <th className="px-5 py-4 text-center">Remaining</th>
+                {filterLeaveType === 'All Leaves' ? (
+                  <>
+                    <th className="px-5 py-4 text-center">Annual Leave</th>
+                    <th className="px-5 py-4 text-center">Days Taken</th>
+                    <th className="px-5 py-4 text-center">Remaining</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="px-5 py-4 text-center">Times Taken</th>
+                    <th className="px-5 py-4 text-center">Days Taken</th>
+                  </>
+                )}
                 <th className="px-5 py-4 text-center">Status</th>
               </tr>
             </thead>
@@ -117,17 +163,30 @@ export function LeaveSummary() {
                   </td>
                 </tr>
               ) : (
-                filteredSummary.map(({ emp, totalTaken, remaining, entitlement, isCurrentlyOnLeave }) => (
+                filteredSummary.map(({ emp, deductibleTaken, remaining, entitlement, isCurrentlyOnLeave, timesTakenSpecific, daysTakenSpecific }) => (
                   <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-5 py-3 font-bold text-slate-800 uppercase text-xs">{emp.surname} {emp.firstname}</td>
                     <td className="px-5 py-3 text-slate-500 text-xs">{emp.department}</td>
-                    <td className="px-5 py-3 text-center font-mono font-semibold">{entitlement}</td>
-                    <td className="px-5 py-3 text-center">
-                      <span className={`font-mono font-bold ${totalTaken > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{totalTaken}</span>
-                    </td>
-                    <td className="px-5 py-3 text-center">
-                      <span className={`font-mono font-bold ${remaining < 5 ? 'text-rose-600' : 'text-emerald-600'}`}>{remaining}</span>
-                    </td>
+                    {filterLeaveType === 'All Leaves' ? (
+                      <>
+                        <td className="px-5 py-3 text-center font-mono font-semibold">{entitlement}</td>
+                        <td className="px-5 py-3 text-center">
+                          <span className={`font-mono font-bold ${deductibleTaken > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{deductibleTaken}</span>
+                        </td>
+                        <td className="px-5 py-3 text-center">
+                          <span className={`font-mono font-bold ${remaining < 5 ? 'text-rose-600' : 'text-emerald-600'}`}>{remaining}</span>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-5 py-3 text-center">
+                          <span className="font-mono font-bold text-indigo-600">{timesTakenSpecific}</span>
+                        </td>
+                        <td className="px-5 py-3 text-center">
+                          <span className={`font-mono font-bold ${daysTakenSpecific > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{daysTakenSpecific}</span>
+                        </td>
+                      </>
+                    )}
                     <td className="px-5 py-3 text-center">
                       <Badge variant="outline" className={isCurrentlyOnLeave ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}>
                         {isCurrentlyOnLeave ? 'On Leave' : 'Active'}

@@ -189,9 +189,9 @@ export function TaskReminders() {
     const payload = {
       title: form.title.trim(), body: form.body.trim(),
       remindAt: new Date(form.remindAt).toISOString(),
-      endAt: form.endAt ? new Date(form.endAt).toISOString() : undefined,
+      endAt: form.endAt ? new Date(form.endAt).toISOString() : null,
       frequency: form.frequency, recipientIds: form.recipientIds,
-      sendEmail: form.sendEmail, mainTaskId: form.mainTaskId || undefined,
+      sendEmail: form.sendEmail, mainTaskId: form.mainTaskId || null,
     };
     if (editingId) updateReminder(editingId, { ...payload, isActive: true });
     else addReminder({ ...payload, isActive: true, createdBy: currentUser!.id });

@@ -714,7 +714,7 @@ export function Leaves() {
         const wfStep = liveLeave?.workflowStep ?? (formId ? 1 : 0);
         const wfRejected = wfStep === -1;
 
-        const leaveTypeOptions = ['Annual', 'Emergency', 'Maternity/Paternity', 'Study', 'Others'];
+        const leaveTypeOptions = leaveTypes.map(t => t.name);
         const isLeaveElapsed = expectedEndDate
           ? new Date(expectedEndDate).setHours(0, 0, 0, 0) <= Date.now()
           : false;
@@ -885,9 +885,17 @@ export function Leaves() {
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                       {leaveTypeOptions.map(opt => {
                         const matched = (leaveType || '').toLowerCase().includes(opt.toLowerCase());
+                        const handleSelect = () => {
+                          if (isLocked) return;
+                          setLeaveType(opt);
+                          const config = leaveTypes.find(t => t.name === opt);
+                          if (config && config.defaultDays > 0) {
+                            setDuration(config.defaultDays.toString());
+                          }
+                        };
                         return (
                           <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, cursor: isLocked ? 'default' : 'pointer' }}>
-                            <input type="radio" checked={matched} onChange={() => !isLocked && setLeaveType(opt)} style={{ display: 'none' }} />
+                            <input type="radio" checked={matched} onChange={handleSelect} style={{ display: 'none' }} />
                             <span style={{ width: 11, height: 11, border: '1px solid #333', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: matched ? '#111' : 'white', color: 'white', fontSize: 8 }}>{matched ? '\u2713' : ''}</span>
                             {opt}
                           </label>

@@ -6,7 +6,7 @@ import { Badge } from '@/src/components/ui/badge';
 import { useAppStore } from '@/src/store/appStore';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import { toast } from '@/src/components/ui/toast';
-import { Save, ArrowLeft, CheckCircle2, Building2, MapPin, Calendar, User, LayoutGrid } from 'lucide-react';
+import { Save, ArrowLeft, CheckCircle2, Building2, MapPin, Calendar, User, LayoutGrid, ChevronDown, ChevronUp } from 'lucide-react';
 import { CreateProjectDialog } from '@/src/components/tasks/CreateProjectDialog';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -100,7 +100,7 @@ const blankForm = (): SiteQuestionnaire => ({
     quotationSent: false, clientFeedbackReceived: false, proposalAccepted: false,
     clientTaxStatus: '', scopeOfWorkSummary: '', scopeExclusionsSummary: '',
     timelineConfirmed: false, permittingResponsibilityOutlined: false, tinProvided: false,
-    clientTinNumber: '', completed: false
+    clientTinNumber: '', mobilizationAdvancePercentage: '70', completed: false
   },
   phase5: {
     safetyPlanIntegrated: false, stage1AdvanceReceived: false, stage2InstallationComplete: false,
@@ -126,6 +126,7 @@ export function SiteOnboarding() {
 
   const pendingSites = useAppStore(s => s.pendingSites);
   const sites = useAppStore(s => s.sites);
+  const clientProfiles = useAppStore(s => s.clientProfiles);
   const clients = useMemo(() => Array.from(new Set(sites.map(s => s.client))).sort(), [sites]);
   const addPendingSite = useAppStore(s => s.addPendingSite);
   const updatePendingSite = useAppStore(s => s.updatePendingSite);
@@ -133,13 +134,42 @@ export function SiteOnboarding() {
   const updateSite = useAppStore(s => s.updateSite);
   const addClient = useAppStore(s => s.addClient);
   const getServiceTemplates = useAppStore(s => s.getServiceTemplates);
+  const invoices = useAppStore(s => s.invoices);
+  const payments = useAppStore(s => s.payments);
 
   const [form, setForm] = useState<SiteQuestionnaire>(blankForm());
   const [initialForm, setInitialForm] = useState<SiteQuestionnaire>(blankForm());
   const [activePhase, setActivePhase] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [isInfoCollapsed, setIsInfoCollapsed] = useState(true);
   const { createProject, users, projects } = useAppData();
   const { user } = useAuth();
+
+  const { clientBalanceStatus } = useMemo(() => {
+    if (!form.clientName) return { clientBalanceStatus: null };
+
+    const cInvoices = invoices.filter(i => i.client === form.clientName);
+    const cPayments = payments.filter(p => p.client === form.clientName);
+
+    // No invoices at all → no badge (nothing to judge)
+    if (cInvoices.length === 0) return { clientBalanceStatus: null };
+
+    const clientBilled = cInvoices.reduce((sum, i) => sum + (i.amount || 0), 0);
+    const clientCleared = cPayments.reduce((sum, p) => sum + (p.amount || 0) + (p.withholdingTax || 0) + (p.discount || 0), 0);
+    const clientBalance = clientBilled - clientCleared;
+
+    // "Fully Paid" only if real billed amount > 0 AND at least one payment exists AND balance is settled
+    if (clientBilled > 0 && cPayments.length > 0 && clientBalance <= 0.01) {
+      return { clientBalanceStatus: 'Fully Paid' };
+    }
+    // "Owing" if billed > 0 and still has outstanding balance
+    if (clientBilled > 0 && clientBalance > 0.01) {
+      return { clientBalanceStatus: 'Owing' };
+    }
+
+    return { clientBalanceStatus: null };
+  }, [invoices, payments, form.clientName]);
+
 
   const [wantsProject, setWantsProject] = useState(true);
   const [showProjectDialog, setShowProjectDialog] = useState(false);
@@ -165,10 +195,25 @@ export function SiteOnboarding() {
     if (!isNew && id) {
       const existing = pendingSites.find(s => s.id === id);
       if (existing) {
-        setForm(existing);
-        setInitialForm(existing);
-        if (existing.status === 'Pending') {
-          const next = [1, 2, 3, 4, 5].find(p => !(existing as any)[`phase${p}`].completed) as any ?? 5;
+        let loadedForm = existing;
+        
+        // Auto-populate TIN if it's currently empty but we have it on record
+        if (!loadedForm.phase4?.clientTinNumber && loadedForm.clientName) {
+          const profile = clientProfiles.find(p => p.name === loadedForm.clientName);
+          let assumedTin = profile?.tinNumber || '';
+          if (!assumedTin) {
+            const prevSite = pendingSites.find(s => s.clientName === loadedForm.clientName && s.phase4?.clientTinNumber);
+            if (prevSite) assumedTin = prevSite.phase4?.clientTinNumber || '';
+          }
+          if (assumedTin) {
+            loadedForm = { ...loadedForm, phase4: { ...loadedForm.phase4, clientTinNumber: assumedTin } };
+          }
+        }
+
+        setForm(loadedForm);
+        setInitialForm(loadedForm);
+        if (loadedForm.status === 'Pending') {
+          const next = [1, 2, 3, 4, 5].find(p => !(loadedForm as any)[`phase${p}`].completed) as any ?? 5;
           setActivePhase(next);
         }
       } else {
@@ -353,8 +398,30 @@ export function SiteOnboarding() {
 
       {/* Site info summary card — only after created */}
       {!isNew && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 transition-all">
+          <div className="flex items-center justify-between cursor-pointer" onClick={() => setIsInfoCollapsed(!isInfoCollapsed)}>
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-semibold text-slate-800">Site Information & Progress</h2>
+              {isInfoCollapsed && <Badge variant="outline" className="text-xs bg-slate-50">{completedCount} / 5 phases done</Badge>}
+              {clientBalanceStatus === 'Fully Paid' && (
+                <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-emerald-300 text-xs shadow-none" title="Client is wholly fully paid across all sites">
+                  Client Fully Paid
+                </Badge>
+              )}
+              {clientBalanceStatus === 'Owing' && (
+                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300 text-xs shadow-none" title="Client has outstanding balances">
+                  Client Owes
+                </Badge>
+              )}
+            </div>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-slate-100 rounded-full">
+              {isInfoCollapsed ? <ChevronDown className="h-5 w-5 text-slate-500" /> : <ChevronUp className="h-5 w-5 text-slate-500" />}
+            </Button>
+          </div>
+          
+          {!isInfoCollapsed && (
+            <div className="mt-5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
             <div className="flex items-start gap-3">
               <div className="p-2 rounded-lg bg-indigo-50 flex-shrink-0">
                 <User className="h-4 w-4 text-indigo-600" />
@@ -418,6 +485,8 @@ export function SiteOnboarding() {
               })}
             </div>
           </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -434,7 +503,25 @@ export function SiteOnboarding() {
                 list="clientList"
                 placeholder="Select or type client name"
                 value={form.clientName}
-                onChange={e => upd({ clientName: e.target.value })}
+                onChange={e => {
+                  const newName = e.target.value;
+                  const profile = clientProfiles.find(p => p.name === newName);
+                  let assumedTin = profile?.tinNumber || '';
+                  if (!assumedTin) {
+                    const prevSite = pendingSites.find(s => s.clientName === newName && s.phase4?.clientTinNumber);
+                    if (prevSite) assumedTin = prevSite.phase4?.clientTinNumber || '';
+                  }
+                  
+                  if (assumedTin) {
+                    setForm(p => ({
+                      ...p,
+                      clientName: newName,
+                      phase4: { ...p.phase4, clientTinNumber: assumedTin }
+                    }));
+                  } else {
+                    upd({ clientName: newName });
+                  }
+                }}
               />
               <datalist id="clientList">{clients.map(c => <option key={c} value={c} />)}</datalist>
               <p className="text-xs text-slate-400">Select existing or type a new name</p>
@@ -790,11 +877,13 @@ export function SiteOnboarding() {
                         <option value="No">No</option>
                       </select>
                     </div>
+
                     <PhaseTextField
-                      label="Client TIN Number"
-                      value={form.phase4.clientTinNumber || ''}
-                      onChange={v => updPhase('phase4', { clientTinNumber: v })}
-                      placeholder="e.g. 19283746-0001"
+                      label="Mobilization Advance Percentage (%)"
+                      type="number"
+                      value={form.phase4.mobilizationAdvancePercentage || ''}
+                      onChange={v => updPhase('phase4', { mobilizationAdvancePercentage: v })}
+                      placeholder="e.g. 50"
                     />
 
                     <div className="space-y-1">
@@ -834,7 +923,7 @@ export function SiteOnboarding() {
                       <div>
                         <h3 className="font-semibold text-emerald-800">Ready for Activation!</h3>
                         <p className="text-sm text-emerald-700 mt-1">
-                          Phases 1–3 complete, quotation accepted, AND 50% mobilization payment confirmed (Stage 1 in Phase 5).
+                          Phases 1–3 complete, quotation accepted, AND {Number(form.phase4.mobilizationAdvancePercentage) > 0 ? `${form.phase4.mobilizationAdvancePercentage}%` : '70%'} mobilization payment confirmed (Stage 1 in Phase 5).
                           Move this site to the <strong>Active Sites</strong> list now.
                         </p>
                         <Button
@@ -874,13 +963,42 @@ export function SiteOnboarding() {
                   <PhaseCheck label="Pre-requisite: Site-Specific Safety Plan Integrated" checked={form.phase5.safetyPlanIntegrated} onChange={v => updPhase('phase5', { safetyPlanIntegrated: v })} />
                   <div />
 
-                  <PhaseCheck label="Stage 1: 50% Advance Received (Mobilization)" checked={form.phase5.stage1AdvanceReceived} onChange={v => updPhase('phase5', { stage1AdvanceReceived: v })} />
-                  <div />
+                  {/* Stage 1: Only shown when advance % > 0 */}
+                  {Number(form.phase4.mobilizationAdvancePercentage) > 0 && (
+                    <>
+                      <PhaseCheck label={`Stage 1: ${form.phase4.mobilizationAdvancePercentage}% Advance Received (Proceed to Work)`} checked={form.phase5.stage1AdvanceReceived} onChange={v => updPhase('phase5', { stage1AdvanceReceived: v })} />
+                      <div />
+                    </>
+                  )}
+                  {Number(form.phase4.mobilizationAdvancePercentage) === 0 && (
+                    <>
+                      <div className="col-span-2 text-xs text-slate-400 italic bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+                        No mobilization advance — first payment collected at installation (see Stage 2 below).
+                      </div>
+                    </>
+                  )}
 
                   <PhaseCheck label="Stage 2: Installation Complete & System Started Up" checked={form.phase5.stage2InstallationComplete} onChange={v => updPhase('phase5', { stage2InstallationComplete: v })} />
-                  <PhaseCheck label="Stage 2: Remaining 50% & First Hire Invoice Issued" checked={form.phase5.stage2FirstInvoiceIssued} onChange={v => updPhase('phase5', { stage2FirstInvoiceIssued: v })} />
+                  <PhaseCheck
+                    label={
+                      Number(form.phase4.mobilizationAdvancePercentage) === 0
+                        ? `Stage 2: 70% First Payment & First Hire Invoice Issued`
+                        : `Stage 2: Remaining ${100 - (Number(form.phase4.mobilizationAdvancePercentage) || 70)}% & First Hire Invoice Issued`
+                    }
+                    checked={form.phase5.stage2FirstInvoiceIssued}
+                    onChange={v => updPhase('phase5', { stage2FirstInvoiceIssued: v })}
+                  />
 
-                  <PhaseCheck label="Stage 3: Timely Weekly Hire Invoicing Ongoing" checked={form.phase5.stage3TimelyBilling} onChange={v => updPhase('phase5', { stage3TimelyBilling: v })} />
+                  {/* Stage 3 label changes when no advance to show 30% remaining */}
+                  <PhaseCheck
+                    label={
+                      Number(form.phase4.mobilizationAdvancePercentage) === 0
+                        ? `Stage 3: Remaining 30% & Timely Weekly Hire Invoicing Ongoing`
+                        : `Stage 3: Timely Weekly Hire Invoicing Ongoing`
+                    }
+                    checked={form.phase5.stage3TimelyBilling}
+                    onChange={v => updPhase('phase5', { stage3TimelyBilling: v })}
+                  />
                   <div />
 
                   <PhaseCheck label="Stage 4: Demobilization Complete" checked={form.phase5.stage4DemobilizationComplete} onChange={v => updPhase('phase5', { stage4DemobilizationComplete: v })} />

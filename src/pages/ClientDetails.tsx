@@ -18,6 +18,15 @@ export function ClientDetails() {
   const sites = useAppStore(s => s.sites);
   const invoices = useAppStore(s => s.invoices);
   const commLogs = useAppStore(s => s.commLogs);
+  const pendingSites = useAppStore(s => s.pendingSites);
+
+  // TIN lookup: clientProfiles first, then any pending site onboarding record
+  const getTinForClient = (name: string): string => {
+    const profile = clientProfiles.find(p => p.name === name);
+    if (profile?.tinNumber) return profile.tinNumber;
+    const pending = pendingSites.find(s => s.clientName === name && s.phase4?.clientTinNumber);
+    return pending?.phase4?.clientTinNumber || 'Not provided';
+  };
 
   // When a specific client is selected, change the header title.
   useSetPageTitle(
@@ -74,12 +83,12 @@ export function ClientDetails() {
       return {
         id: profile?.id || name,
         name,
-        tinNumber: profile?.tinNumber || 'Pending',
+        tinNumber: getTinForClient(name),
         startDate: earliestSiteDate || profile?.startDate || 'Unknown',
         stats: statsByClient[name] || { totalSites: 0, activeSites: 0, totalRevenue: 0 }
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
-  }, [clientProfiles, statsByClient, sites]);
+  }, [clientProfiles, statsByClient, sites, pendingSites]);
 
   // Auto-select client when navigated from SiteOnboarding link
   useEffect(() => {

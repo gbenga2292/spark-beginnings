@@ -422,21 +422,39 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                   {(() => {
                     // Check if this is an approval workflow task
                     let isApprovalTask = false;
+                    let isApprover = false;
                     try {
                       const meta = JSON.parse(activeSubtask.description || '{}');
-                      if (meta.refType && meta.refType !== 'hmo') isApprovalTask = true;
+                      if (meta.refType && meta.refType !== 'hmo') {
+                          isApprovalTask = true;
+                          isApprover = activeSubtask.assignedTo?.split(',').includes(currentUser?.id || '') ?? false;
+                      }
                     } catch (e) {
                       // Normal text description
                     }
+                    
+                    const isStandardApproval = (activeSubtask.requiresApproval || (activeSubtask as any).requires_approval) && activeSubtask.status === 'pending_approval';
+                    if (isStandardApproval) {
+                        isApprovalTask = true;
+                        isApprover = activeMainTask.createdBy === currentUser?.id || currentUser?.role === 'admin';
+                    }
 
                     if (isApprovalTask) {
-                      const isApprover = activeSubtask.assignedTo?.split(',').includes(currentUser?.id || '');
                       const hasActed = activeSubtask.status === 'completed' || !!(activeSubtask as any).rejectedAt;
                       
                       return (
                         <>
                           <button
-                            onClick={() => isApprover && !hasActed && approveSubtask(activeSubtask.id!, currentUser?.id)}
+                            onClick={() => {
+                              if (!isApprover || hasActed) return;
+                              if (isStandardApproval) {
+                                // Pass bypassApproval=true so the requiresApproval interception is skipped
+                                updateSubtaskStatus(activeSubtask.id!, 'completed', currentUser?.id, true);
+                                postComment(activeSubtask.id!, activeMainTask.id, `✅ **Approved** — Task marked as completed.`, currentUser?.id);
+                              } else {
+                                approveSubtask(activeSubtask.id!, currentUser?.id);
+                              }
+                            }}
                             disabled={!isApprover || hasActed}
                             className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold border transition-all ${
                               hasActed ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed' :
@@ -450,7 +468,15 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                             onClick={() => {
                               if (!isApprover || hasActed) return;
                               const reason = window.prompt("Rejection reason (optional):");
-                              if (reason !== null) rejectSubtask(activeSubtask.id!, currentUser?.id, reason);
+                              if (reason !== null) {
+                                  if (isStandardApproval) {
+                                      // Standard task: revert to in_progress and post comment
+                                      updateSubtaskStatus(activeSubtask.id!, 'in_progress', currentUser?.id);
+                                      if (reason) postComment(activeSubtask.id!, activeMainTask.id, `❌ **Rejected**\nReason: ${reason}`, currentUser?.id);
+                                  } else {
+                                      rejectSubtask(activeSubtask.id!, currentUser?.id, reason);
+                                  }
+                              }
                             }}
                             disabled={!isApprover || hasActed}
                             className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold border transition-all ${

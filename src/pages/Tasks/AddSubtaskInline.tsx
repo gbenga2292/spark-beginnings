@@ -22,13 +22,14 @@ export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSu
   const [deadlineTime, setDeadlineTime] = useState("");
   const { user: currentUser } = useAuth();
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
+  const [requiresApproval, setRequiresApproval] = useState(false);
 
   const handleAdd = () => {
     if (!title.trim()) return;
     const assignee = isPersonal ? (currentUser?.id ?? null) : (assignedTo.length > 0 ? assignedTo.join(',') : null);
     const combinedDeadline = deadline ? (deadlineTime ? `${deadline}T${deadlineTime}` : deadline) : undefined;
-    onAdd({ mainTaskId, title: title.trim(), description: desc.trim(), assignedTo: assignee, status: "not_started", deadline: combinedDeadline, priority });
-    setTitle(""); setDesc(""); setAssignedTo([]); setDeadline(""); setDeadlineTime(""); setPriority(undefined); setOpen(false);
+    onAdd({ mainTaskId, title: title.trim(), description: desc.trim(), assignedTo: assignee, status: "not_started", deadline: combinedDeadline, priority, requiresApproval });
+    setTitle(""); setDesc(""); setAssignedTo([]); setDeadline(""); setDeadlineTime(""); setPriority(undefined); setRequiresApproval(false); setOpen(false);
   };
 
   const accentColor = isPersonal ? 'text-indigo-600 hover:text-indigo-700' : 'text-primary hover:text-primary/80';
@@ -97,6 +98,13 @@ export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSu
           <option value="">Priority…</option>
           {PRIORITY_ORDER.map(p => <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>)}
         </select>
+      </div>
+      <div className="flex items-center gap-1.5 mt-2">
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)}
+            className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20" />
+          <span className="text-xs font-medium text-foreground">Requires review before completion</span>
+        </label>
       </div>
       <div className="flex gap-2 justify-end pt-1">
         <button onClick={() => setOpen(false)} className="px-4 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:bg-muted transition-colors">Cancel</button>

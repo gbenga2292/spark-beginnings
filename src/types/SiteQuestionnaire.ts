@@ -54,6 +54,7 @@ export interface SiteQuestionnaire {
     permittingResponsibilityOutlined: boolean;
     tinProvided: boolean;
     clientTinNumber?: string;
+    mobilizationAdvancePercentage?: string;
     completed: boolean;
   };
 

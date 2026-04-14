@@ -8,7 +8,7 @@ import type {
   SalaryAdvance, Loan, Payment, VatPayment, LeaveRecord, DepartmentTasks,
   DisciplinaryRecord, EvaluationRecord, Department, Position,
   LedgerCategory, LedgerVendor, LedgerBank, LedgerBeneficiaryBank, LedgerEntry, CommLog,
-  CompanyExpense, StaffMeritRecord
+  CompanyExpense, StaffMeritRecord, LeaveType
 } from '@/src/store/appStore';
 import { useUserStore, type AppUser, type PrivilegePreset } from '@/src/store/userStore';
 
@@ -235,6 +235,10 @@ export function dbToLedgerEntry(r: any): LedgerEntry {
     category: r.category, amount: Number(r.amount), client: r.client, site: r.site,
     vendor: r.vendor, bank: r.bank, enteredBy: r.entered_by
   };
+}
+
+export function dbToLeaveType(r: any): LeaveType {
+  return { id: r.id, name: r.name, defaultDays: r.default_days || 0 };
 }
 
 export function dbToCompanyExpense(r: any): CompanyExpense {
@@ -729,7 +733,7 @@ export async function fetchAllAppData(privs?: any) {
       offboardingTasks: d.offboarding_tasks || [],
     })) as DepartmentTasks[],
     leaves: (leavesRes.data || []).map(dbToLeave),
-    leaveTypes: (leaveTypesRes.data || []).map((t: any) => t.name),
+    leaveTypes: (leaveTypesRes.data || []).map(dbToLeaveType),
     disciplinaryRecords: (disciplinaryRes.data || []).map(dbToDisciplinary),
     evaluations: (evaluationsRes.data || []).map(dbToEvaluation),
     ledgerCategories: (lCatRes.data || []).map(dbToLedgerCategory),
@@ -1317,8 +1321,11 @@ export const db = {
   },
 
   // Leave Types
-  async insertLeaveType(name: string) {
-    const { error } = await supabase.from('leave_types').insert({ name });
+  async insertLeaveType(type: Partial<LeaveType>) {
+    const { error } = await supabase.from('leave_types').insert({ 
+      name: type.name, 
+      default_days: type.defaultDays || 0 
+    });
     if (error) { console.error('Database error:', error); throw error; }
   },
   async deleteLeaveType(name: string) {
@@ -1607,10 +1614,14 @@ export const db = {
       if (error) { console.error('Database error:', error); throw error; }
     }
   },
-  async setLeaveTypes(types: string[]) {
+  async setLeaveTypes(types: LeaveType[]) {
     await supabase.from('leave_types').delete().neq('name', '');
     if (types.length > 0) {
-      const { error } = await supabase.from('leave_types').insert(types.map(name => ({ name })));
+      const { error } = await supabase.from('leave_types').insert(types.map(t => ({
+        ...(t.id ? { id: t.id } : {}),
+        name: t.name,
+        default_days: t.defaultDays || 0,
+      })));
       if (error) { console.error('Database error:', error); throw error; }
     }
   },

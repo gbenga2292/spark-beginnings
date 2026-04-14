@@ -26,8 +26,9 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
   const [deadline, setDeadline] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("");
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
+  const [requiresApproval, setRequiresApproval] = useState(false);
   const [showSubs, setShowSubs] = useState(true);
-  const [subtasks, setSubs] = useState<{ title: string; assignedTo: string[]; deadline: string; deadlineTime: string; priority: TaskPriority | undefined }[]>([]);
+  const [subtasks, setSubs] = useState<{ title: string; assignedTo: string[]; deadline: string; deadlineTime: string; priority: TaskPriority | undefined; requiresApproval: boolean }[]>([]);
 
   // ── Reminder state ────────────────────────────────────────────────────────
   const [enableReminder, setEnableReminder] = useState(false);
@@ -46,7 +47,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
   const [openMainDropdown, setOpenMainDropdown] = useState(false);
   const [openSubDropdown, setOpenSubDropdown] = useState<number | null>(null);
 
-  const addRow = () => setSubs(p => [...p, { title: "", assignedTo: [], deadline: "", deadlineTime: "", priority: undefined }]);
+  const addRow = () => setSubs(p => [...p, { title: "", assignedTo: [], deadline: "", deadlineTime: "", priority: undefined, requiresApproval: false }]);
   const removeRow = (i: number) => setSubs(p => p.filter((_, idx) => idx !== i));
   const updateRow = (i: number, k: string, v: any) =>
     setSubs(p => p.map((r, idx) => idx === i ? { ...r, [k]: v } : r));
@@ -76,13 +77,14 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
         status: "not_started" as SubTaskStatus,
         deadline: s.deadline ? (s.deadlineTime ? `${s.deadline}T${s.deadlineTime}` : s.deadline) : undefined,
         priority: s.priority,
+        requiresApproval: s.requiresApproval,
       });
     });
 
     const mainAssignedToStr = assignedTo.length > 0 ? assignedTo.join(',') : undefined;
 
     const createdTask = await createMainTask(
-      { title: title.trim(), description: description.trim(), createdBy: currentUserId, teamId, workspaceId: workspaceId ?? teamId, assignedTo: mainAssignedToStr, deadline: combinedDeadline, priority },
+      { title: title.trim(), description: description.trim(), createdBy: currentUserId, teamId, workspaceId: workspaceId ?? teamId, assignedTo: mainAssignedToStr, deadline: combinedDeadline, priority, requiresApproval },
       finalSubs
     );
 
@@ -211,6 +213,12 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
               ))}
             </div>
           </div>
+          
+          <label className="flex items-center gap-2 cursor-pointer mt-1">
+            <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 transition-all" />
+            <span className="text-xs font-medium text-foreground">Requires review before completion</span>
+          </label>
 
           <div className="border border-border rounded-xl overflow-hidden">
             <button type="button" onClick={toggleSubs}
@@ -276,6 +284,13 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
                             <option value="">No Priority</option>
                             {PRIORITY_ORDER.map(p => <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>)}
                           </select>
+                        </div>
+                        <div className="ml-6 flex items-center">
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" checked={sub.requiresApproval} onChange={e => updateRow(i, "requiresApproval", e.target.checked)}
+                              className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/20" />
+                            <span className="text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">Requires Review</span>
+                          </label>
                         </div>
                       </div>
                     ))}
