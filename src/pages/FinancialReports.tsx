@@ -262,11 +262,23 @@ export function FinancialReports() {
     const totalDiscount = payments.reduce((sum, p) => sum + (p.discount || 0), 0);
     const totalValueCleared = totalCollectedCash + totalWHT + totalDiscount;
     const totalOutstanding = Math.max(0, totalBilled - totalValueCleared);
-    const totalVATCollected = payments.reduce((sum, p) => sum + (p.vat || 0), 0);
+    
+    const clientVatMap = new Map<string, number>();
+    const totalVATCollected = payments.reduce((sum, p) => {
+        const payVat = p.payVat || (sites.find(s => s.name === p.site && s.client === p.client)?.vat as any) || 'No';
+        const { vat } = getVatDetails(p.amount || 0, payVat, vatRate);
+        if (vat > 0) clientVatMap.set(p.client, (clientVatMap.get(p.client) || 0) + vat);
+        return sum + (vat || 0);
+    }, 0);
+    
+    const vatSources = Array.from(clientVatMap.entries())
+      .map(([client, amount]) => ({ client, amount }))
+      .sort((a, b) => b.amount - a.amount);
+    
     const totalVATRemitted = vatPayments.reduce((sum, vp) => sum + (vp.amount || 0), 0);
     const vatDeficit = Math.max(0, totalVATCollected - totalVATRemitted);
-    return { totalBilled, totalCollectedCash, totalValueCleared, totalOutstanding, totalWHT, totalDiscount, totalVATCollected, totalVATRemitted, vatDeficit };
-  }, [invoices, payments, vatPayments]);
+    return { totalBilled, totalCollectedCash, totalValueCleared, totalOutstanding, totalWHT, totalDiscount, totalVATCollected, totalVATRemitted, vatDeficit, vatSources };
+  }, [invoices, payments, vatPayments, sites, vatRate]);
 
   const collectionRate = globalStats.totalBilled > 0
     ? Math.round((globalStats.totalValueCleared / globalStats.totalBilled) * 100) : 0;
@@ -375,12 +387,17 @@ export function FinancialReports() {
 
     return Array.from(rowMap.values()).map(r => {
       const bf = bfData.get(r.key) || 0;
-      const balance = bf + r.totalInvoices - r.totalPayment - r.discount - r.withholdingTax;
+      let balance = bf + r.totalInvoices - r.totalPayment - r.discount - r.withholdingTax;
       let status = balance > 0 && r.totalPayment === 0 && r.discount === 0 && r.withholdingTax === 0 && r.totalInvoices === 0 ? 'OWING'
         : balance > 0 && (r.totalPayment > 0 || r.discount > 0 || r.withholdingTax > 0 || bf < 0) ? 'PART PAID'
         : balance > 0 ? 'OWING'
         : balance === 0 && (r.totalInvoices > 0 || bf !== 0) ? 'FULLY PAID'
         : balance < 0 ? 'OVER PAID' : '-';
+        
+      if (balance < 0) {
+        balance = 0;
+        status = 'FULLY PAID';
+      }
       return { ...r, bf, balance, status };
     }).sort((a, b) => a.client.localeCompare(b.client));
   }, [invoices, payments, summaryTab, bfData]);
@@ -1360,8 +1377,8 @@ export function FinancialReports() {
           <CardContent className="p-5 flex flex-col justify-between h-full relative overflow-hidden group">
             <div className="flex justify-between items-start mb-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Total Receivables</p>
-                <h3 className="text-2xl font-bold font-mono text-amber-600">{formatCurrCompact(globalStats.totalOutstanding)}</h3>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Balance Due</p>
+                <h3 className="text-2xl font-bold font-mono text-amber-600">{formatCurrCompact(summaryData.reduce((sum, r) => sum + (r.balance || 0), 0))}</h3>
               </div>
               <div className="h-10 w-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600"><Activity className="w-5 h-5" /></div>
             </div>
@@ -1372,8 +1389,8 @@ export function FinancialReports() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-slate-200 border-l-4 border-l-rose-500">
-          <CardContent className="p-5 flex flex-col justify-between h-full relative overflow-hidden group">
+        <Card className="shadow-sm border-slate-200 border-l-4 border-l-rose-500 relative group overflow-visible">
+          <CardContent className="p-5 flex flex-col justify-between h-full relative cursor-help">
             <div className="flex justify-between items-start mb-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">VAT Liability</p>
@@ -1381,8 +1398,43 @@ export function FinancialReports() {
               </div>
               <div className="h-10 w-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-600"><Landmark className="w-5 h-5" /></div>
             </div>
-            <div className="text-[11px] font-medium text-slate-500 bg-slate-50 px-2 py-1 rounded-md inline-flex items-center gap-1 self-start">
-              Collected: {formatCurrCompact(globalStats.totalVATCollected)}
+            <div className="text-[11px] font-medium text-slate-500 bg-slate-50 px-2 py-1 rounded-md inline-flex items-center gap-1 self-start border border-dashed border-rose-200">
+              Hover for Forensic Breakdown
+            </div>
+            
+            {/* Hover tooltip for forensic breakdown */}
+            <div className="absolute top-full mt-3 right-0 w-64 bg-slate-900 border border-slate-800 text-slate-100 p-4 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none origin-top-right">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> VAT Forensics</span>
+                </div>
+                
+                <div className="space-y-2 mb-3 max-h-[120px] overflow-y-auto no-scrollbar pr-1">
+                    {globalStats.vatSources.length === 0 ? (
+                        <div className="text-xs text-slate-500 italic">No VAT-applicable payments yet.</div>
+                    ) : (
+                        globalStats.vatSources.map(v => (
+                            <div key={v.client} className="flex justify-between items-center text-xs">
+                                <span className="truncate pr-3 text-slate-300 font-medium">{v.client}</span>
+                                <span className="font-mono text-emerald-400 font-bold shrink-0">₦{v.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                        ))
+                    )}
+                </div>
+                
+                <div className="border-t border-slate-800 pt-3 space-y-1.5">
+                    <div className="flex justify-between text-[11px] font-bold text-slate-400">
+                        <span>Total VAT Collected</span>
+                        <span className="font-mono text-white">₦{globalStats.totalVATCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-[11px] font-bold text-slate-400">
+                        <span>Remitted to FIRS</span>
+                        <span className="font-mono text-sky-400">₦{globalStats.totalVATRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-black text-rose-400 pt-1 mt-1 border-t border-slate-800">
+                        <span>Current Deficit</span>
+                        <span className="font-mono">₦{globalStats.vatDeficit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                </div>
             </div>
           </CardContent>
         </Card>

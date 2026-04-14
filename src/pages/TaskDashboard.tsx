@@ -555,7 +555,13 @@ function UserDashboard() {
 
   const wsTaskIds = new Set(wsTasks.map(mt => mt.id));
   const teamSubs = subtasks.filter(s => wsTaskIds.has(s.mainTaskId!));
-  const mySubs = teamSubs.filter(s => s.assignedTo?.includes(currentUser?.id as string));
+  const mySubs = teamSubs.filter(s => {
+    if (!currentUser?.id) return false;
+    const isAssigned = s.assignedTo?.includes(currentUser.id);
+    const mt = wsTasks.find(m => m.id === s.mainTaskId);
+    const isCreator = (s as any).createdBy === currentUser.id || mt?.createdBy === currentUser.id;
+    return isAssigned || isCreator;
+  });
   const myCreatedTasks = wsTasks.filter(mt => mt.createdBy === currentUser?.id);
 
   const myDone = mySubs.filter(s => s.status === 'completed').length;
