@@ -301,6 +301,36 @@ export function FinancialReports() {
       .slice(0, 10);
   }, [invoices, payments, debtorView]);
 
+  // Balance Brought Forward — net balance from ALL years strictly before filterYear, per client/site key
+  const bfData = useMemo(() => {
+    if (filterYear === 'All') return new Map<string, number>();
+    const cutoff = filterYear; // e.g. '2026'
+    const bfMap = new Map<string, number>();
+
+    rawInvoices.forEach(inv => {
+      const normalized = normalizeDate(inv.date);
+      if (!normalized || normalized.substring(0, 4) >= cutoff) return;
+      const matchC = filterClient === 'All' || inv.client === filterClient;
+      if (!matchC) return;
+      const siteName = inv.siteName || (inv as any).site || 'Unknown Site';
+      const key = summaryTab === 'client' ? inv.client : `${inv.client} - ${siteName}`;
+      bfMap.set(key, (bfMap.get(key) || 0) + (inv.amount || 0));
+    });
+
+    rawPayments.forEach(pay => {
+      const normalized = normalizeDate(pay.date);
+      if (!normalized || normalized.substring(0, 4) >= cutoff) return;
+      const matchC = filterClient === 'All' || pay.client === filterClient;
+      if (!matchC) return;
+      const siteName = pay.site || 'Unknown Site';
+      const key = summaryTab === 'client' ? pay.client : `${pay.client} - ${siteName}`;
+      const cleared = (pay.amount || 0) + (pay.withholdingTax || 0) + (pay.discount || 0);
+      bfMap.set(key, (bfMap.get(key) || 0) - cleared);
+    });
+
+    return bfMap;
+  }, [rawInvoices, rawPayments, filterYear, filterClient, summaryTab]);
+
   // Summary Ledger Data
   const summaryData = useMemo(() => {
     const rowMap = new Map<string, any>();
@@ -320,13 +350,29 @@ export function FinancialReports() {
       rowMap.get(key)!.withholdingTax += (pay.withholdingTax || 0);
       rowMap.get(key)!.vat += (pay.vat || 0);
     });
+
+    // Seed rows for clients/sites that only appear in B/F (no current-year activity)
+    bfData.forEach((bfVal, key) => {
+      // Only include them if they actually have an outstanding (or overpaid) balance carrying forward
+      if (!rowMap.has(key) && Math.abs(bfVal) > 0.01) {
+        const parts = key.split(' - ');
+        const client = parts[0];
+        const site = parts.length > 1 ? parts.slice(1).join(' - ') : 'Unknown Site';
+        rowMap.set(key, { client, site, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, discount: 0, withholdingTax: 0, vat: 0 });
+      }
+    });
+
     return Array.from(rowMap.values()).map(r => {
-      const balance = r.totalInvoices - r.totalPayment - r.discount - r.withholdingTax;
-      let status = balance > 0 && r.totalPayment === 0 && r.discount === 0 && r.withholdingTax === 0 ? 'OWING'
-        : balance > 0 ? 'PART PAID' : balance === 0 && r.totalInvoices > 0 ? 'FULLY PAID' : balance < 0 ? 'OVER PAID' : '-';
-      return { ...r, balance, status };
+      const bf = bfData.get(r.key) || 0;
+      const balance = bf + r.totalInvoices - r.totalPayment - r.discount - r.withholdingTax;
+      let status = balance > 0 && r.totalPayment === 0 && r.discount === 0 && r.withholdingTax === 0 && r.totalInvoices === 0 ? 'OWING'
+        : balance > 0 && (r.totalPayment > 0 || r.discount > 0 || r.withholdingTax > 0 || bf < 0) ? 'PART PAID'
+        : balance > 0 ? 'OWING'
+        : balance === 0 && (r.totalInvoices > 0 || bf !== 0) ? 'FULLY PAID'
+        : balance < 0 ? 'OVER PAID' : '-';
+      return { ...r, bf, balance, status };
     }).sort((a, b) => a.client.localeCompare(b.client));
-  }, [invoices, payments, summaryTab]);
+  }, [invoices, payments, summaryTab, bfData]);
 
   // VAT Pie
   const vatPieData = useMemo(() => [
@@ -1308,6 +1354,11 @@ export function FinancialReports() {
                 <TableHead className="font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Discounts</TableHead>
                 <TableHead className="font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">WHT</TableHead>
                 <TableHead className="font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT</TableHead>
+                {filterYear !== 'All' && (
+                  <TableHead className="font-semibold text-xs tracking-wider uppercase text-amber-300 px-5 py-4 text-right" title="Balance carried over from previous years">
+                    B/F
+                  </TableHead>
+                )}
                 <TableHead className="font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">Balance Due</TableHead>
                 <TableHead className="font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-center">Health</TableHead>
               </TableRow>
@@ -1325,6 +1376,17 @@ export function FinancialReports() {
                   <TableCell className="px-5 py-3 text-right font-mono text-slate-400">{row.discount ? row.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                   <TableCell className="px-5 py-3 text-right font-mono text-indigo-600/70">{row.withholdingTax ? row.withholdingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                   <TableCell className="px-5 py-3 text-right font-mono text-indigo-600/70">{row.vat ? row.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                  {filterYear !== 'All' && (
+                    <TableCell className={`px-5 py-3 text-right font-mono font-semibold ${
+                      !row.bf || row.bf === 0 ? 'text-slate-300' : row.bf > 0 ? 'text-amber-600' : 'text-emerald-600'
+                    }`}>
+                      {row.bf && row.bf !== 0
+                        ? (row.bf < 0
+                          ? `(${Math.abs(row.bf).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+                          : row.bf.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+                        : '-'}
+                    </TableCell>
+                  )}
                   <TableCell className={`px-5 py-3 text-right font-mono font-bold ${row.balance > 0 ? 'text-rose-600' : row.balance < 0 ? 'text-slate-500' : 'text-emerald-600'}`}>
                     {row.balance !== 0 ? (row.balance < 0 ? `(${Math.abs(row.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
                   </TableCell>
@@ -1339,21 +1401,40 @@ export function FinancialReports() {
                   </TableCell>
                 </TableRow>
               ))}
-              {summaryData.length > 0 && (
-                <TableRow className="bg-slate-900 hover:bg-slate-900 border-t-4 border-indigo-500 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] relative z-10">
-                  <TableCell colSpan={summaryTab === 'site' ? 2 : 1} className="px-5 py-4 font-bold text-slate-200 text-sm tracking-wider uppercase">Grand Total</TableCell>
-                  <TableCell className="px-5 py-4 text-center font-bold text-slate-300 bg-slate-800/80 rounded-sm">{summaryData.reduce((sum, r) => sum + r.noOfInvoices, 0)}</TableCell>
-                  <TableCell className="px-5 py-4 text-right font-mono font-bold text-slate-200">{globalStats.totalBilled.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                  <TableCell className="px-5 py-4 text-right font-mono font-bold text-emerald-400">{globalStats.totalCollectedCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                  <TableCell className="px-5 py-4 text-right font-mono font-medium text-slate-400">{globalStats.totalDiscount ? globalStats.totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                  <TableCell className="px-5 py-4 text-right font-mono font-medium text-indigo-300">{globalStats.totalWHT ? globalStats.totalWHT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                  <TableCell className="px-5 py-4 text-right font-mono font-medium text-indigo-300">{globalStats.totalVATCollected ? globalStats.totalVATCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                  <TableCell className="px-5 py-4 text-right font-mono font-bold text-rose-400 bg-rose-950/20">{globalStats.totalOutstanding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                  <TableCell className="px-5 py-4"></TableCell>
-                </TableRow>
-              )}
+              {summaryData.length > 0 && (() => {
+                const totalBF = summaryData.reduce((sum, r) => sum + (r.bf || 0), 0);
+                const totalBalance = summaryData.reduce((sum, r) => sum + (r.balance || 0), 0);
+                return (
+                  <TableRow className="bg-slate-900 hover:bg-slate-900 border-t-4 border-indigo-500 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] relative z-10">
+                    <TableCell colSpan={summaryTab === 'site' ? 2 : 1} className="px-5 py-4 font-bold text-slate-200 text-sm tracking-wider uppercase">Grand Total</TableCell>
+                    <TableCell className="px-5 py-4 text-center font-bold text-slate-300 bg-slate-800/80 rounded-sm">{summaryData.reduce((sum, r) => sum + r.noOfInvoices, 0)}</TableCell>
+                    <TableCell className="px-5 py-4 text-right font-mono font-bold text-slate-200">{globalStats.totalBilled.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                    <TableCell className="px-5 py-4 text-right font-mono font-bold text-emerald-400">{globalStats.totalCollectedCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                    <TableCell className="px-5 py-4 text-right font-mono font-medium text-slate-400">{globalStats.totalDiscount ? globalStats.totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    <TableCell className="px-5 py-4 text-right font-mono font-medium text-indigo-300">{globalStats.totalWHT ? globalStats.totalWHT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    <TableCell className="px-5 py-4 text-right font-mono font-medium text-indigo-300">{globalStats.totalVATCollected ? globalStats.totalVATCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    {filterYear !== 'All' && (
+                      <TableCell className={`px-5 py-4 text-right font-mono font-bold ${
+                        totalBF === 0 ? 'text-slate-400' : totalBF > 0 ? 'text-amber-400' : 'text-emerald-400'
+                      }`}>
+                        {totalBF !== 0
+                          ? (totalBF < 0
+                            ? `(${Math.abs(totalBF).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+                            : totalBF.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+                          : '-'}
+                      </TableCell>
+                    )}
+                    <TableCell className="px-5 py-4 text-right font-mono font-bold text-rose-400 bg-rose-950/20">
+                      {totalBalance < 0
+                        ? `(${Math.abs(totalBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+                        : totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="px-5 py-4"></TableCell>
+                  </TableRow>
+                );
+              })()}
               {summaryData.length === 0 && (
-                <TableRow><TableCell colSpan={10} className="px-4 py-12 text-center text-slate-500 font-medium">No data available.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={filterYear !== 'All' ? 11 : 10} className="px-4 py-12 text-center text-slate-500 font-medium">No data available.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

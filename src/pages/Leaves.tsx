@@ -22,6 +22,7 @@ import { addWorkDays } from '@/src/lib/workdays';
 
 function isOnLeave(leave: LeaveRecord, date: Date): boolean {
   if (leave.status === 'Cancelled') return false;
+  if (leave.dateReturned) return false; // Employee has already returned — not on leave
   try {
     return isWithinInterval(date, {
       start: parseISO(leave.startDate),
@@ -183,14 +184,18 @@ export function Leaves() {
   /* auto-sync employee status when a leave is added/updated */
   const syncEmployeeStatus = (empId: string) => {
     const today = new Date();
-    const empActiveLeaves = leaves.filter(
+    const currentState = useAppStore.getState();
+    const currentLeaves = currentState.leaves;
+    const currentEmployees = currentState.employees;
+
+    const empActiveLeaves = currentLeaves.filter(
       l => l.employeeId === empId && l.status !== 'Cancelled' && isOnLeave(l, today)
     );
-    const emp = employees.find(e => e.id === empId);
+    const emp = currentEmployees.find(e => e.id === empId);
     if (!emp) return;
     const shouldBeOnLeave = empActiveLeaves.length > 0;
-    if (shouldBeOnLeave && emp.status !== 'On Leave') updateEmployee(empId, { status: 'On Leave' });
-    if (!shouldBeOnLeave && emp.status === 'On Leave') updateEmployee(empId, { status: 'Active' });
+    if (shouldBeOnLeave && emp.status !== 'On Leave') currentState.updateEmployee(empId, { status: 'On Leave' });
+    if (!shouldBeOnLeave && emp.status === 'On Leave') currentState.updateEmployee(empId, { status: 'Active' });
   };
 
   const handleCreateOrUpdate = async () => {
@@ -233,7 +238,10 @@ export function Leaves() {
 
       updateLeave(formId, {
         leaveType, startDate, duration: parseInt(duration),
-        expectedEndDate: endDate, reason, dateReturned, canBeContacted,
+        expectedEndDate: endDate, reason,
+        // Merge form's date returned into the main dateReturned field
+        dateReturned: previewFormDateReturned || dateReturned,
+        canBeContacted,
         nasFilePath, supervisor, management: approverName,
         approvedById: approverId || undefined,
 

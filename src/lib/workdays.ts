@@ -67,11 +67,11 @@ export function addWorkDays(
 
     const holidaySet = new Set(publicHolidayDates);
     const date = new Date(startDate);
-    
-    let daysAdded = 0;
+
+    // The start date itself counts as Day 1.
+    // So for duration=3 starting Apr 10 → end is Apr 12, not Apr 13.
+    let daysAdded = 1;
     while (daysAdded < duration) {
-        // If duration is 1, it means 1 full day of leave.
-        // We usually add the days one by one.
         date.setDate(date.getDate() + 1);
 
         const dow = date.getDay(); // 0 = Sun, 1 = Mon … 6 = Sat

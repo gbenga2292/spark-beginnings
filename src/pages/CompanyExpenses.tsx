@@ -192,10 +192,26 @@ export function CompanyExpenses() {
 
   const toggleAll = () => {
     if (tab === 'history') return;
-    if (selectedIds.size === Math.min(filteredExpenses.length, 8) && filteredExpenses.length > 0) {
+    if (filteredExpenses.length === 0) return;
+
+    // Determine reference expense to group by
+    const referenceId = [...selectedIds][0];
+    const reference = referenceId 
+      ? filteredExpenses.find(e => e.id === referenceId) || filteredExpenses[0]
+      : filteredExpenses[0];
+
+    // Find all expenses matching the reference's payment details
+    const matchingExpenses = filteredExpenses.filter(e => 
+      e.paidFrom === reference.paidFrom
+    );
+
+    const maxSelectable = Math.min(matchingExpenses.length, 8);
+    const currentlySelectedMatching = matchingExpenses.filter(e => selectedIds.has(e.id));
+
+    if (selectedIds.size === maxSelectable && currentlySelectedMatching.length === maxSelectable) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredExpenses.slice(0, 8).map(e => e.id)));
+      setSelectedIds(new Set(matchingExpenses.slice(0, 8).map(e => e.id)));
     }
   };
 
@@ -391,9 +407,9 @@ export function CompanyExpenses() {
               <div className="bg-slate-50 border-b border-slate-100 flex items-center px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 <div className="flex items-center gap-3 flex-1">
                   <button onClick={toggleAll} className="p-0.5 mt-0.5 rounded focus:ring-2 focus:ring-indigo-500 outline-none text-slate-400 hover:text-indigo-600 transition-colors">
-                    <CheckSquare className={`w-4 h-4 ${selectedIds.size === filteredExpenses.length && filteredExpenses.length > 0 ? 'text-indigo-600' : ''}`} />
+                    <CheckSquare className={`w-4 h-4 ${selectedIds.size > 0 ? 'text-indigo-600' : ''}`} />
                   </button>
-                  <span>Select All (Up to 8)</span>
+                  <span>Select Matching (Up to 8)</span>
                 </div>
               </div>
             )}

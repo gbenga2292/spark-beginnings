@@ -191,7 +191,7 @@ export function Attendance() {
       if (!leave.startDate || !leave.expectedEndDate) return;
       try {
         const start = parseISO(leave.startDate);
-        const resumptionDate = parseISO(leave.expectedEndDate);
+        const resumptionDate = leave.dateReturned ? parseISO(leave.dateReturned) : parseISO(leave.expectedEndDate);
         if (regDateObj >= start && regDateObj < resumptionDate) {
           set.add(leave.employeeId);
         }
@@ -1139,8 +1139,9 @@ export function Attendance() {
               )}
             </div>
           </div>
+        </div>
 
-          {/* Compact entry table */}
+        {/* Compact entry table */}
           <div className="rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0 mt-2">
             <div className="overflow-x-auto overflow-y-auto flex-1">
               <table className="w-full text-sm min-w-[800px]">
