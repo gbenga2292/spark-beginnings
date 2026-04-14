@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -170,6 +170,15 @@ function PersonalTasksView() {
     (statusFilter === 'all' || deriveMainTaskStatus(mt.id, wsSubs) === statusFilter)
   );
 
+  const viewableReminders = React.useMemo(() => 
+    reminders.filter(r => r.isActive && (
+      r.createdBy === currentUser?.id || 
+      r.recipientIds?.length === 0 || 
+      r.recipientIds?.includes(currentUser?.id ?? '')
+    )),
+    [reminders, currentUser?.id]
+  );
+
   useSetPageTitle(
     'My Tasks',
     'Manage your private tasks and to-do list across different view modes',
@@ -238,7 +247,7 @@ function PersonalTasksView() {
             allSubtasks={wsSubs}
             users={users}
             onClickTask={id => toggle(id)}
-            reminders={reminders.filter(r => r.isActive && (r.createdBy === currentUser?.id || r.recipientIds?.includes(currentUser?.id ?? '')))}
+            reminders={viewableReminders}
           />
         </motion.div>
       )}
@@ -667,6 +676,15 @@ function AdminTasksView() {
     return searchMatch;
   });
 
+  const viewableReminders = React.useMemo(() => 
+    reminders.filter(r => r.isActive && (
+      r.createdBy === currentUser?.id || 
+      r.recipientIds?.length === 0 || 
+      r.recipientIds?.includes(currentUser?.id ?? '')
+    )),
+    [reminders, currentUser?.id]
+  );
+
   useSetPageTitle(
     'Team Tasks',
     'Coordinate with your team, track projects, and manage subtasks in real-time',
@@ -759,7 +777,7 @@ function AdminTasksView() {
             mainTasks={mainTasks}
             users={activeUsers}
             onClickSubtask={id => setOpenSubtaskId(id)}
-            reminders={reminders.filter(r => r.isActive && (r.createdBy === currentUser?.id || r.recipientIds?.includes(currentUser?.id ?? '')))}
+            reminders={viewableReminders}
           />
         </motion.div>
       )}

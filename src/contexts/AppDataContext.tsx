@@ -831,7 +831,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             return;
         }
         if (data) {
-            setReminders(prev => [...prev, mapReminderToCamel(data)]);
+            const camel = mapReminderToCamel(data);
+            setReminders(prev => {
+                if (prev.some(r => r.id === camel.id)) return prev;
+                return [...prev, camel];
+            });
             if (data.send_email) {
                 supabase.functions.invoke('send-email-reminder', { body: data }).catch(console.error);
             }

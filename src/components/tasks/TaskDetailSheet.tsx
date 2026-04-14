@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Sheet, SheetContent } from "@/src/components/task_ui/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/src/components/task_ui/sheet";
 import { useAppData } from "@/src/contexts/AppDataContext";
 import { TaskInboxView } from "./TaskInboxView";
 import { AppUser } from "@/src/types/tasks";
@@ -30,6 +30,10 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
         className="!w-screen !max-w-[100vw] h-screen p-0 border-0 bg-white"
         onInteractOutside={(e) => e.preventDefault()}
       >
+        <div className="sr-only">
+          <SheetTitle>Task Details</SheetTitle>
+          <SheetDescription>View and manage subtask details, comments, and activity.</SheetDescription>
+        </div>
         <TaskInboxView
           subtasks={subtasks}
           mainTasks={mainTasks}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   format, parseISO, isPast, isToday, isTomorrow, differenceInHours,
@@ -106,20 +106,56 @@ export function TaskReminders() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   /* Derived lists */
-  const myReminders     = reminders.filter(r => r.createdBy === currentUser?.id);
-  const sharedWithMe    = reminders.filter(r =>
-    r.recipientIds.includes(currentUser?.id || '') && r.createdBy !== currentUser?.id
+  const myReminders = useMemo(() => 
+    reminders.filter(r => r.createdBy === currentUser?.id),
+    [reminders, currentUser?.id]
   );
-  const pool = tab === 'mine' ? myReminders : tab === 'shared' ? sharedWithMe
-    : [...myReminders, ...sharedWithMe].filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
 
-  const filtered = pool
-    .filter(r => filterStatus === 'all' ? true : filterStatus === 'active' ? r.isActive : !r.isActive)
-    .filter(r => !search.trim() || r.title.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => new Date(a.remindAt).getTime() - new Date(b.remindAt).getTime());
+  const sharedWithMe = useMemo(() => 
+    reminders.filter(r => 
+      (r.recipientIds?.length === 0 || r.recipientIds?.includes(currentUser?.id || '')) && 
+      r.createdBy !== currentUser?.id
+    ),
+    [reminders, currentUser?.id]
+  );
 
-  const activeCount   = pool.filter(r => r.isActive).length;
-  const overdueCount  = pool.filter(r => r.isActive && isPast(parseISO(r.remindAt)) && !isToday(parseISO(r.remindAt))).length;
+  const pool = useMemo(() => {
+    if (tab === 'mine') return myReminders;
+    if (tab === 'shared') return sharedWithMe;
+    // Combine and deduplicate
+    const combined = [...myReminders, ...sharedWithMe];
+    const unique = Array.from(new Set(combined.map(r => r.id)))
+      .map(id => combined.find(r => r.id === id)!);
+    return unique;
+  }, [tab, myReminders, sharedWithMe]);
+
+  const filtered = useMemo(() => {
+    return pool
+      .filter(r => filterStatus === 'all' ? true : filterStatus === 'active' ? r.isActive : !r.isActive)
+      .filter(r => !search.trim() || r.title.toLowerCase().includes(search.toLowerCase()))
+      .sort((a, b) => new Date(a.remindAt).getTime() - new Date(b.remindAt).getTime());
+  }, [pool, filterStatus, search]);
+
+  const activeCount = useMemo(() => 
+    pool.filter(r => r.isActive).length,
+    [pool]
+  );
+
+  const overdueCount = useMemo(() => 
+    pool.filter(r => r.isActive && isPast(parseISO(r.remindAt)) && !isToday(parseISO(r.remindAt))).length,
+    [pool]
+  );
+
+  // Pre-group reminders for calendar (optimization)
+  const remindersDayMap = useMemo(() => {
+    const map: Record<string, Reminder[]> = {};
+    filtered.forEach(r => {
+      const dateKey = format(parseISO(r.remindAt), 'yyyy-MM-dd');
+      if (!map[dateKey]) map[dateKey] = [];
+      map[dateKey].push(r);
+    });
+    return map;
+  }, [filtered]);
 
   /* Form helpers */
   const openCreate = () => { setForm(emptyForm()); setEditingId(null); setFormError(''); setShowForm(true); };
@@ -241,8 +277,10 @@ export function TaskReminders() {
     const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
     const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
 
-    const remindersByDay = (day: Date) => filtered.filter(r => isSameDay(parseISO(r.remindAt), day));
-    const selectedReminders = filtered.filter(r => isSameDay(parseISO(r.remindAt), selectedDate));
+    const remindersByDay = (day: Date) => remindersDayMap[format(day, 'yyyy-MM-dd')] || [];
+    
+    const selectedDateKey = format(selectedDate, 'yyyy-MM-dd');
+    const selectedReminders = [...(remindersDayMap[selectedDateKey] || [])];
     
     selectedReminders.sort((a,b) => new Date(a.remindAt).getTime() - new Date(b.remindAt).getTime());
 
