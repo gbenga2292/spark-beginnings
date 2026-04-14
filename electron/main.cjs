@@ -419,7 +419,7 @@ function createWindow() {
 
   // Smooth launch — set zoom to 75% before first paint
   mainWindow.once('ready-to-show', () => {
-    mainWindow.webContents.setZoomFactor(0.75);
+    mainWindow.webContents.setZoomFactor(1.0);
     mainWindow.show();
   });
 
