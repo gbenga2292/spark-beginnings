@@ -36,6 +36,7 @@ export function CompanyExpenses() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tab, setTab] = useState<'pending' | 'history'>('pending');
+  const [isFormVisible, setIsFormVisible] = useState(false);
 
   const [search, setSearch] = useState('');
   
@@ -54,11 +55,13 @@ export function CompanyExpenses() {
     setPaidFrom('');
     setPaidToBankName('');
     setPaidToAccountNo('');
+    setIsFormVisible(false);
   };
 
   const handleEditClick = async (expense: CompanyExpense) => {
     if (!priv?.canAdd) return;
     
+    setIsFormVisible(true);
     // Check for unsaved changes before overwriting form
     if (description || amount || paidFrom || paidToBankName || paidToAccountNo) {
       if (editingId !== expense.id) {
@@ -242,8 +245,19 @@ export function CompanyExpenses() {
     <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6 fade-in">
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Mobile Form Toggle Button */}
+        <div className="lg:hidden text-center">
+          <Button 
+            onClick={() => setIsFormVisible(!isFormVisible)} 
+            variant={isFormVisible ? "outline" : "default"} 
+            className={`w-full font-bold shadow-sm transition-all ${!isFormVisible ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'text-slate-600 border-slate-300 bg-white hover:bg-slate-50'}`}
+          >
+            {isFormVisible ? <><X className="w-4 h-4 mr-2" /> Hide Expense Form</> : <><Plus className="w-4 h-4 mr-2" /> Log New Expense</>}
+          </Button>
+        </div>
+
         {/* Form Column */}
-        <div className="lg:col-span-1">
+        <div className={`lg:col-span-1 transition-all duration-300 ${isFormVisible ? 'block animate-in slide-in-from-top-4' : 'hidden lg:block'}`}>
           <Card className={`border-slate-200 shadow-sm overflow-hidden group transition-all duration-300 ${editingId ? 'ring-2 ring-amber-500' : ''}`}>
             <div className={`h-1.5 w-full ${editingId ? 'bg-amber-500' : 'bg-indigo-600'}`}></div>
             <CardHeader className="bg-slate-50/50 pb-4 border-b border-slate-100 flex flex-row items-center justify-between">
