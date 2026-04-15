@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { cn } from '@/src/lib/utils';
+import { cn, IS_LIMITED_WEB_WEB } from '@/src/lib/utils';
 import { prefetchRoute } from '@/src/lib/routePrefetch';
 import { useUserStore, UserPrivileges } from '@/src/store/userStore';
 import { useAppStore } from '@/src/store/appStore';
@@ -223,6 +223,18 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
 
   const getVisibleItems = (items: NavItem[]) => {
     return items.filter((item) => {
+      // ── Web Version Hard Restrictions ─────────────────────────────────────
+      if (IS_LIMITED_WEB_WEB) {
+        // Allowed paths for Web mode
+        const isTaskPath = item.href.startsWith('/tasks') || item.href === '/comm-log';
+        const isDashboardPath = item.href === '/';
+        const isCompanyExpenses = item.href === '/company-expenses';
+        
+        if (!isTaskPath && !isDashboardPath && !isCompanyExpenses) {
+          return false;
+        }
+      }
+
       if (!currentUser) return false;
       if (item.visible) return item.visible(currentUser);
       if (item.privKey === 'custom') return false;
@@ -300,6 +312,12 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
         <div className={cn("flex flex-1 flex-col overflow-y-auto overflow-x-hidden", navBg)}>
           <nav className={cn('flex-1 space-y-2 py-4', isCollapsed ? 'px-2' : 'px-3')}>
             {navigation.map((category) => {
+              // ── Web Version Category Filtering ────────────────────────────────
+              if (IS_LIMITED_WEB_WEB) {
+                const allowedCategories = ['Dashboard', 'Tasks', 'Account'];
+                if (!allowedCategories.includes(category.name)) return null;
+              }
+
               const visibleItems = getVisibleItems(category.items);
               if (visibleItems.length === 0) return null;
 

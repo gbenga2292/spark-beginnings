@@ -21,3 +21,9 @@ export function isValidUUID(id: string): boolean {
   if (!id) return false;
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 }
+
+/**
+ * Global flag to detect if the app is being built/run as the limited web version.
+ * Controlled via VITE_WEB_VERSION environment variable.
+ */
+export const IS_LIMITED_WEB_WEB = import.meta.env.VITE_WEB_VERSION === 'true';

@@ -1,0 +1,1 @@
+import{R as t}from"./index-BW9BOPPl.js";function Y(a,e){const r=t(a,e==null?void 0:e.in),u=r.getFullYear();return r.setFullYear(u+1,0,0),r.setHours(23,59,59,999),r}function c(a,e){return t(a,e==null?void 0:e.in).getFullYear()}export{Y as e,c as g};

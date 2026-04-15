@@ -1,0 +1,1 @@
+import{V as c,bq as s,ai as d,br as f}from"./index-BW9BOPPl.js";import{a as i}from"./addDays-DBMNyv7j.js";function o(r){return e=>{const n=(r?Math[r]:Math.trunc)(e);return n===0?0:n}}function D(r,e,a){const[n,t]=c(a==null?void 0:a.in,r,e),u=(+n-+t)/s;return o(a==null?void 0:a.roundingMethod)(u)}function M(r,e){return d(r,i(f(r),1),e)}export{D as d,M as i};

@@ -16,6 +16,7 @@ import { PageErrorBoundary } from './components/common/PageErrorBoundary';
 import { TaskProvider } from './contexts/AppDataContext';
 import { PageProvider } from './contexts/PageContext';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
+import { IS_LIMITED_WEB_WEB } from './lib/utils';
 
 // ── Lazy-loaded pages ─────────────────────────────────────────────────────────
 // These are code-split to keep the initial bundle small. Each page loads on demand.
@@ -132,72 +133,77 @@ function AppContent() {
       <Route path="/setup" element={<SuperAdminSetup />} />
       <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
         <Route index element={<Page label="Task Dashboard"><ProtectedRoute requiredModule="tasks"><TaskDashboard /></ProtectedRoute></Page>} />
-        <Route path="hr-dashboard" element={<Page label="HR Dashboard"><ProtectedRoute requiredModule="dashboard"><Dashboard /></ProtectedRoute></Page>} />
-        <Route path="attendance" element={<Page label="Attendance"><ProtectedRoute requiredModule="attendance"><Attendance /></ProtectedRoute></Page>} />
-        <Route path="employees" element={<Page label="Employees"><ProtectedRoute requiredModule="employees"><Employees /></ProtectedRoute></Page>} />
-        <Route path="beneficiaries" element={<Page label="Beneficiaries"><ProtectedRoute requiredModule="beneficiaries"><Beneficiaries /></ProtectedRoute></Page>} />
-        <Route path="organogram" element={<Page label="Organogram"><ProtectedRoute requiredModule="employees"><Organogram /></ProtectedRoute></Page>} />
-        <Route path="sites" element={<Page label="Sites"><ProtectedRoute requiredModule="sites"><Sites /></ProtectedRoute></Page>} />
-        <Route path="sites/onboarding/:id" element={<Page label="Site Onboarding"><ProtectedRoute requiredModule="sites"><SiteOnboarding /></ProtectedRoute></Page>} />
-        <Route path="payroll" element={<Page label="Payroll"><ProtectedRoute requiredModule="payroll"><Payroll /></ProtectedRoute></Page>} />
-        <Route path="client-accounts" element={<Page label="Client Accounts"><ProtectedRoute requiredModule="sites"><ClientAccounts /></ProtectedRoute></Page>} />
-        <Route path="invoices" element={<Navigate to="/client-accounts" replace />} />
-        <Route path="payments" element={<Navigate to="/client-accounts" replace />} />
-        <Route path="vat" element={<Navigate to="/client-accounts" replace />} />
-        <Route path="onboarding" element={<Page label="Onboarding"><ProtectedRoute requiredModule="onboarding"><Onboarding /></ProtectedRoute></Page>} />
-        <Route path="onboarding/new" element={<Page label="New Hire"><ProtectedRoute requiredModule="onboarding"><NewHire /></ProtectedRoute></Page>} />
-        <Route path="onboarding/contract" element={<Page label="Generate Contract"><ProtectedRoute requiredModule="onboarding"><GenerateContract /></ProtectedRoute></Page>} />
-        <Route path="onboarding/offboard" element={<Page label="Offboarding"><ProtectedRoute requiredModule="onboarding"><StartOffboarding /></ProtectedRoute></Page>} />
-        <Route path="reports" element={<Page label="Reports"><ProtectedRoute requiredModule="reports"><Reports /></ProtectedRoute></Page>} />
-        <Route path="financial-reports" element={<Page label="Financial Reports"><ProtectedRoute requiredModule="financialReports"><FinancialReports /></ProtectedRoute></Page>} />
-        <Route path="settings" element={<Page label="Settings"><ProtectedRoute requiredModule="variables"><Settings /></ProtectedRoute></Page>} />
-        <Route path="profile" element={<Page label="Profile"><ProtectedRoute><Profile /></ProtectedRoute></Page>} />
-        <Route path="variables" element={<Navigate to="/settings" replace />} />
-        <Route path="leaves" element={<Page label="Leaves"><ProtectedRoute requiredModule="leaves"><Leaves /></ProtectedRoute></Page>} />
-        <Route path="leave-summary" element={<Page label="Leave Summary"><ProtectedRoute requiredModule="leaves"><LeaveSummary /></ProtectedRoute></Page>} />
-        <Route path="users" element={<Page label="Users"><ProtectedRoute requiredModule="users"><Users /></ProtectedRoute></Page>} />
-        <Route path="users/new" element={<Page label="New User"><ProtectedRoute requiredModule="users"><UserForm /></ProtectedRoute></Page>} />
-        <Route path="users/:id/edit" element={<Page label="Edit User"><ProtectedRoute requiredModule="users"><UserForm /></ProtectedRoute></Page>} />
-        <Route path="salary-loans" element={<Page label="Salary & Loans"><ProtectedRoute requiredModule="salaryLoans"><SalaryLoans /></ProtectedRoute></Page>} />
-        <Route path="hmo" element={<Page label="HMO Management"><ProtectedRoute requiredModule="hmo"><HmoManagement /></ProtectedRoute></Page>} />
-        <Route path="performance-conduct" element={<Page label="Performance & Conduct"><ProtectedRoute requiredModule="disciplinary"><PerformanceConduct /></ProtectedRoute></Page>} />
-        <Route path="evaluations" element={<Page label="Evaluations"><ProtectedRoute requiredModule="evaluations"><Evaluations /></ProtectedRoute></Page>} />
-        <Route path="ledger" element={<Page label="Ledger"><ProtectedRoute requiredModule="ledger"><Ledger /></ProtectedRoute></Page>} />
-        <Route path="company-expenses" element={<Page label="Company Expenses"><ProtectedRoute requiredModule="ledger"><CompanyExpenses /></ProtectedRoute></Page>} />
-        <Route path="clients" element={<Page label="Clients"><ProtectedRoute requiredModule="clients"><ClientDetails /></ProtectedRoute></Page>} />
+        
+        {/* ── Restricted Modules (Hidden in Web Build) ────────────────────────── */}
+        {!IS_LIMITED_WEB_WEB && (
+          <>
+            <Route path="hr-dashboard" element={<Page label="HR Dashboard"><ProtectedRoute requiredModule="dashboard"><Dashboard /></ProtectedRoute></Page>} />
+            <Route path="attendance" element={<Page label="Attendance"><ProtectedRoute requiredModule="attendance"><Attendance /></ProtectedRoute></Page>} />
+            <Route path="employees" element={<Page label="Employees"><ProtectedRoute requiredModule="employees"><Employees /></ProtectedRoute></Page>} />
+            <Route path="beneficiaries" element={<Page label="Beneficiaries"><ProtectedRoute requiredModule="beneficiaries"><Beneficiaries /></ProtectedRoute></Page>} />
+            <Route path="organogram" element={<Page label="Organogram"><ProtectedRoute requiredModule="employees"><Organogram /></ProtectedRoute></Page>} />
+            <Route path="sites" element={<Page label="Sites"><ProtectedRoute requiredModule="sites"><Sites /></ProtectedRoute></Page>} />
+            <Route path="sites/onboarding/:id" element={<Page label="Site Onboarding"><ProtectedRoute requiredModule="sites"><SiteOnboarding /></ProtectedRoute></Page>} />
+            <Route path="payroll" element={<Page label="Payroll"><ProtectedRoute requiredModule="payroll"><Payroll /></ProtectedRoute></Page>} />
+            <Route path="client-accounts" element={<Page label="Client Accounts"><ProtectedRoute requiredModule="sites"><ClientAccounts /></ProtectedRoute></Page>} />
+            <Route path="invoices" element={<Navigate to="/client-accounts" replace />} />
+            <Route path="payments" element={<Navigate to="/client-accounts" replace />} />
+            <Route path="vat" element={<Navigate to="/client-accounts" replace />} />
+            <Route path="onboarding" element={<Page label="Onboarding"><ProtectedRoute requiredModule="onboarding"><Onboarding /></ProtectedRoute></Page>} />
+            <Route path="onboarding/new" element={<Page label="New Hire"><ProtectedRoute requiredModule="onboarding"><NewHire /></ProtectedRoute></Page>} />
+            <Route path="onboarding/contract" element={<Page label="Generate Contract"><ProtectedRoute requiredModule="onboarding"><GenerateContract /></ProtectedRoute></Page>} />
+            <Route path="onboarding/offboard" element={<Page label="Offboarding"><ProtectedRoute requiredModule="onboarding"><StartOffboarding /></ProtectedRoute></Page>} />
+            <Route path="reports" element={<Page label="Reports"><ProtectedRoute requiredModule="reports"><Reports /></ProtectedRoute></Page>} />
+            <Route path="financial-reports" element={<Page label="Financial Reports"><ProtectedRoute requiredModule="financialReports"><FinancialReports /></ProtectedRoute></Page>} />
+            <Route path="settings" element={<Page label="Settings"><ProtectedRoute requiredModule="variables"><Settings /></ProtectedRoute></Page>} />
+            <Route path="variables" element={<Navigate to="/settings" replace />} />
+            <Route path="leaves" element={<Page label="Leaves"><ProtectedRoute requiredModule="leaves"><Leaves /></ProtectedRoute></Page>} />
+            <Route path="leave-summary" element={<Page label="Leave Summary"><ProtectedRoute requiredModule="leaves"><LeaveSummary /></ProtectedRoute></Page>} />
+            <Route path="users" element={<Page label="Users"><ProtectedRoute requiredModule="users"><Users /></ProtectedRoute></Page>} />
+            <Route path="users/new" element={<Page label="New User"><ProtectedRoute requiredModule="users"><UserForm /></ProtectedRoute></Page>} />
+            <Route path="users/:id/edit" element={<Page label="Edit User"><ProtectedRoute requiredModule="users"><UserForm /></ProtectedRoute></Page>} />
+            <Route path="salary-loans" element={<Page label="Salary & Loans"><ProtectedRoute requiredModule="salaryLoans"><SalaryLoans /></ProtectedRoute></Page>} />
+            <Route path="hmo" element={<Page label="HMO Management"><ProtectedRoute requiredModule="hmo"><HmoManagement /></ProtectedRoute></Page>} />
+            <Route path="performance-conduct" element={<Page label="Performance & Conduct"><ProtectedRoute requiredModule="disciplinary"><PerformanceConduct /></ProtectedRoute></Page>} />
+            <Route path="evaluations" element={<Page label="Evaluations"><ProtectedRoute requiredModule="evaluations"><Evaluations /></ProtectedRoute></Page>} />
+            <Route path="ledger" element={<Page label="Ledger"><ProtectedRoute requiredModule="ledger"><Ledger /></ProtectedRoute></Page>} />
+            <Route path="clients" element={<Page label="Clients"><ProtectedRoute requiredModule="clients"><ClientDetails /></ProtectedRoute></Page>} />
+            
+            {/* Operations & Analytics — Restricted on Web */}
+            <Route path="operations/*" element={
+              <Page label="Operations">
+                <ProtectedRoute requiredModule="operations">
+                  <OperationsProvider>
+                    <Routes>
+                      <Route index element={<OperationsDashboard />} />
+                      <Route path="assets" element={<ProtectedRoute requiredModule="opsInventory"><AssetManager /></ProtectedRoute>} />
+                      <Route path="waybills" element={<ProtectedRoute requiredModule="opsWaybills"><WaybillManager /></ProtectedRoute>} />
+                      <Route path="checkout" element={<ProtectedRoute requiredModule="opsCheckout"><QuickCheckout /></ProtectedRoute>} />
+                      <Route path="maintenance" element={<ProtectedRoute requiredModule="opsMaintenance"><MaintenanceManager /></ProtectedRoute>} />
+                      <Route path="vehicles" element={<ProtectedRoute requiredModule="opsVehicles"><VehicleManager /></ProtectedRoute>} />
+                      <Route path="sites" element={<ProtectedRoute requiredModule="opsSites"><SiteManager /></ProtectedRoute>} />
+                      <Route path="*" element={<Navigate to="/operations" replace />} />
+                    </Routes>
+                  </OperationsProvider>
+                </ProtectedRoute>
+              </Page>
+            } />
+            <Route path="activity-log" element={<Page label="Activity Log"><ProtectedRoute requiredModule="activityLog"><ActivityLog /></ProtectedRoute></Page>} />
+            <Route path="employee-analytics" element={<Page label="Employee Analytics"><ProtectedRoute requiredModule="employees"><EmployeeAnalytics /></ProtectedRoute></Page>} />
+          </>
+        )}
 
-        {/* Task Manager Module */}
+        {/* ── Shared Routes (Available in Web Build) ─────────────────────────── */}
+        <Route path="profile" element={<Page label="Profile"><ProtectedRoute><Profile /></ProtectedRoute></Page>} />
+        <Route path="company-expenses" element={<Page label="Company Expenses"><ProtectedRoute requiredModule="ledger"><CompanyExpenses /></ProtectedRoute></Page>} />
+        
         <Route path="tasks" element={<Page label="Task Register"><ProtectedRoute requiredModule="tasks"><Tasks /></ProtectedRoute></Page>} />
         <Route path="tasks/dashboard" element={<Navigate to="/" replace />} />
         <Route path="tasks/reminders" element={<Page label="Task Reminders"><ProtectedRoute requiredModule="tasks"><TaskReminders /></ProtectedRoute></Page>} />
         <Route path="tasks/reports" element={<Page label="Task Reports"><ProtectedRoute requiredModule="tasks"><TaskReports /></ProtectedRoute></Page>} />
-
+        
         <Route path="comm-log" element={<Page label="Communication Log"><ProtectedRoute requiredModule="commLog"><CommLog /></ProtectedRoute></Page>} />
-
-        {/* Operations Module */}
-        <Route path="operations/*" element={
-          <Page label="Operations">
-            <ProtectedRoute requiredModule="operations">
-              <OperationsProvider>
-                <Routes>
-                  <Route index element={<OperationsDashboard />} />
-                  <Route path="assets" element={<ProtectedRoute requiredModule="opsInventory"><AssetManager /></ProtectedRoute>} />
-                  <Route path="waybills" element={<ProtectedRoute requiredModule="opsWaybills"><WaybillManager /></ProtectedRoute>} />
-                  <Route path="checkout" element={<ProtectedRoute requiredModule="opsCheckout"><QuickCheckout /></ProtectedRoute>} />
-                  <Route path="maintenance" element={<ProtectedRoute requiredModule="opsMaintenance"><MaintenanceManager /></ProtectedRoute>} />
-                  <Route path="vehicles" element={<ProtectedRoute requiredModule="opsVehicles"><VehicleManager /></ProtectedRoute>} />
-                  <Route path="sites" element={<ProtectedRoute requiredModule="opsSites"><SiteManager /></ProtectedRoute>} />
-                  <Route path="*" element={<Navigate to="/operations" replace />} />
-                </Routes>
-              </OperationsProvider>
-            </ProtectedRoute>
-          </Page>
-        } />
-
-
-        <Route path="activity-log" element={<Page label="Activity Log"><ProtectedRoute requiredModule="activityLog"><ActivityLog /></ProtectedRoute></Page>} />
         <Route path="notifications" element={<Page label="Notifications"><ProtectedRoute><NotificationsPage /></ProtectedRoute></Page>} />
-        <Route path="employee-analytics" element={<Page label="Employee Analytics"><ProtectedRoute requiredModule="employees"><EmployeeAnalytics /></ProtectedRoute></Page>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
