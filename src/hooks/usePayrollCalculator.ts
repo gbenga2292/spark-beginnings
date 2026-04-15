@@ -109,8 +109,13 @@ export function usePayrollCalculator() {
 
             if (r.day?.toLowerCase() === 'yes') {
               daysWorked += 1;
-            } else if (r.day?.toLowerCase() === 'no') {
-              // Only count real absences, matching Payroll.tsx logic
+            }
+            if (r.night?.toLowerCase() === 'yes') {
+              daysWorked += 1;
+            }
+            
+            if (r.day?.toLowerCase() === 'no' && r.night?.toLowerCase() === 'no') {
+              // Only count real absences if NEITHER shift was worked
               const st = (r as any).absentStatus?.toUpperCase() || '';
               const isRealAbsence = ['ABSENT', 'NO WORK', 'ABSENT WITHOUT PERMIT', 'SUSPENSION', 'OFF DUTY'].includes(st);
               if (isRealAbsence) {

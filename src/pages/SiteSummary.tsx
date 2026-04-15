@@ -8,6 +8,7 @@ import { usePriv } from '@/src/hooks/usePriv';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { usePayrollCalculator } from '@/src/hooks/usePayrollCalculator';
+import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
 
 export function SiteSummary({ filterYear, filterMonth }: { filterYear?: string, filterMonth?: string } = {}) {
   const [internalMonth, setInternalMonth] = useState(new Date().getMonth() + 1);
@@ -21,6 +22,7 @@ export function SiteSummary({ filterYear, filterMonth }: { filterYear?: string, 
   const pendingSites = useAppStore(s => s.pendingSites);
   const employees = useAppStore(s => s.employees);
   const sites = useAppStore(s => s.sites);
+  const publicHolidays = useAppStore(s => s.publicHolidays);
 
   const priv = usePriv('sites');
   const { calculatePayrollForMonth } = usePayrollCalculator();
@@ -50,95 +52,134 @@ export function SiteSummary({ filterYear, filterMonth }: { filterYear?: string, 
   const results: { name: string; client: string; cost: number; teamSize: number }[] = [];
   let grandTotal = 0;
 
-  if (workDays > 0) {
-    const payrollRows = calculatePayrollForMonth(currentMonthKey, parseInt(selectedYear));
-    
+    const filterAllMonths = filterMonth === 'All';
+    const monthsToProcess = filterAllMonths 
+      ? Array.from({ length: parseInt(selectedYear) === new Date().getFullYear() ? new Date().getMonth() + 1 : 12 }, (_, i) => i + 1)
+      : [selectedMonth];
+
+    // Build a Master Client Map for accuracy
+    const masterSiteMap: Record<string, { client: string; name: string }> = {};
+    sites.forEach(s => {
+      masterSiteMap[s.name.toLowerCase().trim()] = { client: s.client, name: s.name };
+    });
+    pendingSites.forEach(s => {
+      const key = s.siteName.toLowerCase().trim();
+      if (!masterSiteMap[key]) {
+        masterSiteMap[key] = { client: s.clientName || 'Internal', name: s.siteName };
+      }
+    });
+
     // Group purely by Site Name. The Master Lists dictate the true assigned Client.
     const siteAllocations: Record<string, { cost: number; teamSize: Set<string>; displayName: string; displayClient: string }> = {};
 
-    // 1. Initialize with Master Sites
-    sites.forEach(s => {
+    // 1. Initialize with Master Map
+    Object.values(masterSiteMap).forEach(s => {
       const key = s.name.toLowerCase().trim();
       siteAllocations[key] = { cost: 0, teamSize: new Set(), displayName: s.name, displayClient: s.client };
     });
 
-    // 2. Initialize with Pending Sites (acting as fallbacks)
-    pendingSites.forEach(s => {
-      const key = s.siteName.toLowerCase().trim();
-      if (!siteAllocations[key]) {
-        siteAllocations[key] = { cost: 0, teamSize: new Set(), displayName: s.siteName, displayClient: s.clientName || 'Internal' };
-      }
-    });
-
-    // 3. Ensure a definitive 'Office' bucket exists
-    const officeSite = sites.find(s => s.name.toLowerCase().trim() === 'office' || s.client === 'DCEL');
-    const finalOfficeSiteName = officeSite?.name || 'Office';
-    const finalOfficeClientName = officeSite?.client || 'DCEL';
-    const officeKey = finalOfficeSiteName.toLowerCase().trim();
-
+    // 2. Ensure a definitive 'Office' bucket exists
+    const officeKey = 'office';
     if (!siteAllocations[officeKey]) {
-      siteAllocations[officeKey] = { cost: 0, teamSize: new Set(), displayName: finalOfficeSiteName, displayClient: finalOfficeClientName };
+      const officeSite = sites.find(s => s.name.toLowerCase().trim() === 'office' || s.client === 'DCEL');
+      siteAllocations[officeKey] = { 
+        cost: 0, 
+        teamSize: new Set(), 
+        displayName: officeSite?.name || 'Office', 
+        displayClient: officeSite?.client || 'DCEL' 
+      };
     }
 
-    payrollRows.forEach(row => {
-      const staffPayrollId = row.id;
-      const staffGrossPay = row.grossPay;
-      
-      if (staffGrossPay <= 0) return;
+    monthsToProcess.forEach(mIdx => {
+      const mKey = monthsMap[mIdx - 1];
+      const mValues = monthValues[mKey];
+      if (!mValues || mValues.workDays <= 0) return;
 
-      const staffRecords = attendanceRecords.filter(r => {
-        if (!r.date || r.staffId !== staffPayrollId) return false;
-        const [yStr, mStr] = r.date.split('-');
-        return parseInt(yStr, 10) === parseInt(selectedYear) && parseInt(mStr, 10) === selectedMonth;
-      });
+      const payrollRows = calculatePayrollForMonth(mKey, parseInt(selectedYear));
+      const holidayDates = publicHolidays.map(h => h.date);
+      const payrollVariables = useAppStore.getState().payrollVariables;
+      const mOvertimeRate = mValues.overtimeRate;
 
-      // Gather this staff's proportional weight for each site they worked
-      const staffSiteContribution: Record<string, number> = {};
-      let totalStaffUnits = 0;
+      payrollRows.forEach(row => {
+        const staffPayrollId = row.id;
+        const staffGrossPay = row.grossPay;
+        
+        if (staffGrossPay <= 0) return;
 
-      staffRecords.forEach(r => {
-        const processShift = (sName: string, cName: string, weight: number) => {
-          if (!sName) return;
-          const cleanedSite = sName.trim();
-          const lowerSite = cleanedSite.toLowerCase();
-          
-          if (!siteAllocations[lowerSite]) {
-            // Unregistered ad-hoc site directly from Attendance
-            siteAllocations[lowerSite] = { 
-              cost: 0, 
-              teamSize: new Set(), 
-              displayName: cleanedSite, 
-              displayClient: cName?.trim() && cName.trim() !== 'Internal' ? cName.trim() : 'Internal' 
-            };
-          }
-
-          staffSiteContribution[lowerSite] = (staffSiteContribution[lowerSite] || 0) + weight;
-          totalStaffUnits += weight;
-        };
-
-        processShift(r.daySite, r.dayClient, 1);
-        processShift(r.nightSite, r.nightClient, 1);
-        // OT weight is 1 (not 1 + overtimeRate) because grossPay already includes
-        // the overtime premium as a lump sum — the weight here is purely for
-        // proportional session-based distribution, not cost-weighting.
-        processShift(r.otSite, '', 1);
-      });
-
-      // Distribute Gross Pay across sites based on worked weights
-      if (totalStaffUnits > 0) {
-        Object.entries(staffSiteContribution).forEach(([siteKey, units]) => {
-          const proportion = units / totalStaffUnits;
-          const allocatedCost = proportion * staffGrossPay;
-          
-          siteAllocations[siteKey].cost += allocatedCost;
-          siteAllocations[siteKey].teamSize.add(staffPayrollId);
+        const staffRecords = attendanceRecords.filter(r => {
+          if (!r.date || r.staffId !== staffPayrollId) return false;
+          const [yStr, mStr] = r.date.split('-');
+          return parseInt(yStr, 10) === parseInt(selectedYear) && parseInt(mStr, 10) === mIdx;
         });
-      } else {
-        // No physical attendance records for this month -> attribute to Office overhead
-        siteAllocations[officeKey].cost += staffGrossPay;
-        siteAllocations[officeKey].teamSize.add(staffPayrollId);
-      }
+
+        // Gather this staff's proportional weight for each site they worked
+        const staffSiteContribution: Record<string, number> = {};
+        let totalStaffUnits = 0;
+
+        staffRecords.forEach(r => {
+          const metrics = calculateAttendanceMetrics(r, holidayDates, payrollVariables, monthValues as any, attendanceRecords);
+
+          const processShift = (sName: string, cName: string, weight: number) => {
+            if (!sName || weight <= 0) return;
+            const cleanedSite = sName.trim();
+            const lowerSite = cleanedSite.toLowerCase();
+            
+            if (!siteAllocations[lowerSite]) {
+              // Try to find a fuzzy match in master map if exact match fails
+              const fuzzyMasterKey = Object.keys(masterSiteMap).find(k => 
+                k.includes(lowerSite) || lowerSite.includes(k)
+              );
+              const master = fuzzyMasterKey ? masterSiteMap[fuzzyMasterKey] : null;
+
+              siteAllocations[lowerSite] = { 
+                cost: 0, 
+                teamSize: new Set(), 
+                displayName: master?.name || cleanedSite, 
+                displayClient: master?.client || (cName?.trim() && cName.trim() !== 'Internal' ? cName.trim() : 'Internal')
+              };
+            } else {
+                // Already exists, but ensure we are using the Master Client name if available
+                const fuzzyMasterKey = Object.keys(masterSiteMap).find(k => 
+                    k === lowerSite || k.includes(lowerSite) || lowerSite.includes(k)
+                );
+                const master = fuzzyMasterKey ? masterSiteMap[fuzzyMasterKey] : null;
+                if (master && (siteAllocations[lowerSite].displayClient === 'Internal' || !siteAllocations[lowerSite].displayClient)) {
+                    siteAllocations[lowerSite].displayName = master.name;
+                    siteAllocations[lowerSite].displayClient = master.client;
+                }
+            }
+
+            staffSiteContribution[lowerSite] = (staffSiteContribution[lowerSite] || 0) + weight;
+            totalStaffUnits += weight;
+          };
+
+          // Standard Shifts (Cores)
+          if (r.day === 'Yes') processShift(r.daySite, r.dayClient, 1);
+          if (r.night === 'Yes') processShift(r.nightSite, r.nightClient, 1);
+
+          // OT / Premium Components
+          if (metrics.ot > 0) {
+            processShift(metrics.otSite, '', 1 + mOvertimeRate);
+          }
+        });
+
+        // Distribute Gross Pay across sites based on worked weights
+        if (totalStaffUnits > 0) {
+          Object.entries(staffSiteContribution).forEach(([siteKey, units]) => {
+            const proportion = units / totalStaffUnits;
+            const allocatedCost = proportion * staffGrossPay;
+            
+            siteAllocations[siteKey].cost += allocatedCost;
+            siteAllocations[siteKey].teamSize.add(staffPayrollId);
+          });
+        } else {
+          // No physical attendance records for this month -> attribute to Office overhead
+          siteAllocations[officeKey].cost += staffGrossPay;
+          siteAllocations[officeKey].teamSize.add(staffPayrollId);
+        }
+      });
     });
+
 
     // Convert map to strictly populated array
     Object.values(siteAllocations).forEach(data => {
@@ -152,7 +193,6 @@ export function SiteSummary({ filterYear, filterMonth }: { filterYear?: string, 
         grandTotal += data.cost;
       }
     });
-  }
 
   results.sort((a, b) => b.cost - a.cost);
 

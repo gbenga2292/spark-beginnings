@@ -3,6 +3,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { useAppStore, AttendanceRecord } from '@/src/store/appStore';
+import { supabase } from '@/src/integrations/supabase/client';
 import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
@@ -97,6 +98,50 @@ export function Attendance() {
   };
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const [nameResolutions, setNameResolutions] = useState<Record<string, string>>({});
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('hotfix') === 'abayomi') {
+      const runFix = async () => {
+        try {
+          const dates = ["2026-04-10", "2026-04-11", "2026-04-12", "2026-04-13"];
+          const abayomi = employees.find(e => 
+            (e.surname?.toLowerCase().includes('abayomi')) || 
+            (e.firstname?.toLowerCase().includes('abayomi')) || 
+            (e.surname?.toLowerCase().includes('shodunke')) || 
+            (e.firstname?.toLowerCase().includes('shodunke'))
+          );
+          
+          if (!abayomi) {
+            console.error("Abayomi not found in local cache");
+            return;
+          }
+
+          const { data, error } = await supabase.from('attendance_records')
+            .select('*')
+            .in('date', dates)
+            .eq('staff_id', abayomi.id);
+            
+          if (error) { console.error("Error: ", error.message); return; }
+          if (!data || data.length === 0) { console.warn("No records found for Abayomi on those dates."); return; }
+          
+          for (const r of data) {
+            if (r.date === '2026-04-12') {
+              console.log('Deleting record for Sunday 12th', r.id);
+              await supabase.from('attendance_records').delete().match({ id: r.id });
+            } else {
+              console.log('Clearing night shift for', r.date, r.id);
+              await supabase.from('attendance_records').update({ night: 'No', night_site: '', night_client: '' }).match({ id: r.id });
+            }
+          }
+          alert("Abayomi data fixed. Remove ?hotfix=abayomi from URL and refresh.");
+        } catch(e: any) {
+          console.error("Hotfix failed: ", e.message);
+        }
+      };
+      runFix();
+    }
+  }, [employees]);
   const [nameSearchTerms, setNameSearchTerms] = useState<Record<string, string>>({});
 
   // ─── Permissions ───────────────────────────────────────────
@@ -249,7 +294,7 @@ export function Attendance() {
       existingRecords.forEach(r => {
         loadedData[r.staffId] = {
           day: r.daySite || r.absentStatus || '',
-          night: r.nightSite || (r.absentStatus && !r.daySite ? r.absentStatus : ''),
+          night: r.nightSite || '',
           overtime: r.overtimeDetails ? true : false,
           overtimeDetails: r.overtimeDetails || ''
         };
@@ -269,7 +314,12 @@ export function Attendance() {
         ? emp.staffType === 'NON-EMPLOYEE' 
         : emp.staffType === staffTypeFilter;
       const isNotCEO = emp.position !== 'CEO';
-      return matchesSearch && matchesType && isNotCEO;
+      
+      // Only show employees who have started by this date and haven't left yet
+      const hasStarted = !emp.startDate || emp.startDate <= registerDate;
+      const notEnded = !emp.endDate || emp.endDate >= registerDate;
+      
+      return matchesSearch && matchesType && isNotCEO && hasStarted && notEnded;
     }).sort((a, b) => {
       const idxA = getPositionIndex(a.position);
       const idxB = getPositionIndex(b.position);
@@ -473,7 +523,7 @@ export function Attendance() {
           const nightPermitOverride = isPermit(nightSiteRaw);
 
           const day: 'Yes' | 'No' = (dSite && !isAbsentStatus(dSite)) || permitOverride ? 'Yes' : 'No';
-          const night: 'Yes' | 'No' = (nSite && !isAbsentStatus(nSite)) || nightPermitOverride ? 'Yes' : 'No';
+          const night: 'Yes' | 'No' = (nSite && !isAbsentStatus(nSite)) ? 'Yes' : 'No';
           return {
             id: generateId(), date, staffId: empId, staffName: empName,
             position: '', dayClient: dSiteObj?.client || (permitOverride ? 'DCEL' : ''), 
@@ -631,7 +681,7 @@ export function Attendance() {
       const nightPermitOverride = isPermit(ns);
 
       const day = (ds && !isAbsentStatus(ds)) || permitOverride ? 'Yes' : 'No';
-      const night = (ns && !isAbsentStatus(ns)) || nightPermitOverride ? 'Yes' : 'No';
+      const night = (ns && !isAbsentStatus(ns)) ? 'Yes' : 'No';
 
       const finalDaySite = (isAbsentStatus(ds) && !isPermit(ds)) ? (permitOverride ? 'Office' : '') : (permitOverride ? 'Office' : ds);
       const finalNightSite = (isAbsentStatus(ns) && !isPermit(ns)) ? '' : (nightPermitOverride ? 'Office' : ns);
@@ -716,15 +766,23 @@ export function Attendance() {
     return ["ABSENT", "ABSENT WITH PERMIT", "ABSENT WITHOUT PERMIT", "ON LEAVE", "NO WORK", "SICK LEAVE", "MATERNITY LEAVE", "ANNUAL LEAVE", "SUSPENSION", "PUBLIC HOLIDAY", "OFF DUTY"].includes(upper);
   };
 
-  const applyOverride = (src: string, currentSite: string, currentShift: string, currentReason: string) => {
+  const applyOverride = (src: string, currentSite: string, currentShift: string, currentReason: string, isNight: boolean = false) => {
     if (!src) return { site: currentSite, shift: currentShift, reason: currentReason };
     const upperSrc = src.toUpperCase();
-    if (["ABSENT", "NO WORK", "ABSENT WITHOUT PERMIT", "SUSPENSION", "OFF DUTY"].includes(upperSrc)) {
-      return { site: src, shift: "No", reason: src };
+    
+    const isAbsent = ["ABSENT", "NO WORK", "ABSENT WITHOUT PERMIT", "SUSPENSION", "OFF DUTY"].includes(upperSrc);
+    const isPaidLeave = ["ABSENT WITH PERMIT", "ON LEAVE", "SICK LEAVE", "MATERNITY LEAVE", "ANNUAL LEAVE", "PUBLIC HOLIDAY"].includes(upperSrc);
+    
+    if (isAbsent || isPaidLeave) {
+      if (isNight || isAbsent) {
+        // Night shifts or primary absences should always be 'No' work
+        return { site: "", shift: "No", reason: (isPaidLeave && !currentReason) ? src : (currentReason || src) };
+      }
+      // Paid leaves like 'On Leave' or 'Absent with Permit' count as Day shift Yes at Office
+      const site = (upperSrc === "ABSENT WITH PERMIT" || upperSrc === "ON LEAVE") ? "Office" : src;
+      return { site, shift: "Yes", reason: src };
     }
-    if (["ABSENT WITH PERMIT", "ON LEAVE", "SICK LEAVE", "MATERNITY LEAVE", "ANNUAL LEAVE", "PUBLIC HOLIDAY"].includes(upperSrc)) {
-      return { site: (upperSrc === "ABSENT WITH PERMIT" || upperSrc === "ON LEAVE") ? "Office" : src, shift: "Yes", reason: src };
-    }
+    
     return { site: src, shift: "Yes", reason: currentReason };
   };
 
@@ -789,9 +847,19 @@ export function Attendance() {
     const rawRecords: RawRecord[] = [];
 
     employees.forEach(emp => {
+      const deptObj = departments.find(d => d.name === emp.department);
+      const defaultDays = emp.staffType === 'FIELD' ? 6 : 5;
+      const wd = deptObj?.workDaysPerWeek ?? defaultDays;
+      const isWorkday = (dow <= wd) && !dateIsHoliday;
+
       const onLeave = employeesOnLeaveForRegisterDate.has(emp.id);
-      const formDaySite = onLeave ? 'On Leave' : (attendanceData[emp.id]?.day || '');
-      const formNightSite = onLeave ? 'On Leave' : (attendanceData[emp.id]?.night || '');
+      
+      // If on leave and it's a workday, force 'On Leave' status for Day shift. 
+      // If it's NOT a workday, leave status doesn't apply (it is just a regular non-workday).
+      const formDaySite = (onLeave && isWorkday) ? 'On Leave' : (!onLeave ? (attendanceData[emp.id]?.day || '') : '');
+      
+      // If on leave, they CANNOT have the night shift pre-filled.
+      const formNightSite = (onLeave) ? '' : (attendanceData[emp.id]?.night || '');
 
       let staffHasWorkEntry = false;
       if (formDaySite && !isAbsentStatus(formDaySite)) staffHasWorkEntry = true;
@@ -800,7 +868,7 @@ export function Attendance() {
       // Default: on weekdays that aren't holidays, Operations staff are at Office for day shift
       // Other departments only get an entry if manually specified (status, day, night, or overtime).
       const isOperations = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase());
-      const fillData = isOperations ? !(isSunday || dateIsHoliday) : false;
+      const fillData = isOperations ? isWorkday : false;
       const hasOvertime = attendanceData[emp.id]?.overtime;
       if (!fillData && !staffHasWorkEntry && !formDaySite && !formNightSite && !hasOvertime) return;
 
@@ -810,12 +878,12 @@ export function Attendance() {
       let nightShift: 'Yes' | 'No' = "No";
       let absentReason = "";
 
-      const dayOverride = applyOverride(formDaySite, daySite, dayShift, absentReason);
+      const dayOverride = applyOverride(formDaySite, daySite, dayShift, absentReason, false);
       daySite = dayOverride.site;
       dayShift = dayOverride.shift as 'Yes' | 'No';
       absentReason = dayOverride.reason;
 
-      const nightOverride = applyOverride(formNightSite, nightSite, nightShift, absentReason);
+      const nightOverride = applyOverride(formNightSite, nightSite, nightShift, absentReason, true);
       nightSite = nightOverride.site;
       nightShift = nightOverride.shift as 'Yes' | 'No';
       absentReason = nightOverride.reason;
@@ -1171,10 +1239,17 @@ export function Attendance() {
                   ) : (
                     filteredEmployees.map((employee, idx) => {
                       const onLeave = employeesOnLeaveForRegisterDate.has(employee.id);
-                      const dayVal = onLeave ? 'On Leave' : (attendanceData[employee.id]?.day || '');
-                      const nightVal = onLeave ? 'On Leave' : (attendanceData[employee.id]?.night || '');
-                      const hasEntry = dayVal || nightVal;
+                      
+                      const dow = getDOW(registerDate);
+                      const deptObj = departments.find(d => d.name === employee.department);
+                      const defaultDays = employee.staffType === 'FIELD' ? 6 : 5;
+                      const wd = deptObj?.workDaysPerWeek ?? defaultDays;
+                      const isWorkday = (dow <= wd) && !isHoliday(registerDate);
+
+                      const dayVal = (onLeave && isWorkday) ? 'On Leave' : (!onLeave ? (attendanceData[employee.id]?.day || '') : '');
                       const isAbsent = dayVal && isAbsentStatus(dayVal);
+                      const nightVal = (!onLeave && !isAbsent) ? (attendanceData[employee.id]?.night || '') : '';
+                      const hasEntry = dayVal || nightVal;
 
                       return (
                         <tr
@@ -1225,7 +1300,7 @@ export function Attendance() {
                             <td className="py-1 px-2 border-l border-slate-100 dark:border-slate-700">
                               <select
                                 className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all ${
-                                  onLeave ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
+                                  (onLeave || isAbsent) ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
                                 } ${nightVal && !isAbsentStatus(nightVal)
                                   ? 'border-indigo-300 bg-indigo-50 text-indigo-800 font-medium'
                                   : nightVal && isAbsentStatus(nightVal)
@@ -1234,7 +1309,7 @@ export function Attendance() {
                                   } focus:ring-1 focus:ring-slate-400`}
                                 value={nightVal}
                                 onChange={(e) => handleSelectChange(employee.id, 'night', e.target.value)}
-                                disabled={onLeave}
+                                disabled={onLeave || isAbsent}
                               >
                                 <option value="">&mdash; Select &mdash;</option>
                                 <optgroup label="Sites">

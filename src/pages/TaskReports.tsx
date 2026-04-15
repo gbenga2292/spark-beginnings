@@ -3,9 +3,10 @@ import { motion } from 'framer-motion';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useWorkspace } from '@/src/hooks/use-workspace';
+import { useAppStore } from '@/src/store/appStore';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid,
-    Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area,
+    Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell,
 } from 'recharts';
 import {
     format, subDays, isPast, parseISO, startOfMonth, endOfMonth,
@@ -59,8 +60,10 @@ function AnalyticsDashboard() {
     const [rolling, setRolling]       = useState<number | null>(30);
     const [filterYear, setFilterYear] = useState<number | ''>('');   // '' = all
     const [filterMonth, setFilterMonth] = useState<number | ''>(''); // '' = all  (0-indexed)
+    const [filterSite, setFilterSite]   = useState<string>('all');
 
     const yearList = useMemo(() => buildYearList(subtasks), [subtasks]);
+    const sites = useAppStore(s => s.sites);
 
     // ── Resolve effective date interval ──────────────────────────────────────
     // Priority: Year+Month > Year only > Rolling window
@@ -103,11 +106,18 @@ function AnalyticsDashboard() {
     const validSubs = useMemo(() =>
         subtasks.filter(s => {
             if (!s.createdAt) return false;
+            
+            // Site Filter Logic: Try to match main task title with a site name
+            if (filterSite !== 'all') {
+                const mt = mainTasks.find(m => m.id === s.mainTaskId);
+                if (!mt || !mt.title.toLowerCase().includes(filterSite.toLowerCase())) return false;
+            }
+
             try {
                 return isWithinInterval(parseISO(s.createdAt), { start: intervalStart, end: intervalEnd });
             } catch { return false; }
         }),
-    [subtasks, intervalStart, intervalEnd]);
+    [subtasks, mainTasks, intervalStart, intervalEnd, filterSite]);
 
     // All-time subtasks for bottleneck (unfiltered by date)
     const allSubs = subtasks;
@@ -134,13 +144,35 @@ function AnalyticsDashboard() {
     // ── 1. Bottleneck Analysis (uses ALL subtasks — not date-filtered) ────────
     const bottleneckData = useMemo(() =>
         teamUsers.map(user => {
-            const userSubs    = allSubs.filter(s => s.assignedTo?.includes(user.id));
+            const userSubs    = allStatusSubs.filter(s => {
+                if (!s.assignedTo) return false;
+                const assignees = typeof s.assignedTo === 'string' 
+                    ? s.assignedTo.split(',').map(id => id.trim()) 
+                    : Array.isArray(s.assignedTo) ? s.assignedTo : [];
+                return assignees.includes(user.id);
+            });
             const overdue     = userSubs.filter(s => s.deadline && isPast(parseISO(s.deadline)) && s.status !== 'completed').length;
             const stuckInProg = userSubs.filter(s => s.status === 'in_progress').length;
             const completed   = userSubs.filter(s => s.status === 'completed').length;
             return { ...user, total: userSubs.length, overdue, stuckInProg, completed, riskScore: (overdue * 3) + stuckInProg };
         }).filter(u => u.total > 0).sort((a, b) => b.riskScore - a.riskScore),
-    [teamUsers, allSubs]);
+    [teamUsers, subtasks]);
+
+    const allStatusSubs = subtasks;
+
+    // ── Priority Distribution ──
+    const priorityData = useMemo(() => {
+        const counts = { urgent: 0, high: 0, medium: 0, low: 0 };
+        validSubs.forEach(s => {
+            if (s.priority) counts[s.priority] = (counts[s.priority] || 0) + 1;
+        });
+        return [
+            { name: 'Urgent', value: counts.urgent, color: '#f43f5e' },
+            { name: 'High',   value: counts.high,   color: '#f59e0b' },
+            { name: 'Medium', value: counts.medium, color: '#6366f1' },
+            { name: 'Low',    value: counts.low,    color: '#94a3b8' },
+        ].filter(p => p.value > 0);
+    }, [validSubs]);
 
     // ── 2. Velocity chart — bucket by day or month within the interval ────────
     const velocityData = useMemo(() => {
@@ -229,10 +261,37 @@ function AnalyticsDashboard() {
         return 'All time';
     }, [filterYear, filterMonth, rolling]);
 
+    const currentSiteName = useMemo(() => {
+        if (filterSite === 'all') return 'All Sites';
+        return sites.find(s => s.name === filterSite)?.name || filterSite;
+    }, [filterSite, sites]);
+
     useSetPageTitle(
         'Performance Analytics',
-        `Showing data for ${periodLabel} across ${workspace?.name}`,
+        `Analyzing ${periodLabel} · ${currentSiteName}`,
         <div className="flex items-center gap-2">
+            {/* Site Selector */}
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-9 min-w-[140px] justify-between gap-2 px-3 text-[10px] font-bold uppercase tracking-tight border-slate-200 bg-white hover:border-indigo-300 transition-colors">
+                        {currentSiteName}
+                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[180px] max-h-[300px] overflow-y-auto">
+                    <DropdownMenuItem className="text-xs" onClick={() => setFilterSite('all')}>
+                        All Sites
+                    </DropdownMenuItem>
+                    {sites.map(s => (
+                        <DropdownMenuItem key={s.id} className="text-xs" onClick={() => setFilterSite(s.name)}>
+                            {s.name}
+                        </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
+
             {/* Year Selector */}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -308,7 +367,7 @@ function AnalyticsDashboard() {
                 <Download className="h-4 w-4" /> <span className="hidden sm:inline">Export</span>
             </Button>
         </div>,
-        [filterYear, filterMonth, rolling, periodLabel, workspace?.name]
+        [filterYear, filterMonth, rolling, periodLabel, filterSite, sites, currentSiteName]
     );
 
     function startOfDay(d: Date) { const c = new Date(d); c.setHours(0,0,0,0); return c; }
@@ -435,7 +494,7 @@ function AnalyticsDashboard() {
                 </motion.div>
 
                 {/* Project Pipeline */}
-                <motion.div variants={item} className="lg:col-span-3 bg-card border border-border rounded-2xl shadow-sm p-5 min-h-64 flex flex-col">
+                <motion.div variants={item} className="lg:col-span-2 bg-card border border-border rounded-2xl shadow-sm p-5 min-h-64 flex flex-col">
                     <div className="mb-4">
                         <h3 className="text-sm font-semibold text-foreground">Project Pipeline Health</h3>
                         <p className="text-xs text-muted-foreground">Completion ratios for active projects · {periodLabel}</p>
@@ -460,6 +519,53 @@ function AnalyticsDashboard() {
                             </ResponsiveContainer>
                         </div>
                     )}
+                </motion.div>
+
+                {/* Priority Breakdown */}
+                <motion.div variants={item} className="bg-card border border-border rounded-2xl shadow-sm p-5 flex flex-col items-center justify-center">
+                    <div className="w-full mb-4">
+                        <h3 className="text-sm font-semibold text-foreground">Priority Breakdown</h3>
+                        <p className="text-xs text-muted-foreground">Risk distribution for this period</p>
+                    </div>
+                    {priorityData.length === 0 ? (
+                        <p className="text-center text-xs text-muted-foreground py-12">No priority data.</p>
+                    ) : (
+                        <div className="relative w-full aspect-square max-h-[220px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={priorityData}
+                                        innerRadius={60}
+                                        outerRadius={80}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                    >
+                                        {priorityData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                    <RechartsTooltip
+                                        contentStyle={{ borderRadius: '12px', border: '1px solid var(--border)', backgroundColor: 'var(--card)', fontSize: 12 }}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                <span className="text-2xl font-black text-foreground">{validSubs.length}</span>
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase">Tasks</span>
+                            </div>
+                        </div>
+                    )}
+                    <div className="w-full mt-4 space-y-1.5 overflow-y-auto max-h-[100px]">
+                        {priorityData.map(p => (
+                            <div key={p.name} className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+                                    <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">{p.name}</span>
+                                </div>
+                                <span className="text-xs font-black text-slate-800">{p.value}</span>
+                            </div>
+                        ))}
+                    </div>
                 </motion.div>
             </div>
         </motion.div>
