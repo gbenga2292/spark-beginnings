@@ -13,7 +13,7 @@ import {
     startOfYear, endOfYear, isSameDay, isWithinInterval, getDaysInMonth,
     getYear, getMonth,
 } from 'date-fns';
-import { Download, AlertCircle, Clock, CheckCircle2, Activity, Filter, FileText, ChevronDown, CalendarDays } from 'lucide-react';
+import { Download, AlertCircle, Clock, CheckCircle2, Activity, Filter, FileText, ChevronDown, CalendarDays, FolderOpen, FileSpreadsheet, TrendingUp, GanttChartSquare } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { Button } from '@/src/components/ui/button';
@@ -119,13 +119,13 @@ function AnalyticsDashboard() {
         }),
     [subtasks, mainTasks, intervalStart, intervalEnd, filterSite]);
 
-    // All-time subtasks for bottleneck (unfiltered by date)
-    const allSubs = subtasks;
+    // ── All-time subtasks (unfiltered by date) ─────────────────────────────
+    const allStatusSubs = subtasks;
 
     const completedSubs  = validSubs.filter(s => s.status === 'completed');
     const inProgressSubs = validSubs.filter(s => s.status === 'in_progress');
 
-    // ── Avg closure time (days between createdAt → updatedAt where completed) ─
+    // ── Avg closure time (days) ─────────────────────────────────────────────
     const avgClosureDays = useMemo(() => {
         const pairs = completedSubs
             .filter(s => s.createdAt && s.updatedAt)
@@ -157,8 +157,6 @@ function AnalyticsDashboard() {
             return { ...user, total: userSubs.length, overdue, stuckInProg, completed, riskScore: (overdue * 3) + stuckInProg };
         }).filter(u => u.total > 0).sort((a, b) => b.riskScore - a.riskScore),
     [teamUsers, subtasks]);
-
-    const allStatusSubs = subtasks;
 
     // ── Priority Distribution ──
     const priorityData = useMemo(() => {
@@ -364,7 +362,7 @@ function AnalyticsDashboard() {
                 onClick={handleExport}
                 className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
             >
-                <Download className="h-4 w-4" /> <span className="hidden sm:inline">Export</span>
+                <FileSpreadsheet className="h-4 w-4" /> <span className="hidden sm:inline">Export Analysis</span>
             </Button>
         </div>,
         [filterYear, filterMonth, rolling, periodLabel, filterSite, sites, currentSiteName]
@@ -374,29 +372,35 @@ function AnalyticsDashboard() {
 
     /* ── RENDER ──────────────────────────────────────────────────────────── */
     return (
-        <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 h-full flex flex-col min-h-0 py-6 px-6">
+        <div className="h-full flex flex-col min-h-0 bg-slate-50 dark:bg-slate-950 overflow-hidden">
+            <motion.div 
+                variants={container} 
+                initial="hidden" 
+                animate="show" 
+                className="space-y-6 h-full flex flex-col min-h-0 py-6 px-6 overflow-y-auto"
+            >
 
             {/* ── Stat Cards ── */}
             <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                     {
-                        icon: <FileText className="w-5 h-5" />,
-                        bg: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600',
+                        icon: <GanttChartSquare className="w-5 h-5" />,
+                        bg: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600',
                         label: 'Total Workload',
                         value: validSubs.length,
                         sub: 'Subtasks in this period',
                     },
                     {
                         icon: <CheckCircle2 className="w-5 h-5" />,
-                        bg: 'bg-green-100 dark:bg-green-900/30 text-green-600',
+                        bg: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600',
                         label: 'Completed',
                         value: completedSubs.length,
                         sub: `${validSubs.length > 0 ? Math.round((completedSubs.length / validSubs.length) * 100) : 0}% completion rate`,
-                        subColor: 'text-green-600',
+                        subColor: 'text-emerald-600',
                     },
                     {
-                        icon: <Clock className="w-5 h-5" />,
-                        bg: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600',
+                        icon: <TrendingUp className="w-5 h-5" />,
+                        bg: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600',
                         label: 'Avg Closure Time',
                         value: avgClosureDays !== null ? `${avgClosureDays}d` : '—',
                         sub: 'createdAt → completedAt',
@@ -410,14 +414,20 @@ function AnalyticsDashboard() {
                         subColor: 'text-red-600',
                     },
                 ].map(card => (
-                    <div key={card.label} className="bg-card border border-border rounded-2xl p-5 shadow-sm">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className={`p-2 rounded-xl ${card.bg}`}>{card.icon}</div>
-                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{card.label}</p>
+                    <motion.div 
+                        key={card.label} 
+                        whileHover={{ y: -2 }}
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all"
+                    >
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className={`p-2.5 rounded-xl ${card.bg} shadow-inner`}>{card.icon}</div>
+                            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{card.label}</p>
                         </div>
-                        <p className="text-3xl font-black text-foreground">{card.value}</p>
-                        <p className={`text-[11px] mt-1 ${card.subColor ?? 'text-muted-foreground'}`}>{card.sub}</p>
-                    </div>
+                        <div className="flex items-baseline gap-2">
+                            <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{card.value}</p>
+                        </div>
+                        <p className={`text-[11px] font-medium mt-1.5 ${card.subColor ?? 'text-slate-500'}`}>{card.sub}</p>
+                    </motion.div>
                 ))}
             </motion.div>
 
@@ -425,12 +435,24 @@ function AnalyticsDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 flex-1 min-h-0">
 
                 {/* Velocity / Burn Chart */}
-                <motion.div variants={item} className="lg:col-span-2 bg-card border border-border rounded-2xl shadow-sm p-5 flex flex-col">
-                    <div className="mb-4">
-                        <h3 className="text-sm font-semibold text-foreground">Task Velocity / Burn Chart</h3>
-                        <p className="text-xs text-muted-foreground">
-                            {bucketMode === 'monthly' ? 'Monthly' : 'Daily'} throughput — created vs closed · {periodLabel}
-                        </p>
+                <motion.div variants={item} className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col hover:shadow-md transition-shadow">
+                    <div className="mb-6 flex justify-between items-start">
+                        <div>
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">Task Velocity / Burn Chart</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                {bucketMode === 'monthly' ? 'Monthly' : 'Daily'} throughput — created vs closed · {periodLabel}
+                            </p>
+                        </div>
+                        <div className="flex gap-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+                                <span className="text-[10px] font-bold text-slate-400 uppercase">Created</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                                <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-tighter">Closed</span>
+                            </div>
+                        </div>
                     </div>
                     <div className="flex-1 w-full min-h-[250px]">
                         <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
@@ -465,67 +487,83 @@ function AnalyticsDashboard() {
                 </motion.div>
 
                 {/* Bottleneck Radar */}
-                <motion.div variants={item} className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden flex flex-col">
-                    <div className="p-4 border-b border-border/50 bg-slate-50/50 dark:bg-slate-900/40">
-                        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                            <Filter className="w-4 h-4 text-rose-500" /> Bottleneck Radar
+                <motion.div variants={item} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+                    <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+                            <Activity className="w-4 h-4 text-rose-500" /> Bottleneck Radar
                         </h3>
-                        <p className="text-xs text-muted-foreground mt-0.5">Ranked by operational blockages (all time)</p>
+                        <p className="text-[11px] text-slate-500 mt-1">Ranked by operational blockages (all time)</p>
                     </div>
-                    <div className="overflow-y-auto flex-1 p-2">
+                    <div className="overflow-y-auto flex-1 p-3">
                         {bottleneckData.length === 0 ? (
-                            <p className="text-center text-xs text-muted-foreground py-12">No blocked team members — great!</p>
+                            <div className="flex flex-col items-center justify-center py-12 gap-3">
+                                <CheckCircle2 className="w-8 h-8 text-emerald-500/50" />
+                                <p className="text-center text-xs font-medium text-slate-400">No blocked team members — great!</p>
+                            </div>
                         ) : bottleneckData.map(u => (
-                            <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors">
-                                <div className={`w-8 h-8 rounded-full ${u.avatarColor} flex-shrink-0 flex items-center justify-center text-white text-[10px] font-bold shadow-sm`}>
+                            <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                <div className={`w-9 h-9 rounded-full ${u.avatarColor} flex-shrink-0 flex items-center justify-center text-white text-[10px] font-black shadow-md`}>
                                     {u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-bold text-foreground truncate">{u.name}</p>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{u.name}</p>
                                     <div className="flex gap-1.5 mt-1 flex-wrap">
-                                        {u.overdue > 0     && <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-semibold">{u.overdue} Overdue</span>}
-                                        {u.stuckInProg > 0 && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">{u.stuckInProg} In Prog</span>}
+                                        {u.overdue > 0     && <span className="text-[9px] bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 px-1.5 py-0.5 rounded-full font-bold border border-red-100 dark:border-red-900/20">{u.overdue} Overdue</span>}
+                                        {u.stuckInProg > 0 && <span className="text-[9px] bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded-full font-bold border border-amber-100 dark:border-amber-900/20">{u.stuckInProg} In Prog</span>}
                                     </div>
                                 </div>
-                                <p className="text-xs font-black text-rose-500 flex-shrink-0">Risk {u.riskScore}</p>
+                                <div className="text-right">
+                                    <p className="text-xs font-black text-rose-500 tracking-tighter">Risk {u.riskScore}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 group-hover:text-slate-500 underline decoration-slate-200 underline-offset-2">Inspect</p>
+                                </div>
                             </div>
                         ))}
                     </div>
                 </motion.div>
 
                 {/* Project Pipeline */}
-                <motion.div variants={item} className="lg:col-span-2 bg-card border border-border rounded-2xl shadow-sm p-5 min-h-64 flex flex-col">
-                    <div className="mb-4">
-                        <h3 className="text-sm font-semibold text-foreground">Project Pipeline Health</h3>
-                        <p className="text-xs text-muted-foreground">Completion ratios for active projects · {periodLabel}</p>
+                <motion.div variants={item} className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 min-h-64 flex flex-col hover:shadow-md transition-shadow">
+                    <div className="mb-6">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">Project Pipeline Health</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">Completion ratios for active projects · {periodLabel}</p>
                     </div>
-                    {projectHealthData.length === 0 ? (
-                        <p className="text-center text-xs text-muted-foreground py-12">No project data in this period.</p>
-                    ) : (
-                        <div className="flex-1 min-h-0" style={{ height: Math.max(200, projectHealthData.length * 40) }}>
-                            <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
-                                <BarChart data={projectHealthData} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} className="opacity-[0.08]" stroke="currentColor" />
-                                    <XAxis type="number" axisLine={false} tickLine={false}
-                                        tick={{ fontSize: 10, fill: 'currentColor' }} className="text-muted-foreground"
-                                        allowDecimals={false} />
-                                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false}
-                                        tick={{ fontSize: 11, fill: 'currentColor' }} width={140} className="text-muted-foreground font-medium" />
-                                    <RechartsTooltip cursor={{ fill: 'var(--muted)', opacity: 0.4 }}
-                                        contentStyle={{ borderRadius: '12px', border: '1px solid var(--border)', backgroundColor: 'var(--card)', fontSize: 12 }} />
-                                    <Bar dataKey="completed" name="Completed" stackId="a" fill="#10b981" barSize={14} />
-                                    <Bar dataKey="remaining" name="Remaining"  stackId="a" fill="#e2e8f0" radius={[0, 4, 4, 0]} barSize={14} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    )}
+                    <div className="flex-1 space-y-5 overflow-y-auto pr-2 custom-scrollbar">
+                        {projectHealthData.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 gap-3 opacity-50">
+                                <FolderOpen className="w-8 h-8 text-slate-300" />
+                                <p className="text-center text-xs font-medium text-slate-400">No projects found in this period</p>
+                            </div>
+                        ) : projectHealthData.map(p => (
+                            <div key={p.name} className="space-y-2 group">
+                                <div className="flex justify-between items-center px-1">
+                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate tracking-tight">{p.name}</span>
+                                    <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded uppercase">{Math.round((p.completed / (p.completed + (p.remaining || 0))) * 100) || 0}%</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner">
+                                    <motion.div 
+                                        initial={{ width: 0 }} 
+                                        animate={{ width: `${Math.round((p.completed / (p.completed + (p.remaining || 0))) * 100) || 0}%` }}
+                                        transition={{ duration: 1, ease: "easeOut" }}
+                                        className={`h-full rounded-full shadow-sm ${
+                                            (p.completed / (p.completed + (p.remaining || 0))) > 0.8 ? 'bg-emerald-500' : 
+                                            (p.completed / (p.completed + (p.remaining || 0))) > 0.4 ? 'bg-indigo-500' : 'bg-amber-500'
+                                        }`} 
+                                    />
+                                </div>
+                                <div className="flex justify-between items-center px-1">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{p.completed} / {p.completed + (p.remaining || 0)} Units Done</span>
+                                    <span className="text-[9px] font-bold text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">Analyze Project →</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </motion.div>
 
                 {/* Priority Breakdown */}
-                <motion.div variants={item} className="bg-card border border-border rounded-2xl shadow-sm p-5 flex flex-col items-center justify-center">
-                    <div className="w-full mb-4">
-                        <h3 className="text-sm font-semibold text-foreground">Priority Breakdown</h3>
-                        <p className="text-xs text-muted-foreground">Risk distribution for this period</p>
+                <motion.div variants={item} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col items-center justify-center hover:shadow-md transition-shadow">
+                    <div className="w-full mb-6">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">Priority Breakdown</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">Risk distribution for this period</p>
                     </div>
                     {priorityData.length === 0 ? (
                         <p className="text-center text-xs text-muted-foreground py-12">No priority data.</p>
@@ -550,24 +588,25 @@ function AnalyticsDashboard() {
                                 </PieChart>
                             </ResponsiveContainer>
                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span className="text-2xl font-black text-foreground">{validSubs.length}</span>
-                                <span className="text-[10px] font-bold text-muted-foreground uppercase">Tasks</span>
+                                <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{validSubs.length}</span>
+                                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Tasks</span>
                             </div>
                         </div>
                     )}
                     <div className="w-full mt-4 space-y-1.5 overflow-y-auto max-h-[100px]">
                         {priorityData.map(p => (
-                            <div key={p.name} className="flex items-center justify-between">
+                            <div key={p.name} className="flex items-center justify-between group">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
-                                    <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">{p.name}</span>
+                                    <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: p.color }} />
+                                    <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-tight group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">{p.name}</span>
                                 </div>
-                                <span className="text-xs font-black text-slate-800">{p.value}</span>
+                                <span className="text-xs font-black text-slate-900 dark:text-white tracking-widest">{p.value}</span>
                             </div>
                         ))}
                     </div>
                 </motion.div>
             </div>
         </motion.div>
+    </div>
     );
 }

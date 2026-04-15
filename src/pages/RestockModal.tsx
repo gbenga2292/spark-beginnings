@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
-import { X, Package, Plus, ChevronDown } from 'lucide-react';
+import { X, Package, Plus, ChevronDown, Trash2 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
-import { useTheme } from '@/src/hooks/useTheme';
 import { Button } from '@/src/components/ui/button';
-import { Input } from '@/src/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/src/components/ui/dialog';
 
 interface RestockModalProps {
   onClose: () => void;
+  preselectedAssetId?: string;
 }
 
 interface RestockItem {
@@ -18,95 +17,166 @@ interface RestockItem {
   totalCost: number;
 }
 
-export function RestockModal({ onClose }: RestockModalProps) {
+export function RestockModal({ onClose, preselectedAssetId }: RestockModalProps) {
   const { assets, restockAssets } = useOperations();
-  const { isDark } = useTheme();
   const [items, setItems] = useState<RestockItem[]>([
-    { id: Math.random().toString(36).substr(2, 9), assetId: '', quantity: 0, totalCost: 0 }
+    { id: crypto.randomUUID(), assetId: preselectedAssetId || '', quantity: 0, totalCost: 0 }
   ]);
 
-  const handleAddItem = () => {
-    setItems([...items, { id: Math.random().toString(36).substr(2, 9), assetId: '', quantity: 0, totalCost: 0 }]);
-  };
+  const handleAddItem = () =>
+    setItems(prev => [...prev, { id: crypto.randomUUID(), assetId: '', quantity: 0, totalCost: 0 }]);
 
-  const handleUpdateItem = (id: string, field: keyof RestockItem, value: any) => {
-    setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
-  };
+  const handleRemoveItem = (id: string) =>
+    setItems(prev => prev.filter(i => i.id !== id));
+
+  const handleUpdate = (id: string, field: keyof RestockItem, value: any) =>
+    setItems(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
 
   const handleRestock = () => {
-    const validItems = items.filter(i => i.assetId && i.quantity > 0);
-    if (validItems.length === 0) return;
-    restockAssets(validItems.map(i => ({ assetId: i.assetId, quantity: i.quantity, totalCost: i.totalCost })));
+    const valid = items.filter(i => i.assetId && i.quantity > 0);
+    if (!valid.length) return;
+    restockAssets(valid.map(i => ({ assetId: i.assetId, quantity: i.quantity, totalCost: i.totalCost })));
     onClose();
   };
 
-  const selectClass = "w-full h-11 px-4 rounded-xl bg-slate-50/50 dark:bg-slate-950 border border-transparent focus:ring-2 focus:ring-blue-500/20 outline-none font-medium text-sm text-slate-700 dark:text-slate-200 appearance-none";
+  const isValid = items.some(i => i.assetId && i.quantity > 0);
+
+  const selectCls = [
+    'w-full h-9 pl-3 pr-8 rounded-lg text-sm font-medium appearance-none outline-none',
+    'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700',
+    'text-slate-700 dark:text-slate-200',
+    'focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500',
+    'transition-all',
+  ].join(' ');
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent aria-describedby={undefined} className="max-w-3xl p-0 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900">
-        <DialogHeader className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between space-y-0">
-          <div className="flex items-center gap-3">
-            <Package className="h-5 w-5 text-slate-800 dark:text-white" />
-            <DialogTitle className="text-lg font-bold">Restock Assets</DialogTitle>
+      <DialogContent
+        aria-describedby={undefined}
+        className="max-w-lg p-0 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900"
+      >
+        {/* Header */}
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-lg bg-teal-600 flex items-center justify-center shadow-sm">
+              <Package className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <DialogTitle className="text-sm font-bold text-slate-800 dark:text-white leading-none">Restock Assets</DialogTitle>
+              <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold mt-0.5">Inventory Management</p>
+            </div>
           </div>
-          <DialogClose className="h-9 w-9 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400">
-            <X className="h-4 w-4" />
+          <DialogClose className="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 transition-colors">
+            <X className="h-3.5 w-3.5" />
           </DialogClose>
         </DialogHeader>
 
-        <div className="overflow-y-auto max-h-[65vh] no-scrollbar p-6">
-          <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
-            {/* Table Header */}
-            <div className="hidden md:grid grid-cols-[2fr,1fr,1.5fr,1fr] gap-4 px-6 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Asset</span>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Quantity</span>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Total Cost</span>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Unit Cost</span>
-            </div>
-
-            <div className="divide-y divide-slate-50 dark:divide-slate-800">
-              {items.map((item) => {
-                const unitCost = item.quantity > 0 ? (item.totalCost / item.quantity).toFixed(2) : "0.00";
-                return (
-                  <div key={item.id} className="grid grid-cols-1 md:grid-cols-[2fr,1fr,1.5fr,1fr] gap-4 p-4 md:px-6 md:py-4 items-center">
-                    <div className="relative">
-                      <select value={item.assetId} onChange={e => handleUpdateItem(item.id, 'assetId', e.target.value)} className={selectClass}>
-                        <option value="">Select asset</option>
-                        {assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                      </select>
-                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                    </div>
-                    <Input type="number" placeholder="Qty" value={item.quantity || ''}
-                      onChange={e => handleUpdateItem(item.id, 'quantity', Number(e.target.value))}
-                      className="h-11 rounded-xl bg-slate-50/50 dark:bg-slate-950 border-transparent font-bold text-sm text-center" />
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">₦</span>
-                      <Input type="number" placeholder="Cost" value={item.totalCost || ''}
-                        onChange={e => handleUpdateItem(item.id, 'totalCost', Number(e.target.value))}
-                        className="h-11 pl-8 rounded-xl bg-slate-50/50 dark:bg-slate-950 border-transparent font-bold text-sm" />
-                    </div>
-                    <div className="text-center">
-                      <span className="font-black text-slate-800 dark:text-white text-sm">₦{unitCost}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <button onClick={handleAddItem}
-              className="w-full py-4 flex items-center justify-center gap-2 font-bold text-sm text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-t border-slate-100 dark:border-slate-800">
-              <Plus className="h-4 w-4" /> Add Another Asset
-            </button>
-          </div>
+        {/* Column Headers */}
+        <div className="grid grid-cols-[2fr_1fr_1.5fr_auto] gap-2 px-5 pt-3 pb-1">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Asset</span>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Qty</span>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Cost (₦)</span>
+          <span className="w-6" />
         </div>
 
-        <div className="p-6 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
-          <Button variant="outline" onClick={onClose} className="h-10 px-6 rounded-xl font-bold text-xs uppercase text-slate-500">Cancel</Button>
-          <Button onClick={handleRestock} disabled={items.some(i => !i.assetId || i.quantity <= 0)}
-            className="h-10 px-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase shadow-sm disabled:opacity-50">
-            Restock Assets
-          </Button>
+        {/* Items */}
+        <div className="px-5 pb-2 space-y-2 max-h-[45vh] overflow-y-auto no-scrollbar">
+          {items.map(item => {
+            const unitCost = item.quantity > 0 ? (item.totalCost / item.quantity) : 0;
+            return (
+              <div key={item.id} className="grid grid-cols-[2fr_1fr_1.5fr_auto] gap-2 items-center">
+                {/* Asset select */}
+                <div className="relative">
+                  <select
+                    value={item.assetId}
+                    onChange={e => handleUpdate(item.id, 'assetId', e.target.value)}
+                    className={selectCls}
+                  >
+                    <option value="">Select asset</option>
+                    {assets.map(a => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                </div>
+
+                {/* Qty */}
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="0"
+                  value={item.quantity || ''}
+                  onChange={e => handleUpdate(item.id, 'quantity', Number(e.target.value))}
+                  className={cn(
+                    'h-9 px-2 rounded-lg text-sm font-bold text-center outline-none',
+                    'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700',
+                    'focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all w-full'
+                  )}
+                />
+
+                {/* Cost + derived unit cost */}
+                <div className="space-y-0.5">
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="0.00"
+                    value={item.totalCost || ''}
+                    onChange={e => handleUpdate(item.id, 'totalCost', Number(e.target.value))}
+                    className={cn(
+                      'h-9 px-2 rounded-lg text-sm font-bold outline-none w-full',
+                      'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700',
+                      'focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all'
+                    )}
+                  />
+                  {unitCost > 0 && (
+                    <p className="text-[10px] text-teal-600 dark:text-teal-400 font-semibold text-right pr-1">
+                      ₦{unitCost.toFixed(2)}/unit
+                    </p>
+                  )}
+                </div>
+
+                {/* Remove */}
+                <button
+                  onClick={() => handleRemoveItem(item.id)}
+                  disabled={items.length === 1}
+                  className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 disabled:opacity-0 transition-all"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Add row */}
+        <button
+          onClick={handleAddItem}
+          className="mx-5 mb-3 flex items-center gap-1.5 text-xs font-bold text-teal-600 dark:text-teal-400 hover:text-teal-700 transition-colors"
+        >
+          <Plus className="h-3.5 w-3.5" /> Add another asset
+        </button>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+          <p className="text-[11px] text-slate-400 font-medium">
+            {items.filter(i => i.assetId && i.quantity > 0).length} item(s) ready
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="h-8 px-4 rounded-lg font-bold text-xs text-slate-500 border-slate-200 dark:border-slate-700"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRestock}
+              disabled={!isValid}
+              className="h-8 px-5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-sm disabled:opacity-40 transition-all"
+            >
+              Restock
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
