@@ -792,19 +792,19 @@ export function SiteOnboarding() {
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-3">
                       <PhaseTextField
-                        label="Total Wellpoints Required" type="number"
-                        value={form.phase3.totalWellpointsRequired}
+                        label="Total Headers Required" type="number"
+                        value={form.phase3.totalHeadersRequired}
                         onChange={v => {
-                          const wp = parseInt(v, 10);
-                          const h = isNaN(wp) ? '' : Math.ceil(wp / 6).toString();
-                          updPhase('phase3', { totalWellpointsRequired: v, totalHeadersRequired: h });
+                          const h = parseFloat(v);
+                          const wp = isNaN(h) ? '' : (h * 6).toString();
+                          updPhase('phase3', { totalHeadersRequired: v, totalWellpointsRequired: wp });
                         }}
-                        placeholder="e.g. 60"
+                        placeholder="e.g. 10"
                       />
                       <PhaseTextField
-                        label="Total Headers Required (Auto-calculated: 6/Header)" type="number"
-                        value={form.phase3.totalHeadersRequired}
-                        onChange={v => updPhase('phase3', { totalHeadersRequired: v })}
+                        label="Total Wellpoints Required (Auto-calculated: 6/Header)"
+                        value={form.phase3.totalWellpointsRequired}
+                        onChange={() => {}}
                         readOnly={true}
                         placeholder="Auto-calculated"
                       />

@@ -55,7 +55,20 @@ export function Employees() {
   const evaluations = useAppStore((state) => state.evaluations);
   const hrVariables = useAppStore((state) => state.hrVariables);
   const { addDisciplinaryRecord, deleteDisciplinaryRecord, setEmployeeFormDirty } = useAppStore();
-  const { reminders, addReminder } = useAppData();
+  const { reminders, addReminder, updateReminder, users } = useAppData();
+
+  // Derive the profile IDs of all HR department employees so LASHMA reminders
+  // are sent to the whole HR team instead of only the current logged-in user.
+  const hrRecipientIds = useMemo(() => {
+    const hrEmails = new Set(
+      employees
+        .filter(e => e.department === 'HR' && e.status !== 'Terminated' && e.email)
+        .map(e => e.email!.toLowerCase())
+    );
+    return users
+      .filter((u: any) => u.email && hrEmails.has(u.email.toLowerCase()))
+      .map((u: any) => u.id as string);
+  }, [employees, users]);
 
   const [isLoggingPerformance, setIsLoggingPerformance] = useState(false);
   const [performanceRecord, setPerformanceRecord] = useState<Partial<DisciplinaryRecord>>({
@@ -253,24 +266,32 @@ export function Employees() {
     addEmployee(newEmployee);
     setEmployeeFormDirty(false);
     
-    // Manage LASHMA Renewal Reminder
+    // Manage LASHMA Renewal Reminder — upsert to prevent duplicates
     if (newEmployee.lashmaExpiryDate) {
       const expiry = new Date(newEmployee.lashmaExpiryDate);
       const remindAt = new Date(expiry);
       remindAt.setDate(remindAt.getDate() - 7);
-      
+
       const title = `LASHMA Renewal: ${newEmployee.firstname} ${newEmployee.surname}`;
-      // Basic check to avoid duplicates: find existing reminder with same title
-      const existing = reminders.find(r => r.title === title && r.isActive);
-      
-      if (!existing || existing.remindAt !== remindAt.toISOString()) {
+      const recipients = hrRecipientIds.length > 0 ? hrRecipientIds : (currentUser?.id ? [currentUser.id] : []);
+      const existing = reminders.find(r => r.title === title);
+
+      if (!existing) {
         addReminder({
           title,
           body: `Health insurance (LASHMA) for ${newEmployee.firstname} ${newEmployee.surname} expires on ${newEmployee.lashmaExpiryDate}. Please initiate renewal.`,
           remindAt: remindAt.toISOString(),
-          recipientIds: currentUser?.id ? [currentUser.id] : [],
+          recipientIds: recipients,
           frequency: 'once',
-          isActive: true
+          isActive: true,
+        });
+      } else if (existing.remindAt !== remindAt.toISOString() || JSON.stringify(existing.recipientIds?.sort()) !== JSON.stringify([...recipients].sort())) {
+        // Expiry date changed or recipients need updating — update in-place
+        updateReminder(existing.id, {
+          remindAt: remindAt.toISOString(),
+          recipientIds: recipients,
+          isActive: true,
+          body: `Health insurance (LASHMA) for ${newEmployee.firstname} ${newEmployee.surname} expires on ${newEmployee.lashmaExpiryDate}. Please initiate renewal.`,
         });
       }
     }
@@ -386,24 +407,32 @@ export function Employees() {
     updateEmployee(editingEmployeeId, updateData);
     setEmployeeFormDirty(false);
     
-    // Manage LASHMA Renewal Reminder
+    // Manage LASHMA Renewal Reminder — upsert to prevent duplicates
     if (formData.lashmaExpiryDate) {
       const expiry = new Date(formData.lashmaExpiryDate);
       const remindAt = new Date(expiry);
       remindAt.setDate(remindAt.getDate() - 7);
-      
+
       const title = `LASHMA Renewal: ${formData.firstname} ${formData.surname}`;
-      // Basic check to avoid duplicates: find existing reminder with same title
-      const existing = reminders.find(r => r.title === title && r.isActive);
-      
-      if (!existing || existing.remindAt !== remindAt.toISOString()) {
+      const recipients = hrRecipientIds.length > 0 ? hrRecipientIds : (currentUser?.id ? [currentUser.id] : []);
+      const existing = reminders.find(r => r.title === title);
+
+      if (!existing) {
         addReminder({
           title,
           body: `Health insurance (LASHMA) for ${formData.firstname} ${formData.surname} expires on ${formData.lashmaExpiryDate}. Please initiate renewal.`,
           remindAt: remindAt.toISOString(),
-          recipientIds: currentUser?.id ? [currentUser.id] : [], 
+          recipientIds: recipients,
           frequency: 'once',
-          isActive: true
+          isActive: true,
+        });
+      } else if (existing.remindAt !== remindAt.toISOString() || JSON.stringify(existing.recipientIds?.sort()) !== JSON.stringify([...recipients].sort())) {
+        // Expiry date changed or recipients need updating — update in-place
+        updateReminder(existing.id, {
+          remindAt: remindAt.toISOString(),
+          recipientIds: recipients,
+          isActive: true,
+          body: `Health insurance (LASHMA) for ${formData.firstname} ${formData.surname} expires on ${formData.lashmaExpiryDate}. Please initiate renewal.`,
         });
       }
     }

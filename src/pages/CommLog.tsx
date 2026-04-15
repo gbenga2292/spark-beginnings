@@ -895,9 +895,12 @@ interface LogCardProps {
   isDark: boolean;
   expanded: boolean;
   onToggleExpand: () => void;
+  currentUserName: string;
+  isAdmin: boolean;
 }
 
-function LogCard({ log, onEdit, onDelete, onToggleFollowUp, isDark, expanded, onToggleExpand }: LogCardProps) {
+function LogCard({ log, onEdit, onDelete, onToggleFollowUp, isDark, expanded, onToggleExpand, currentUserName, isAdmin }: LogCardProps) {
+  const canDelete = isAdmin || log.loggedBy === currentUserName;
   const isOverdue = log.followUpDate && !log.followUpDone && isBefore(parseISO(log.followUpDate), startOfDay(new Date()));
 
   return (
@@ -954,24 +957,45 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, isDark, expanded, on
           </div>
 
           <div className="flex items-center gap-1 flex-shrink-0">
-            {log.followUpDate && (
+            {/* Follow-up status pill */}
+            {log.followUpDate && !log.followUpDone && (
               <button
-                onClick={onToggleFollowUp}
-                title={log.followUpDone ? 'Follow-up done' : isOverdue ? 'OVERDUE follow-up!' : 'Mark follow-up done'}
-                className={cn('p-1.5 rounded-lg transition-colors', log.followUpDone
-                  ? 'text-emerald-600 hover:bg-emerald-50'
-                  : isOverdue ? 'text-red-600 hover:bg-red-50 animate-pulse' : 'text-amber-500 hover:bg-amber-50'
+                onClick={e => { e.stopPropagation(); onToggleFollowUp(); }}
+                title="Click to mark follow-up as done"
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all select-none',
+                  isOverdue
+                    ? 'bg-red-100 text-red-700 border-red-300 hover:bg-red-600 hover:text-white hover:border-red-600 animate-pulse'
+                    : 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-500 hover:text-white hover:border-amber-500'
                 )}
               >
-                {log.followUpDone ? <BellOff className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
+                <CheckCircle2 className="w-3 h-3" />
+                {isOverdue ? 'Overdue · Mark Done' : 'Follow-up · Mark Done'}
               </button>
             )}
-            <button onClick={onEdit} className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-indigo-400' : 'text-slate-400 hover:bg-slate-100 hover:text-indigo-600')}>
-              <Pencil className="w-4 h-4" />
-            </button>
-            <button onClick={onDelete} className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-400 hover:bg-red-900/30 hover:text-red-400' : 'text-slate-400 hover:bg-red-50 hover:text-red-600')}>
-              <Trash2 className="w-4 h-4" />
-            </button>
+            {log.followUpDate && log.followUpDone && (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                <CheckCircle2 className="w-3 h-3" /> Done
+              </span>
+            )}
+            {canDelete && (
+              <button
+                onClick={onEdit}
+                title={isAdmin && log.loggedBy !== currentUserName ? 'Edit (Admin Override)' : 'Edit your log'}
+                className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-indigo-400' : 'text-slate-400 hover:bg-slate-100 hover:text-indigo-600')}
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+            )}
+            {canDelete && (
+              <button
+                onClick={onDelete}
+                title={isAdmin && log.loggedBy !== currentUserName ? 'Delete (Admin Override)' : 'Delete your log'}
+                className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-400 hover:bg-red-900/30 hover:text-red-400' : 'text-slate-400 hover:bg-red-50 hover:text-red-600')}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
             <button onClick={onToggleExpand} className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-500 hover:bg-slate-800' : 'text-slate-400 hover:bg-slate-100')}>
               {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
@@ -1379,6 +1403,8 @@ export function CommLog() {
                     onEdit={() => handleEdit(log)}
                     onDelete={() => handleDelete(log.id)}
                     onToggleFollowUp={() => updateCommLog(log.id, { followUpDone: !log.followUpDone })}
+                    currentUserName={currentUser?.name || ''}
+                    isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
                   />
                 ))
               )}

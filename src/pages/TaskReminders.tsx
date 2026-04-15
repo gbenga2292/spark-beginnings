@@ -122,12 +122,9 @@ export function TaskReminders() {
   const pool = useMemo(() => {
     if (tab === 'mine') return myReminders;
     if (tab === 'shared') return sharedWithMe;
-    // Combine and deduplicate
-    const combined = [...myReminders, ...sharedWithMe];
-    const unique = Array.from(new Set(combined.map(r => r.id)))
-      .map(id => combined.find(r => r.id === id)!);
-    return unique;
-  }, [tab, myReminders, sharedWithMe]);
+    // 'all' shows everything in the database
+    return reminders;
+  }, [tab, myReminders, sharedWithMe, reminders]);
 
   const filtered = useMemo(() => {
     return pool
@@ -246,22 +243,36 @@ export function TaskReminders() {
           <div className="h-px bg-border flex-1"></div>
         </div>
         <div className="space-y-2">
-          {reminders.map(rem => (
-            <div key={rem.id} className={`p-2.5 rounded-xl border transition-all group ${rem.isActive ? 'bg-card border-border hover:border-indigo-200 hover:shadow-sm' : 'bg-muted/30 border-border/50 opacity-70'}`}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <div className={`w-1.5 h-1.5 rounded-full ${rem.isActive ? 'bg-indigo-500' : 'bg-muted-foreground'}`} />
-                  <span className="text-xs font-semibold text-foreground truncate">{format(parseISO(rem.remindAt), 'h:mm a')}</span>
+          {reminders.map(rem => {
+            const isAdminCal = (currentUser as any)?.privileges?.users?.canManage || (currentUser as any)?.role === 'admin' || (currentUser as any)?.role === 'co-admin';
+            const isOwnerCal = rem.createdBy === currentUser?.id;
+            const canEditCal = isOwnerCal || isAdminCal;
+            return (
+              <div key={rem.id} className={`p-2.5 rounded-xl border transition-all group ${rem.isActive ? 'bg-card border-border hover:border-indigo-200 hover:shadow-sm' : 'bg-muted/30 border-border/50 opacity-70'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div className={`w-1.5 h-1.5 rounded-full ${rem.isActive ? 'bg-indigo-500' : 'bg-muted-foreground'}`} />
+                    <span className="text-xs font-semibold text-foreground truncate">{format(parseISO(rem.remindAt), 'h:mm a')}</span>
+                  </div>
+                  {canEditCal && (
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => openEdit(rem)} title={isAdminCal && !isOwnerCal ? 'Edit (Admin Override)' : 'Edit'} className="p-1 hover:bg-muted rounded text-muted-foreground"><Edit3 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => deleteReminder(rem.id)} title={isAdminCal && !isOwnerCal ? 'Delete (Admin Override)' : 'Delete'} className="p-1 hover:bg-red-50 rounded text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openEdit(rem)} className="p-1 hover:bg-muted rounded text-muted-foreground"><Edit3 className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => deleteReminder(rem.id)} className="p-1 hover:bg-red-50 rounded text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
-                </div>
+                <p className="text-xs font-medium text-foreground mt-1.5 line-clamp-2 leading-tight">{rem.title}</p>
+                {rem.body && <p className="text-[10px] text-muted-foreground mt-1 line-clamp-1">{rem.body}</p>}
+                {isOwnerCal ? (
+                  <span className="mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-full">✦ You</span>
+                ) : (
+                  <span className="mt-1.5 inline-flex items-center gap-1 text-[9px] font-medium text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-full">
+                    {users.find(u => u.id === rem.createdBy)?.name?.split(' ')[0] ?? 'System'}
+                  </span>
+                )}
               </div>
-              <p className="text-xs font-medium text-foreground mt-1.5 line-clamp-2 leading-tight">{rem.title}</p>
-              {rem.body && <p className="text-[10px] text-muted-foreground mt-1 line-clamp-1">{rem.body}</p>}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -436,6 +447,8 @@ export function TaskReminders() {
             {filtered.map(rem => {
               const rel         = getRelativeTime(rem.remindAt);
               const isOwner     = rem.createdBy === currentUser?.id;
+              const isAdmin     = (currentUser as any)?.privileges?.users?.canManage || (currentUser as any)?.role === 'admin' || (currentUser as any)?.role === 'co-admin';
+              const canEdit     = isOwner || isAdmin;
               const linkedTask  = rem.mainTaskId ? mainTasks.find(t => t.id === rem.mainTaskId) : null;
               const creatorUser = users.find(u => u.id === rem.createdBy);
               const isSelected  = selected?.id === rem.id;
@@ -486,18 +499,18 @@ export function TaskReminders() {
                             className={`p-1.5 rounded-lg transition-colors ${isSelected ? 'bg-indigo-100 text-indigo-600' : 'text-muted-foreground hover:bg-muted'}`}>
                             <Eye className="w-3.5 h-3.5" />
                           </button>
-                          {isOwner && (
+                          {canEdit && (
                             <>
                               <button onClick={() => toggleReminderActive(rem.id)}
                                 title={rem.isActive ? 'Pause' : 'Resume'}
                                 className={`p-1.5 rounded-lg transition-colors ${rem.isActive ? 'text-indigo-500 hover:bg-indigo-50' : 'text-muted-foreground hover:bg-muted'}`}>
                                 {rem.isActive ? <ToggleRight className="w-3.5 h-3.5" /> : <ToggleLeft className="w-3.5 h-3.5" />}
                               </button>
-                              <button onClick={() => openEdit(rem)} title="Edit"
+                              <button onClick={() => openEdit(rem)} title={isAdmin && !isOwner ? 'Edit (Admin Override)' : 'Edit'}
                                 className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors">
                                 <Edit3 className="w-3.5 h-3.5" />
                               </button>
-                              <button onClick={() => deleteReminder(rem.id)} title="Delete"
+                              <button onClick={() => deleteReminder(rem.id)} title={isAdmin && !isOwner ? 'Delete (Admin Override)' : 'Delete'}
                                 className="p-1.5 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors">
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -554,6 +567,17 @@ export function TaskReminders() {
                             )}
                           </div>
                         )}
+
+                        {/* Creator badge */}
+                        {isOwner ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 ml-auto">
+                            ✦ Created by You
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 ml-auto">
+                            👤 {creatorUser?.name?.split(' ')[0] ?? 'System'}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -587,7 +611,7 @@ export function TaskReminders() {
                               {rem.recipientIds.map((id: string) => users.find(u => u.id === id)?.name?.split(' ')[0]).filter(Boolean).join(', ') || '—'}
                             </p>
                           </div>
-                          {isOwner && (
+                          {canEdit && (
                             <div className="col-span-2 sm:col-span-4 flex gap-2 pt-1 border-t border-border/40">
                               <button onClick={() => openEdit(rem)}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">

@@ -659,27 +659,48 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                   </div>
                 </div>
 
-                {/* Task Narration (Main Task Description) */}
-                {activeMainTask.description && (
-                  <div className="mb-6">
-                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Task Narration (Project Context)</h3>
-                    <div className="flex items-start gap-3 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-900/20 shadow-sm">
-                      <FileText className="w-5 h-5 text-emerald-500 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{activeMainTask.description}</p>
-                    </div>
-                  </div>
-                )}
+                {/* Task Narration & Description */}
+                {(() => {
+                  const hasMainDesc = !!activeMainTask.description;
+                  const hasSubDesc = !!activeSubtask.description;
+                  const isDuplicate = hasMainDesc && hasSubDesc && activeMainTask.description === activeSubtask.description;
 
-                {/* Description card */}
-                {activeSubtask.description && (
-                  <div className="mb-8">
-                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Subtask Details</h3>
-                    <div className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 bg-white shadow-sm">
-                      <MessageSquare className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{activeSubtask.description}</p>
+                  if (isDuplicate) {
+                    return (
+                      <div className="mb-8">
+                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Task Description</h3>
+                        <div className="flex items-start gap-4 p-5 rounded-2xl border border-indigo-100 bg-indigo-50/30 shadow-sm transition-all hover:bg-white hover:border-indigo-200">
+                          <FileText className="w-5 h-5 text-indigo-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-[14px] text-slate-700 leading-relaxed whitespace-pre-wrap">{activeSubtask.description}</p>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-6 mb-8">
+                      {hasMainDesc && (
+                        <div>
+                          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Task Narration (Project Context)</h3>
+                          <div className="flex items-start gap-3 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-900/20 shadow-sm">
+                            <FileText className="w-5 h-5 text-emerald-500 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{activeMainTask.description}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {hasSubDesc && (
+                        <div>
+                          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Subtask Details</h3>
+                          <div className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:border-indigo-200">
+                            <MessageSquare className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{activeSubtask.description}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
               </div>
             </div>
