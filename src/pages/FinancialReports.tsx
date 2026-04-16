@@ -537,18 +537,42 @@ export function FinancialReports() {
     });
   };
 
-  const exportInvoicePdf = () => {
-    const head = [["Invoice ID", "Client", "Site", "Date", "Amount (₦)", "Status"]];
-    const body = invoices.map(inv => [inv.id, inv.client, inv.siteName, formatDisplayDate(inv.date), (inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), inv.status]);
+  const exportInvoicePdf = (mode: 'bare' | 'detailed' = 'detailed') => {
+    let head: string[][] = [];
+    let body: any[][] = [];
+
+    if (mode === 'bare') {
+      head = [["Client", "Site", "Date", "Amount (₦)", "Status"]];
+      body = invoices.map(inv => [
+        inv.client, 
+        inv.siteName || '', 
+        formatDisplayDate(inv.date), 
+        (inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 
+        inv.status
+      ]);
+    } else {
+      head = [["Inv No", "Client", "Site", "Project", "Amount", "Date", "Due Date", "Status", "Total Charge"]];
+      body = invoices.map(inv => [
+        inv.invoiceNumber,
+        inv.client,
+        inv.siteName || '',
+        inv.project || '',
+        (inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        formatDisplayDate(inv.date),
+        formatDisplayDate(inv.dueDate) || '',
+        inv.status,
+        (inv.totalCharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      ]);
+    }
     
     setPreviewModal({
       isOpen: true,
-      title: "Invoice Report",
+      title: `Invoice Report (${mode === 'bare' ? 'Basic' : 'Detailed'})`,
       type: 'pdf',
       data: body,
       headers: head[0],
-      filename: "invoice_report.pdf",
-      onConfirm: () => generatePdf("Invoice Report", head, body, "invoice_report.pdf")
+      filename: `invoice_report_${mode}.pdf`,
+      onConfirm: () => generatePdf(`Invoice Report (${mode === 'bare' ? 'Basic' : 'Detailed'})`, head, body, `invoice_report_${mode}.pdf`)
     });
   };
 
@@ -1740,9 +1764,14 @@ export function FinancialReports() {
                 </div>
               )}
               {priv.canExport && (
-                <Button variant="outline" size="sm" className="w-full gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportInvoicePdf}>
-                  <FileText className="h-4 w-4" /> PDF
-                </Button>
+                <div className="flex bg-slate-50 border border-slate-200 rounded-md shadow-sm h-9 overflow-hidden shrink-0 w-full font-semibold">
+                  <Button variant="ghost" size="sm" className="flex-1 gap-2 h-full text-red-700 hover:bg-red-50 rounded-none border-r border-slate-200 px-3 transition-colors text-xs font-semibold" onClick={() => exportInvoicePdf('bare')} title="Export Basic Fields PDF">
+                    <FileText className="h-4 w-4" /> Basic PDF
+                  </Button>
+                  <Button variant="ghost" size="sm" className="flex-1 gap-2 h-full text-red-700 hover:bg-red-50 rounded-none px-3 transition-colors text-xs font-semibold" onClick={() => exportInvoicePdf('detailed')} title="Export Detailed Fields PDF">
+                    Detailed PDF
+                  </Button>
+                </div>
               )}
             </div>
           </CardContent>

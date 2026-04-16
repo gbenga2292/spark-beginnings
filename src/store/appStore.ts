@@ -424,6 +424,8 @@ export interface PendingInvoice {
   vat: number;
   totalCharge: number;
   totalExclusiveOfVat: number;
+  printLayout?: any;
+  historyLog?: any[];
 }
 
 export interface Invoice {
@@ -457,6 +459,8 @@ export interface Invoice {
   vat?: number;
   totalCharge?: number;
   totalExclusiveOfVat?: number;
+  printLayout?: any;
+  historyLog?: any[];
 }
 
 export interface SalaryAdvance {

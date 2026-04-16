@@ -1,8 +1,9 @@
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import React, { useState, useMemo } from 'react';
+import InvoiceLogo from '../../logo/logo-2.png';
 import { useAppStore, PendingInvoice, Invoice } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight } from 'lucide-react';
+import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight, Printer } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -41,7 +42,11 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
   const isViewingUnpaid = activeTab === 'unpaid';
   const isViewingCompleted = activeTab === 'completed';
   const payments = useAppStore(state => state.payments);
+  const ledgerBanks = useAppStore(state => state.ledgerBanks);
+  const ledgerBeneficiaryBanks = useAppStore(state => state.ledgerBeneficiaryBanks);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [printInvoiceTarget, setPrintInvoiceTarget] = useState<Invoice | PendingInvoice | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [sortField, setSortField] = useState<string>('startDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -1319,6 +1324,11 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                                 <Edit className="w-4 h-4" />
                               </Button>
                             )}
+                            {priv.canEdit && (
+                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setPrintInvoiceTarget(inv); }} className="h-8 w-8 text-blue-600 hover:bg-blue-50" title="Print Invoice">
+                                <Printer className="w-4 h-4" />
+                              </Button>
+                            )}
                             {priv.canDelete && (
                               <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(inv.id); }} className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete row">
                                 <Trash2 className="w-4 h-4" />
@@ -1582,6 +1592,420 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
             </div>
           </div>
         )}
+
+        {/* Print Invoice Modal Overlay */}
+        {printInvoiceTarget && (
+          <InvoicePrintModal 
+            invoice={printInvoiceTarget as any} 
+            onClose={() => setPrintInvoiceTarget(null)}
+            ledgerBanks={ledgerBanks}
+            ledgerBeneficiaryBanks={ledgerBeneficiaryBanks}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Invoice Print Component ──
+function toWords(num: number): string {
+  if (num === 0) return 'Zero Naira Only';
+  const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  const scales = ['', 'Thousand', 'Million', 'Billion', 'Trillion'];
+  const convertHundreds = (n: number) => {
+    let res = '';
+    if (n > 99) { res += a[Math.floor(n / 100)] + ' Hundred '; n %= 100; if(n > 0) res += 'and '; }
+    if (n > 19) { res += b[Math.floor(n / 10)] + ' '; n %= 10; }
+    if (n > 0) { res += a[n] + ' '; }
+    return res.trim();
+  };
+  let str = '';
+  let intPart = Math.floor(num);
+  let decPart = Math.round((num - intPart) * 100);
+  if (intPart === 0) str = 'Zero ';
+  else {
+    let scaleIdx = 0;
+    while (intPart > 0) {
+      let chunk = intPart % 1000;
+      if (chunk > 0) {
+        str = convertHundreds(chunk) + (scales[scaleIdx] ? ' ' + scales[scaleIdx] + ' ' : ' ') + str;
+      }
+      intPart = Math.floor(intPart / 1000);
+      scaleIdx++;
+    }
+  }
+  str = str.replace(/\s+/g, ' ').trim();
+  if (decPart > 0) {
+    str += ' Naira and ' + convertHundreds(decPart) + ' Kobo Only';
+  } else {
+    str += ' Naira Only';
+  }
+  return str;
+}
+
+export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBeneficiaryBanks }: { 
+  invoice: any, 
+  onClose: () => void,
+  ledgerBanks: {id: string, name: string}[],
+  ledgerBeneficiaryBanks: {id: string, name: string}[] 
+}) {
+  const printRef = React.useRef<HTMLDivElement>(null);
+  
+  // Combine both banks for selection dropdown logic if needed, but here we just take the first as default
+  const defaultBank = ledgerBeneficiaryBanks[0]?.name || ledgerBanks[0]?.name || 'Stanbic IBTC Bank\n0000000000';
+  
+  const [billedToInput, setBilledToInput] = useState(invoice.client || 'Client Name\nCompany Address\nCity');
+  const [paidToInput, setPaidToInput] = useState('Dewatering Construction Etc Limited\n' + defaultBank);
+  const [projectText, setProjectText] = useState('DCEL- SED');
+  const [termsText, setTermsText] = useState('For Immediate Payment');
+  
+  const [invoiceDate, setInvoiceDate] = useState(invoice.printLayout?.invoiceDate || invoice.date || invoice.startDate || '');
+  const [invoiceNo, setInvoiceNo] = useState(invoice.printLayout?.invoiceNo || invoice.invoiceNumber || invoice.invoiceNo || '');
+  const [paymentsCredits, setPaymentsCredits] = useState<number>(invoice.printLayout?.paymentsCredits || 0);
+  
+  const [items, setItems] = useState<any[]>(() => {
+    if (invoice.printLayout?.items) return invoice.printLayout.items;
+    const list = [];
+    if (invoice.rentalCost && invoice.rentalCost > 0) {
+      list.push({ id: generateId(), selected: true, desc: `Phase 1\nLease of ${invoice.noOfMachine || 0} Dewatering Pumps @ N${(invoice.dailyRentalCost || 0).toLocaleString()} per pump for ${invoice.duration || 0} days.`, qty: invoice.noOfMachine || 1, unitRate: invoice.rentalCost, amount: invoice.rentalCost });
+    }
+    if (invoice.techniciansCost && invoice.techniciansCost > 0) {
+      list.push({ id: generateId(), selected: true, desc: `Technician Charge for ${invoice.noOfTechnician || 0} dewatering staff @ N${(invoice.techniciansDailyRate || 0).toLocaleString()} per technician per day for ${invoice.duration || 0} days.`, qty: invoice.noOfTechnician || 1, unitRate: invoice.techniciansCost, amount: invoice.techniciansCost });
+    }
+    if (invoice.dieselCost && invoice.dieselCost > 0) {
+      list.push({ id: generateId(), selected: true, desc: `Diesel Supply (${invoice.dailyUsage || 0}L/day for ${invoice.duration || 0} Days @ ₦${(invoice.dieselCostPerLtr || 0).toLocaleString()}/L)`, qty: 1, unitRate: invoice.dieselCost, amount: invoice.dieselCost });
+    }
+    if (invoice.mobDemob && invoice.mobDemob > 0) {
+      list.push({ id: generateId(), selected: true, desc: `Mobilization / Demobilization`, qty: 1, unitRate: invoice.mobDemob, amount: invoice.mobDemob });
+    }
+    if (invoice.installation && invoice.installation > 0) {
+      list.push({ id: generateId(), selected: true, desc: `Installation`, qty: 1, unitRate: invoice.installation, amount: invoice.installation });
+    }
+    if (invoice.damages && invoice.damages > 0) {
+      list.push({ id: generateId(), selected: true, desc: `Damages / Repairs`, qty: 1, unitRate: invoice.damages, amount: invoice.damages });
+    }
+    if (list.length === 0) {
+       list.push({ id: generateId(), selected: true, desc: 'Description of service...', qty: 1, amount: 0 });
+    }
+    return list;
+  });
+
+  const subtotal = items.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+  
+  const vatIncSetting = invoice.vatInc;
+  const vatRateStr = String(useAppStore.getState().payrollVariables?.vatRate || '7.5');
+  const vatRate = parseFloat(vatRateStr) || 7.5;
+
+  let totalCharge = subtotal;
+  let vat = 0;
+  if (vatIncSetting === 'Add') {
+    vat = subtotal * (vatRate / 100);
+    totalCharge = subtotal + vat;
+  }
+  
+  const [customWords, setCustomWords] = useState<string | null>(invoice.printLayout?.customWords || null);
+  
+  React.useEffect(() => {
+    // Determine auto-calculate if words have never been saved
+    if (customWords === null && !invoice.printLayout?.customWords) {
+      setCustomWords('TOTAL AMOUNT IN WORD: ' + toWords(totalCharge));
+    }
+  }, [totalCharge, invoice.printLayout?.customWords]);
+
+  const wordsValue = customWords !== null ? customWords : ('TOTAL AMOUNT IN WORD: ' + toWords(totalCharge));
+  const [footerText, setFooterText] = useState(invoice.printLayout?.footerText || 'We look forward to your swift response.');
+  
+  const [footerCompany, setFooterCompany] = useState(invoice.printLayout?.footerCompany || 'DEWATERING CONSTRUCTION ETC LIMITED');
+  const [footerContact, setFooterContact] = useState(invoice.printLayout?.footerContact || '09030002182, 08028280712');
+  const [footerEmail, setFooterEmail] = useState(invoice.printLayout?.footerEmail || 'info@dewaterconstruct.com');
+
+  const calcBalanceDue = totalCharge - paymentsCredits;
+
+  const handlePrint = () => {
+    const content = printRef.current;
+    if (!content) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html><head><title>Print Invoice ${invoiceNo}</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; background-color: white;}
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 13.5px; color: #111; background: white!important; line-height: 1.4; }
+        .a4-page { width: 210mm; min-height: 297mm; padding: 15mm; margin: auto; break-after: auto; display: flex; flex-direction: column; }
+        
+        .top-section { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px; }
+        .logo-box { width: 60%; }
+        /* Logo representation */
+        .logo-box svg { height: 90px; width: auto; }
+        .inv-header { text-align: right; width: 240px; }
+        .inv-header h1 { font-family: 'Arial Black', Impact, sans-serif; font-size: 32px; font-weight: 900; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; color: #111; text-align: right; margin-top: 10px;}
+        .date-table { width: 100%; border-collapse: collapse; border: 1.5px solid #385296; font-size: 13.5px; font-weight: bold; }
+        .date-table th { border: 1.5px solid #385296; padding: 4px; text-align: center; }
+        .date-table td { border: 1.5px solid #385296; padding: 4px; text-align: center; font-weight: normal; }
+
+        .mid-section { display: flex; justify-content: space-between; gap: 30px; margin-bottom: 20px; }
+        .box { flex: 1; border: 1.5px solid #385296; }
+        .box-title { font-weight: bold; padding: 5px 8px; font-size: 13.5px; border-bottom: 1.5px solid #385296; }
+        .box-content { padding: 8px; white-space: pre-wrap; font-size: 13.5px; min-height: 80px; }
+
+        .project-terms { display: flex; justify-content: flex-end; margin-bottom: -1.5px; }
+        .pt-table { border-collapse: collapse; width: 340px; text-align: center; font-size: 12px; }
+        .pt-table th, .pt-table td { border: 1.5px solid #385296; padding: 4px; }
+        .pt-table th { font-weight: normal; }
+        .pt-table td { font-weight: normal; }
+
+        .main-table { width: 100%; border-collapse: collapse; border: 1.5px solid #385296; font-size: 13.5px; }
+        .main-table th { border: 1.5px solid #385296; padding: 8px; text-align: center; font-weight: bold; }
+        .main-table td { border-left: 1.5px solid #385296; border-right: 1.5px solid #385296; padding: 12px; vertical-align: top; }
+        
+        .desc-col { width: 65%; }
+        .qty-col { width: 15%; text-align: center!important; }
+        .amt-col { width: 20%; text-align: right!important; padding-right: 10px!important;}
+
+        .footer { margin-top: auto; padding-top: 40px; font-size: 13.5px; line-height: 1.4; font-weight: bold;}
+        
+        @media print {
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .a4-page { width: 100%; padding: 10mm; margin: 0; box-shadow: none; break-after: auto; }
+        }
+        .hide-on-print { display: none !important; }
+        .show-on-print { display: block !important; }
+        span.show-on-print { display: inline !important; }
+      </style></head><body>
+      ${content.innerHTML}
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); }, 400);
+  };
+
+  const handleSaveLayout = () => {
+    const layout = {
+      items,
+      invoiceDate,
+      invoiceNo,
+      customWords,
+      paymentsCredits,
+      footerCompany,
+      footerContact,
+      footerEmail,
+      footerText
+    };
+
+    const actionLog = {
+      date: new Date().toISOString(),
+      action: 'Saved Print Layout',
+      totalCharge: totalCharge
+    };
+
+    const isPending = 'invoiceNo' in invoice;
+    const currentId = invoice.id;
+    
+    try {
+      if (isPending) {
+        useAppStore.getState().updatePendingInvoice(currentId, { 
+          printLayout: layout, 
+          historyLog: [...((invoice as any).historyLog || []), actionLog] 
+        });
+      } else {
+        useAppStore.getState().updateInvoice(currentId, { 
+          printLayout: layout, 
+          historyLog: [...((invoice as any).historyLog || []), actionLog] 
+        });
+      }
+      toast.success("Invoice layout successfully saved to history log");
+    } catch (e) {
+      toast.error("Failed to save layout");
+    }
+  };
+
+  const handleUpdateItem = (index: number, k: string, val: string | number | boolean) => {
+    const newItems = [...items];
+    (newItems[index] as any)[k] = val;
+    setItems(newItems);
+  };
+  
+  const handleAddItem = () => {
+    setItems([...items, { id: generateId(), selected: true, desc: 'New Line Item', qty: 1, amount: 0 }]);
+  };
+
+  const handleDeleteItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+      <div className="bg-white max-w-4xl w-full rounded-2xl shadow-2xl h-[95vh] flex flex-col pointer-events-auto overflow-hidden">
+        
+        {/* Editor Controls Header */}
+        <div className="bg-slate-50 border-b border-slate-100 p-4 shrink-0 flex items-center justify-between z-10 shadow-sm relative">
+          <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+            <Printer className="h-5 w-5 text-teal-600" /> Print Invoice Editor
+          </h2>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={handleSaveLayout} className="gap-2 bg-slate-800 hover:bg-slate-700 text-white h-9 shadow-sm px-4">
+              Save Layout State
+            </Button>
+            <Button size="sm" onClick={handlePrint} className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9 shadow-sm px-4">
+              <Printer className="w-4 h-4"/> Print Document
+            </Button>
+            <Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9 border-slate-200 shadow-sm ml-2 bg-white hover:bg-slate-100">
+              <X className="h-5 w-5 text-slate-500" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Unified View */}
+        <div className="flex-1 overflow-auto bg-gray-300 p-6 pb-20 relative flex justify-center [scrollbar-gutter:stable]">
+          <div ref={printRef} className="relative">
+            <div className="a4-page bg-white shadow-xl shrink-0 mx-auto" style={{ width: '210mm', minHeight: '297mm', padding: '15mm' }}>
+              
+              <div className="top-section">
+                <div className="logo-box">
+                  <img src={InvoiceLogo} alt="Invoice Logo" style={{ maxHeight: '110px', width: 'auto' }} />
+                </div>
+                <div className="inv-header">
+                  <h1>INVOICE</h1>
+                  <table className="date-table">
+                    <thead><tr><th>Date</th><th>Invoice #</th></tr></thead>
+                    <tbody>
+                      <tr>
+                        <td>
+                          <input type="text" className="hide-on-print" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} style={{width: '90px', border:'1px solid #ddd', padding:'2px', textAlign: 'center'}} />
+                          <span className="show-on-print" style={{display:'none'}}>{formatDisplayDate(invoiceDate)}</span>
+                        </td>
+                        <td>
+                          <div style={{width: '90px', textAlign: 'center', padding:'2px', marginLeft:'auto', marginRight:'auto', fontWeight: 'normal'}}>{invoiceNo}</div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="mid-section">
+                <div className="box">
+                  <div className="box-title">Bill To</div>
+                  <div className="box-content">
+                    <textarea className="hide-on-print" value={billedToInput} onChange={e => setBilledToInput(e.target.value)} style={{width:'100%', minHeight:'80px', border:'none', resize:'vertical'}} />
+                    <span className="show-on-print" style={{display:'none'}}>{billedToInput}</span>
+                  </div>
+                </div>
+                <div className="box">
+                  <div className="box-title">Pay To</div>
+                  <div className="box-content">
+                    <textarea className="hide-on-print" value={paidToInput} onChange={e => setPaidToInput(e.target.value)} style={{width:'100%', minHeight:'80px', border:'none', resize:'vertical'}} />
+                    <span className="show-on-print" style={{display:'none'}}>{paidToInput}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="project-terms">
+                <table className="pt-table">
+                  <thead><tr><th>Project</th><th>Terms</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <input className="hide-on-print" value={projectText} onChange={e => setProjectText(e.target.value)} style={{width:'100%', textAlign:'center', border:'none'}} />
+                        <span className="show-on-print" style={{display:'none'}}>{projectText}</span>
+                      </td>
+                      <td>
+                        <input className="hide-on-print" value={termsText} onChange={e => setTermsText(e.target.value)} style={{width:'100%', textAlign:'center', border:'none'}} />
+                        <span className="show-on-print" style={{display:'none'}}>{termsText}</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <table className="main-table border-t-0" style={{marginTop: 0}}>
+                <thead>
+                  <tr>
+                    <th className="hide-on-print" style={{width: '40px', borderRight: 'none'}}></th>
+                    <th className="desc-col">Description</th>
+                    <th className="qty-col">Quantity</th>
+                    <th className="amt-col">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, idx) => (
+                    <tr key={item.id}>
+                      <td className="hide-on-print" style={{borderLeft: 'none', borderRight: '1.5px solid #385296', textAlign: 'center'}}>
+                        <button onClick={() => handleDeleteItem(idx)} style={{color: 'white', fontWeight: 'bold', fontSize: 13, background: '#ef4444', border: 'none', cursor: 'pointer', outline: 'none', borderRadius: '50%', width: 22, height: 22}}>&times;</button>
+                      </td>
+                      <td style={{borderRight: '1.5px solid #385296'}}>
+                        <textarea className="hide-on-print" value={item.desc} onChange={e => handleUpdateItem(idx, 'desc', e.target.value)} style={{width:'100%', minHeight:'60px', border:'1px dashed #ccc', padding: 4}} />
+                        <span className="show-on-print" style={{display:'none', whiteSpace:'pre-wrap'}}>{item.desc}</span>
+                      </td>
+                      <td className="qty-col" style={{borderRight: '1.5px solid #385296'}}>
+                        <input className="hide-on-print" value={item.qty} onChange={e => handleUpdateItem(idx, 'qty', e.target.value)} style={{width:'100%', textAlign:'center', border:'1px dashed #ccc', padding: 4}} />
+                        <span className="show-on-print" style={{display:'none'}}>{item.qty}</span>
+                      </td>
+                      <td className="amt-col" style={{borderRight: 'none'}}>
+                        <input className="hide-on-print" type="number" value={item.amount} onChange={e => handleUpdateItem(idx, 'amount', e.target.value)} style={{width:'100%', textAlign:'right', border:'1px dashed #ccc', padding: 4}} />
+                        <span className="show-on-print" style={{display:'none'}}>{parseFloat(item.amount||0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                      </td>
+                    </tr>
+                  ))}
+                  
+                  {/* Words Row */}
+                  <tr>
+                    <td className="hide-on-print" style={{borderLeft: 'none', borderRight: '1.5px solid #385296'}}></td>
+                    <td style={{borderRight: '1.5px solid #385296', paddingTop: '30px', paddingBottom: '20px'}}>
+                      <button onClick={handleAddItem} className="hide-on-print text-blue-600 underline text-sm mb-6 bg-transparent border-none cursor-pointer">+ Add Another Item</button>
+                      <textarea className="hide-on-print text-sm font-bold" value={wordsValue} onChange={e => setCustomWords(e.target.value)} style={{width:'100%', minHeight:'50px', border:'1px dashed #ccc', padding: 4}} />
+                      <span className="show-on-print text-[13.5px]" style={{display:'none', fontWeight: 'bold'}}>{wordsValue}</span>
+                    </td>
+                    <td className="qty-col" style={{borderRight: '1.5px solid #385296'}}></td>
+                    <td className="amt-col" style={{borderRight: 'none'}}></td>
+                  </tr>
+
+                  {/* Summary Rows */}
+                  <tr style={{borderTop: '1.5px solid #385296'}}>
+                    <td className="hide-on-print" style={{borderLeft: 'none', borderRight: '1.5px solid #385296'}}></td>
+                    <td rowSpan={3} style={{borderRight: '1.5px solid #385296', padding: '12px 12px', verticalAlign: 'bottom'}}>
+                      <input className="hide-on-print text-[13.5px]" value={footerText} onChange={e => setFooterText(e.target.value)} style={{width:'100%', border:'1px dashed #ccc', padding: 4}} />
+                      <span className="show-on-print text-[13.5px]" style={{display:'none'}}>{footerText}</span>
+                    </td>
+                    <td className="qty-col" style={{borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px'}}>Total Due</td>
+                    <td className="amt-col" style={{borderBottom: '1.5px solid #385296', borderRight: 'none', fontWeight: 'bold', padding: '10px 12px'}}>NGN {totalCharge.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                  </tr>
+                  <tr>
+                    <td className="hide-on-print" style={{borderLeft: 'none', borderRight: '1.5px solid #385296'}}></td>
+                    <td className="qty-col" style={{borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px'}}>Payments/Credits</td>
+                    <td className="amt-col" style={{borderBottom: '1.5px solid #385296', borderRight: 'none', padding: '10px 12px'}}>
+                      <span className="hide-on-print w-full flex justify-end items-center">NGN <input type="number" value={paymentsCredits} onChange={e => setPaymentsCredits(Number(e.target.value))} style={{width:'80px', textAlign:'right', border:'1px dashed #ccc', marginLeft: '5px'}} /></span>
+                      <span className="show-on-print" style={{display:'none'}}>NGN {paymentsCredits.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="hide-on-print" style={{borderLeft: 'none', borderRight: '1.5px solid #385296'}}></td>
+                    <td className="qty-col" style={{borderRight: '1.5px solid #385296', borderBottom: 'none', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px'}}>Balance Due</td>
+                    <td className="amt-col" style={{borderRight: 'none', borderBottom: 'none', fontWeight: 'bold', padding: '10px 12px'}}>NGN {calcBalanceDue.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div className="footer">
+                <div style={{fontWeight: 900, letterSpacing: '1px'}}>
+                  <input className="hide-on-print" value={footerCompany} onChange={e => setFooterCompany(e.target.value)} style={{width:'100%', border:'1px dashed #ccc', fontWeight: 900, outline: 'none'}} />
+                  <span className="show-on-print" style={{display:'none'}}>{footerCompany}</span>
+                </div>
+                <div>
+                  <input className="hide-on-print" value={footerContact} onChange={e => setFooterContact(e.target.value)} style={{width:'100%', border:'1px dashed #ccc', outline: 'none'}} />
+                  <span className="show-on-print" style={{display:'none'}}>{footerContact}</span>
+                </div>
+                <div>
+                  <input className="hide-on-print" value={footerEmail} onChange={e => setFooterEmail(e.target.value)} style={{width:'100%', border:'1px dashed #ccc', outline: 'none'}} />
+                  <span className="show-on-print" style={{display:'none'}}>{footerEmail}</span>
+                </div>
+              </div>
+              
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

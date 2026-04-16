@@ -87,6 +87,7 @@ export function dbToInvoice(r: any): Invoice {
     dieselCost: Number(r.diesel_cost), techniciansCost: Number(r.technicians_cost),
     totalCost: Number(r.total_cost), vat: Number(r.vat),
     totalCharge: Number(r.total_charge), totalExclusiveOfVat: Number(r.total_exclusive_of_vat),
+    printLayout: r.print_layout, historyLog: r.history_log || [],
   };
 }
 
@@ -103,6 +104,7 @@ export function dbToPendingInvoice(r: any): PendingInvoice {
     dieselCost: Number(r.diesel_cost), techniciansCost: Number(r.technicians_cost),
     totalCost: Number(r.total_cost), vat: Number(r.vat),
     totalCharge: Number(r.total_charge), totalExclusiveOfVat: Number(r.total_exclusive_of_vat),
+    printLayout: r.print_layout, historyLog: r.history_log || [],
   };
 }
 
@@ -417,6 +419,7 @@ function invoiceToDb(i: Invoice) {
     technicians_cost: i.techniciansCost, total_cost: i.totalCost,
     vat: i.vat, total_charge: i.totalCharge,
     total_exclusive_of_vat: i.totalExclusiveOfVat,
+    print_layout: i.printLayout, history_log: i.historyLog || [],
   };
 }
 
@@ -432,6 +435,7 @@ function pendingInvoiceToDb(p: PendingInvoice) {
     diesel_cost: p.dieselCost, technicians_cost: p.techniciansCost,
     total_cost: p.totalCost, vat: p.vat, total_charge: p.totalCharge,
     total_exclusive_of_vat: p.totalExclusiveOfVat,
+    print_layout: p.printLayout, history_log: p.historyLog || [],
   };
 }
 
@@ -1047,7 +1051,7 @@ export const db = {
         noOfTechnician: 'no_of_technician', techniciansDailyRate: 'technicians_daily_rate',
         mobDemob: 'mob_demob', rentalCost: 'rental_cost', dieselCost: 'diesel_cost',
         techniciansCost: 'technicians_cost', totalCost: 'total_cost', totalCharge: 'total_charge',
-        totalExclusiveOfVat: 'total_exclusive_of_vat',
+        totalExclusiveOfVat: 'total_exclusive_of_vat', printLayout: 'print_layout', historyLog: 'history_log',
       };
       update[map[k] || k] = v;
     });
@@ -1075,7 +1079,7 @@ export const db = {
         startDate: 'start_date', endDate: 'end_date', rentalCost: 'rental_cost',
         dieselCost: 'diesel_cost', techniciansCost: 'technicians_cost',
         totalCost: 'total_cost', totalCharge: 'total_charge',
-        totalExclusiveOfVat: 'total_exclusive_of_vat',
+        totalExclusiveOfVat: 'total_exclusive_of_vat', printLayout: 'print_layout', historyLog: 'history_log',
       };
       update[map[k] || k] = v;
     });
