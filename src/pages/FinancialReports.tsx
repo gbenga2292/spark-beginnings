@@ -203,8 +203,12 @@ export function FinancialReports() {
   }, [rawInvoices, rawPayments, rawVatPayments]);
 
   const availableClients = useMemo(() => {
-    return Array.from(new Set(sites.map(s => s.client))).sort();
-  }, [sites]);
+    const clientSet = new Set<string>();
+    sites.forEach(s => { if (s.client) clientSet.add(s.client.trim()); });
+    rawInvoices.forEach(i => { if (i.client) clientSet.add(i.client.trim()); });
+    rawPayments.forEach(p => { if ((p as any).client) clientSet.add(((p as any).client as string).trim()); });
+    return Array.from(clientSet).sort();
+  }, [sites, rawInvoices, rawPayments]);
 
   const invoices = useMemo(() => rawInvoices.filter(i => {
     const normalized = normalizeDate(i.date);
@@ -218,7 +222,7 @@ export function FinancialReports() {
         if (parts.length === 3) matchM = parseInt(parts[1], 10) === parseInt(filterMonth, 10);
       }
     }
-    const matchC = filterClient === 'All' || i.client === filterClient;
+    const matchC = filterClient === 'All' || (i.client || '').trim() === filterClient.trim();
     return matchY && matchM && matchC;
   }), [rawInvoices, filterYear, filterMonth, filterClient]);
 
@@ -234,7 +238,7 @@ export function FinancialReports() {
         if (parts.length === 3) matchM = parseInt(parts[1], 10) === parseInt(filterMonth, 10);
       }
     }
-    const matchC = filterClient === 'All' || p.client === filterClient;
+    const matchC = filterClient === 'All' || (p.client || '').trim() === filterClient.trim();
     return matchY && matchM && matchC;
   }), [rawPayments, filterYear, filterMonth, filterClient]);
 
@@ -250,7 +254,7 @@ export function FinancialReports() {
         if (parts.length === 3) matchM = parseInt(parts[1], 10) === parseInt(filterMonth, 10);
       }
     }
-    const matchC = filterClient === 'All' || v.client === filterClient;
+    const matchC = filterClient === 'All' || (v.client || '').trim() === filterClient.trim();
     return matchY && matchM && matchC;
   }), [rawVatPayments, filterYear, filterMonth, filterClient]);
 
@@ -333,20 +337,22 @@ export function FinancialReports() {
     rawInvoices.forEach(inv => {
       const normalized = normalizeDate(inv.date);
       if (!normalized || normalized.substring(0, 4) >= cutoff) return;
-      const matchC = filterClient === 'All' || inv.client === filterClient;
+      const matchC = filterClient === 'All' || (inv.client || '').trim() === filterClient;
       if (!matchC) return;
-      const siteName = inv.siteName || (inv as any).site || 'Unknown Site';
-      const key = summaryTab === 'client' ? inv.client : `${inv.client} - ${siteName}`;
+      const siteName = (inv.siteName || (inv as any).site || 'Unknown Site').trim();
+      const clientName = (inv.client || '').trim();
+      const key = summaryTab === 'client' ? clientName : `${clientName} - ${siteName}`;
       bfMap.set(key, (bfMap.get(key) || 0) + (inv.amount || 0));
     });
 
     rawPayments.forEach(pay => {
       const normalized = normalizeDate(pay.date);
       if (!normalized || normalized.substring(0, 4) >= cutoff) return;
-      const matchC = filterClient === 'All' || pay.client === filterClient;
+      const matchC = filterClient === 'All' || (pay.client || '').trim() === filterClient;
       if (!matchC) return;
-      const siteName = pay.site || 'Unknown Site';
-      const key = summaryTab === 'client' ? pay.client : `${pay.client} - ${siteName}`;
+      const siteName = (pay.site || 'Unknown Site').trim();
+      const clientName = (pay.client || '').trim();
+      const key = summaryTab === 'client' ? clientName : `${clientName} - ${siteName}`;
       const cleared = (pay.amount || 0) + (pay.withholdingTax || 0) + (pay.discount || 0);
       bfMap.set(key, (bfMap.get(key) || 0) - cleared);
     });
@@ -358,16 +364,18 @@ export function FinancialReports() {
   const summaryData = useMemo(() => {
     const rowMap = new Map<string, any>();
     invoices.forEach(inv => {
-      const siteName = inv.siteName || (inv as any).site || 'Unknown Site';
-      const key = summaryTab === 'client' ? inv.client : `${inv.client} - ${siteName}`;
-      if (!rowMap.has(key)) rowMap.set(key, { client: inv.client, site: siteName, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, discount: 0, withholdingTax: 0, vat: 0 });
+      const siteName = (inv.siteName || (inv as any).site || 'Unknown Site').trim();
+      const clientName = (inv.client || '').trim();
+      const key = summaryTab === 'client' ? clientName : `${clientName} - ${siteName}`;
+      if (!rowMap.has(key)) rowMap.set(key, { client: clientName, site: siteName, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, discount: 0, withholdingTax: 0, vat: 0 });
       rowMap.get(key)!.noOfInvoices += 1;
       rowMap.get(key)!.totalInvoices += (inv.amount || 0);
     });
     payments.forEach(pay => {
-      const siteName = pay.site || 'Unknown Site';
-      const key = summaryTab === 'client' ? pay.client : `${pay.client} - ${siteName}`;
-      if (!rowMap.has(key)) rowMap.set(key, { client: pay.client, site: siteName, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, discount: 0, withholdingTax: 0, vat: 0 });
+      const siteName = (pay.site || 'Unknown Site').trim();
+      const clientName = (pay.client || '').trim();
+      const key = summaryTab === 'client' ? clientName : `${clientName} - ${siteName}`;
+      if (!rowMap.has(key)) rowMap.set(key, { client: clientName, site: siteName, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, discount: 0, withholdingTax: 0, vat: 0 });
       rowMap.get(key)!.totalPayment += (pay.amount || 0);
       rowMap.get(key)!.discount += (pay.discount || 0);
       rowMap.get(key)!.withholdingTax += (pay.withholdingTax || 0);

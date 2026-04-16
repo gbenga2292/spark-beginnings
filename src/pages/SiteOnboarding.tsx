@@ -287,7 +287,8 @@ export function SiteOnboarding() {
             updates.endDate = form.phase5.actualEndDate || '';
           }
           
-          const newVat = ((form.phase4.clientTaxStatus as string) || '') === 'Yes' ? 'Yes' : 'No';
+          const taxStatus = (form.phase4.clientTaxStatus as string) || '';
+          const newVat = taxStatus === 'Add' ? 'Add' : taxStatus === 'Yes' ? 'Yes' : 'No';
           
           if (newVat !== matchingSite.vat) {
             updates.vat = newVat;
@@ -327,7 +328,7 @@ export function SiteOnboarding() {
       name: form.siteName,
       client: form.clientName,
       status: 'Active',
-      vat: ((form.phase4.clientTaxStatus as string) || '') === 'Yes' ? 'Yes' : 'No',
+      vat: (() => { const ts = (form.phase4.clientTaxStatus as string) || ''; return ts === 'Add' ? 'Add' : ts === 'Yes' ? 'Yes' : 'No'; })() as 'Yes' | 'No' | 'Add',
       startDate: form.phase1.timelineStartDate || new Date().toISOString().split('T')[0],
       endDate: ''
     });
@@ -873,8 +874,9 @@ export function SiteOnboarding() {
                         onChange={e => updPhase('phase4', { clientTaxStatus: e.target.value as any })}
                       >
                         <option value="">-- Select --</option>
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
+                        <option value="Add">Add (Add 7.5% VAT on top)</option>
+                        <option value="Yes">Yes (VAT Inclusive)</option>
+                        <option value="No">No (VAT Exempt)</option>
                       </select>
                     </div>
 

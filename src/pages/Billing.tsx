@@ -344,7 +344,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
     setForm({
       ...initialForm,
       vatInc: inv.vatInc || 'No',
-      destination: 'totalCost' in inv ? 'Pending' : 'Active',
+      destination: activeTab === 'quotations' ? 'Pending' : 'Active',
       startDate: 'startDate' in inv ? inv.startDate : inv.date,
       duration: 'duration' in inv ? String(inv.duration ?? 0) : '0',
       invoiceNo: 'invoiceNo' in inv ? inv.invoiceNo : inv.invoiceNumber,
