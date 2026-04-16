@@ -64,10 +64,14 @@ export function WaybillManager() {
   const currentSearch = activeTab === 'waybill' ? waybillSearch : returnSearch;
   const setCurrentSearch = activeTab === 'waybill' ? setWaybillSearch : setReturnSearch;
 
+  // ── Full-page detail view (replaces list entirely) ────────────────────
+  if (viewingWaybill) {
+    return <WaybillDetailView waybill={viewingWaybill} onClose={() => setViewingWaybill(null)} />;
+  }
+
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
       {showCreateModal && <WaybillForm onClose={() => setShowCreateModal(false)} />}
-      {viewingWaybill && <WaybillDetailView waybill={viewingWaybill} onClose={() => setViewingWaybill(null)} />}
 
       {/* Mobile Actions */}
       <div className="flex sm:hidden flex-wrap gap-2 px-1">

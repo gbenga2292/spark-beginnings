@@ -1836,32 +1836,117 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-      <div className="bg-white max-w-4xl w-full rounded-2xl shadow-2xl h-[95vh] flex flex-col pointer-events-auto overflow-hidden">
-        
-        {/* Editor Controls Header */}
-        <div className="bg-slate-50 border-b border-slate-100 p-4 shrink-0 flex items-center justify-between z-10 shadow-sm relative">
-          <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <Printer className="h-5 w-5 text-teal-600" /> Print Invoice Editor
-          </h2>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md">
+      <div className="bg-white max-w-[900px] w-full rounded-2xl shadow-2xl h-[96vh] flex flex-col pointer-events-auto overflow-hidden border border-slate-200">
+
+        {/* ── Editor Header ─────────────────────────────────────────────────── */}
+        <div className="shrink-0 flex items-center justify-between px-5 py-3.5 bg-white border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-teal-50 flex items-center justify-center">
+              <Printer className="h-4 w-4 text-teal-600" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-800 leading-tight">Invoice Print Editor</p>
+              <p className="text-[11px] text-slate-400 font-medium">#{invoiceNo} · {invoice.client}</p>
+            </div>
+          </div>
+
           <div className="flex items-center gap-2">
-            <Button size="sm" onClick={handleSaveLayout} className="gap-2 bg-slate-800 hover:bg-slate-700 text-white h-9 shadow-sm px-4">
-              Save Layout State
+            {/* Status pill */}
+            <span className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              Unsaved Changes
+            </span>
+
+            <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block" />
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSaveLayout}
+              className="h-9 gap-2 text-slate-700 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-xs px-4"
+            >
+              Save State
             </Button>
-            <Button size="sm" onClick={handlePrint} className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9 shadow-sm px-4">
-              <Printer className="w-4 h-4"/> Print Document
+            <Button
+              size="sm"
+              onClick={handlePrint}
+              className="h-9 gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs px-4 shadow-sm"
+            >
+              <Printer className="w-3.5 h-3.5" /> Print Document
             </Button>
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9 border-slate-200 shadow-sm ml-2 bg-white hover:bg-slate-100">
-              <X className="h-5 w-5 text-slate-500" />
-            </Button>
+            <button
+              onClick={onClose}
+              className="h-9 w-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors ml-1"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         </div>
 
-        {/* Unified View */}
-        <div className="flex-1 overflow-auto bg-gray-300 p-6 pb-20 relative flex justify-center [scrollbar-gutter:stable]">
-          <div ref={printRef} className="relative">
-            <div className="a4-page bg-white shadow-xl shrink-0 mx-auto" style={{ width: '210mm', minHeight: '297mm', padding: '15mm' }}>
-              
+        {/* ── Toolbar strip ────────────────────────────────────────────────── */}
+        <div className="shrink-0 px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-3 text-[11px] text-slate-500 font-medium">
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded border border-dashed border-slate-400 inline-block" />
+            Dashed fields are editable
+          </span>
+          <span className="text-slate-300">·</span>
+          <span>Click any field in the document to edit it</span>
+          <span className="text-slate-300">·</span>
+          <span>Fields are hidden when printing</span>
+        </div>
+
+        {/* ── A4 Canvas ─────────────────────────────────────────────────────── */}
+        <div className="flex-1 overflow-auto bg-[#e8eaed] p-8 flex justify-center [scrollbar-gutter:stable]">
+          <div ref={printRef}>
+            <style>{`
+              .invoice-canvas {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                font-size: 13.5px;
+                color: #111;
+                line-height: 1.4;
+              }
+              .invoice-canvas * {
+                box-sizing: border-box;
+              }
+              .invoice-canvas .a4-page {
+                width: 210mm;
+                min-height: 297mm;
+                padding: 15mm;
+                margin: auto;
+                background-color: white;
+                box-shadow: 0 4px 24px 0 rgba(0,0,0,0.18), 0 1px 4px 0 rgba(0,0,0,0.10);
+                border-radius: 2px;
+                display: flex;
+                flex-direction: column;
+              }
+              .invoice-canvas .top-section { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px !important; }
+              .invoice-canvas .logo-box { width: 60%; }
+              .invoice-canvas .inv-header { text-align: right; width: 240px; }
+              .invoice-canvas .inv-header h1 { font-family: 'Arial Black', Impact, sans-serif; font-size: 32px !important; font-weight: 900; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; color: #111; text-align: right; margin-top: 10px;}
+              .invoice-canvas table.date-table { width: 100%; border-collapse: collapse !important; border: 1.5px solid #385296 !important; font-size: 13.5px; font-weight: bold; background: white; margin: 0 !important; }
+              .invoice-canvas table.date-table th { border: 1.5px solid #385296 !important; padding: 4px !important; text-align: center; }
+              .invoice-canvas table.date-table td { border: 1.5px solid #385296 !important; padding: 4px !important; text-align: center; font-weight: normal; vertical-align: middle; }
+              .invoice-canvas .mid-section { display: flex; justify-content: space-between; gap: 30px; margin-bottom: 20px !important; }
+              .invoice-canvas .box { flex: 1; border: 1.5px solid #385296 !important; background: white; }
+              .invoice-canvas .box-title { font-weight: bold; padding: 5px 8px !important; font-size: 13.5px; border-bottom: 1.5px solid #385296 !important; margin: 0 !important; }
+              .invoice-canvas .box-content { padding: 8px !important; white-space: pre-wrap; font-size: 13.5px; min-height: 80px; }
+              .invoice-canvas .project-terms { display: flex; justify-content: flex-end; margin-bottom: -1.5px !important; }
+              .invoice-canvas table.pt-table { border-collapse: collapse !important; width: 340px; text-align: center; font-size: 12px; background: white; margin: 0 !important; }
+              .invoice-canvas table.pt-table th, .invoice-canvas table.pt-table td { border: 1.5px solid #385296 !important; padding: 4px !important; }
+              .invoice-canvas table.pt-table th { font-weight: normal; }
+              .invoice-canvas table.pt-table td { font-weight: normal; }
+              .invoice-canvas table.main-table { width: 100%; border-collapse: collapse !important; border: 1.5px solid #385296 !important; font-size: 13.5px; background: white; margin: 0 !important; }
+              .invoice-canvas table.main-table th { border: 1.5px solid #385296 !important; padding: 8px !important; text-align: center; font-weight: bold; }
+              .invoice-canvas table.main-table td { border-left: 1.5px solid #385296 !important; border-right: 1.5px solid #385296 !important; padding: 12px !important; vertical-align: top; }
+              .invoice-canvas .desc-col { width: 65%; }
+              .invoice-canvas .qty-col { width: 15%; text-align: center!important; }
+              .invoice-canvas .amt-col { width: 20%; text-align: right!important; padding-right: 10px!important;}
+              .invoice-canvas .footer { margin-top: auto; padding-top: 40px; font-size: 13.5px; line-height: 1.4; font-weight: bold;}
+            `}</style>
+            <div className="invoice-canvas">
+              <div className="a4-page">
+                {/* Top: Logo + Invoice header */}
               <div className="top-section">
                 <div className="logo-box">
                   <img src={InvoiceLogo} alt="Invoice Logo" style={{ maxHeight: '110px', width: 'auto' }} />
@@ -1873,11 +1958,17 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
                     <tbody>
                       <tr>
                         <td>
-                          <input type="text" className="hide-on-print" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} style={{width: '90px', border:'1px solid #ddd', padding:'2px', textAlign: 'center'}} />
-                          <span className="show-on-print" style={{display:'none'}}>{formatDisplayDate(invoiceDate)}</span>
+                          <input
+                            type="text"
+                            className="hide-on-print"
+                            value={invoiceDate}
+                            onChange={e => setInvoiceDate(e.target.value)}
+                            style={{ width: '90px', border: '1px solid #ddd', padding: '2px', textAlign: 'center', borderRadius: 3 }}
+                          />
+                          <span className="show-on-print" style={{ display: 'none' }}>{formatDisplayDate(invoiceDate)}</span>
                         </td>
                         <td>
-                          <div style={{width: '90px', textAlign: 'center', padding:'2px', marginLeft:'auto', marginRight:'auto', fontWeight: 'normal'}}>{invoiceNo}</div>
+                          <div style={{ width: '90px', textAlign: 'center', padding: '2px', marginLeft: 'auto', marginRight: 'auto', fontWeight: 'normal' }}>{invoiceNo}</div>
                         </td>
                       </tr>
                     </tbody>
@@ -1885,45 +1976,58 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
                 </div>
               </div>
 
+              {/* Bill To / Pay To */}
               <div className="mid-section">
                 <div className="box">
                   <div className="box-title">Bill To</div>
                   <div className="box-content">
-                    <textarea className="hide-on-print" value={billedToInput} onChange={e => setBilledToInput(e.target.value)} style={{width:'100%', minHeight:'80px', border:'none', resize:'vertical'}} />
-                    <span className="show-on-print" style={{display:'none'}}>{billedToInput}</span>
+                    <textarea
+                      className="hide-on-print"
+                      value={billedToInput}
+                      onChange={e => setBilledToInput(e.target.value)}
+                      style={{ width: '100%', minHeight: '80px', border: 'none', resize: 'vertical', outline: 'none', background: 'transparent' }}
+                    />
+                    <span className="show-on-print" style={{ display: 'none' }}>{billedToInput}</span>
                   </div>
                 </div>
                 <div className="box">
                   <div className="box-title">Pay To</div>
                   <div className="box-content">
-                    <textarea className="hide-on-print" value={paidToInput} onChange={e => setPaidToInput(e.target.value)} style={{width:'100%', minHeight:'80px', border:'none', resize:'vertical'}} />
-                    <span className="show-on-print" style={{display:'none'}}>{paidToInput}</span>
+                    <textarea
+                      className="hide-on-print"
+                      value={paidToInput}
+                      onChange={e => setPaidToInput(e.target.value)}
+                      style={{ width: '100%', minHeight: '80px', border: 'none', resize: 'vertical', outline: 'none', background: 'transparent' }}
+                    />
+                    <span className="show-on-print" style={{ display: 'none' }}>{paidToInput}</span>
                   </div>
                 </div>
               </div>
 
+              {/* Project / Terms */}
               <div className="project-terms">
                 <table className="pt-table">
                   <thead><tr><th>Project</th><th>Terms</th></tr></thead>
                   <tbody>
                     <tr>
                       <td>
-                        <input className="hide-on-print" value={projectText} onChange={e => setProjectText(e.target.value)} style={{width:'100%', textAlign:'center', border:'none'}} />
-                        <span className="show-on-print" style={{display:'none'}}>{projectText}</span>
+                        <input className="hide-on-print" value={projectText} onChange={e => setProjectText(e.target.value)} style={{ width: '100%', textAlign: 'center', border: 'none', outline: 'none', background: 'transparent' }} />
+                        <span className="show-on-print" style={{ display: 'none' }}>{projectText}</span>
                       </td>
                       <td>
-                        <input className="hide-on-print" value={termsText} onChange={e => setTermsText(e.target.value)} style={{width:'100%', textAlign:'center', border:'none'}} />
-                        <span className="show-on-print" style={{display:'none'}}>{termsText}</span>
+                        <input className="hide-on-print" value={termsText} onChange={e => setTermsText(e.target.value)} style={{ width: '100%', textAlign: 'center', border: 'none', outline: 'none', background: 'transparent' }} />
+                        <span className="show-on-print" style={{ display: 'none' }}>{termsText}</span>
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
 
-              <table className="main-table border-t-0" style={{marginTop: 0}}>
+              {/* Line Items Table */}
+              <table className="main-table border-t-0" style={{ marginTop: 0 }}>
                 <thead>
                   <tr>
-                    <th className="hide-on-print" style={{width: '40px', borderRight: 'none'}}></th>
+                    <th className="hide-on-print" style={{ width: '36px', borderRight: 'none', background: '#f8fafc' }}></th>
                     <th className="desc-col">Description</th>
                     <th className="qty-col">Quantity</th>
                     <th className="amt-col">Amount</th>
@@ -1932,77 +2036,135 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
                 <tbody>
                   {items.map((item, idx) => (
                     <tr key={item.id}>
-                      <td className="hide-on-print" style={{borderLeft: 'none', borderRight: '1.5px solid #385296', textAlign: 'center'}}>
-                        <button onClick={() => handleDeleteItem(idx)} style={{color: 'white', fontWeight: 'bold', fontSize: 13, background: '#ef4444', border: 'none', cursor: 'pointer', outline: 'none', borderRadius: '50%', width: 22, height: 22}}>&times;</button>
+                      <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', textAlign: 'center', background: '#fafafa' }}>
+                        <button
+                          onClick={() => handleDeleteItem(idx)}
+                          style={{ color: 'white', fontWeight: 'bold', fontSize: 12, background: '#ef4444', border: 'none', cursor: 'pointer', outline: 'none', borderRadius: '50%', width: 20, height: 20, lineHeight: '20px' }}
+                        >&times;</button>
                       </td>
-                      <td style={{borderRight: '1.5px solid #385296'}}>
-                        <textarea className="hide-on-print" value={item.desc} onChange={e => handleUpdateItem(idx, 'desc', e.target.value)} style={{width:'100%', minHeight:'60px', border:'1px dashed #ccc', padding: 4}} />
-                        <span className="show-on-print" style={{display:'none', whiteSpace:'pre-wrap'}}>{item.desc}</span>
+                      <td style={{ borderRight: '1.5px solid #385296' }}>
+                        <textarea
+                          className="hide-on-print"
+                          value={item.desc}
+                          onChange={e => handleUpdateItem(idx, 'desc', e.target.value)}
+                          style={{ width: '100%', minHeight: '60px', border: '1px dashed #c7d2e0', padding: 4, borderRadius: 3, outline: 'none', resize: 'vertical', background: '#f9fafb', fontFamily: 'inherit', fontSize: 'inherit' }}
+                        />
+                        <span className="show-on-print" style={{ display: 'none', whiteSpace: 'pre-wrap' }}>{item.desc}</span>
                       </td>
-                      <td className="qty-col" style={{borderRight: '1.5px solid #385296'}}>
-                        <input className="hide-on-print" value={item.qty} onChange={e => handleUpdateItem(idx, 'qty', e.target.value)} style={{width:'100%', textAlign:'center', border:'1px dashed #ccc', padding: 4}} />
-                        <span className="show-on-print" style={{display:'none'}}>{item.qty}</span>
+                      <td className="qty-col" style={{ borderRight: '1.5px solid #385296' }}>
+                        <input
+                          className="hide-on-print"
+                          value={item.qty}
+                          onChange={e => handleUpdateItem(idx, 'qty', e.target.value)}
+                          style={{ width: '100%', textAlign: 'center', border: '1px dashed #c7d2e0', padding: 4, borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 'inherit' }}
+                        />
+                        <span className="show-on-print" style={{ display: 'none' }}>{item.qty}</span>
                       </td>
-                      <td className="amt-col" style={{borderRight: 'none'}}>
-                        <input className="hide-on-print" type="number" value={item.amount} onChange={e => handleUpdateItem(idx, 'amount', e.target.value)} style={{width:'100%', textAlign:'right', border:'1px dashed #ccc', padding: 4}} />
-                        <span className="show-on-print" style={{display:'none'}}>{parseFloat(item.amount||0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                      <td className="amt-col" style={{ borderRight: 'none' }}>
+                        <input
+                          className="hide-on-print"
+                          type="number"
+                          value={item.amount}
+                          onChange={e => handleUpdateItem(idx, 'amount', e.target.value)}
+                          style={{ width: '100%', textAlign: 'right', border: '1px dashed #c7d2e0', padding: 4, borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 'inherit' }}
+                        />
+                        <span className="show-on-print" style={{ display: 'none' }}>{parseFloat(item.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </td>
                     </tr>
                   ))}
-                  
-                  {/* Words Row */}
+
+                  {/* Amount-in-words + Add item row */}
                   <tr>
-                    <td className="hide-on-print" style={{borderLeft: 'none', borderRight: '1.5px solid #385296'}}></td>
-                    <td style={{borderRight: '1.5px solid #385296', paddingTop: '30px', paddingBottom: '20px'}}>
-                      <button onClick={handleAddItem} className="hide-on-print text-blue-600 underline text-sm mb-6 bg-transparent border-none cursor-pointer">+ Add Another Item</button>
-                      <textarea className="hide-on-print text-sm font-bold" value={wordsValue} onChange={e => setCustomWords(e.target.value)} style={{width:'100%', minHeight:'50px', border:'1px dashed #ccc', padding: 4}} />
-                      <span className="show-on-print text-[13.5px]" style={{display:'none', fontWeight: 'bold'}}>{wordsValue}</span>
+                    <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
+                    <td style={{ borderRight: '1.5px solid #385296', paddingTop: '24px', paddingBottom: '16px' }}>
+                      <button
+                        onClick={handleAddItem}
+                        className="hide-on-print"
+                        style={{ color: '#2563eb', textDecoration: 'underline', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', marginBottom: '12px', display: 'block' }}
+                      >+ Add Another Item</button>
+                      <textarea
+                        className="hide-on-print"
+                        value={wordsValue}
+                        onChange={e => setCustomWords(e.target.value)}
+                        style={{ width: '100%', minHeight: '50px', border: '1px dashed #c7d2e0', padding: 4, fontWeight: 'bold', borderRadius: 3, outline: 'none', background: '#f9fafb', fontFamily: 'inherit', fontSize: 13 }}
+                      />
+                      <span className="show-on-print" style={{ display: 'none', fontWeight: 'bold', fontSize: '13.5px' }}>{wordsValue}</span>
                     </td>
-                    <td className="qty-col" style={{borderRight: '1.5px solid #385296'}}></td>
-                    <td className="amt-col" style={{borderRight: 'none'}}></td>
+                    <td className="qty-col" style={{ borderRight: '1.5px solid #385296' }}></td>
+                    <td className="amt-col" style={{ borderRight: 'none' }}></td>
                   </tr>
 
-                  {/* Summary Rows */}
-                  <tr style={{borderTop: '1.5px solid #385296'}}>
-                    <td className="hide-on-print" style={{borderLeft: 'none', borderRight: '1.5px solid #385296'}}></td>
-                    <td rowSpan={3} style={{borderRight: '1.5px solid #385296', padding: '12px 12px', verticalAlign: 'bottom'}}>
-                      <input className="hide-on-print text-[13.5px]" value={footerText} onChange={e => setFooterText(e.target.value)} style={{width:'100%', border:'1px dashed #ccc', padding: 4}} />
-                      <span className="show-on-print text-[13.5px]" style={{display:'none'}}>{footerText}</span>
+                  {/* Totals */}
+                  <tr style={{ borderTop: '1.5px solid #385296' }}>
+                    <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
+                    <td rowSpan={3} style={{ borderRight: '1.5px solid #385296', padding: '12px', verticalAlign: 'bottom' }}>
+                      <input
+                        className="hide-on-print"
+                        value={footerText}
+                        onChange={e => setFooterText(e.target.value)}
+                        style={{ width: '100%', border: '1px dashed #c7d2e0', padding: 4, borderRadius: 3, outline: 'none', background: '#f9fafb', fontSize: 13, fontFamily: 'inherit' }}
+                      />
+                      <span className="show-on-print" style={{ display: 'none', fontSize: '13.5px' }}>{footerText}</span>
                     </td>
-                    <td className="qty-col" style={{borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px'}}>Total Due</td>
-                    <td className="amt-col" style={{borderBottom: '1.5px solid #385296', borderRight: 'none', fontWeight: 'bold', padding: '10px 12px'}}>NGN {totalCharge.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="qty-col" style={{ borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px' }}>Total Due</td>
+                    <td className="amt-col" style={{ borderBottom: '1.5px solid #385296', borderRight: 'none', fontWeight: 'bold', padding: '10px 12px' }}>NGN {totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   </tr>
                   <tr>
-                    <td className="hide-on-print" style={{borderLeft: 'none', borderRight: '1.5px solid #385296'}}></td>
-                    <td className="qty-col" style={{borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px'}}>Payments/Credits</td>
-                    <td className="amt-col" style={{borderBottom: '1.5px solid #385296', borderRight: 'none', padding: '10px 12px'}}>
-                      <span className="hide-on-print w-full flex justify-end items-center">NGN <input type="number" value={paymentsCredits} onChange={e => setPaymentsCredits(Number(e.target.value))} style={{width:'80px', textAlign:'right', border:'1px dashed #ccc', marginLeft: '5px'}} /></span>
-                      <span className="show-on-print" style={{display:'none'}}>NGN {paymentsCredits.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                    <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
+                    <td className="qty-col" style={{ borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px' }}>Payments/Credits</td>
+                    <td className="amt-col" style={{ borderBottom: '1.5px solid #385296', borderRight: 'none', padding: '10px 12px' }}>
+                      <span className="hide-on-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4 }}>
+                        NGN
+                        <input
+                          type="number"
+                          value={paymentsCredits}
+                          onChange={e => setPaymentsCredits(Number(e.target.value))}
+                          style={{ width: '80px', textAlign: 'right', border: '1px dashed #c7d2e0', borderRadius: 3, padding: '2px 4px', outline: 'none', background: '#f9fafb' }}
+                        />
+                      </span>
+                      <span className="show-on-print" style={{ display: 'none' }}>NGN {paymentsCredits.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </td>
                   </tr>
                   <tr>
-                    <td className="hide-on-print" style={{borderLeft: 'none', borderRight: '1.5px solid #385296'}}></td>
-                    <td className="qty-col" style={{borderRight: '1.5px solid #385296', borderBottom: 'none', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px'}}>Balance Due</td>
-                    <td className="amt-col" style={{borderRight: 'none', borderBottom: 'none', fontWeight: 'bold', padding: '10px 12px'}}>NGN {calcBalanceDue.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
+                    <td className="qty-col" style={{ borderRight: '1.5px solid #385296', borderBottom: 'none', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px' }}>Balance Due</td>
+                    <td className="amt-col" style={{ borderRight: 'none', borderBottom: 'none', fontWeight: 'bold', padding: '10px 12px' }}>NGN {calcBalanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   </tr>
                 </tbody>
               </table>
 
+              {/* Footer */}
               <div className="footer">
-                <div style={{fontWeight: 900, letterSpacing: '1px'}}>
-                  <input className="hide-on-print" value={footerCompany} onChange={e => setFooterCompany(e.target.value)} style={{width:'100%', border:'1px dashed #ccc', fontWeight: 900, outline: 'none'}} />
-                  <span className="show-on-print" style={{display:'none'}}>{footerCompany}</span>
+                <div style={{ fontWeight: 900, letterSpacing: '1px' }}>
+                  <input
+                    className="hide-on-print"
+                    value={footerCompany}
+                    onChange={e => setFooterCompany(e.target.value)}
+                    style={{ width: '100%', border: '1px dashed #c7d2e0', fontWeight: 900, outline: 'none', background: '#f9fafb', borderRadius: 3, padding: '2px 4px' }}
+                  />
+                  <span className="show-on-print" style={{ display: 'none' }}>{footerCompany}</span>
                 </div>
                 <div>
-                  <input className="hide-on-print" value={footerContact} onChange={e => setFooterContact(e.target.value)} style={{width:'100%', border:'1px dashed #ccc', outline: 'none'}} />
-                  <span className="show-on-print" style={{display:'none'}}>{footerContact}</span>
+                  <input
+                    className="hide-on-print"
+                    value={footerContact}
+                    onChange={e => setFooterContact(e.target.value)}
+                    style={{ width: '100%', border: '1px dashed #c7d2e0', outline: 'none', background: '#f9fafb', borderRadius: 3, padding: '2px 4px' }}
+                  />
+                  <span className="show-on-print" style={{ display: 'none' }}>{footerContact}</span>
                 </div>
                 <div>
-                  <input className="hide-on-print" value={footerEmail} onChange={e => setFooterEmail(e.target.value)} style={{width:'100%', border:'1px dashed #ccc', outline: 'none'}} />
-                  <span className="show-on-print" style={{display:'none'}}>{footerEmail}</span>
+                  <input
+                    className="hide-on-print"
+                    value={footerEmail}
+                    onChange={e => setFooterEmail(e.target.value)}
+                    style={{ width: '100%', border: '1px dashed #c7d2e0', outline: 'none', background: '#f9fafb', borderRadius: 3, padding: '2px 4px' }}
+                  />
+                  <span className="show-on-print" style={{ display: 'none' }}>{footerEmail}</span>
                 </div>
               </div>
-              
+
+              </div>
             </div>
           </div>
         </div>
