@@ -22,7 +22,9 @@ export default defineConfig(({mode}) => {
     base: './',
     plugins: [react(), tailwindcss(), stripGhostAssets()],
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'process.env.GEMINI_API_KEY': mode === 'production' && process.env.VITE_WEB_VERSION === 'true' 
+        ? JSON.stringify('') 
+        : JSON.stringify(env.GEMINI_API_KEY),
     },
     resolve: {
       alias: {
