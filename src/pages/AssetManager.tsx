@@ -21,7 +21,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose,
 } from '@/src/components/ui/dialog';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
-import { X } from 'lucide-react';
 
 /* ─────────────────────────────────────────────────────────────── */
 /* Inline Description Dialog                                       */
@@ -31,21 +30,19 @@ function DescriptionDialog({ asset, onClose }: { asset: Asset; onClose: () => vo
     <Dialog open onOpenChange={onClose}>
       <DialogContent
         aria-describedby={undefined}
-        className="max-w-md p-0 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900"
+        className="max-w-md p-0 overflow-hidden rounded-2xl bg-card border border-border shadow-2xl"
       >
-        <DialogHeader className="flex flex-row items-center justify-between space-y-0 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-slate-700 flex items-center justify-center">
-              <FileText className="h-4 w-4 text-white" />
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+              <FileText className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <DialogTitle className="text-sm font-bold text-slate-800 dark:text-white leading-none">Description</DialogTitle>
-              <p className="text-[10px] text-slate-400 font-semibold mt-0.5 truncate max-w-[220px]">{asset.name}</p>
+              <DialogTitle className="text-base font-semibold text-foreground leading-none">Description</DialogTitle>
+              <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[200px]">{asset.name}</p>
             </div>
           </div>
-          <DialogClose className="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 transition-colors">
-            <X className="h-3.5 w-3.5" />
-          </DialogClose>
+          <DialogClose />
         </DialogHeader>
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -57,19 +54,19 @@ function DescriptionDialog({ asset, onClose }: { asset: Asset; onClose: () => vo
               { label: 'Unit',     value: asset.unitOfMeasurement },
               { label: 'Status',   value: asset.status },
             ].map(({ label, value }) => (
-              <div key={label} className="rounded-xl bg-slate-50 dark:bg-slate-800 p-3 border border-slate-100 dark:border-slate-700">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
-                <p className="text-sm font-bold text-slate-800 dark:text-white capitalize mt-0.5 truncate">{value}</p>
+              <div key={label} className="rounded-xl bg-muted/40 p-3 border border-border">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
+                <p className="text-sm font-bold text-foreground capitalize mt-0.5 truncate">{value}</p>
               </div>
             ))}
           </div>
           {asset.description ? (
-            <div className="rounded-xl bg-slate-50 dark:bg-slate-800 p-4 border border-slate-100 dark:border-slate-700">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Notes</p>
-              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">{asset.description}</p>
+            <div className="rounded-xl bg-muted/40 p-4 border border-border">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Notes</p>
+              <p className="text-sm text-foreground/80 leading-relaxed">{asset.description}</p>
             </div>
           ) : (
-            <p className="text-sm text-slate-400 text-center py-2">No description added.</p>
+            <p className="text-sm text-muted-foreground text-center py-2">No description added.</p>
           )}
         </div>
       </DialogContent>
@@ -86,26 +83,24 @@ function RestockHistoryDialog({ asset, onClose }: { asset: Asset; onClose: () =>
     <Dialog open onOpenChange={onClose}>
       <DialogContent
         aria-describedby={undefined}
-        className="max-w-md p-0 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900"
+        className="max-w-md p-0 overflow-hidden rounded-2xl bg-card border border-border shadow-2xl"
       >
-        <DialogHeader className="flex flex-row items-center justify-between space-y-0 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-teal-600 flex items-center justify-center">
-              <Clock className="h-4 w-4 text-white" />
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Clock className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <DialogTitle className="text-sm font-bold text-slate-800 dark:text-white leading-none">Restock History</DialogTitle>
-              <p className="text-[10px] text-slate-400 font-semibold mt-0.5 truncate max-w-[220px]">{asset.name}</p>
+              <DialogTitle className="text-base font-semibold text-foreground leading-none">Restock History</DialogTitle>
+              <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[200px]">{asset.name}</p>
             </div>
           </div>
-          <DialogClose className="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 transition-colors">
-            <X className="h-3.5 w-3.5" />
-          </DialogClose>
+          <DialogClose />
         </DialogHeader>
         <div className="overflow-y-auto max-h-[60vh] no-scrollbar p-5">
           {history.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-10 text-slate-400">
-              <div className="h-12 w-12 rounded-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3 py-10 text-muted-foreground">
+              <div className="h-12 w-12 rounded-full bg-muted border border-border flex items-center justify-center">
                 <Clock className="h-5 w-5" />
               </div>
               <p className="text-sm font-semibold">No restock records yet</p>
@@ -113,23 +108,23 @@ function RestockHistoryDialog({ asset, onClose }: { asset: Asset; onClose: () =>
           ) : (
             <div className="space-y-2">
               {[...history].reverse().map((record, idx) => (
-                <div key={record.id} className="rounded-xl border border-slate-100 dark:border-slate-800 p-4 flex items-center gap-4">
-                  <div className="h-8 w-8 rounded-full bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 flex items-center justify-center font-black text-xs shrink-0">
+                <div key={record.id} className="rounded-xl border border-border bg-muted/30 p-4 flex items-center gap-4">
+                  <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black text-xs shrink-0">
                     #{history.length - idx}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
-                      <p className="text-sm font-bold text-slate-800 dark:text-white">+{record.quantity} units</p>
-                      <p className="text-[10px] text-slate-400 font-semibold">
+                      <p className="text-sm font-bold text-foreground">+{record.quantity} units</p>
+                      <p className="text-[10px] text-muted-foreground font-semibold">
                         {new Date(record.date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
                     </div>
                     <div className="flex gap-4 mt-1">
-                      <span className="text-xs text-slate-400 font-medium">
-                        Unit: <span className="font-bold text-slate-600 dark:text-slate-300">₦{record.unitCost.toFixed(2)}</span>
+                      <span className="text-xs text-muted-foreground font-medium">
+                        Unit: <span className="font-bold text-foreground">₦{record.unitCost.toFixed(2)}</span>
                       </span>
-                      <span className="text-xs text-slate-400 font-medium">
-                        Total: <span className="font-bold text-teal-600 dark:text-teal-400">₦{record.totalCost.toLocaleString()}</span>
+                      <span className="text-xs text-muted-foreground font-medium">
+                        Total: <span className="font-bold text-primary">₦{record.totalCost.toLocaleString()}</span>
                       </span>
                     </div>
                   </div>

@@ -10,7 +10,7 @@ import { WaybillType } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
-import { Dialog, DialogContent, DialogClose } from '@/src/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/src/components/ui/dialog';
 import { toast } from '@/src/components/ui/toast';
 
 interface WaybillFormProps {
@@ -114,132 +114,138 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
     <Dialog open onOpenChange={onClose}>
       <DialogContent
         aria-describedby={undefined}
-        className="max-w-3xl p-0 overflow-hidden rounded-2xl border-0 shadow-2xl bg-white dark:bg-slate-900"
+        className="max-w-3xl p-0 overflow-hidden rounded-2xl bg-card border border-border shadow-2xl"
       >
         {/* Header */}
-        <div className="flex flex-col items-center pt-8 pb-4 px-8 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
-          <div className="h-14 w-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg mb-3">
-            <FileText className="h-7 w-7" />
+        <DialogHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 py-5 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <FileText className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <DialogTitle className="text-xl font-black text-foreground uppercase tracking-tight">
+                {initialType === 'waybill' ? 'Create Waybill' : 'Create Return Sheet'}
+              </DialogTitle>
+              <p className="text-muted-foreground font-bold text-xs mt-0.5">Issue assets for delivery to project sites</p>
+            </div>
           </div>
-          <h2 className="text-xl font-bold text-slate-800 dark:text-white">
-            {initialType === 'waybill' ? 'Create Waybill' : 'Create Return Sheet'}
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">Issue assets for delivery to project sites</p>
-          <DialogClose className="absolute top-4 right-4 h-8 w-8 rounded-lg bg-white dark:bg-slate-700 hover:bg-slate-100 flex items-center justify-center text-slate-400 shadow-sm border border-slate-100 dark:border-slate-700">
-            <X className="h-4 w-4" />
-          </DialogClose>
-        </div>
+          <DialogClose className="hidden sm:flex" />
+        </DialogHeader>
 
-        <div className="overflow-y-auto max-h-[70vh] p-6 space-y-6">
+        <div className="overflow-y-auto max-h-[70vh] no-scrollbar p-6 space-y-6">
           {/* Waybill Information */}
-          <div>
-            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-4">Waybill Information</h3>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="text-muted-foreground"><MapPin className="h-4 w-4" /></div>
+              <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest">
+                Waybill Information
+              </h3>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Purpose */}
               <div className="space-y-1.5 md:col-span-1 row-span-2">
-                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Purpose *</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Purpose *</Label>
                 <textarea
                   value={purpose}
                   onChange={e => setPurpose(e.target.value)}
                   rows={3}
-                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder="e.g. Operational Activities"
                 />
               </div>
 
               {/* Driver Name */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Driver Name *</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Driver Name *</Label>
                 <div className="relative">
                   <select
                     value={driverName}
                     onChange={e => setDriverName(e.target.value)}
-                    className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none"
+                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
                   >
                     <option value="">Select Driver</option>
                     {uniqueDrivers.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 </div>
               </div>
 
               {/* Vehicle */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Vehicle *</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Vehicle *</Label>
                 <div className="relative">
                   <select
                     value={vehicleName}
                     onChange={e => setVehicleName(e.target.value)}
-                    className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none"
+                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
                   >
                     <option value="">Select Vehicle</option>
                     {vehicleOptions.map(v => <option key={v} value={v}>{v}</option>)}
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 </div>
               </div>
 
               {/* Site */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Site *</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Site *</Label>
                 <div className="relative">
                   <select
                     value={siteName}
                     onChange={e => setSiteName(e.target.value)}
-                    className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none"
+                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
                   >
                     <option value="">Select Site</option>
                     {siteOptions.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 </div>
               </div>
 
               {/* Expected Return Date */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Expected Return Date</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Expected Return Date</Label>
                 <Input
                   type="date"
                   value={expectedReturnDate}
                   onChange={e => setExpectedReturnDate(e.target.value)}
-                  className="h-10 rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm"
+                  className="h-10 rounded-xl border-space-200 dark:border-slate-700 bg-background text-sm"
                 />
               </div>
 
               {/* Service */}
               <div className="space-y-1.5 md:col-span-2">
-                <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Service *</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Service *</Label>
                 <div className="relative">
                   <select
                     value={service}
                     onChange={e => setService(e.target.value)}
-                    className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none max-w-xs"
+                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none max-w-xs"
                   >
                     {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 </div>
               </div>
             </div>
           </div>
 
+          <div className="h-px bg-border w-full" />
+
           {/* Items to Issue */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Items to Issue</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="text-xs text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1 px-2 py-1 rounded border border-slate-200 dark:border-slate-700 hover:border-blue-300"
-                >
-                  <FileText className="h-3 w-3" /> Add from Request
-                </button>
+                <div className="text-muted-foreground"><Package className="h-4 w-4" /></div>
+                <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest">Items to Issue</h3>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setItemMode('single')}
                   className={cn(
-                    "text-xs font-semibold px-3 py-1.5 rounded transition-all",
-                    itemMode === 'single' ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
+                    "text-xs font-bold px-3 py-1.5 rounded-lg transition-all",
+                    itemMode === 'single' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
                   )}
                 >
                   Single Item
@@ -248,8 +254,8 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                   type="button"
                   onClick={() => setItemMode('bulk')}
                   className={cn(
-                    "text-xs font-semibold px-3 py-1.5 rounded transition-all",
-                    itemMode === 'bulk' ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
+                    "text-xs font-bold px-3 py-1.5 rounded-lg transition-all",
+                    itemMode === 'bulk' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
                   )}
                 >
                   Bulk Input
@@ -258,7 +264,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                   type="button"
                   onClick={addItem}
                   disabled={!selectedAssetId}
-                  className="flex items-center gap-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition-all disabled:opacity-40"
+                  className="flex items-center gap-1.5 text-xs font-bold bg-primary text-primary-foreground px-3 py-1.5 rounded-lg transition-all hover:bg-primary/90 disabled:opacity-40"
                 >
                   <Plus className="h-3.5 w-3.5" /> Add Item
                 </button>
@@ -267,28 +273,28 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
 
             {/* Single item search */}
             {itemMode === 'single' && (
-              <div className="relative mb-3">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={searchAsset}
                   onChange={e => { setSearchAsset(e.target.value); setSelectedAssetId(''); }}
                   placeholder="Search inventory by name..."
-                  className="pl-10 h-10 rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm"
+                  className="pl-10 h-10 rounded-xl border-border bg-background text-sm"
                 />
                 {searchAsset && filteredAssets.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 z-20 max-h-48 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl p-1">
+                  <div className="absolute top-full left-0 right-0 mt-1 z-20 max-h-48 overflow-y-auto rounded-xl border border-border bg-card shadow-xl p-1 pb-1">
                     {filteredAssets.map(a => (
                       <button
                         key={a.id}
                         type="button"
                         onClick={() => { setSelectedAssetId(a.id); setSearchAsset(a.name); }}
-                        className="w-full text-left p-2.5 rounded-lg text-xs font-medium hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-between"
+                        className="w-full text-left p-2.5 rounded-lg text-xs font-medium hover:bg-muted transition-colors flex items-center justify-between text-foreground"
                       >
                         <div>
-                          <span className="font-bold text-slate-700 dark:text-slate-200">{a.name}</span>
-                          <span className="ml-2 text-slate-400 capitalize">{a.type}</span>
+                          <span className="font-bold">{a.name}</span>
+                          <span className="ml-2 text-muted-foreground capitalize">{a.type}</span>
                         </div>
-                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded font-bold text-slate-500">
+                        <span className="text-[10px] bg-muted px-2 py-0.5 rounded font-bold text-muted-foreground">
                           {a.availableQuantity} {a.unitOfMeasurement}
                         </span>
                       </button>
@@ -300,52 +306,52 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
 
             {/* Bulk input */}
             {itemMode === 'bulk' && (
-              <div className="mb-3 space-y-2">
+              <div className="space-y-2">
                 <textarea
                   value={bulkText}
                   onChange={e => setBulkText(e.target.value)}
                   rows={4}
-                  placeholder={"Enter items, one per line:\nBlind Pipes x 10\nSuction Pipe x 5\nTee Connectors x 2"}
-                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  placeholder={`Enter items, one per line:\nBlind Pipes x 10\nSuction Pipe x 5\nTee Connectors x 2`}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 text-foreground"
                 />
-                <Button type="button" size="sm" onClick={addBulkItems} className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-8">
+                <Button type="button" size="sm" onClick={addBulkItems} className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs h-8 font-bold rounded-lg px-4">
                   Parse & Add Items
                 </Button>
               </div>
             )}
 
             {/* Items list */}
-            <div className="rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden min-h-[120px]">
+            <div className="rounded-xl border border-border overflow-hidden bg-background min-h-[120px]">
               {items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-slate-300 dark:text-slate-600">
-                  <FileText className="h-10 w-10 mb-2" />
-                  <p className="text-sm font-medium">No items added yet</p>
+                <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                  <FileText className="h-10 w-10 mb-2 opacity-20" />
+                  <p className="text-sm font-bold opacity-50 uppercase tracking-widest">No items added yet</p>
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                <div className="divide-y divide-border">
                   {items.map((item, idx) => (
-                    <div key={item.assetId} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <div key={item.assetId} className="flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-8 w-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0">
-                          <Package className="h-4 w-4 text-blue-500" />
+                        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <Package className="h-4 w-4 text-primary" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{item.assetName}</p>
-                          <p className="text-[10px] text-slate-400 capitalize">{item.type}</p>
+                          <p className="text-sm font-bold text-foreground truncate">{item.assetName}</p>
+                          <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{item.type}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
-                        <div className="flex bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                        <div className="flex bg-card rounded-lg border border-border overflow-hidden">
                           <button type="button" onClick={() => updateQuantity(item.assetId, item.quantity - 1)}
-                            className="w-7 h-7 flex items-center justify-center text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold text-sm">−</button>
-                          <span className="w-8 h-7 flex items-center justify-center text-xs font-black text-blue-600 border-x border-slate-200 dark:border-slate-700">
+                            className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground font-black text-sm transition-colors">−</button>
+                          <span className="w-8 h-7 flex items-center justify-center text-xs font-black text-foreground border-x border-border">
                             {item.quantity}
                           </span>
                           <button type="button" onClick={() => updateQuantity(item.assetId, item.quantity + 1)}
-                            className="w-7 h-7 flex items-center justify-center text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold text-sm">+</button>
+                            className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground font-black text-sm transition-colors">+</button>
                         </div>
                         <button type="button" onClick={() => removeItem(item.assetId)}
-                          className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors">
+                          className="p-1.5 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
@@ -358,14 +364,14 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
         </div>
 
         {/* Footer */}
-        <div className="p-5 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-800/20">
-          <Button variant="outline" onClick={onClose} className="h-10 px-6 rounded-xl font-semibold text-xs uppercase text-slate-500">
+        <div className="p-5 border-t border-border flex justify-end gap-3 bg-muted/20">
+          <Button variant="outline" onClick={onClose} className="h-10 px-6 rounded-xl font-black text-xs uppercase text-muted-foreground hover:text-foreground">
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={items.length === 0 || !siteName || !driverName}
-            className="h-10 px-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase gap-2 shadow-sm disabled:opacity-50"
+            className="h-10 px-8 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs uppercase tracking-widest gap-2 shadow-sm disabled:opacity-50"
           >
             <CheckCircle2 className="h-4 w-4" /> Create Waybill
           </Button>

@@ -1,11 +1,11 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
-import { useState } from 'react';
 import { 
   ArrowLeft, X, Printer, Share2, Calendar, User, Car, MapPin, FileText
 } from 'lucide-react';
 import { Waybill } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/src/components/ui/dialog';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 import { jsPDF } from 'jspdf';
@@ -57,110 +57,95 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
   };
 
   return (
-    <div className={cn(
-      "fixed inset-0 z-50 overflow-y-auto animate-in slide-in-from-right-10 duration-500",
-      isDark ? 'bg-slate-950' : 'bg-white'
-    )}>
-      <div className="max-w-5xl mx-auto min-h-full flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
-        
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent
+        aria-describedby={undefined}
+        className="max-w-4xl p-0 overflow-hidden rounded-2xl bg-card border border-border shadow-2xl"
+      >
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-6">
+        <DialogHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 py-5 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
           <div className="flex items-center gap-4">
-            <button onClick={onClose}
-              className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all shrink-0">
-              <ArrowLeft className="h-4 w-4" />
-            </button>
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <FileText className="h-5 w-5 text-primary" />
+            </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
+              <DialogTitle className="text-xl font-black text-foreground uppercase tracking-tight">
                 {waybill.type === 'return' ? 'Return' : 'Waybill'} {waybill.id}
-              </h1>
-              <p className="text-slate-400 font-bold text-xs">{waybill.siteName}</p>
+              </DialogTitle>
+              <p className="text-muted-foreground font-bold text-xs mt-0.5">{waybill.siteName}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Button variant="outline" className="h-9 px-4 rounded-xl border-slate-200 dark:border-slate-700 font-bold flex items-center gap-2 text-slate-600 dark:text-slate-300 text-xs flex-1 sm:flex-none"
+            <Button variant="outline" className="h-9 px-4 rounded-xl border-border font-bold flex items-center gap-2 text-muted-foreground hover:text-foreground text-xs flex-1 sm:flex-none"
               onClick={() => generatePDF(false)}>
               <Printer className="h-4 w-4" /> Print
             </Button>
-            <Button className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-bold flex items-center gap-2 text-xs flex-1 sm:flex-none"
+            <Button className="h-9 px-4 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm font-bold flex items-center gap-2 text-xs flex-1 sm:flex-none"
               onClick={() => generatePDF(true)}>
               <Share2 className="h-4 w-4" /> Share PDF
             </Button>
-            <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg hidden sm:flex">
-              <X className="h-4 w-4" />
-            </button>
+            <DialogClose className="hidden sm:flex" />
           </div>
-        </div>
+        </DialogHeader>
 
-        {/* Info Bar */}
-        <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-slate-400 text-xs font-bold">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5" />
-            <span>{formatDisplayDate(waybill.issueDate)}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5" />
-            <span>{waybill.siteName}</span>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className={cn(
-          "rounded-2xl border p-6 sm:p-8 lg:p-10 space-y-8",
-          isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50/50 border-slate-100'
-        )}>
+        {/* Content Body */}
+        <div className="overflow-y-auto max-h-[70vh] no-scrollbar p-6 sm:p-8 space-y-8 bg-background">
+          
           {/* Info Grid */}
           <div className="space-y-4">
-            <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase">
-              {waybill.type === 'return' ? 'Return' : 'Waybill'} Information
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="text-muted-foreground"><MapPin className="h-4 w-4" /></div>
+              <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest">
+                {waybill.type === 'return' ? 'Return' : 'Waybill'} Information
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[
                 { icon: Calendar, label: 'Issue Date', value: formatDisplayDate(waybill.issueDate) },
                 { icon: User, label: 'Driver', value: waybill.driverName },
                 { icon: Car, label: 'Vehicle', value: waybill.vehicle || 'L200' },
               ].map((item, i) => (
-                <div key={i} className="space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-slate-400">
-                    <item.icon className="h-3.5 w-3.5" />
+                <div key={i} className="rounded-xl border border-border bg-muted/40 p-4 space-y-2">
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <item.icon className="h-4 w-4" />
                     <span className="text-[10px] font-black uppercase tracking-widest">{item.label}</span>
                   </div>
-                  <p className="text-base font-black text-slate-800 dark:text-white">{item.value}</p>
+                  <p className="text-base font-black text-foreground">{item.value}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="h-px bg-slate-100 dark:bg-slate-800 w-full" />
+          <div className="h-px bg-border w-full" />
 
           {/* Items Table */}
           <div className="space-y-4">
-            <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase">
-              Items {waybill.type === 'return' ? 'Returned' : 'Listed'}
-            </h3>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="text-muted-foreground"><Package className="h-4 w-4" /></div>
+              <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest">
+                Items {waybill.type === 'return' ? 'Returned' : 'Listed'}
+              </h3>
+            </div>
             
-            <div className={cn(
-              "rounded-xl border overflow-hidden shadow-sm",
-              isDark ? 'bg-slate-800/50 border-slate-800' : 'bg-white border-slate-100'
-            )}>
+            <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead className={cn("border-b", isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50/50 border-slate-100')}>
+                  <thead className="bg-muted/50 border-b border-border">
                     <tr>
-                      <th className="px-4 sm:px-6 py-3 text-[10px] font-black uppercase text-slate-400 tracking-widest">Asset Name</th>
-                      <th className="px-4 sm:px-6 py-3 text-[10px] font-black uppercase text-slate-400 tracking-widest">Qty Expected</th>
-                      <th className="px-4 sm:px-6 py-3 text-[10px] font-black uppercase text-slate-400 tracking-widest">Qty {waybill.type === 'return' ? 'Returned' : 'Delivered'}</th>
-                      <th className="px-4 sm:px-6 py-3 text-[10px] font-black uppercase text-slate-400 tracking-widest">Status</th>
+                      <th className="px-4 sm:px-6 py-3 text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-tight">Asset Name</th>
+                      <th className="px-4 sm:px-6 py-3 text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-tight">Qty Expected</th>
+                      <th className="px-4 sm:px-6 py-3 text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-tight">Qty {waybill.type === 'return' ? 'Returned' : 'Delivered'}</th>
+                      <th className="px-4 sm:px-6 py-3 text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-tight">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                  <tbody className="divide-y divide-border">
                     {waybill.items.map((item, i) => (
-                      <tr key={i} className="hover:bg-slate-50/20 dark:hover:bg-slate-800/30 transition-colors">
-                        <td className="px-4 sm:px-6 py-4 font-bold text-sm text-slate-700 dark:text-slate-200">{item.assetName}</td>
-                        <td className="px-4 sm:px-6 py-4 font-black text-sm text-slate-800 dark:text-white">{item.quantity}</td>
-                        <td className="px-4 sm:px-6 py-4 font-black text-sm text-slate-800 dark:text-white">{item.quantity}</td>
+                      <tr key={i} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 sm:px-6 py-4 font-bold text-sm text-foreground">{item.assetName}</td>
+                        <td className="px-4 sm:px-6 py-4 font-black text-sm text-foreground">{item.quantity}</td>
+                        <td className="px-4 sm:px-6 py-4 font-black text-sm text-foreground">{item.quantity}</td>
                         <td className="px-4 sm:px-6 py-4">
-                          <Badge variant="outline" className="bg-green-50 dark:bg-green-900/20 text-green-600 border-green-100 dark:border-green-800 font-black text-[9px] uppercase px-2 py-0 rounded-full">
+                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-black text-[9px] uppercase px-2 py-0 rounded-full">
                             Completed
                           </Badge>
                         </td>
@@ -170,20 +155,23 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
                 </table>
               </div>
 
-              <div className="px-4 sm:px-6 py-4 space-y-2 border-t border-slate-50 dark:border-slate-800 font-bold text-sm text-slate-500">
-                <div className="flex items-center justify-between">
-                  <span>Total Items:</span>
-                  <span className="text-slate-800 dark:text-white font-black">{waybill.items.length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Total Quantity:</span>
-                  <span className="text-slate-800 dark:text-white font-black">{waybill.items.reduce((acc, i) => acc + i.quantity, 0)}</span>
+              <div className="px-4 sm:px-6 py-4 border-t border-border bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
+                    <span>Total Items:</span>
+                    <span className="text-foreground font-black">{waybill.items.length}</span>
+                  </div>
+                  <div className="h-4 w-px bg-border hidden sm:block" />
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
+                    <span>Total Quantity:</span>
+                    <span className="text-foreground font-black">{waybill.items.reduce((acc, i) => acc + i.quantity, 0)}</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
