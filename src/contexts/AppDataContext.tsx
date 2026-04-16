@@ -351,6 +351,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         if (p.teamId !== undefined) payload.teamId = p.teamId;
         if (p.workspaceId !== undefined) payload.workspaceId = p.workspaceId;
         if (p.createdBy !== undefined) payload.createdBy = p.createdBy;
+        if (payload.requiresApproval !== undefined) {
+            payload.requires_approval = payload.requiresApproval;
+            delete payload.requiresApproval;
+        }
+        if (payload.isProject !== undefined) {
+            payload.is_project = payload.isProject;
+            delete payload.isProject;
+        }
         const { data, error } = await supabase.from('main_tasks').update(payload).eq('id', id).select().single();
         if (error) {
             console.error('updateMainTask error:', error);
@@ -395,6 +403,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         const payload: any = { ...p };
         if (p.assignedTo !== undefined) { payload.assignedTo = p.assignedTo; }
         if (p.mainTaskId !== undefined) { payload.mainTaskId = p.mainTaskId; }
+        if (payload.requiresApproval !== undefined) {
+            payload.requires_approval = payload.requiresApproval;
+            delete payload.requiresApproval;
+        }
         const { data, error } = await supabase.from('subtasks').update(payload).eq('id', id).select().single();
         if (error) {
             console.error('updateSubtask error:', error);

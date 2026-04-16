@@ -1,6 +1,6 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { 
-  ArrowLeft, X, Printer, Share2, Calendar, User, Car, MapPin, FileText
+  ArrowLeft, X, Printer, Share2, Calendar, User, Car, MapPin, FileText, Package
 } from 'lucide-react';
 import { Waybill } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
