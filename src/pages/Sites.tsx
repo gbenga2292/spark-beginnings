@@ -342,17 +342,31 @@ export function Sites() {
     site.clientName.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const isDuplicate = (name: string, client: string, excludeId?: string) =>
-    sites.some(s =>
-      s.name.trim().toLowerCase() === name.trim().toLowerCase() &&
-      s.client.trim().toLowerCase() === client.trim().toLowerCase() &&
+  const isDuplicate = (name: string, client: string, excludeId?: string) => {
+    const nameLow = name.trim().toLowerCase();
+    const clientLow = client.trim().toLowerCase();
+
+    const activeMatch = sites.some(s =>
+      s.name.trim().toLowerCase() === nameLow &&
+      s.client.trim().toLowerCase() === clientLow &&
       s.id !== excludeId
-    ) || pendingSites.some(ps =>
-      ps.siteName.trim().toLowerCase() === name.trim().toLowerCase() &&
-      ps.clientName.trim().toLowerCase() === client.trim().toLowerCase() &&
-      ps.id !== excludeId &&
-      ps.siteId !== excludeId
     );
+    if (activeMatch) return true;
+
+    // Only flag a pendingSite as a duplicate if there is NO active site record
+    // for that name/client already (avoids false positives from linked questionnaires
+    // whose siteId was never back-filled at activation time).
+    return pendingSites.some(ps =>
+      ps.siteName.trim().toLowerCase() === nameLow &&
+      ps.clientName.trim().toLowerCase() === clientLow &&
+      ps.id !== excludeId &&
+      ps.siteId !== excludeId &&
+      !sites.some(s =>
+        s.name.trim().toLowerCase() === ps.siteName.trim().toLowerCase() &&
+        s.client.trim().toLowerCase() === ps.clientName.trim().toLowerCase()
+      )
+    );
+  };
 
   const handleAdd = () => {
     if (!addForm.name || !addForm.client) { setAddError('Site name and client are required.'); return; }
@@ -421,9 +435,17 @@ export function Sites() {
       updatePendingSite(linkedPS.id, {
         siteName: editForm.name,
         clientName: editForm.client,
+        phase1: {
+          ...linkedPS.phase1,
+          timelineStartDate: editForm.startDate || linkedPS.phase1.timelineStartDate
+        },
         phase4: {
           ...linkedPS.phase4,
           clientTaxStatus: taxStatus
+        },
+        phase5: {
+          ...linkedPS.phase5,
+          actualEndDate: editForm.endDate || linkedPS.phase5?.actualEndDate || ''
         }
       });
     }

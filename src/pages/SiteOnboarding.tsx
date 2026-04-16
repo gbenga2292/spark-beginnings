@@ -283,6 +283,9 @@ export function SiteOnboarding() {
         
         if (matchingSite) {
           const updates: any = {};
+          if (form.phase1.timelineStartDate && form.phase1.timelineStartDate !== matchingSite.startDate) {
+            updates.startDate = form.phase1.timelineStartDate;
+          }
           if (form.phase5.actualEndDate !== matchingSite.endDate) {
             updates.endDate = form.phase5.actualEndDate || '';
           }

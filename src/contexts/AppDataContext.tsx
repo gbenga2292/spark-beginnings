@@ -346,19 +346,23 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }, [user?.id]);
 
     const updateMainTask = useCallback(async (id: string, p: any) => {
-        const payload: any = { ...p };
-        if (p.assignedTo !== undefined) payload.assignedTo = p.assignedTo;
-        if (p.teamId !== undefined) payload.teamId = p.teamId;
-        if (p.workspaceId !== undefined) payload.workspaceId = p.workspaceId;
-        if (p.createdBy !== undefined) payload.createdBy = p.createdBy;
-        if (payload.requiresApproval !== undefined) {
-            payload.requires_approval = payload.requiresApproval;
-            delete payload.requiresApproval;
-        }
-        if (payload.isProject !== undefined) {
-            payload.is_project = payload.isProject;
-            delete payload.isProject;
-        }
+        // Build a clean whitelist payload — only send columns that actually exist
+        // in the main_tasks table. Unknown keys cause a 400 from Supabase.
+        const payload: Record<string, any> = {};
+        if (p.title !== undefined)              payload.title = p.title;
+        if (p.description !== undefined)        payload.description = p.description ?? null;
+        if (p.deadline !== undefined)           payload.deadline = p.deadline ?? null;
+        if (p.priority !== undefined)           payload.priority = p.priority ?? null;
+        if (p.assignedTo !== undefined)         payload.assignedTo = p.assignedTo ?? null;
+        if (p.teamId !== undefined)             payload.teamId = p.teamId;
+        if (p.workspaceId !== undefined)        payload.workspaceId = p.workspaceId;
+        if (p.createdBy !== undefined)          payload.createdBy = p.createdBy;
+        if (p.is_deleted !== undefined)         payload.is_deleted = p.is_deleted;
+        if (p.is_project !== undefined)         payload.is_project = p.is_project;
+        if (p.isProject !== undefined)          payload.is_project = p.isProject;
+        // camelCase → snake_case conversions
+        if (p.requiresApproval !== undefined)   payload.requires_approval = p.requiresApproval;
+        if (p.requires_approval !== undefined)  payload.requires_approval = p.requires_approval;
         const { data, error } = await supabase.from('main_tasks').update(payload).eq('id', id).select().single();
         if (error) {
             console.error('updateMainTask error:', error);
