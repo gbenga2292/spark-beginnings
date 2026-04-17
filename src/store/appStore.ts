@@ -21,6 +21,7 @@ export interface CommLog {
   followUpDate?: string;
   followUpDone: boolean;
   loggedBy: string;
+  parentId?: string; // Links this log to its parent conversation
   createdAt: string;
 }
 

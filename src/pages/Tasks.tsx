@@ -163,12 +163,17 @@ function PersonalTasksView() {
     { label: "Completed", value: "completed" },
   ] as const;
 
-  const filtered = wsTasks.filter(mt =>
-    (mt.title.toLowerCase().includes(search.toLowerCase()) ||
+  const filtered = wsTasks.filter(mt => {
+    const status = deriveMainTaskStatus(mt.id, wsSubs);
+    const searchMatch = (mt.title.toLowerCase().includes(search.toLowerCase()) ||
       mt.description.toLowerCase().includes(search.toLowerCase())) &&
-    (priorityFilter === 'all' || mt.priority === priorityFilter) &&
-    (statusFilter === 'all' || deriveMainTaskStatus(mt.id, wsSubs) === statusFilter)
-  );
+    (priorityFilter === 'all' || mt.priority === priorityFilter);
+    
+    if (!searchMatch) return false;
+    
+    if (statusFilter === 'all') return status !== 'completed';
+    return status === statusFilter;
+  });
 
   const viewableReminders = React.useMemo(() => 
     reminders.filter(r => r.isActive && (
@@ -300,7 +305,7 @@ function PersonalTasksView() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0">
             {STATUS_TABS.map(tab => {
               const isActive = statusFilter === tab.value;
-              const count = tab.value === "all" ? wsTasks.length : wsTasks.filter(mt => deriveMainTaskStatus(mt.id, wsSubs) === tab.value).length;
+              const count = tab.value === "all" ? wsTasks.filter(mt => deriveMainTaskStatus(mt.id, wsSubs) !== 'completed').length : wsTasks.filter(mt => deriveMainTaskStatus(mt.id, wsSubs) === tab.value).length;
               if (tab.value !== 'all' && count === 0) return null;
               return (
                 <button key={tab.value} onClick={() => setStatusFilter(tab.value)}
@@ -663,8 +668,9 @@ function AdminTasksView() {
   });
 
   const tabFiltered = filtered.filter(mt => {
-    if (statusFilter === 'all') return true;
-    return deriveMainTaskStatus(mt.id, teamSubtasks) === statusFilter;
+    const status = deriveMainTaskStatus(mt.id, teamSubtasks);
+    if (statusFilter === 'all') return status !== 'completed';
+    return status === statusFilter;
   });
 
   const filteredMySubs = mySubs.filter(sub => {
@@ -672,8 +678,10 @@ function AdminTasksView() {
     const searchMatch = (sub.title?.toLowerCase().includes(mySearch.toLowerCase()) || 
                          mt?.title?.toLowerCase().includes(mySearch.toLowerCase()));
     
-    if (myStatusFilter !== 'all' && sub.status !== myStatusFilter) return false;
-    return searchMatch;
+    if (!searchMatch) return false;
+    
+    if (myStatusFilter === 'all') return sub.status !== 'completed';
+    return sub.status === myStatusFilter;
   });
 
   const viewableReminders = React.useMemo(() => 
@@ -1087,7 +1095,7 @@ function AdminTasksView() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0 overflow-x-auto">
             {MY_STATUS_TABS.map(tab => {
               const isActive = myStatusFilter === tab.value;
-              const count = tab.value === "all" ? mySubs.length : mySubs.filter(s => s.status === tab.value).length;
+              const count = tab.value === "all" ? mySubs.filter(s => s.status !== 'completed').length : mySubs.filter(s => s.status === tab.value).length;
               if (tab.value !== 'all' && count === 0) return null;
               return (
                 <button key={tab.value} onClick={() => setMyStatusFilter(tab.value)}
@@ -1207,7 +1215,7 @@ function AdminTasksView() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0">
           {STATUS_TABS.map(tab => {
             const isActive = statusFilter === tab.value;
-            const count = tab.value === "all" ? teamTasks.length
+            const count = tab.value === "all" ? teamTasks.filter(mt => deriveMainTaskStatus(mt.id, teamSubtasks) !== 'completed').length
               : teamTasks.filter(mt => deriveMainTaskStatus(mt.id, teamSubtasks) === tab.value).length;
             return (
               <button key={tab.value} onClick={() => setStatusFilter(tab.value)}

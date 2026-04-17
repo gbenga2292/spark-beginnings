@@ -174,16 +174,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                                     onClick: () => { window.location.href = `/tasks?openTask=${unread[0].mainTaskId}`; }
                                 } : undefined;
                                 
-                                toast.info(unread[0].title === 'New Task Created' ? `New Task: ${unread[0].body}` : unread[0].title, {
-                                    description: unread[0].title !== 'New Task Created' ? unread[0].body : undefined,
-                                    duration: 8000,
-                                    action: actionObj
-                                });
+                                const msgTitle = unread[0].title === 'New Task Created' ? `New Task: ${unread[0].body}` : unread[0].title;
+                                const msgDesc = unread[0].title !== 'New Task Created' ? unread[0].body : undefined;
+                                toast.info(msgDesc ? `${msgTitle} - ${msgDesc}` : msgTitle, actionObj);
                             } else {
-                                toast.info(`You have ${unread.length} pending notifications`, {
-                                    description: 'Check your inbox or reminders for recent updates and mentions.',
-                                    duration: 8000
-                                });
+                                toast.info(`You have ${unread.length} pending notifications - Check your inbox or reminders for recent updates and mentions.`);
                             }
                         }
                     }

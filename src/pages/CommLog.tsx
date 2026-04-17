@@ -90,6 +90,7 @@ function emptyForm() {
     followUpDate: '',
     followUpDone: false,
     createTask: false,
+    parentId: undefined as string | undefined,
   };
 }
 
@@ -308,6 +309,13 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
         )}
       </div>
 
+      {form.parentId && !isEdit && (
+        <div className={cn("px-4 py-2 border-b text-xs flex items-center gap-1.5", isDark ? 'bg-indigo-950/30 text-indigo-400 border-slate-800' : 'bg-indigo-50 text-indigo-700 border-slate-100')}>
+          <MessageSquare className="w-3.5 h-3.5" />
+          Adding a follow-up note. The client and site information have been locked to the parent log.
+        </div>
+      )}
+
       <div className="p-4 overflow-y-auto space-y-5 flex-1 style-scroll">
 
         {/* Row 1: date, time */}
@@ -356,6 +364,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
           <div>
             <div className={labelCls}>Linked To *</div>
             <select
+              disabled={!!form.parentId}
               value={form.contactType === 'Client' ? 'Existing Client' : 'Potential Client'}
               onChange={e => {
                 const isPot = e.target.value === 'Potential Client';
@@ -376,6 +385,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
               <input disabled value={form.client} className={cn(inputCls, isDark ? 'bg-slate-900 opacity-50 cursor-not-allowed' : 'bg-slate-100 opacity-50 cursor-not-allowed')} />
             ) : isPotential ? (
               <input
+                disabled={!!form.parentId}
                 type="text"
                 placeholder="Enter prospect or company name"
                 value={form.client}
@@ -384,6 +394,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
               />
             ) : (
               <select
+                disabled={!!form.parentId}
                 value={form.client}
                 onChange={e => {
                   onChange({ client: e.target.value, siteId: '', siteName: '' });
@@ -407,13 +418,14 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
             {recentlyOnboardedSite ? (
               <div className="flex gap-2 items-center">
                 <input disabled value={form.siteName} className={cn(inputCls, 'flex-1', isDark ? 'bg-slate-900 opacity-50 cursor-not-allowed' : 'bg-slate-100 opacity-50 cursor-not-allowed')} />
-                <Button variant="ghost" title="Undo new site registration" onClick={handleUndoOnboard} className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 px-2 h-9 flex-shrink-0">
+                <Button disabled={!!form.parentId} variant="ghost" title="Undo new site registration" onClick={handleUndoOnboard} className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 px-2 h-9 flex-shrink-0">
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
             ) : isPotential ? (
               <>
                 <input
+                  disabled={!!form.parentId}
                   type="text"
                   placeholder="Type site name"
                   value={form.siteName}
@@ -424,7 +436,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
                   onBlur={handleSiteInputBlur}
                   className={inputCls}
                 />
-                {form.siteName.trim() && isSiteNew(form.siteName) && !onboardBannerFor && (
+                {!form.parentId && form.siteName.trim() && isSiteNew(form.siteName) && !onboardBannerFor && (
                   <p className="mt-1.5 text-xs text-amber-500 flex items-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5" /> Potential site — leave field or click away to get onboarding prompt.
                   </p>
@@ -434,6 +446,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
               <div className="space-y-2">
                 {!isManualSite ? (
                   <select
+                    disabled={!!form.parentId}
                     value={filteredSites.some(s => s.name === form.siteName) ? form.siteName : (form.siteName ? '__CUSTOM__' : '')}
                     onChange={e => {
                       const val = e.target.value;
@@ -550,18 +563,18 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
         )}
 
         {/* Subject */}
-        <div>
-          <div className={labelCls}>Subject</div>
-          <input
-            type="text"
-            placeholder="Brief topic of communication"
-            value={form.subject}
-            onChange={e => onChange({ subject: e.target.value })}
-            className={inputCls}
-          />
-        </div>
-
-      </div>
+        {!form.parentId && (
+          <div>
+            <div className={labelCls}>Subject</div>
+            <input
+              type="text"
+              placeholder="Brief topic of communication"
+              value={form.subject}
+              onChange={e => onChange({ subject: e.target.value })}
+              className={inputCls}
+            />
+          </div>
+        )}
 
       {/* Notes */}
       <div>
@@ -600,9 +613,9 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
               id="follow-up-done"
               checked={form.followUpDone}
               onChange={e => onChange({ followUpDone: e.target.checked })}
-              className="w-4 h-4 accent-indigo-600"
+              className="w-4 h-4 accent-indigo-600 cursor-pointer"
             />
-            <label htmlFor="follow-up-done" className={cn('text-sm', isDark ? 'text-slate-300' : 'text-slate-700')}>
+            <label htmlFor="follow-up-done" className={cn('text-sm cursor-pointer', isDark ? 'text-slate-300' : 'text-slate-700')}>
               Follow-up done
             </label>
           </div>
@@ -632,6 +645,8 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
           )}
         </label>
       )}
+
+      </div> {/* <-- Moved the closing div for the scrollable container here */}
 
       {/* Actions */}
       <div className="flex gap-2 p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 rounded-b-xl shrink-0">
@@ -892,14 +907,16 @@ interface LogCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onToggleFollowUp: () => void;
+  onAddFollowUpNote?: () => void;
   isDark: boolean;
   expanded: boolean;
   onToggleExpand: () => void;
   currentUserName: string;
   isAdmin: boolean;
+  isChild?: boolean;
 }
 
-function LogCard({ log, onEdit, onDelete, onToggleFollowUp, isDark, expanded, onToggleExpand, currentUserName, isAdmin }: LogCardProps) {
+function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, isDark, expanded, onToggleExpand, currentUserName, isAdmin, isChild }: LogCardProps) {
   const canDelete = isAdmin || log.loggedBy === currentUserName;
   const isOverdue = log.followUpDate && !log.followUpDone && isBefore(parseISO(log.followUpDate), startOfDay(new Date()));
 
@@ -907,7 +924,8 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, isDark, expanded, on
     <div className={cn(
       'rounded-xl border overflow-hidden transition-all duration-200',
       isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200',
-      'hover:shadow-md'
+      'hover:shadow-md',
+      isChild && (isDark ? 'ml-8 border-l-2 border-l-slate-600 bg-slate-900/50' : 'ml-8 border-l-2 border-l-slate-300 bg-slate-50')
     )}>
       <div className={cn('h-1', log.direction === 'Incoming' ? 'bg-emerald-500' : 'bg-blue-500')} />
 
@@ -930,29 +948,28 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, isDark, expanded, on
                 <span className={cn('inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium', channelColor(log.channel))}>
                   {channelIcon(log.channel)} {log.channel}
                 </span>
+                {log.contactPerson && (
+                  <span className={cn('inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium', isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700')}>
+                    👤 {log.contactPerson}
+                  </span>
+                )}
                 <span className={cn('inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium', contactTypeColor(log.contactType))}>
                   {contactTypeIcon(log.contactType)}
-                  {log.contactType === 'Client' ? 'Existing Client' : log.contactType}
+                  {log.client || (log.contactType === 'Client' ? 'Existing Client' : log.contactType)}
                 </span>
                 <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', log.direction === 'Incoming' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700')}>
                   {log.direction}
                 </span>
               </div>
 
-              <div className={cn('text-sm', isDark ? 'text-slate-200' : 'text-slate-800')}>
+              <div className={cn('text-sm flex flex-wrap items-center gap-2', isDark ? 'text-slate-200' : 'text-slate-800')}>
                 {log.subject && <span className="font-semibold">{log.subject}</span>}
-                {log.client && (
-                  <span className={cn('ml-2 text-xs', isDark ? 'text-slate-400' : 'text-slate-500')}>
-                    {log.contactType === 'Potential Client' ? '🔮 Prospect: ' : '🏢 '}{log.client}
-                    {log.siteName && ` · 📍 ${log.siteName}`}
+                {log.siteName && (
+                  <span className={cn('text-xs', isDark ? 'text-slate-400' : 'text-slate-500')}>
+                    📍 {log.siteName}
                   </span>
                 )}
               </div>
-              {log.contactPerson && (
-                <div className={cn('text-xs mt-0.5', isDark ? 'text-slate-500' : 'text-slate-500')}>
-                  👤 {log.contactPerson}
-                </div>
-              )}
             </div>
           </div>
 
@@ -994,6 +1011,15 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, isDark, expanded, on
                 className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-400 hover:bg-red-900/30 hover:text-red-400' : 'text-slate-400 hover:bg-red-50 hover:text-red-600')}
               >
                 <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            {!isChild && onAddFollowUpNote && (
+              <button
+                onClick={e => { e.stopPropagation(); onAddFollowUpNote(); }}
+                title="Add a follow-up log to this conversation"
+                className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-emerald-400' : 'text-slate-400 hover:bg-slate-100 hover:text-emerald-600')}
+              >
+                <MessageSquare className="w-4 h-4" />
               </button>
             )}
             <button onClick={onToggleExpand} className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-500 hover:bg-slate-800' : 'text-slate-400 hover:bg-slate-100')}>
@@ -1166,6 +1192,7 @@ export function CommLog() {
         outcome: form.outcome || undefined,
         followUpDate: form.followUpDate || undefined,
         followUpDone: form.followUpDone,
+        parentId: form.parentId || undefined,
       });
       toast.success('Log updated');
       setEditingId(null);
@@ -1187,6 +1214,7 @@ export function CommLog() {
         followUpDate: form.followUpDate || undefined,
         followUpDone: false,
         loggedBy,
+        parentId: form.parentId || undefined,
         createdAt: new Date().toISOString(),
       });
       toast.success('Communication logged');
@@ -1220,6 +1248,7 @@ export function CommLog() {
       followUpDate: log.followUpDate || '',
       followUpDone: log.followUpDone,
       createTask: false,
+      parentId: log.parentId,
     });
     setEditingId(log.id);
     setShowForm(true);
@@ -1393,20 +1422,63 @@ export function CommLog() {
                   )}
                 </div>
               ) : (
-                filtered.map(log => (
-                  <LogCard
-                    key={log.id}
-                    log={log}
-                    isDark={isDark}
-                    expanded={expandedIds.has(log.id)}
-                    onToggleExpand={() => toggleExpand(log.id)}
-                    onEdit={() => handleEdit(log)}
-                    onDelete={() => handleDelete(log.id)}
-                    onToggleFollowUp={() => updateCommLog(log.id, { followUpDone: !log.followUpDone })}
-                    currentUserName={currentUser?.name || ''}
-                    isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
-                  />
-                ))
+                (() => {
+                  const renderedIds = new Set<string>();
+                  const nodes: React.ReactNode[] = [];
+                  
+                  filtered.forEach(log => {
+                    const parentId = log.parentId || log.id;
+                    if (renderedIds.has(parentId)) return;
+                    renderedIds.add(parentId);
+                    
+                    const parentLog = commLogs.find(l => l.id === parentId) || log;
+                    const threadChildren = commLogs.filter(l => l.parentId === parentId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+                    
+                    nodes.push(
+                      <div key={'thread-' + parentId} className="space-y-1.5 mb-3 pt-1">
+                        <LogCard
+                          log={parentLog}
+                          isDark={isDark}
+                          expanded={expandedIds.has(parentLog.id)}
+                          onToggleExpand={() => toggleExpand(parentLog.id)}
+                          onEdit={() => handleEdit(parentLog)}
+                          onDelete={() => handleDelete(parentLog.id)}
+                          onToggleFollowUp={() => updateCommLog(parentLog.id, { followUpDone: !parentLog.followUpDone })}
+                          onAddFollowUpNote={() => {
+                            setForm({ 
+                              ...emptyForm(), 
+                              parentId: parentLog.id, 
+                              client: parentLog.client || '', 
+                              siteName: parentLog.siteName || '', 
+                              contactType: parentLog.contactType, 
+                              channel: parentLog.channel 
+                            });
+                            setShowForm(true);
+                            setEditingId(null);
+                          }}
+                          currentUserName={currentUser?.name || ''}
+                          isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
+                        />
+                        {threadChildren.map(child => (
+                           <LogCard
+                             key={child.id}
+                             log={child}
+                             isChild
+                             isDark={isDark}
+                             expanded={expandedIds.has(child.id)}
+                             onToggleExpand={() => toggleExpand(child.id)}
+                             onEdit={() => handleEdit(child)}
+                             onDelete={() => handleDelete(child.id)}
+                             onToggleFollowUp={() => updateCommLog(child.id, { followUpDone: !child.followUpDone })}
+                             currentUserName={currentUser?.name || ''}
+                             isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
+                           />
+                        ))}
+                      </div>
+                    );
+                  });
+                  return nodes;
+                })()
               )}
             </div>
           </div>

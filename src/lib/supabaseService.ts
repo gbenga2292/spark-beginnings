@@ -295,6 +295,7 @@ export function dbToCommLog(r: any): CommLog {
     followUpDate: r.follow_up_date ?? undefined,
     followUpDone: r.follow_up_done ?? false,
     loggedBy: r.logged_by ?? '',
+    parentId: r.parent_id ?? undefined,
     createdAt: r.created_at ?? new Date().toISOString(),
   };
 }
@@ -608,6 +609,7 @@ function commLogToDb(l: CommLog) {
     follow_up_date: l.followUpDate ?? null,
     follow_up_done: l.followUpDone,
     logged_by: l.loggedBy,
+    parent_id: l.parentId ?? null,
     created_at: l.createdAt,
   };
 }

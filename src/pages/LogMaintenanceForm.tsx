@@ -34,7 +34,7 @@ export function LogMaintenanceForm() {
   const [inventoryPartFilter, setInventoryPartFilter] = useState('');
   const [customPartForm, setCustomPartForm] = useState({ name: '', qty: 1, cost: '' });
   
-  const reusables = assets.filter(a => a.type === 'reusable' || a.category === 'consumable');
+  const reusables = assets.filter(a => a.type === 'reusables' || a.type === 'consumable');
 
   const updateAssetData = (id: string, field: string, value: any) => {
     setAssetData(prev => ({
