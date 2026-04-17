@@ -17,6 +17,19 @@ import { Input } from '@/src/components/ui/input';
 
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 
+function WaybillManagerHeader({ onCreate }: { onCreate: () => void }) {
+  useSetPageTitle(
+    'Logistics Management',
+    'Track and manage asset deliveries (Waybills) and site returns',
+    <div className="hidden sm:flex items-center gap-2">
+      <Button size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9" onClick={onCreate}>
+        <Plus className="h-4 w-4" /> Create Waybill
+      </Button>
+    </div>
+  );
+  return null;
+}
+
 export function WaybillManager() {
   const { waybills, updateWaybillStatus, deleteWaybill } = useOperations();
   const { isDark } = useTheme();
@@ -26,18 +39,9 @@ export function WaybillManager() {
   const [viewingWaybill, setViewingWaybill] = useState<Waybill | null>(null);
   const [activeTab, setActiveTab] = useState<'waybill' | 'return'>('waybill');
 
-  useSetPageTitle(
-    'Logistics Management',
-    'Track and manage asset deliveries (Waybills) and site returns',
-    <div className="hidden sm:flex items-center gap-2">
-      <Button size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9" onClick={() => setShowCreateModal(true)}>
-        <Plus className="h-4 w-4" /> Create Waybill
-      </Button>
-    </div>
-  );
-
   const outgoingWaybills = waybills.filter(w => w.type === 'waybill');
   const incomingReturns = waybills.filter(w => w.type === 'return');
+
 
   const filteredOutgoing = outgoingWaybills.filter(w => 
     w.id.toLowerCase().includes(waybillSearch.toLowerCase()) ||
@@ -71,6 +75,7 @@ export function WaybillManager() {
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+      <WaybillManagerHeader onCreate={() => setShowCreateModal(true)} />
       {showCreateModal && <WaybillForm onClose={() => setShowCreateModal(false)} />}
 
       {/* Mobile Actions */}

@@ -182,6 +182,7 @@ function AppContent() {
                       <Route path="maintenance" element={<ProtectedRoute requiredModule="opsMaintenance"><MaintenanceManager /></ProtectedRoute>} />
                       <Route path="vehicles" element={<ProtectedRoute requiredModule="opsVehicles"><VehicleManager /></ProtectedRoute>} />
                       <Route path="sites" element={<ProtectedRoute requiredModule="opsSites"><SiteManager /></ProtectedRoute>} />
+                      <Route path="analytics" element={<ProtectedRoute requiredModule="opsCheckout"><EmployeeAnalytics /></ProtectedRoute>} />
                       <Route path="*" element={<Navigate to="/operations" replace />} />
                     </Routes>
                   </OperationsProvider>
@@ -189,7 +190,6 @@ function AppContent() {
               </Page>
             } />
             <Route path="activity-log" element={<Page label="Activity Log"><ProtectedRoute requiredModule="activityLog"><ActivityLog /></ProtectedRoute></Page>} />
-            <Route path="employee-analytics" element={<Page label="Employee Analytics"><ProtectedRoute requiredModule="employees"><EmployeeAnalytics /></ProtectedRoute></Page>} />
           </>
         )}
 

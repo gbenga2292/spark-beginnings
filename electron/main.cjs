@@ -2,6 +2,22 @@ const { app, BrowserWindow, Menu, dialog, shell, ipcMain, Notification, Tray } =
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
+/* ─── Single Instance Lock ─────────────────────────────────────── */
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, we should focus our window.
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 /* ─── Globals ──────────────────────────────────────────────────── */
 let mainWindow = null;
 let tray = null;
@@ -77,20 +93,7 @@ function can(page, field) {
 /* ─── Build context menus ──────────────────────────────────────── */
 function buildMenus() {
   /* ── FILE ──────────────────────────────────────────────────── */
-  const fileActions = [
-    can('ledger',   'canAdd') && {
-      label: '⊕  New Voucher',
-      click: () => mainWindow?.webContents.send('navigate', '/ledger'),
-    },
-    can('leaves',    'canAdd') && {
-      label: '⊕  New Leave Request',
-      click: () => mainWindow?.webContents.send('navigate', '/leaves'),
-    },
-  ].filter(Boolean);
-
   const fileTemplate = [
-    ...fileActions,
-    ...(fileActions.length > 0 ? [{ type: 'separator' }] : []),
     {
       label: 'Save Page as PDF',
       accelerator: 'CmdOrCtrl+S',

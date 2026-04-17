@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import {
-  ArrowLeft, Download, Eye, Calendar, User, Car, MapPin, Package, X, FileText
+  ArrowLeft, Download, Eye, Calendar, User, Car, MapPin, Package, X, FileText, Share2
 } from 'lucide-react';
 import { Waybill } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
@@ -25,7 +25,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
 
     // Logo
     try {
-      doc.addImage(logoSrc, 'PNG', 15, 10, 40, 20);
+      doc.addImage(logoSrc, 'PNG', 15, 10, 60, 22);
     } catch (_) { /* skip if logo fails */ }
 
     // Title
@@ -79,6 +79,26 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
     generatePdfDoc().save(`${waybill.id}.pdf`);
   };
 
+  const handleShare = async () => {
+    try {
+      const doc = generatePdfDoc();
+      const pdfBlob = doc.output('blob');
+      
+      if (navigator.share) {
+        const file = new File([pdfBlob], `${waybill.id}.pdf`, { type: 'application/pdf' });
+        await navigator.share({
+          title: `Waybill ${waybill.id}`,
+          text: `Please find attached the Waybill ${waybill.id}`,
+          files: [file],
+        });
+      } else {
+        alert('Sharing is not supported on this browser. You can download the PDF instead.');
+      }
+    } catch (error) {
+      console.error('Error sharing document:', error);
+    }
+  };
+
   // ── Page header ──────────────────────────────────────────────────────────────
   useSetPageTitle(
     `${waybill.type === 'return' ? 'Return' : 'Waybill'} ${waybill.id}`,
@@ -90,14 +110,22 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
         className="h-9 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-xs"
         onClick={handlePreview}
       >
-        <Eye className="h-4 w-4" /> Preview PDF
+        <Eye className="h-4 w-4" /> Preview
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-9 gap-2 text-teal-700 border-teal-200 bg-teal-50 hover:bg-teal-100 font-semibold text-xs"
+        onClick={handleShare}
+      >
+        <Share2 className="h-4 w-4" /> Share
       </Button>
       <Button
         size="sm"
         className="h-9 gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs shadow-sm"
         onClick={handleDownload}
       >
-        <Download className="h-4 w-4" /> Download PDF
+        <Download className="h-4 w-4" /> Download
       </Button>
     </div>,
     [waybill.id]
@@ -122,10 +150,17 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
             className="flex-1 gap-2 text-slate-600 border-slate-200 font-semibold text-xs"
             onClick={handlePreview}
           >
-            <Eye className="h-4 w-4" /> Preview PDF
+            <Eye className="h-4 w-4" /> Preview
           </Button>
           <Button
-            className="flex-1 gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs"
+            variant="outline"
+            className="flex-1 gap-2 text-teal-700 border-teal-200 bg-teal-50 font-semibold text-xs"
+            onClick={handleShare}
+          >
+            <Share2 className="h-4 w-4" /> Share
+          </Button>
+          <Button
+            className="w-full gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs"
             onClick={handleDownload}
           >
             <Download className="h-4 w-4" /> Download PDF

@@ -88,26 +88,26 @@ export function MaintenanceManager() {
   ];
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10 px-4 sm:px-6 lg:px-8 animate-in fade-in duration-500">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10 px-4 sm:px-6 lg:px-8">
       {/* Compact Tabs */}
-      <div className="flex bg-white dark:bg-slate-900 p-1.5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 items-center overflow-x-auto no-scrollbar gap-1 w-fit">
+      <div className="flex bg-card p-1.5 rounded-xl shadow-sm border border-border items-center overflow-x-auto no-scrollbar gap-1 w-fit">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as MaintenanceTab)}
             className={cn(
-              "px-6 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 uppercase tracking-wider",
+              "px-5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-2",
               activeTab === tab.id 
-                ? 'bg-blue-600 text-white shadow-md' 
-                : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600'
+                ? 'bg-primary text-primary-foreground shadow-sm' 
+                : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
             )}
           >
             <tab.icon className="h-4 w-4" />
             {tab.label}
             {tab.count !== undefined && (
               <span className={cn(
-                "px-1.5 py-0.5 rounded-md text-[10px]",
-                activeTab === tab.id ? "bg-blue-500 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                "px-2 py-0.5 rounded-md text-[10px] font-bold",
+                activeTab === tab.id ? "bg-primary-foreground/20 text-primary-foreground" : "bg-secondary text-secondary-foreground"
               )}>
                 {tab.count}
               </span>

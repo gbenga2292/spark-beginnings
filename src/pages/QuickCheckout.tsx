@@ -31,6 +31,12 @@ export function QuickCheckout() {
   const [hoveredCheckout, setHoveredCheckout] = useState<string | null>(null);
   const [activityFilter, setActivityFilter] = useState('all');
 
+  // Return Items Dialog State
+  const [checkoutToUpdate, setCheckoutToUpdate] = useState<Checkout | null>(null);
+  const [returnQty, setReturnQty] = useState<number>(1);
+  const [returnCondition, setReturnCondition] = useState<string>('Returned (Good)');
+  const [returnNotes, setReturnNotes] = useState<string>('');
+
   useSetPageTitle(
     view === 'checkout' ? 'Quick Checkout' : 'Checkout Activity',
     view === 'checkout' 
@@ -88,19 +94,33 @@ export function QuickCheckout() {
     setReturnDays(7);
   };
 
-  const handleUpdateStatus = (c: Checkout) => {
-    const qtyStr = window.prompt(`How many of ${c.assetName} are being returned? (Max ${c.quantity - c.returnedQuantity})`, `${c.quantity - c.returnedQuantity}`);
-    if (qtyStr !== null) {
-      const returned = parseInt(qtyStr, 10);
-      if (!isNaN(returned) && returned > 0 && returned <= (c.quantity - c.returnedQuantity)) {
-        const totalReturned = c.returnedQuantity + returned;
-        const newStatus = totalReturned >= c.quantity ? 'returned' : 'outstanding';
-        updateCheckoutStatus(c.id, { returnedQuantity: totalReturned, status: newStatus as any });
-        toast.success(`Updated checkout status for ${c.assetName}`);
-      } else {
-        toast.error('Invalid quantity entered');
-      }
+  const openReturnDialog = (c: Checkout) => {
+    setCheckoutToUpdate(c);
+    setReturnQty(1); // Default to 1 instead of max to be safe
+    setReturnCondition('Returned (Good)');
+    setReturnNotes('');
+  };
+
+  const handleConfirmReturn = () => {
+    if (!checkoutToUpdate) return;
+    
+    const returned = returnQty;
+    if (isNaN(returned) || returned <= 0 || returned > (checkoutToUpdate.quantity - checkoutToUpdate.returnedQuantity)) {
+      toast.error('Invalid quantity entered');
+      return;
     }
+
+    const totalReturned = checkoutToUpdate.returnedQuantity + returned;
+    const newStatus = totalReturned >= checkoutToUpdate.quantity ? 'returned' : 'outstanding';
+    
+    // In a real app we'd save condition and notes to the db payload here as well
+    updateCheckoutStatus(checkoutToUpdate.id, { 
+      returnedQuantity: totalReturned, 
+      status: newStatus as any 
+    });
+    
+    toast.success(`Updated checkout status for ${checkoutToUpdate.assetName}`);
+    setCheckoutToUpdate(null);
   };
 
   if (view === 'activity') {
@@ -270,7 +290,7 @@ export function QuickCheckout() {
                   {hoveredCheckout === c.id && (
                     <div className="flex items-center gap-2 mt-3 animate-in fade-in duration-200">
                       <Button variant="outline" className="flex-1 h-9 rounded-lg font-semibold text-slate-600 dark:text-slate-300 text-xs gap-2"
-                        onClick={() => handleUpdateStatus(c)}>
+                        onClick={() => openReturnDialog(c)}>
                         <RotateCcw className="h-3.5 w-3.5" /> Update Status
                       </Button>
                       <Button variant="ghost" size="icon" className="h-9 w-9 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg"
@@ -294,6 +314,86 @@ export function QuickCheckout() {
         <FileText className="h-4 w-4" />
         View All Checkout Activity History
       </Button>
+
+      {/* Return Items Dialog Overlay */}
+      {checkoutToUpdate && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-0">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setCheckoutToUpdate(null)} />
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-[400px] relative z-10 animate-in zoom-in-95 fade-in duration-200 overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+              <h2 className="text-base font-bold text-slate-800 dark:text-white">Return Items</h2>
+              <button 
+                onClick={() => setCheckoutToUpdate(null)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <div className="h-4 w-4 flex items-center justify-center">✕</div>
+              </button>
+            </div>
+            
+            <div className="p-5 space-y-5">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Return Quantity</label>
+                  <Input 
+                    type="number" 
+                    value={returnQty} 
+                    onChange={(e) => setReturnQty(Number(e.target.value))}
+                    min={1}
+                    max={checkoutToUpdate.quantity - checkoutToUpdate.returnedQuantity}
+                    className="h-11 rounded-lg border-blue-500 focus-visible:ring-blue-500 focus-visible:ring-offset-0 focus-visible:border-blue-500 shadow-sm" 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Condition / Status</label>
+                  <select 
+                    value={returnCondition} 
+                    onChange={(e) => setReturnCondition(e.target.value)}
+                    className="w-full h-11 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 outline-none text-sm px-3 appearance-none font-medium text-slate-700"
+                    style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
+                  >
+                    <option value="Returned (Good)">Returned (Good)</option>
+                    <option value="Returned (Damaged)">Returned (Damaged)</option>
+                    <option value="Returned (Lost / Missing)">Returned (Lost / Missing)</option>
+                    <option value="Consumed completely">Consumed completely</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Notes (Optional)</label>
+                  <textarea 
+                    placeholder="Add any notes or clarification about this return/update..."
+                    value={returnNotes}
+                    onChange={(e) => setReturnNotes(e.target.value)}
+                    className="w-full min-h-[80px] rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-3 text-sm text-slate-600 outline-none resize-none font-medium"
+                  />
+                </div>
+              </div>
+              
+              <p className="text-[11px] text-slate-400">
+                These notes will appear in checkout reports for additional context
+              </p>
+              
+              <div className="flex gap-3 pt-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1 h-11 rounded-lg border-slate-200 dark:border-slate-800 font-semibold"
+                  onClick={() => setCheckoutToUpdate(null)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  className="flex-1 h-11 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-semibold gap-2 shadow-sm"
+                  onClick={handleConfirmReturn}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Update Status
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
