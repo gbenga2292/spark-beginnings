@@ -15,8 +15,9 @@ import { AddSubtaskInline } from './Tasks/AddSubtaskInline';
 import { AssignUserDialog } from './Tasks/AssignUserDialog';
 import type { AppUser } from "@/src/store/userStore";
 import type { TaskPriority } from "@/src/types/tasks";
-import { RotateCcw, Reply, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, Plus, Search, Circle, Loader2, Calendar, X, Users, Clock, ChevronDown, ChevronRight, UserCheck, ArrowUpDown, Flag, MessageSquare, Send, Pencil, Lock, User, FolderOpen, List, Bell, RefreshCw, Link as LinkIcon, FileText, Paperclip } from 'lucide-react';
+import { RotateCcw, Reply, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, Plus, Search, Circle, Loader2, Calendar, X, Users, Clock, ChevronDown, ChevronRight, UserCheck, ArrowUpDown, Flag, MessageSquare, Send, Pencil, Lock, User, FolderOpen, List, Bell, RefreshCw, Link as LinkIcon, FileText, Paperclip, AtSign } from 'lucide-react';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { useTaskReadTracker } from '@/src/hooks/useTaskReadTracker';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { TabsContent } from '@/src/components/ui/tabs';
@@ -530,6 +531,13 @@ function AdminTasksView() {
     updateSubtask, deleteSubtask, updateSubtaskStatus, deleteMainTask, updateMainTask,
     postComment, getMainTaskComments, projects, createProject, reminders } = useAppData();
   const { user: currentUser } = useAuth();
+  const { readMap, markRead } = useTaskReadTracker();
+  const myId = currentUser?.id;
+  // Derive name from users list (Supabase User has no .name field)
+  const myFirstName = React.useMemo(() => {
+    const me = users.find(u => u.id === myId);
+    return (me?.name || '').split(' ')[0].toLowerCase();
+  }, [users, myId]);
   const sites = useAppStore(s => s.sites);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -616,6 +624,13 @@ function AdminTasksView() {
        }, { replace: true });
     }
   }, [searchParams, setSearchParams, subtasks, projects, mainTasks]);
+
+  // Mark task + parent as read whenever the detail sheet opens
+  React.useEffect(() => {
+    if (!openSubtaskId) return;
+    const sub = subtasks.find(s => s.id === openSubtaskId);
+    markRead(openSubtaskId, sub?.mainTaskId);
+  }, [openSubtaskId, subtasks, markRead]);
 
   const { wsTasks: teamTasks, wsMembers, workspace: teamWs } = useWorkspace();
   const employees = useAppStore(state => state.employees);
@@ -742,8 +757,18 @@ function AdminTasksView() {
     [viewMode, scope, sortBy, mySubs.length, pendingApprovalSubs.length]
   );
 
-  const toggle = (id: string) =>
-    setExpanded(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  const toggle = (id: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+        markRead(id); // mark task as read when row is expanded
+      }
+      return next;
+    });
+  };
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
@@ -773,8 +798,19 @@ function AdminTasksView() {
             mainTasks={scope === 'projects' ? tabFiltered.filter(m => m.is_project) : tabFiltered}
             allSubtasks={teamSubtasks}
             users={activeUsers}
-            onClickTask={id => { toggle(id); setViewMode('list'); }}
+            onClickTask={id => {
+              const firstSub = teamSubtasks.find(s => s.mainTaskId === id);
+              if (firstSub) {
+                setOpenSubtaskId(firstSub.id);
+              } else {
+                setEditingTask(mainTasks.find(m => m.id === id) || null);
+              }
+            }}
             reminders={reminders.filter(r => r.isActive && (r.createdBy === currentUser?.id || r.recipientIds?.includes(currentUser?.id ?? '')))}
+            comments={comments}
+            currentUserId={myId}
+            currentUserFirstName={myFirstName}
+            readMap={readMap}
           />
         </motion.div>
       )}
@@ -786,6 +822,10 @@ function AdminTasksView() {
             users={activeUsers}
             onClickSubtask={id => setOpenSubtaskId(id)}
             reminders={viewableReminders}
+            comments={comments}
+            currentUserId={myId}
+            currentUserFirstName={myFirstName}
+            readMap={readMap}
           />
         </motion.div>
       )}
@@ -1125,6 +1165,23 @@ function AdminTasksView() {
                   const sc = statusConfig[sub.status as SubTaskStatus];
                   const mt = mainTasks.find(m => m.id === sub.mainTaskId);
                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
+
+                  const parentId = sub.mainTaskId ?? (sub as any).main_task_id;
+                  const subCmts = comments.filter(c => {
+                    const cMainId = c.main_task_id ?? c.mainTaskId;
+                    const cSubId  = c.subtask_id  ?? c.subtaskId;
+                    return cMainId === parentId || cSubId === sub.id;
+                  });
+                  const subReadAt = readMap[sub.id] || readMap[parentId] || '';
+                  const subMentioned = myFirstName && subCmts.some(c =>
+                    (c.content || c.text || '').toLowerCase().includes(`@${myFirstName}`) &&
+                    (c.created_at || '') > subReadAt
+                  );
+                  const subUnseenCount = subCmts.filter(c =>
+                    (c.author_id ?? c.authorId) !== myId &&
+                    (c.created_at || '') > subReadAt
+                  ).length;
+
                   return (
                     <motion.div key={sub.id ?? i}
                       initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
@@ -1133,9 +1190,22 @@ function AdminTasksView() {
                       className={`flex items-center gap-3 px-4 py-3.5 bg-card border rounded-xl hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer group ${(sub as SubTask).priority ? `border-l-4 ${PRIORITY_CONFIG[(sub as SubTask).priority!].border}` : ''}`}>
                       <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc.dot}`} />
                       <div className="min-w-0 flex-1">
-                        <p className={`text-sm font-medium group-hover:text-primary transition-colors truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                          {sub.title}
-                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <p className={`text-sm font-medium group-hover:text-primary transition-colors truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                            {sub.title}
+                          </p>
+                          {subMentioned && (
+                            <span title="You were mentioned" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[9px] font-bold bg-indigo-600 text-white flex-shrink-0">
+                              <AtSign className="w-2.5 h-2.5" />
+                            </span>
+                          )}
+                          {!subMentioned && subUnseenCount > 0 && (
+                            <span title={`${subUnseenCount} unread update${subUnseenCount !== 1 ? 's' : ''}`}
+                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500 text-white flex-shrink-0 min-w-[16px] justify-center">
+                              {subUnseenCount}
+                            </span>
+                          )}
+                        </div>
                         {mt && <p className="text-xs text-muted-foreground truncate mt-0.5">{mt.title}</p>}
                       </div>
                       {(sub as SubTask).priority && <PriorityBadge priority={(sub as SubTask).priority} size="xs" />}
@@ -1256,6 +1326,36 @@ function AdminTasksView() {
                 const sc = mainStatusConfig[status];
                 const pct = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
 
+                // WhatsApp-style badges (uses component-level myFirstName / myId / readMap)
+                // Resolve mainTask ID — covers snake_case (Supabase raw) & camelCase (local inserts)
+                const mtId = mt.id;
+                const subIds = new Set(subs.map(s => s.id));
+                const taskComments = comments.filter(c => {
+                  const cMainId = c.main_task_id ?? c.mainTaskId;
+                  const cSubId  = c.subtask_id  ?? c.subtaskId;
+                  return cMainId === mtId || (cSubId && subIds.has(cSubId));
+                });
+                const readAt = readMap[mtId] || '';
+                const isMentioned = myFirstName && taskComments.some(c =>
+                  (c.content || c.text || '').toLowerCase().includes(`@${myFirstName}`) &&
+                  (c.created_at || '') > readAt
+                );
+                // Only count comments from others, after the last time the task was viewed
+                const isInvolved = myId && (
+                  subs.some(s => {
+                    const a = s.assignedTo || s.assigned_to || '';
+                    return String(a).includes(myId);
+                  }) ||
+                  (mt.createdBy === myId) ||
+                  String(mt.assignedTo || '').includes(myId)
+                );
+                const unseenCount = isInvolved
+                  ? taskComments.filter(c =>
+                      (c.author_id ?? c.authorId) !== myId &&
+                      (c.created_at || '') > readAt
+                    ).length
+                  : 0;
+
                 return (
                   <div key={mt.id} id={`task-row-${mt.id}`}
                     className={`bg-card border border-border rounded-xl overflow-hidden transition-colors border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority as TaskPriority].border : 'border-l-transparent'
@@ -1272,6 +1372,22 @@ function AdminTasksView() {
                         <div className="flex items-center gap-2">
                           <p className="text-sm text-foreground font-medium truncate">{mt.title}</p>
                           {mt.priority && <PriorityBadge priority={mt.priority} size="xs" />}
+                          {/* WhatsApp-style @ mention badge */}
+                          {isMentioned && (
+                            <span
+                              title="You were mentioned in this task"
+                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white flex-shrink-0">
+                              <AtSign className="w-2.5 h-2.5" />
+                            </span>
+                          )}
+                          {/* Unread update count badge */}
+                          {!isMentioned && unseenCount > 0 && (
+                            <span
+                              title={`${unseenCount} update${unseenCount !== 1 ? 's' : ''} on this task`}
+                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white flex-shrink-0 min-w-[18px] justify-center">
+                              {unseenCount}
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                           <span>{progress.completed}/{progress.total} subtasks</span>
@@ -1345,6 +1461,26 @@ function AdminTasksView() {
                                 const sc2 = statusConfig[sub.status as SubTaskStatus];
                                 const assignee = users.find(u => u.id === sub.assignedTo?.split(',')[0]);
                                 const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
+
+                                // Per-subtask badges — covers full parent thread so main-task-level
+                                // comments appear on subtask rows too.
+                                const parentId = sub.mainTaskId ?? sub.main_task_id;
+                                const subCmts = comments.filter(c => {
+                                  const cMainId = c.main_task_id ?? c.mainTaskId;
+                                  const cSubId  = c.subtask_id  ?? c.subtaskId;
+                                  return cMainId === parentId || cSubId === sub.id;
+                                });
+                                // Use whichever readAt is more recent (subtask or its parent)
+                                const subReadAt = readMap[sub.id] || readMap[parentId] || '';
+                                const subMentioned = myFirstName && subCmts.some(c =>
+                                  (c.content || c.text || '').toLowerCase().includes(`@${myFirstName}`) &&
+                                  (c.created_at || '') > subReadAt
+                                );
+                                const subUnseenCount = subCmts.filter(c =>
+                                  (c.author_id ?? c.authorId) !== myId &&
+                                  (c.created_at || '') > subReadAt
+                                ).length;
+
                                 return (
                                   <motion.div key={sub.id} id={`subtask-row-${sub.id}`}
                                     initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
@@ -1353,9 +1489,22 @@ function AdminTasksView() {
                                     className="flex items-center gap-3 px-5 py-3 hover:bg-primary/5 transition-colors cursor-pointer group">
                                     <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc2.dot}`} />
                                     <div className="min-w-0 flex-1">
-                                      <p className={`text-sm font-medium truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                                        {sub.title}
-                                      </p>
+                                      <div className="flex items-center gap-1.5">
+                                        <p className={`text-sm font-medium truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                                          {sub.title}
+                                        </p>
+                                        {subMentioned && (
+                                          <span title="You were mentioned" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[9px] font-bold bg-indigo-600 text-white flex-shrink-0">
+                                            <AtSign className="w-2.5 h-2.5" />
+                                          </span>
+                                        )}
+                                        {!subMentioned && subUnseenCount > 0 && (
+                                          <span title={`${subUnseenCount} unread update${subUnseenCount !== 1 ? 's' : ''}`}
+                                            className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500 text-white flex-shrink-0 min-w-[16px] justify-center">
+                                            {subUnseenCount}
+                                          </span>
+                                        )}
+                                      </div>
                                       {sub.description && <p className="text-xs text-muted-foreground truncate">{sub.description}</p>}
                                     </div>
                                     {/* Assignee */}

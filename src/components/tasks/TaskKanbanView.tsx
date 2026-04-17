@@ -5,7 +5,40 @@ import type { SubTask, SubTaskStatus, MainTask, AppUser } from "@/src/types/task
 import { SubtaskCard, MainTaskCard } from "./TaskCard";
 import { deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
 
-/* ─── Kanban column config ─────────────────────────────────────────────────── */
+/* â”€â”€â”€ Badge helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+function computeBadges(
+  comments: any[],
+  myId: string | undefined,
+  myFirstName: string | undefined,
+  readMap: Record<string, string>,
+  taskId: string,
+  relatedSubIds: string[] = [],
+): { isMentioned: boolean; unseenCount: number } {
+  if (!myId) return { isMentioned: false, unseenCount: 0 };
+
+  const readAt = readMap[taskId] || '';
+  const subIdSet = new Set(relatedSubIds);
+  const taskCmts = comments.filter(c => {
+    const cMainId = c.main_task_id ?? c.mainTaskId;
+    const cSubId  = c.subtask_id  ?? c.subtaskId;
+    return cMainId === taskId || (cSubId && subIdSet.has(cSubId));
+  });
+
+  const isMentioned = !!myFirstName && taskCmts.some(c =>
+    (c.content || c.text || '').toLowerCase().includes(`@${myFirstName.toLowerCase()}`) &&
+    (c.created_at || '') > readAt
+  );
+
+  const unseenCount = taskCmts.filter(c =>
+    (c.author_id ?? c.authorId) !== myId &&
+    (c.created_at || '') > readAt
+  ).length;
+
+  return { isMentioned, unseenCount };
+}
+
+
+/* â”€â”€â”€ Kanban column config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const COLUMNS: { status: SubTaskStatus; label: string; icon: React.ElementType; color: string; bg: string }[] = [
   { status: "not_started", label: "Not Started", icon: Circle, color: "text-muted-foreground", bg: "bg-muted/50" },
   { status: "in_progress", label: "In Progress", icon: Loader2, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950/20" },
@@ -19,7 +52,7 @@ const MAIN_COLUMNS: { status: string; label: string; icon: React.ElementType; co
   { status: "completed", label: "Done", icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50 dark:bg-green-950/20" },
 ];
 
-/* ─── Subtask Kanban (for User view / My Tasks) ──────────────────────────── */
+/* â”€â”€â”€ Subtask Kanban (for User view / My Tasks) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 interface SubtaskKanbanProps {
   subtasks: SubTask[];
   mainTasks: MainTask[];
@@ -27,6 +60,10 @@ interface SubtaskKanbanProps {
   onClickSubtask: (id: string) => void;
   hidePendingApproval?: boolean;
   reminders?: any[];
+  comments?: any[];
+  currentUserId?: string;
+  currentUserFirstName?: string;
+  readMap?: Record<string, string>;
 }
 
 function ReminderKanbanCard({ reminder }: { reminder: any }) {
@@ -48,7 +85,10 @@ function ReminderKanbanCard({ reminder }: { reminder: any }) {
   );
 }
 
-export function SubtaskKanbanView({ subtasks, mainTasks, users, onClickSubtask, hidePendingApproval, reminders }: SubtaskKanbanProps) {
+export function SubtaskKanbanView({
+  subtasks, mainTasks, users, onClickSubtask, hidePendingApproval, reminders,
+  comments = [], currentUserId, currentUserFirstName, readMap = {},
+}: SubtaskKanbanProps) {
   const allColumns = [
     { type: 'col', status: 'not_started' },
     { type: 'col', status: 'in_progress' },
@@ -110,6 +150,10 @@ export function SubtaskKanbanView({ subtasks, mainTasks, users, onClickSubtask, 
                 {items.map(sub => {
                   const mt = mainTasks.find(m => m.id === sub.mainTaskId);
                   const assignee = sub.assignedTo ? users.find(u => u.id === sub.assignedTo?.split(',')[0]) : undefined;
+                  const { isMentioned, unseenCount } = computeBadges(
+                    comments, currentUserId, currentUserFirstName, readMap,
+                    sub.id ?? '', []
+                  );
                   return (
                     <SubtaskCard
                       key={sub.id}
@@ -118,6 +162,8 @@ export function SubtaskKanbanView({ subtasks, mainTasks, users, onClickSubtask, 
                       assignee={assignee}
                       onClick={() => onClickSubtask(sub.id ?? '')}
                       compact
+                      isMentioned={isMentioned}
+                      unseenCount={unseenCount}
                     />
                   );
                 })}
@@ -133,16 +179,23 @@ export function SubtaskKanbanView({ subtasks, mainTasks, users, onClickSubtask, 
   );
 }
 
-/* ─── Main Task Kanban (for Admin All Tasks view) ────────────────────────── */
+/* â”€â”€â”€ Main Task Kanban (for Admin All Tasks view) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 interface MainTaskKanbanProps {
   mainTasks: MainTask[];
   allSubtasks: SubTask[];
   users: AppUser[];
   onClickTask: (id: string) => void;
   reminders?: any[];
+  comments?: any[];
+  currentUserId?: string;
+  currentUserFirstName?: string;
+  readMap?: Record<string, string>;
 }
 
-export function MainTaskKanbanView({ mainTasks, allSubtasks, users, onClickTask, reminders }: MainTaskKanbanProps) {
+export function MainTaskKanbanView({
+  mainTasks, allSubtasks, users, onClickTask, reminders,
+  comments = [], currentUserId, currentUserFirstName, readMap = {},
+}: MainTaskKanbanProps) {
   const allColumns = [
     { type: 'col', status: 'not_started' },
     { type: 'col', status: 'in_progress' },
@@ -199,6 +252,11 @@ export function MainTaskKanbanView({ mainTasks, allSubtasks, users, onClickTask,
               <AnimatePresence mode="popLayout">
                 {items.map(mt => {
                   const subs = allSubtasks.filter(s => s.mainTaskId === mt.id);
+                  const subIds = subs.map(s => s.id ?? '');
+                  const { isMentioned, unseenCount } = computeBadges(
+                    comments, currentUserId, currentUserFirstName, readMap,
+                    mt.id, subIds
+                  );
                   return (
                     <MainTaskCard
                       key={mt.id}
@@ -207,6 +265,8 @@ export function MainTaskKanbanView({ mainTasks, allSubtasks, users, onClickTask,
                       users={users}
                       onClick={() => onClickTask(mt.id)}
                       compact
+                      isMentioned={isMentioned}
+                      unseenCount={unseenCount}
                     />
                   );
                 })}

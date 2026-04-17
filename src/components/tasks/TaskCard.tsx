@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Clock, Flag, CheckCircle2, Circle, Loader2, User, Hourglass } from "lucide-react";
+import { Clock, Flag, CheckCircle2, Circle, Loader2, User, Hourglass, AtSign } from "lucide-react";
 import { isPast, isToday, isTomorrow, format } from "date-fns";
 import type { SubTask, SubTaskStatus, MainTask, AppUser, TaskPriority } from "@/src/types/tasks";
 import { getMainTaskProgress, deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
@@ -34,9 +34,11 @@ interface MainTaskCardProps {
   users: AppUser[];
   onClick: () => void;
   compact?: boolean;
+  isMentioned?: boolean;
+  unseenCount?: number;
 }
 
-export function MainTaskCard({ task, subtasks, users, onClick, compact }: MainTaskCardProps) {
+export function MainTaskCard({ task, subtasks, users, onClick, compact, isMentioned, unseenCount }: MainTaskCardProps) {
   const progress = getMainTaskProgress(task.id, subtasks);
   const status = deriveMainTaskStatus(task.id, subtasks);
   const pct = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
@@ -54,14 +56,29 @@ export function MainTaskCard({ task, subtasks, users, onClick, compact }: MainTa
         task.priority ? PRIORITY_CONFIG[task.priority].border : "border-l-transparent"
       } ${compact ? "p-3" : "p-4"}`}
     >
-      {/* Title + priority */}
+      {/* Title + priority + badges */}
       <div className="flex items-start gap-2 mb-2">
         <p className={`font-medium text-foreground group-hover:text-primary transition-colors flex-1 ${compact ? "text-xs" : "text-sm"} ${status === "completed" ? "line-through text-muted-foreground" : ""}`}>
           {task.title}
         </p>
-        {task.priority && (
-          <span className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${PRIORITY_CONFIG[task.priority].dot}`} title={task.priority} />
-        )}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* WhatsApp-style @ mention badge */}
+          {isMentioned && (
+            <span title="You were mentioned" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-600 text-white">
+              <AtSign className="w-2.5 h-2.5" />
+            </span>
+          )}
+          {/* Unread count badge */}
+          {!isMentioned && unseenCount != null && unseenCount > 0 && (
+            <span title={`${unseenCount} unread update${unseenCount !== 1 ? 's' : ''}`}
+              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500 text-white min-w-[18px] justify-center">
+              {unseenCount}
+            </span>
+          )}
+          {task.priority && (
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 mt-0.5 ${PRIORITY_CONFIG[task.priority].dot}`} title={task.priority} />
+          )}
+        </div>
       </div>
 
       {/* Progress bar */}
@@ -100,9 +117,11 @@ interface SubtaskCardProps {
   assignee?: AppUser;
   onClick: () => void;
   compact?: boolean;
+  isMentioned?: boolean;
+  unseenCount?: number;
 }
 
-export function SubtaskCard({ subtask, mainTask, assignee, onClick, compact }: SubtaskCardProps) {
+export function SubtaskCard({ subtask, mainTask, assignee, onClick, compact, isMentioned, unseenCount }: SubtaskCardProps) {
   const sc = statusConfig[subtask.status];
   const isOverdue = subtask.deadline && isPast(new Date(subtask.deadline)) && subtask.status !== "completed";
 
@@ -117,12 +136,24 @@ export function SubtaskCard({ subtask, mainTask, assignee, onClick, compact }: S
         subtask.priority ? `border-l-4 ${PRIORITY_CONFIG[subtask.priority].border}` : ""
       } ${compact ? "p-2.5" : "p-3.5"}`}
     >
-      {/* Status dot + title */}
+      {/* Status dot + title + badges */}
       <div className="flex items-start gap-2 mb-1.5">
         <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1 ${sc.dot}`} />
         <p className={`flex-1 font-medium group-hover:text-primary transition-colors ${compact ? "text-xs" : "text-sm"} ${subtask.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
           {subtask.title}
         </p>
+        {/* WhatsApp-style badges */}
+        {isMentioned && (
+          <span title="You were mentioned" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[9px] font-bold bg-indigo-600 text-white flex-shrink-0">
+            <AtSign className="w-2.5 h-2.5" />
+          </span>
+        )}
+        {!isMentioned && unseenCount != null && unseenCount > 0 && (
+          <span title={`${unseenCount} unread update${unseenCount !== 1 ? 's' : ''}`}
+            className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500 text-white flex-shrink-0 min-w-[16px] justify-center">
+            {unseenCount}
+          </span>
+        )}
       </div>
 
       {/* Meta */}
@@ -145,3 +176,6 @@ export function SubtaskCard({ subtask, mainTask, assignee, onClick, compact }: S
     </motion.div>
   );
 }
+
+
+

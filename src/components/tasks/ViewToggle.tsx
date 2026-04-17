@@ -10,9 +10,9 @@ interface ViewToggleProps {
 }
 
 const VIEWS: { mode: TaskViewMode; icon: React.ElementType; label: string }[] = [
+  { mode: "board", icon: LayoutGrid, label: "Board" },
   { mode: "list", icon: List, label: "List" },
   { mode: "compact", icon: AlignJustify, label: "Compact" },
-  { mode: "board", icon: LayoutGrid, label: "Board" },
   { mode: "focus", icon: Target, label: "Focus" },
   { mode: "gantt", icon: CalendarRange, label: "Gantt Chart" },
   { mode: "inbox", icon: Inbox, label: "Inbox" },

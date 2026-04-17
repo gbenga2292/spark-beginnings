@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/src/store/appStore';
 import type { CommLog } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
@@ -180,13 +181,15 @@ interface LogFormProps {
   onSave: () => void;
   onCancel: () => void;
   isEdit?: boolean;
+  editingId?: string | null;
   isDark: boolean;
 }
 
-function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormProps) {
+function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }: LogFormProps) {
   const sites = useAppStore(s => s.sites);
   const pendingSites = useAppStore(s => s.pendingSites);
   const storeClients = useAppStore(s => s.clients);
+  const commLogs = useAppStore(s => s.commLogs);
   const addPendingSite = useAppStore(s => s.addPendingSite);
   const deletePendingSite = useAppStore(s => s.deletePendingSite);
 
@@ -199,6 +202,8 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
       .filter(Boolean)
       .sort();
   }, [sites, pendingSites, storeClients]);
+
+  const hasChildren = editingId ? commLogs.some(l => l.parentId === editingId) : false;
 
   // Onboard-in-background wizard state
   const [onboardBannerFor, setOnboardBannerFor] = useState<string | null>(null);
@@ -302,11 +307,9 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
         <h2 className={cn("text-lg font-semibold", isDark ? 'text-slate-100' : 'text-slate-900')}>
           {isEdit ? 'Edit Log' : 'New Communication'}
         </h2>
-        {!isEdit && (
-          <Button variant="ghost" size="icon" onClick={onCancel} className={cn("h-8 w-8", isDark ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}>
-            <X className="w-4 h-4" />
-          </Button>
-        )}
+        <Button variant="ghost" size="icon" onClick={onCancel} className={cn("h-8 w-8", isDark ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}>
+          <X className="w-4 h-4" />
+        </Button>
       </div>
 
       {form.parentId && !isEdit && (
@@ -646,6 +649,40 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, isDark }: LogFormPr
         </label>
       )}
 
+      {/* Convert to Follow-Up */}
+      {isEdit && !hasChildren && (
+        <div className={cn("p-4 rounded-lg border space-y-2", isDark ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200')}>
+          <div className={labelCls}>Attach as Follow-up to (Optional)</div>
+          <select
+            value={form.parentId || ''}
+            onChange={e => onChange({ parentId: e.target.value || undefined })}
+            className={selectCls}
+          >
+            <option value="">— Keep as Main Log —</option>
+            {commLogs
+              .filter(l => !l.parentId && l.id !== editingId)
+              .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+              .map(l => (
+                <option key={l.id} value={l.id}>
+                  {format(parseISO(l.date), 'MMM d, yyyy')} - {l.subject || l.notes.substring(0, 40) + (l.notes.length > 40 ? '...' : '')}
+                </option>
+              ))}
+          </select>
+          <p className={cn("text-[10px] uppercase font-semibold mt-1", isDark ? 'text-slate-500' : 'text-slate-400')}>
+            Select a main log to move this under as a reply/follow-up.
+          </p>
+        </div>
+      )}
+      {isEdit && hasChildren && (
+        <div className={cn("p-3 rounded-lg border flex items-start gap-2", isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-100')}>
+          <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+          <div className="text-xs">
+            <span className={cn('font-semibold', isDark ? 'text-amber-500' : 'text-amber-700')}>Thread Anchor:</span> 
+            <span className={cn('ml-1', isDark ? 'text-slate-400' : 'text-slate-500')}>This log has follow-up replies attached to it. It cannot be converted into a follow-up of another log.</span>
+          </div>
+        </div>
+      )}
+
       </div> {/* <-- Moved the closing div for the scrollable container here */}
 
       {/* Actions */}
@@ -666,11 +703,12 @@ interface CommLogTaskDialogProps {
   onClose: () => void;
   initialTitle: string;
   initialDescription: string;
+  parentLogSubject?: string;
   isDark: boolean;
 }
 
-function CommLogTaskDialog({ open, onClose, initialTitle, initialDescription, isDark }: CommLogTaskDialogProps) {
-  const { createMainTask, users } = useAppData();
+function CommLogTaskDialog({ open, onClose, initialTitle, initialDescription, parentLogSubject, isDark }: CommLogTaskDialogProps) {
+  const { createMainTask, mainTasks, addSubtask, users } = useAppData();
   const { user } = useAuth();
 
   const [title, setTitle] = useState(initialTitle);
@@ -700,7 +738,7 @@ function CommLogTaskDialog({ open, onClose, initialTitle, initialDescription, is
 
   if (!open) return null;
 
-  const addSubtask = () => {
+  const handleAddSubtask = () => {
     const t = newSubtask.trim();
     if (!t) return;
     setSubtasks(prev => [...prev, { id: crypto.randomUUID(), title: t }]);
@@ -712,18 +750,70 @@ function CommLogTaskDialog({ open, onClose, initialTitle, initialDescription, is
   const handleSubmit = async () => {
     if (!title.trim()) { toast.error('Task title is required'); return; }
     setSaving(true);
-    const subs = subtasks.map(s => ({ title: s.title, status: 'not_started' }));
-    await createMainTask({
-      title: title.trim(),
-      description: description.trim(),
-      createdBy: user?.id,
-      teamId: 'dcel-team',
-      workspaceId: 'dcel-team',
-      assignedTo: assignee.length > 0 ? assignee.join(',') : null,
-      deadline: deadline || null,
-      priority,
-      is_project: false,
-    }, subs);
+    
+    if (parentLogSubject) {
+      // It's a follow-up log, find or create the main task using parentLogSubject
+      const existingMainTask = mainTasks.find(m => m.title.trim().toLowerCase() === parentLogSubject.trim().toLowerCase());
+      
+      const newSubtasks = [
+        {
+          title: title.trim(),
+          description: description.trim(),
+          assignedTo: assignee.length > 0 ? assignee[0] : null,
+          status: 'not_started',
+          deadline: deadline || null,
+          priority,
+        },
+        ...subtasks.map(s => ({
+          title: s.title,
+          description: null,
+          assignedTo: null,
+          status: 'not_started',
+          deadline: null,
+          priority: null,
+        }))
+      ];
+
+      if (existingMainTask) {
+        // Main task exists, add subtasks
+        for (const sub of newSubtasks) {
+          await addSubtask({ ...sub, mainTaskId: existingMainTask.id });
+        }
+        toast.success(`Added follow-up task under "${existingMainTask.title}"`);
+      } else {
+        // Main task does not exist, create it then add subtasks
+        const newMainTask = await createMainTask({
+          title: parentLogSubject.trim(),
+          description: `Automatically created for communication thread: ${parentLogSubject}`,
+          createdBy: user?.id,
+          teamId: 'dcel-team',
+          workspaceId: 'dcel-team',
+          is_project: false,
+        }, []);
+        
+        if (newMainTask) {
+          for (const sub of newSubtasks) {
+            await addSubtask({ ...sub, mainTaskId: newMainTask.id });
+          }
+          toast.success('Main task and follow-up subtasks created');
+        }
+      }
+    } else {
+      // Normal flow (Main log task creation)
+      const subs = subtasks.map(s => ({ title: s.title, status: 'not_started' }));
+      await createMainTask({
+        title: title.trim(),
+        description: description.trim(),
+        createdBy: user?.id,
+        teamId: 'dcel-team',
+        workspaceId: 'dcel-team',
+        assignedTo: assignee.length > 0 ? assignee.join(',') : null,
+        deadline: deadline || null,
+        priority,
+        is_project: false,
+      }, subs);
+    }
+
     setSaving(false);
     onClose();
   };
@@ -763,6 +853,16 @@ function CommLogTaskDialog({ open, onClose, initialTitle, initialDescription, is
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {parentLogSubject && (
+            <div className={cn("p-3 rounded-lg border flex items-start gap-2", isDark ? 'bg-indigo-950/30 border-indigo-900/50' : 'bg-indigo-50 border-indigo-100')}>
+              <ClipboardList className="w-5 h-5 text-indigo-500 mt-0.5 flex-shrink-0" />
+              <div className="text-xs">
+                <span className="font-semibold text-indigo-600 dark:text-indigo-400">Threaded Follow-up Task:</span>
+                <p className="text-slate-600 dark:text-slate-300 mt-0.5">This will be added as a subtask under the main conversation task: <strong className="text-indigo-700 dark:text-indigo-300">{parentLogSubject}</strong>. If the main task doesn't exist yet, it will be automatically created.</p>
+              </div>
+            </div>
+          )}
+
           {/* Title */}
           <div>
             <div className={labelCls}>Task Title *</div>
@@ -870,10 +970,10 @@ function CommLogTaskDialog({ open, onClose, initialTitle, initialDescription, is
                 placeholder="Add a subtask…"
                 value={newSubtask}
                 onChange={e => setNewSubtask(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSubtask(); } }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtask(); } }}
                 className={cn(inputCls, 'flex-1')}
               />
-              <Button onClick={addSubtask} variant="outline" className="h-9 px-3 gap-1 text-xs">
+              <Button onClick={handleAddSubtask} variant="outline" className="h-9 px-3 gap-1 text-xs">
                 <Plus className="w-3.5 h-3.5" /> Add
               </Button>
             </div>
@@ -1074,11 +1174,13 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
 // ────────────────────────────────────────────────────────────
 export function CommLog() {
   const { isDark } = useTheme();
+  const navigate = useNavigate();
   const currentUser = useUserStore(s => s.getCurrentUser());
   const commLogs = useAppStore(s => s.commLogs);
   const addCommLog = useAppStore(s => s.addCommLog);
   const updateCommLog = useAppStore(s => s.updateCommLog);
   const deleteCommLog = useAppStore(s => s.deleteCommLog);
+  const { mainTasks } = useAppData();
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1086,7 +1188,7 @@ export function CommLog() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   // Task-from-log dialog state
-  const [taskDialog, setTaskDialog] = useState<{ open: boolean; title: string; description: string }>(
+  const [taskDialog, setTaskDialog] = useState<{ open: boolean; title: string; description: string; parentLogSubject?: string }>(
     { open: false, title: '', description: '' }
   );
 
@@ -1219,10 +1321,21 @@ export function CommLog() {
       });
       toast.success('Communication logged');
       if (form.createTask) {
+        let parentSubject: string | undefined;
+        let initialTitle = form.subject.trim() || `Follow-up: ${form.channel} with ${form.client || 'contact'}`;
+
+        if (form.parentId) {
+          const parentLog = commLogs.find(l => l.id === form.parentId);
+          if (parentLog) {
+            parentSubject = parentLog.subject || `Communication with ${parentLog.client || 'Contact'}`;
+          }
+        }
+
         setTaskDialog({
           open: true,
-          title: form.subject.trim() || `Follow-up: ${form.channel} with ${form.client || 'contact'}`,
+          title: initialTitle,
           description: buildTaskDescription(form),
+          parentLogSubject: parentSubject
         });
       }
     }
@@ -1276,6 +1389,7 @@ export function CommLog() {
         onClose={() => setTaskDialog(d => ({ ...d, open: false }))}
         initialTitle={taskDialog.title}
         initialDescription={taskDialog.description}
+        parentLogSubject={taskDialog.parentLogSubject}
         isDark={isDark}
       />
       <div className={cn('flex flex-col h-full min-h-0', panelBg)}>
@@ -1321,14 +1435,132 @@ export function CommLog() {
                 onSave={handleSave}
                 onCancel={() => { setShowForm(false); setEditingId(null); setForm(emptyForm()); }}
                 isEdit={!!editingId}
+                editingId={editingId}
                 isDark={isDark}
               />
             </div>
           )}
 
-          {/* RIGHT: Filters + Log list */}
+          {/* RIGHT: When editing - focused thread + linked tasks; otherwise filters + log list */}
           <div className="flex-1 flex flex-col gap-3 min-h-0 overflow-hidden">
 
+            {editingId ? (() => {
+              // Find the log being edited and resolve its thread anchor
+              const editingLog = commLogs.find(l => l.id === editingId);
+              if (!editingLog) return null;
+              const anchorId = editingLog.parentId || editingLog.id;
+              const anchorLog = commLogs.find(l => l.id === anchorId) || editingLog;
+              const threadChildren = commLogs.filter(l => l.parentId === anchorId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+              // Find linked tasks by matching subject to main task titles
+              const logSubject = (anchorLog.subject || '').trim().toLowerCase();
+              const linkedTasks = logSubject 
+                ? mainTasks.filter(t => t.title.trim().toLowerCase() === logSubject)
+                : [];
+
+              return (
+                <div className="flex-1 overflow-y-auto space-y-4 pr-1 min-h-0">
+                  {/* Thread header */}
+                  <div className={cn('flex items-center gap-2 px-1 py-2 border-b', isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-500')}>
+                    <MessageSquare className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      Editing thread: <span className={cn('font-semibold', isDark ? 'text-slate-200' : 'text-slate-800')}>{anchorLog.subject || anchorLog.client || 'Log'}</span>
+                    </span>
+                  </div>
+
+                  {/* Thread: main log */}
+                  <div className="space-y-1.5">
+                    <LogCard
+                      log={anchorLog}
+                      isDark={isDark}
+                      expanded={expandedIds.has(anchorLog.id)}
+                      onToggleExpand={() => toggleExpand(anchorLog.id)}
+                      onEdit={() => handleEdit(anchorLog)}
+                      onDelete={() => handleDelete(anchorLog.id)}
+                      onToggleFollowUp={() => updateCommLog(anchorLog.id, { followUpDone: !anchorLog.followUpDone })}
+                      onAddFollowUpNote={() => {
+                        setForm({ ...emptyForm(), parentId: anchorLog.id, client: anchorLog.client || '', siteName: anchorLog.siteName || '', contactType: anchorLog.contactType, channel: anchorLog.channel });
+                        setShowForm(true);
+                        setEditingId(null);
+                      }}
+                      currentUserName={currentUser?.name || ''}
+                      isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
+                    />
+
+                    {/* Follow-up children */}
+                    {threadChildren.map(child => (
+                      <LogCard
+                        key={child.id}
+                        log={child}
+                        isChild
+                        isDark={isDark}
+                        expanded={expandedIds.has(child.id)}
+                        onToggleExpand={() => toggleExpand(child.id)}
+                        onEdit={() => handleEdit(child)}
+                        onDelete={() => handleDelete(child.id)}
+                        onToggleFollowUp={() => updateCommLog(child.id, { followUpDone: !child.followUpDone })}
+                        currentUserName={currentUser?.name || ''}
+                        isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Linked Tasks section */}
+                  <div className={cn('rounded-xl border p-4 space-y-3', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200')}>
+                    <div className={cn('flex items-center gap-2 text-sm font-semibold', isDark ? 'text-slate-300' : 'text-slate-700')}>
+                      <ClipboardList className="w-4 h-4 text-indigo-500" />
+                      Linked Tasks
+                      {linkedTasks.length > 0 && (
+                        <span className="ml-auto text-xs font-normal px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400">
+                          {linkedTasks.length}
+                        </span>
+                      )}
+                    </div>
+
+                    {linkedTasks.length === 0 ? (
+                      <p className={cn('text-xs italic', isDark ? 'text-slate-500' : 'text-slate-400')}>
+                        No tasks created from this log yet. Use the "Create Task" option when saving a log.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {linkedTasks.map(task => (
+                          <button
+                            key={task.id}
+                            onClick={() => navigate('/tasks')}
+                            className={cn(
+                              'w-full text-left flex items-center gap-3 p-3 rounded-lg border transition-all hover:shadow-sm',
+                              isDark
+                                ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 hover:border-indigo-700'
+                                : 'bg-slate-50 border-slate-200 hover:bg-indigo-50 hover:border-indigo-200'
+                            )}
+                          >
+                            <CheckCircle2 className={cn('w-4 h-4 flex-shrink-0', task.status === 'completed' ? 'text-emerald-500' : 'text-slate-400')} />
+                            <div className="min-w-0 flex-1">
+                              <p className={cn('text-sm font-medium truncate', isDark ? 'text-slate-200' : 'text-slate-800')}>{task.title}</p>
+                              {task.deadline && (
+                                <p className={cn('text-xs mt-0.5', isDark ? 'text-slate-500' : 'text-slate-400')}>
+                                  Due: {format(parseISO(task.deadline), 'MMM d, yyyy')}
+                                </p>
+                              )}
+                            </div>
+                            <span className={cn('text-xs px-2 py-0.5 rounded-full flex-shrink-0',
+                              task.status === 'completed'
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
+                                : task.status === 'in_progress'
+                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400'
+                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                            )}>
+                              {task.status?.replace('_', ' ') || 'pending'}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })() : (
+              <>
             {/* Filters */}
             <div className={cn('rounded-xl border p-3 space-y-2 flex-shrink-0', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200')}>
               <div className="flex items-center gap-2 flex-wrap">
@@ -1481,6 +1713,8 @@ export function CommLog() {
                 })()
               )}
             </div>
+            </>
+            )}
           </div>
         </div>
       </div>

@@ -12,7 +12,7 @@ import {
   User, Calendar, Clock, ChevronDown, ChevronRight,
   MessageSquare, Hash, Paperclip, Send, FolderOpen, X,
   ArrowRight, ArrowLeft, Plus, Hourglass, FileText, FileSpreadsheet, Presentation,
-  Pencil, Reply, Link as LinkIcon, Check
+  Pencil, Reply, Link as LinkIcon, Check, Trash2
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/src/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
@@ -833,7 +833,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
   subtasks?: SubTask[];
   onSelectSubtask?: (id: string | null) => void;
 }) {
-  const { updateComment } = useAppData();
+  const { updateComment, deleteComment } = useAppData();
   const [text, setText] = useState("");
   const comments = getSubtaskComments(subtask.id);
   const endRef = useRef<HTMLDivElement>(null);
@@ -963,48 +963,12 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
       }
     }
 
-    // Capture "@" mentions to send notifications via the reminders system
+    // Capture "@" mentions 
     const mentions = Array.from(finalContent.matchAll(/@(\w+)/g)).map(m => m[1].toLowerCase());
     
-    // Who we are already notifying to avoid duplicate mentions
-    const notifiedUserIds = new Set<string>();
-
-    if (mentions.length > 0) {
-      users.forEach(u => {
-        const fname = (u.name || "").split(' ')[0].toLowerCase();
-        if (mentions.includes(fname) && u.id !== currentUser.id) {
-           notifiedUserIds.add(u.id);
-           addReminder({
-             title: `Mentioned in Task: ${mainTask.title}`,
-             body: `${users.find(x => x.id === currentUser.id)?.name || currentUser.email?.split('@')[0] || 'Someone'} mentioned you: "${finalContent.substring(0, 50)}..."`,
-             remindAt: new Date().toISOString(),
-             recipientIds: [u.id],
-             createdBy: currentUser.id,
-             mainTaskId: mainId,
-             subtaskId: subtask.id,
-             isActive: true
-           });
-        }
-      });
-    }
-
-    // Capture Replies
-    if (replyingTo) {
-        const replyAuthorId = replyingTo.authorId || replyingTo.author_id;
-        if (replyAuthorId && replyAuthorId !== currentUser.id && !notifiedUserIds.has(replyAuthorId)) {
-           notifiedUserIds.add(replyAuthorId);
-           addReminder({
-             title: `Reply in Task: ${mainTask.title}`,
-             body: `${users.find(x => x.id === currentUser.id)?.name || currentUser.email?.split('@')[0] || 'Someone'} replied to your update: "${content.substring(0, 50)}..."`,
-             remindAt: new Date().toISOString(),
-             recipientIds: [replyAuthorId],
-             createdBy: currentUser.id,
-             mainTaskId: mainId,
-             subtaskId: subtask.id,
-             isActive: true
-           });
-        }
-    }
+    // Notifications for mentions & replies are handled by real-time subscriptions in TaskPopupNotifications.
+    // We no longer pollute the Reminders database for chat activity.
+    let _notifiedUserIds = new Set<string>();
 
     // Capture Assignees (task updated)
     if (subtask.assignedTo) {
@@ -1051,6 +1015,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
             const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'co-admin';
             const isPast24Hours = (new Date().getTime() - new Date(createdAt).getTime()) > 24 * 60 * 60 * 1000;
             const canEdit = isAdmin || (isAuthor && !isPast24Hours);
+            const canDelete = isAdmin || (isAuthor && !isPast24Hours);
             const renderText = (t: string) => {
               return t.split(/(@\w+|#\S+)/g).map((part: string, i: number) => {
                 if (part.startsWith('@')) return <span key={i} className="font-semibold text-primary bg-primary/10 px-1 rounded">{part}</span>;
@@ -1098,6 +1063,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
                       <button onClick={() => setReplyingTo(c)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors" title="Reply"><Reply className="w-3 h-3" /></button>
                       {canEdit && <button onClick={() => { setEditingId(c.id); setEditTextContent(c.text); }} className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors" title="Edit"><Pencil className="w-3 h-3" /></button>}
+                      {canDelete && <button onClick={() => { if (window.confirm("Are you sure you want to delete this update?")) { deleteComment(c.id); } }} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Delete"><Trash2 className="w-3 h-3" /></button>}
                     </div>
                     <span className="text-[10px] text-slate-400 flex-shrink-0">
                       {format(new Date(createdAt), "MMM d, yyyy, h:mm a")}

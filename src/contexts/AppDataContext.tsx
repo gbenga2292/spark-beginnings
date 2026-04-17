@@ -33,6 +33,7 @@ interface AppDataContextType {
     rejectSubtask: (id: string, userId?: string, note?: string) => Promise<void>;
     postComment: (subId: string, mainId: string, authorId: string, text: string, attachments?: CommentAttachment[], fileLinks?: string[]) => Promise<void>;
     updateComment: (id: string, text: string) => Promise<void>;
+    deleteComment: (id: string) => Promise<void>;
     getMainTaskComments: (id: string) => any[];
     getSubtaskComments: (subtaskId: string) => any[];
     getMainTaskWorkflow: (mainTaskId: string) => any[];
@@ -219,23 +220,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
             // subtasks
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'subtasks' }, (payload) => {
-                const assignedUserId = payload.new.assignedTo || payload.new.assigned_to;
-                if (assignedUserId === user?.id && payload.new.created_by !== user?.id) {
-                    toast.info(`You have been assigned a new task: ${payload.new.title}`);
-                    showNativeNotification("Task Assigned", `You have been assigned a new task: ${payload.new.title}`);
-                }
                 setSubtasks(prev => {
+
                     if (prev.some(s => s.id === payload.new.id)) return prev;
                     return [...prev, payload.new];
                 });
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'subtasks' }, (payload) => {
-                const oldAssigned = payload.old?.assignedTo || payload.old?.assigned_to;
-                const newAssigned = payload.new.assignedTo || payload.new.assigned_to;
-                if (newAssigned === user?.id && oldAssigned !== user?.id) {
-                    toast.info(`You have been assigned to task: ${payload.new.title}`);
-                    showNativeNotification("Task Assigned", `You have been assigned to task: ${payload.new.title}`);
-                }
                 setSubtasks(prev => prev.map(s => s.id === payload.new.id ? payload.new : s));
             })
             .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'subtasks' }, (payload) => {
@@ -268,18 +259,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     const isCreator = camel.createdBy === user?.id;
 
                     if (isRecipient && !isCreator) {
-                        const title = camel.title === 'New Task Created' ? 'New Task' : 'Notification';
-                        
-                        const actionObj = camel.mainTaskId ? {
-                            label: 'View',
-                            onClick: () => { window.location.href = `/tasks?openTask=${camel.mainTaskId}`; }
-                        } : undefined;
-
-                        const fullMessage = camel.title === 'New Task Created' 
-                            ? `${title}: ${camel.body}` 
-                            : `${camel.title} - ${camel.body || ''}`;
-                        toast.info(fullMessage.replace(/ - $/, ''), actionObj);
-                        showNativeNotification(title, camel.title === 'New Task Created' ? camel.body || '' : camel.title);
+                        // Notifications are now handled exclusively by the TaskPopupNotifications module
                     }
                     
                     return [...prev, camel];
@@ -796,6 +776,20 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         if (data) setComments(prev => prev.map(c => c.id === id ? data : c));
     }, []);
 
+    const deleteComment = useCallback(async (id: string) => {
+        const { error } = await supabase
+            .from('task_updates')
+            .delete()
+            .eq('id', id);
+        if (error) {
+            console.error('deleteComment error:', error);
+            toast.error('Failed to delete comment.');
+            return;
+        }
+        setComments(prev => prev.filter(c => c.id !== id));
+        toast.info('Comment deleted');
+    }, []);
+
     const getMainTaskComments = useCallback((id: string) => comments.filter(c => c.task_id === id || c.main_task_id === id), [comments]);
     // Since task_updates has no subtask_id column, comments are now keyed by subtask_id stored in-memory (augmented on insert)
     const getSubtaskComments = useCallback((subtaskId: string) => comments.filter(c => c.subtask_id === subtaskId || c.task_id === subtaskId), [comments]);
@@ -1026,6 +1020,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         rejectSubtask,
         postComment,
         updateComment,
+        deleteComment,
         getMainTaskComments,
         getSubtaskComments,
         getMainTaskWorkflow,
@@ -1033,7 +1028,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         createMainTask, updateMainTask, deleteMainTask,
         addSubtask, updateSubtask, deleteSubtask, assignSubtask,
         updateSubtaskStatus, approveSubtask, rejectSubtask,
-        postComment, updateComment, getMainTaskComments, getSubtaskComments, getMainTaskWorkflow,
+        postComment, updateComment, deleteComment, getMainTaskComments, getSubtaskComments, getMainTaskWorkflow,
         addReminder, updateReminder, deleteReminder, toggleReminderActive, snoozeReminder]);
 
     return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;
