@@ -965,13 +965,18 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
 
     // Capture "@" mentions to send notifications via the reminders system
     const mentions = Array.from(finalContent.matchAll(/@(\w+)/g)).map(m => m[1].toLowerCase());
+    
+    // Who we are already notifying to avoid duplicate mentions
+    const notifiedUserIds = new Set<string>();
+
     if (mentions.length > 0) {
       users.forEach(u => {
         const fname = (u.name || "").split(' ')[0].toLowerCase();
         if (mentions.includes(fname) && u.id !== currentUser.id) {
+           notifiedUserIds.add(u.id);
            addReminder({
              title: `Mentioned in Task: ${mainTask.title}`,
-             body: `${currentUser.name} mentioned you: "${finalContent.substring(0, 50)}..."`,
+             body: `${users.find(x => x.id === currentUser.id)?.name || currentUser.email?.split('@')[0] || 'Someone'} mentioned you: "${finalContent.substring(0, 50)}..."`,
              remindAt: new Date().toISOString(),
              recipientIds: [u.id],
              createdBy: currentUser.id,
@@ -981,6 +986,44 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
            });
         }
       });
+    }
+
+    // Capture Replies
+    if (replyingTo) {
+        const replyAuthorId = replyingTo.authorId || replyingTo.author_id;
+        if (replyAuthorId && replyAuthorId !== currentUser.id && !notifiedUserIds.has(replyAuthorId)) {
+           notifiedUserIds.add(replyAuthorId);
+           addReminder({
+             title: `Reply in Task: ${mainTask.title}`,
+             body: `${users.find(x => x.id === currentUser.id)?.name || currentUser.email?.split('@')[0] || 'Someone'} replied to your update: "${content.substring(0, 50)}..."`,
+             remindAt: new Date().toISOString(),
+             recipientIds: [replyAuthorId],
+             createdBy: currentUser.id,
+             mainTaskId: mainId,
+             subtaskId: subtask.id,
+             isActive: true
+           });
+        }
+    }
+
+    // Capture Assignees (task updated)
+    if (subtask.assignedTo) {
+        const assignees = typeof subtask.assignedTo === 'string' ? subtask.assignedTo.split(',').map(s => s.trim()) : (subtask.assignedTo as string[]);
+        assignees.forEach(assigneeId => {
+            if (assigneeId !== currentUser.id && !notifiedUserIds.has(assigneeId)) {
+                notifiedUserIds.add(assigneeId);
+                addReminder({
+                    title: `Update on Assigned Task: ${mainTask.title}`,
+                    body: `${users.find(x => x.id === currentUser.id)?.name || currentUser.email?.split('@')[0] || 'Someone'} posted an update on your task.`,
+                    remindAt: new Date().toISOString(),
+                    recipientIds: [assigneeId],
+                    createdBy: currentUser.id,
+                    mainTaskId: mainId,
+                    subtaskId: subtask.id,
+                    isActive: true
+                });
+            }
+        });
     }
 
     // Pass the attachments directly
@@ -1057,7 +1100,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
                       {canEdit && <button onClick={() => { setEditingId(c.id); setEditTextContent(c.text); }} className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors" title="Edit"><Pencil className="w-3 h-3" /></button>}
                     </div>
                     <span className="text-[10px] text-slate-400 flex-shrink-0">
-                      {format(new Date(createdAt), "h:mm a")}
+                      {format(new Date(createdAt), "MMM d, yyyy, h:mm a")}
                     </span>
                   </div>
                 </div>
@@ -1415,7 +1458,7 @@ function WorkflowFeed({ mainTask, users, getMainTaskWorkflow }: { mainTask: any;
                     )}
                   </div>
                   <span className="text-[10px] text-slate-400 shrink-0 mt-0.5">
-                    {format(new Date(createdAt), "MMM d, h:mm a")}
+                    {format(new Date(createdAt), "MMM d, yyyy, h:mm a")}
                   </span>
                 </div>
               </div>

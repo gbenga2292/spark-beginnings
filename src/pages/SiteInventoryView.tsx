@@ -12,6 +12,8 @@ import { Button } from '@/src/components/ui/button';
 import { cn } from '@/src/lib/utils';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { WaybillForm } from './WaybillForm';
+import { CreateReturnWaybill } from './CreateReturnWaybill';
+import { SiteTransactionsView } from './SiteTransactionsView';
 
 interface SiteInventoryViewProps {
   site: Site;
@@ -34,6 +36,7 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
   const { waybills, assets, maintenanceAssets } = useOperations();
   const [activeTab, setActiveTab] = useState<TabId>('materials');
   const [showReturnWaybill, setShowReturnWaybill] = useState(false);
+  const [showTransactions, setShowTransactions] = useState(false);
 
   // All waybills for this site
   const siteWaybills = waybills.filter(w =>
@@ -96,6 +99,25 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
 
   const services = questionnaire?.phase3?.dewateringMethods || ['Dewatering'];
 
+  if (showReturnWaybill) {
+    return (
+      <CreateReturnWaybill
+        site={site}
+        inventoryItems={allItems}
+        onBack={() => setShowReturnWaybill(false)}
+      />
+    );
+  }
+
+  if (showTransactions) {
+    return (
+      <SiteTransactionsView
+        site={site}
+        onBack={() => setShowTransactions(false)}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] bg-white dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm animate-in fade-in duration-200">
       {/* Top Bar */}
@@ -147,6 +169,7 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
             variant="outline"
             size="sm"
             className="gap-2 h-9 text-xs font-semibold"
+            onClick={() => setShowTransactions(true)}
           >
             <Activity className="h-3.5 w-3.5" /> Transactions
           </Button>
@@ -360,14 +383,10 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
 
       </div>
 
-      {/* Return Waybill Modal */}
-      {showReturnWaybill && (
-        <WaybillForm
-          onClose={() => setShowReturnWaybill(false)}
-          initialType="return"
-          prefillSiteName={site.name}
-        />
-      )}
+      {/* 
+        Return Waybill is now handled at the top level 
+        of this component when showReturnWaybill is true 
+      */}
     </div>
   );
 }

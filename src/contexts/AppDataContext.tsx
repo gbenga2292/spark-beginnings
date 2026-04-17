@@ -152,7 +152,42 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 }
                 setProjects(loadedProjects);
                 if (commRes.data) setComments(commRes.data);
-                if (remRes.data) setReminders(remRes.data.map(mapReminderToCamel));
+                if (remRes.data) {
+                    const mappedRems = remRes.data.map(mapReminderToCamel);
+                    setReminders(mappedRems);
+                    
+                    if (!sessionStorage.getItem('startup_reminders_shown') && user) {
+                        sessionStorage.setItem('startup_reminders_shown', 'true');
+                        
+                        // Check if we have active reminders for the current user
+                        // We check if it's created by someone else to avoid self-spam
+                        const unread = mappedRems.filter(r => {
+                            const isGlobal = !r.recipientIds || r.recipientIds.length === 0;
+                            const isRecipient = isGlobal || (r.recipientIds && r.recipientIds.includes(user.id));
+                            return isRecipient && r.createdBy !== user.id && r.isActive;
+                        });
+                        
+                        if (unread.length > 0) {
+                            if (unread.length === 1) {
+                                const actionObj = unread[0].mainTaskId ? {
+                                    label: 'View',
+                                    onClick: () => { window.location.href = `/tasks?openTask=${unread[0].mainTaskId}`; }
+                                } : undefined;
+                                
+                                toast.info(unread[0].title === 'New Task Created' ? `New Task: ${unread[0].body}` : unread[0].title, {
+                                    description: unread[0].title !== 'New Task Created' ? unread[0].body : undefined,
+                                    duration: 8000,
+                                    action: actionObj
+                                });
+                            } else {
+                                toast.info(`You have ${unread.length} pending notifications`, {
+                                    description: 'Check your inbox or reminders for recent updates and mentions.',
+                                    duration: 8000
+                                });
+                            }
+                        }
+                    }
+                }
             } catch (err: any) {
                 if (!isActive) return;
                 if (err?.name === 'AbortError' || err?.message?.includes('AbortError') || err?.message?.includes('Lock')) {
@@ -238,14 +273,17 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     const isCreator = camel.createdBy === user?.id;
 
                     if (isRecipient && !isCreator) {
-                        const title = camel.title === 'New Task Created' ? 'New Task' : 'Reminder';
+                        const title = camel.title === 'New Task Created' ? 'New Task' : 'Notification';
                         
                         const actionObj = camel.mainTaskId ? {
-                            label: 'Click to see',
+                            label: 'View',
                             onClick: () => { window.location.href = `/tasks?openTask=${camel.mainTaskId}`; }
                         } : undefined;
 
-                        toast.info(`${title}: ${camel.title === 'New Task Created' ? camel.body : camel.title}`, actionObj);
+                        const fullMessage = camel.title === 'New Task Created' 
+                            ? `${title}: ${camel.body}` 
+                            : `${camel.title} - ${camel.body || ''}`;
+                        toast.info(fullMessage.replace(/ - $/, ''), actionObj);
                         showNativeNotification(title, camel.title === 'New Task Created' ? camel.body || '' : camel.title);
                     }
                     
