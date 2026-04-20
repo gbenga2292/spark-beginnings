@@ -661,9 +661,27 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
 
                 {/* Task Narration & Description */}
                 {(() => {
-                  const hasMainDesc = !!activeMainTask.description;
-                  const hasSubDesc = !!activeSubtask.description;
+                  let isMainDescJson = false;
+                  try {
+                    if (activeMainTask.description && activeMainTask.description.trim().startsWith('{')) {
+                      const meta = JSON.parse(activeMainTask.description);
+                      if (meta && meta.refType) isMainDescJson = true;
+                    }
+                  } catch (e) {}
+
+                  let isSubDescJson = false;
+                  try {
+                    if (activeSubtask.description && activeSubtask.description.trim().startsWith('{')) {
+                      const meta = JSON.parse(activeSubtask.description);
+                      if (meta && meta.refType) isSubDescJson = true;
+                    }
+                  } catch (e) {}
+
+                  const hasMainDesc = !!activeMainTask.description && !isMainDescJson;
+                  const hasSubDesc = !!activeSubtask.description && !isSubDescJson;
                   const isDuplicate = hasMainDesc && hasSubDesc && activeMainTask.description === activeSubtask.description;
+
+                  if (!hasMainDesc && !hasSubDesc) return null;
 
                   if (isDuplicate) {
                     return (
