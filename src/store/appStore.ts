@@ -578,10 +578,10 @@ interface AppState {
   updateEmployee: (id: string, employee: Partial<Employee>) => void;
   bulkUpdateEmployees: (ids: string[], employee: Partial<Employee>) => void;
   deleteEmployee: (id: string) => void;
-  addAttendanceRecords: (records: AttendanceRecord[]) => void;
-  updateAttendanceRecord: (id: string, record: Partial<AttendanceRecord>) => void;
-  removeAttendanceRecordsByDate: (date: string) => void;
-  deleteAttendanceRecords: (ids: string[]) => void;
+  addAttendanceRecords: (records: AttendanceRecord[]) => Promise<void>;
+  updateAttendanceRecord: (id: string, record: Partial<AttendanceRecord>) => Promise<void>;
+  removeAttendanceRecordsByDate: (date: string) => Promise<void>;
+  deleteAttendanceRecords: (ids: string[]) => Promise<void>;
   
   addDisciplinaryRecord: (record: DisciplinaryRecord) => void;
   updateDisciplinaryRecord: (id: string, record: Partial<DisciplinaryRecord>) => void;
@@ -857,10 +857,10 @@ export const useAppStore = create<AppState>()(
       deleteEmployee: (id) => { set((s) => ({ employees: s.employees.filter(emp => emp.id !== id) })); db.deleteEmployee(id); },
 
       // Attendance
-      addAttendanceRecords: (records) => { set((s) => ({ attendanceRecords: [...s.attendanceRecords, ...records] })); db.insertAttendanceRecords(records); },
-      updateAttendanceRecord: (id, record) => { set((s) => ({ attendanceRecords: s.attendanceRecords.map(r => r.id === id ? { ...r, ...record } : r) })); db.updateAttendanceRecord(id, record); },
-      removeAttendanceRecordsByDate: (date) => { set((s) => ({ attendanceRecords: s.attendanceRecords.filter(r => r.date !== date) })); db.deleteAttendanceByDate(date); },
-      deleteAttendanceRecords: (ids) => { set((s) => ({ attendanceRecords: s.attendanceRecords.filter(r => !ids.includes(r.id)) })); db.deleteAttendanceByIds(ids); },
+      addAttendanceRecords: async (records) => { set((s) => ({ attendanceRecords: [...s.attendanceRecords, ...records] })); await db.insertAttendanceRecords(records); },
+      updateAttendanceRecord: async (id, record) => { set((s) => ({ attendanceRecords: s.attendanceRecords.map(r => r.id === id ? { ...r, ...record } : r) })); await db.updateAttendanceRecord(id, record); },
+      removeAttendanceRecordsByDate: async (date) => { set((s) => ({ attendanceRecords: s.attendanceRecords.filter(r => r.date !== date) })); await db.deleteAttendanceByDate(date); },
+      deleteAttendanceRecords: async (ids) => { set((s) => ({ attendanceRecords: s.attendanceRecords.filter(r => !ids.includes(r.id)) })); await db.deleteAttendanceByIds(ids); },
 
       // Positions & Departments
       addPosition: (position) => { set((s) => ({ positions: [...s.positions, position] })); db.insertPosition(position); },

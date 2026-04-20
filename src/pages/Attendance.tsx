@@ -382,7 +382,7 @@ export function Attendance() {
     if (dbSelectedIds.size === 0) return;
     const ok = await showConfirm(`Are you sure you want to delete ${dbSelectedIds.size} attendance record(s)?`, { variant: 'danger' });
     if (!ok) return;
-    deleteAttendanceRecords(Array.from(dbSelectedIds));
+    await deleteAttendanceRecords(Array.from(dbSelectedIds));
     setDbSelectedIds(new Set());
     toast.success('Selected records deleted.');
   };
@@ -466,7 +466,7 @@ export function Attendance() {
     setImportFile(null);
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const bstr = evt.target?.result as string;
         const wb = XLSX.read(bstr, { type: 'binary', raw: true });
@@ -622,9 +622,11 @@ export function Attendance() {
           if (allRecords.length > 0) {
             if (mode === 'overwrite') {
               const dates = Array.from(new Set(allRecords.map(r => r.date)));
-              dates.forEach(d => removeAttendanceRecordsByDate(d));
+              for (const d of dates) {
+                await removeAttendanceRecordsByDate(d);
+              }
             }
-            addAttendanceRecords(allRecords);
+            await addAttendanceRecords(allRecords);
             toast.success(`Imported ${allRecords.length} of ${rawData.length} records (${mode}).`);
           } else {
             toast.error('No valid records found in the file.');
@@ -654,7 +656,9 @@ export function Attendance() {
     if (allRecords.length > 0) {
       if (mode === 'overwrite') {
         const dates = Array.from(new Set(allRecords.map(r => r.date)));
-        dates.forEach(d => removeAttendanceRecordsByDate(d));
+        for (const d of dates) {
+          await removeAttendanceRecordsByDate(d);
+        }
       }
       await addAttendanceRecords(allRecords);
       const skipNote = skipped > 0 ? ` | ${skipped} records skipped` : '';
@@ -821,7 +825,7 @@ export function Attendance() {
     if (existingRecords.length > 0) {
       const ok = await showConfirm(`Entries already exist for ${formatDisplayDate(registerDate)}. Click OK to overwrite them, or Cancel to abort.`, { confirmLabel: 'Overwrite' });
       if (!ok) return;
-      removeAttendanceRecordsByDate(registerDate);
+      await removeAttendanceRecordsByDate(registerDate);
     }
 
     const dateObj = new Date(registerDate + 'T00:00:00');
@@ -966,7 +970,7 @@ export function Attendance() {
       };
     });
 
-    addAttendanceRecords(records);
+    await addAttendanceRecords(records);
     setLastEntryDate(registerDate);
     // Increment date to next day only if it won't be a future date
     const nextDay = getNextDayStr(registerDate);
