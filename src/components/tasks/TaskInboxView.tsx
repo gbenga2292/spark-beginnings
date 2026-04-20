@@ -974,8 +974,8 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
     if (subtask.assignedTo) {
         const assignees = typeof subtask.assignedTo === 'string' ? subtask.assignedTo.split(',').map(s => s.trim()) : (subtask.assignedTo as string[]);
         assignees.forEach(assigneeId => {
-            if (assigneeId !== currentUser.id && !notifiedUserIds.has(assigneeId)) {
-                notifiedUserIds.add(assigneeId);
+            if (assigneeId !== currentUser.id && !_notifiedUserIds.has(assigneeId)) {
+                _notifiedUserIds.add(assigneeId);
                 addReminder({
                     title: `Update on Assigned Task: ${mainTask.title}`,
                     body: `${users.find(x => x.id === currentUser.id)?.name || currentUser.email?.split('@')[0] || 'Someone'} posted an update on your task.`,

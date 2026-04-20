@@ -7,7 +7,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen } from 'lucide-react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
@@ -934,6 +934,25 @@ export function Sites() {
                                     <Eye className="h-4 w-4 text-slate-400" />
                                     <span>View Onboarding</span>
                                   </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => {
+                                      navigate(`/communication-logs?site=${encodeURIComponent(site.name)}`);
+                                    }}
+                                    className="gap-2"
+                                  >
+                                    <MessageSquare className="h-4 w-4 text-slate-400" />
+                                    <span>Site Conversations</span>
+                                  </DropdownMenuItem>
+
+                                  <DropdownMenuItem 
+                                    onClick={() => {
+                                      toast.info('Site Diary is a work in progress!', { icon: '🚧' });
+                                    }}
+                                    className="gap-2 text-emerald-600 focus:text-emerald-700"
+                                  >
+                                    <BookOpen className="h-4 w-4" />
+                                    <span>Site Diary (WIP)</span>
+                                  </DropdownMenuItem>
   
                                   {canEditSite && (
                                     <DropdownMenuItem 
@@ -1043,6 +1062,26 @@ export function Sites() {
                                     <Eye className="h-4 w-4 text-slate-400" />
                                     <span>View Onboarding</span>
                                   </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => {
+                                      navigate(`/communication-logs?site=${encodeURIComponent(site.name)}`);
+                                    }}
+                                    className="gap-2"
+                                  >
+                                    <MessageSquare className="h-4 w-4 text-slate-400" />
+                                    <span>Site Conversations</span>
+                                  </DropdownMenuItem>
+
+                                  <DropdownMenuItem 
+                                    onClick={() => {
+                                      toast.info('Site Diary is a work in progress!', { icon: '🚧' });
+                                    }}
+                                    className="gap-2 text-emerald-600 focus:text-emerald-700"
+                                  >
+                                    <BookOpen className="h-4 w-4" />
+                                    <span>Site Diary (WIP)</span>
+                                  </DropdownMenuItem>
+
                                   {canEditSite && (
                                     <DropdownMenuItem onClick={() => { setViewMode('table'); handleEditStart(site); }} className="gap-2 text-indigo-700 focus:text-indigo-700 focus:bg-indigo-50">
                                       <Pencil className="h-4 w-4" />

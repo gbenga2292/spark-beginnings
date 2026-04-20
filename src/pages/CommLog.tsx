@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '@/src/store/appStore';
 import type { CommLog } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
@@ -1014,11 +1014,18 @@ interface LogCardProps {
   currentUserName: string;
   isAdmin: boolean;
   isChild?: boolean;
+  mainTasks: any[];
+  onNavigateTask: (taskId: string) => void;
 }
 
-function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, isDark, expanded, onToggleExpand, currentUserName, isAdmin, isChild }: LogCardProps) {
+function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, isDark, expanded, onToggleExpand, currentUserName, isAdmin, isChild, mainTasks, onNavigateTask }: LogCardProps) {
   const canDelete = isAdmin || log.loggedBy === currentUserName;
   const isOverdue = log.followUpDate && !log.followUpDone && isBefore(parseISO(log.followUpDate), startOfDay(new Date()));
+
+  const logSubject = (log.subject || '').trim().toLowerCase();
+  const linkedTasks = logSubject 
+    ? mainTasks.filter(t => t.title.trim().toLowerCase() === logSubject)
+    : [];
 
   return (
     <div className={cn(
@@ -1048,15 +1055,20 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
                 <span className={cn('inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium', channelColor(log.channel))}>
                   {channelIcon(log.channel)} {log.channel}
                 </span>
+                <span className={cn('inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-bold shadow-sm', contactTypeColor(log.contactType))}>
+                  {contactTypeIcon(log.contactType)}
+                  {log.client || (log.contactType === 'Client' ? 'Existing Client' : log.contactType)}
+                </span>
+                {log.siteName && (
+                  <span className={cn('inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-semibold shadow-sm', isDark ? 'bg-indigo-950 text-indigo-400 border border-indigo-900/50' : 'bg-indigo-50 text-indigo-700 border border-indigo-100')}>
+                    📍 {log.siteName}
+                  </span>
+                )}
                 {log.contactPerson && (
                   <span className={cn('inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium', isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700')}>
                     👤 {log.contactPerson}
                   </span>
                 )}
-                <span className={cn('inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium', contactTypeColor(log.contactType))}>
-                  {contactTypeIcon(log.contactType)}
-                  {log.client || (log.contactType === 'Client' ? 'Existing Client' : log.contactType)}
-                </span>
                 <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', log.direction === 'Incoming' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700')}>
                   {log.direction}
                 </span>
@@ -1064,11 +1076,6 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
 
               <div className={cn('text-sm flex flex-wrap items-center gap-2', isDark ? 'text-slate-200' : 'text-slate-800')}>
                 {log.subject && <span className="font-semibold">{log.subject}</span>}
-                {log.siteName && (
-                  <span className={cn('text-xs', isDark ? 'text-slate-400' : 'text-slate-500')}>
-                    📍 {log.siteName}
-                  </span>
-                )}
               </div>
             </div>
           </div>
@@ -1164,6 +1171,37 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
             </div>
           </div>
         )}
+
+        {/* Linked Tasks prominently displayed */}
+        {linkedTasks.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {linkedTasks.map(t => (
+              <button
+                key={t.id}
+                onClick={(e) => { e.stopPropagation(); onNavigateTask(t.id); }}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors shadow-sm',
+                  t.status === 'completed' 
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300'
+                    : t.status === 'in_progress'
+                    ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300',
+                  isDark && (
+                    t.status === 'completed' ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800 hover:bg-emerald-900/50' :
+                    t.status === 'in_progress' ? 'bg-blue-900/30 text-blue-400 border-blue-800 hover:bg-blue-900/50' : 
+                    'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                  )
+                )}
+              >
+                <ClipboardList className="w-3.5 h-3.5 opacity-70" />
+                {t.title}
+                <Badge variant="outline" className="ml-1 h-4 px-1.5 text-[9px] bg-white/50 dark:bg-black/20 border-current/20 font-bold uppercase rounded text-current">
+                  {t.status?.replace('_', ' ') || 'pending'}
+                </Badge>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1175,6 +1213,7 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
 export function CommLog() {
   const { isDark } = useTheme();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const currentUser = useUserStore(s => s.getCurrentUser());
   const commLogs = useAppStore(s => s.commLogs);
   const addCommLog = useAppStore(s => s.addCommLog);
@@ -1193,7 +1232,7 @@ export function CommLog() {
   );
 
   // Filters
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('site') || '');
   const [filterDirection, setFilterDirection] = useState('All');
   const [filterChannel, setFilterChannel] = useState('All');
   const [filterContactType, setFilterContactType] = useState('All');
@@ -1485,6 +1524,8 @@ export function CommLog() {
                       }}
                       currentUserName={currentUser?.name || ''}
                       isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
+                      mainTasks={mainTasks}
+                      onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
                     />
 
                     {/* Follow-up children */}
@@ -1501,6 +1542,8 @@ export function CommLog() {
                         onToggleFollowUp={() => updateCommLog(child.id, { followUpDone: !child.followUpDone })}
                         currentUserName={currentUser?.name || ''}
                         isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
+                        mainTasks={mainTasks}
+                        onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
                       />
                     ))}
                   </div>
@@ -1690,6 +1733,8 @@ export function CommLog() {
                           }}
                           currentUserName={currentUser?.name || ''}
                           isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
+                          mainTasks={mainTasks}
+                          onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
                         />
                         {threadChildren.map(child => (
                            <LogCard
@@ -1704,6 +1749,8 @@ export function CommLog() {
                              onToggleFollowUp={() => updateCommLog(child.id, { followUpDone: !child.followUpDone })}
                              currentUserName={currentUser?.name || ''}
                              isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
+                             mainTasks={mainTasks}
+                             onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
                            />
                         ))}
                       </div>

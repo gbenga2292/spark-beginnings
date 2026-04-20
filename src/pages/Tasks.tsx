@@ -139,7 +139,12 @@ function PersonalTasksView() {
     }
     const openTaskId = searchParams.get("openTask");
     if (openTaskId) {
-      setExpanded(prev => new Set([...prev, openTaskId]));
+      const task = mainTasks.find(m => m.id === openTaskId);
+      if (task) {
+        setEditingTask(task);
+      } else {
+        setExpanded(prev => new Set([...prev, openTaskId]));
+      }
       setTimeout(() => document.getElementById(`task-row-${openTaskId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
     }
     
@@ -583,6 +588,7 @@ function AdminTasksView() {
     }
     const openTaskId = searchParams.get("openTask");
     if (openTaskId) {
+      setChatTaskId(openTaskId);
       setExpanded(prev => new Set([...prev, openTaskId]));
       setTimeout(() => document.getElementById(`task-row-${openTaskId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
     }
