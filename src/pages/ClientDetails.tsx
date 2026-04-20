@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '../store/appStore';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useSetPageTitle } from '../contexts/PageContext';
-import { Users, Building2, Calendar, FileText, Search, MapPin, LayoutGrid, List, ArrowLeft, Phone, Mail, MessageCircle, MessageSquare, Car, ExternalLink, ChevronRight } from 'lucide-react';
+import { Users, Building2, Calendar, FileText, Search, MapPin, LayoutGrid, List, ChevronRight } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
@@ -11,7 +11,7 @@ import { format, parseISO } from 'date-fns';
 export function ClientDetails() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const navigate = useNavigate();
   const location = useLocation();
   
   const clientProfiles = useAppStore(s => s.clientProfiles);
@@ -51,10 +51,10 @@ export function ClientDetails() {
     return pending?.phase4?.clientTinNumber || 'Not provided';
   };
 
-  // When a specific client is selected, change the header title.
+  // Use a generalized page title since we are removing the inline detail view
   useSetPageTitle(
-    selectedClientId ? 'Client Details' : 'Clients Summary',
-    selectedClientId ? 'View client performance and external communications.' : 'View all clients, total sites, revenue, and details.',
+    'Clients Summary',
+    'View all clients, total sites, revenue, and details.',
     undefined,
     []
   );
@@ -96,7 +96,9 @@ export function ClientDetails() {
       ...Object.keys(statsByClient)
     ]);
 
-    return Array.from(names).map(name => {
+    return Array.from(names)
+      .filter(name => name.trim().toLowerCase() !== 'dcel') // DCEL is the company itself, exclude from Client directory
+      .map(name => {
       const key = name.trim().toLowerCase();
       const profile = deduplicatedProfiles.find(p => p.name.trim().toLowerCase() === key);
 
@@ -117,156 +119,12 @@ export function ClientDetails() {
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [deduplicatedProfiles, statsByClient, sites, pendingSites]);
 
-  // Auto-select client when navigated from SiteOnboarding link
-  useEffect(() => {
-    const targetName: string | undefined = (location.state as any)?.selectClient;
-    if (!targetName || !allClients.length) return;
-    const match = allClients.find(c => c.name === targetName);
-    if (match) setSelectedClientId(match.id);
-  }, [location.state, allClients]);
+  // Removed inline detail view since clicking a client now navigates to the unified Sites page.
 
   const filteredClients = allClients.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.tinNumber.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const selectedClient = useMemo(() => {
-    if (!selectedClientId) return null;
-    return allClients.find(c => c.id === selectedClientId) || null;
-  }, [selectedClientId, allClients]);
-
-  const clientLogs = useMemo(() => {
-    if (!selectedClient) return [];
-    return commLogs
-      .filter(l => l.client === selectedClient.name)
-      .sort((a, b) => {
-        const dateA = a.date + (a.time ? `T${a.time}` : 'T00:00');
-        const dateB = b.date + (b.time ? `T${b.time}` : 'T00:00');
-        return new Date(dateB).getTime() - new Date(dateA).getTime();
-      });
-  }, [commLogs, selectedClient]);
-
-  const getChannelIcon = (ch: string) => {
-    if (ch === 'Call') return <Phone className="w-4 h-4" />;
-    if (ch === 'Email') return <Mail className="w-4 h-4" />;
-    if (ch === 'WhatsApp') return <MessageCircle className="w-4 h-4" />;
-    if (ch === 'Meeting') return <Users className="w-4 h-4" />;
-    if (ch === 'SMS') return <MessageSquare className="w-4 h-4" />;
-    if (ch === 'Visit') return <Car className="w-4 h-4" />;
-    return <MessageSquare className="w-4 h-4" />;
-  };
-
-  // ----------------------------------------------------
-  // Detail View Rendering
-  // ----------------------------------------------------
-  if (selectedClient) {
-    return (
-      <div className="flex flex-col gap-6 h-full max-w-5xl mx-auto w-full">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" onClick={() => setSelectedClientId(null)}>
-            <ArrowLeft className="w-4 h-4 mr-2" /> Back
-          </Button>
-          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Building2 className="w-6 h-6 text-indigo-600" />
-            {selectedClient.name}
-          </h2>
-        </div>
-
-        {/* Stats Summary */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <p className="text-sm text-slate-500 mb-1 flex items-center gap-1.5"><FileText className="w-4 h-4" /> TIN Number</p>
-            <p className="text-lg font-semibold text-slate-800">{selectedClient.tinNumber}</p>
-          </div>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <p className="text-sm text-slate-500 mb-1 flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Client Since</p>
-            <p className="text-lg font-semibold text-slate-800">{selectedClient.startDate}</p>
-          </div>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <p className="text-sm text-slate-500 mb-1 flex items-center gap-1.5"><MapPin className="w-4 h-4 text-slate-400" /> Total Sites</p>
-            <p className="text-2xl font-bold text-slate-800">{selectedClient.stats.totalSites}</p>
-          </div>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <p className="text-sm text-slate-500 mb-1 flex items-center gap-1.5"><MapPin className="w-4 h-4 text-emerald-500" /> Active Sites</p>
-            <p className="text-2xl font-bold text-emerald-600">{selectedClient.stats.activeSites}</p>
-          </div>
-        </div>
-
-        {/* Timeline of Logs */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex-1">
-          <h3 className="text-lg font-semibold text-slate-800 mb-6 flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-indigo-500" />
-            External Communication Logs
-          </h3>
-          
-          {clientLogs.length === 0 ? (
-            <div className="text-center py-12 flex flex-col items-center">
-              <MessageSquare className="w-12 h-12 text-slate-200 mb-3" />
-              <p className="text-slate-500 font-medium">No communications logged yet.</p>
-            </div>
-          ) : (
-            <div className="relative border-l-2 border-indigo-100 ml-4 pl-6 space-y-8 mt-4 pb-8">
-              {clientLogs.map((log, idx) => {
-                const isIncoming = log.direction === 'Incoming';
-                const dateObj = new Date(log.date);
-                return (
-                  <div key={log.id || idx} className="relative">
-                    {/* Timeline dot */}
-                    <div className={cn(
-                      "absolute -left-[35px] mt-1.5 h-4 w-4 rounded-full border-4 border-white shadow-sm ring-1 ring-slate-200",
-                      isIncoming ? "bg-emerald-500" : "bg-indigo-500"
-                    )} />
-                    
-                    <div className={cn(
-                      "rounded-lg border p-4 shadow-sm",
-                      isIncoming ? "bg-emerald-50/30 border-emerald-100" : "bg-indigo-50/30 border-indigo-100"
-                    )}>
-                      <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className={cn(
-                            "inline-flex items-center justify-center w-6 h-6 rounded-md text-white shadow-sm",
-                            isIncoming ? "bg-emerald-500" : "bg-indigo-500"
-                          )}>
-                            {getChannelIcon(log.channel)}
-                          </span>
-                          <span className="font-semibold text-slate-800">
-                            {isIncoming ? 'Received from' : 'Sent to'} {log.contactPerson || 'Client / Site'}
-                          </span>
-                          {log.siteName && (
-                            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium border border-slate-200">
-                              {log.siteName}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-slate-500 font-medium whitespace-nowrap bg-white px-2 py-1 rounded-md border border-slate-100">
-                          {format(dateObj, 'MMM d, yyyy')} {log.time && `• ${log.time}`}
-                        </div>
-                      </div>
-                      
-                      {log.subject && (
-                        <div className="font-medium text-slate-800 text-sm mb-1">{log.subject}</div>
-                      )}
-                      
-                      <div className="text-sm text-slate-600 leading-relaxed bg-white/60 p-3 rounded-md border border-slate-100/50 mt-2">
-                        {log.notes}
-                      </div>
-                      
-                      {log.outcome && (
-                        <div className="mt-3 text-sm flex gap-2 pt-3 border-t border-slate-200/50">
-                          <span className="font-medium text-slate-700">Outcome:</span>
-                          <span className="text-slate-600">{log.outcome}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
 
   // ----------------------------------------------------
   // Master View Rendering (Grid/List)
@@ -311,7 +169,7 @@ export function ClientDetails() {
             <div 
               key={client.id} 
               className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md hover:border-slate-300 cursor-pointer group"
-              onClick={() => setSelectedClientId(client.id)}
+              onClick={() => navigate(`/sites?client=${encodeURIComponent(client.name)}`)}
             >
               <div className="p-5 border-b border-slate-100 flex justify-between items-start">
                 <div>
@@ -382,7 +240,7 @@ export function ClientDetails() {
                     <td className="px-6 py-4 text-center font-medium text-slate-800">{client.stats.totalSites}</td>
                     <td className="px-6 py-4 text-center font-medium text-emerald-600">{client.stats.activeSites}</td>
                     <td className="px-6 py-4 text-right">
-                      <Button size="sm" variant="outline" className="text-indigo-600 border-indigo-200 hover:bg-indigo-50" onClick={() => setSelectedClientId(client.id)}>
+                      <Button size="sm" variant="outline" className="text-indigo-600 border-indigo-200 hover:bg-indigo-50" onClick={() => navigate(`/sites?client=${encodeURIComponent(client.name)}`)}>
                         View Details
                       </Button>
                     </td>

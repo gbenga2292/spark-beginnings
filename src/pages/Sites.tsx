@@ -7,7 +7,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen } from 'lucide-react';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check } from 'lucide-react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
@@ -25,6 +25,7 @@ import { useUserStore } from '@/src/store/userStore';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { normalizeDate } from '@/src/lib/dateUtils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { cn } from '../lib/utils';
 
 const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive' | 'Ended', startDate: new Date().toISOString().split('T')[0], endDate: '' };
 
@@ -279,6 +280,12 @@ export function Sites() {
 
   const sites = useAppStore((s) => s.sites);
   const pendingSites = useAppStore((s) => s.pendingSites);
+  const clientProfiles = useAppStore((s) => s.clientProfiles);
+  const addClientProfile = useAppStore((s) => s.addClientProfile);
+  const updateClientProfile = useAppStore((s) => s.updateClientProfile);
+  const invoices = useAppStore((s) => s.invoices);
+  const commLogs = useAppStore((s) => s.commLogs);
+  
   const clients = useMemo(() => Array.from(new Set(sites.map(s => s.client))).sort(), [sites]);
   const addSite = useAppStore((s) => s.addSite);
   const addClient = useAppStore((s) => s.addClient);
@@ -293,16 +300,123 @@ export function Sites() {
   const [sortField, setSortField] = useState<'client' | 'name' | 'startDate' | 'endDate' | 'status'>('client');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
+  // URL state for Client Mode
+  const urlClientName = searchParams.get('client');
+  const selectedClientName = urlClientName || null;
+
+  // Editing TIN state
+  const [editingTin, setEditingTin] = useState(false);
+  const [tinInput, setTinInput] = useState('');
+
+  // Selected client computed properties
+  const selectedClient = useMemo(() => {
+    if (!selectedClientName) return null;
+    const nameLow = selectedClientName.trim().toLowerCase();
+    
+    // Deduplicate profiles
+    let tinNumber = 'Not provided';
+    let profileStartDate = 'Unknown';
+    
+    const profile = clientProfiles.find(p => p.name.trim().toLowerCase() === nameLow);
+    if (profile) {
+      tinNumber = profile.tinNumber || 'Not provided';
+      profileStartDate = profile.startDate || 'Unknown';
+    } else {
+      const pending = pendingSites.find(s => s.clientName.trim().toLowerCase() === nameLow && s.phase4?.clientTinNumber);
+      if (pending?.phase4?.clientTinNumber) tinNumber = pending.phase4.clientTinNumber;
+    }
+
+    let totalSites = 0;
+    let activeSites = 0;
+    let totalRevenue = 0;
+
+    sites.forEach(s => {
+      if (s.client.trim().toLowerCase() === nameLow) {
+        totalSites++;
+        if (s.status === 'Active') activeSites++;
+      }
+    });
+
+    invoices.forEach(inv => {
+      if (inv.client.trim().toLowerCase() === nameLow && inv.status === 'Paid') {
+        totalRevenue += (inv.totalCharge || 0);
+      }
+    });
+
+    const clientSiteDates = sites
+      .filter(s => s.client.trim().toLowerCase() === nameLow && s.startDate)
+      .map(s => s.startDate)
+      .sort();
+    const startDate = clientSiteDates[0] || profileStartDate;
+
+    return {
+      id: profile?.id,
+      name: selectedClientName,
+      tinNumber,
+      startDate,
+      stats: { totalSites, activeSites, totalRevenue }
+    };
+  }, [selectedClientName, sites, invoices, clientProfiles, pendingSites]);
+
+  const handleSaveTin = async () => {
+    if (!selectedClient) return;
+    
+    try {
+      if (selectedClient.id) {
+        updateClientProfile(selectedClient.id, { tinNumber: tinInput });
+      } else {
+        addClientProfile({
+          id: generateId(),
+          name: selectedClientName!,
+          tinNumber: tinInput,
+          startDate: new Date().toISOString().split('T')[0]
+        });
+      }
+      toast.success('Client TIN updated');
+      setEditingTin(false);
+    } catch (e) {
+      toast.error('Failed to update TIN');
+    }
+  };
+
+  const clientLogs = useMemo(() => {
+    if (!selectedClientName) return [];
+    const nameLow = selectedClientName.trim().toLowerCase();
+    return commLogs
+      .filter(l => l.client.trim().toLowerCase() === nameLow)
+      .sort((a, b) => {
+        const dateA = a.date + (a.time ? `T${a.time}` : 'T00:00');
+        const dateB = b.date + (b.time ? `T${b.time}` : 'T00:00');
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
+      });
+  }, [commLogs, selectedClientName]);
+
+  const getChannelIcon = (ch: string) => {
+    if (ch === 'Call') return <Phone className="w-4 h-4" />;
+    if (ch === 'Email') return <Mail className="w-4 h-4" />;
+    if (ch === 'WhatsApp') return <MessageCircle className="w-4 h-4" />;
+    if (ch === 'Meeting') return <Users className="w-4 h-4" />;
+    if (ch === 'SMS') return <MessageSquare className="w-4 h-4" />;
+    if (ch === 'Visit') return <Car className="w-4 h-4" />;
+    return <MessageSquare className="w-4 h-4" />;
+  };
+
   const filteredSites = useMemo(() => {
     return sites.filter(site => {
       const isHardcoded = site.client.toLowerCase() === 'dcel' && site.name.toLowerCase() === 'office';
       if (isHardcoded) return false;
+      
+      // Filter by client if in Single Client Mode
+      if (selectedClientName && site.client.toLowerCase() !== selectedClientName.toLowerCase()) {
+        return false;
+      }
+
       return (
         site.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         site.client.toLowerCase().includes(searchTerm.toLowerCase())
       );
     });
-  }, [sites, searchTerm]);
+  }, [sites, searchTerm, selectedClientName]);
 
   const sortedSites = useMemo(() => {
     return [...filteredSites].sort((a, b) => {
@@ -336,11 +450,15 @@ export function Sites() {
       : <ChevronDown className="ml-1 h-3 w-3 text-indigo-600" />;
   };
 
-  const filteredPendingSites = pendingSites.filter(site =>
-    site.status === 'Pending' &&
-    (site.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    site.clientName.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredPendingSites = pendingSites.filter(site => {
+    if (site.status !== 'Pending') return false;
+    if (selectedClientName && site.clientName.toLowerCase() !== selectedClientName.toLowerCase()) return false;
+    
+    return (
+      site.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      site.clientName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   const isDuplicate = (name: string, client: string, excludeId?: string) => {
     const nameLow = name.trim().toLowerCase();
@@ -687,8 +805,8 @@ export function Sites() {
   };
 
   useSetPageTitle(
-    'Sites & Clients',
-    'Manage project sites, clients, and technical onboarding summaries',
+    selectedClient ? `${selectedClient.name} Sites` : 'Sites Management',
+    selectedClient ? `Manage sites, view communications and details for ${selectedClient.name}` : 'Manage project sites, clients, and technical onboarding summaries',
     <div className="hidden sm:flex items-center gap-2">
       {canImport && (
         <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
@@ -729,20 +847,35 @@ export function Sites() {
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-[500px]">
         {/* Unified Header with Tabs and Search */}
         <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
-          <div className="flex bg-slate-200/50 p-1 rounded-lg">
-            <button
-              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'active' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              onClick={() => setActiveTab('active')}
-            >
-              Active Sites
-            </button>
-            <button
-              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'pending' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              onClick={() => setActiveTab('pending')}
-            >
-              Pending Onboarding
-            </button>
-          </div>
+          {selectedClient ? (
+            <div className="flex items-center gap-4">
+              <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+                <ArrowLeft className="w-4 h-4 mr-2" /> Back
+              </Button>
+              <div className="flex items-center gap-2 text-sm">
+                 <span className="text-slate-500">Managing sites for:</span>
+                 <Badge variant="secondary" className="px-3 py-1 font-bold bg-indigo-50 text-indigo-700 border-indigo-200">
+                   <Building2 className="w-3.5 h-3.5 mr-1.5" />
+                   {selectedClient.name}
+                 </Badge>
+              </div>
+            </div>
+          ) : (
+            <div className="flex bg-slate-200/50 p-1 rounded-lg">
+              <button
+                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'active' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                onClick={() => setActiveTab('active')}
+              >
+                Active Sites
+              </button>
+              <button
+                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'pending' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                onClick={() => setActiveTab('pending')}
+              >
+                Pending Onboarding
+              </button>
+            </div>
+          )}
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <div className="relative w-full sm:w-64">
@@ -787,7 +920,143 @@ export function Sites() {
           </div>
         </div>
 
-        {activeTab === 'active' ? (
+        {selectedClient && (
+          <div className="p-4 sm:p-5 border-b border-slate-100 bg-white">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 shadow-sm relative group">
+                <div className="flex justify-between items-center mb-1">
+                  <p className="text-xs text-slate-500 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> TIN Number</p>
+                  {!editingTin && (
+                    <button onClick={() => { setTinInput(selectedClient.tinNumber === 'Not provided' ? '' : selectedClient.tinNumber); setEditingTin(true); }} className="text-indigo-600 hover:text-indigo-800 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+                {editingTin ? (
+                  <div className="flex items-center gap-1 mt-1">
+                    <Input 
+                      autoFocus
+                      size={1}
+                      className="h-7 text-xs px-2"
+                      value={tinInput}
+                      onChange={(e) => setTinInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveTin()}
+                    />
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-600 shrink-0" onClick={handleSaveTin}>
+                      <Check className="h-3 w-3" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-400 shrink-0" onClick={() => setEditingTin(false)}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-sm font-bold text-slate-800 truncate" title={selectedClient.tinNumber}>{selectedClient.tinNumber}</p>
+                )}
+              </div>
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 shadow-sm">
+                <p className="text-xs text-slate-500 mb-1 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Client Since</p>
+                <p className="text-sm font-bold text-slate-800">{selectedClient.startDate}</p>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 shadow-sm">
+                <p className="text-xs text-slate-500 mb-1 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-slate-400" /> Total Sites</p>
+                <p className="text-xl font-black text-slate-800">{selectedClient.stats.totalSites}</p>
+              </div>
+              <div className="bg-emerald-50/50 p-3 rounded-lg border border-emerald-100 shadow-sm">
+                <p className="text-xs text-emerald-600/80 mb-1 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> Active Sites</p>
+                <p className="text-xl font-black text-emerald-700">{selectedClient.stats.activeSites}</p>
+              </div>
+            </div>
+
+            <div className="flex bg-slate-100/80 p-1 rounded-lg w-fit">
+              <button
+                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'active' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
+                onClick={() => setActiveTab('active')}
+              >
+                Client Sites
+              </button>
+              <button
+                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'pending' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
+                onClick={() => setActiveTab('pending')}
+              >
+                Pending / Onboarding
+              </button>
+              <button
+                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'logs' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
+                onClick={() => setActiveTab('logs')}
+              >
+                Communication Logs
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'logs' && selectedClient ? (
+          <div className="flex-1 overflow-y-auto style-scroll rounded-b-2xl bg-slate-50 p-4 sm:p-6">
+            {clientLogs.length === 0 ? (
+              <div className="text-center py-12 flex flex-col items-center">
+                <MessageSquare className="w-12 h-12 text-slate-200 mb-3" />
+                <p className="text-slate-500 font-medium">No communications logged yet.</p>
+              </div>
+            ) : (
+              <div className="relative border-l-2 border-indigo-100 ml-4 pl-6 space-y-6 max-w-3xl">
+                {clientLogs.map((log, idx) => {
+                  const isIncoming = log.direction === 'Incoming';
+                  const dateObj = new Date(log.date);
+                  return (
+                    <div key={log.id || idx} className="relative">
+                      <div className={cn(
+                        "absolute -left-[35px] mt-1.5 h-4 w-4 rounded-full border-4 border-white shadow-sm ring-1 ring-slate-200",
+                        isIncoming ? "bg-emerald-500" : "bg-indigo-500"
+                      )} />
+                      
+                      <div className={cn(
+                        "rounded-lg border p-4 shadow-sm bg-white",
+                        isIncoming ? "border-emerald-100" : "border-indigo-100"
+                      )}>
+                        <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "inline-flex items-center justify-center w-6 h-6 rounded-md text-white shadow-sm",
+                              isIncoming ? "bg-emerald-500" : "bg-indigo-500"
+                            )}>
+                              {getChannelIcon(log.channel)}
+                            </span>
+                            <span className="font-semibold text-slate-800 text-sm">
+                              {isIncoming ? 'Received from' : 'Sent to'} {log.contactPerson || 'Client / Site'}
+                            </span>
+                            {log.siteName && (
+                              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium border border-slate-200">
+                                {log.siteName}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-500 font-medium whitespace-nowrap bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                            {format(dateObj, 'MMM d, yyyy')} {log.time && `• ${log.time}`}
+                          </div>
+                        </div>
+                        
+                        {log.subject && (
+                          <div className="font-medium text-slate-800 text-sm mb-1">{log.subject}</div>
+                        )}
+                        
+                        <div className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-md border border-slate-100 mt-2">
+                          {log.notes}
+                        </div>
+                        
+                        {log.outcome && (
+                          <div className="mt-3 text-sm flex gap-2 pt-3 border-t border-slate-100">
+                            <span className="font-medium text-slate-700">Outcome:</span>
+                            <span className="text-slate-600">{log.outcome}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : activeTab === 'active' ? (
           <div className="flex-1 flex flex-col min-h-0">
             {viewMode === 'table' ? (
             <div className="overflow-auto style-scroll flex-1">
@@ -829,9 +1098,18 @@ export function Sites() {
                   const siteIndex = sites.findIndex(s => s.id === site.id);
                   const siteCode = `S-${String(siteIndex + 1).padStart(3, '0')}`;
                   return (
-                    <TableRow key={site.id} className="hover:bg-slate-50/50 transition-colors">
-                      <TableCell className="font-mono text-xs font-semibold text-slate-400">{siteCode}</TableCell>
-                      <TableCell className="font-bold text-slate-900">
+                    <TableRow 
+                      key={site.id} 
+                      className="hover:bg-slate-50/50 transition-colors cursor-pointer group/row"
+                      onClick={() => {
+                        // Enter client detail mode when clicking a site if we aren't already grouped
+                        if (!selectedClientName) {
+                          navigate(`/sites?client=${encodeURIComponent(site.client)}`);
+                        }
+                      }}
+                    >
+                      <TableCell className="font-mono text-xs font-semibold text-slate-400" onClick={e => e.stopPropagation()}>{siteCode}</TableCell>
+                      <TableCell className="font-bold text-slate-900" onClick={e => e.stopPropagation()}>
                         {editingId === site.id ? (
                           <select
                             value={editForm.client}
@@ -893,7 +1171,7 @@ export function Sites() {
                         </Badge>
                       </TableCell>
                       {hasActions && (
-                        <TableCell className="text-right whitespace-nowrap">
+                        <TableCell className="text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                           {editingId === site.id ? (
                             <div className="flex justify-end gap-2">
                               <Button variant="ghost" size="sm" className="text-emerald-600" onClick={handleSaveEdit}>
@@ -946,7 +1224,7 @@ export function Sites() {
 
                                   <DropdownMenuItem 
                                     onClick={() => {
-                                      toast.info('Site Diary is a work in progress!', { icon: '🚧' });
+                                      toast.info('🚧 Site Diary is a work in progress!');
                                     }}
                                     className="gap-2 text-emerald-600 focus:text-emerald-700"
                                   >
@@ -1001,7 +1279,15 @@ export function Sites() {
                   const q = pendingSites.find(ps => ps.siteName === site.name && ps.clientName === site.client);
                   
                   return (
-                    <Card key={site.id} className="border-slate-200 shadow-sm hover:shadow-md transition-all bg-white group overflow-hidden">
+                    <Card 
+                      key={site.id} 
+                      className="border-slate-200 shadow-sm hover:shadow-md transition-all bg-white group overflow-hidden cursor-pointer"
+                      onClick={() => {
+                        if (!selectedClientName) {
+                          navigate(`/sites?client=${encodeURIComponent(site.client)}`);
+                        }
+                      }}
+                    >
                       <CardContent className="p-5 sm:p-6 pb-4">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex gap-3">
@@ -1074,7 +1360,7 @@ export function Sites() {
 
                                   <DropdownMenuItem 
                                     onClick={() => {
-                                      toast.info('Site Diary is a work in progress!', { icon: '🚧' });
+                                      toast.info('🚧 Site Diary is a work in progress!');
                                     }}
                                     className="gap-2 text-emerald-600 focus:text-emerald-700"
                                   >
@@ -1133,7 +1419,15 @@ export function Sites() {
               </TableHeader>
               <TableBody>
                 {filteredPendingSites.map(site => (
-                  <TableRow key={site.id} className="hover:bg-slate-50/50 transition-colors">
+                  <TableRow 
+                    key={site.id} 
+                    className="hover:bg-slate-50/50 transition-colors cursor-pointer"
+                    onClick={() => {
+                      if (!selectedClientName) {
+                        navigate(`/sites?client=${encodeURIComponent(site.clientName)}`);
+                      }
+                    }}
+                  >
                     <TableCell className="font-bold text-slate-900">{site.clientName}</TableCell>
                     <TableCell className="font-medium text-slate-600">{site.siteName}</TableCell>
                     <TableCell className="text-center">{site.phase1.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
@@ -1149,7 +1443,7 @@ export function Sites() {
                         {site.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                       <Button variant="ghost" size="sm" className="text-slate-400 hover:text-indigo-600 hover:bg-slate-50" onClick={() => navigate(`/sites/onboarding/${site.id}`)}>
                         <Eye className="h-4 w-4 mr-2" /> View Form
                       </Button>
