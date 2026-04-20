@@ -833,7 +833,10 @@ export const db = {
 
   // Client Profiles
   async insertClientProfile(c: any) {
-    const { error } = await supabase.from('clients').insert(clientProfileToDb(c));
+    // Upsert on name conflict to avoid creating duplicate rows for the same client name
+    const { error } = await supabase
+      .from('clients')
+      .upsert(clientProfileToDb(c), { onConflict: 'name' });
     if (error) { console.error('insertClientProfile:', error); throw error; }
   },
   async updateClientProfile(id: string, c: Partial<any>) {

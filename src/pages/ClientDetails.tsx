@@ -20,11 +20,34 @@ export function ClientDetails() {
   const commLogs = useAppStore(s => s.commLogs);
   const pendingSites = useAppStore(s => s.pendingSites);
 
-  // TIN lookup: clientProfiles first, then any pending site onboarding record
+  // Deduplicate profiles by normalized name (trim + lowercase).
+  // Prefer the profile with the most complete data (has TIN or startDate).
+  // This guards against DB having two rows for the same client (e.g. one old
+  // entry without TIN and a newer one created via the full profile form).
+  const deduplicatedProfiles = useMemo(() => {
+    const seen = new Map<string, any>();
+    clientProfiles.forEach(c => {
+      const key = c.name.trim().toLowerCase();
+      const existing = seen.get(key);
+      if (!existing) {
+        seen.set(key, { ...c, name: c.name.trim() });
+      } else {
+        // Prefer profile that has TIN or startDate over an empty one
+        const newIsBetter = (c.tinNumber && !existing.tinNumber) || (c.startDate && !existing.startDate);
+        if (newIsBetter) {
+          seen.set(key, { ...c, name: c.name.trim() });
+        }
+      }
+    });
+    return Array.from(seen.values());
+  }, [clientProfiles]);
+
+  // TIN lookup: deduplicatedProfiles first, then any pending site onboarding record
   const getTinForClient = (name: string): string => {
-    const profile = clientProfiles.find(p => p.name === name);
+    const key = name.trim().toLowerCase();
+    const profile = deduplicatedProfiles.find(p => p.name.trim().toLowerCase() === key);
     if (profile?.tinNumber) return profile.tinNumber;
-    const pending = pendingSites.find(s => s.clientName === name && s.phase4?.clientTinNumber);
+    const pending = pendingSites.find(s => s.clientName.trim().toLowerCase() === key && s.phase4?.clientTinNumber);
     return pending?.phase4?.clientTinNumber || 'Not provided';
   };
 
@@ -38,44 +61,48 @@ export function ClientDetails() {
 
   const statsByClient = useMemo(() => {
     const stats: Record<string, { totalSites: number, activeSites: number, totalRevenue: number, id: string }> = {};
-    clientProfiles.forEach(c => {
+    // Use deduplicatedProfiles so two DB rows for the same client don't create two stat buckets
+    deduplicatedProfiles.forEach(c => {
       stats[c.name] = { totalSites: 0, activeSites: 0, totalRevenue: 0, id: c.id };
     });
-    
-    // Fallback for clients in `sites` that lack a profile
+
+    // Normalize site client names so trailing-space variants map to the right bucket
     sites.forEach(s => {
-      if (!stats[s.client]) {
-         stats[s.client] = { totalSites: 0, activeSites: 0, totalRevenue: 0, id: s.client };
+      const clientName = s.client.trim();
+      if (!stats[clientName]) {
+        stats[clientName] = { totalSites: 0, activeSites: 0, totalRevenue: 0, id: clientName };
       }
-      stats[s.client].totalSites++;
-      if (s.status === 'Active') stats[s.client].activeSites++;
+      stats[clientName].totalSites++;
+      if (s.status === 'Active') stats[clientName].activeSites++;
     });
 
     invoices.forEach(inv => {
-      if (!stats[inv.client]) {
-        stats[inv.client] = { totalSites: 0, activeSites: 0, totalRevenue: 0, id: inv.client };
+      const clientName = inv.client.trim();
+      if (!stats[clientName]) {
+        stats[clientName] = { totalSites: 0, activeSites: 0, totalRevenue: 0, id: clientName };
       }
       if (inv.status === 'Paid') {
-        stats[inv.client].totalRevenue += (inv.totalCharge || 0);
+        stats[clientName].totalRevenue += (inv.totalCharge || 0);
       }
     });
 
     return stats;
-  }, [clientProfiles, sites, invoices]);
+  }, [deduplicatedProfiles, sites, invoices]);
 
   const allClients = useMemo(() => {
-    // Merge actual profiles with derived clients
+    // Merge deduplicated profiles with any site-derived clients
     const names = new Set([
-      ...clientProfiles.map(p => p.name),
+      ...deduplicatedProfiles.map(p => p.name),
       ...Object.keys(statsByClient)
     ]);
-    
-    return Array.from(names).map(name => {
-      const profile = clientProfiles.find(p => p.name === name);
 
-      // Earliest site start date for this client
+    return Array.from(names).map(name => {
+      const key = name.trim().toLowerCase();
+      const profile = deduplicatedProfiles.find(p => p.name.trim().toLowerCase() === key);
+
+      // Earliest site start date for this client (normalize site client names too)
       const clientSiteDates = sites
-        .filter(s => s.client === name && s.startDate)
+        .filter(s => s.client.trim().toLowerCase() === key && s.startDate)
         .map(s => s.startDate)
         .sort();
       const earliestSiteDate = clientSiteDates[0] || null;
@@ -88,7 +115,7 @@ export function ClientDetails() {
         stats: statsByClient[name] || { totalSites: 0, activeSites: 0, totalRevenue: 0 }
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
-  }, [clientProfiles, statsByClient, sites, pendingSites]);
+  }, [deduplicatedProfiles, statsByClient, sites, pendingSites]);
 
   // Auto-select client when navigated from SiteOnboarding link
   useEffect(() => {
