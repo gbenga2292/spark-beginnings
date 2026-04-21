@@ -1016,357 +1016,410 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
     setPendingFileLinks([]);
   };
 
+  // Helper: stable color per author
+  const BUBBLE_COLORS = [
+    '#25D366', '#128C7E', '#075E54', '#00BCD4', '#FF7043',
+    '#AB47BC', '#5C6BC0', '#EC407A', '#FF8F00', '#26A69A',
+  ];
+  const getAuthorColor = (id: string) => {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    return BUBBLE_COLORS[Math.abs(hash) % BUBBLE_COLORS.length];
+  };
+
+  // Helper: date separator label
+  const dateSepLabel = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+    const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    if (msgDay.getTime() === today.getTime()) return 'Today';
+    if (msgDay.getTime() === yesterday.getTime()) return 'Yesterday';
+    return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-3 py-2.5 space-y-1.5 bg-slate-50/40">
+      {/* Messages - WhatsApp background */}
+      <div
+        className="flex-1 overflow-y-auto px-3 py-4 space-y-1"
+        style={{
+          background: '#efeae2',
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23c8bfb0' fill-opacity='0.18'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+        }}
+      >
         {comments.length === 0 ? (
-          <p className="text-sm text-center text-slate-400 py-10">No updates yet. Be the first to post!</p>
-        ) : (
-          comments.map((c: any) => {
-            // Normalize snake_case from Supabase
+          <div className="flex flex-col items-center justify-center py-14 gap-2">
+            <div className="w-14 h-14 rounded-full bg-white/60 flex items-center justify-center shadow-sm">
+              <MessageSquare className="w-6 h-6 text-slate-400" />
+            </div>
+            <p className="text-sm font-medium text-slate-500">No updates yet</p>
+            <p className="text-xs text-slate-400">Be the first to post an update!</p>
+          </div>
+        ) : (() => {
+          let lastDateLabel = '';
+          return comments.map((c: any) => {
             const authorId = c.authorId || c.author_id;
             const createdAt = c.createdAt || c.created_at || new Date().toISOString();
             const author = users.find((u: any) => u.id === authorId);
-            const isAuthor = authorId === currentUser?.id;
+            const isOwn = authorId === currentUser?.id;
             const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'co-admin';
             const isPast24Hours = (new Date().getTime() - new Date(createdAt).getTime()) > 24 * 60 * 60 * 1000;
-            const canEdit = isAdmin || (isAuthor && !isPast24Hours);
-            const canDelete = isAdmin || (isAuthor && !isPast24Hours);
-            const renderText = (t: string) => {
-              return t.split(/(@\w+|#\S+)/g).map((part: string, i: number) => {
-                if (part.startsWith('@')) return <span key={i} className="font-semibold text-primary bg-primary/10 px-1 rounded">{part}</span>;
+            const canEdit = isAdmin || (isOwn && !isPast24Hours);
+            const canDelete = isAdmin || (isOwn && !isPast24Hours);
+            const authorColor = getAuthorColor(authorId || 'x');
+
+            const dateLabel = dateSepLabel(createdAt);
+            const showDateSep = dateLabel !== lastDateLabel;
+            if (showDateSep) lastDateLabel = dateLabel;
+
+            const renderText = (t: string) =>
+              t.split(/(@\w+|#\S+)/g).map((part: string, i: number) => {
+                if (part.startsWith('@')) return <span key={i} className="font-semibold" style={{ color: isOwn ? '#075E54' : '#128C7E', background: isOwn ? 'rgba(0,0,0,0.06)' : 'rgba(18,140,126,0.08)', borderRadius: 3, padding: '0 2px' }}>{part}</span>;
                 if (part.startsWith('#')) {
                   const tag = part.slice(1).toLowerCase();
-                  // Find the subtask whose title matches this tag (within same main task)
                   const mainTaskId = (subtask as any).main_task_id || subtask.mainTaskId;
                   const linked = subtasks?.find(s => {
                     const sMainId = (s as any).main_task_id || s.mainTaskId;
                     return sMainId === mainTaskId && s.title?.toLowerCase().includes(tag);
                   });
-                  if (linked && onSelectSubtask) {
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => onSelectSubtask(linked.id!)}
-                        className="font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded hover:bg-emerald-100 transition-colors text-xs cursor-pointer underline-offset-2 hover:underline"
-                        title={`Go to subtask: ${linked.title}`}
-                      >
-                        {part}
-                      </button>
-                    );
-                  }
-                  return <span key={i} className="font-semibold text-emerald-600 bg-emerald-50 px-1 rounded">{part}</span>;
+                  if (linked && onSelectSubtask)
+                    return <button key={i} onClick={() => onSelectSubtask(linked.id!)} className="font-semibold underline underline-offset-2" style={{ color: isOwn ? '#075E54' : '#128C7E' }} title={`Go to: ${linked.title}`}>{part}</button>;
+                  return <span key={i} className="font-semibold" style={{ color: isOwn ? '#075E54' : '#128C7E' }}>{part}</span>;
                 }
                 return <span key={i}>{part}</span>;
               });
-            };
+
             return (
-              <div key={c.id} id={`comment-${c.id}`} className="bg-white rounded-xl border border-slate-100 shadow-sm px-3 py-2 relative z-0 group transition-all">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <Avatar className="w-6 h-6 flex-shrink-0">
-                      <AvatarImage src={author?.avatarUrl} />
-                      <AvatarFallback className={`text-[9px] font-bold text-white ${author?.avatarColor || 'bg-slate-400'}`}>
-                        {author?.name?.substring(0, 2).toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-[12px] font-bold text-slate-900 leading-none">{author?.name || 'Unknown'}</p>
-                      <p className="text-[10px] text-slate-400 leading-none">@{author?.name?.split(' ')[0] || 'user'}</p>
-                    </div>
+              <div key={c.id}>
+                {/* Date separator */}
+                {showDateSep && (
+                  <div className="flex justify-center my-3">
+                    <span className="px-3 py-1 bg-[#d1f2e0]/90 text-[#555] text-[11px] font-semibold rounded-full shadow-sm border border-white/60">{dateLabel}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
-                      <button onClick={() => setReplyingTo(c)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors" title="Reply"><Reply className="w-3 h-3" /></button>
-                      {canEdit && <button onClick={() => { setEditingId(c.id); setEditTextContent(c.text); }} className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors" title="Edit"><Pencil className="w-3 h-3" /></button>}
-                      {canDelete && <button onClick={() => { if (window.confirm("Are you sure you want to delete this update?")) { deleteComment(c.id); } }} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Delete"><Trash2 className="w-3 h-3" /></button>}
+                )}
+
+                {/* Message row */}
+                <div
+                  id={`comment-${c.id}`}
+                  className={`flex items-end gap-2 mb-1 group ${ isOwn ? 'flex-row-reverse' : 'flex-row' }`}
+                >
+                  {/* Avatar — only for others */}
+                  {!isOwn && (
+                    <div className="flex-shrink-0 mb-1">
+                      <Avatar className="w-8 h-8 shadow-sm">
+                        <AvatarImage src={author?.avatarUrl} />
+                        <AvatarFallback className="text-[10px] font-bold text-white" style={{ background: authorColor }}>
+                          {author?.name?.substring(0, 2).toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
                     </div>
-                    <span className="text-[10px] text-slate-400 flex-shrink-0">
-                      {format(new Date(createdAt), "MMM d, yyyy, h:mm a")}
-                    </span>
-                  </div>
-                </div>
-                {editingId === c.id ? (
-                  <div className="mt-1.5">
-                    <textarea 
-                      value={editTextContent} 
-                      onChange={e => setEditTextContent(e.target.value)} 
-                      className="w-full border border-slate-200 rounded-lg p-2 text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary/20" 
-                      rows={2} 
-                    />
-                    <div className="flex gap-1.5 mt-1 justify-end">
-                      <button onClick={() => setEditingId(null)} className="text-[10px] font-semibold text-slate-500 hover:bg-slate-100 px-2.5 py-1 rounded-md transition-colors">Cancel</button>
-                      <button onClick={() => { 
-                        if (c.text !== editTextContent) {
-                          if (!isAuthor || isPast24Hours) {
-                            const mainTaskId = (subtask as any).main_task_id || subtask.mainTaskId;
-                            postComment(c.subtask_id || c.subtaskId || subtask.id, mainTaskId, currentUser.id, `⚙️ **Admin Edit Log:** Update by @${author?.name?.split(' ')[0] || 'user'} was edited.\n\n**Original:**\n${c.text}\n\n**New:**\n${editTextContent}`);
-                          }
-                          updateComment(c.id, editTextContent); 
-                        }
-                        setEditingId(null); 
-                      }} className="text-[10px] font-bold bg-primary text-white px-3 py-1 rounded-md hover:bg-primary/90 transition-colors shadow-sm">Save</button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {(() => {
-                      const m = c.text.match(/^\[reply_to:([a-zA-Z0-9.-]+)\]\n([\s\S]*)$/);
-                      if (m) {
-                        const refId = m[1];
-                        const refBody = m[2];
-                        const refComm = comments.find((pc: any) => pc.id === refId);
-                        const refAuthor = refComm ? users.find((u: any) => u.id === (refComm.authorId || refComm.author_id)) : null;
-                        
-                        return (
-                          <div className="mb-1">
-                            <div 
+                  )}
+
+                  {/* Bubble */}
+                  <div
+                    className={`relative max-w-[75%] rounded-2xl px-3 py-2 ${ isOwn ? 'rounded-br-sm' : 'rounded-bl-sm' }`}
+                    style={{
+                      background: isOwn ? '#dcf8c6' : '#ffffff',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.13)',
+                    }}
+                  >
+                    {/* Sender name — only for others */}
+                    {!isOwn && (
+                      <p className="text-[12px] font-bold mb-0.5 leading-tight" style={{ color: authorColor }}>
+                        {author?.name || 'Unknown'}
+                        <span className="font-normal text-slate-400 ml-1.5" style={{ fontSize: 10 }}>@{author?.name?.split(' ')[0]?.toLowerCase()}</span>
+                      </p>
+                    )}
+
+                    {/* Edit mode */}
+                    {editingId === c.id ? (
+                      <div>
+                        <textarea
+                          value={editTextContent}
+                          onChange={e => setEditTextContent(e.target.value)}
+                          className="w-full border border-slate-200 rounded-lg p-2 text-xs bg-white/80 focus:outline-none focus:ring-2 focus:ring-green-400/30 resize-none"
+                          rows={2}
+                        />
+                        <div className="flex gap-1.5 mt-1 justify-end">
+                          <button onClick={() => setEditingId(null)} className="text-[10px] font-semibold text-slate-500 hover:bg-slate-100 px-2.5 py-1 rounded-md transition-colors">Cancel</button>
+                          <button onClick={() => {
+                            if (c.text !== editTextContent) {
+                              if (!isOwn || isPast24Hours) {
+                                const mainTaskId = (subtask as any).main_task_id || subtask.mainTaskId;
+                                postComment(c.subtask_id || c.subtaskId || subtask.id, mainTaskId, currentUser.id, `⚙️ **Admin Edit Log:** Update by @${author?.name?.split(' ')[0] || 'user'} was edited.\n\n**Original:**\n${c.text}\n\n**New:**\n${editTextContent}`);
+                              }
+                              updateComment(c.id, editTextContent);
+                            }
+                            setEditingId(null);
+                          }} className="text-[10px] font-bold bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 transition-colors shadow-sm">Save</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Reply preview */}
+                        {(() => {
+                          const m = c.text?.match(/^\[reply_to:([a-zA-Z0-9.-]+)\]\n([\s\S]*)$/);
+                          if (!m) return null;
+                          const refId = m[1];
+                          const refComm = comments.find((pc: any) => pc.id === refId);
+                          const refAuthor = refComm ? users.find((u: any) => u.id === (refComm.authorId || refComm.author_id)) : null;
+                          return (
+                            <div
                               onClick={() => {
                                 const el = document.getElementById(`comment-${refId}`);
                                 if (el) {
                                   el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                  el.classList.add('ring-2', 'ring-blue-400', 'ring-offset-1');
-                                  setTimeout(() => el.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-1'), 2000);
+                                  el.classList.add('ring-2', 'ring-green-400', 'ring-offset-1');
+                                  setTimeout(() => el.classList.remove('ring-2', 'ring-green-400', 'ring-offset-1'), 2000);
                                 }
                               }}
-                              className="mb-1.5 px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all flex flex-col gap-0.5 border-l-4 border-l-blue-400"
+                              className="mb-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer flex flex-col gap-0.5 border-l-[3px] transition-all hover:brightness-95"
+                              style={{
+                                background: isOwn ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.05)',
+                                borderLeftColor: refAuthor ? getAuthorColor(refAuthor.id) : '#128C7E',
+                              }}
                             >
-                                <span className="text-[9px] font-bold text-blue-700 flex items-center gap-1"><Reply className="w-2.5 h-2.5"/> Reply to {refAuthor?.name || 'Unknown'}</span>
-                                <span className="text-[10px] text-slate-500 truncate">{refComm?.text.replace(/^\[reply_to:[^\]]+\]\n/, '') || 'Message deleted'}</span>
+                              <span className="text-[11px] font-bold" style={{ color: refAuthor ? getAuthorColor(refAuthor.id) : '#128C7E' }}>{refAuthor?.name || 'Unknown'}</span>
+                              <span className="text-[11px] text-slate-600 truncate">{refComm?.text.replace(/^\[reply_to:[^\]]+\]\n/, '') || 'Message deleted'}</span>
                             </div>
-                            <p className="text-[12px] text-slate-700 leading-snug whitespace-pre-wrap">{renderText(refBody)}</p>
-                          </div>
-                        );
-                      }
-                      
-                      return <p className="text-[12px] text-slate-700 leading-snug whitespace-pre-wrap">{renderText(c.text)}</p>;
-                    })()}
-                    {/* Attachments */}
-                    {Array.isArray(c.attachments) && c.attachments.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {c.attachments.map((att: any, ai: number) => {
-                          const isImg = att.type?.startsWith('image/');
-                          return isImg ? (
-                            <a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="block rounded-lg overflow-hidden border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                              <img src={att.url} alt={att.name} className="max-w-[160px] max-h-[120px] object-cover" />
-                            </a>
-                          ) : (
-                            <a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 px-2 py-1 bg-slate-50 border border-slate-200 rounded-md text-[10px] font-medium text-slate-700 hover:bg-slate-100 transition-colors">
-                              <FileText className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                              <span className="truncate max-w-[120px]">{att.name}</span>
-                            </a>
                           );
-                        })}
-                      </div>
+                        })()}
+
+                        {/* Message body */}
+                        <p className="text-[13px] text-slate-800 leading-snug whitespace-pre-wrap break-words">
+                          {renderText((c.text || '').replace(/^\[reply_to:[^\]]+\]\n/, ''))}
+                        </p>
+
+                        {/* Attachments */}
+                        {Array.isArray(c.attachments) && c.attachments.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {c.attachments.map((att: any, ai: number) => {
+                              const isImg = att.type?.startsWith('image/');
+                              return isImg ? (
+                                <a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="block rounded-lg overflow-hidden border border-white/40 shadow-sm hover:shadow-md transition-shadow">
+                                  <img src={att.url} alt={att.name} className="max-w-[200px] max-h-[150px] object-cover" />
+                                </a>
+                              ) : (
+                                <a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-2.5 py-1.5 bg-black/5 rounded-lg text-[11px] font-medium text-slate-700 hover:bg-black/10 transition-colors">
+                                  <FileText className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                                  <span className="truncate max-w-[140px]">{att.name}</span>
+                                </a>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* File links */}
+                        {Array.isArray(c.file_links) && c.file_links.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {c.file_links.map((lnk: string, li: number) => {
+                              const isElectron = !!(window as any).electronAPI;
+                              const linkName = lnk.split(/[/\\]/).pop() || lnk;
+                              return isElectron ? (
+                                <button key={li} onClick={() => (window as any).electronAPI.shellOpenPath(lnk)} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-black/5 rounded-lg text-[11px] font-semibold text-sky-800 hover:bg-black/10 transition-colors" title={`Open: ${lnk}`}>
+                                  <LinkIcon className="w-3 h-3 flex-shrink-0" />
+                                  <span className="truncate max-w-[160px] hover:underline">{linkName}</span>
+                                </button>
+                              ) : (
+                                <div key={li} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-black/5 rounded-lg text-[11px] font-semibold text-slate-700">
+                                  <LinkIcon className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                  <span className="truncate max-w-[160px]" title={lnk}>{linkName}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Timestamp + actions row */}
+                        <div className={`flex items-center gap-1.5 mt-1 ${ isOwn ? 'justify-end' : 'justify-start' }`}>
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                            <button onClick={() => setReplyingTo(c)} className="p-0.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Reply">
+                              <Reply className="w-3 h-3" />
+                            </button>
+                            {canEdit && <button onClick={() => { setEditingId(c.id); setEditTextContent(c.text); }} className="p-0.5 rounded text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors" title="Edit"><Pencil className="w-3 h-3" /></button>}
+                            {canDelete && <button onClick={() => { if (window.confirm('Delete this update?')) deleteComment(c.id); }} className="p-0.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete"><Trash2 className="w-3 h-3" /></button>}
+                          </div>
+                          <span className="text-[10px] text-slate-400 select-none">
+                            {format(new Date(createdAt), 'h:mm a')}
+                          </span>
+                        </div>
+                      </>
                     )}
-                    {/* File path links */}
-                    {Array.isArray(c.file_links) && c.file_links.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {c.file_links.map((lnk: string, li: number) => {
-                           const isElectron = !!(window as any).electronAPI;
-                           const linkName = lnk.split(/[/\\]/).pop() || lnk;
-                           return isElectron ? (
-                             <button
-                               key={li}
-                               onClick={() => (window as any).electronAPI.shellOpenPath(lnk)}
-                               className="flex items-center gap-1 px-2 py-1 bg-sky-50 border border-sky-100 rounded-md text-[10px] font-semibold text-sky-700 hover:bg-sky-100 transition-colors cursor-pointer text-left"
-                               title={`Open: ${lnk}`}
-                             >
-                                <LinkIcon className="w-3 h-3 flex-shrink-0" />
-                                <span className="truncate max-w-[220px] hover:underline underline-offset-1">{linkName}</span>
-                             </button>
-                           ) : (
-                             <div key={li} className="flex items-center gap-1 px-2 py-1 bg-slate-50 border border-slate-200 rounded-md text-[10px] font-semibold text-slate-700">
-                               <LinkIcon className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                               <span className="truncate max-w-[220px]" title={lnk}>{linkName}</span>
-                             </div>
-                           );
-                        })}
-                      </div>
-                    )}
-                  </>
-                )}
+                  </div>
+                </div>
               </div>
             );
-          })
-        )}
+          });
+        })()}
         <div ref={endRef} />
       </div>
 
-      {/* Compose */}
-      <div className="p-4 border-t border-border bg-white flex-shrink-0 relative z-20">
+      {/* WhatsApp-style Compose Bar */}
+      <div className="flex-shrink-0 relative z-20" style={{ background: '#f0f2f5', borderTop: '1px solid #d9dbde' }}>
+        {/* Reply preview */}
         {replyingTo && (
-           <div className="mb-3 px-4 py-2 bg-blue-50/50 rounded-xl border border-blue-100 flex items-start justify-between">
-              <div className="min-w-0 pr-4">
-                 <p className="text-[11px] font-bold text-blue-800 mb-0.5 flex items-center gap-1.5"><Reply className="w-3.5 h-3.5" /> Replying to {users.find(u => u.id === (replyingTo.author_id || replyingTo.authorId))?.name}</p>
-                 <p className="text-xs text-blue-700 truncate opacity-80">{replyingTo.text}</p>
-              </div>
-              <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-blue-100 rounded-lg text-blue-500 transition-colors"><X className="w-3.5 h-3.5"/></button>
-           </div>
+          <div className="mx-3 mt-2 px-3 py-2 bg-white rounded-xl border-l-4 flex items-start justify-between" style={{ borderLeftColor: getAuthorColor(replyingTo.author_id || replyingTo.authorId || 'x') }}>
+            <div className="min-w-0 pr-3">
+              <p className="text-[11px] font-bold mb-0.5 flex items-center gap-1" style={{ color: getAuthorColor(replyingTo.author_id || replyingTo.authorId || 'x') }}>
+                <Reply className="w-3 h-3" /> Replying to {users.find((u: any) => u.id === (replyingTo.author_id || replyingTo.authorId))?.name}
+              </p>
+              <p className="text-xs text-slate-500 truncate">{(replyingTo.text || '').replace(/^\[reply_to:[^\]]+\]\n/, '').substring(0, 80)}</p>
+            </div>
+            <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors"><X className="w-3.5 h-3.5" /></button>
+          </div>
         )}
 
-        <div className="relative border border-slate-200 rounded-2xl bg-white focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
-          
-          <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" multiple />
+        {/* Pending attachments */}
+        {(pendingAttachments.length > 0 || pendingFileLinks.length > 0) && (
+          <div className="flex flex-wrap gap-1.5 px-3 pt-2">
+            {pendingAttachments.map((a, i) => (
+              <div key={`att-${i}`} className="flex items-center gap-1.5 px-2 py-1 bg-white border border-slate-200 rounded-full text-[11px] font-medium text-slate-700 shadow-sm">
+                <Paperclip className="w-3 h-3 text-slate-400" />
+                <span className="truncate max-w-[100px]" title={a.name}>{a.name}</span>
+                <button onClick={() => setPendingAttachments(prev => prev.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-red-500 ml-0.5"><X className="w-3 h-3" /></button>
+              </div>
+            ))}
+            {pendingFileLinks.map((l, i) => (
+              <div key={`lnk-${i}`} className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-[11px] font-medium text-emerald-700 shadow-sm">
+                <FolderOpen className="w-3 h-3 text-emerald-500" />
+                <span className="truncate max-w-[100px]" title={l}>{l.split('\\').pop() || l}</span>
+                <button onClick={() => setPendingFileLinks(prev => prev.filter((_, idx) => idx !== i))} className="text-emerald-500 hover:text-red-500 ml-0.5"><X className="w-3 h-3" /></button>
+              </div>
+            ))}
+          </div>
+        )}
 
-          {(pendingAttachments.length > 0 || pendingFileLinks.length > 0) && (
-             <div className="flex flex-wrap gap-2 pt-3 px-4 pb-0">
-               {pendingAttachments.map((a, i) => (
-                  <div key={`att-${i}`} className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700">
-                     <Paperclip className="w-3 h-3 text-slate-400" />
-                     <span className="truncate max-w-[120px]" title={a.name}>{a.name}</span>
-                     <button onClick={() => setPendingAttachments(prev => prev.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-red-500 ml-1"><X className="w-3 h-3" /></button>
-                  </div>
-               ))}
-               {pendingFileLinks.map((l, i) => (
-                  <div key={`lnk-${i}`} className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 border border-emerald-100 rounded-lg text-xs font-medium text-emerald-700">
-                     <FolderOpen className="w-3 h-3 text-emerald-400" />
-                     <span className="truncate max-w-[120px]" title={l}>{l.split('\\').pop() || l}</span>
-                     <button onClick={() => setPendingFileLinks(prev => prev.filter((_, idx) => idx !== i))} className="text-emerald-500 hover:text-red-500 ml-1"><X className="w-3 h-3" /></button>
-                  </div>
-               ))}
-             </div>
-          )}
-
-          {/* Mention Popover */}
-          {showMention && filteredUsers.length > 0 && (
-            <div className="absolute bottom-full left-4 mb-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-50 flex flex-col py-1">
-              {filteredUsers.slice(0, 5).map((u, idx) => (
-                <button
-                  key={u.id}
-                  onClick={() => {
-                     const textarea = document.getElementById(`updates-textarea-${subtask.id}`) as HTMLTextAreaElement;
-                     const cursor = textarea?.selectionStart || text.length;
-                     const textBefore = text.substring(0, cursor);
-                     const match = textBefore.match(/(?:^|\s)@(\w*)$/);
-                     if (match) {
-                         const mentionStr = `@${u.name.split(" ")[0]}`;
-                         const beforeMention = textBefore.substring(0, textBefore.length - match[1].length - 1 + (match[0].startsWith(' ') ? 1 : 0));
-                         const afterCursor = text.substring(cursor);
-                         setText(beforeMention + mentionStr + " " + afterCursor);
-                         setShowMention(false);
-                     }
-                  }}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors text-left ${idx === mentionIndex ? 'bg-primary/10 text-primary' : 'hover:bg-slate-50 text-slate-700'}`}
-                >
-                   <Avatar className="w-6 h-6 flex-shrink-0">
-                     <AvatarImage src={u.avatarUrl} />
-                     <AvatarFallback className={`text-[9px] font-bold text-white ${u.avatarColor || 'bg-slate-400'}`}>
-                       {u.name.substring(0, 2).toUpperCase()}
-                     </AvatarFallback>
-                   </Avatar>
-                   <div className="flex flex-col min-w-0">
-                     <span className="font-semibold truncate leading-tight">{u.name}</span>
-                     <span className="text-[10px] opacity-60 truncate leading-tight">@{u.name.split(' ')[0].toLowerCase()}</span>
-                   </div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          <textarea
-            id={`updates-textarea-${subtask.id}`}
-            value={text}
-            onChange={e => {
-              const val = e.target.value;
-              setText(val);
-              const cursor = e.target.selectionStart;
-              const textBefore = val.substring(0, cursor);
-              const match = textBefore.match(/(?:^|\s)@(\w*)$/);
-              if (match) {
-                  setShowMention(true);
-                  setMentionQuery(match[1]);
-                  setMentionIndex(0);
-              } else {
-                  setShowMention(false);
-              }
-            }}
-            onKeyDown={e => {
-              if (showMention && filteredUsers.length > 0) {
-                if (e.key === "ArrowDown") {
-                    e.preventDefault();
-                    setMentionIndex(prev => (prev + 1) % Math.min(filteredUsers.length, 5));
-                    return;
-                }
-                if (e.key === "ArrowUp") {
-                    e.preventDefault();
-                    setMentionIndex(prev => (prev - 1 + Math.min(filteredUsers.length, 5)) % Math.min(filteredUsers.length, 5));
-                    return;
-                }
-                if (e.key === "Enter" || e.key === "Tab") {
-                    e.preventDefault();
-                    const u = filteredUsers[mentionIndex];
-                    if (u) {
-                       const textarea = e.target as HTMLTextAreaElement;
-                       const cursor = textarea.selectionStart;
-                       const textBefore = text.substring(0, cursor);
-                       const match = textBefore.match(/(?:^|\s)@(\w*)$/);
-                       if (match) {
-                           const mentionStr = `@${u.name.split(" ")[0]}`;
-                           const beforeMention = textBefore.substring(0, textBefore.length - match[1].length - 1 + (match[0].startsWith(' ') ? 1 : 0));
-                           const afterCursor = text.substring(cursor);
-                           setText(beforeMention + mentionStr + " " + afterCursor);
-                           setShowMention(false);
-                       }
-                    }
-                    return;
-                }
-                if (e.key === "Escape") {
-                    setShowMention(false);
-                    return;
-                }
-              }
-              if (e.key === 'Enter' && !e.shiftKey) { 
-                e.preventDefault(); 
-                handleSend(); 
-              }
-            }}
-            placeholder="Write an update..."
-            rows={2}
-            className="w-full px-4 py-3 text-sm text-slate-700 bg-transparent resize-none focus:outline-none placeholder:text-slate-400"
-          />
-          <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100">
-            <div className="flex items-center gap-0.5">
-              <button onClick={() => fileInputRef.current?.click()} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-yellow-600 transition-colors" title="Attach file">
-                <Paperclip className="w-3.5 h-3.5" />
-              </button>
-              <button onClick={() => handleAttachLink(false)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-sky-600 transition-colors" title="Link a file on local network">
-                <LinkIcon className="w-3.5 h-3.5" />
-              </button>
-              <button onClick={() => handleAttachLink(true)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-600 transition-colors" title="Link a folder on local network">
-                <FolderOpen className="w-3.5 h-3.5" />
-              </button>
-              <button onClick={() => {
-                 const textarea = document.getElementById(`updates-textarea-${subtask.id}`) as HTMLTextAreaElement;
-                 if (textarea) {
-                     setText(text + (text.endsWith(' ') || text === '' ? '@' : ' @'));
-                     textarea.focus();
-                 }
-              }} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary transition-colors" title="Mention user">
-                <span className="text-sm font-bold">@</span>
-              </button>
-              <button onClick={() => {
-                 const textarea = document.getElementById(`updates-textarea-${subtask.id}`) as HTMLTextAreaElement;
-                 if (textarea) {
-                     setText(text + (text.endsWith(' ') || text === '' ? '#' : ' #'));
-                     textarea.focus();
-                 }
-              }} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors" title="Create subtask">
-                <Hash className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <button
-              disabled={(!text.trim() && pendingAttachments.length === 0 && pendingFileLinks.length === 0)}
-              onClick={handleSend}
-              className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
-            >
-              <Send className="w-3.5 h-3.5" />
+        <div className="flex items-end gap-2 px-3 py-2">
+          {/* Left toolbar */}
+          <div className="flex items-center gap-0.5 flex-shrink-0 pb-1">
+            <button onClick={() => fileInputRef.current?.click()} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/8 text-slate-500 hover:text-slate-700 transition-colors" title="Attach file">
+              <Paperclip className="w-4.5 h-4.5" style={{ width: 18, height: 18 }} />
+            </button>
+            <button onClick={() => handleAttachLink(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/8 text-slate-500 hover:text-slate-700 transition-colors" title="Link file">
+              <LinkIcon style={{ width: 17, height: 17 }} />
+            </button>
+            <button onClick={() => handleAttachLink(true)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/8 text-slate-500 hover:text-slate-700 transition-colors" title="Link folder">
+              <FolderOpen style={{ width: 17, height: 17 }} />
             </button>
           </div>
+
+          {/* Input pill */}
+          <div className="relative flex-1">
+            {/* Mention Popover */}
+            {showMention && filteredUsers.length > 0 && (
+              <div className="absolute bottom-full left-0 mb-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-50 flex flex-col py-1">
+                {filteredUsers.slice(0, 5).map((u, idx) => (
+                  <button
+                    key={u.id}
+                    onClick={() => {
+                      const textarea = document.getElementById(`updates-textarea-${subtask.id}`) as HTMLTextAreaElement;
+                      const cursor = textarea?.selectionStart || text.length;
+                      const textBefore = text.substring(0, cursor);
+                      const match = textBefore.match(/(?:^|\s)@(\w*)$/);
+                      if (match) {
+                        const mentionStr = `@${u.name.split(' ')[0]}`;
+                        const beforeMention = textBefore.substring(0, textBefore.length - match[1].length - 1 + (match[0].startsWith(' ') ? 1 : 0));
+                        const afterCursor = text.substring(cursor);
+                        setText(beforeMention + mentionStr + ' ' + afterCursor);
+                        setShowMention(false);
+                      }
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors text-left ${idx === mentionIndex ? 'bg-green-50 text-green-700' : 'hover:bg-slate-50 text-slate-700'}`}
+                  >
+                    <Avatar className="w-6 h-6 flex-shrink-0">
+                      <AvatarImage src={u.avatarUrl} />
+                      <AvatarFallback className="text-[9px] font-bold text-white" style={{ background: getAuthorColor(u.id) }}>
+                        {u.name.substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-semibold truncate text-[13px] leading-tight">{u.name}</span>
+                      <span className="text-[10px] opacity-60 truncate leading-tight">@{u.name.split(' ')[0].toLowerCase()}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" multiple />
+            <div className="flex items-end bg-white rounded-full px-4 py-2 shadow-sm" style={{ border: '1px solid #ced4d8' }}>
+              <textarea
+                id={`updates-textarea-${subtask.id}`}
+                value={text}
+                onChange={e => {
+                  const val = e.target.value;
+                  setText(val);
+                  const cursor = e.target.selectionStart;
+                  const textBefore = val.substring(0, cursor);
+                  const match = textBefore.match(/(?:^|\s)@(\w*)$/);
+                  if (match) { setShowMention(true); setMentionQuery(match[1]); setMentionIndex(0); }
+                  else setShowMention(false);
+                }}
+                onKeyDown={e => {
+                  if (showMention && filteredUsers.length > 0) {
+                    if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex(p => (p + 1) % Math.min(filteredUsers.length, 5)); return; }
+                    if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIndex(p => (p - 1 + Math.min(filteredUsers.length, 5)) % Math.min(filteredUsers.length, 5)); return; }
+                    if (e.key === 'Enter' || e.key === 'Tab') {
+                      e.preventDefault();
+                      const u = filteredUsers[mentionIndex];
+                      if (u) {
+                        const ta = e.target as HTMLTextAreaElement;
+                        const cur = ta.selectionStart;
+                        const tb = text.substring(0, cur);
+                        const m2 = tb.match(/(?:^|\s)@(\w*)$/);
+                        if (m2) {
+                          const ms = `@${u.name.split(' ')[0]}`;
+                          const bm = tb.substring(0, tb.length - m2[1].length - 1 + (m2[0].startsWith(' ') ? 1 : 0));
+                          setText(bm + ms + ' ' + text.substring(cur));
+                          setShowMention(false);
+                        }
+                      }
+                      return;
+                    }
+                    if (e.key === 'Escape') { setShowMention(false); return; }
+                  }
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+                }}
+                placeholder="Type a message"
+                rows={1}
+                style={{ maxHeight: 120, overflowY: 'auto' }}
+                className="flex-1 w-full text-[14px] text-slate-800 bg-transparent resize-none focus:outline-none placeholder:text-slate-400 leading-snug"
+              />
+              <div className="flex items-center gap-1 ml-1 flex-shrink-0 pb-px">
+                <button
+                  onClick={() => {
+                    const ta = document.getElementById(`updates-textarea-${subtask.id}`) as HTMLTextAreaElement;
+                    if (ta) { setText(text + (text.endsWith(' ') || text === '' ? '@' : ' @')); ta.focus(); }
+                  }}
+                  className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-green-600 transition-colors font-bold text-sm"
+                  title="Mention"
+                >@</button>
+                <button
+                  onClick={() => {
+                    const ta = document.getElementById(`updates-textarea-${subtask.id}`) as HTMLTextAreaElement;
+                    if (ta) { setText(text + (text.endsWith(' ') || text === '' ? '#' : ' #')); ta.focus(); }
+                  }}
+                  className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-green-600 transition-colors"
+                  title="Subtask"
+                ><Hash style={{ width: 15, height: 15 }} /></button>
+              </div>
+            </div>
+          </div>
+
+          {/* Send button — WhatsApp green circle */}
+          <button
+            onClick={handleSend}
+            disabled={!text.trim() && pendingAttachments.length === 0 && pendingFileLinks.length === 0}
+            className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full text-white shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: '#25D366' }}
+          >
+            <Send style={{ width: 17, height: 17 }} />
+          </button>
         </div>
-        <p className="text-[10px] text-slate-400 mt-2 px-1">Enter to send · Shift+Enter for new line · @mention · #subtask</p>
+        <p className="text-[10px] text-slate-400 text-center pb-1.5">Enter to send · Shift+Enter for new line · @mention · #subtask</p>
       </div>
     </div>
   );
