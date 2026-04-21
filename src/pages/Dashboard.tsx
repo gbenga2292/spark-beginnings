@@ -466,17 +466,6 @@ export function Dashboard() {
             ALERTS.push({ type: 'urgent', msg: `Low attendance rate: ${kpiStats.attendanceRate}% — review staffing.` });
         }
 
-        const activeRems = reminders.filter(r => r.isActive);
-        activeRems.forEach(r => {
-            const remDate = new Date(r.remindAt);
-            const diffHrs = (remDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60);
-            if (diffHrs <= 24 && diffHrs > 0) {
-                ALERTS.push({ type: 'warning', msg: `Reminder: ${r.title} is due soon.` });
-            } else if (diffHrs <= 0) {
-                ALERTS.push({ type: 'urgent', msg: `Overdue Reminder: ${r.title}.` });
-            }
-        });
-
         if (ALERTS.length === 0) {
             ALERTS.push({ type: 'info', msg: 'No pending critical actions. Systems nominal.' });
         }
@@ -746,8 +735,8 @@ export function Dashboard() {
                         <CardHeader className="bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 pb-4">
                             <CardTitle className="text-lg flex items-center gap-2 text-slate-800 dark:text-slate-100"><Clock className="h-5 w-5 text-indigo-500" /> Action Center</CardTitle>
                         </CardHeader>
-                        <CardContent className="pt-5 flex flex-col gap-4 h-full">
-                            <div className="space-y-3 flex-1">
+                        <CardContent className="pt-5 pb-5 flex flex-col gap-4">
+                            <div className="space-y-3 pr-2 overflow-y-auto max-h-[280px] custom-scrollbar">
                                 {alerts.map((alert, i) => (
                                     <div key={i} className={`flex items-start gap-3 p-3 rounded-md text-sm font-medium ${
                                         alert.type === 'urgent' ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border border-rose-100 dark:border-rose-800/50' :

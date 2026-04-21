@@ -917,8 +917,8 @@ export function AccountsReportBuilder({
       <DialogContent className="!fixed !inset-0 !z-50 !max-w-[100vw] !w-screen !h-screen !max-h-screen !m-0 !rounded-none p-0 overflow-hidden flex flex-col bg-slate-100 print:max-w-none print:h-auto print:bg-white border-0 gap-0">
 
         {/* ── Top Header ── */}
-        <DialogHeader className="bg-slate-900 border-b border-slate-700/60 shrink-0 print:hidden text-left z-20">
-          <div className="flex items-center w-full">
+        <DialogHeader className="bg-slate-900 border-b border-slate-700/60 shrink-0 print:hidden text-left z-20 overflow-hidden">
+          <div className="flex items-center w-full py-0 h-8">
 
             {/* ── Close button: full-height flush left strip ── */}
             <button

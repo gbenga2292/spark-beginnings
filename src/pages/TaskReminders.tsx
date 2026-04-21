@@ -42,7 +42,8 @@ const SYSTEM_REMINDER_TITLES = [
 function isSystemReminder(r: Reminder): boolean {
   return (
     SYSTEM_REMINDER_TITLES.includes(r.title as any) ||
-    r.title?.startsWith('Mentioned')
+    r.title?.startsWith('Mentioned') ||
+    r.title?.startsWith('Update on Assigned Task:')
   );
 }
 
@@ -136,7 +137,7 @@ export function TaskReminders() {
         .from('reminders')
         .delete()
         .or(
-          `title.eq.New Task Created,title.ilike.Mentioned%,title.eq.Task Reminder`
+          `title.eq.New Task Created,title.ilike.Mentioned%,title.eq.Task Reminder,title.ilike.Update on Assigned Task:%`
         );
       if (error) throw error;
       toast.success('System reminders cleared successfully');
