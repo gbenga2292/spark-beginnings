@@ -73,10 +73,13 @@ export function WaybillManager() {
     return <WaybillDetailView waybill={viewingWaybill} onClose={() => setViewingWaybill(null)} />;
   }
 
+  if (showCreateModal) {
+    return <WaybillForm onClose={() => setShowCreateModal(false)} />;
+  }
+
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
       <WaybillManagerHeader onCreate={() => setShowCreateModal(true)} />
-      {showCreateModal && <WaybillForm onClose={() => setShowCreateModal(false)} />}
 
       {/* Mobile Actions */}
       <div className="flex sm:hidden flex-wrap gap-2 px-1">

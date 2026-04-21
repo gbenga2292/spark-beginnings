@@ -169,9 +169,12 @@ function PersonalSpaceDashboard() {
           </div>
           {/* Multi-segment progress */}
           <div className="relative w-full h-3 bg-muted rounded-full overflow-hidden flex">
-            <motion.div initial={{ width: 0 }} animate={{ width: `${rate}%` }}
+            <motion.div initial={{ width: 0 }} animate={{ width: `${(inProgress / Math.max(wsSubs.length, 1)) * 100}%` }}
               transition={{ duration: 1, delay: 0.3, ease: "easeOut" }}
-              className="h-full bg-gradient-to-r from-violet-500 to-purple-600 rounded-full" />
+              className="h-full bg-violet-500" />
+            <motion.div initial={{ width: 0 }} animate={{ width: `${rate}%` }}
+              transition={{ duration: 1, delay: 0.4, ease: "easeOut" }}
+              className="h-full bg-green-500" />
           </div>
           <div className="flex items-center gap-5 mt-4">
             {[
@@ -649,10 +652,18 @@ function UserDashboard() {
           </div>
           <span className="text-lg font-bold text-primary tabular-nums">{myRate}%</span>
         </div>
-        <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden">
-          <motion.div initial={{ width: 0 }} animate={{ width: `${myRate}%` }}
+        <div className="relative w-full h-2.5 bg-muted rounded-full overflow-hidden flex">
+          <motion.div initial={{ width: 0 }} animate={{ width: `${(myProgress / Math.max(mySubs.length, 1)) * 100}%` }}
             transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
-            className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-full" />
+            className="h-full bg-primary" />
+          <motion.div initial={{ width: 0 }} animate={{ width: `${myRate}%` }}
+            transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
+            className="h-full bg-green-500" />
+          {myPendingApproval > 0 && (
+            <motion.div initial={{ width: 0 }} animate={{ width: `${(myPendingApproval / Math.max(mySubs.length, 1)) * 100}%` }}
+              transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
+              className="h-full bg-amber-400" />
+          )}
         </div>
         <div className="flex items-center gap-6 mt-3 text-xs text-muted-foreground flex-wrap">
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-primary" />{myProgress} in progress</span>

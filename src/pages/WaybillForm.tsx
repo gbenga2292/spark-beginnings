@@ -10,7 +10,6 @@ import { WaybillType } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/src/components/ui/dialog';
 import { toast } from '@/src/components/ui/toast';
 
 interface WaybillFormProps {
@@ -111,28 +110,27 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
   };
 
   return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent
-        aria-describedby={undefined}
-        className="max-w-3xl p-0 overflow-hidden rounded-2xl bg-card border border-border shadow-2xl"
-      >
+    <div className="max-w-4xl mx-auto pb-10 flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-300">
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden flex flex-col">
         {/* Header */}
-        <DialogHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 py-5 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 py-5 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <FileText className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <DialogTitle className="text-xl font-black text-foreground uppercase tracking-tight">
+              <h2 className="text-xl font-black text-foreground uppercase tracking-tight">
                 {initialType === 'waybill' ? 'Create Waybill' : 'Create Return Sheet'}
-              </DialogTitle>
+              </h2>
               <p className="text-muted-foreground font-bold text-xs mt-0.5">Issue assets for delivery to project sites</p>
             </div>
           </div>
-          <DialogClose className="hidden sm:flex" />
-        </DialogHeader>
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
 
-        <div className="overflow-y-auto max-h-[70vh] no-scrollbar p-6 space-y-6">
+        <div className="p-6 space-y-8">
           {/* Waybill Information */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -376,7 +374,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
             <CheckCircle2 className="h-4 w-4" /> Create Waybill
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }

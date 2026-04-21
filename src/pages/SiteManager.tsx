@@ -24,7 +24,6 @@ export function SiteManager() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('Active');
-  const [selectedSite, setSelectedSite] = useState<{ site: Site; q: SiteQuestionnaire | null } | null>(null);
   const [inventorySite, setInventorySite] = useState<{ site: Site; q: SiteQuestionnaire | null } | null>(null);
 
   const activeCount = sites.filter(s => s.status === 'Active').length;
@@ -63,7 +62,6 @@ export function SiteManager() {
         site={inventorySite.site}
         questionnaire={inventorySite.q}
         onBack={() => {
-          setSelectedSite(inventorySite);
           setInventorySite(null);
         }}
       />
@@ -151,7 +149,7 @@ export function SiteManager() {
                   </div>
                   <div className="flex justify-end">
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-all"
-                      onClick={(e) => { e.stopPropagation(); setSelectedSite({ site, q: q || null }); }}>
+                      onClick={(e) => { e.stopPropagation(); setInventorySite({ site, q: q || null }); }}>
                       <Eye className="h-4 w-4" />
                     </Button>
                   </div>
@@ -162,80 +160,6 @@ export function SiteManager() {
         })}
       </div>
 
-      {/* Details Modal */}
-      {selectedSite && (
-        <Dialog open={!!selectedSite} onOpenChange={() => setSelectedSite(null)}>
-          <DialogContent aria-describedby={undefined} className="max-w-2xl p-0 overflow-hidden rounded-2xl border-0 shadow-2xl bg-white dark:bg-slate-900 animate-in zoom-in-95 duration-500">
-            <DialogHeader className="p-6 sm:p-8 pb-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-10 flex flex-row items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-xl bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
-                  <MapPin className="h-6 w-6 text-teal-600" />
-                </div>
-                <div>
-                  <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white uppercase leading-tight">{selectedSite.site.name}</DialogTitle>
-                  <p className="text-slate-400 font-semibold text-xs">{selectedSite.site.client}</p>
-                </div>
-              </div>
-              <button onClick={() => setSelectedSite(null)} className="h-10 w-10 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 transition-all">
-                <Plus className="h-5 w-5 rotate-45" />
-              </button>
-            </DialogHeader>
-
-            <div className="p-6 sm:p-8 space-y-6 max-h-[60vh] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-teal-500 flex items-center gap-2"><Activity className="h-3 w-3" /> Services</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(selectedSite.q?.phase3?.dewateringMethods || ['Dewatering']).map((m: string) => (
-                      <span key={m} className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-1 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 capitalize">
-                        {m}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase tracking-wider text-teal-500 flex items-center gap-2"><Building2 className="h-3 w-3" /> Client</label>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{selectedSite.site.client}</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-teal-500 flex items-center gap-2"><Info className="h-3 w-3" /> Scope of Work</label>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed border-l-4 border-teal-500 pl-4 py-2 bg-teal-50/20 dark:bg-teal-900/10 rounded-r-xl">
-                  {selectedSite.q?.phase4?.scopeOfWorkSummary || "Detailed proposal and engineering assessment pending."}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-3 gap-6">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase tracking-wider text-teal-500 flex items-center gap-2"><User className="h-3 w-3" /> Person</label>
-                  <p className="text-xs font-semibold text-slate-800 dark:text-white">{selectedSite.q?.contactPersonName || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase tracking-wider text-teal-500 flex items-center gap-2"><Phone className="h-3 w-3" /> Phone</label>
-                  <p className="text-xs font-semibold text-slate-800 dark:text-white">{selectedSite.q?.contactPersonPhone || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase tracking-wider text-teal-500 flex items-center gap-2"><Calendar className="h-3 w-3" /> Created</label>
-                  <p className="text-xs font-semibold text-slate-800 dark:text-white">—</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-slate-100 dark:border-slate-800">
-              <Button 
-                onClick={() => {
-                  setInventorySite(selectedSite);
-                  setSelectedSite(null);
-                }}
-                className="w-full h-11 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all gap-2"
-              >
-                <Package className="h-4 w-4" /> View Site Inventory
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }
