@@ -650,29 +650,48 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
       )}
 
       {/* Convert to Follow-Up */}
-      {isEdit && !hasChildren && (
-        <div className={cn("p-4 rounded-lg border space-y-2", isDark ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200')}>
-          <div className={labelCls}>Attach as Follow-up to (Optional)</div>
-          <select
-            value={form.parentId || ''}
-            onChange={e => onChange({ parentId: e.target.value || undefined })}
-            className={selectCls}
-          >
-            <option value="">— Keep as Main Log —</option>
-            {commLogs
-              .filter(l => !l.parentId && l.id !== editingId)
-              .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-              .map(l => (
-                <option key={l.id} value={l.id}>
-                  {format(parseISO(l.date), 'MMM d, yyyy')} - {l.subject || l.notes.substring(0, 40) + (l.notes.length > 40 ? '...' : '')}
-                </option>
-              ))}
-          </select>
-          <p className={cn("text-[10px] uppercase font-semibold mt-1", isDark ? 'text-slate-500' : 'text-slate-400')}>
-            Select a main log to move this under as a reply/follow-up.
-          </p>
-        </div>
-      )}
+      {isEdit && !hasChildren && (() => {
+        const candidates = commLogs.filter(l => {
+          if (l.parentId) return false;
+          if (l.id === editingId) return false;
+          const sameClient = (l.client || '').trim().toLowerCase() === (form.client || '').trim().toLowerCase();
+          if (!sameClient) return false;
+          const curSite = (form.siteName || '').trim().toLowerCase();
+          const candSite = (l.siteName || '').trim().toLowerCase();
+          if (curSite && candSite && curSite !== candSite) return false;
+          return true;
+        });
+
+        return (
+          <div className={cn("p-4 rounded-lg border space-y-2", isDark ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200')}>
+            <div className={labelCls}>Attach as Follow-up to (Optional)</div>
+            <select
+              value={form.parentId || ''}
+              onChange={e => onChange({ parentId: e.target.value || undefined })}
+              className={selectCls}
+              disabled={candidates.length === 0}
+            >
+              <option value="">— Keep as Main Log —</option>
+              {candidates
+                .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+                .map(l => (
+                  <option key={l.id} value={l.id}>
+                    {format(parseISO(l.date), 'MMM d, yyyy')}
+                    {l.siteName ? ` · ${l.siteName}` : ''}
+                    {' — '}
+                    {l.subject || l.notes.substring(0, 40) + (l.notes.length > 40 ? '...' : '')}
+                  </option>
+                ))}
+            </select>
+            <p className={cn("text-[10px] font-semibold mt-1", isDark ? 'text-slate-500' : 'text-slate-400')}>
+              {candidates.length === 0
+                ? `No other logs for ${form.client || 'this client'}${form.siteName ? ` / ${form.siteName}` : ''} to attach to.`
+                : `Showing ${candidates.length} log${candidates.length !== 1 ? 's' : ''} for ${form.client || 'this client'}${form.siteName ? ` / ${form.siteName}` : ''}.`
+              }
+            </p>
+          </div>
+        );
+      })()}
       {isEdit && hasChildren && (
         <div className={cn("p-3 rounded-lg border flex items-start gap-2", isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-100')}>
           <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
@@ -1224,7 +1243,12 @@ export function CommLog() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm());
+  // expandedIds = card body expanded (shows notes/outcome)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  // collapsedThreadIds = parent log is collapsed (hides follow-ups)
+  const [collapsedThreadIds, setCollapsedThreadIds] = useState<Set<string>>(new Set());
+  // collapsedClients = client section is collapsed
+  const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set());
 
   // Task-from-log dialog state
   const [taskDialog, setTaskDialog] = useState<{ open: boolean; title: string; description: string; parentLogSubject?: string }>(
@@ -1415,6 +1439,22 @@ export function CommLog() {
     setExpandedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleThread = (id: string) => {
+    setCollapsedThreadIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleClient = (client: string) => {
+    setCollapsedClients(prev => {
+      const next = new Set(prev);
+      if (next.has(client)) next.delete(client); else next.add(client);
       return next;
     });
   };
@@ -1682,8 +1722,8 @@ export function CommLog() {
               </div>
             </div>
 
-            {/* Scrollable log list */}
-            <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
+            {/* Scrollable log list — grouped by client */}
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1 min-h-0">
               {filtered.length === 0 ? (
                 <div className={cn('rounded-xl border py-16 flex flex-col items-center gap-3', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200')}>
                   <MessageSquare className={cn('w-10 h-10', isDark ? 'text-slate-700' : 'text-slate-200')} />
@@ -1698,65 +1738,161 @@ export function CommLog() {
                 </div>
               ) : (
                 (() => {
-                  const renderedIds = new Set<string>();
-                  const nodes: React.ReactNode[] = [];
-                  
+                  // ── Build client-grouped thread map ──────────────────────
+                  // Collect the unique root (parent) log ids that appear in the
+                  // filtered set, then group them by client name.
+                  const seenRootIds = new Set<string>();
+                  const clientMap = new Map<string, { parentLog: CommLog; children: CommLog[] }[]>();
+
                   filtered.forEach(log => {
                     const parentId = log.parentId || log.id;
-                    if (renderedIds.has(parentId)) return;
-                    renderedIds.add(parentId);
-                    
+                    if (seenRootIds.has(parentId)) return;
+                    seenRootIds.add(parentId);
+
                     const parentLog = commLogs.find(l => l.id === parentId) || log;
-                    const threadChildren = commLogs.filter(l => l.parentId === parentId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-                    
-                    nodes.push(
-                      <div key={'thread-' + parentId} className="space-y-1.5 mb-3 pt-1">
-                        <LogCard
-                          log={parentLog}
-                          isDark={isDark}
-                          expanded={expandedIds.has(parentLog.id)}
-                          onToggleExpand={() => toggleExpand(parentLog.id)}
-                          onEdit={() => handleEdit(parentLog)}
-                          onDelete={() => handleDelete(parentLog.id)}
-                          onToggleFollowUp={() => updateCommLog(parentLog.id, { followUpDone: !parentLog.followUpDone })}
-                          onAddFollowUpNote={() => {
-                            setForm({ 
-                              ...emptyForm(), 
-                              parentId: parentLog.id, 
-                              client: parentLog.client || '', 
-                              siteName: parentLog.siteName || '', 
-                              contactType: parentLog.contactType, 
-                              channel: parentLog.channel 
-                            });
-                            setShowForm(true);
-                            setEditingId(null);
-                          }}
-                          currentUserName={currentUser?.name || ''}
-                          isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
-                          mainTasks={mainTasks}
-                          onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
-                        />
-                        {threadChildren.map(child => (
-                           <LogCard
-                             key={child.id}
-                             log={child}
-                             isChild
-                             isDark={isDark}
-                             expanded={expandedIds.has(child.id)}
-                             onToggleExpand={() => toggleExpand(child.id)}
-                             onEdit={() => handleEdit(child)}
-                             onDelete={() => handleDelete(child.id)}
-                             onToggleFollowUp={() => updateCommLog(child.id, { followUpDone: !child.followUpDone })}
-                             currentUserName={currentUser?.name || ''}
-                             isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
-                             mainTasks={mainTasks}
-                             onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
-                           />
-                        ))}
+                    const children = commLogs
+                      .filter(l => l.parentId === parentId)
+                      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+                    const clientKey = parentLog.client || '(No Client)';
+                    if (!clientMap.has(clientKey)) clientMap.set(clientKey, []);
+                    clientMap.get(clientKey)!.push({ parentLog, children });
+                  });
+
+                  // Sort clients alphabetically
+                  const sortedClients = Array.from(clientMap.keys()).sort((a, b) => a.localeCompare(b));
+
+                  return sortedClients.map(clientName => {
+                    const threads = clientMap.get(clientName)!;
+                    const isClientCollapsed = collapsedClients.has(clientName);
+                    const threadCount = threads.length;
+                    const replyCount = threads.reduce((sum, t) => sum + t.children.length, 0);
+
+                    return (
+                      <div key={`client-${clientName}`} className={cn(
+                        'rounded-xl border overflow-hidden',
+                        isDark ? 'border-slate-700 bg-slate-900/40' : 'border-slate-200 bg-white'
+                      )}>
+                        {/* Client section header */}
+                        <button
+                          onClick={() => toggleClient(clientName)}
+                          className={cn(
+                            'w-full flex items-center gap-3 px-4 py-3 text-left transition-colors',
+                            isDark
+                              ? 'bg-slate-800/60 hover:bg-slate-800 border-b border-slate-700'
+                              : 'bg-slate-50 hover:bg-slate-100 border-b border-slate-200'
+                          )}
+                        >
+                          <Building2 className={cn('w-4 h-4 flex-shrink-0', isDark ? 'text-indigo-400' : 'text-indigo-500')} />
+                          <span className={cn('font-semibold text-sm flex-1 text-left', isDark ? 'text-slate-100' : 'text-slate-800')}>
+                            {clientName}
+                          </span>
+                          <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600')}>
+                            {threadCount} log{threadCount !== 1 ? 's' : ''}{replyCount > 0 ? ` · ${replyCount} follow-up${replyCount !== 1 ? 's' : ''}` : ''}
+                          </span>
+                          {isClientCollapsed
+                            ? <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                            : <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" />}
+                        </button>
+
+                        {/* Client threads — hidden when client section is collapsed */}
+                        {!isClientCollapsed && (
+                          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {threads.map(({ parentLog, children }) => {
+                              const isThreadCollapsed = collapsedThreadIds.has(parentLog.id);
+                              const hasChildren = children.length > 0;
+
+                              return (
+                                <div key={`thread-${parentLog.id}`} className="">
+                                  {/* Parent log — with inline thread-collapse toggle when it has children */}
+                                  <div className="relative">
+                                    {hasChildren && (
+                                      <button
+                                        onClick={() => toggleThread(parentLog.id)}
+                                        title={isThreadCollapsed ? 'Show follow-ups' : 'Hide follow-ups'}
+                                        className={cn(
+                                          'absolute left-0 top-0 bottom-0 w-1 z-10 transition-colors',
+                                          isThreadCollapsed
+                                            ? (isDark ? 'bg-indigo-600/60 hover:bg-indigo-500' : 'bg-indigo-400/60 hover:bg-indigo-500')
+                                            : (isDark ? 'bg-indigo-800/40 hover:bg-indigo-700/60' : 'bg-indigo-200 hover:bg-indigo-300')
+                                        )}
+                                        aria-label={isThreadCollapsed ? 'Expand thread' : 'Collapse thread'}
+                                      />
+                                    )}
+                                    <div className={hasChildren ? 'pl-2' : ''}>
+                                      <LogCard
+                                        log={parentLog}
+                                        isDark={isDark}
+                                        expanded={expandedIds.has(parentLog.id)}
+                                        onToggleExpand={() => toggleExpand(parentLog.id)}
+                                        onEdit={() => handleEdit(parentLog)}
+                                        onDelete={() => handleDelete(parentLog.id)}
+                                        onToggleFollowUp={() => updateCommLog(parentLog.id, { followUpDone: !parentLog.followUpDone })}
+                                        onAddFollowUpNote={() => {
+                                          setForm({
+                                            ...emptyForm(),
+                                            parentId: parentLog.id,
+                                            client: parentLog.client || '',
+                                            siteName: parentLog.siteName || '',
+                                            contactType: parentLog.contactType,
+                                            channel: parentLog.channel
+                                          });
+                                          setShowForm(true);
+                                          setEditingId(null);
+                                        }}
+                                        currentUserName={currentUser?.name || ''}
+                                        isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
+                                        mainTasks={mainTasks}
+                                        onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
+                                      />
+                                    </div>
+                                    {/* Thread collapse indicator when has children */}
+                                    {hasChildren && isThreadCollapsed && (
+                                      <button
+                                        onClick={() => toggleThread(parentLog.id)}
+                                        className={cn(
+                                          'w-full flex items-center gap-2 px-4 py-1.5 text-xs font-medium transition-colors border-t',
+                                          isDark
+                                            ? 'bg-indigo-950/40 text-indigo-400 border-slate-700 hover:bg-indigo-950/60'
+                                            : 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100'
+                                        )}
+                                      >
+                                        <ChevronDown className="w-3.5 h-3.5" />
+                                        {children.length} follow-up{children.length !== 1 ? 's' : ''} hidden — click to expand
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {/* Follow-up children — hidden when thread is collapsed */}
+                                  {!isThreadCollapsed && children.map(child => (
+                                    <div key={child.id} className={cn(
+                                      'pl-2 border-l-2',
+                                      isDark ? 'border-indigo-800/60' : 'border-indigo-200'
+                                    )}>
+                                      <LogCard
+                                        log={child}
+                                        isChild
+                                        isDark={isDark}
+                                        expanded={expandedIds.has(child.id)}
+                                        onToggleExpand={() => toggleExpand(child.id)}
+                                        onEdit={() => handleEdit(child)}
+                                        onDelete={() => handleDelete(child.id)}
+                                        onToggleFollowUp={() => updateCommLog(child.id, { followUpDone: !child.followUpDone })}
+                                        currentUserName={currentUser?.name || ''}
+                                        isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
+                                        mainTasks={mainTasks}
+                                        onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   });
-                  return nodes;
                 })()
               )}
             </div>

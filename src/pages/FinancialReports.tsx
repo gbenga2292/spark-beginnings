@@ -24,6 +24,7 @@ import { usePayrollCalculator } from '@/src/hooks/usePayrollCalculator';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { SiteSummary } from './SiteSummary';
+import { AccountsReportBuilder } from '@/src/components/financial/AccountsReportBuilder';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -80,6 +81,7 @@ export function FinancialReports() {
   const [filterMonth, setFilterMonth] = useState<string>('All');
   const [filterClient, setFilterClient] = useState<string>('All');
   const [mainTab, setMainTab] = useState<'client-account' | 'payroll-summary' | 'site-summary' | 'ledger-summary'>('client-account');
+  const [reportBuilderOpen, setReportBuilderOpen] = useState(false);
   const sitesPriv = usePriv('sites');
   const [ledgerSummaryView, setLedgerSummaryView] = useState<'category' | 'bank' | 'client' | 'site'>('category');
 
@@ -1083,6 +1085,10 @@ export function FinancialReports() {
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+      <AccountsReportBuilder
+        open={reportBuilderOpen}
+        onOpenChange={setReportBuilderOpen}
+      />
       {renderReportPreview()}
       {exportMessage && (
         <div className="fixed top-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center gap-2 animate-in slide-in-from-top-2">
@@ -1743,79 +1749,22 @@ export function FinancialReports() {
         </CardContent>
       </Card>
 
-      {/* Quick Export Cards */}
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card className="hover:shadow-md transition-shadow bg-white border-slate-200">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-semibold text-slate-900">Invoice Report</CardTitle>
-            <ReceiptText className="h-5 w-5 text-indigo-600" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-slate-500 mb-4 h-10">Full invoice listing with client, site, amounts, and status.</p>
-            <div className="flex flex-col gap-2">
-              {priv.canExport && (
-                <div className="flex bg-slate-50 border border-slate-200 rounded-md shadow-sm h-9 overflow-hidden shrink-0 w-full font-semibold">
-                  <Button variant="ghost" size="sm" className="flex-1 gap-2 h-full text-indigo-700 hover:bg-indigo-100 rounded-none border-r border-slate-200 px-3 transition-colors text-xs font-semibold" onClick={() => exportInvoiceReport('bare')} title="Export Basic Fields Only">
-                    <Download className="h-4 w-4" /> Basic CSV
-                  </Button>
-                  <Button variant="ghost" size="sm" className="flex-1 gap-2 h-full text-indigo-700 hover:bg-indigo-100 rounded-none px-3 transition-colors text-xs font-semibold" onClick={() => exportInvoiceReport('detailed')} title="Export Complete Data">
-                    Detailed CSV
-                  </Button>
-                </div>
-              )}
-              {priv.canExport && (
-                <div className="flex bg-slate-50 border border-slate-200 rounded-md shadow-sm h-9 overflow-hidden shrink-0 w-full font-semibold">
-                  <Button variant="ghost" size="sm" className="flex-1 gap-2 h-full text-red-700 hover:bg-red-50 rounded-none border-r border-slate-200 px-3 transition-colors text-xs font-semibold" onClick={() => exportInvoicePdf('bare')} title="Export Basic Fields PDF">
-                    <FileText className="h-4 w-4" /> Basic PDF
-                  </Button>
-                  <Button variant="ghost" size="sm" className="flex-1 gap-2 h-full text-red-700 hover:bg-red-50 rounded-none px-3 transition-colors text-xs font-semibold" onClick={() => exportInvoicePdf('detailed')} title="Export Detailed Fields PDF">
-                    Detailed PDF
-                  </Button>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow bg-white border-slate-200">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-semibold text-slate-900">Payment Report</CardTitle>
-            <NairaSign className="h-5 w-5 text-emerald-600" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-slate-500 mb-4 h-10">Payment records with WHT, VAT, and discount breakdowns.</p>
-            <div className="flex gap-2">
-              {priv.canExport && (
-                <Button variant="outline" size="sm" className="w-full gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportPaymentReport}>
-                  <FileSpreadsheet className="h-4 w-4" /> Excel
-                </Button>
-              )}
-              {priv.canExport && (
-                <Button variant="outline" size="sm" className="w-full gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportPaymentPdf}>
-                  <FileText className="h-4 w-4" /> PDF
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow bg-white border-slate-200">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-semibold text-slate-900">VAT Remittance</CardTitle>
-            <Landmark className="h-5 w-5 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-slate-500 mb-4 h-10">Track VAT collected vs remitted to FIRS for compliance.</p>
-            <div className="flex gap-2">
-              {priv.canExport && (
-                <Button variant="outline" size="sm" className="w-full gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportVatReport}>
-                  <FileSpreadsheet className="h-4 w-4" /> Excel
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Custom Report Builder Card */}
+      <Card className="hover:shadow-md transition-shadow bg-gradient-to-r from-indigo-50 to-white border-indigo-200 mt-6 max-w-3xl">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-lg font-bold text-indigo-900">Advanced Report Builder</CardTitle>
+          <FileSpreadsheet className="h-6 w-6 text-indigo-600" />
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-slate-500 mb-4 font-medium">
+            Build completely custom financial reports. Select modules, map columns, pick your clients and duration, and export directly to PDF or Excel.
+          </p>
+          <Button className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white gap-2 font-bold" onClick={() => setReportBuilderOpen(true)}>
+            <div className="h-5 w-5 bg-white/20 rounded-full flex items-center justify-center shrink-0"><FileSpreadsheet className="h-3 w-3" /></div>
+            Open Report Builder
+          </Button>
+        </CardContent>
+      </Card>
 
       </>
       ) : (
@@ -2351,134 +2300,7 @@ export function FinancialReports() {
       </>
       )}
 
-      {/* Custom Financial Report Builder */}
-      <Card className="bg-white border-slate-200 mb-6">
-        <CardHeader className="border-b border-slate-100 pb-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <CardTitle className="text-slate-900">Custom Financial Report Builder</CardTitle>
-              <p className="text-sm text-slate-500 mt-1">Pick the data modules you need — export as a multi-sheet Excel or a PDF summary.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSelectedFields(selectedFields.length === ALL_FINANCIAL_FIELDS.length ? [] : ALL_FINANCIAL_FIELDS)}
-                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline underline-offset-2 transition-colors"
-              >
-                {selectedFields.length === ALL_FINANCIAL_FIELDS.length ? 'Deselect All' : 'Select All'}
-              </button>
-              <span className="text-xs text-slate-400">{selectedFields.length} / {ALL_FINANCIAL_FIELDS.length} modules</span>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="space-y-6">
-            {/* Tab Navigation */}
-            <div className="flex overflow-x-auto gap-2 pb-2 hide-scrollbar border-b border-slate-100">
-              {FINANCIAL_REPORT_GROUPS.map(group => {
-                const isActive = activeFinBuilderTab === group.group;
-                const groupSelectedCount = group.fields.filter(f => selectedFields.includes(f)).length;
-                return (
-                  <button
-                    key={group.group}
-                    onClick={() => setActiveFinBuilderTab(group.group)}
-                    className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors whitespace-nowrap border-b-2 ${
-                      isActive 
-                        ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50' 
-                        : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-                    }`}
-                  >
-                    {group.group}
-                    {groupSelectedCount > 0 && (
-                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-100 text-indigo-800 text-[10px]">
-                        {groupSelectedCount}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
 
-            {/* Active Tab Content */}
-            {FINANCIAL_REPORT_GROUPS.filter(g => g.group === activeFinBuilderTab).map(group => {
-              const checkColor: Record<string, string> = {
-                indigo:  'accent-indigo-600',
-                emerald: 'accent-emerald-600',
-                amber:   'accent-amber-500',
-                violet:  'accent-violet-600',
-              };
-              const allGroupSelected = group.fields.every(f => selectedFields.includes(f));
-              return (
-                <div key={group.group} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <div className="flex items-center justify-between mb-3 px-1">
-                    <p className="text-sm font-medium text-slate-500">Select modules to include in your report:</p>
-                    <button
-                      onClick={() => {
-                        if (allGroupSelected) {
-                          setSelectedFields(prev => prev.filter(f => !group.fields.includes(f)));
-                        } else {
-                          setSelectedFields(prev => [...new Set([...prev, ...group.fields])]);
-                        }
-                      }}
-                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
-                    >
-                      {allGroupSelected ? '- Deselect Group' : '+ Select Group'}
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 bg-slate-50 p-5 rounded-xl border border-slate-100">
-                    {group.fields.map(field => (
-                      <label key={field} className="flex items-start gap-3 text-sm font-medium text-slate-700 cursor-pointer hover:text-slate-900 transition-colors bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                        <input
-                          type="checkbox"
-                          checked={selectedFields.includes(field)}
-                          onChange={() => toggleField(field)}
-                          className={`mt-0.5 h-4 w-4 rounded border-slate-300 ${checkColor[group.color]} transition-all`}
-                        />
-                        <span className="leading-tight">{field}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Preview bar */}
-            {selectedFields.length > 0 && (
-              <div className="flex items-start sm:items-center gap-3 text-xs text-slate-500 bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 sm:px-4 sm:py-3 animate-in fade-in">
-                <CheckCircle2 className="h-5 w-5 text-indigo-500 flex-shrink-0 mt-0.5 sm:mt-0" />
-                <div>
-                  Report will include <strong className="text-indigo-700">{selectedFields.length} module{selectedFields.length > 1 ? 's' : ''}</strong>. Excel = one sheet per module. PDF = key metric summary.
-                  <div className="text-indigo-600/80 italic mt-0.5">{selectedFields.slice(0, 5).join(', ')}{selectedFields.length > 5 ? ` +${selectedFields.length - 5} more` : ''}</div>
-                </div>
-              </div>
-            )}
-
-            {/* Export buttons */}
-            <div className="pt-2 flex flex-wrap items-center justify-end gap-3">
-              {priv.canExport ? (
-                <>
-                  <Button
-                    variant="outline"
-                    className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                    onClick={generateCustomReport}
-                    disabled={selectedFields.length === 0}
-                  >
-                    <FileSpreadsheet className="h-4 w-4" /> Export Excel
-                  </Button>
-                  <Button
-                    className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
-                    onClick={generateCustomReportPdf}
-                    disabled={selectedFields.length === 0}
-                  >
-                    <FileText className="h-4 w-4" /> Export PDF Summary
-                  </Button>
-                </>
-              ) : (
-                <p className="text-xs text-slate-400 italic">Export not permitted</p>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       </div>
     </div>

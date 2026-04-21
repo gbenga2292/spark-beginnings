@@ -1193,7 +1193,7 @@ function AdminTasksView() {
                       initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.02, duration: 0.25 }}
                       onClick={() => setOpenSubtaskId(sub.id ?? null)}
-                      className={`flex items-center gap-3 px-4 py-3.5 bg-card border rounded-xl hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer group ${(sub as SubTask).priority ? `border-l-4 ${PRIORITY_CONFIG[(sub as SubTask).priority!].border}` : ''}`}>
+                      className={`flex items-center gap-3 px-4 py-3.5 bg-card border rounded-xl hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer group ${(sub as SubTask).priority && PRIORITY_CONFIG[(sub as SubTask).priority!] ? `border-l-4 ${PRIORITY_CONFIG[(sub as SubTask).priority!].border}` : ''}`}>
                       <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc.dot}`} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
@@ -1364,7 +1364,7 @@ function AdminTasksView() {
 
                 return (
                   <div key={mt.id} id={`task-row-${mt.id}`}
-                    className={`bg-card border border-border rounded-xl overflow-hidden transition-colors border-l-4 ${mt.priority ? PRIORITY_CONFIG[mt.priority as TaskPriority].border : 'border-l-transparent'
+                    className={`bg-card border border-border rounded-xl overflow-hidden transition-colors border-l-4 ${mt.priority && PRIORITY_CONFIG[mt.priority as TaskPriority] ? PRIORITY_CONFIG[mt.priority as TaskPriority].border : 'border-l-transparent'
                       } hover:shadow-sm`}>
                     {/* Main task header */}
                     <div role="button" tabIndex={0}
@@ -1882,7 +1882,7 @@ function UserTasksView() {
                       initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.02, duration: 0.25 }}
                       onClick={() => setOpenSubtaskId(sub.id ?? null)}
-                      className={`flex items-center gap-3 px-4 py-3.5 bg-card border rounded-xl hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer group ${(sub as SubTask).priority ? `border-l-4 ${PRIORITY_CONFIG[(sub as SubTask).priority!].border}` : ''}`}>
+                      className={`flex items-center gap-3 px-4 py-3.5 bg-card border rounded-xl hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer group ${(sub as SubTask).priority && PRIORITY_CONFIG[(sub as SubTask).priority!] ? `border-l-4 ${PRIORITY_CONFIG[(sub as SubTask).priority!].border}` : ''}`}>
                       <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc.dot}`} />
                       <div className="min-w-0 flex-1">
                         <p className={`text-sm font-medium group-hover:text-primary transition-colors truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>

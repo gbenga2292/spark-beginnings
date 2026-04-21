@@ -53,7 +53,7 @@ export function MainTaskCard({ task, subtasks, users, onClick, compact, isMentio
       exit={{ opacity: 0, scale: 0.95 }}
       onClick={onClick}
       className={`bg-card border rounded-xl cursor-pointer transition-all hover:shadow-md hover:border-primary/30 group border-l-4 ${
-        task.priority ? PRIORITY_CONFIG[task.priority].border : "border-l-transparent"
+        task.priority ? (PRIORITY_CONFIG[task.priority]?.border ?? 'border-l-transparent') : "border-l-transparent"
       } ${compact ? "p-3" : "p-4"}`}
     >
       {/* Title + priority + badges */}
@@ -75,7 +75,7 @@ export function MainTaskCard({ task, subtasks, users, onClick, compact, isMentio
               {unseenCount}
             </span>
           )}
-          {task.priority && (
+          {task.priority && PRIORITY_CONFIG[task.priority] && (
             <span className={`w-2 h-2 rounded-full flex-shrink-0 mt-0.5 ${PRIORITY_CONFIG[task.priority].dot}`} title={task.priority} />
           )}
         </div>
@@ -133,7 +133,7 @@ export function SubtaskCard({ subtask, mainTask, assignee, onClick, compact, isM
       exit={{ opacity: 0, scale: 0.95 }}
       onClick={onClick}
       className={`bg-card border rounded-xl cursor-pointer transition-all hover:shadow-md hover:border-primary/30 group ${
-        subtask.priority ? `border-l-4 ${PRIORITY_CONFIG[subtask.priority].border}` : ""
+        subtask.priority && PRIORITY_CONFIG[subtask.priority] ? `border-l-4 ${PRIORITY_CONFIG[subtask.priority].border}` : ""
       } ${compact ? "p-2.5" : "p-3.5"}`}
     >
       {/* Status dot + title + badges */}
@@ -164,7 +164,7 @@ export function SubtaskCard({ subtask, mainTask, assignee, onClick, compact, isM
             <Clock className="w-2.5 h-2.5" />{formatDueDate(subtask.deadline)}
           </span>
         )}
-        {subtask.priority && (
+        {subtask.priority && PRIORITY_CONFIG[subtask.priority] && (
           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_CONFIG[subtask.priority].dot}`} title={subtask.priority} />
         )}
         {assignee && (

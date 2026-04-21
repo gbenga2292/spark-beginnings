@@ -34,6 +34,7 @@ const PRIORITY_BADGE: Record<TaskPriority, { cls: string; dot: string }> = {
 function PriorityPill({ priority }: { priority?: TaskPriority }) {
   if (!priority) return null;
   const p = PRIORITY_BADGE[priority];
+  if (!p) return null; // guard against unknown/legacy priority values from DB
   return (
     <span className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${p.cls}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${p.dot}`} />{priority.charAt(0).toUpperCase() + priority.slice(1)}

@@ -56,6 +56,7 @@ export const PRIORITY_ORDER: TaskPriority[] = ['urgent', 'high', 'medium', 'low'
 export function PriorityBadge({ priority, size = 'sm' }: { priority?: TaskPriority; size?: 'xs' | 'sm' }) {
   if (!priority) return null;
   const cfg = PRIORITY_CONFIG[priority];
+  if (!cfg) return null; // guard against unknown/legacy priority values from DB
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-semibold ${cfg.className} ${size === 'xs' ? 'text-[10px] px-1.5' : ''}`}>
       <Flag className="w-2.5 h-2.5" />
@@ -98,10 +99,10 @@ export function PriorityPicker({ value, onChange }: { value?: TaskPriority; onCh
         ref={btnRef}
         type="button"
         onClick={handleToggle}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all hover:shadow-sm ${value ? PRIORITY_CONFIG[value].className : 'border-border bg-muted text-muted-foreground hover:text-foreground'}`}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all hover:shadow-sm ${value && PRIORITY_CONFIG[value] ? PRIORITY_CONFIG[value].className : 'border-border bg-muted text-muted-foreground hover:text-foreground'}`}
       >
         <Flag className="w-3 h-3" />
-        {value ? PRIORITY_CONFIG[value].label : 'Priority'}
+        {value && PRIORITY_CONFIG[value] ? PRIORITY_CONFIG[value].label : 'Priority'}
       </button>
 
       <AnimatePresence>
