@@ -1819,7 +1819,18 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
   const [items, setItems] = useState<any[]>(() => {
     if (invoice.printLayout?.items) return invoice.printLayout.items;
     const list = [];
-    if (invoice.rentalCost && invoice.rentalCost > 0) {
+    if (invoice.machineConfigs && invoice.machineConfigs.length > 0) {
+      let isFirst = true;
+      invoice.machineConfigs.forEach((m: any, i: number) => {
+        const mRate = parseFloat(m.rate) || 0;
+        const mDur = parseFloat(m.duration) || 0;
+        const mCost = mRate * mDur;
+        if (mCost > 0) {
+          list.push({ id: generateId(), selected: true, desc: `${isFirst ? 'Phase 1\n' : ''}Lease of 1 Dewatering Pump @ N${mRate.toLocaleString()} per pump for ${mDur} days.`, qty: 1, unitRate: mCost, amount: mCost });
+          isFirst = false;
+        }
+      });
+    } else if (invoice.rentalCost && invoice.rentalCost > 0) {
       list.push({ id: generateId(), selected: true, desc: `Phase 1\nLease of ${invoice.noOfMachine || 0} Dewatering Pumps @ N${(invoice.dailyRentalCost || 0).toLocaleString()} per pump for ${invoice.duration || 0} days.`, qty: invoice.noOfMachine || 1, unitRate: invoice.rentalCost, amount: invoice.rentalCost });
     }
     if (invoice.techniciansCost && invoice.techniciansCost > 0) {
@@ -1851,7 +1862,9 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
 
   let totalCharge = subtotal;
   let vat = 0;
-  if (vatIncSetting === 'Add') {
+  if (vatIncSetting === 'Yes') {
+    vat = (subtotal / (100 + vatRate)) * vatRate;
+  } else if (vatIncSetting === 'Add') {
     vat = subtotal * (vatRate / 100);
     totalCharge = subtotal + vat;
   }
@@ -2247,20 +2260,39 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
                   </tr>
 
                   {/* Totals */}
+                  {vat > 0 ? (
+                  <>
+                  <tr style={{ borderTop: '1.5px solid #385296' }}>
+                    <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
+                    <td rowSpan={5} style={{ borderRight: '1.5px solid #385296', padding: '12px', verticalAlign: 'bottom' }}>
+                      <input className="hide-on-print" value={footerText} onChange={e => setFooterText(e.target.value)} style={{ width: '100%', border: '1px dashed #c7d2e0', padding: 4, borderRadius: 3, outline: 'none', background: '#f9fafb', fontSize: 13, fontFamily: 'inherit' }} />
+                      <span className="show-on-print" style={{ display: 'none', fontSize: '13.5px' }}>{footerText}</span>
+                    </td>
+                    <td className="qty-col" style={{ borderBottom: '1px solid #e2e8f0', borderRight: '1.5px solid #385296', textAlign: 'left', padding: '8px 12px' }}>Subtotal</td>
+                    <td className="amt-col" style={{ borderBottom: '1px solid #e2e8f0', borderRight: 'none', padding: '8px 12px' }}>NGN {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                  <tr>
+                    <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
+                    <td className="qty-col" style={{ borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', padding: '8px 12px', color: '#dc2626' }}>VAT Charge {vatIncSetting === 'Yes' ? '(Incl.)' : ''}</td>
+                    <td className="amt-col" style={{ borderBottom: '1.5px solid #385296', borderRight: 'none', padding: '8px 12px', color: '#dc2626' }}>NGN {vat.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                  <tr>
+                    <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
+                    <td className="qty-col" style={{ borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '8px 12px' }}>Total Due</td>
+                    <td className="amt-col" style={{ borderBottom: '1.5px solid #385296', borderRight: 'none', fontWeight: 'bold', padding: '8px 12px' }}>NGN {totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                  </>
+                  ) : (
                   <tr style={{ borderTop: '1.5px solid #385296' }}>
                     <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
                     <td rowSpan={3} style={{ borderRight: '1.5px solid #385296', padding: '12px', verticalAlign: 'bottom' }}>
-                      <input
-                        className="hide-on-print"
-                        value={footerText}
-                        onChange={e => setFooterText(e.target.value)}
-                        style={{ width: '100%', border: '1px dashed #c7d2e0', padding: 4, borderRadius: 3, outline: 'none', background: '#f9fafb', fontSize: 13, fontFamily: 'inherit' }}
-                      />
+                      <input className="hide-on-print" value={footerText} onChange={e => setFooterText(e.target.value)} style={{ width: '100%', border: '1px dashed #c7d2e0', padding: 4, borderRadius: 3, outline: 'none', background: '#f9fafb', fontSize: 13, fontFamily: 'inherit' }} />
                       <span className="show-on-print" style={{ display: 'none', fontSize: '13.5px' }}>{footerText}</span>
                     </td>
                     <td className="qty-col" style={{ borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px' }}>Total Due</td>
                     <td className="amt-col" style={{ borderBottom: '1.5px solid #385296', borderRight: 'none', fontWeight: 'bold', padding: '10px 12px' }}>NGN {totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   </tr>
+                  )}
                   <tr>
                     <td className="hide-on-print" style={{ borderLeft: 'none', borderRight: '1.5px solid #385296', background: '#fafafa' }}></td>
                     <td className="qty-col" style={{ borderBottom: '1.5px solid #385296', borderRight: '1.5px solid #385296', textAlign: 'left', fontWeight: 'bold', padding: '10px 12px' }}>Payments/Credits</td>
