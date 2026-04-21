@@ -1035,9 +1035,13 @@ interface LogCardProps {
   isChild?: boolean;
   mainTasks: any[];
   onNavigateTask: (taskId: string) => void;
+  // thread collapse props (only meaningful on parent/non-child cards)
+  childCount?: number;
+  isThreadCollapsed?: boolean;
+  onToggleThread?: () => void;
 }
 
-function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, isDark, expanded, onToggleExpand, currentUserName, isAdmin, isChild, mainTasks, onNavigateTask }: LogCardProps) {
+function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, isDark, expanded, onToggleExpand, currentUserName, isAdmin, isChild, mainTasks, onNavigateTask, childCount, isThreadCollapsed, onToggleThread }: LogCardProps) {
   const canDelete = isAdmin || log.loggedBy === currentUserName;
   const isOverdue = log.followUpDate && !log.followUpDone && isBefore(parseISO(log.followUpDate), startOfDay(new Date()));
 
@@ -1146,6 +1150,22 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
                 className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-emerald-400' : 'text-slate-400 hover:bg-slate-100 hover:text-emerald-600')}
               >
                 <MessageSquare className="w-4 h-4" />
+              </button>
+            )}
+            {/* Thread collapse button — only shown on parent logs with children */}
+            {!isChild && !!childCount && onToggleThread && (
+              <button
+                onClick={e => { e.stopPropagation(); onToggleThread(); }}
+                title={isThreadCollapsed ? `Show ${childCount} follow-up${childCount !== 1 ? 's' : ''}` : `Collapse ${childCount} follow-up${childCount !== 1 ? 's' : ''}`}
+                className={cn(
+                  'flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold border transition-all',
+                  isThreadCollapsed
+                    ? (isDark ? 'bg-indigo-900/40 border-indigo-700 text-indigo-300 hover:bg-indigo-900/70' : 'bg-indigo-50 border-indigo-300 text-indigo-600 hover:bg-indigo-100')
+                    : (isDark ? 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200')
+                )}
+              >
+                {isThreadCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+                {childCount}
               </button>
             )}
             <button onClick={onToggleExpand} className={cn('p-1.5 rounded-lg transition-colors', isDark ? 'text-slate-500 hover:bg-slate-800' : 'text-slate-400 hover:bg-slate-100')}>
@@ -1804,22 +1824,7 @@ export function CommLog() {
 
                               return (
                                 <div key={`thread-${parentLog.id}`} className="">
-                                  {/* Parent log — with inline thread-collapse toggle when it has children */}
-                                  <div className="relative">
-                                    {hasChildren && (
-                                      <button
-                                        onClick={() => toggleThread(parentLog.id)}
-                                        title={isThreadCollapsed ? 'Show follow-ups' : 'Hide follow-ups'}
-                                        className={cn(
-                                          'absolute left-0 top-0 bottom-0 w-1 z-10 transition-colors',
-                                          isThreadCollapsed
-                                            ? (isDark ? 'bg-indigo-600/60 hover:bg-indigo-500' : 'bg-indigo-400/60 hover:bg-indigo-500')
-                                            : (isDark ? 'bg-indigo-800/40 hover:bg-indigo-700/60' : 'bg-indigo-200 hover:bg-indigo-300')
-                                        )}
-                                        aria-label={isThreadCollapsed ? 'Expand thread' : 'Collapse thread'}
-                                      />
-                                    )}
-                                    <div className={hasChildren ? 'pl-2' : ''}>
+                                  <div className={hasChildren ? 'pl-2' : ''}>
                                       <LogCard
                                         log={parentLog}
                                         isDark={isDark}
@@ -1844,6 +1849,9 @@ export function CommLog() {
                                         isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
                                         mainTasks={mainTasks}
                                         onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
+                                        childCount={hasChildren ? children.length : undefined}
+                                        isThreadCollapsed={isThreadCollapsed}
+                                        onToggleThread={() => toggleThread(parentLog.id)}
                                       />
                                     </div>
                                     {/* Thread collapse indicator when has children */}
@@ -1861,7 +1869,6 @@ export function CommLog() {
                                         {children.length} follow-up{children.length !== 1 ? 's' : ''} hidden — click to expand
                                       </button>
                                     )}
-                                  </div>
 
                                   {/* Follow-up children — hidden when thread is collapsed */}
                                   {!isThreadCollapsed && children.map(child => (

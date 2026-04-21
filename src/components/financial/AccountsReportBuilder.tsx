@@ -6,32 +6,46 @@ import { Upload, Printer, Trash2, Save, X, Info } from 'lucide-react';
 import { useAppStore } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
 import logoSrc from '../../../logo/logo-2.png';
+import { usePayrollCalculator } from '@/src/hooks/usePayrollCalculator';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const YEAR_RANGE_START = 2020;
 const currentYear = new Date().getFullYear();
 
-type DataSource = 'INVOICE' | 'PAYMENT' | 'VAT';
+
+type DataSource = 'INVOICE' | 'PAYMENT' | 'VAT' | 'PAYROLL' | 'LEDGER' | 'SITE';
 
 const SOURCE_LABELS: Record<DataSource, string> = {
   INVOICE: 'Invoices',
   PAYMENT: 'Payments',
   VAT:     'VAT Remittances',
+  PAYROLL: 'Payroll',
+  LEDGER:  'Ledger',
+  SITE:    'Sites',
 };
 const SOURCE_PILL: Record<DataSource, string> = {
   INVOICE: 'bg-blue-100 text-blue-700 border-blue-200',
   PAYMENT: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   VAT:     'bg-amber-100  text-amber-700  border-amber-200',
+  PAYROLL: 'bg-purple-100 text-purple-700 border-purple-200',
+  LEDGER:  'bg-slate-100  text-slate-700  border-slate-200',
+  SITE:    'bg-indigo-100 text-indigo-700 border-indigo-200',
 };
 const SOURCE_TOGGLE_ON: Record<DataSource, string> = {
   INVOICE: 'bg-blue-50   border-blue-300  text-blue-800',
   PAYMENT: 'bg-emerald-50 border-emerald-300 text-emerald-800',
   VAT:     'bg-amber-50   border-amber-300  text-amber-800',
+  PAYROLL: 'bg-purple-50 border-purple-300 text-purple-800',
+  LEDGER:  'bg-slate-50  border-slate-300  text-slate-800',
+  SITE:    'bg-indigo-50 border-indigo-300 text-indigo-800',
 };
 const ROW_TINT: Record<DataSource, string> = {
   INVOICE: '',
   PAYMENT: 'bg-emerald-50/40',
   VAT:     'bg-amber-50/40',
+  PAYROLL: 'bg-purple-50/40',
+  LEDGER:  'bg-slate-50/40',
+  SITE:    'bg-indigo-50/40',
 };
 
 // VAT month name → sidebar key
@@ -108,6 +122,36 @@ const TXN_COLUMNS: ColumnDef[] = [
   { id: 'vatOwed',      label: 'VAT Owed',         summable: true,  sources: ['VAT'] },
   { id: 'vatPaid',      label: 'VAT Paid',         summable: true,  sources: ['VAT'] },
   { id: 'vatBalDue',    label: 'Bal Due',          summable: true,  sources: ['VAT'] },
+  // Payroll
+  { id: 'p_employee',   label: 'Employee Name',    summable: false, sources: ['PAYROLL'] },
+  { id: 'p_department', label: 'Department',       summable: false, sources: ['PAYROLL'] },
+  { id: 'p_position',   label: 'Position',         summable: false, sources: ['PAYROLL'] },
+  { id: 'p_staffType',  label: 'Staff Type',       summable: false, sources: ['PAYROLL'] },
+  { id: 'p_basic',      label: 'Gross Pay',        summable: true,  sources: ['PAYROLL'] },
+  { id: 'p_pension',    label: 'Pension',          summable: true,  sources: ['PAYROLL'] },
+  { id: 'p_paye',       label: 'PAYE Tax',         summable: true,  sources: ['PAYROLL'] },
+  { id: 'p_nsitf',      label: 'NSITF',            summable: true,  sources: ['PAYROLL'] },
+  { id: 'p_net',        label: 'Net Pay',          summable: true,  sources: ['PAYROLL'] },
+  { id: 'p_month',      label: 'Month',            summable: false, sources: ['PAYROLL'] },
+  { id: 'p_year',       label: 'Year',             summable: false, sources: ['PAYROLL'] },
+  // Ledger
+  { id: 'l_date',       label: 'Date',             summable: false, sources: ['LEDGER'] },
+  { id: 'l_voucher',    label: 'Voucher No.',      summable: false, sources: ['LEDGER'] },
+  { id: 'l_category',   label: 'Category',         summable: false, sources: ['LEDGER'] },
+  { id: 'l_desc',       label: 'Description',      summable: false, sources: ['LEDGER'] },
+  { id: 'l_amount',     label: 'Amount',           summable: true,  sources: ['LEDGER'] },
+  { id: 'l_vendor',     label: 'Vendor',           summable: false, sources: ['LEDGER'] },
+  { id: 'l_bank',       label: 'Bank',             summable: false, sources: ['LEDGER'] },
+  { id: 'l_client',     label: 'Ledger Client',    summable: false, sources: ['LEDGER'] },
+  { id: 'l_site',       label: 'Ledger Site',      summable: false, sources: ['LEDGER'] },
+  { id: 'l_enteredBy',  label: 'Entered By',       summable: false, sources: ['LEDGER'] },
+  // Site
+  { id: 't_name',       label: 'Site Name',        summable: false, sources: ['SITE'] },
+  { id: 't_client',     label: 'Site Client',      summable: false, sources: ['SITE'] },
+  { id: 't_status',     label: 'Status',           summable: false, sources: ['SITE'] },
+  { id: 't_vat',        label: 'VAT Setting',      summable: false, sources: ['SITE'] },
+  { id: 't_start',      label: 'Start Date',       summable: false, sources: ['SITE'] },
+  { id: 't_end',        label: 'End Date',         summable: false, sources: ['SITE'] },
 ];
 
 /**
@@ -115,9 +159,9 @@ const TXN_COLUMNS: ColumnDef[] = [
  * Mix of period-scoped and all-time values to give accurate balance.
  */
 const SUM_COLUMNS: ColumnDef[] = [
-  { id: 's_sn',            label: 'S/N',                      summable: false, sources: ['INVOICE','PAYMENT','VAT'] },
-  { id: 's_client',        label: 'Client Name',              summable: false, sources: ['INVOICE','PAYMENT','VAT'] },
-  { id: 's_tin',           label: 'Client TIN',               summable: false, sources: ['INVOICE','PAYMENT','VAT'] },
+  { id: 's_sn',            label: 'S/N',                      summable: false, sources: ['INVOICE','PAYMENT','VAT','PAYROLL','LEDGER','SITE'] },
+  { id: 's_client',        label: 'Client Name',              summable: false, sources: ['INVOICE','PAYMENT','VAT','PAYROLL','LEDGER','SITE'] },
+  { id: 's_tin',           label: 'Client TIN',               summable: false, sources: ['INVOICE','PAYMENT','VAT','PAYROLL','LEDGER','SITE'] },
   // ── Invoice ──
   { id: 's_inv_count',     label: 'Invoice Count (Period)',   summable: true,  sources: ['INVOICE'] },
   { id: 's_periodcharged', label: 'Period Invoiced',          summable: true,  sources: ['INVOICE'] },
@@ -133,6 +177,10 @@ const SUM_COLUMNS: ColumnDef[] = [
   // ── VAT ──
   { id: 's_vat_count',     label: 'VAT Records',              summable: true,  sources: ['VAT'] },
   { id: 's_vat_remitted',  label: 'Total VAT Remitted',       summable: true,  sources: ['VAT'] },
+  // ── Ledger ──
+  { id: 's_ledger_total',  label: 'Ledger Expenses',          summable: true,  sources: ['LEDGER'] },
+  // ── Site ──
+  { id: 's_site_count',    label: 'Site Count',               summable: true,  sources: ['SITE'] },
   // ── Cross-source: accurate balance (all-time) ──────────────────────────────
   // Requires BOTH invoice and payment sources
   { id: 's_bfwd',          label: 'Balance B/F (Prev. Years)',summable: true,  sources: ['INVOICE','PAYMENT'] },
@@ -165,6 +213,21 @@ const BUILT_IN_PRESETS: ReportPreset[] = [
     columns: ['sn','client','vatDate','remMonth','remYear','vatAmtPaid','vatableAmt','vatOwed','vatPaid','vatBalDue'],
   },
   {
+    id: '__payroll', name: 'Payroll Report', builtIn: true,
+    sources: ['PAYROLL'],
+    columns: ['sn','p_employee','p_department','p_position','p_staffType','p_basic','p_pension','p_paye','p_nsitf','p_net','p_month','p_year'],
+  },
+  {
+    id: '__led', name: 'Ledger Report', builtIn: true,
+    sources: ['LEDGER'],
+    columns: ['sn','l_date','l_voucher','l_category','l_desc','l_client','l_site','l_amount','l_vendor','l_bank','l_enteredBy'],
+  },
+  {
+    id: '__site', name: 'Site Directory', builtIn: true,
+    sources: ['SITE'],
+    columns: ['sn','t_name','t_client','t_status','t_vat','t_start','t_end'],
+  },
+  {
     // Outstanding — uses all-time balance for accuracy
     id: '__outstanding', name: 'Outstanding Balance', builtIn: true,
     sources: ['INVOICE','PAYMENT'],
@@ -172,10 +235,10 @@ const BUILT_IN_PRESETS: ReportPreset[] = [
   },
 ];
 
-const fm = (v: number | null | undefined) =>
-  typeof v === 'number'
-    ? v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : '0.00';
+const fm = (v: number | null | undefined) => {
+  if (typeof v !== 'number' || v === 0) return '-';
+  return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 
 interface TaggedRecord { _source: DataSource; _raw: any; }
 
@@ -197,6 +260,8 @@ interface AggRow {
   payDiscount: number;
   vatCount: number;
   vatRemitted: number;
+  ledgerTotal: number;
+  siteCount: number;
   // All-time (ignore date filter — driven from rawInvoices/rawPayments directly)
   allTimeCharged: number;
   allTimeCleared: number;
@@ -220,6 +285,28 @@ export interface DashboardConfig {
   onExportPdf: () => void;
 }
 
+// ── Source compatibility rules ──────────────────────────────────────────────
+// Each entry defines sources that CANNOT be combined. A new source is blocked
+// if it would form any of these forbidden pairings with the current selection.
+const INCOMPATIBLE_PAIRS: [DataSource, DataSource][] = [
+  ['INVOICE', 'PAYROLL'],
+  ['INVOICE', 'LEDGER'],
+  ['INVOICE', 'SITE'],
+  ['PAYMENT', 'SITE'],
+  ['PAYMENT', 'PAYROLL'],
+  ['VAT',     'PAYROLL'],
+  ['VAT',     'LEDGER'],
+  ['VAT',     'SITE'],
+  ['PAYROLL', 'LEDGER'],
+  ['PAYROLL', 'SITE'],
+  ['LEDGER',  'SITE'],
+];
+
+const isComboAllowed = (next: DataSource[]): boolean =>
+  !INCOMPATIBLE_PAIRS.some(
+    ([a, b]) => next.includes(a) && next.includes(b)
+  );
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export function AccountsReportBuilder({
   open,
@@ -233,13 +320,15 @@ export function AccountsReportBuilder({
   const rawInvoices    = useAppStore(s => s.invoices);
   const rawPayments    = useAppStore(s => s.payments);
   const rawVatPayments = useAppStore(s => s.vatPayments);
+  const rawLedgerEntries = useAppStore(s => s.ledgerEntries);
   const sites          = useAppStore(s => s.sites);
   const clientProfiles = useAppStore(s => s.clientProfiles);
   const pendingSites   = useAppStore(s => s.pendingSites);
   const vatRate        = useAppStore(s => s.payrollVariables.vatRate);
-
+  
+  const { calculatePayrollForMonth } = usePayrollCalculator();
   const [selectedSources, setSelectedSources] = useState<DataSource[]>(['INVOICE']);
-  const [selectedYear,    setSelectedYear]    = useState(currentYear);
+  const [selectedYears,   setSelectedYears]   = useState<number[]>([currentYear]);
   const [selectedMonths,  setSelectedMonths]  = useState<string[]>(MONTHS.map(m => m.key));
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectedColumns, setSelectedColumns] = useState<string[]>(BUILT_IN_PRESETS[0].columns);
@@ -254,7 +343,8 @@ export function AccountsReportBuilder({
   // Auto-switch column set when entering/leaving multi-source mode
   useEffect(() => {
     if (isMultiSource && !prevMulti.current) {
-      setSelectedColumns(BUILT_IN_PRESETS[3].columns); // Outstanding Balance defaults
+      const outstandingPreset = BUILT_IN_PRESETS.find(p => p.id === '__outstanding');
+      if (outstandingPreset) setSelectedColumns(outstandingPreset.columns);
     }
     prevMulti.current = isMultiSource;
   }, [isMultiSource]);
@@ -290,14 +380,38 @@ export function AccountsReportBuilder({
     rawInvoices.forEach(x => { if (x.client) s.add(x.client.trim()); });
     rawPayments.forEach(x => { if ((x as any).client) s.add(((x as any).client as string).trim()); });
     rawVatPayments.forEach(x => { if (x.client) s.add(x.client.trim()); });
+    rawLedgerEntries.forEach(x => { if (x.client && x.client !== '—') s.add(x.client.trim()); });
     return Array.from(s).sort();
-  }, [sites, rawInvoices, rawPayments, rawVatPayments]);
+  }, [sites, rawInvoices, rawPayments, rawVatPayments, rawLedgerEntries]);
 
   useEffect(() => {
     if (availableClients.length > 0 && selectedClients.length === 0) {
       setSelectedClients(availableClients);
     }
   }, [availableClients]); // eslint-disable-line
+
+  // ── Pre-cache payroll rows per year×month to avoid re-invoking heavy calculator on every sidebar interaction ──
+  const payrollCache = useMemo(() => {
+    const cache = new Map<string, ReturnType<typeof calculatePayrollForMonth>>();
+    selectedYears.forEach(yr => {
+      selectedMonths.forEach(mKey => {
+        const key = `${yr}_${mKey}`;
+        if (!cache.has(key)) cache.set(key, calculatePayrollForMonth(mKey, yr));
+      });
+    });
+    return cache;
+  }, [selectedYears, selectedMonths, calculatePayrollForMonth]);
+
+  // ── Pre-compute which sources are blocked to avoid calling isComboAllowed per-button on every render ──
+  const blockedSources = useMemo(() => {
+    const set = new Set<DataSource>();
+    (['INVOICE','PAYMENT','VAT','PAYROLL','LEDGER','SITE'] as DataSource[]).forEach(src => {
+      if (!selectedSources.includes(src) && !isComboAllowed([...selectedSources, src])) {
+        set.add(src);
+      }
+    });
+    return set;
+  }, [selectedSources]);
 
   // ── VAT remittance lookup: client_monthKey_year → total remitted ─────────────
   // Used by single-source VAT mode to compare what's owed vs what's been paid.
@@ -318,7 +432,9 @@ export function AccountsReportBuilder({
 
     const keepByDate = (date: string, client: string) => {
       const norm = normalizeDate(date);
-      if (!norm || !norm.startsWith(String(selectedYear))) return false;
+      if (!norm) return false;
+      const yr = parseInt(norm.substring(0, 4), 10);
+      if (!selectedYears.includes(yr)) return false;
       const mo = parseInt(norm.substring(5, 7), 10);
       return monthIndexes.includes(mo) && selectedClients.includes((client || '').trim());
     };
@@ -327,7 +443,7 @@ export function AccountsReportBuilder({
     const keepVat = (r: any) => {
       const mKey = monthNameToKey(r.month);
       if (!mKey || !selectedMonths.includes(mKey)) return false;
-      if (String(r.year) !== String(selectedYear)) return false;
+      if (!selectedYears.map(String).includes(String(r.year))) return false;
       return selectedClients.includes((r.client || '').trim());
     };
 
@@ -373,11 +489,48 @@ export function AccountsReportBuilder({
       }
     }
 
+    if (selectedSources.includes('PAYROLL')) {
+      selectedYears.forEach(yr => {
+        selectedMonths.forEach(mKey => {
+          const pRows = payrollCache.get(`${yr}_${mKey}`) ?? [];
+          pRows.forEach(r => {
+            rows.push({ _source: 'PAYROLL', _raw: { ...r, month: mKey, year: yr, date: `${yr}-01-01` } });
+          });
+        });
+      });
+    }
+
+    if (selectedSources.includes('LEDGER')) {
+      rawLedgerEntries
+        .filter(r => {
+          const norm = normalizeDate(r.date);
+          if (!norm) return false;
+          const yr = parseInt(norm.substring(0, 4), 10);
+          if (!selectedYears.includes(yr)) return false;
+          const mo = parseInt(norm.substring(5, 7), 10);
+          return monthIndexes.includes(mo) && (
+            selectedClients.includes((r.client || '').trim()) ||
+            (r.client || '').trim() === '' ||
+            r.client === '—'
+          );
+        })
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .forEach(r => rows.push({ _source: 'LEDGER', _raw: r }));
+    }
+
+    if (selectedSources.includes('SITE')) {
+      sites.forEach(s => {
+        if (selectedClients.includes((s.client || '').trim())) {
+           rows.push({ _source: 'SITE', _raw: { ...s, date: s.startDate || `${selectedYears[selectedYears.length - 1]}-01-01` } });
+        }
+      });
+    }
+
     if (selectedSources.length > 1) {
-      rows.sort((a, b) => new Date(a._raw.date).getTime() - new Date(b._raw.date).getTime());
+      rows.sort((a, b) => new Date(a._raw.date || 0).getTime() - new Date(b._raw.date || 0).getTime());
     }
     return rows;
-  }, [rawInvoices, rawPayments, rawVatPayments, selectedSources, selectedYear, selectedMonths, selectedClients]);
+  }, [rawInvoices, rawPayments, rawVatPayments, rawLedgerEntries, sites, payrollCache, selectedSources, selectedYears, selectedMonths, selectedClients, vatRate]);
 
   // ── Aggregated rows (multi-source) ───────────────────────────────────────────
   // Correctly separates period values from ALL-TIME values for accurate balance.
@@ -386,18 +539,20 @@ export function AccountsReportBuilder({
 
     const map = new Map<string, AggRow>();
     const ensure = (client: string): AggRow => {
-      if (!map.has(client)) {
-        map.set(client, {
-          client, tin: getTin(client),
+      const cLabel = client || '—';
+      if (!map.has(cLabel)) {
+        map.set(cLabel, {
+          client: cLabel, tin: getTin(cLabel),
           invCount: 0, periodCharged: 0, invVat: 0,
           payCount: 0, periodCleared: 0, totalPaidCash: 0, payWht: 0, payDiscount: 0,
           vatCount: 0, vatRemitted: 0,
+          ledgerTotal: 0, siteCount: 0,
           allTimeCharged: 0, allTimeCleared: 0,
           bfwdCharged: 0, bfwdCleared: 0, bfwd: 0,
           balance: 0,
         });
       }
-      return map.get(client)!;
+      return map.get(cLabel)!;
     };
 
     // Step 1: Period-scoped values from pre-filtered records
@@ -418,6 +573,10 @@ export function AccountsReportBuilder({
       } else if (rec._source === 'VAT') {
         row.vatCount++;
         row.vatRemitted += r.amount || 0;
+      } else if (rec._source === 'LEDGER') {
+        row.ledgerTotal += r.amount || 0;
+      } else if (rec._source === 'SITE') {
+        row.siteCount++;
       }
     });
 
@@ -428,11 +587,12 @@ export function AccountsReportBuilder({
         if (!selectedClients.includes(client)) return;
         const row = ensure(client);
         row.allTimeCharged += r.totalCharge || 0;
-        // Brought forward: invoices strictly before the selected year
+        // Brought forward: invoices strictly before the earliest selected year
         const norm = normalizeDate(r.date);
         if (norm) {
           const yr = parseInt(norm.substring(0, 4), 10);
-          if (yr < selectedYear) row.bfwdCharged += r.totalCharge || 0;
+          const minYr = Math.min(...selectedYears);
+          if (yr < minYr) row.bfwdCharged += r.totalCharge || 0;
         }
       });
     }
@@ -444,11 +604,12 @@ export function AccountsReportBuilder({
         const row = ensure(client);
         const cleared = ((r as any).amount || 0) + ((r as any).withholdingTax || 0) + ((r as any).discount || 0);
         row.allTimeCleared += cleared;
-        // Brought forward: payments strictly before the selected year
+        // Brought forward: payments strictly before the earliest selected year
         const norm = normalizeDate((r as any).date);
         if (norm) {
           const yr = parseInt(norm.substring(0, 4), 10);
-          if (yr < selectedYear) row.bfwdCleared += cleared;
+          const minYr = Math.min(...selectedYears);
+          if (yr < minYr) row.bfwdCleared += cleared;
         }
       });
     }
@@ -460,7 +621,7 @@ export function AccountsReportBuilder({
     });
 
     return Array.from(map.values()).sort((a, b) => a.client.localeCompare(b.client));
-  }, [recordsToPrint, isMultiSource, selectedClients, selectedYear, rawInvoices, rawPayments]); // eslint-disable-line
+  }, [recordsToPrint, isMultiSource, selectedClients, selectedYears, rawInvoices, rawPayments]); // eslint-disable-line
 
   // ── Column sets ──────────────────────────────────────────────────────────────
   const relevantCols = useMemo(() => {
@@ -566,6 +727,52 @@ export function AccountsReportBuilder({
         default: return '—';
       }
     }
+
+    if (src === 'PAYROLL') {
+      switch (colId) {
+        case 'p_employee':   return `${r.surname || ''} ${r.firstname || ''}`.trim() || '—';
+        case 'p_department': return r.department || '—';
+        case 'p_position':   return r.position || '—';
+        case 'p_staffType':  return r.staffType || '—';
+        case 'p_basic':      return r.grossPay || 0;
+        case 'p_pension':    return r.pension || 0;
+        case 'p_paye':       return r.paye || 0;
+        case 'p_nsitf':      return r.nsitf || 0;
+        case 'p_net':        return r.takeHomePay || 0;
+        case 'p_month':      return MONTHS.find(m => m.key === r.month)?.label || r.month || '—';
+        case 'p_year':       return r.year || '—';
+        default: return '—';
+      }
+    }
+
+    if (src === 'LEDGER') {
+      switch (colId) {
+        case 'l_date':       return formatDisplayDate(r.date);
+        case 'l_voucher':    return r.voucherNo || '—';
+        case 'l_category':   return r.category || '—';
+        case 'l_desc':       return r.description || '—';
+        case 'l_amount':     return r.amount || 0;
+        case 'l_vendor':     return r.vendor || '—';
+        case 'l_bank':       return r.bank || '—';
+        case 'l_client':     return r.client || '—';
+        case 'l_site':       return r.site || '—';
+        case 'l_enteredBy':  return r.enteredBy || '—';
+        default: return '—';
+      }
+    }
+
+    if (src === 'SITE') {
+      switch (colId) {
+        case 't_name':       return r.name || '—';
+        case 't_client':     return r.client || '—';
+        case 't_status':     return r.status || '—';
+        case 't_vat':        return r.vat || '—';
+        case 't_start':      return formatDisplayDate(r.startDate);
+        case 't_end':        return formatDisplayDate(r.endDate);
+        default: return '—';
+      }
+    }
+
     return '—';
   };
 
@@ -586,6 +793,8 @@ export function AccountsReportBuilder({
       case 's_allcleared':   return row.allTimeCleared;
       case 's_vat_count':    return row.vatCount;
       case 's_vat_remitted': return row.vatRemitted;
+      case 's_ledger_total': return row.ledgerTotal;
+      case 's_site_count':   return row.siteCount;
       case 's_bfwd':         return row.bfwd;
       case 's_balance':      return row.balance;
       default: return '—';
@@ -608,6 +817,9 @@ export function AccountsReportBuilder({
   const isNumericCol = (colId: string) =>
     !['sn','client','site','tin','date','vatDate','dueDate','invoiceNo','billingCycle',
       'vatInc','status','remMonth','remYear','project',
+      'p_employee','p_department','p_position','p_staffType','p_month','p_year',
+      'l_date','l_voucher','l_category','l_desc','l_vendor','l_bank','l_client','l_site','l_enteredBy',
+      't_name','t_client','t_status','t_vat','t_start','t_end',
       's_sn','s_client','s_tin'].includes(colId);
 
   // ── Preset management ────────────────────────────────────────────────────────
@@ -642,8 +854,17 @@ export function AccountsReportBuilder({
 
   const toggleSource = (src: DataSource) => {
     setSelectedSources(prev => {
-      const next = prev.includes(src) ? prev.filter(s => s !== src) : [...prev, src];
-      return next.length === 0 ? prev : next;
+      if (prev.includes(src)) {
+        // Deselecting: remove it; if last one, reset to INVOICE
+        const next = prev.filter(s => s !== src);
+        return next.length === 0 ? ['INVOICE'] : next;
+      }
+      const next = [...prev, src];
+      if (!isComboAllowed(next)) {
+        // Incompatible with current mix — switch to this source exclusively
+        return [src];
+      }
+      return next;
     });
   };
 
@@ -661,7 +882,7 @@ export function AccountsReportBuilder({
     dataRows.push(totalsRow);
 
     const csv = [headers.join(','), ...dataRows.map(r => r.map(esc).join(','))].join('\n');
-    const fileName = `${selectedSources.map(s => s.toLowerCase()).join('_')}_report_${selectedYear}.csv`;
+    const fileName = `${selectedSources.map(s => s.toLowerCase()).join('_')}_report_${selectedYears.join('-')}.csv`;
 
     if ((window as any).electronAPI?.savePathDialog) {
       const fp = await (window as any).electronAPI.savePathDialog({
@@ -696,32 +917,59 @@ export function AccountsReportBuilder({
       <DialogContent className="!fixed !inset-0 !z-50 !max-w-[100vw] !w-screen !h-screen !max-h-screen !m-0 !rounded-none p-0 overflow-hidden flex flex-col bg-slate-100 print:max-w-none print:h-auto print:bg-white border-0 gap-0">
 
         {/* ── Top Header ── */}
-        <DialogHeader className="bg-indigo-700 px-4 py-3 border-b border-indigo-800 shadow-md shrink-0 print:hidden text-left z-20">
-          <div className="flex justify-between items-center w-full gap-3">
-            <DialogTitle className="text-white font-bold text-base tracking-wide flex items-center gap-3 min-w-0">
-              <button onClick={() => onOpenChange(false)} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors shrink-0" aria-label="Close">
-                <X className="h-5 w-5 text-white" />
-              </button>
-              <span className="text-white/50 text-sm font-normal shrink-0">Report Builder</span>
-              <span className="text-white font-bold truncate">{reportTitle}</span>
+        <DialogHeader className="bg-slate-900 border-b border-slate-700/60 shrink-0 print:hidden text-left z-20">
+          <div className="flex items-center w-full">
+
+            {/* ── Close button: full-height flush left strip ── */}
+            <button
+              onClick={() => onOpenChange(false)}
+              aria-label="Close"
+              className="flex items-center justify-center w-8 h-8 shrink-0 text-slate-400 hover:text-white hover:bg-white/10 rounded transition-colors mr-1"
+            >
+              <X className="h-3.5 w-3.5" strokeWidth={2.5} />
+            </button>
+
+            {/* ── Breadcrumb + title ── */}
+            <DialogTitle className="flex items-center gap-2 px-3 min-w-0 flex-1">
+              <span className="text-slate-500 text-[11px] font-medium uppercase tracking-widest shrink-0 select-none">
+                Report Builder
+              </span>
+              <span className="text-slate-600 text-[11px] shrink-0">/</span>
+              <span className="text-white text-sm font-semibold truncate">{reportTitle}</span>
               {isMultiSource && (
-                <span className="text-[11px] bg-amber-400 text-amber-900 font-bold px-2 py-0.5 rounded-full shrink-0">
-                  Grouped by Client
+                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold px-2 py-0.5 rounded shrink-0">
+                  Multi-source
                 </span>
               )}
             </DialogTitle>
-            <div className="flex gap-2 items-center shrink-0">
-              <span className="text-white/40 text-xs hidden sm:block">
-                {rowCount} {isMultiSource ? 'client(s)' : 'record(s)'}
-              </span>
-              <Button variant="secondary" size="sm" className="gap-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800"
-                onClick={handleExportCSV} disabled={rowCount === 0}>
-                <Upload className="h-4 w-4" /><span className="hidden sm:inline">Export CSV</span>
-              </Button>
-              <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => window.print()} disabled={rowCount === 0}>
-                <Printer className="h-4 w-4" /><span className="hidden sm:inline">Print / PDF</span>
-              </Button>
+
+            {/* ── Meta + actions ── */}
+            <div className="flex items-center gap-2 px-2 shrink-0 border-l border-slate-700/50">
+              {rowCount > 0 && (
+                <span className="text-slate-500 text-[11px] font-mono hidden md:block">
+                  {rowCount} {isMultiSource ? 'clients' : 'records'}
+                </span>
+              )}
+              {/* Primary action */}
+              <button
+                onClick={handleExportCSV}
+                disabled={rowCount === 0}
+                className="inline-flex items-center gap-1.5 h-7 px-3 text-xs font-semibold rounded bg-indigo-600 hover:bg-indigo-500 text-white transition-colors disabled:opacity-40 disabled:pointer-events-none"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                Export CSV
+              </button>
+              {/* Secondary action */}
+              <button
+                onClick={() => window.print()}
+                disabled={rowCount === 0}
+                className="inline-flex items-center gap-1.5 h-7 px-3 text-xs font-semibold rounded border border-slate-600 text-slate-300 hover:border-slate-400 hover:text-white transition-colors disabled:opacity-40 disabled:pointer-events-none"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Print
+              </button>
             </div>
+
           </div>
         </DialogHeader>
 
@@ -771,42 +1019,81 @@ export function AccountsReportBuilder({
               <div>
                 <h4 className="font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-2">Data Sources</h4>
                 <div className="flex flex-col gap-1.5">
-                  {(['INVOICE','PAYMENT','VAT'] as DataSource[]).map(src => {
+                  {(['INVOICE','PAYMENT','VAT','PAYROLL','LEDGER','SITE'] as DataSource[]).map((src, idx) => {
                     const active = selectedSources.includes(src);
+                    const isDivider = idx === 3;
+                    // Use pre-computed blockedSources for performance
+                    const wouldBlock = !active && blockedSources.has(src);
                     return (
-                      <button key={src} onClick={() => toggleSource(src)}
-                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border text-sm font-semibold transition-all ${active ? SOURCE_TOGGLE_ON[src] : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-500'}`}>
-                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${active ? 'border-current' : 'border-slate-300'}`}>
-                          {active && <div className="w-2 h-2 rounded-sm bg-current" />}
-                        </div>
-                        {SOURCE_LABELS[src]}
-                      </button>
+                      <div key={src}>
+                        {isDivider && <div className="my-1 border-t border-slate-200" />}
+                        <button
+                          onClick={() => toggleSource(src)}
+                          title={wouldBlock ? `Cannot combine with current selection` : undefined}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-sm font-semibold transition-all
+                            ${active
+                              ? SOURCE_TOGGLE_ON[src]
+                              : wouldBlock
+                              ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed opacity-50'
+                              : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-500'
+                            }`}
+                        >
+                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${active ? 'border-current' : 'border-slate-300'}`}>
+                            {active && <div className="w-2 h-2 rounded-sm bg-current" />}
+                          </div>
+                          <span className="flex-1 text-left">{SOURCE_LABELS[src]}</span>
+                          {wouldBlock
+                            ? <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border bg-slate-100 text-slate-400 border-slate-200">N/A</span>
+                            : <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${SOURCE_PILL[src]}`}>
+                                {['INVOICE','PAYMENT','VAT'].includes(src) ? 'Finance' : src === 'PAYROLL' ? 'HR' : src === 'LEDGER' ? 'Expense' : 'Ops'}
+                              </span>
+                          }
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
-                {isMultiSource && (
-                  <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
-                    <p className="text-[11px] text-amber-800 font-semibold flex items-start gap-1.5">
-                      <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                      One row per client. <strong>Balance Due</strong> is computed from <em>all historical data</em> — not just the filtered period.
-                    </p>
-                  </div>
-                )}
+
               </div>
 
-              {/* Year */}
+              {/* Years */}
               <div>
-                <h4 className="font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-2">Year</h4>
-                <select className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-indigo-400"
-                  value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}>
-                  {Array.from({ length: currentYear - YEAR_RANGE_START + 2 }, (_, i) => YEAR_RANGE_START + i)
-                    .reverse().map(yr => <option key={yr} value={yr}>{yr}</option>)}
-                </select>
+                <h4 className="font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-2 flex items-center justify-between">
+                  Year(s)
+                  <div className="flex gap-2">
+                    <button className="text-[10px] text-indigo-600 font-bold hover:underline"
+                      onClick={() => setSelectedYears(Array.from({ length: currentYear - YEAR_RANGE_START + 2 }, (_, i) => YEAR_RANGE_START + i))}>All</button>
+                    <span className="text-slate-300">|</span>
+                    <button className="text-[10px] text-indigo-600 font-bold hover:underline"
+                      onClick={() => setSelectedYears([currentYear])}>Reset</button>
+                  </div>
+                </h4>
+                <div className="grid grid-cols-3 gap-1 max-h-[110px] overflow-y-auto pr-0.5 custom-scrollbar">
+                  {Array.from({ length: currentYear - YEAR_RANGE_START + 2 }, (_, i) => currentYear - i).map(yr => {
+                    const active = selectedYears.includes(yr);
+                    return (
+                      <label key={yr} className={`flex items-center gap-1 text-xs font-medium cursor-pointer px-1.5 py-1 rounded transition-colors select-none ${
+                        active ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'
+                      }`}>
+                        <input type="checkbox" className="rounded border-slate-300 text-indigo-600 h-3 w-3"
+                          checked={active}
+                          onChange={e => {
+                            if (e.target.checked) setSelectedYears(prev => [...prev, yr].sort((a, b) => a - b));
+                            else {
+                              const next = selectedYears.filter(y => y !== yr);
+                              if (next.length > 0) setSelectedYears(next); // keep at least one
+                            }
+                          }} />
+                        {yr}
+                      </label>
+                    );
+                  })}
+                </div>
                 {selectedSources.includes('VAT') && (
                   <p className="text-[10px] text-slate-400 italic mt-1">VAT: filters by period year, not payment date</p>
                 )}
                 {isMultiSource && (
-                  <p className="text-[10px] text-slate-400 italic mt-1"><strong>B/F</strong> = balance accrued before {selectedYear}</p>
+                  <p className="text-[10px] text-slate-400 italic mt-1"><strong>B/F</strong> = balance before {Math.min(...selectedYears)}</p>
                 )}
               </div>
 
@@ -883,9 +1170,14 @@ export function AccountsReportBuilder({
                         ? (col.id.includes('charged') || col.id === 's_inv_count' || col.id === 's_inv_vat' ? 'INVOICE'
                           : col.id.includes('cleared') || col.id.includes('pay') || col.id === 's_total_cash'  ? 'PAYMENT'
                           : col.id.includes('vat')     ? 'VAT'
+                          : col.id === 's_ledger_total' ? 'LEDGER'
+                          : col.id === 's_site_count'   ? 'SITE'
                           : col.id === 's_bfwd' || col.id === 's_balance' ? 'CROSS'
                           : 'SHARED')
-                        : (SHARED_IDS.has(col.id) ? 'SHARED' : col.sources.length === 1 ? col.sources[0] : 'SHARED');
+                        : (['INVOICE','PAYMENT','VAT','PAYROLL','LEDGER','SITE'] as const).reduce<string>((acc, src) => {
+                            if (acc !== 'SHARED') return acc;
+                            return col.sources.length === 1 && col.sources[0] === src ? src : acc;
+                          }, SHARED_IDS.has(col.id) ? 'SHARED' : 'SHARED');
 
                       const showHeader = group !== lastGroup;
                       lastGroup = group;
@@ -895,11 +1187,17 @@ export function AccountsReportBuilder({
                         group === 'INVOICE' ? (isMultiSource ? '— Invoice Totals —'  : '— Invoice Fields —')  :
                         group === 'PAYMENT' ? (isMultiSource ? '— Payment Totals —'  : '— Payment Fields —')  :
                         group === 'VAT'     ? (isMultiSource ? '— VAT Totals —'      : '— VAT Fields —')      :
+                        group === 'PAYROLL' ? '— Payroll Fields —' :
+                        group === 'LEDGER'  ? (isMultiSource ? '— Ledger Totals —'   : '— Ledger Fields —')   :
+                        group === 'SITE'    ? (isMultiSource ? '— Site Totals —'     : '— Site Fields —')     :
                                               '— Accounting Balance —';
                       const groupColor =
                         group === 'INVOICE' ? 'text-blue-500'    :
                         group === 'PAYMENT' ? 'text-emerald-600' :
                         group === 'VAT'     ? 'text-amber-600'   :
+                        group === 'PAYROLL' ? 'text-purple-600'  :
+                        group === 'LEDGER'  ? 'text-slate-500'   :
+                        group === 'SITE'    ? 'text-indigo-600'  :
                         group === 'CROSS'   ? 'text-indigo-500'  : 'text-slate-400';
 
                       const isSelected = selectedColumns.includes(col.id);
@@ -955,16 +1253,11 @@ export function AccountsReportBuilder({
                   <h1 className="text-xl font-bold text-slate-900">{reportTitle}</h1>
                   <p className="text-sm text-slate-500 mt-0.5">
                     {selectedSources.length > 1 && `${selectedSources.map(s => SOURCE_LABELS[s]).join(' + ')} · `}
-                    {selectedYear} · {selectedMonths.length === 12 ? 'All Months' : `${selectedMonths.length} month(s)`}
+                    {selectedYears.length === 1 ? selectedYears[0] : `${Math.min(...selectedYears)}–${Math.max(...selectedYears)}`} · {selectedMonths.length === 12 ? 'All Months' : `${selectedMonths.length} month(s)`}
                     {selectedClients.length !== availableClients.length ? ` · ${selectedClients.length} client(s)` : ''}
                     {isMultiSource ? ` · ${aggregatedRows.length} unique client(s)` : ` · ${recordsToPrint.length} record(s)`}
                   </p>
-                  {isMultiSource && (
-                    <p className="text-[11px] text-amber-700 mt-1 flex items-center gap-1">
-                      <Info className="h-3 w-3 shrink-0" />
-                      Balance Due and B/F reflect all-time data across all years, not just {selectedYear}.
-                    </p>
-                  )}
+
                 </div>
                 <div className="text-right text-xs text-slate-400 print:hidden">
                   <p>Generated: {new Date().toLocaleDateString()}</p>

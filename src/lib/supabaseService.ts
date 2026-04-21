@@ -1554,6 +1554,8 @@ export const db = {
     if (l.outcome !== undefined) update.outcome = l.outcome ?? null;
     if (l.followUpDate !== undefined) update.follow_up_date = l.followUpDate ?? null;
     if (l.followUpDone !== undefined) update.follow_up_done = l.followUpDone;
+    // parentId maps to parent_id — critical for thread persistence
+    if (l.parentId !== undefined) update.parent_id = l.parentId ?? null;
     update.updated_at = new Date().toISOString();
     const { error } = await supabase.from('comm_logs').update(update).eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }

@@ -340,20 +340,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 }
             }
 
-            // Create global reminder for all users
-            const remPayload = {
-                title: 'New Task Created',
-                body: data.title,
-                remind_at: new Date().toISOString(),
-                end_at: null,
-                frequency: 'once',
-                recipient_ids: null, // null/empty means everyone
-                is_active: true,
-                created_by: user?.id,
-                main_task_id: data.id,
-            };
-            const { error: remErr } = await supabase.from('reminders').insert(remPayload);
-            if (remErr) console.error('Error creating new task reminder:', remErr);
+            // NOTE: No automatic reminder record is inserted here.
+            // Task-creation popup notifications are handled exclusively by the
+            // real-time `task_updates` listener in TaskPopupNotifications.tsx.
         }
         return data;
     }, [user?.id]);

@@ -4,7 +4,7 @@ import { TaskContext } from '../contexts/AppDataContext';
 import { useAuth } from '../hooks/useAuth';
 import { Plus, Search, ShieldAlert, FileText, CheckCircle2, AlertCircle, Clock, Save, X, Download, History } from 'lucide-react';
 import { toast } from '../components/ui/toast';
-import { differenceInDays } from 'date-fns';
+import { differenceInDays, format, parseISO } from 'date-fns';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 
@@ -43,6 +43,15 @@ export function HmoManagement() {
     }
     
     return { start: start || null, end: end || null, dur: dur || null };
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '';
+    try {
+      return format(parseISO(dateStr), 'dd/MM/yyyy');
+    } catch {
+      return dateStr;
+    }
   };
 
   // Get active directory
@@ -170,9 +179,9 @@ export function HmoManagement() {
       const row = [
         `"${emp.firstname} ${emp.surname}"`,
         `"${emp.lashmaPolicyNumber || ''}"`,
-        `"${start || ''}"`,
+        `"${formatDate(start)}"`,
         `"${dur || ''}"`,
-        `"${end || ''}"`,
+        `"${formatDate(end)}"`,
         `"${status}"`
       ];
       csvRows.push(row.join(','));
@@ -290,13 +299,13 @@ export function HmoManagement() {
                         {emp.lashmaPolicyNumber || <span className="text-slate-300 italic">Not set</span>}
                       </td>
                       <td className="px-5 py-3">
-                        {start || <span className="text-slate-300 italic">Not set</span>}
+                        {formatDate(start) || <span className="text-slate-300 italic">Not set</span>}
                       </td>
                       <td className="px-5 py-3">
                         {dur ? `${dur} months` : '-'}
                       </td>
                       <td className="px-5 py-3">
-                        {end || '-'}
+                        {formatDate(end) || '-'}
                       </td>
                       <td className="px-5 py-3">
                         {!end ? (
@@ -361,7 +370,7 @@ export function HmoManagement() {
                         <div>
                           <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Policy: {viewHistoryEmp.lashmaPolicyNumber || 'N/A'}</p>
                           <p className="text-xs font-medium text-slate-500">
-                            {getHmoDetails(viewHistoryEmp).start || 'N/A'} - {getHmoDetails(viewHistoryEmp).end || 'N/A'} ({getHmoDetails(viewHistoryEmp).dur || '-'} months)
+                            {formatDate(getHmoDetails(viewHistoryEmp).start) || 'N/A'} - {formatDate(getHmoDetails(viewHistoryEmp).end) || 'N/A'} ({getHmoDetails(viewHistoryEmp).dur || '-'} months)
                           </p>
                         </div>
                      </div>

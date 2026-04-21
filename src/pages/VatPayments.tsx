@@ -289,11 +289,14 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
 
     const totalsData = useMemo(() => {
         let data = uniqueClients.map(client => {
-            let clientPayments = payments.filter(p => p.client === client && p.payVat && p.payVat !== 'No');
-            let clientVatPayments = vatPayments.filter(vp => vp.client === client);
+            const allClientPayments = payments.filter(p => p.client === client && p.payVat && p.payVat !== 'No');
+            const allClientVatPayments = vatPayments.filter(vp => vp.client === client);
+
+            let periodClientPayments = [...allClientPayments];
+            let periodClientVatPayments = [...allClientVatPayments];
 
             if (filterFromMonth || filterToMonth) {
-                const checkDate = (d: string) => {
+                const checkPayDate = (d: string) => {
                     if (!d) return false;
                     let dateYM = '';
                     if (d.includes('-')) {
@@ -309,21 +312,43 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                     if (filterToMonth && dateYM > filterToMonth) return false;
                     return true;
                 };
-                clientPayments = clientPayments.filter(p => checkDate(p.date));
-                clientVatPayments = clientVatPayments.filter(vp => checkDate(vp.date));
+
+                const checkVatPeriod = (vp: VatPayment) => {
+                    const monthIndex = MONTHS.findIndex(m => m === vp.month);
+                    const mKey = monthIndex !== -1 ? (monthIndex + 1).toString().padStart(2, '0') : '';
+                    if (!mKey || !vp.year) return false;
+                    const dateYM = `${vp.year}-${mKey}`;
+                    if (filterFromMonth && dateYM < filterFromMonth) return false;
+                    if (filterToMonth && dateYM > filterToMonth) return false;
+                    return true;
+                };
+
+                periodClientPayments = allClientPayments.filter(p => checkPayDate(p.date));
+                periodClientVatPayments = allClientVatPayments.filter(checkVatPeriod);
             }
 
-            const totalPaid = clientPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-            const totalVat = clientPayments.reduce((sum, p) => {
+            const totalPaid = periodClientPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+            const totalVat = periodClientPayments.reduce((sum, p) => {
                 const vatValue = p.payVat === 'Add' ? Math.round(((p.amount * 7.5) / 107.5) * 100) / 100 
                                : p.payVat === 'Yes' ? Math.round(((p.amount / (100 + vatRate)) * vatRate) * 100) / 100 
                                : 0;
                 return sum + vatValue;
             }, 0);
-            const vatPaid = clientVatPayments.reduce((sum, vp) => sum + vp.amount, 0);
+            const vatPaid = periodClientVatPayments.reduce((sum, vp) => sum + vp.amount, 0);
 
-            const vatBalanceToPay = totalVat - vatPaid;
-            const principleOnVatDue = totalVat > 0 ? (vatBalanceToPay / totalVat) * totalPaid : 0;
+            // All-time balance calculations
+            const allTimeTotalVat = allClientPayments.reduce((sum, p) => {
+                const vatValue = p.payVat === 'Add' ? Math.round(((p.amount * 7.5) / 107.5) * 100) / 100 
+                               : p.payVat === 'Yes' ? Math.round(((p.amount / (100 + vatRate)) * vatRate) * 100) / 100 
+                               : 0;
+                return sum + vatValue;
+            }, 0);
+            const allTimeVatPaid = allClientVatPayments.reduce((sum, vp) => sum + vp.amount, 0);
+            
+            const vatBalanceToPay = allTimeTotalVat - allTimeVatPaid;
+            
+            const allTimeTotalPaid = allClientPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+            const principleOnVatDue = allTimeTotalVat > 0 ? (vatBalanceToPay / allTimeTotalVat) * allTimeTotalPaid : 0;
 
             return {
                 client,
@@ -334,6 +359,9 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                 principleOnVatDue: Math.max(0, principleOnVatDue)
             };
         });
+
+        // Hide rows that have absolutely no activity AND no all-time outstanding balance
+        data = data.filter(d => !(d.totalPaid === 0 && d.vat === 0 && d.vatPaid === 0 && d.vatBalanceToPay === 0));
 
         if (searchTerm) {
             const lowerSearch = searchTerm.toLowerCase();
@@ -356,18 +384,11 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
     const sortedVatPayments = useMemo(() => {
         let filtered = vatPayments;
         if (filterFromMonth || filterToMonth) {
-            filtered = filtered.filter(p => {
-                const d = p.date || '';
-                let dateYM = '';
-                if (d.includes('-')) {
-                    dateYM = d.substring(0, 7);
-                } else {
-                    const parts = d.split('/');
-                    if (parts.length === 3) {
-                        dateYM = `${parts[2]}-${parts[1]}`;
-                    }
-                }
-                if (!dateYM) return false;
+            filtered = filtered.filter(vp => {
+                const monthIndex = MONTHS.findIndex(m => m === vp.month);
+                const mKey = monthIndex !== -1 ? (monthIndex + 1).toString().padStart(2, '0') : '';
+                if (!mKey || !vp.year) return false;
+                const dateYM = `${vp.year}-${mKey}`;
                 if (filterFromMonth && dateYM < filterFromMonth) return false;
                 if (filterToMonth && dateYM > filterToMonth) return false;
                 return true;

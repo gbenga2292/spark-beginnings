@@ -1169,7 +1169,17 @@ export function FinancialReports() {
               );
             })}
           </div>
+          
+          <Button 
+            size="sm" 
+            className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 font-bold whitespace-nowrap hidden sm:flex shrink-0 border border-indigo-500 shadow-sm" 
+            onClick={() => setReportBuilderOpen(true)}
+          >
+            <div className="h-5 w-5 bg-white/20 rounded-full flex items-center justify-center shrink-0"><FileSpreadsheet className="h-3 w-3 text-white" /></div>
+            Open Report Builder
+          </Button>
         </div>
+
 
       {mainTab === 'site-summary' ? (
         <SiteSummary filterYear={filterYear} filterMonth={filterMonth} />
@@ -1749,22 +1759,6 @@ export function FinancialReports() {
         </CardContent>
       </Card>
 
-      {/* Custom Report Builder Card */}
-      <Card className="hover:shadow-md transition-shadow bg-gradient-to-r from-indigo-50 to-white border-indigo-200 mt-6 max-w-3xl">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-lg font-bold text-indigo-900">Advanced Report Builder</CardTitle>
-          <FileSpreadsheet className="h-6 w-6 text-indigo-600" />
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-slate-500 mb-4 font-medium">
-            Build completely custom financial reports. Select modules, map columns, pick your clients and duration, and export directly to PDF or Excel.
-          </p>
-          <Button className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white gap-2 font-bold" onClick={() => setReportBuilderOpen(true)}>
-            <div className="h-5 w-5 bg-white/20 rounded-full flex items-center justify-center shrink-0"><FileSpreadsheet className="h-3 w-3" /></div>
-            Open Report Builder
-          </Button>
-        </CardContent>
-      </Card>
 
       </>
       ) : (
