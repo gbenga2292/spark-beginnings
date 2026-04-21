@@ -1,5 +1,5 @@
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { Button } from '@/src/components/ui/button';
 import { Upload, Printer, Trash2, Save, X, Info } from 'lucide-react';
@@ -240,6 +240,17 @@ const fm = (v: number | null | undefined) => {
   return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
+// Stable set — defined outside component so it is never recreated on render
+const NON_NUMERIC_COLS = new Set([
+  'sn','client','site','tin','date','vatDate','dueDate','invoiceNo','billingCycle',
+  'vatInc','status','remMonth','remYear','project',
+  'p_employee','p_department','p_position','p_staffType','p_month','p_year',
+  'l_date','l_voucher','l_category','l_desc','l_vendor','l_bank','l_client','l_site','l_enteredBy',
+  't_name','t_client','t_status','t_vat','t_start','t_end',
+  's_sn','s_client','s_tin',
+]);
+const isNumericCol = (colId: string) => !NON_NUMERIC_COLS.has(colId);
+
 interface TaggedRecord { _source: DataSource; _raw: any; }
 
 /**
@@ -358,20 +369,20 @@ export function AccountsReportBuilder({
   }, []);
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
-  const getTin = (name: string): string => {
+  const getTin = useCallback((name: string): string => {
     const p = clientProfiles.find(x => x.name === name);
     if (p?.tinNumber) return p.tinNumber;
     const s = pendingSites.find(x => x.clientName === name && x.phase4?.clientTinNumber);
     return s?.phase4?.clientTinNumber || '';
-  };
+  }, [clientProfiles, pendingSites]);
 
-  const getVatDetails = (amount: number, payVat: string, rate: number) => {
+  const getVatDetails = useCallback((amount: number, payVat: string, rate: number) => {
     const vat =
       payVat === 'Add' ? Math.round(((amount * 7.5) / 107.5) * 100) / 100
       : payVat === 'Yes' ? Math.round(((amount / (100 + rate)) * rate) * 100) / 100
       : 0;
     return { vat, amountForVat: payVat !== 'No' ? amount - vat : amount };
-  };
+  }, []);
 
   // ── Available clients ────────────────────────────────────────────────────────
   const availableClients = useMemo(() => {
@@ -646,7 +657,7 @@ export function AccountsReportBuilder({
   );
 
   // ── Cell resolvers ────────────────────────────────────────────────────────────
-  const getTxnValue = (colId: string, rec: TaggedRecord, idx: number): string | number => {
+  const getTxnValue = useCallback((colId: string, rec: TaggedRecord, idx: number): string | number => {
     const { _source: src, _raw: r } = rec;
     if (colId === 'sn')     return idx + 1;
     if (colId === 'client') return r.client || '—';
@@ -774,9 +785,10 @@ export function AccountsReportBuilder({
     }
 
     return '—';
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getTin, getVatDetails, sites, vatRate, vatRemittanceMap]);
 
-  const getAggValue = (colId: string, row: AggRow, idx: number): string | number => {
+  const getAggValue = useCallback((colId: string, row: AggRow, idx: number): string | number => {
     switch (colId) {
       case 's_sn':           return idx + 1;
       case 's_client':       return row.client;
@@ -799,9 +811,9 @@ export function AccountsReportBuilder({
       case 's_balance':      return row.balance;
       default: return '—';
     }
-  };
+  }, []);
 
-  const getColTotal = (colId: string): number => {
+  const getColTotal = useCallback((colId: string): number => {
     if (isMultiSource) {
       return aggregatedRows.reduce((sum, row, i) => {
         const v = getAggValue(colId, row, i);
@@ -812,15 +824,9 @@ export function AccountsReportBuilder({
       const v = getTxnValue(colId, rec, i);
       return sum + (typeof v === 'number' ? v : 0);
     }, 0);
-  };
+  }, [isMultiSource, aggregatedRows, recordsToPrint, getAggValue, getTxnValue]);
 
-  const isNumericCol = (colId: string) =>
-    !['sn','client','site','tin','date','vatDate','dueDate','invoiceNo','billingCycle',
-      'vatInc','status','remMonth','remYear','project',
-      'p_employee','p_department','p_position','p_staffType','p_month','p_year',
-      'l_date','l_voucher','l_category','l_desc','l_vendor','l_bank','l_client','l_site','l_enteredBy',
-      't_name','t_client','t_status','t_vat','t_start','t_end',
-      's_sn','s_client','s_tin'].includes(colId);
+  // isNumericCol is now a stable module-level function above the component
 
   // ── Preset management ────────────────────────────────────────────────────────
   const savePreset = () => {
@@ -920,11 +926,19 @@ export function AccountsReportBuilder({
         <DialogHeader className="bg-slate-900 border-b border-slate-700/60 shrink-0 print:hidden text-left z-20 overflow-hidden">
           <div className="flex items-center w-full py-0 h-8">
 
-            {/* ── Close button: full-height flush left strip ── */}
+            {/* ── Close button: solid red, instant tactile feedback ── */}
             <button
               onClick={() => onOpenChange(false)}
-              aria-label="Close"
-              className="flex items-center justify-center w-8 h-8 shrink-0 text-slate-400 hover:text-white hover:bg-white/10 rounded transition-colors mr-1"
+              aria-label="Close report builder"
+              className={[
+                'flex items-center justify-center',
+                'w-8 h-8 shrink-0 mr-1',
+                'bg-red-600 hover:bg-red-500 active:bg-red-700',
+                'text-white rounded',
+                'transition-all duration-100',
+                'active:scale-95',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-900',
+              ].join(' ')}
             >
               <X className="h-3.5 w-3.5" strokeWidth={2.5} />
             </button>
