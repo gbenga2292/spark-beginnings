@@ -100,6 +100,7 @@ const navigation: NavCategory[] = [
     icon: Users,
     items: [
       { name: 'HR Dashboard', href: '/hr-dashboard', icon: LayoutDashboard, privKey: 'dashboard', privField: 'canView' },
+      { name: 'Daily Journal', href: '/daily-journal', icon: BookOpen, privKey: 'dashboard', privField: 'canView' },
       { name: 'Daily Register', href: '/attendance', icon: CalendarClock, privKey: 'attendance', privField: 'canView' },
       { name: 'Employees', href: '/employees', icon: Users, privKey: 'employees', privField: 'canView' },
       { name: 'Onboarding', href: '/onboarding', icon: UserPlus, privKey: 'onboarding', privField: 'canView' },

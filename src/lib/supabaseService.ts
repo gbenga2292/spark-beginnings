@@ -8,7 +8,7 @@ import type {
   SalaryAdvance, Loan, Payment, VatPayment, LeaveRecord, DepartmentTasks,
   DisciplinaryRecord, EvaluationRecord, Department, Position,
   LedgerCategory, LedgerVendor, LedgerBank, LedgerBeneficiaryBank, LedgerEntry, CommLog,
-  CompanyExpense, StaffMeritRecord, LeaveType
+  CompanyExpense, StaffMeritRecord, LeaveType, DailyJournal, SiteJournalEntry
 } from '@/src/store/appStore';
 import { useUserStore, type AppUser, type PrivilegePreset } from '@/src/store/userStore';
 
@@ -351,7 +351,50 @@ export function dbToVehicleMovement(r: any): VehicleTripLeg {
   };
 }
 
-// ─── Mappers: App → DB ──────────────────────────────────────
+export function dbToDailyJournal(r: any): DailyJournal {
+  return {
+    id: r.id,
+    date: r.date,
+    generalNotes: r.general_notes,
+    loggedBy: r.logged_by,
+    createdAt: r.created_at,
+  };
+}
+
+export function dbToSiteJournalEntry(r: any): SiteJournalEntry {
+  return {
+    id: r.id,
+    journalId: r.journal_id,
+    siteId: r.site_id,
+    siteName: r.site_name,
+    clientName: r.client_name,
+    narration: r.narration,
+  };
+}
+
+export function dailyJournalToDb(j: DailyJournal): any {
+  return {
+    id: j.id,
+    date: j.date,
+    general_notes: j.generalNotes,
+    logged_by: j.loggedBy,
+    workspace_id: getWS(),
+  };
+}
+
+export function siteJournalEntryToDb(e: SiteJournalEntry): any {
+  return {
+    id: e.id,
+    journal_id: e.journalId,
+    site_id: e.siteId,
+    site_name: e.siteName,
+    client_name: e.clientName,
+    narration: e.narration,
+    workspace_id: getWS(),
+  };
+}
+
+// ─── Exported DB Methods ──────────────────────────────────────
 
 function clientProfileToDb(c: any) {
   return { id: c.id, name: c.name, tin_number: c.tinNumber || '', start_date: c.startDate || '' };
@@ -683,6 +726,8 @@ export async function fetchAllAppData(privs?: any) {
     staffMeritRes,
     vehiclesRes,
     vehicleTripsRes,
+    dailyJournalsRes,
+    siteJournalEntriesRes,
   ] = await Promise.all([
     supabase.from('sites').select('*').order('created_at'),
     supabase.from('clients').select('*').order('name'),
@@ -714,6 +759,8 @@ export async function fetchAllAppData(privs?: any) {
     supabase.from('staff_merit_record').select('*').order('incident_date', { ascending: false }),
     supabase.from('vehicles').select('*').order('name'),
     supabase.from('vehicle_movement_log').select('*').order('departure_time', { ascending: false }).limit(500),
+    supabase.from('daily_journals').select('*').order('date', { ascending: false }),
+    supabase.from('site_journal_entries').select('*'),
   ]);
 
   const settings = settingsRes.data;
@@ -751,6 +798,8 @@ export async function fetchAllAppData(privs?: any) {
     staffMeritRecords: (staffMeritRes.data || []).map(dbToStaffMerit),
     vehicles: (vehiclesRes.data || []).map(dbToVehicle),
     vehicleTrips: (vehicleTripsRes.data || []).map(dbToVehicleMovement),
+    dailyJournals: (dailyJournalsRes?.data || []).map(dbToDailyJournal),
+    siteJournalEntries: (siteJournalEntriesRes?.data || []).map(dbToSiteJournalEntry),
     positions: (positionsRes.data || []).map((p: any) => ({
       id: p.id,
       title: p.title || p.name,
@@ -1714,5 +1763,42 @@ export const db = {
   async insertVehicleTripRecords(logs: any[]) {
     const { error } = await supabase.from('vehicle_movement_log').insert(logs.map(vehicleMovementToDb));
     if (error) { console.error('Database error:', error); throw error; }
+  },
+
+  // Daily Journals
+  async insertDailyJournal(j: DailyJournal, entries: SiteJournalEntry[]) {
+    // 1. Insert Journal
+    const { error: jError } = await supabase.from('daily_journals').insert(dailyJournalToDb(j));
+    if (jError) { console.error('insertDailyJournal (journal):', jError); throw jError; }
+
+    // 2. Insert Entries
+    if (entries.length > 0) {
+      const { error: eError } = await supabase.from('site_journal_entries').insert(entries.map(siteJournalEntryToDb));
+      if (eError) { console.error('insertDailyJournal (entries):', eError); throw eError; }
+    }
+  },
+  async updateDailyJournal(id: string, j: Partial<DailyJournal>, newEntries: SiteJournalEntry[]) {
+    // 1. Update Journal
+    const update: any = {};
+    if (j.date !== undefined) update.date = j.date;
+    if (j.generalNotes !== undefined) update.general_notes = j.generalNotes;
+    
+    if (Object.keys(update).length > 0) {
+      const { error: jError } = await supabase.from('daily_journals').update(update).eq('id', id);
+      if (jError) { console.error('updateDailyJournal (journal):', jError); throw jError; }
+    }
+
+    // 2. Delete existing entries and insert new ones
+    const { error: delError } = await supabase.from('site_journal_entries').delete().eq('journal_id', id);
+    if (delError) { console.error('updateDailyJournal (delete entries):', delError); throw delError; }
+
+    if (newEntries.length > 0) {
+      const { error: insError } = await supabase.from('site_journal_entries').insert(newEntries.map(siteJournalEntryToDb));
+      if (insError) { console.error('updateDailyJournal (insert entries):', insError); throw insError; }
+    }
+  },
+  async deleteDailyJournal(id: string) {
+    const { error } = await supabase.from('daily_journals').delete().eq('id', id);
+    if (error) { console.error('deleteDailyJournal:', error); throw error; }
   }
 };

@@ -204,6 +204,7 @@ export function Sites() {
   const [addError, setAddError] = useState('');
   const [narrativeSite, setNarrativeSite] = useState<{ site: any; q: SiteQuestionnaire | null } | null>(null);
 
+
   const buildNarrative = (site: any, q: SiteQuestionnaire | null): string => {
     const lines: string[] = [];
     const name = site.name || 'this site';
@@ -1214,7 +1215,7 @@ export function Sites() {
                                   </DropdownMenuItem>
                                   <DropdownMenuItem 
                                     onClick={() => {
-                                      navigate(`/communication-logs?site=${encodeURIComponent(site.name)}`);
+                                      navigate(`/comm-log?site=${encodeURIComponent(site.name)}`);
                                     }}
                                     className="gap-2"
                                   >
@@ -1224,10 +1225,11 @@ export function Sites() {
 
                                   <DropdownMenuItem 
                                     onClick={() => {
-                                      toast.info('🚧 Site Diary is a work in progress!');
+                                      setDiarySite(site);
                                     }}
                                     className="gap-2 text-emerald-600 focus:text-emerald-700"
                                   >
+
                                     <BookOpen className="h-4 w-4" />
                                     <span>Site Diary (WIP)</span>
                                   </DropdownMenuItem>
@@ -1350,7 +1352,7 @@ export function Sites() {
                                   </DropdownMenuItem>
                                   <DropdownMenuItem 
                                     onClick={() => {
-                                      navigate(`/communication-logs?site=${encodeURIComponent(site.name)}`);
+                                      navigate(`/comm-log?site=${encodeURIComponent(site.name)}`);
                                     }}
                                     className="gap-2"
                                   >
@@ -1360,7 +1362,7 @@ export function Sites() {
 
                                   <DropdownMenuItem 
                                     onClick={() => {
-                                      toast.info('🚧 Site Diary is a work in progress!');
+                                      navigate(`/sites/diary/${site.id}`);
                                     }}
                                     className="gap-2 text-emerald-600 focus:text-emerald-700"
                                   >
@@ -1472,7 +1474,7 @@ export function Sites() {
             <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 py-5 flex items-start justify-between">
               <div>
                 <h2 className="text-white font-bold text-lg">{narrativeSite.site.name}</h2>
-                <p className="text-indigo-200 text-sm mt-0.5">{narrativeSite.site.client} Â· {narrativeSite.site.status}</p>
+                <p className="text-indigo-200 text-sm mt-0.5">{narrativeSite.site.client} · {narrativeSite.site.status}</p>
               </div>
               <button onClick={() => setNarrativeSite(null)} className="text-indigo-200 hover:text-white mt-1">
                 <X className="h-5 w-5" />
@@ -1480,7 +1482,7 @@ export function Sites() {
             </div>
             <div className="px-6 py-5">
               <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Project Summary</h3>
-              <p className="text-slate-700 text-sm leading-relaxed">
+              <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
                 {buildNarrative(narrativeSite.site, narrativeSite.q)}
               </p>
             </div>
@@ -1490,8 +1492,7 @@ export function Sites() {
           </div>
         </div>
       )}
+
     </div>
   );
 }
-
-

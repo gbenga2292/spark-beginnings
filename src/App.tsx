@@ -24,6 +24,7 @@ const Employees = lazy(() => import('./pages/Employees').then(m => ({ default: m
 const Beneficiaries = lazy(() => import('./pages/Beneficiaries').then(m => ({ default: m.Beneficiaries })));
 const Organogram = lazy(() => import('./pages/Organogram').then(m => ({ default: m.Organogram })));
 const Sites = lazy(() => import('./pages/Sites').then(m => ({ default: m.Sites })));
+const SiteDiary = lazy(() => import('./pages/SiteDiary').then(m => ({ default: m.SiteDiary })));
 const ClientDetails = lazy(() => import('./pages/ClientDetails').then(m => ({ default: m.ClientDetails })));
 const SiteOnboarding = lazy(() => import('./pages/SiteOnboarding').then(m => ({ default: m.SiteOnboarding })));
 const Attendance = lazy(() => import('./pages/Attendance').then(m => ({ default: m.Attendance })));
@@ -56,6 +57,7 @@ const TaskReminders = lazy(() => import('./pages/TaskReminders').then(m => ({ de
 const Tasks = lazy(() => import('./pages/Tasks').then(m => ({ default: m.Tasks })));
 const TaskReports = lazy(() => import('./pages/TaskReports').then(m => ({ default: m.TaskReports })));
 const CommLog = lazy(() => import('./pages/CommLog').then(m => ({ default: m.CommLog })));
+const DailyJournal = lazy(() => import('./pages/DailyJournal').then(m => ({ default: m.DailyJournal })));
 const OperationsDashboard = lazy(() => import('./pages/OperationsDashboard').then(m => ({ default: m.Dashboard })));
 const AssetManager = lazy(() => import('./pages/AssetManager').then(m => ({ default: m.AssetManager })));
 const WaybillManager = lazy(() => import('./pages/WaybillManager').then(m => ({ default: m.WaybillManager })));
@@ -138,11 +140,13 @@ function AppContent() {
         {!IS_LIMITED_WEB_WEB && (
           <>
             <Route path="hr-dashboard" element={<Page label="HR Dashboard"><ProtectedRoute requiredModule="dashboard"><Dashboard /></ProtectedRoute></Page>} />
+            <Route path="daily-journal" element={<Page label="Daily Journal"><ProtectedRoute requiredModule="dashboard"><DailyJournal /></ProtectedRoute></Page>} />
             <Route path="attendance" element={<Page label="Attendance"><ProtectedRoute requiredModule="attendance"><Attendance /></ProtectedRoute></Page>} />
             <Route path="employees" element={<Page label="Employees"><ProtectedRoute requiredModule="employees"><Employees /></ProtectedRoute></Page>} />
             <Route path="beneficiaries" element={<Page label="Beneficiaries"><ProtectedRoute requiredModule="beneficiaries"><Beneficiaries /></ProtectedRoute></Page>} />
             <Route path="organogram" element={<Page label="Organogram"><ProtectedRoute requiredModule="employees"><Organogram /></ProtectedRoute></Page>} />
             <Route path="sites" element={<Page label="Sites"><ProtectedRoute requiredModule="sites"><Sites /></ProtectedRoute></Page>} />
+            <Route path="sites/diary/:siteId" element={<Page label="Site Diary"><ProtectedRoute requiredModule="sites"><SiteDiary /></ProtectedRoute></Page>} />
             <Route path="sites/onboarding/:id" element={<Page label="Site Onboarding"><ProtectedRoute requiredModule="sites"><SiteOnboarding /></ProtectedRoute></Page>} />
             <Route path="payroll" element={<Page label="Payroll"><ProtectedRoute requiredModule="payroll"><Payroll /></ProtectedRoute></Page>} />
             <Route path="client-accounts" element={<Page label="Client Accounts"><ProtectedRoute requiredModule="sites"><ClientAccounts /></ProtectedRoute></Page>} />

@@ -3,7 +3,7 @@ import { useAppStore, DEFAULT_OFFBOARDING_TASKS, DEFAULT_LEAVE_TYPES } from '@/s
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry } from '@/src/lib/supabaseService';
 import { generateId } from '@/src/lib/utils';
 import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
 import { useNetworkStore } from '@/src/store/networkStore';
@@ -168,6 +168,8 @@ export function useDataLoader(isAuthenticated: boolean) {
           ledgerBeneficiaryBanks: appData.ledgerBeneficiaryBanks.length > 0 ? appData.ledgerBeneficiaryBanks : useAppStore.getState().ledgerBeneficiaryBanks,
           ledgerEntries: appData.ledgerEntries || [],
           staffMeritRecords: appData.staffMeritRecords || [],
+          dailyJournals: appData.dailyJournals || [],
+          siteJournalEntries: appData.siteJournalEntries || [],
           ...(appData.payrollVariables ? { payrollVariables: appData.payrollVariables as any } : {}),
           ...(appData.payeTaxVariables ? { payeTaxVariables: appData.payeTaxVariables as any } : {}),
           ...(appData.monthValues && Object.keys(appData.monthValues as any).length > 0 ? { monthValues: appData.monthValues as any } : {}),
@@ -642,6 +644,34 @@ export function useRealtimeData(isAuthenticated: boolean) {
                 useAppStore.setState({ ledgerEntries: current.map(e => e.id === updated.id ? updated : e) });
               } else if (eventType === 'DELETE') {
                 useAppStore.setState({ ledgerEntries: current.filter(e => e.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'daily_journals': {
+              const current = appState.dailyJournals;
+              if (eventType === 'INSERT') {
+                if (!current.some(j => j.id === newRow.id)) {
+                  useAppStore.setState({ dailyJournals: [dbToDailyJournal(newRow), ...current] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToDailyJournal(newRow);
+                useAppStore.setState({ dailyJournals: current.map(j => j.id === updated.id ? updated : j) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ dailyJournals: current.filter(j => j.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'site_journal_entries': {
+              const current = appState.siteJournalEntries;
+              if (eventType === 'INSERT') {
+                if (!current.some(e => e.id === newRow.id)) {
+                  useAppStore.setState({ siteJournalEntries: [...current, dbToSiteJournalEntry(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToSiteJournalEntry(newRow);
+                useAppStore.setState({ siteJournalEntries: current.map(e => e.id === updated.id ? updated : e) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ siteJournalEntries: current.filter(e => e.id !== oldRow.id) });
               }
               break;
             }

@@ -25,6 +25,23 @@ export interface CommLog {
   createdAt: string;
 }
 
+export interface DailyJournal {
+  id: string;
+  date: string;
+  generalNotes: string;
+  loggedBy: string;
+  createdAt: string;
+}
+
+export interface SiteJournalEntry {
+  id: string;
+  journalId: string;
+  siteId: string;
+  siteName: string;
+  clientName: string;
+  narration: string;
+}
+
 export interface StaffMeritRecord {
   id: string;
   workspaceId: string;
@@ -530,6 +547,12 @@ interface AppState {
   updateCommLog: (id: string, log: Partial<CommLog>) => void;
   deleteCommLog: (id: string) => void;
 
+  dailyJournals: DailyJournal[];
+  siteJournalEntries: SiteJournalEntry[];
+  addDailyJournal: (journal: DailyJournal, entries: SiteJournalEntry[]) => void;
+  updateDailyJournal: (journalId: string, journal: Partial<DailyJournal>, newEntries: SiteJournalEntry[]) => void;
+  deleteDailyJournal: (journalId: string) => void;
+
   sites: Site[];
   pendingSites: SiteQuestionnaire[];
   clients: string[]; // Keep this for legacy dropdowns and backward compat
@@ -739,6 +762,8 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       // ── Default state (empty - data comes from Supabase) ──
       commLogs: [],
+      dailyJournals: [],
+      siteJournalEntries: [],
       leaves: [],
       isVariablesDirty: false,
       setVariablesDirty: (val) => set({ isVariablesDirty: val }),
@@ -823,6 +848,29 @@ export const useAppStore = create<AppState>()(
       addCommLog: (log) => { set((s) => ({ commLogs: [...s.commLogs, log] })); db.insertCommLog(log); },
       updateCommLog: (id, log) => { set((s) => ({ commLogs: s.commLogs.map(l => l.id === id ? { ...l, ...log } : l) })); db.updateCommLog(id, log); },
       deleteCommLog: (id) => { set((s) => ({ commLogs: s.commLogs.filter(l => l.id !== id) })); db.deleteCommLog(id); },
+
+      // Daily Journals
+      addDailyJournal: (journal, entries) => {
+        set((s) => ({
+          dailyJournals: [...s.dailyJournals, journal],
+          siteJournalEntries: [...s.siteJournalEntries, ...entries],
+        }));
+        db.insertDailyJournal(journal, entries);
+      },
+      updateDailyJournal: (journalId, journal, newEntries) => {
+        set((s) => ({
+          dailyJournals: s.dailyJournals.map((j) => (j.id === journalId ? { ...j, ...journal } : j)),
+          siteJournalEntries: [...s.siteJournalEntries.filter((e) => e.journalId !== journalId), ...newEntries],
+        }));
+        db.updateDailyJournal(journalId, journal, newEntries);
+      },
+      deleteDailyJournal: (journalId) => {
+        set((s) => ({
+          dailyJournals: s.dailyJournals.filter((j) => j.id !== journalId),
+          siteJournalEntries: s.siteJournalEntries.filter((e) => e.journalId !== journalId),
+        }));
+        db.deleteDailyJournal(journalId);
+      },
 
       // Leaves
       addLeave: (leave) => { set((s) => ({ leaves: [...s.leaves, leave] })); db.insertLeave(leave); },
