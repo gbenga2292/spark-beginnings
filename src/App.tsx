@@ -25,6 +25,7 @@ const Beneficiaries = lazy(() => import('./pages/Beneficiaries').then(m => ({ de
 const Organogram = lazy(() => import('./pages/Organogram').then(m => ({ default: m.Organogram })));
 const Sites = lazy(() => import('./pages/Sites').then(m => ({ default: m.Sites })));
 const SiteDiary = lazy(() => import('./pages/SiteDiary').then(m => ({ default: m.SiteDiary })));
+const SiteConversations = lazy(() => import('./pages/SiteConversations').then(m => ({ default: m.SiteConversations })));
 const ClientDetails = lazy(() => import('./pages/ClientDetails').then(m => ({ default: m.ClientDetails })));
 const SiteOnboarding = lazy(() => import('./pages/SiteOnboarding').then(m => ({ default: m.SiteOnboarding })));
 const Attendance = lazy(() => import('./pages/Attendance').then(m => ({ default: m.Attendance })));
@@ -147,6 +148,7 @@ function AppContent() {
             <Route path="organogram" element={<Page label="Organogram"><ProtectedRoute requiredModule="employees"><Organogram /></ProtectedRoute></Page>} />
             <Route path="sites" element={<Page label="Sites"><ProtectedRoute requiredModule="sites"><Sites /></ProtectedRoute></Page>} />
             <Route path="sites/diary/:siteId" element={<Page label="Site Diary"><ProtectedRoute requiredModule="sites"><SiteDiary /></ProtectedRoute></Page>} />
+            <Route path="sites/conversations/:siteId" element={<Page label="Site Conversations"><ProtectedRoute requiredModule="sites"><SiteConversations /></ProtectedRoute></Page>} />
             <Route path="sites/onboarding/:id" element={<Page label="Site Onboarding"><ProtectedRoute requiredModule="sites"><SiteOnboarding /></ProtectedRoute></Page>} />
             <Route path="payroll" element={<Page label="Payroll"><ProtectedRoute requiredModule="payroll"><Payroll /></ProtectedRoute></Page>} />
             <Route path="client-accounts" element={<Page label="Client Accounts"><ProtectedRoute requiredModule="sites"><ClientAccounts /></ProtectedRoute></Page>} />

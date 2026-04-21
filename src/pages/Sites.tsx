@@ -7,7 +7,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check } from 'lucide-react';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check, Bell } from 'lucide-react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
@@ -197,6 +197,7 @@ export function Sites() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('active');
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
+  const [selectedLogsSiteId, setSelectedLogsSiteId] = useState<string | 'all'>('all');
   const [isAddingSite, setIsAddingSite] = useState(searchParams.get('action') === 'add');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addForm, setAddForm] = useState({ ...EMPTY_FORM });
@@ -384,13 +385,37 @@ export function Sites() {
     if (!selectedClientName) return [];
     const nameLow = selectedClientName.trim().toLowerCase();
     return commLogs
-      .filter(l => l.client.trim().toLowerCase() === nameLow)
+      .filter(l => {
+        if (l.client.trim().toLowerCase() !== nameLow) return false;
+        if (selectedLogsSiteId !== 'all' && l.siteId !== selectedLogsSiteId) return false;
+        return true;
+      })
       .sort((a, b) => {
         const dateA = a.date + (a.time ? `T${a.time}` : 'T00:00');
         const dateB = b.date + (b.time ? `T${b.time}` : 'T00:00');
-        return new Date(dateB).getTime() - new Date(dateA).getTime();
+        return new Date(dateA).getTime() - new Date(dateB).getTime(); // ascending for threading
       });
-  }, [commLogs, selectedClientName]);
+  }, [commLogs, selectedClientName, selectedLogsSiteId]);
+
+  // Group: parent logs (no parentId) with their follow-ups as children
+  const groupedClientLogs = useMemo(() => {
+    const parents = clientLogs.filter(l => !l.parentId);
+    const followUps = clientLogs.filter(l => !!l.parentId);
+    return parents
+      .map(parent => ({
+        ...parent,
+        followUps: followUps
+          .filter(fu => fu.parentId === parent.id)
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+      }))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // newest first
+  }, [clientLogs]);
+
+  // Sites belonging to this client for the logs site-selector
+  const clientSitesForLogs = useMemo(() => {
+    if (!selectedClientName) return [];
+    return sites.filter(s => s.client.trim().toLowerCase() === selectedClientName.trim().toLowerCase());
+  }, [sites, selectedClientName]);
 
   const getChannelIcon = (ch: string) => {
     if (ch === 'Call') return <Phone className="w-4 h-4" />;
@@ -981,41 +1006,68 @@ export function Sites() {
               >
                 Pending / Onboarding
               </button>
-              <button
-                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'logs' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
-                onClick={() => setActiveTab('logs')}
-              >
-                Communication Logs
-              </button>
             </div>
           </div>
         )}
 
         {activeTab === 'logs' && selectedClient ? (
           <div className="flex-1 overflow-y-auto style-scroll rounded-b-2xl bg-slate-50 p-4 sm:p-6">
-            {clientLogs.length === 0 ? (
+            {/* Site Filter + Add Button */}
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-indigo-500" />
+                <span className="text-sm font-semibold text-slate-700">Filter by Site:</span>
+                <select
+                  value={selectedLogsSiteId}
+                  onChange={e => setSelectedLogsSiteId(e.target.value)}
+                  className="text-sm border border-slate-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700"
+                >
+                  <option value="all">All Sites</option>
+                  {clientSitesForLogs.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+              <Button
+                size="sm"
+                className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                onClick={() => {
+                  const params = new URLSearchParams();
+                  params.set('prefill_client', selectedClientName!);
+                  if (selectedLogsSiteId !== 'all') params.set('prefill_site', selectedLogsSiteId);
+                  navigate(`/comm-log?${params.toString()}`);
+                }}
+              >
+                <Plus className="w-4 h-4" /> New Log
+              </Button>
+            </div>
+
+            {groupedClientLogs.length === 0 ? (
               <div className="text-center py-12 flex flex-col items-center">
                 <MessageSquare className="w-12 h-12 text-slate-200 mb-3" />
                 <p className="text-slate-500 font-medium">No communications logged yet.</p>
+                <p className="text-xs text-slate-400 mt-1">Select a different site or add a new log entry.</p>
               </div>
             ) : (
               <div className="relative border-l-2 border-indigo-100 ml-4 pl-6 space-y-6 max-w-3xl">
-                {clientLogs.map((log, idx) => {
+                {groupedClientLogs.map((log, idx) => {
                   const isIncoming = log.direction === 'Incoming';
                   const dateObj = new Date(log.date);
                   return (
                     <div key={log.id || idx} className="relative">
+                      {/* Timeline dot */}
                       <div className={cn(
                         "absolute -left-[35px] mt-1.5 h-4 w-4 rounded-full border-4 border-white shadow-sm ring-1 ring-slate-200",
                         isIncoming ? "bg-emerald-500" : "bg-indigo-500"
                       )} />
-                      
+
+                      {/* Main log card */}
                       <div className={cn(
                         "rounded-lg border p-4 shadow-sm bg-white",
                         isIncoming ? "border-emerald-100" : "border-indigo-100"
                       )}>
                         <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className={cn(
                               "inline-flex items-center justify-center w-6 h-6 rounded-md text-white shadow-sm",
                               isIncoming ? "bg-emerald-500" : "bg-indigo-500"
@@ -1031,26 +1083,82 @@ export function Sites() {
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-slate-500 font-medium whitespace-nowrap bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
-                            {format(dateObj, 'MMM d, yyyy')} {log.time && `• ${log.time}`}
+                          <div className="flex items-center gap-2">
+                            <div className="text-xs text-slate-500 font-medium whitespace-nowrap bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                              {format(dateObj, 'MMM d, yyyy')}{log.time && ` • ${log.time}`}
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-xs gap-1 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                              onClick={() => navigate(`/comm-log?highlightId=${log.id}`)}
+                            >
+                              <Pencil className="h-3 w-3" /> Edit
+                            </Button>
                           </div>
                         </div>
-                        
+
                         {log.subject && (
                           <div className="font-medium text-slate-800 text-sm mb-1">{log.subject}</div>
                         )}
-                        
+
                         <div className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-md border border-slate-100 mt-2">
                           {log.notes}
                         </div>
-                        
+
                         {log.outcome && (
                           <div className="mt-3 text-sm flex gap-2 pt-3 border-t border-slate-100">
                             <span className="font-medium text-slate-700">Outcome:</span>
                             <span className="text-slate-600">{log.outcome}</span>
                           </div>
                         )}
+
+                        {log.followUpDate && (
+                          <div className={cn(
+                            "mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs font-medium",
+                            log.followUpDone ? "text-emerald-600" : "text-amber-600"
+                          )}>
+                            {log.followUpDone
+                              ? <CheckCircle2 className="h-3.5 w-3.5" />
+                              : <Bell className="h-3.5 w-3.5" />}
+                            Follow-up: {format(new Date(log.followUpDate), 'MMM d, yyyy')}
+                            {log.followUpDone ? ' (Done)' : ''}
+                          </div>
+                        )}
                       </div>
+
+                      {/* Follow-up threads */}
+                      {log.followUps && log.followUps.length > 0 && (
+                        <div className="mt-3 ml-6 space-y-3 border-l-2 border-dashed border-slate-200 pl-4">
+                          {log.followUps.map(fu => (
+                            <div key={fu.id} className="bg-white border border-slate-100 rounded-lg p-3 shadow-sm relative">
+                              <div className="absolute -left-[21px] top-3 h-3 w-3 rounded-full bg-slate-300 border-2 border-white" />
+                              <div className="flex items-start justify-between gap-2 mb-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded text-white", fu.direction === 'Incoming' ? "bg-emerald-400" : "bg-indigo-400")}>
+                                    {getChannelIcon(fu.channel)}
+                                  </span>
+                                  <span className="text-xs font-semibold text-slate-700">
+                                    Follow-up · {fu.direction === 'Incoming' ? 'Received' : 'Sent'}
+                                  </span>
+                                  <span className="text-xs text-slate-400">{format(new Date(fu.date), 'MMM d, yyyy')}{fu.time && ` ${fu.time}`}</span>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-1.5 text-xs text-slate-400 hover:text-indigo-600"
+                                  onClick={() => navigate(`/comm-log?highlightId=${fu.id}`)}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              {fu.subject && <p className="text-xs font-medium text-slate-700 mb-1">{fu.subject}</p>}
+                              <p className="text-xs text-slate-600 leading-relaxed">{fu.notes}</p>
+                              {fu.outcome && <p className="text-xs text-slate-500 mt-1 italic">→ {fu.outcome}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1215,7 +1323,7 @@ export function Sites() {
                                   </DropdownMenuItem>
                                   <DropdownMenuItem 
                                     onClick={() => {
-                                      navigate(`/comm-log?site=${encodeURIComponent(site.name)}`);
+                                      navigate(`/sites/conversations/${site.id}`);
                                     }}
                                     className="gap-2"
                                   >
@@ -1225,13 +1333,12 @@ export function Sites() {
 
                                   <DropdownMenuItem 
                                     onClick={() => {
-                                      setDiarySite(site);
+                                      navigate(`/sites/diary/${site.id}`);
                                     }}
                                     className="gap-2 text-emerald-600 focus:text-emerald-700"
                                   >
-
                                     <BookOpen className="h-4 w-4" />
-                                    <span>Site Diary (WIP)</span>
+                                    <span>Site Diary</span>
                                   </DropdownMenuItem>
   
                                   {canEditSite && (
@@ -1352,7 +1459,7 @@ export function Sites() {
                                   </DropdownMenuItem>
                                   <DropdownMenuItem 
                                     onClick={() => {
-                                      navigate(`/comm-log?site=${encodeURIComponent(site.name)}`);
+                                      navigate(`/sites/conversations/${site.id}`);
                                     }}
                                     className="gap-2"
                                   >
@@ -1367,7 +1474,7 @@ export function Sites() {
                                     className="gap-2 text-emerald-600 focus:text-emerald-700"
                                   >
                                     <BookOpen className="h-4 w-4" />
-                                    <span>Site Diary (WIP)</span>
+                                    <span>Site Diary</span>
                                   </DropdownMenuItem>
 
                                   {canEditSite && (
