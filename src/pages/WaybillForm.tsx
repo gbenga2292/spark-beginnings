@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore } from '@/src/store/appStore';
 import { 
-  X, Plus, Trash2, Truck, FileText,
+  X, Plus, Trash2, Truck, FileText, GripVertical,
   MapPin, Package, Search, CheckCircle2, ChevronDown
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
@@ -11,6 +11,8 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { toast } from '@/src/components/ui/toast';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { ArrowLeft } from 'lucide-react';
 
 interface WaybillFormProps {
   onClose: () => void;
@@ -30,11 +32,10 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
   const [vehicleName, setVehicleName] = useState('');
   const [service, setService] = useState('Dewatering');
   const [expectedReturnDate, setExpectedReturnDate] = useState('');
-  const [items, setItems] = useState<{ assetId: string; assetName: string; quantity: number; type: string }[]>([]);
-  const [searchAsset, setSearchAsset] = useState('');
-  const [selectedAssetId, setSelectedAssetId] = useState('');
   const [itemMode, setItemMode] = useState<'single' | 'bulk'>('single');
+  const [items, setItems] = useState<{ rowId: string; assetId: string; quantity: number }[]>([]);
   const [bulkText, setBulkText] = useState('');
+  const [parsedItems, setParsedItems] = useState<{ id: string; originalText: string; quantity: number; matchedAssetId: string | null; isRematching?: boolean }[]>([]);
 
   const driverOptions = [
     ...employees.filter(e => ['Driver', 'Foreman', 'Site Supervisor', 'Assistant Supervisor'].includes(e.position || ''))
@@ -45,55 +46,72 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
   const vehicleOptions = vehicles.map(v => v.name);
   const siteOptions = sites.map(s => s.name);
 
-  const filteredAssets = assets.filter(a =>
-    a.name.toLowerCase().includes(searchAsset.toLowerCase()) &&
-    !items.find(i => i.assetId === a.id)
-  );
+  const addItem = () => setItems([...items, { rowId: `row-${Date.now()}-${Math.random()}`, assetId: '', quantity: 1 }]);
+  const updateItemAsset = (rowId: string, assetId: string) => setItems(items.map(i => i.rowId === rowId ? { ...i, assetId } : i));
+  const updateItemQuantity = (rowId: string, qty: number) => setItems(items.map(i => i.rowId === rowId ? { ...i, quantity: Math.max(1, qty) } : i));
+  const removeItem = (rowId: string) => setItems(items.filter(i => i.rowId !== rowId));
 
-  const addItem = () => {
-    const asset = assets.find(a => a.id === selectedAssetId);
-    if (asset) {
-      setItems([...items, { assetId: asset.id, assetName: asset.name, quantity: 1, type: asset.type }]);
-      setSelectedAssetId('');
-      setSearchAsset('');
-    }
-  };
-
-  const addBulkItems = () => {
+  const handleParse = () => {
     const lines = bulkText.split('\n').filter(l => l.trim());
-    const newItems: typeof items = [];
-    lines.forEach(line => {
-      const match = line.match(/^(.+?)\s+[x×]\s*(\d+)/i) || line.match(/^(\d+)\s+(.+)/);
-      if (match) {
-        const name = (match[1] || match[2]).trim();
-        const qty = parseInt(match[2] || match[1]);
-        const asset = assets.find(a => a.name.toLowerCase().includes(name.toLowerCase()));
-        if (asset && !items.find(i => i.assetId === asset.id)) {
-          newItems.push({ assetId: asset.id, assetName: asset.name, quantity: qty || 1, type: asset.type });
-        } else {
-          // Add as manual item
-          newItems.push({ assetId: `manual-${Date.now()}-${Math.random()}`, assetName: name, quantity: qty || 1, type: 'consumable' });
-        }
+    const newParsed = lines.map(line => {
+      let qty = 1;
+      let name = line.trim();
+      const matchEnd = name.match(/(.*?)\s+[xX*]?\s*(\d+)$/);
+      const matchStart = name.match(/^(\d+)\s+[xX*]?\s*(.*)/);
+      if (matchEnd) {
+        name = matchEnd[1].trim();
+        qty = parseInt(matchEnd[2], 10) || 1;
+      } else if (matchStart) {
+        qty = parseInt(matchStart[1], 10) || 1;
+        name = matchStart[2].trim();
       }
+
+      const lowerName = name.toLowerCase();
+      let match = assets.find(a => a.name.toLowerCase() === lowerName);
+      if (!match) {
+        match = assets.find(a => a.name.toLowerCase().includes(lowerName) || lowerName.includes(a.name.toLowerCase()));
+      }
+
+      return {
+        id: `parsed-${Date.now()}-${Math.random()}`,
+        originalText: name,
+        quantity: qty,
+        matchedAssetId: match ? match.id : null,
+        isRematching: false,
+      };
     });
-    if (newItems.length) {
-      setItems(prev => [...prev, ...newItems]);
-      setBulkText('');
-      setItemMode('single');
-    }
+    setParsedItems(newParsed);
   };
 
-  const removeItem = (id: string) => setItems(items.filter(i => i.assetId !== id));
-  const updateQuantity = (id: string, qty: number) =>
-    setItems(items.map(i => i.assetId === id ? { ...i, quantity: Math.max(1, qty) } : i));
+  const handleImportBulk = () => {
+    const validParsed = parsedItems.filter(p => p.matchedAssetId);
+    const newItems = validParsed.map(p => ({
+      rowId: `row-${Date.now()}-${Math.random()}`,
+      assetId: p.matchedAssetId as string,
+      quantity: p.quantity,
+    }));
+    setItems([...items, ...newItems]);
+    setParsedItems([]);
+    setBulkText('');
+    setItemMode('single');
+    toast.success(`Imported ${newItems.length} items successfully`);
+  };
+
+  useSetPageTitle(
+    initialType === 'waybill' ? 'Create Waybill' : 'Create Return Sheet',
+    'Issue assets for delivery to project sites',
+    null,
+    [initialType]
+  );
 
   const handleSubmit = () => {
     if (!siteName || !driverName) {
       toast.error('Please fill in all required fields');
       return;
     }
-    if (items.length === 0) {
-      toast.error('Add at least one item to the waybill');
+    const validItems = items.filter(i => i.assetId);
+    if (validItems.length === 0) {
+      toast.error('Add at least one valid item to the waybill');
       return;
     }
     createWaybill({
@@ -103,34 +121,26 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
       issueDate: new Date().toISOString(),
       driverName,
       vehicle: vehicleName,
-      items: items.map(i => ({ assetId: i.assetId, assetName: i.assetName, quantity: i.quantity })),
+      items: validItems.map(i => {
+        const asset = assets.find(a => a.id === i.assetId);
+        return { assetId: i.assetId, assetName: asset?.name || 'Unknown', quantity: i.quantity };
+      }),
     });
     toast.success(`Waybill created successfully for ${siteName}`);
     onClose();
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-10 flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-300">
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 py-5 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <FileText className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-foreground uppercase tracking-tight">
-                {initialType === 'waybill' ? 'Create Waybill' : 'Create Return Sheet'}
-              </h2>
-              <p className="text-muted-foreground font-bold text-xs mt-0.5">Issue assets for delivery to project sites</p>
-            </div>
-          </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted">
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+    <div className="max-w-5xl mx-auto w-full pb-10 flex flex-col gap-6 animate-in fade-in duration-300">
+      <button
+        onClick={onClose}
+        className="flex items-center gap-2 text-sm text-slate-500 hover:text-teal-700 dark:hover:text-teal-400 font-semibold transition-colors w-fit"
+      >
+        <ArrowLeft className="h-4 w-4" /> Back to Waybills
+      </button>
 
-        <div className="p-6 space-y-8">
+      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+        <div className="p-6 sm:p-8 space-y-8">
           {/* Waybill Information */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -237,139 +247,217 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                 <div className="text-muted-foreground"><Package className="h-4 w-4" /></div>
                 <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest">Items to Issue</h3>
               </div>
+              
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setItemMode('single')}
                   className={cn(
                     "text-xs font-bold px-3 py-1.5 rounded-lg transition-all",
-                    itemMode === 'single' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
+                    itemMode === 'single' ? "bg-slate-800 text-white dark:bg-white dark:text-slate-900" : "bg-slate-100 text-slate-500 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-400"
                   )}
                 >
-                  Single Item
+                  Single Items
                 </button>
                 <button
                   type="button"
                   onClick={() => setItemMode('bulk')}
                   className={cn(
                     "text-xs font-bold px-3 py-1.5 rounded-lg transition-all",
-                    itemMode === 'bulk' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
+                    itemMode === 'bulk' ? "bg-slate-800 text-white dark:bg-white dark:text-slate-900" : "bg-slate-100 text-slate-500 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-400"
                   )}
                 >
-                  Bulk Input
+                  Bulk Import
                 </button>
-                <button
-                  type="button"
-                  onClick={addItem}
-                  disabled={!selectedAssetId}
-                  className="flex items-center gap-1.5 text-xs font-bold bg-primary text-primary-foreground px-3 py-1.5 rounded-lg transition-all hover:bg-primary/90 disabled:opacity-40"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add Item
-                </button>
+                {itemMode === 'single' && (
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className="flex items-center gap-1.5 text-xs font-bold bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 px-3 py-1.5 rounded-lg transition-all hover:bg-teal-200 dark:hover:bg-teal-900/50"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Item
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Single item search */}
-            {itemMode === 'single' && (
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={searchAsset}
-                  onChange={e => { setSearchAsset(e.target.value); setSelectedAssetId(''); }}
-                  placeholder="Search inventory by name..."
-                  className="pl-10 h-10 rounded-xl border-border bg-background text-sm"
-                />
-                {searchAsset && filteredAssets.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 z-20 max-h-48 overflow-y-auto rounded-xl border border-border bg-card shadow-xl p-1 pb-1">
-                    {filteredAssets.map(a => (
-                      <button
-                        key={a.id}
-                        type="button"
-                        onClick={() => { setSelectedAssetId(a.id); setSearchAsset(a.name); }}
-                        className="w-full text-left p-2.5 rounded-lg text-xs font-medium hover:bg-muted transition-colors flex items-center justify-between text-foreground"
+            {itemMode === 'bulk' ? (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Paste items (one per line)</Label>
+                  <textarea
+                    value={bulkText}
+                    onChange={e => setBulkText(e.target.value)}
+                    rows={4}
+                    placeholder={`DEWATERING PUMP`}
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/30 resize-none"
+                  />
+                  <div className="flex gap-2">
+                    <Button 
+                      type="button" 
+                      onClick={handleParse} 
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-9 px-6 rounded-lg shadow-sm"
+                      disabled={!bulkText.trim()}
+                    >
+                      Parse
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      onClick={() => { setBulkText(''); setParsedItems([]); }} 
+                      className="h-9 px-4 font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+
+                {parsedItems.length > 0 && (
+                  <div className="space-y-3">
+                    <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Parsed Preview</Label>
+                    <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900">
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {parsedItems.map(item => {
+                          const matched = item.matchedAssetId ? assets.find(a => a.id === item.matchedAssetId) : null;
+                          return (
+                            <div key={item.id} className="p-3 sm:px-4 flex flex-col sm:flex-row gap-3 sm:items-center">
+                              <Input 
+                                value={item.originalText} 
+                                onChange={e => setParsedItems(parsedItems.map(p => p.id === item.id ? { ...p, originalText: e.target.value } : p))}
+                                className="h-9 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 sm:w-1/3" 
+                              />
+                              <Input 
+                                type="number" 
+                                min="1"
+                                value={item.quantity} 
+                                onChange={e => setParsedItems(parsedItems.map(p => p.id === item.id ? { ...p, quantity: parseInt(e.target.value) || 1 } : p))}
+                                className="h-9 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 w-24" 
+                              />
+                              <div className="flex-1 min-w-0">
+                                {item.isRematching ? (
+                                  <select
+                                    value={item.matchedAssetId || ''}
+                                    onChange={e => setParsedItems(parsedItems.map(p => p.id === item.id ? { ...p, matchedAssetId: e.target.value, isRematching: false } : p))}
+                                    className="w-full h-9 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/30 appearance-none"
+                                  >
+                                    <option value="">Select correct asset...</option>
+                                    {assets.map(a => <option key={a.id} value={a.id}>{a.name} ({a.availableQuantity})</option>)}
+                                  </select>
+                                ) : matched ? (
+                                  <div className="flex flex-col justify-center">
+                                    <span className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{matched.name}</span>
+                                    <span className="text-xs text-slate-500">Available: {matched.availableQuantity} {matched.unitOfMeasurement}</span>
+                                  </div>
+                                ) : (
+                                  <div className="text-sm font-medium text-rose-500 flex items-center h-full">No match found</div>
+                                )}
+                              </div>
+                              <div className="shrink-0 flex items-center">
+                                {!item.isRematching && (
+                                  <Button 
+                                    type="button" 
+                                    onClick={() => setParsedItems(parsedItems.map(p => p.id === item.id ? { ...p, isRematching: true } : p))}
+                                    className="h-8 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg"
+                                  >
+                                    Rematch
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="flex justify-end pt-2">
+                      <Button 
+                        type="button" 
+                        onClick={handleImportBulk}
+                        disabled={parsedItems.filter(p => p.matchedAssetId).length === 0}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 px-6 rounded-lg shadow-sm"
                       >
-                        <div>
-                          <span className="font-bold">{a.name}</span>
-                          <span className="ml-2 text-muted-foreground capitalize">{a.type}</span>
-                        </div>
-                        <span className="text-[10px] bg-muted px-2 py-0.5 rounded font-bold text-muted-foreground">
-                          {a.availableQuantity} {a.unitOfMeasurement}
-                        </span>
-                      </button>
-                    ))}
+                        Import {parsedItems.filter(p => p.matchedAssetId).length} items
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
-            )}
-
-            {/* Bulk input */}
-            {itemMode === 'bulk' && (
-              <div className="space-y-2">
-                <textarea
-                  value={bulkText}
-                  onChange={e => setBulkText(e.target.value)}
-                  rows={4}
-                  placeholder={`Enter items, one per line:\nBlind Pipes x 10\nSuction Pipe x 5\nTee Connectors x 2`}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 text-foreground"
-                />
-                <Button type="button" size="sm" onClick={addBulkItems} className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs h-8 font-bold rounded-lg px-4">
-                  Parse & Add Items
-                </Button>
-              </div>
-            )}
-
-            {/* Items list */}
-            <div className="rounded-xl border border-border overflow-hidden bg-background min-h-[120px]">
-              {items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-                  <FileText className="h-10 w-10 mb-2 opacity-20" />
-                  <p className="text-sm font-bold opacity-50 uppercase tracking-widest">No items added yet</p>
+            ) : (
+              <div className="space-y-3">
+                {items.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30">
+                  <FileText className="h-10 w-10 mb-2 opacity-30" />
+                  <p className="text-sm font-bold opacity-70 uppercase tracking-widest">No items added yet</p>
                 </div>
               ) : (
-                <div className="divide-y divide-border">
-                  {items.map((item, idx) => (
-                    <div key={item.assetId} className="flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                          <Package className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-foreground truncate">{item.assetName}</p>
-                          <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{item.type}</p>
-                        </div>
+                items.map((item) => {
+                  const selectedAsset = assets.find(a => a.id === item.assetId);
+                  
+                  return (
+                    <div key={item.rowId} className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm group transition-all">
+                      <div className="absolute left-3 top-5 opacity-40 hover:opacity-100 transition-opacity hidden sm:block cursor-grab">
+                        <GripVertical className="h-4 w-4 text-slate-400" />
                       </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <div className="flex bg-card rounded-lg border border-border overflow-hidden">
-                          <button type="button" onClick={() => updateQuantity(item.assetId, item.quantity - 1)}
-                            className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground font-black text-sm transition-colors">−</button>
-                          <span className="w-8 h-7 flex items-center justify-center text-xs font-black text-foreground border-x border-border">
-                            {item.quantity}
-                          </span>
-                          <button type="button" onClick={() => updateQuantity(item.assetId, item.quantity + 1)}
-                            className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground font-black text-sm transition-colors">+</button>
+                      
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.rowId)}
+                        className="absolute right-4 top-4 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 p-1.5 rounded-lg transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 sm:ml-6 pr-6 sm:pr-8">
+                        <div className="space-y-1.5 sm:col-span-6">
+                          <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Asset</Label>
+                          <div className="relative">
+                            <select
+                              value={item.assetId}
+                              onChange={(e) => updateItemAsset(item.rowId, e.target.value)}
+                              className="w-full h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 text-sm font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/30 appearance-none"
+                            >
+                              <option value="">Select asset</option>
+                              {assets.map(a => (
+                                <option key={a.id} value={a.id}>{a.name} ({a.availableQuantity} {a.unitOfMeasurement})</option>
+                              ))}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                          </div>
                         </div>
-                        <button type="button" onClick={() => removeItem(item.assetId)}
-                          className="p-1.5 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+
+                        <div className="space-y-1.5 sm:col-span-3">
+                          <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Quantity</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => updateItemQuantity(item.rowId, parseInt(e.target.value) || 1)}
+                            className="h-10 rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-sm font-medium focus-visible:ring-teal-500/30"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5 sm:col-span-3">
+                          <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Available</Label>
+                          <div className="h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900 flex items-center px-3 text-sm font-bold text-slate-500 cursor-not-allowed">
+                            {selectedAsset ? `${selectedAsset.availableQuantity} ${selectedAsset.unitOfMeasurement}` : '-'}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })
               )}
             </div>
           </div>
         </div>
-
         {/* Footer */}
-        <div className="p-5 border-t border-border flex justify-end gap-3 bg-muted/20">
-          <Button variant="outline" onClick={onClose} className="h-10 px-6 rounded-xl font-black text-xs uppercase text-muted-foreground hover:text-foreground">
+        <div className="p-6 sm:px-8 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-800/30">
+          <Button variant="outline" onClick={onClose} className="h-11 px-6 rounded-xl font-bold text-xs uppercase text-slate-600 dark:text-slate-400 hover:text-slate-900 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={items.length === 0 || !siteName || !driverName}
-            className="h-10 px-8 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs uppercase tracking-widest gap-2 shadow-sm disabled:opacity-50"
+            className="h-11 px-8 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-widest gap-2 shadow-sm disabled:opacity-50"
           >
             <CheckCircle2 className="h-4 w-4" /> Create Waybill
           </Button>
