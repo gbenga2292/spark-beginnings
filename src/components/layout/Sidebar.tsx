@@ -131,8 +131,7 @@ const navigation: NavCategory[] = [
     name: 'Clients & Sites',
     icon: Building2,
     items: [
-      { name: 'Clients', href: '/clients', icon: Users, privKey: 'clients', privField: 'canView' },
-      { name: 'Sites', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView' },
+      { name: 'Sites Overview', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView' },
     ],
   },
   // ── Account ───────────────────────────────────────────────────────────────

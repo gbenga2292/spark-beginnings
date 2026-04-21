@@ -26,7 +26,6 @@ const Organogram = lazy(() => import('./pages/Organogram').then(m => ({ default:
 const Sites = lazy(() => import('./pages/Sites').then(m => ({ default: m.Sites })));
 const SiteDiary = lazy(() => import('./pages/SiteDiary').then(m => ({ default: m.SiteDiary })));
 const SiteConversations = lazy(() => import('./pages/SiteConversations').then(m => ({ default: m.SiteConversations })));
-const ClientDetails = lazy(() => import('./pages/ClientDetails').then(m => ({ default: m.ClientDetails })));
 const SiteOnboarding = lazy(() => import('./pages/SiteOnboarding').then(m => ({ default: m.SiteOnboarding })));
 const Attendance = lazy(() => import('./pages/Attendance').then(m => ({ default: m.Attendance })));
 const Payroll = lazy(() => import('./pages/Payroll').then(m => ({ default: m.Payroll })));
@@ -173,7 +172,7 @@ function AppContent() {
             <Route path="performance-conduct" element={<Page label="Performance & Conduct"><ProtectedRoute requiredModule="disciplinary"><PerformanceConduct /></ProtectedRoute></Page>} />
             <Route path="evaluations" element={<Page label="Evaluations"><ProtectedRoute requiredModule="evaluations"><Evaluations /></ProtectedRoute></Page>} />
             <Route path="ledger" element={<Page label="Ledger"><ProtectedRoute requiredModule="ledger"><Ledger /></ProtectedRoute></Page>} />
-            <Route path="clients" element={<Page label="Clients"><ProtectedRoute requiredModule="clients"><ClientDetails /></ProtectedRoute></Page>} />
+            <Route path="clients" element={<Navigate to="/sites" replace />} />
             
             {/* Operations & Analytics — Restricted on Web */}
             <Route path="operations/*" element={

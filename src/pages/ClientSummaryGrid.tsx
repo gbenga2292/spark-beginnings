@@ -1,14 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '../store/appStore';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useSetPageTitle } from '../contexts/PageContext';
 import { Users, Building2, Calendar, FileText, Search, MapPin, LayoutGrid, List, ChevronRight } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { format, parseISO } from 'date-fns';
 
-export function ClientDetails() {
+export function ClientSummaryGrid() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const navigate = useNavigate();
@@ -50,14 +49,6 @@ export function ClientDetails() {
     const pending = pendingSites.find(s => s.clientName.trim().toLowerCase() === key && s.phase4?.clientTinNumber);
     return pending?.phase4?.clientTinNumber || 'Not provided';
   };
-
-  // Use a generalized page title since we are removing the inline detail view
-  useSetPageTitle(
-    'Clients Summary',
-    'View all clients, total sites, revenue, and details.',
-    undefined,
-    []
-  );
 
   const statsByClient = useMemo(() => {
     const stats: Record<string, { totalSites: number, activeSites: number, totalRevenue: number, id: string }> = {};
@@ -130,7 +121,7 @@ export function ClientDetails() {
   // Master View Rendering (Grid/List)
   // ----------------------------------------------------
   return (
-    <div className="flex flex-col gap-6 h-full max-w-7xl mx-auto w-full">
+    <div className="flex flex-col gap-5 flex-1 min-h-0 w-full">
       <div className="flex flex-wrap gap-4 items-center justify-between">
         <div className="relative w-full sm:w-80 border-slate-200">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />

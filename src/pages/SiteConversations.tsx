@@ -9,6 +9,7 @@ import {
   Users, Car, Bell, CheckCircle2, Pencil, Building2, MapPin,
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 function channelIcon(ch: string) {
   if (ch === 'Call') return <Phone className="w-4 h-4" />;
@@ -33,13 +34,13 @@ export function SiteConversations() {
   const siteLogs = useMemo(() => {
     if (!siteId) return [];
     return commLogs
-      .filter(l => l.siteId === siteId)
+      .filter(l => l.siteId === siteId || (site && l.siteName === site.name))
       .sort((a, b) => {
         const da = a.date + (a.time ? `T${a.time}` : 'T00:00');
         const db = b.date + (b.time ? `T${b.time}` : 'T00:00');
         return new Date(da).getTime() - new Date(db).getTime();
       });
-  }, [commLogs, siteId]);
+  }, [commLogs, siteId, site]);
 
   // Group: parent logs with their follow-ups threaded below, newest-first
   const grouped = useMemo(() => {
@@ -66,40 +67,32 @@ export function SiteConversations() {
     );
   }
 
+  useSetPageTitle(
+    'Site Conversations',
+    site ? `${site.name} · ${site.client}` : 'Comm Logs',
+    <div className="flex items-center gap-3">
+      <Button 
+        variant="outline" 
+        size="sm" 
+        className="gap-2 shrink-0 bg-white shadow-sm"
+        onClick={() => navigate(`/sites?client=${encodeURIComponent(site.client)}`)}
+      >
+        <ArrowLeft className="h-4 w-4" /> Back
+      </Button>
+      <Button
+        size="sm"
+        className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shrink-0 shadow-sm"
+        onClick={() => {
+          navigate(`/comm-log?prefill_site=${siteId}&prefill_client=${encodeURIComponent(site.client)}`);
+        }}
+      >
+        <Plus className="w-4 h-4" /> New Log
+      </Button>
+    </div>
+  );
+
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className={cn(
-        "flex shrink-0 border-b px-6 py-4 shadow-sm items-center gap-4",
-        isDark ? "bg-slate-900 border-slate-800" : "bg-white"
-      )}>
-        <button
-          onClick={() => navigate(-1)}
-          className="text-slate-400 hover:text-slate-600 transition-colors"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-indigo-500" />
-            Site Conversations
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5" /> {site.name}
-            <span className="text-slate-300 mx-1">·</span>
-            <Building2 className="h-3.5 w-3.5" /> {site.client}
-          </p>
-        </div>
-        <Button
-          size="sm"
-          className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shrink-0"
-          onClick={() => {
-            navigate(`/comm-log?prefill_site=${siteId}&prefill_client=${encodeURIComponent(site.client)}`);
-          }}
-        >
-          <Plus className="w-4 h-4" /> New Log
-        </Button>
-      </div>
 
       {/* Body */}
       <div className={cn("flex-1 overflow-auto p-6", isDark ? "bg-slate-950" : "bg-slate-50")}>

@@ -444,6 +444,7 @@ export interface PendingInvoice {
   totalExclusiveOfVat: number;
   printLayout?: any;
   historyLog?: any[];
+  machineConfigs?: { qt: number, rate: number, duration: number }[];
 }
 
 export interface Invoice {
@@ -479,6 +480,7 @@ export interface Invoice {
   totalExclusiveOfVat?: number;
   printLayout?: any;
   historyLog?: any[];
+  machineConfigs?: { qt: number, rate: number, duration: number }[];
 }
 
 export interface SalaryAdvance {

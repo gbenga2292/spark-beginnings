@@ -1,11 +1,13 @@
 import React, { useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useAppStore } from '@/src/store/appStore';
 import { Calendar, BookOpen, ArrowLeft, Building2 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 
 export function SiteDiary() {
   const { siteId } = useParams();
+  const navigate = useNavigate();
   const { siteJournalEntries, dailyJournals, sites } = useAppStore();
 
   const site = useMemo(() => sites.find(s => s.id === siteId), [sites, siteId]);
@@ -30,26 +32,26 @@ export function SiteDiary() {
     return (
       <div className="flex flex-col items-center justify-center p-12">
         <h2 className="text-xl font-bold text-slate-800">Site not found</h2>
-        <Link to="/sites" className="text-emerald-600 hover:underline mt-2">Return to Sites</Link>
+        <Button variant="link" onClick={() => navigate('/sites')} className="text-emerald-600 hover:underline mt-2">Return to Sites</Button>
       </div>
     );
   }
 
+  useSetPageTitle(
+    site ? `${site.name} Diary` : 'Site Diary',
+    site ? `Client: ${site.client}` : 'View aggregated daily journal entries',
+    <Button 
+      variant="outline" 
+      size="sm" 
+      className="gap-2 shrink-0 bg-white shadow-sm"
+      onClick={() => navigate(`/sites?client=${encodeURIComponent(site.client)}`)}
+    >
+      <ArrowLeft className="h-4 w-4" /> Back to Sites
+    </Button>
+  );
+
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 border-b bg-white px-6 py-4 shadow-sm">
-        <Link to="/sites" className="mr-4 text-slate-400 hover:text-slate-600 self-center">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <BookOpen className="h-6 w-6 text-emerald-600" /> {site.name} Diary
-          </h1>
-          <p className="flex items-center text-sm font-medium text-slate-500 mt-1">
-            <Building2 className="mr-1.5 h-4 w-4" /> Client: {site.client}
-          </p>
-        </div>
-      </div>
 
       <div className="flex-1 overflow-auto bg-slate-50 p-6">
         <div className="mx-auto max-w-3xl">

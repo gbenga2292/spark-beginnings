@@ -97,6 +97,57 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
   };
   const [form, setForm] = useState(initialForm);
 
+  // ── Per-machine rate/duration configs ──────────────────────────
+  type MachineRow = { rate: string; duration: string; sameRateAsFirst: boolean; sameDurationAsFirst: boolean };
+  const [machineConfigs, setMachineConfigs] = useState<MachineRow[]>([]);
+
+  // Keep machineConfigs in sync with noOfMachine changes
+  const handleNoOfMachineChange = (val: string) => {
+    handleChange('noOfMachine', val);
+    const n = parseInt(val) || 0;
+    setMachineConfigs(prev => {
+      const next: MachineRow[] = [];
+      for (let i = 0; i < n; i++) {
+        if (prev[i]) {
+          next.push(prev[i]);
+        } else {
+          // Default new rows to same as first if first exists
+          next.push({ rate: prev[0]?.rate ?? '', duration: prev[0]?.duration ?? '', sameRateAsFirst: i > 0, sameDurationAsFirst: i > 0 });
+        }
+      }
+      return next;
+    });
+  };
+
+  const handleMachineRowChange = (idx: number, field: 'rate' | 'duration', val: string) => {
+    setMachineConfigs(prev => {
+      const next = prev.map((r, i) => {
+        if (i === idx) return { ...r, [field]: val };
+        // If a sibling row is same as first and we just changed row 0, mirror it
+        if (idx === 0) {
+          if (field === 'rate' && r.sameRateAsFirst) return { ...r, rate: val };
+          if (field === 'duration' && r.sameDurationAsFirst) return { ...r, duration: val };
+        }
+        return r;
+      });
+      return next;
+    });
+  };
+
+  const handleMachineSameToggle = (idx: number, field: 'rate' | 'duration', checked: boolean) => {
+    setMachineConfigs(prev => {
+      const first = prev[0];
+      return prev.map((r, i) => {
+        if (i !== idx) return r;
+        if (field === 'rate') {
+          return checked ? { ...r, sameRateAsFirst: true, rate: first?.rate ?? '' } : { ...r, sameRateAsFirst: false };
+        } else {
+          return checked ? { ...r, sameDurationAsFirst: true, duration: first?.duration ?? '' } : { ...r, sameDurationAsFirst: false };
+        }
+      });
+    });
+  };
+
   const uniqueClients = useMemo(() => {
     const clients = new Set(siteRegistry.map(s => s.client));
     if (form.client && !clients.has(form.client)) {
@@ -125,13 +176,12 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
 
   const handleClear = () => {
     setForm(initialForm);
+    setMachineConfigs([]);
     setSelectedId(null);
   };
 
   const livePreview = useMemo(() => {
-    const duration = parseFloat(form.duration) || 0;
-    const noOfMachine = parseFloat(form.noOfMachine) || 0;
-    const dailyRentalCost = parseFloat(form.dailyRentalCost) || 0;
+    const noOfMachine = parseInt(form.noOfMachine) || 0;
     const noOfTechnician = parseFloat(form.noOfTechnician) || 0;
     const techniciansDailyRate = parseFloat(form.techniciansDailyRate) || 0;
     const dieselCostPerLtr = parseFloat(form.dieselCostPerLtr) || 0;
@@ -140,12 +190,20 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
     const installation = parseFloat(form.installation) || 0;
     const damages = parseFloat(form.damages) || 0;
 
-    const rentalCost = noOfMachine * dailyRentalCost * duration;
-    const dieselCost = noOfMachine * dailyUsage * dieselCostPerLtr * duration;
-    const techniciansCost = noOfTechnician * techniciansDailyRate * duration;
+    // Max duration across all machine rows — used for technicians, diesel, end-date
+    const maxDuration = machineConfigs.length > 0
+      ? Math.max(...machineConfigs.map(r => parseFloat(r.duration) || 0))
+      : 0;
+
+    // Rental cost = sum of (rate × duration) per machine
+    const rentalCost = machineConfigs.reduce((sum, row) => {
+      return sum + (parseFloat(row.rate) || 0) * (parseFloat(row.duration) || 0);
+    }, 0);
+
+    const dieselCost = noOfMachine * dailyUsage * dieselCostPerLtr * maxDuration;
+    const techniciansCost = noOfTechnician * techniciansDailyRate * maxDuration;
     const instMobDemob = mobDemob + installation;
     const otherCosts = damages;
-
     const totalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
 
     let siteRecord = siteRegistry.find(s => s.name === form.site && s.client === form.client);
@@ -166,13 +224,11 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       totalCharge = totalCost + vat;
     }
 
-    return { totalCost, vat, totalCharge, vatInc };
-  }, [form, sites, vatRate]);
+    return { totalCost, vat, totalCharge, vatInc, maxDuration };
+  }, [form, machineConfigs, siteRegistry, vatRate]);
 
-  const calculateFullInvoiceData = (input: any) => {
-    const duration = parseFloat(input.duration) || 0;
-    const noOfMachine = parseFloat(input.noOfMachine) || 0;
-    const dailyRentalCost = parseFloat(input.dailyRentalCost) || 0;
+  const calculateFullInvoiceData = (input: any, configs?: { rate: string; duration: string }[]) => {
+    const noOfMachine = parseInt(input.noOfMachine) || 0;
     const noOfTechnician = parseFloat(input.noOfTechnician) || 0;
     const techniciansDailyRate = parseFloat(input.techniciansDailyRate) || 0;
     const dieselCostPerLtr = parseFloat(input.dieselCostPerLtr) || 0;
@@ -181,37 +237,43 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
     const installation = parseFloat(input.installation) || 0;
     const damages = parseFloat(input.damages) || 0;
 
+    const activeCfgs = configs && configs.length > 0 ? configs : null;
+
+    // Max duration drives end-date, technicians, and diesel
+    const maxDuration = activeCfgs
+      ? Math.max(...activeCfgs.map(r => parseFloat(r.duration) || 0))
+      : (parseFloat(input.duration) || 0);
+
     let startDate = normalizeDate(input.startDate || input.date);
     let endDate = '';
-    if (startDate && duration > 0) {
+    if (startDate && maxDuration > 0) {
       const start = new Date(startDate);
       if (!isNaN(start.getTime())) {
-        start.setDate(start.getDate() + duration - 1);
+        start.setDate(start.getDate() + maxDuration - 1);
         endDate = start.toISOString().split('T')[0];
       }
     } else if (input.endDate || input.dueDate) {
       endDate = normalizeDate(input.endDate || input.dueDate);
     }
 
-    const rentalCost = noOfMachine * dailyRentalCost * duration;
-    const dieselCost = noOfMachine * dailyUsage * dieselCostPerLtr * duration;
-    const techniciansCost = noOfTechnician * techniciansDailyRate * duration;
+    // Rental cost = sum of (rate × duration) per machine
+    const rentalCost = activeCfgs
+      ? activeCfgs.reduce((sum, row) => sum + (parseFloat(row.rate) || 0) * (parseFloat(row.duration) || 0), 0)
+      : (parseInt(input.noOfMachine) || 0) * (parseFloat(input.dailyRentalCost) || 0) * maxDuration;
+
+    const dieselCost = noOfMachine * dailyUsage * dieselCostPerLtr * maxDuration;
+    const techniciansCost = noOfTechnician * techniciansDailyRate * maxDuration;
     const instMobDemob = mobDemob + installation;
     const otherCosts = damages;
-
     const totalCost = rentalCost + dieselCost + techniciansCost + instMobDemob + otherCosts;
 
     const siteName = (input.site || input.siteName || '').trim();
     const clientName = (input.client || '').trim();
-    
+
     let siteObj = siteRegistry.find(s => s.name === siteName && s.client === clientName);
-    
-    // Fallback: Check if the user accidentally swapped Client and Site
     if (!siteObj) {
       siteObj = siteRegistry.find(s => s.name === clientName && s.client === siteName);
     }
-    
-    // Site configuration is the ground truth for VAT
     const vatInc = siteObj ? siteObj.vat : (input.vatInc || 'No');
 
     let vat = 0;
@@ -226,14 +288,21 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       totalCharge = totalCost + vat;
     }
 
+    const machineConfigsOut = activeCfgs
+      ? activeCfgs.map(r => ({ qt: 1, rate: parseFloat(r.rate) || 0, duration: parseFloat(r.duration) || 0 }))
+      : undefined;
+
     return {
-      duration, noOfMachine, dailyRentalCost, noOfTechnician, techniciansDailyRate,
+      duration: maxDuration, noOfMachine,
+      dailyRentalCost: parseFloat(input.dailyRentalCost) || 0,
+      noOfTechnician, techniciansDailyRate,
       dieselCostPerLtr, dailyUsage, mobDemob, installation, damages,
       startDate, endDate, rentalCost, dieselCost, techniciansCost,
-      totalCost, vat, totalCharge, vatInc, 
+      totalCost, vat, totalCharge, vatInc,
       totalExclusiveOfVat: totalCharge - vat,
       invoiceNo: input.invoiceNo || input.invoiceNumber || '',
-      client: clientName, site: siteName
+      client: clientName, site: siteName,
+      machineConfigs: machineConfigsOut,
     };
   };
 
@@ -242,7 +311,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       toast.error('Invoice Number, Client, and Site are required');
       return null;
     }
-    const data = calculateFullInvoiceData(form);
+    const data = calculateFullInvoiceData(form, machineConfigs.length > 0 ? machineConfigs : undefined);
     return {
       id: '', // Placeholder
       ...data
@@ -346,6 +415,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
 
   const handleEdit = (inv: PendingInvoice | Invoice) => {
     setSelectedId(inv.id);
+    const noOfMachine = 'noOfMachine' in inv ? String(inv.noOfMachine ?? 0) : '0';
     setForm({
       ...initialForm,
       vatInc: inv.vatInc || 'No',
@@ -355,7 +425,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       invoiceNo: 'invoiceNo' in inv ? inv.invoiceNo : inv.invoiceNumber,
       client: (inv.client || '').trim(),
       site: (('site' in inv ? inv.site : inv.siteName) || '').trim(),
-      noOfMachine: 'noOfMachine' in inv ? String(inv.noOfMachine ?? 0) : '0',
+      noOfMachine,
       dailyRentalCost: 'dailyRentalCost' in inv ? String(inv.dailyRentalCost ?? 0) : '0',
       noOfTechnician: 'noOfTechnician' in inv ? String(inv.noOfTechnician ?? 0) : '0',
       techniciansDailyRate: 'techniciansDailyRate' in inv ? String(inv.techniciansDailyRate ?? 0) : '0',
@@ -367,6 +437,24 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       createReminder: false,
       sendEmailNotification: true,
     });
+    // Restore per-machine configs if saved, or generate defaults from flat fields
+    if (inv.machineConfigs && inv.machineConfigs.length > 0) {
+      setMachineConfigs(
+        inv.machineConfigs.map((c, i) => ({
+          rate: String(c.rate),
+          duration: String(c.duration),
+          sameRateAsFirst: i > 0 && c.rate === inv.machineConfigs![0].rate,
+          sameDurationAsFirst: i > 0 && c.duration === inv.machineConfigs![0].duration,
+        }))
+      );
+    } else {
+      const n = parseInt(noOfMachine) || 0;
+      const rate = 'dailyRentalCost' in inv ? String(inv.dailyRentalCost ?? '') : '';
+      const dur = 'duration' in inv ? String(inv.duration ?? '') : '';
+      setMachineConfigs(
+        Array.from({ length: n }, (_, i) => ({ rate, duration: dur, sameRateAsFirst: i > 0, sameDurationAsFirst: i > 0 }))
+      );
+    }
     setIsModalOpen(true);
   };
 
@@ -1402,14 +1490,10 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                   <p className="text-[11px] text-indigo-600 mt-1 pl-1">Select where you want this record to be inserted.</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 gap-5">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Date</label>
                     <Input type="date" value={form.startDate} onChange={e => handleChange('startDate', e.target.value)} className="bg-slate-50 h-11" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Duration (Days)</label>
-                    <Input type="number" min="0" value={form.duration} onChange={e => handleChange('duration', e.target.value)} className="bg-slate-50 h-11" />
                   </div>
                 </div>
 
@@ -1461,30 +1545,98 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 pt-5 border-t border-slate-100">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Machines</label>
-                    <Input type="number" min="0" value={form.noOfMachine} onChange={e => handleChange('noOfMachine', e.target.value)} className="bg-slate-50" />
+                <div className="pt-5 border-t border-slate-100 space-y-4">
+                  {/* ── Machines row count ─────────────────────────────── */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-end">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">No. of Machines</label>
+                      <Input
+                        type="number" min="0" value={form.noOfMachine}
+                        onChange={e => handleNoOfMachineChange(e.target.value)}
+                        className="bg-slate-50"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Technicians</label>
+                      <Input type="number" min="0" value={form.noOfTechnician} onChange={e => handleChange('noOfTechnician', e.target.value)} className="bg-slate-50" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Daily Tech Rate</label>
+                      <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.techniciansDailyRate} onValueChange={(v) => handleChange('techniciansDailyRate', v.value || '')} className="bg-slate-50" />
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Daily R. Cost</label>
-                    <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.dailyRentalCost} onValueChange={(v) => handleChange('dailyRentalCost', v.value || '')} className="bg-slate-50" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Technicians</label>
-                    <Input type="number" min="0" value={form.noOfTechnician} onChange={e => handleChange('noOfTechnician', e.target.value)} className="bg-slate-50" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Daily Tech Rate</label>
-                    <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.techniciansDailyRate} onValueChange={(v) => handleChange('techniciansDailyRate', v.value || '')} className="bg-slate-50" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Daily Usage (L)</label>
-                    <Input type="number" min="0" value={form.dailyUsage} onChange={e => handleChange('dailyUsage', e.target.value)} className="bg-slate-50" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Diesel Cost/ Ltr</label>
-                    <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.dieselCostPerLtr} onValueChange={(v) => handleChange('dieselCostPerLtr', v.value || '')} className="bg-slate-50" />
+
+                  {/* ── Per-machine rate / duration rows ──────────────── */}
+                  {machineConfigs.length > 0 && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Machine Rate &amp; Duration</p>
+                      {machineConfigs.map((row, idx) => (
+                        <div key={idx} className="grid grid-cols-[auto_1fr_1fr] items-center gap-3">
+                          {/* Label */}
+                          <span className="text-xs font-semibold text-slate-600 w-20 shrink-0">
+                            Machine {idx + 1}
+                          </span>
+                          <div className="space-y-0.5">
+                            {idx === 0 ? (
+                              <span className="text-[10px] text-slate-400 font-medium pb-1.5 inline-block">Daily Rate (₦)</span>
+                            ) : (
+                              <label className="flex items-center gap-2 text-[10px] text-slate-500 cursor-pointer pb-1 sm:mt-1">
+                                <input
+                                  type="checkbox"
+                                  checked={row.sameRateAsFirst}
+                                  onChange={e => handleMachineSameToggle(idx, 'rate', e.target.checked)}
+                                  className="accent-indigo-600 w-3 h-3"
+                                />
+                                Same as M-1
+                              </label>
+                            )}
+                            <NumericFormat
+                              customInput={Input}
+                              thousandSeparator decimalScale={2}
+                              value={row.rate}
+                              disabled={idx > 0 && row.sameRateAsFirst}
+                              onValueChange={v => handleMachineRowChange(idx, 'rate', v.value || '')}
+                              className={idx > 0 && row.sameRateAsFirst ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}
+                            />
+                          </div>
+                          {/* Duration */}
+                          <div className="space-y-0.5">
+                            {idx === 0 ? (
+                              <span className="text-[10px] text-slate-400 font-medium pb-1.5 inline-block">Duration (Days)</span>
+                            ) : (
+                              <label className="flex items-center gap-2 text-[10px] text-slate-500 cursor-pointer pb-1 sm:mt-1">
+                                <input
+                                  type="checkbox"
+                                  checked={row.sameDurationAsFirst}
+                                  onChange={e => handleMachineSameToggle(idx, 'duration', e.target.checked)}
+                                  className="accent-indigo-600 w-3 h-3"
+                                />
+                                Same as M-1
+                              </label>
+                            )}
+                            <Input
+                              type="number" min="0"
+                              value={row.duration}
+                              disabled={idx > 0 && row.sameDurationAsFirst}
+                              onChange={e => handleMachineRowChange(idx, 'duration', e.target.value)}
+                              className={idx > 0 && row.sameDurationAsFirst ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ── Diesel ────────────────────────────────────────── */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Daily Usage (L)</label>
+                      <Input type="number" min="0" value={form.dailyUsage} onChange={e => handleChange('dailyUsage', e.target.value)} className="bg-slate-50" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Diesel Cost / Ltr</label>
+                      <NumericFormat customInput={Input} thousandSeparator decimalScale={2} value={form.dieselCostPerLtr} onValueChange={(v) => handleChange('dieselCostPerLtr', v.value || '')} className="bg-slate-50" />
+                    </div>
                   </div>
                 </div>
 

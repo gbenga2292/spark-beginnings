@@ -88,6 +88,7 @@ export function dbToInvoice(r: any): Invoice {
     totalCost: Number(r.total_cost), vat: Number(r.vat),
     totalCharge: Number(r.total_charge), totalExclusiveOfVat: Number(r.total_exclusive_of_vat),
     printLayout: r.print_layout, historyLog: r.history_log || [],
+    machineConfigs: r.machine_configs || undefined,
   };
 }
 
@@ -105,6 +106,7 @@ export function dbToPendingInvoice(r: any): PendingInvoice {
     totalCost: Number(r.total_cost), vat: Number(r.vat),
     totalCharge: Number(r.total_charge), totalExclusiveOfVat: Number(r.total_exclusive_of_vat),
     printLayout: r.print_layout, historyLog: r.history_log || [],
+    machineConfigs: r.machine_configs || undefined,
   };
 }
 
@@ -464,6 +466,7 @@ function invoiceToDb(i: Invoice) {
     vat: i.vat, total_charge: i.totalCharge,
     total_exclusive_of_vat: i.totalExclusiveOfVat,
     print_layout: i.printLayout, history_log: i.historyLog || [],
+    machine_configs: i.machineConfigs || null,
   };
 }
 
@@ -480,6 +483,7 @@ function pendingInvoiceToDb(p: PendingInvoice) {
     total_cost: p.totalCost, vat: p.vat, total_charge: p.totalCharge,
     total_exclusive_of_vat: p.totalExclusiveOfVat,
     print_layout: p.printLayout, history_log: p.historyLog || [],
+    machine_configs: p.machineConfigs || null,
   };
 }
 

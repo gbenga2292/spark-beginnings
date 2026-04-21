@@ -26,6 +26,7 @@ import { useAppData } from '@/src/contexts/AppDataContext';
 import { normalizeDate } from '@/src/lib/dateUtils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { cn } from '../lib/utils';
+import { ClientSummaryGrid } from './ClientSummaryGrid';
 
 const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive' | 'Ended', startDate: new Date().toISOString().split('T')[0], endDate: '' };
 
@@ -195,7 +196,7 @@ export function Sites() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('active');
+  const [activeTab, setActiveTab] = useState<'clients' | 'active' | 'pending'>('clients');
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [selectedLogsSiteId, setSelectedLogsSiteId] = useState<string | 'all'>('all');
   const [isAddingSite, setIsAddingSite] = useState(searchParams.get('action') === 'add');
@@ -433,7 +434,7 @@ export function Sites() {
       if (isHardcoded) return false;
       
       // Filter by client if in Single Client Mode
-      if (selectedClientName && site.client.toLowerCase() !== selectedClientName.toLowerCase()) {
+      if (selectedClientName && site.client.trim().toLowerCase() !== selectedClientName.trim().toLowerCase()) {
         return false;
       }
 
@@ -875,7 +876,7 @@ export function Sites() {
         <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50">
           {selectedClient ? (
             <div className="flex items-center gap-4">
-              <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+              <Button variant="outline" size="sm" onClick={() => navigate('/sites')}>
                 <ArrowLeft className="w-4 h-4 mr-2" /> Back
               </Button>
               <div className="flex items-center gap-2 text-sm">
@@ -889,14 +890,20 @@ export function Sites() {
           ) : (
             <div className="flex bg-slate-200/50 p-1 rounded-lg">
               <button
-                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'active' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                onClick={() => setActiveTab('active')}
+                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'clients' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                onClick={() => { setActiveTab('clients'); setSearchTerm(''); }}
               >
-                Active Sites
+                Client Summary
+              </button>
+              <button
+                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'active' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                onClick={() => { setActiveTab('active'); setSearchTerm(''); }}
+              >
+                All Sites
               </button>
               <button
                 className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'pending' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                onClick={() => setActiveTab('pending')}
+                onClick={() => { setActiveTab('pending'); setSearchTerm(''); }}
               >
                 Pending Onboarding
               </button>
@@ -904,15 +911,17 @@ export function Sites() {
           )}
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search Client or Site..."
-                className="pl-9 bg-white border-slate-200 h-9 text-sm focus-visible:ring-indigo-500/50 rounded-lg shadow-sm"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+            {activeTab !== 'clients' && (
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Search Client or Site..."
+                  className="pl-9 bg-white border-slate-200 h-9 text-sm focus-visible:ring-indigo-500/50 rounded-lg shadow-sm"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            )}
             {activeTab === 'active' && (
               <>
                 <select 
@@ -992,180 +1001,15 @@ export function Sites() {
                 <p className="text-xl font-black text-emerald-700">{selectedClient.stats.activeSites}</p>
               </div>
             </div>
-
-            <div className="flex bg-slate-100/80 p-1 rounded-lg w-fit">
-              <button
-                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'active' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
-                onClick={() => setActiveTab('active')}
-              >
-                Client Sites
-              </button>
-              <button
-                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'pending' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
-                onClick={() => setActiveTab('pending')}
-              >
-                Pending / Onboarding
-              </button>
-            </div>
           </div>
         )}
 
-        {activeTab === 'logs' && selectedClient ? (
-          <div className="flex-1 overflow-y-auto style-scroll rounded-b-2xl bg-slate-50 p-4 sm:p-6">
-            {/* Site Filter + Add Button */}
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-indigo-500" />
-                <span className="text-sm font-semibold text-slate-700">Filter by Site:</span>
-                <select
-                  value={selectedLogsSiteId}
-                  onChange={e => setSelectedLogsSiteId(e.target.value)}
-                  className="text-sm border border-slate-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700"
-                >
-                  <option value="all">All Sites</option>
-                  {clientSitesForLogs.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-              <Button
-                size="sm"
-                className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
-                onClick={() => {
-                  const params = new URLSearchParams();
-                  params.set('prefill_client', selectedClientName!);
-                  if (selectedLogsSiteId !== 'all') params.set('prefill_site', selectedLogsSiteId);
-                  navigate(`/comm-log?${params.toString()}`);
-                }}
-              >
-                <Plus className="w-4 h-4" /> New Log
-              </Button>
-            </div>
-
-            {groupedClientLogs.length === 0 ? (
-              <div className="text-center py-12 flex flex-col items-center">
-                <MessageSquare className="w-12 h-12 text-slate-200 mb-3" />
-                <p className="text-slate-500 font-medium">No communications logged yet.</p>
-                <p className="text-xs text-slate-400 mt-1">Select a different site or add a new log entry.</p>
-              </div>
-            ) : (
-              <div className="relative border-l-2 border-indigo-100 ml-4 pl-6 space-y-6 max-w-3xl">
-                {groupedClientLogs.map((log, idx) => {
-                  const isIncoming = log.direction === 'Incoming';
-                  const dateObj = new Date(log.date);
-                  return (
-                    <div key={log.id || idx} className="relative">
-                      {/* Timeline dot */}
-                      <div className={cn(
-                        "absolute -left-[35px] mt-1.5 h-4 w-4 rounded-full border-4 border-white shadow-sm ring-1 ring-slate-200",
-                        isIncoming ? "bg-emerald-500" : "bg-indigo-500"
-                      )} />
-
-                      {/* Main log card */}
-                      <div className={cn(
-                        "rounded-lg border p-4 shadow-sm bg-white",
-                        isIncoming ? "border-emerald-100" : "border-indigo-100"
-                      )}>
-                        <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={cn(
-                              "inline-flex items-center justify-center w-6 h-6 rounded-md text-white shadow-sm",
-                              isIncoming ? "bg-emerald-500" : "bg-indigo-500"
-                            )}>
-                              {getChannelIcon(log.channel)}
-                            </span>
-                            <span className="font-semibold text-slate-800 text-sm">
-                              {isIncoming ? 'Received from' : 'Sent to'} {log.contactPerson || 'Client / Site'}
-                            </span>
-                            {log.siteName && (
-                              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium border border-slate-200">
-                                {log.siteName}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="text-xs text-slate-500 font-medium whitespace-nowrap bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
-                              {format(dateObj, 'MMM d, yyyy')}{log.time && ` • ${log.time}`}
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 px-2 text-xs gap-1 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                              onClick={() => navigate(`/comm-log?highlightId=${log.id}`)}
-                            >
-                              <Pencil className="h-3 w-3" /> Edit
-                            </Button>
-                          </div>
-                        </div>
-
-                        {log.subject && (
-                          <div className="font-medium text-slate-800 text-sm mb-1">{log.subject}</div>
-                        )}
-
-                        <div className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-md border border-slate-100 mt-2">
-                          {log.notes}
-                        </div>
-
-                        {log.outcome && (
-                          <div className="mt-3 text-sm flex gap-2 pt-3 border-t border-slate-100">
-                            <span className="font-medium text-slate-700">Outcome:</span>
-                            <span className="text-slate-600">{log.outcome}</span>
-                          </div>
-                        )}
-
-                        {log.followUpDate && (
-                          <div className={cn(
-                            "mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs font-medium",
-                            log.followUpDone ? "text-emerald-600" : "text-amber-600"
-                          )}>
-                            {log.followUpDone
-                              ? <CheckCircle2 className="h-3.5 w-3.5" />
-                              : <Bell className="h-3.5 w-3.5" />}
-                            Follow-up: {format(new Date(log.followUpDate), 'MMM d, yyyy')}
-                            {log.followUpDone ? ' (Done)' : ''}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Follow-up threads */}
-                      {log.followUps && log.followUps.length > 0 && (
-                        <div className="mt-3 ml-6 space-y-3 border-l-2 border-dashed border-slate-200 pl-4">
-                          {log.followUps.map(fu => (
-                            <div key={fu.id} className="bg-white border border-slate-100 rounded-lg p-3 shadow-sm relative">
-                              <div className="absolute -left-[21px] top-3 h-3 w-3 rounded-full bg-slate-300 border-2 border-white" />
-                              <div className="flex items-start justify-between gap-2 mb-1">
-                                <div className="flex items-center gap-1.5">
-                                  <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded text-white", fu.direction === 'Incoming' ? "bg-emerald-400" : "bg-indigo-400")}>
-                                    {getChannelIcon(fu.channel)}
-                                  </span>
-                                  <span className="text-xs font-semibold text-slate-700">
-                                    Follow-up · {fu.direction === 'Incoming' ? 'Received' : 'Sent'}
-                                  </span>
-                                  <span className="text-xs text-slate-400">{format(new Date(fu.date), 'MMM d, yyyy')}{fu.time && ` ${fu.time}`}</span>
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 px-1.5 text-xs text-slate-400 hover:text-indigo-600"
-                                  onClick={() => navigate(`/comm-log?highlightId=${fu.id}`)}
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                              </div>
-                              {fu.subject && <p className="text-xs font-medium text-slate-700 mb-1">{fu.subject}</p>}
-                              <p className="text-xs text-slate-600 leading-relaxed">{fu.notes}</p>
-                              {fu.outcome && <p className="text-xs text-slate-500 mt-1 italic">→ {fu.outcome}</p>}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+        {/* --- Render Main Body Based on activeTab --- */}
+        {!selectedClient && activeTab === 'clients' ? (
+          <div className="flex-1 p-4 sm:p-6 bg-slate-50/50">
+            <ClientSummaryGrid />
           </div>
-        ) : activeTab === 'active' ? (
+        ) : (activeTab === 'active' || selectedClient) ? (
           <div className="flex-1 flex flex-col min-h-0">
             {viewMode === 'table' ? (
             <div className="overflow-auto style-scroll flex-1">

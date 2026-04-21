@@ -434,7 +434,7 @@ export function SiteOnboarding() {
                 <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Client</p>
                 {form.clientName ? (
                   <button
-                    onClick={() => navigate('/clients', { state: { selectClient: form.clientName } })}
+                    onClick={() => navigate(`/sites?client=${encodeURIComponent(form.clientName)}`)}
                     className="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline underline-offset-2 transition-colors text-left"
                   >
                     {form.clientName}

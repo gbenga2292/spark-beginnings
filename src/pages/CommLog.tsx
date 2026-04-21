@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '@/src/store/appStore';
 import type { CommLog } from '@/src/store/appStore';
@@ -1252,7 +1252,7 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
 export function CommLog() {
   const { isDark } = useTheme();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const currentUser = useUserStore(s => s.getCurrentUser());
   const commLogs = useAppStore(s => s.commLogs);
   const addCommLog = useAppStore(s => s.addCommLog);
@@ -1449,6 +1449,19 @@ export function CommLog() {
     setEditingId(log.id);
     setShowForm(true);
   };
+
+  useEffect(() => {
+    const editId = searchParams.get('highlightId');
+    if (editId && commLogs.length > 0 && !showForm) {
+      const logToEdit = commLogs.find(l => l.id === editId);
+      if (logToEdit) {
+        handleEdit(logToEdit);
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('highlightId');
+        setSearchParams(newParams, { replace: true });
+      }
+    }
+  }, [searchParams, commLogs, showForm, setSearchParams]);
 
   const handleDelete = async (id: string) => {
     const ok = await showConfirm('Delete this communication log?', { variant: 'danger', confirmLabel: 'Delete' });
