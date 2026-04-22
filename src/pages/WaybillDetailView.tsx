@@ -172,7 +172,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
           className="h-9 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm"
           onClick={handleOpenReturnDialog}
         >
-          <CheckCircle2 className="h-4 w-4" /> Complete Return
+          <CheckCircle2 className="h-4 w-4" /> Process Return
         </Button>
       )}
     </div>,

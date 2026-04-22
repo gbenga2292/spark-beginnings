@@ -51,7 +51,10 @@ export function SiteManager() {
   });
 
   const getSiteStats = (siteId: string) => {
-    const siteWaybills = waybills.filter(w => (w.siteName ?? '').toLowerCase().includes(siteId.toLowerCase()));
+    const siteWaybills = waybills.filter(w => 
+      (w.siteName ?? '').toLowerCase().includes(siteId.toLowerCase()) && 
+      w.status !== 'outstanding'
+    );
     const uniqueItemsCount = new Set(siteWaybills.flatMap(w => w.items.map(i => i.assetId))).size;
     return { waybills: siteWaybills.length, items: uniqueItemsCount };
   };

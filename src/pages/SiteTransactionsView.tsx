@@ -28,8 +28,9 @@ export function SiteTransactionsView({ site, onBack }: SiteTransactionsViewProps
 
   // Derive transactions from waybills for this site
   const siteWaybills = waybills.filter(w =>
-    w.siteName?.toLowerCase() === site.name.toLowerCase() ||
-    w.siteId === site.id
+    (w.siteName?.toLowerCase() === site.name.toLowerCase() ||
+    w.siteId === site.id) &&
+    w.status !== 'outstanding'
   );
 
   const transactions: Transaction[] = [];

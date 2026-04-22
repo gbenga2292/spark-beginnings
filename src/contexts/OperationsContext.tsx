@@ -91,10 +91,10 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     const fetchData = async () => {
       try {
         const [{ data: dbAssets }, { data: dbWaybills }, { data: dbCheckouts }, { data: dbMaintenance }] = await Promise.all([
-          supabase.from('operations_assets').select('*'),
-          supabase.from('operations_waybills').select('*'),
-          supabase.from('operations_checkouts').select('*'),
-          supabase.from('operations_maintenance').select('*')
+          supabase.from('assets').select('*'),
+          supabase.from('waybills').select('*'),
+          supabase.from('quick_checkouts').select('*'),
+          supabase.from('maintenance_logs').select('*')
         ]);
 
         if (dbAssets) {
@@ -106,10 +106,10 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             quantity: a.quantity,
             availableQuantity: a.available_quantity,
             reservedQuantity: a.reserved_quantity,
-            usedQuantity: a.used_quantity,
-            missingQuantity: a.missing_quantity || 0,
-            damagedQuantity: a.damaged_quantity || 0,
-            unitOfMeasurement: a.unit,
+            usedQuantity: a.used_count || 0,
+            missingQuantity: a.missing_count || 0,
+            damagedQuantity: a.damaged_count || 0,
+            unitOfMeasurement: a.unit_of_measurement,
             status: a.status,
             location: a.location,
             condition: a.condition,
@@ -165,7 +165,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const persistAsset = async (asset: Asset) => {
-    await supabase.from('operations_assets').upsert({
+    await supabase.from('assets').upsert({
       id: asset.id,
       name: asset.name,
       category: asset.category,
@@ -173,10 +173,10 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       quantity: asset.quantity,
       available_quantity: asset.availableQuantity,
       reserved_quantity: asset.reservedQuantity,
-      used_quantity: asset.usedQuantity,
-      missing_quantity: asset.missingQuantity || 0,
-      damaged_quantity: asset.damagedQuantity || 0,
-      unit: asset.unitOfMeasurement,
+      used_count: asset.usedQuantity,
+      missing_count: asset.missingQuantity || 0,
+      damaged_count: asset.damagedQuantity || 0,
+      unit_of_measurement: asset.unitOfMeasurement,
       status: asset.status,
       location: asset.location,
       condition: asset.condition,
@@ -185,7 +185,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const persistWaybill = async (waybill: Waybill) => {
-    await supabase.from('operations_waybills').upsert({
+    await supabase.from('waybills').upsert({
       id: waybill.id,
       type: waybill.type,
       status: waybill.status,
@@ -200,7 +200,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const persistCheckout = async (checkout: Checkout) => {
-    await supabase.from('operations_checkouts').upsert({
+    await supabase.from('quick_checkouts').upsert({
       id: checkout.id,
       employee_id: checkout.employeeId,
       employee_name: checkout.employeeName,
@@ -215,7 +215,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const persistMaintenance = async (session: MaintenanceSession) => {
-    await supabase.from('operations_maintenance').upsert({
+    await supabase.from('maintenance_logs').upsert({
       id: session.id,
       date: session.date,
       type: session.type,
@@ -320,10 +320,15 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       setAssets(prev => prev.map(asset => {
         const item = waybill.items.find(i => i.assetId === asset.id);
         if (item) {
-          const updated = {
+          const reservedQuantity = asset.reservedQuantity + item.quantity;
+          const missingQuantity = asset.missingQuantity || 0;
+          const damagedQuantity = asset.damagedQuantity || 0;
+          const usedQuantity = asset.usedQuantity || 0;
+          
+          const updated: Asset = {
             ...asset,
-            availableQuantity: Math.max(0, asset.availableQuantity - item.quantity),
-            reservedQuantity: asset.reservedQuantity + item.quantity,
+            reservedQuantity,
+            availableQuantity: Math.max(0, asset.quantity - (reservedQuantity + (asset.missingQuantity || 0) + (asset.damagedQuantity || 0) + (asset.usedQuantity || 0))),
           };
           persistAsset(updated);
           return updated;
@@ -342,19 +347,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       if (!waybill) return prev;
 
       if (waybill.type === 'waybill' && status === 'sent_to_site' && waybill.status !== 'sent_to_site') {
-        setAssets(assetsPrev => assetsPrev.map(asset => {
-          const item = waybill.items.find(i => i.assetId === asset.id);
-          if (item) {
-            const updated = {
-              ...asset,
-              reservedQuantity: Math.max(0, asset.reservedQuantity - item.quantity),
-              usedQuantity: asset.usedQuantity + item.quantity,
-            };
-            persistAsset(updated);
-            return updated;
-          }
-          return asset;
-        }));
+        // Items stay in 'Reserved' even when sent to site, as per user requirement.
+        // No quantity change needed here.
       }
 
       if (waybill.type === 'return' && status === 'return_completed' && waybill.status !== 'return_completed') {
@@ -362,12 +356,19 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           const item = waybill.items.find(i => i.assetId === asset.id);
           if (item) {
             const cond = returnConditions?.[item.assetId] || { good: item.quantity, damaged: 0, missing: 0 };
-            const updated = {
+            
+            const reservedQuantity = Math.max(0, asset.reservedQuantity - item.quantity);
+            const damagedQuantity = (asset.damagedQuantity || 0) + cond.damaged;
+            const missingQuantity = (asset.missingQuantity || 0) + cond.missing;
+            const usedQuantity = asset.usedQuantity || 0;
+            
+            const updated: Asset = {
               ...asset,
-              usedQuantity: Math.max(0, asset.usedQuantity - item.quantity),
-              availableQuantity: asset.availableQuantity + cond.good,
-              damagedQuantity: (asset.damagedQuantity || 0) + cond.damaged,
-              missingQuantity: (asset.missingQuantity || 0) + cond.missing,
+              reservedQuantity,
+              damagedQuantity,
+              missingQuantity,
+              usedQuantity,
+              availableQuantity: Math.max(0, asset.quantity - (reservedQuantity + damagedQuantity + missingQuantity + usedQuantity)),
             };
             persistAsset(updated);
             return updated;
@@ -443,7 +444,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteWaybill = (id: string) => {
     setWaybills(prev => prev.filter(w => w.id !== id));
-    supabase.from('operations_waybills').delete().eq('id', id).then();
+    supabase.from('waybills').delete().eq('id', id).then();
   };
 
   const addCheckout = (checkout: Omit<Checkout, 'id' | 'status' | 'checkoutDate' | 'returnedQuantity' | 'expectedReturnDate'>) => {

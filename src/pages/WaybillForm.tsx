@@ -152,12 +152,32 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
 
   return (
     <div className="max-w-5xl mx-auto w-full pb-10 flex flex-col gap-6 animate-in fade-in duration-300">
-      <button
-        onClick={onClose}
-        className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-700 dark:hover:text-blue-400 font-semibold transition-colors w-fit"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back to Waybills
-      </button>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-700 dark:hover:text-blue-400 font-semibold transition-colors w-fit"
+        >
+          <ArrowLeft className="h-4 w-4" /> BACK TO WAYBILLS
+        </button>
+
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="outline" 
+            onClick={onClose} 
+            className="h-10 px-6 rounded-xl font-bold text-xs uppercase text-slate-600 dark:text-slate-400 hover:text-slate-900 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm tracking-wider"
+          >
+            CANCEL
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={items.length === 0 || !siteName || !driverName}
+            className="h-10 px-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-widest gap-2 shadow-sm disabled:opacity-50"
+          >
+            <CheckCircle2 className="h-4 w-4" /> 
+            {isEditing ? 'UPDATE' : 'CREATE'} {initialType === 'waybill' ? 'WAYBILL' : 'RETURN SHEET'}
+          </Button>
+        </div>
+      </div>
 
       <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col">
         <div className="p-6 sm:p-8 space-y-8">
@@ -404,84 +424,71 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
             ) : (
               <div className="space-y-3">
                 {items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30">
-                  <FileText className="h-10 w-10 mb-2 opacity-30" />
-                  <p className="text-sm font-bold opacity-70 uppercase tracking-widest">No items added yet</p>
-                </div>
-              ) : (
-                items.map((item) => {
-                  const selectedAsset = assets.find(a => a.id === item.assetId);
-                  
-                  return (
-                    <div key={item.rowId} className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm group transition-all">
-                      <div className="absolute left-3 top-5 opacity-40 hover:opacity-100 transition-opacity hidden sm:block cursor-grab">
-                        <GripVertical className="h-4 w-4 text-slate-400" />
-                      </div>
-                      
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.rowId)}
-                        className="absolute right-4 top-4 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 p-1.5 rounded-lg transition-colors"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+                  <div className="flex flex-col items-center justify-center py-10 text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30">
+                    <FileText className="h-10 w-10 mb-2 opacity-30" />
+                    <p className="text-sm font-bold opacity-70 uppercase tracking-widest">No items added yet</p>
+                  </div>
+                ) : (
+                  items.map((item) => {
+                    const selectedAsset = assets.find(a => a.id === item.assetId);
+                    
+                    return (
+                      <div key={item.rowId} className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm group transition-all">
+                        <div className="absolute left-3 top-5 opacity-40 hover:opacity-100 transition-opacity hidden sm:block cursor-grab">
+                          <GripVertical className="h-4 w-4 text-slate-400" />
+                        </div>
+                        
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.rowId)}
+                          className="absolute right-4 top-4 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 p-1.5 rounded-lg transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 sm:ml-6 pr-6 sm:pr-8">
-                        <div className="space-y-1.5 sm:col-span-6">
-                          <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Asset</Label>
-                          <div className="relative">
-                            <select
-                              value={item.assetId}
-                              onChange={(e) => updateItemAsset(item.rowId, e.target.value)}
-                              className="w-full h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 text-sm font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none"
-                            >
-                              <option value="">Select asset</option>
-                              {assets.map(a => (
-                                <option key={a.id} value={a.id}>{a.name} ({a.availableQuantity} {a.unitOfMeasurement})</option>
-                              ))}
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 sm:ml-6 pr-6 sm:pr-8">
+                          <div className="space-y-1.5 sm:col-span-6">
+                            <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Asset</Label>
+                            <div className="relative">
+                              <select
+                                value={item.assetId}
+                                onChange={(e) => updateItemAsset(item.rowId, e.target.value)}
+                                className="w-full h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 text-sm font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none"
+                              >
+                                <option value="">Select asset</option>
+                                {assets.map(a => (
+                                  <option key={a.id} value={a.id}>{a.name} ({a.availableQuantity} {a.unitOfMeasurement})</option>
+                                ))}
+                              </select>
+                              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5 sm:col-span-3">
+                            <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Quantity</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => updateItemQuantity(item.rowId, parseInt(e.target.value) || 1)}
+                              className="h-10 rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-sm font-medium focus-visible:ring-blue-500/30"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5 sm:col-span-3">
+                            <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Available</Label>
+                            <div className="h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900 flex items-center px-3 text-sm font-bold text-slate-500 cursor-not-allowed">
+                              {selectedAsset ? `${selectedAsset.availableQuantity} ${selectedAsset.unitOfMeasurement}` : '-'}
+                            </div>
                           </div>
                         </div>
-
-                        <div className="space-y-1.5 sm:col-span-3">
-                          <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Quantity</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={item.quantity}
-                            onChange={(e) => updateItemQuantity(item.rowId, parseInt(e.target.value) || 1)}
-                            className="h-10 rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-sm font-medium focus-visible:ring-blue-500/30"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5 sm:col-span-3">
-                          <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Available</Label>
-                          <div className="h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900 flex items-center px-3 text-sm font-bold text-slate-500 cursor-not-allowed">
-                            {selectedAsset ? `${selectedAsset.availableQuantity} ${selectedAsset.unitOfMeasurement}` : '-'}
-                          </div>
-                        </div>
                       </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-      {/* Footer */}
-        <div className="p-6 sm:px-8 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-800/30">
-          <Button variant="outline" onClick={onClose} className="h-11 px-6 rounded-xl font-bold text-xs uppercase text-slate-600 dark:text-slate-400 hover:text-slate-900 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={items.length === 0 || !siteName || !driverName}
-            className="h-11 px-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-widest gap-2 shadow-sm disabled:opacity-50"
-          >
-            <CheckCircle2 className="h-4 w-4" /> Create Waybill
-          </Button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

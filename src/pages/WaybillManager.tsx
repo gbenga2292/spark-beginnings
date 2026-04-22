@@ -2,7 +2,7 @@ import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { 
-  Plus, Search, Eye, Edit2, Trash2, Truck, ArrowRightLeft, ListFilter, Calendar
+  Plus, Search, Eye, Edit2, Trash2, Truck, ArrowRightLeft, ListFilter, Calendar, RotateCcw
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
@@ -19,14 +19,16 @@ import { Label } from '@/src/components/ui/label';
 
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 
-function WaybillManagerHeader({ onCreate }: { onCreate: () => void }) {
+function WaybillManagerHeader({ onCreate, activeTab }: { onCreate: () => void, activeTab: 'waybill' | 'return' }) {
   useSetPageTitle(
     'Logistics Management',
     'Track and manage asset deliveries (Waybills) and site returns',
     <div className="hidden sm:flex items-center gap-2">
-      <Button size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9" onClick={onCreate}>
-        <Plus className="h-4 w-4" /> Create Waybill
-      </Button>
+      {activeTab === 'waybill' && (
+        <Button size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9" onClick={onCreate}>
+          <Plus className="h-4 w-4" /> Create Waybill
+        </Button>
+      )}
     </div>
   );
   return null;
@@ -43,6 +45,8 @@ export function WaybillManager() {
   const [waybillToSend, setWaybillToSend] = useState<Waybill | null>(null);
   const [sentDate, setSentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [activeTab, setActiveTab] = useState<'waybill' | 'return'>('waybill');
+  const [waybillToProcess, setWaybillToProcess] = useState<Waybill | null>(null);
+  const [returnConditions, setReturnConditions] = useState<Record<string, { good: number, damaged: number, missing: number }>>({});
 
   const outgoingWaybills = waybills.filter(w => w.type === 'waybill');
   const incomingReturns = waybills.filter(w => w.type === 'return');
@@ -81,6 +85,22 @@ export function WaybillManager() {
     }
   };
 
+  const handleOpenProcessReturn = (wb: Waybill) => {
+    const initial: Record<string, { good: number, damaged: number, missing: number }> = {};
+    wb.items.forEach(item => {
+      initial[item.assetId] = { good: item.quantity, damaged: 0, missing: 0 };
+    });
+    setReturnConditions(initial);
+    setWaybillToProcess(wb);
+  };
+
+  const handleCompleteReturn = () => {
+    if (waybillToProcess) {
+      updateWaybillStatus(waybillToProcess.id, 'return_completed', sentDate, returnConditions);
+      setWaybillToProcess(null);
+    }
+  };
+
   if (viewingWaybill) {
     return <WaybillDetailView waybill={viewingWaybill} onClose={() => setViewingWaybill(null)} />;
   }
@@ -95,10 +115,10 @@ export function WaybillManager() {
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <WaybillManagerHeader onCreate={() => setShowCreateModal(true)} />
+      <WaybillManagerHeader onCreate={() => setShowCreateModal(true)} activeTab={activeTab} />
 
       {/* Mobile Actions */}
-      <div className="flex sm:hidden flex-wrap gap-2 px-1">
+      <div className={cn("flex sm:hidden flex-wrap gap-2 px-1", activeTab === 'return' && "hidden")}>
         <Button className="flex-1 gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm" onClick={() => setShowCreateModal(true)}>
           <Plus className="h-4 w-4" /> Create Waybill
         </Button>
@@ -196,12 +216,14 @@ export function WaybillManager() {
                           onClick={() => setViewingWaybill(wb)}>
                           <Eye className="h-4 w-4" />
                         </Button>
-                        {activeTab === 'waybill' && (
+                        {activeTab === 'waybill' ? (
                           <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                              onClick={() => setEditingWaybill(wb)}>
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
+                            {wb.status === 'outstanding' && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                onClick={() => setEditingWaybill(wb)}>
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                            )}
                             {wb.status === 'outstanding' && (
                               <Button 
                                 size="sm" 
@@ -210,10 +232,35 @@ export function WaybillManager() {
                                 <Calendar className="h-3.5 w-3.5" /> Send
                               </Button>
                             )}
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
-                              onClick={() => deleteWaybill(wb.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            {wb.status === 'outstanding' && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                                onClick={() => deleteWaybill(wb.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {wb.status === 'outstanding' && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                onClick={() => setEditingWaybill(wb)}>
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {wb.status === 'outstanding' && (
+                              <Button 
+                                size="sm" 
+                                className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs ml-1"
+                                onClick={() => handleOpenProcessReturn(wb)}>
+                                <RotateCcw className="h-3.5 w-3.5" /> Process
+                              </Button>
+                            )}
+                            {wb.status === 'outstanding' && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                                onClick={() => deleteWaybill(wb.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </>
                         )}
                       </div>
@@ -227,6 +274,94 @@ export function WaybillManager() {
       </Card>
 
       {/* ── Send Waybill Date Picker Dialog ─────────────────────────────────────────────────── */}
+      {/* ── Process Return Dialog ─────────────────────────────────────────────────── */}
+      {waybillToProcess && (
+        <Dialog open onOpenChange={() => setWaybillToProcess(null)}>
+          <DialogContent className="sm:max-w-[450px] p-6 rounded-2xl">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800 dark:text-white">Process Return Sheet</h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  Record the condition of items being returned to the warehouse.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-700">Return Date</Label>
+                <Input 
+                  type="date"
+                  value={sentDate}
+                  onChange={(e) => setSentDate(e.target.value)}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-3 max-h-80 overflow-y-auto no-scrollbar pr-1">
+                <Label className="text-xs font-bold text-slate-700 border-b pb-2 block">Item Conditions</Label>
+                {waybillToProcess.items.map(item => (
+                  <div key={item.assetId} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg space-y-3 border border-slate-100 dark:border-slate-700">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate pr-2">{item.assetName}</span>
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold">Total: {item.quantity}</Badge>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] uppercase font-black text-emerald-600">Good</Label>
+                        <Input 
+                          type="number" 
+                          min={0}
+                          value={returnConditions[item.assetId]?.good || 0}
+                          onChange={(e) => setReturnConditions(prev => ({
+                            ...prev,
+                            [item.assetId]: { ...prev[item.assetId], good: parseInt(e.target.value) || 0 }
+                          }))}
+                          className="h-9 text-sm border-emerald-100 focus-visible:ring-emerald-500 rounded-lg"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] uppercase font-black text-amber-600">Damaged</Label>
+                        <Input 
+                          type="number" 
+                          min={0}
+                          value={returnConditions[item.assetId]?.damaged || 0}
+                          onChange={(e) => setReturnConditions(prev => ({
+                            ...prev,
+                            [item.assetId]: { ...prev[item.assetId], damaged: parseInt(e.target.value) || 0 }
+                          }))}
+                          className="h-9 text-sm border-amber-100 focus-visible:ring-amber-500 rounded-lg"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] uppercase font-black text-rose-600">Missing</Label>
+                        <Input 
+                          type="number" 
+                          min={0}
+                          value={returnConditions[item.assetId]?.missing || 0}
+                          onChange={(e) => setReturnConditions(prev => ({
+                            ...prev,
+                            [item.assetId]: { ...prev[item.assetId], missing: parseInt(e.target.value) || 0 }
+                          }))}
+                          className="h-9 text-sm border-rose-100 focus-visible:ring-rose-500 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-3 justify-end pt-4">
+                <Button variant="ghost" onClick={() => setWaybillToProcess(null)} className="rounded-xl font-semibold">
+                  Cancel
+                </Button>
+                <Button onClick={handleCompleteReturn} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl gap-2 font-semibold">
+                  <RotateCcw className="h-4 w-4" /> Complete Return
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {waybillToSend && (
         <Dialog open onOpenChange={() => setWaybillToSend(null)}>
           <DialogContent className="sm:max-w-[425px] p-6 rounded-2xl">

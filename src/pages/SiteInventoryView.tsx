@@ -42,14 +42,15 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
 
   // All waybills for this site
   const siteWaybills = waybills.filter(w =>
-    w.siteName?.toLowerCase() === site.name.toLowerCase() ||
-    w.siteId === site.id
+    (w.siteName?.toLowerCase() === site.name.toLowerCase() ||
+    w.siteId === site.id) &&
+    w.status !== 'outstanding'
   );
 
   // Build site inventory by aggregating all waybill items
   const inventoryMap = new Map<string, SiteItem>();
   siteWaybills
-    .filter(w => w.type === 'waybill')
+    .filter(w => w.type === 'waybill' && w.status !== 'outstanding')
     .forEach(wb => {
       wb.items.forEach(item => {
         const existing = inventoryMap.get(item.assetId);

@@ -59,6 +59,7 @@ function EquipmentAnalytics({ asset }: { asset: Asset }) {
   const reserved = asset.reservedQuantity || 0;
   const damaged = asset.damagedQuantity || 0;
   const missing = asset.missingQuantity || 0;
+  const used = asset.usedQuantity || 0;
   const utilRate = total > 0 ? Math.round(((total - available) / total) * 100) : 0;
   const healthRate = total > 0 ? Math.round(((total - damaged - missing) / total) * 100) : 100;
 
@@ -82,6 +83,7 @@ function EquipmentAnalytics({ asset }: { asset: Asset }) {
           {[
             { label: 'Available', val: available, max: total, color: 'blue' },
             { label: 'Reserved', val: reserved, max: total, color: 'blue' },
+            { label: 'Used', val: used, max: total, color: 'emerald' },
             { label: 'Damaged', val: damaged, max: total, color: 'amber' },
             { label: 'Missing', val: missing, max: total, color: 'rose' },
           ].map(row => (
