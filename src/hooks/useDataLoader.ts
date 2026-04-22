@@ -3,7 +3,7 @@ import { useAppStore, DEFAULT_OFFBOARDING_TASKS, DEFAULT_LEAVE_TYPES } from '@/s
 import { useUserStore, NO_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType } from '@/src/lib/supabaseService';
 import { generateId } from '@/src/lib/utils';
 import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
 import { useNetworkStore } from '@/src/store/networkStore';
@@ -170,6 +170,9 @@ export function useDataLoader(isAuthenticated: boolean) {
           staffMeritRecords: appData.staffMeritRecords || [],
           dailyJournals: appData.dailyJournals || [],
           siteJournalEntries: appData.siteJournalEntries || [],
+          vehicles: appData.vehicles || [],
+          vehicleTrips: appData.vehicleTrips || [],
+          vehicleDocumentTypes: appData.vehicleDocumentTypes || [],
           ...(appData.payrollVariables ? { payrollVariables: appData.payrollVariables as any } : {}),
           ...(appData.payeTaxVariables ? { payeTaxVariables: appData.payeTaxVariables as any } : {}),
           ...(appData.monthValues && Object.keys(appData.monthValues as any).length > 0 ? { monthValues: appData.monthValues as any } : {}),
@@ -672,6 +675,48 @@ export function useRealtimeData(isAuthenticated: boolean) {
                 useAppStore.setState({ siteJournalEntries: current.map(e => e.id === updated.id ? updated : e) });
               } else if (eventType === 'DELETE') {
                 useAppStore.setState({ siteJournalEntries: current.filter(e => e.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'vehicles': {
+              const current = appState.vehicles;
+              if (eventType === 'INSERT') {
+                if (!current.some(v => v.id === newRow.id)) {
+                  useAppStore.setState({ vehicles: [...current, dbToVehicle(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToVehicle(newRow);
+                useAppStore.setState({ vehicles: current.map(v => v.id === updated.id ? updated : v) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ vehicles: current.filter(v => v.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'vehicle_movement_log': {
+              const current = appState.vehicleTrips;
+              if (eventType === 'INSERT') {
+                if (!current.some(t => t.id === newRow.id)) {
+                  useAppStore.setState({ vehicleTrips: [...current, dbToVehicleMovement(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToVehicleMovement(newRow);
+                useAppStore.setState({ vehicleTrips: current.map(t => t.id === updated.id ? updated : t) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ vehicleTrips: current.filter(t => t.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'vehicle_document_types': {
+              const current = appState.vehicleDocumentTypes;
+              if (eventType === 'INSERT') {
+                if (!current.some(t => t.id === newRow.id)) {
+                  useAppStore.setState({ vehicleDocumentTypes: [...current, dbToVehicleDocumentType(newRow)] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToVehicleDocumentType(newRow);
+                useAppStore.setState({ vehicleDocumentTypes: current.map(t => t.id === updated.id ? updated : t) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ vehicleDocumentTypes: current.filter(t => t.id !== oldRow.id) });
               }
               break;
             }

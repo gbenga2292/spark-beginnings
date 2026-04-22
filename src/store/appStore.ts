@@ -693,6 +693,8 @@ interface AppState {
   addVehicleDocumentType: (type: VehicleDocumentType) => void;
   deleteVehicleDocumentType: (id: string) => void;
   updateVehicleDocument: (vehicleId: string, docTypeName: string, date: string) => void;
+  updateVehicleTripRecord: (id: string, log: any) => void;
+  deleteVehicleTripRecord: (id: string) => void;
 
   payrollVariables: {
     basic: number;
@@ -1199,7 +1201,7 @@ export const useAppStore = create<AppState>()(
       addVehicleTripRecords: (logs) => { set((s) => ({ vehicleTrips: [...logs, ...s.vehicleTrips] })); db.insertVehicleTripRecords(logs); },
       addVehicleDocumentType: (type) => { set((s) => ({ vehicleDocumentTypes: [...s.vehicleDocumentTypes, type] })); db.insertVehicleDocumentType(type); },
       deleteVehicleDocumentType: (id) => { set((s) => ({ vehicleDocumentTypes: s.vehicleDocumentTypes.filter(t => t.id !== id) })); db.deleteVehicleDocumentType(id); },
-      updateVehicleDocument: (vehicleId, docTypeName, date) => {
+      updateVehicleDocument: (vehicleId: string, docTypeName, date) => {
         set((s) => {
           const vehicle = s.vehicles.find(v => v.id === vehicleId);
           if (!vehicle) return s;
@@ -1207,6 +1209,14 @@ export const useAppStore = create<AppState>()(
           db.updateVehicleDocument(vehicleId, updatedDocs);
           return { vehicles: s.vehicles.map(v => v.id === vehicleId ? { ...v, documents: updatedDocs } : v) };
         });
+      },
+      updateVehicleTripRecord: (id, log) => {
+        set((s) => ({ vehicleTrips: s.vehicleTrips.map(t => t.id === id ? { ...t, ...log } : t) }));
+        db.updateVehicleTripRecord(id, log);
+      },
+      deleteVehicleTripRecord: (id) => {
+        set((s) => ({ vehicleTrips: s.vehicleTrips.filter(t => t.id !== id) }));
+        db.deleteVehicleTripRecord(id);
       },
     }),
     {

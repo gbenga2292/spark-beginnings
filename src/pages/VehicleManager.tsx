@@ -4,13 +4,18 @@ import { useAppStore } from '../store/appStore';
 import { 
   Plus, Search, Truck, MapPin, Clock, Calendar, 
   Edit2, Trash2, History, AlertCircle, ChevronRight,
-  MoreHorizontal, PlusCircle, X, Check, ClipboardList
+  MoreHorizontal, PlusCircle, X, Check, ClipboardList,
+  LayoutGrid, List, ChevronLeft
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 import { Vehicle, VehicleTripLeg, VehicleDocumentType } from '../types/operations';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
-import { isSameMonth, isBefore, startOfMonth } from 'date-fns';
+import { 
+  isSameMonth, isBefore, startOfMonth, endOfMonth, 
+  startOfWeek, endOfWeek, addDays, isSameDay, 
+  format, startOfDay, addMonths, subMonths 
+} from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -26,18 +31,22 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 export function VehicleManager() {
   const { 
     vehicles, vehicleTrips, addVehicle, updateVehicle, deleteVehicle, addVehicleTripRecords,
+    updateVehicleTripRecord, deleteVehicleTripRecord,
     vehicleDocumentTypes, updateVehicleDocument
   } = useOperations();
   const { sites, pendingSites, employees } = useAppStore();
   
   const [activeTab, setActiveTab] = useState<'fleet' | 'logs' | 'documents'>('fleet');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [showTripForm, setShowTripForm] = useState(false);
+  const [editingTrip, setEditingTrip] = useState<VehicleTripLeg | null>(null);
   const [editingDocVehicle, setEditingDocVehicle] = useState<Vehicle | null>(null);
   const [showDocUpdateForm, setShowDocUpdateForm] = useState(false);
   const [docUpdateForm, setDocUpdateForm] = useState({ type: '', date: '' });
   const [search, setSearch] = useState('');
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   // 1. Vehicle Form State
   const [vForm, setVForm] = useState({
@@ -66,22 +75,26 @@ export function VehicleManager() {
     'Vehicle Management',
     'Manage company fleet and track daily movement logs',
     <div className="hidden sm:flex items-center gap-2">
-      <Button 
-        variant="outline" size="sm" className="gap-2 h-9"
-        onClick={() => setShowTripForm(true)}
-      >
-        <ClipboardList className="h-4 w-4" /> Record Trip
-      </Button>
-      <Button 
-        size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9"
-        onClick={() => {
-          setEditingVehicle(null);
-          setVForm({ name: '', registration_number: '', type: 'van', status: 'active' });
-          setShowVehicleForm(true);
-        }}
-      >
-        <Plus className="h-4 w-4" /> Add Vehicle
-      </Button>
+      {activeTab === 'logs' && (
+        <Button 
+          variant="outline" size="sm" className="gap-2 h-9"
+          onClick={() => setShowTripForm(true)}
+        >
+          <ClipboardList className="h-4 w-4" /> Record Trip
+        </Button>
+      )}
+      {activeTab === 'fleet' && (
+        <Button 
+          size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9"
+          onClick={() => {
+            setEditingVehicle(null);
+            setVForm({ name: '', registration_number: '', type: 'van', status: 'active' });
+            setShowVehicleForm(true);
+          }}
+        >
+          <Plus className="h-4 w-4" /> Add Vehicle
+        </Button>
+      )}
     </div>
   );
 
@@ -99,17 +112,32 @@ export function VehicleManager() {
     const selectedVehicle = vehicles.find(v => v.id === tForm.vehicle_id);
     if (!selectedVehicle || !tForm.driver_name) return;
 
-    const logs = tForm.legs.map(leg => ({
-      ...leg,
-      vehicle_id: selectedVehicle.id,
-      vehicle_reg: selectedVehicle.registration_number,
-      driver_name: tForm.driver_name,
-      departure_time: `${tForm.date}T${leg.departure_time || '00:00'}:00Z`,
-      arrival_time: leg.arrival_time ? `${tForm.date}T${leg.arrival_time}:00Z` : undefined,
-    }));
+    if (editingTrip) {
+      const leg = tForm.legs[0];
+      const updatedLog = {
+        ...leg,
+        id: editingTrip.id,
+        vehicle_id: selectedVehicle.id,
+        vehicle_reg: selectedVehicle.registration_number,
+        driver_name: tForm.driver_name,
+        departure_time: `${tForm.date}T${leg.departure_time || '00:00'}:00Z`,
+        arrival_time: leg.arrival_time ? `${tForm.date}T${leg.arrival_time}:00Z` : undefined,
+      };
+      updateVehicleTripRecord(editingTrip.id, updatedLog);
+    } else {
+      const logs = tForm.legs.map(leg => ({
+        ...leg,
+        vehicle_id: selectedVehicle.id,
+        vehicle_reg: selectedVehicle.registration_number,
+        driver_name: tForm.driver_name,
+        departure_time: `${tForm.date}T${leg.departure_time || '00:00'}:00Z`,
+        arrival_time: leg.arrival_time ? `${tForm.date}T${leg.arrival_time}:00Z` : undefined,
+      }));
+      addVehicleTripRecords(logs);
+    }
 
-    addVehicleTripRecords(logs);
     setShowTripForm(false);
+    setEditingTrip(null);
     setTForm({
       vehicle_id: '',
       date: new Date().toISOString().split('T')[0],
@@ -118,10 +146,50 @@ export function VehicleManager() {
     });
   };
 
+  const handleEditTrip = (trip: VehicleTripLeg) => {
+    setEditingTrip(trip);
+    const datePart = trip.departure_time.split('T')[0];
+    const depTimePart = trip.departure_time.split('T')[1].substring(0, 5);
+    const arrTimePart = trip.arrival_time ? trip.arrival_time.split('T')[1].substring(0, 5) : '';
+
+    setTForm({
+      vehicle_id: trip.vehicle_id,
+      date: datePart,
+      driver_name: trip.driver_name,
+      legs: [{
+        site_name: trip.site_name,
+        purpose: trip.purpose,
+        departure_time: depTimePart,
+        arrival_time: arrTimePart,
+        remark: trip.remark,
+        odometer_start: trip.odometer_start,
+        odometer_end: trip.odometer_end
+      }]
+    });
+    setShowTripForm(true);
+  };
+
   const filteredVehicles = vehicles.filter(v => 
     v.name.toLowerCase().includes(search.toLowerCase()) || 
     v.registration_number.toLowerCase().includes(search.toLowerCase())
   );
+
+  const sortedTrips = [...vehicleTrips].sort((a, b) => 
+    new Date(b.departure_time).getTime() - new Date(a.departure_time).getTime()
+  );
+
+  // Calendar Helper Functions
+  const calendarDays = () => {
+    const start = startOfWeek(startOfMonth(currentMonth));
+    const end = endOfWeek(endOfMonth(currentMonth));
+    const days = [];
+    let day = start;
+    while (day <= end) {
+      days.push(day);
+      day = addDays(day, 1);
+    }
+    return days;
+  };
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
@@ -175,11 +243,11 @@ export function VehicleManager() {
                     <ClipboardList className="h-5 w-5" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg font-bold">Daily Trip Movement Log</CardTitle>
-                    <p className="text-xs text-slate-500">Record vehicle visits and mileage for today</p>
+                    <CardTitle className="text-lg font-bold">{editingTrip ? 'Edit Trip Record' : 'Daily Trip Movement Log'}</CardTitle>
+                    <p className="text-xs text-slate-500">{editingTrip ? 'Modify the details of this site visit' : 'Record vehicle visits and mileage for today'}</p>
                   </div>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => setShowTripForm(false)}><X className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => { setShowTripForm(false); setEditingTrip(null); }}><X className="h-4 w-4" /></Button>
               </div>
             </CardHeader>
             <CardContent className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
@@ -212,12 +280,14 @@ export function VehicleManager() {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-teal-600 flex items-center gap-2">
-                    <MapPin className="h-4 w-4" /> Trip Leg(s) / Site Visits
+                    <MapPin className="h-4 w-4" /> {editingTrip ? 'Trip Details' : 'Trip Leg(s) / Site Visits'}
                   </h3>
-                  <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 hover:bg-teal-50 h-8 gap-1"
-                    onClick={() => setTForm({...tForm, legs: [...tForm.legs, { site_name: '', purpose: '', departure_time: '', arrival_time: '', remark: '', odometer_start: undefined, odometer_end: undefined }]})}>
-                    <PlusCircle className="h-4 w-4" /> Add Leg
-                  </Button>
+                  {!editingTrip && (
+                    <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 hover:bg-teal-50 h-8 gap-1"
+                      onClick={() => setTForm({...tForm, legs: [...tForm.legs, { site_name: '', purpose: '', departure_time: '', arrival_time: '', remark: '', odometer_start: undefined, odometer_end: undefined }]})}>
+                      <PlusCircle className="h-4 w-4" /> Add Leg
+                    </Button>
+                  )}
                 </div>
 
                 {tForm.legs.map((leg, idx) => (
@@ -310,8 +380,8 @@ export function VehicleManager() {
               </div>
             </CardContent>
             <CardHeader className="bg-slate-50 dark:bg-slate-800 border-t flex flex-row gap-3 pt-4">
-              <Button className="flex-1 bg-teal-600 hover:bg-teal-700" onClick={handleSaveTrip}>Submit Entry</Button>
-              <Button variant="outline" className="flex-1" onClick={() => setShowTripForm(false)}>Discard</Button>
+              <Button className="flex-1 bg-teal-600 hover:bg-teal-700" onClick={handleSaveTrip}>{editingTrip ? 'Update Entry' : 'Submit Entry'}</Button>
+              <Button variant="outline" className="flex-1" onClick={() => { setShowTripForm(false); setEditingTrip(null); }}>Discard</Button>
             </CardHeader>
           </Card>
         </div>
@@ -553,71 +623,179 @@ export function VehicleManager() {
         </div>
       ) : (
         <div className="space-y-6">
-          <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
-            <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 border-b dark:border-slate-800">
-               <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
-                <History className="h-4 w-4 text-teal-500" /> Recent Movements
-              </h3>
+          <div className="flex items-center justify-between px-1">
+             <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
+              <History className="h-4 w-4 text-teal-500" /> {viewMode === 'list' ? 'Recent Movements' : 'Monthly Movement Calendar'}
+            </h3>
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+              <Button 
+                variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
+                size="sm" className="h-7 px-3 gap-2 text-[10px] font-bold uppercase"
+                onClick={() => setViewMode('list')}
+              >
+                <List className="h-3 w-3" /> List
+              </Button>
+              <Button 
+                variant={viewMode === 'calendar' ? 'secondary' : 'ghost'} 
+                size="sm" className="h-7 px-3 gap-2 text-[10px] font-bold uppercase"
+                onClick={() => setViewMode('calendar')}
+              >
+                <LayoutGrid className="h-3 w-3" /> Calendar
+              </Button>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-slate-100 dark:bg-slate-800/50 text-[10px] uppercase font-bold tracking-wider text-slate-500">
-                    <th className="px-6 py-3">Vehicle & Driver</th>
-                    <th className="px-6 py-3">Destination & Purpose</th>
-                    <th className="px-6 py-3">Times</th>
-                    <th className="px-6 py-3">Mileage</th>
-                    <th className="px-6 py-3">Remark</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {vehicleTrips.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-10 text-center text-slate-400 text-sm italic">No logs recorded yet</td>
+          </div>
+
+          {viewMode === 'list' ? (
+            <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-slate-100 dark:bg-slate-800/50 text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                      <th className="px-6 py-3">Vehicle & Driver</th>
+                      <th className="px-6 py-3">Destination & Purpose</th>
+                      <th className="px-6 py-3">Times</th>
+                      <th className="px-6 py-3">Mileage</th>
+                      <th className="px-6 py-3">Remark</th>
+                      <th className="px-6 py-3 text-right">Actions</th>
                     </tr>
-                  ) : (
-                    vehicleTrips.map(trip => (
-                      <tr key={trip.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-slate-700 dark:text-slate-200 text-xs uppercase">{trip.vehicle_reg}</span>
-                            <span className="text-[10px] font-semibold text-slate-400">{trip.driver_name}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-teal-600 dark:text-teal-400 text-xs flex items-center gap-1">
-                              <MapPin className="h-3 w-3" /> {trip.site_name}
-                            </span>
-                            <span className="text-[10px] text-slate-500 italic">{trip.purpose}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                            <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Dep:</span> {new Date(trip.departure_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                            <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Arr:</span> {trip.arrival_time ? new Date(trip.arrival_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '—'}</div>
-                            <div className="text-[8px] text-slate-400 mt-0.5">{formatDisplayDate(trip.departure_time)}</div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                            <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Start:</span> {trip.odometer_start || '—'}</div>
-                            <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">End:</span> {trip.odometer_end || '—'}</div>
-                            {trip.odometer_start && trip.odometer_end && (
-                              <div className="text-[8px] text-teal-500 mt-0.5">Total: {trip.odometer_end - trip.odometer_start} km</div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="text-[10px] text-slate-500 max-w-[150px] truncate" title={trip.remark}>{trip.remark || '—'}</p>
-                        </td>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {sortedTrips.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-sm italic">No logs recorded yet</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+                    ) : (
+                      sortedTrips.map(trip => (
+                        <tr key={trip.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-700 dark:text-slate-200 text-xs uppercase">{trip.vehicle_reg}</span>
+                              <span className="text-[10px] font-semibold text-slate-400">{trip.driver_name}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-teal-600 dark:text-teal-400 text-xs flex items-center gap-1">
+                                <MapPin className="h-3 w-3" /> {trip.site_name}
+                              </span>
+                              <span className="text-[10px] text-slate-500 italic">{trip.purpose}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                              <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Dep:</span> {new Date(trip.departure_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                              <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Arr:</span> {trip.arrival_time ? new Date(trip.arrival_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '—'}</div>
+                              <div className="text-[8px] text-slate-400 mt-0.5">{formatDisplayDate(trip.departure_time)}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                              <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Start:</span> {trip.odometer_start || '—'}</div>
+                              <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">End:</span> {trip.odometer_end || '—'}</div>
+                              {trip.odometer_start && trip.odometer_end && (
+                                <div className="text-[8px] text-teal-500 mt-0.5">Total: {trip.odometer_end - trip.odometer_start} km</div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="text-[10px] text-slate-500 max-w-[150px] truncate" title={trip.remark}>{trip.remark || '—'}</p>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditTrip(trip)}>
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicleTripRecord(trip.id)}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ) : (
+            <Card className="border-none shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b dark:border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <h4 className="font-bold text-sm text-slate-700 dark:text-slate-200">{format(currentMonth, 'MMMM yyyy')}</h4>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-8 px-2 text-[10px] font-bold uppercase" onClick={() => setCurrentMonth(new Date())}>
+                      Today
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                   <div className="flex items-center gap-2">
+                     <div className="h-2 w-2 rounded-full bg-teal-500"></div>
+                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Site Visit</span>
+                   </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-7 border-b dark:border-slate-800">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="py-2 text-center text-[10px] font-bold text-slate-400 uppercase border-r last:border-r-0 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/20">
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 auto-rows-[120px]">
+                {calendarDays().map((day, idx) => {
+                  const dayTrips = vehicleTrips.filter(t => isSameDay(new Date(t.departure_time), day));
+                  const isCurrentMonth = isSameMonth(day, currentMonth);
+                  const isToday = isSameDay(day, new Date());
+
+                  return (
+                    <div key={idx} className={cn(
+                      "border-r border-b dark:border-slate-800 p-2 relative group",
+                      !isCurrentMonth && "bg-slate-50/50 dark:bg-slate-900/50",
+                      isToday && "bg-teal-50/30 dark:bg-teal-900/10"
+                    )}>
+                      <span className={cn(
+                        "text-[10px] font-bold",
+                        isToday ? "text-teal-600" : isCurrentMonth ? "text-slate-500" : "text-slate-300"
+                      )}>
+                        {format(day, 'd')}
+                      </span>
+                      
+                      <div className="mt-1 space-y-1 overflow-y-auto max-h-[85px] scrollbar-hide">
+                        {dayTrips.map(trip => (
+                          <div 
+                            key={trip.id} 
+                            className="bg-teal-50 dark:bg-teal-900/20 border-l-2 border-teal-500 p-1 rounded-sm cursor-pointer hover:bg-teal-100 transition-colors group/item"
+                            onClick={() => handleEditTrip(trip)}
+                          >
+                            <div className="flex justify-between items-start gap-1">
+                              <span className="text-[8px] font-bold text-teal-700 dark:text-teal-400 truncate leading-tight uppercase" title={trip.site_name}>
+                                {trip.site_name}
+                              </span>
+                              <span className="text-[7px] text-slate-400 font-mono shrink-0">
+                                {format(new Date(trip.departure_time), 'HH:mm')}
+                              </span>
+                            </div>
+                            <p className="text-[7px] text-slate-500 truncate leading-tight" title={`${trip.vehicle_reg} - ${trip.driver_name}`}>
+                              {trip.vehicle_reg}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
         </div>
       )}
     </div>

@@ -815,7 +815,7 @@ export async function fetchAllAppData(privs?: any) {
     vehicles: (vehiclesRes.data || []).map(dbToVehicle),
     vehicleTrips: (vehicleTripsRes.data || []).map(dbToVehicleMovement),
     vehicleDocumentTypes: (vehicleDocTypesRes.data || []).map(dbToVehicleDocumentType),
-    ledgerEntries: (lEntRes.data || []).map(dbToLedgerEntry),
+    dailyJournals: (dailyJournalsRes.data || []).map(dbToDailyJournal),
     siteJournalEntries: (siteJournalEntriesRes?.data || []).map(dbToSiteJournalEntry),
     positions: (positionsRes.data || []).map((p: any) => ({
       id: p.id,
@@ -1781,6 +1781,14 @@ export const db = {
   // Vehicle Trip Logs
   async insertVehicleTripRecords(logs: any[]) {
     const { error } = await supabase.from('vehicle_movement_log').insert(logs.map(vehicleMovementToDb));
+    if (error) { console.error('Database error:', error); throw error; }
+  },
+  async updateVehicleTripRecord(id: string, log: any) {
+    const { error } = await supabase.from('vehicle_movement_log').update(vehicleMovementToDb(log)).eq('id', id);
+    if (error) { console.error('Database error:', error); throw error; }
+  },
+  async deleteVehicleTripRecord(id: string) {
+    const { error } = await supabase.from('vehicle_movement_log').delete().eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
   },
 

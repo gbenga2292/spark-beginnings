@@ -49,6 +49,8 @@ interface OperationsContextType {
   updateVehicle: (id: string, updates: Partial<Vehicle>) => void;
   deleteVehicle: (id: string) => void;
   addVehicleTripRecords: (logs: any[]) => void;
+  updateVehicleTripRecord: (id: string, log: any) => void;
+  deleteVehicleTripRecord: (id: string) => void;
   vehicleDocumentTypes: VehicleDocumentType[];
   addVehicleDocumentType: (name: string) => void;
   deleteVehicleDocumentType: (id: string) => void;
@@ -78,6 +80,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     updateVehicle: storeUpdateVehicle, 
     deleteVehicle: storeDeleteVehicle, 
     addVehicleTripRecords: storeAddVehicleTripRecords,
+    updateVehicleTripRecord: storeUpdateVehicleTripRecord,
+    deleteVehicleTripRecord: storeDeleteVehicleTripRecord,
     addVehicleDocumentType: storeAddVehicleDocumentType,
     deleteVehicleDocumentType: storeDeleteVehicleDocumentType,
     updateVehicleDocument: storeUpdateVehicleDocument
@@ -632,6 +636,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         const logsWithIds = logs.map(l => ({ ...l, id: crypto.randomUUID() }));
         storeAddVehicleTripRecords(logsWithIds);
       },
+      updateVehicleTripRecord: storeUpdateVehicleTripRecord,
+      deleteVehicleTripRecord: storeDeleteVehicleTripRecord,
       vehicleDocumentTypes,
       addVehicleDocumentType: (name) => {
         storeAddVehicleDocumentType({ id: crypto.randomUUID(), name });
