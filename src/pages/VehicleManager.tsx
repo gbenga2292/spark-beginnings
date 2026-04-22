@@ -10,6 +10,7 @@ import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 import { Vehicle, VehicleTripLeg, VehicleDocumentType } from '../types/operations';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { isSameMonth, isBefore, startOfMonth } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -505,11 +506,27 @@ export function VehicleManager() {
                       <td className="px-6 py-4 whitespace-nowrap font-mono text-xs font-bold text-teal-600">{v.registration_number}</td>
                       {vehicleDocumentTypes.map(type => {
                         const date = v.documents?.[type.name];
+                        const dateValue = date ? new Date(date) : null;
+                        const today = new Date();
+                        const isExpiringSoon = dateValue && (
+                          isSameMonth(dateValue, today) || 
+                          isBefore(dateValue, today)
+                        );
+
                         return (
-                          <td key={type.id} className="px-6 py-4 whitespace-nowrap">
+                          <td key={type.id} className={cn(
+                            "px-6 py-4 whitespace-nowrap transition-colors",
+                            isExpiringSoon && "bg-rose-50 dark:bg-rose-900/20"
+                          )}>
                             {date ? (
-                              <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                              <span className={cn(
+                                "text-[10px] font-bold",
+                                isExpiringSoon ? "text-rose-600 dark:text-rose-400" : "text-slate-600 dark:text-slate-300"
+                              )}>
                                 {formatDisplayDate(date)}
+                                {isExpiringSoon && (
+                                  <AlertCircle className="inline-block h-3 w-3 ml-1 text-rose-500 animate-pulse" />
+                                )}
                               </span>
                             ) : (
                               <span className="text-[10px] text-slate-400 italic">Not set</span>

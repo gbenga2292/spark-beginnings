@@ -68,6 +68,7 @@ const VehicleManager = lazy(() => import('./pages/VehicleManager').then(m => ({ 
 const EmployeeAnalytics = lazy(() => import('./pages/EmployeeAnalytics').then(m => ({ default: m.EmployeeAnalytics })));
 const NotificationsPage = lazy(() => import('./pages/Notifications').then(m => ({ default: m.NotificationsPage })));
 import { OperationsProvider } from './contexts/OperationsContext';
+import { useVehicleDocumentSync } from './hooks/useVehicleDocumentSync';
 
 // ── Suspense fallback ─────────────────────────────────────────────────────────
 function PageLoader() {
@@ -118,6 +119,9 @@ function AppContent() {
   
   // Listen to realtime database changes so connected clients update instantly
   useRealtimeData(!!user);
+
+  // Auto-sync vehicle document expiries to tasks and reminders
+  useVehicleDocumentSync();
 
   // Handle navigation triggered by Electron main-process menu items
   useEffect(() => {

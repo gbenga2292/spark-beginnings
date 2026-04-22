@@ -24,6 +24,7 @@ import { useAppData } from '@/src/contexts/AppDataContext';
 import { useUserStore } from '@/src/store/userStore';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useTheme } from '@/src/hooks/useTheme';
+import { addDays, isBefore } from 'date-fns';
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 export interface TaskPopup {
@@ -131,7 +132,7 @@ function PopupCard({
 /* ─── Main component ─────────────────────────────────────────────────────── */
 export function TaskPopupNotifications() {
   const { user } = useAuth();
-  const { subtasks, mainTasks, comments, reminders } = useAppData();
+  const { subtasks, mainTasks, comments, reminders, updateReminder } = useAppData();
   const currentUser = useUserStore(s => s.getCurrentUser());
   const navigate = useNavigate();
   const { isDark } = useTheme();
@@ -139,6 +140,8 @@ export function TaskPopupNotifications() {
   const [popups, setPopups] = useState<TaskPopup[]>([]);
   // Track reminder IDs we've already shown to prevent duplicates on re-render
   const shownIds = useRef<Set<string>>(new Set());
+  // Track reminder updates to prevent multiple hits within the same window
+  const updatedReminders = useRef<Set<string>>(new Set());
   // Track comment IDs processed by real-time so we don't re-process on initial load
   const processedCommentIds = useRef<Set<string>>(new Set());
   const initialised = useRef(false);
@@ -215,6 +218,22 @@ export function TaskPopupNotifications() {
           taskUrl:   rem.mainTaskId ? `/tasks?openTask=${rem.mainTaskId}` : undefined,
           dedupeKey: `rem-popup-${rem.id}`,
         });
+
+        // ── Handle Recurrence / Deactivation ──
+        if (!updatedReminders.current.has(rem.id)) {
+            updatedReminders.current.add(rem.id);
+            
+            if (rem.frequency === 'weekly') {
+                const nextDate = addDays(new Date(rem.remindAt), 7);
+                if (!rem.endAt || isBefore(nextDate, new Date(rem.endAt))) {
+                    updateReminder(rem.id, { remindAt: nextDate.toISOString() });
+                } else {
+                    updateReminder(rem.id, { isActive: false });
+                }
+            } else if (rem.frequency === 'once' || !rem.frequency) {
+                updateReminder(rem.id, { isActive: false });
+            }
+        }
       });
     };
 
