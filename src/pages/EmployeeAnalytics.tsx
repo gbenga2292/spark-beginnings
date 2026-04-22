@@ -15,7 +15,8 @@ import {
   Search,
   CheckCircle2,
   AlertCircle,
-  Package
+  Package,
+  RotateCcw
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
@@ -23,6 +24,8 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
 import { Badge } from '@/src/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
+import { Label } from '@/src/components/ui/label';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { toast } from '@/src/components/ui/toast';
 import { Asset, Checkout } from '../types/operations';
@@ -33,6 +36,10 @@ export function EmployeeAnalytics() {
   const { checkouts, assets, updateCheckoutStatus } = useOperations();
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [updatingCheckout, setUpdatingCheckout] = useState<Checkout | null>(null);
+  const [returnQty, setReturnQty] = useState<number>(0);
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useSetPageTitle(
     'Employee Checkout Analytics',
@@ -81,26 +88,35 @@ export function EmployeeAnalytics() {
   };
 
   const handleUpdateStatus = (c: Checkout, assetContext?: Asset) => {
-    const isConsumable = assetContext?.type === 'consumable' || assetContext?.category === 'ppe';
-    
-    if (isConsumable) {
-      if (window.confirm(`Mark ${c.quantity} units of ${c.assetName} as Fully Consumed/Used?`)) {
-        updateCheckoutStatus(c.id, { returnedQuantity: c.quantity, status: 'returned' });
-        toast.success(`Marked ${c.assetName} as consumed.`);
-      }
-    } else {
-      const qtyStr = window.prompt(`How many of ${c.assetName} are being returned? (Max ${c.quantity - c.returnedQuantity})`, `${c.quantity - c.returnedQuantity}`);
-      if (qtyStr !== null) {
-        const returned = parseInt(qtyStr, 10);
-        if (!isNaN(returned) && returned > 0 && returned <= (c.quantity - c.returnedQuantity)) {
-          const totalReturned = c.returnedQuantity + returned;
-          const newStatus = totalReturned >= c.quantity ? 'returned' : 'outstanding';
-          updateCheckoutStatus(c.id, { returnedQuantity: totalReturned, status: newStatus as any });
-          toast.success(`Updated return status for ${c.assetName}`);
-        } else {
-          toast.error('Invalid quantity entered');
-        }
-      }
+    setUpdatingCheckout(c);
+    setReturnQty(c.quantity - c.returnedQuantity);
+    setIsReturnModalOpen(true);
+  };
+
+  const submitReturnUpdate = async () => {
+    if (!updatingCheckout) return;
+
+    setIsSubmitting(true);
+    try {
+      const linkedAsset = assets.find(a => a.id === updatingCheckout.assetId);
+      const isConsumable = linkedAsset?.type === 'consumable' || linkedAsset?.category === 'ppe';
+      
+      const totalReturned = updatingCheckout.returnedQuantity + returnQty;
+      const isFullyReturned = totalReturned >= updatingCheckout.quantity;
+      const newStatus = isFullyReturned ? 'returned' : 'partial_returned';
+
+      await updateCheckoutStatus(updatingCheckout.id, { 
+        returnedQuantity: totalReturned, 
+        status: newStatus as any 
+      });
+
+      toast.success(isConsumable ? 'Marked as consumed/used.' : `Updated return status for ${updatingCheckout.assetName}`);
+      setIsReturnModalOpen(false);
+      setUpdatingCheckout(null);
+    } catch (error) {
+      toast.error('Failed to update status');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -108,6 +124,7 @@ export function EmployeeAnalytics() {
   const pastLoans = employeeCheckouts.filter(c => c.status === 'returned');
 
   return (
+    <>
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10 px-4 sm:px-6 lg:px-8">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[600px]">
         {/* Employee Sidebar */}
@@ -312,6 +329,78 @@ export function EmployeeAnalytics() {
         </Card>
       </div>
     </div>
+
+    <Dialog open={isReturnModalOpen} onOpenChange={setIsReturnModalOpen}>
+      <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden rounded-2xl border-none shadow-2xl">
+        <DialogHeader className="p-6 pb-0 bg-slate-50 dark:bg-slate-900/50">
+          <div className="h-12 w-12 rounded-2xl bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center text-teal-600 mb-4">
+            <RotateCcw className="h-6 w-6" />
+          </div>
+          <DialogTitle className="text-xl font-bold text-slate-900 dark:text-white">Update Return Status</DialogTitle>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            {updatingCheckout && (
+              <>Recording return for <span className="font-semibold text-slate-700 dark:text-slate-200">{updatingCheckout.assetName}</span></>
+            )}
+          </p>
+        </DialogHeader>
+
+        <div className="p-6 space-y-6">
+          {updatingCheckout && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Checked Out</span>
+                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{updatingCheckout.quantity} Units</span>
+                </div>
+                <div className="flex flex-col text-right">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Already Returned</span>
+                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{updatingCheckout.returnedQuantity} Units</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Quantity being returned now</Label>
+                <div className="relative">
+                  <Input 
+                    type="number"
+                    min="1"
+                    max={updatingCheckout.quantity - updatingCheckout.returnedQuantity}
+                    value={returnQty}
+                    onChange={(e) => setReturnQty(Math.min(updatingCheckout.quantity - updatingCheckout.returnedQuantity, parseInt(e.target.value) || 0))}
+                    className="h-12 text-lg font-bold pl-12 rounded-xl focus-visible:ring-teal-500/50 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                  />
+                  <Package className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 uppercase">
+                    Units
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 ml-1">
+                  Maximum possible return: {updatingCheckout.quantity - updatingCheckout.returnedQuantity} units
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="p-6 pt-0 bg-white dark:bg-transparent">
+          <Button 
+            variant="ghost" 
+            onClick={() => setIsReturnModalOpen(false)}
+            className="rounded-xl font-semibold text-slate-500"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={submitReturnUpdate}
+            disabled={isSubmitting || returnQty <= 0}
+            className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold px-8 shadow-lg shadow-teal-600/20"
+          >
+            {isSubmitting ? 'Updating...' : 'Confirm Return'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 

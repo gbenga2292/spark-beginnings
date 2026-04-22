@@ -16,12 +16,14 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { toast } from '@/src/components/ui/toast';
 
 export function CheckoutManager() {
-  const { assets } = useOperations();
+  const { assets, checkouts, addCheckout } = useOperations();
   const { isDark } = useTheme();
   const [selectedAssetId, setSelectedAssetId] = useState('');
   const [employeeName, setEmployeeName] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const [returnInDays, setReturnInDays] = useState(7);
   const [activeStep, setActiveStep] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const selectedAsset = assets.find(a => a.id === selectedAssetId);
 
@@ -30,11 +32,7 @@ export function CheckoutManager() {
     'Issue tools, PPE, and consumables directly to field staff'
   );
 
-  const recentCheckouts = [
-    { id: 'CK-881', employee: 'David Adeleke', asset: 'Reflective Vests', qty: 2, time: '10:15 AM', status: 'completed' },
-    { id: 'CK-880', employee: 'Grace Eniola', asset: 'Safety Boots', qty: 1, time: '09:45 AM', status: 'completed' },
-    { id: 'CK-879', employee: 'Samuel Okon', asset: 'Raincoat (Medium)', qty: 1, time: '08:30 AM', status: 'completed' },
-  ];
+  const recentCheckouts = checkouts.slice(0, 5);
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
@@ -136,6 +134,48 @@ export function CheckoutManager() {
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     </div>
                   </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block ml-1">Expected Return (Days)</label>
+                    <div className="relative">
+                      <Input 
+                        type="number"
+                        min="1"
+                        value={returnInDays}
+                        onChange={(e) => setReturnInDays(parseInt(e.target.value) || 1)}
+                        className="w-full h-11 pl-10 pr-4 rounded-lg text-sm font-medium focus-visible:ring-blue-500/50 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                      />
+                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeStep === 2 && selectedAsset && (
+                <div className="space-y-5 animate-in slide-in-from-right-4 duration-300">
+                  <div className="p-6 rounded-2xl bg-blue-50 dark:bg-blue-900/10 border-2 border-blue-100 dark:border-blue-800/50 space-y-4">
+                    <h4 className="text-sm font-bold text-blue-900 dark:text-blue-200 flex items-center gap-2">
+                      <Package className="h-4 w-4" /> Final Review
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Asset</p>
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{selectedAsset.name}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantity</p>
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{quantity} {selectedAsset.unitOfMeasurement}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Employee</p>
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{employeeName}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Return In</p>
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{returnInDays} Days</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -150,19 +190,34 @@ export function CheckoutManager() {
                 Back
               </Button>
               <Button 
-                onClick={() => {
+                onClick={async () => {
                   if(activeStep < 2) setActiveStep(prev => prev + 1);
                   else {
-                    toast.success('Checkout Processed Successfully!');
-                    setActiveStep(0);
-                    setSelectedAssetId('');
-                    setEmployeeName('');
+                    setIsSubmitting(true);
+                    try {
+                      await addCheckout({
+                        assetId: selectedAssetId,
+                        assetName: selectedAsset?.name || 'Unknown',
+                        quantity,
+                        employeeId: 'EMP-TEMP', // In a real app, this would be selected from a list
+                        employeeName,
+                        returnInDays
+                      });
+                      toast.success('Checkout Processed Successfully!');
+                      setActiveStep(0);
+                      setSelectedAssetId('');
+                      setEmployeeName('');
+                    } catch (error) {
+                      toast.error('Failed to process checkout');
+                    } finally {
+                      setIsSubmitting(false);
+                    }
                   }
                 }}
-                disabled={!selectedAssetId || (activeStep === 1 && !employeeName)}
+                disabled={!selectedAssetId || (activeStep === 1 && !employeeName) || isSubmitting}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-sm px-8 h-10"
               >
-                {activeStep < 2 ? 'Next Step' : 'Confirm Issue'}
+                {isSubmitting ? 'Processing...' : (activeStep < 2 ? 'Next Step' : 'Confirm Issue')}
               </Button>
             </div>
           </CardContent>
@@ -181,15 +236,19 @@ export function CheckoutManager() {
               </div>
 
               <div className="space-y-3">
-                {recentCheckouts.map((log) => (
+                {recentCheckouts.length === 0 ? (
+                  <div className="py-8 text-center text-slate-400">
+                    <p className="text-xs font-medium">No recent activity</p>
+                  </div>
+                ) : recentCheckouts.map((log) => (
                   <div key={log.id} className="flex gap-3 items-center p-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all">
                     <div className="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800 shrink-0 flex items-center justify-center font-semibold text-xs text-slate-500 border border-slate-200 dark:border-slate-700">
-                      {log.employee.split(' ').map(n => n[0]).join('')}
+                      {log.employeeName.split(' ').map(n => n[0]).join('')}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{log.employee}</p>
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{log.employeeName}</p>
                       <p className="text-xs text-slate-400 flex items-center gap-1">
-                        {log.qty}x {log.asset} • {log.time}
+                        {log.quantity}x {log.assetName} • {new Date(log.checkoutDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
                   </div>
@@ -210,7 +269,7 @@ export function CheckoutManager() {
                 <Badge className="bg-white/20 text-white border-0 text-[11px] font-semibold px-2 py-0.5">LIVE</Badge>
               </div>
               <div>
-                <h4 className="text-3xl font-bold">24</h4>
+                <h4 className="text-3xl font-bold">{checkouts.filter(c => new Date(c.checkoutDate).toDateString() === new Date().toDateString()).length}</h4>
                 <p className="text-xs text-blue-200 mt-1">Items Issued Today</p>
               </div>
               <div className="pt-3 border-t border-white/10 flex items-center justify-between">
