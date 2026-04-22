@@ -14,13 +14,20 @@ export function computeWorkDays(
     year: number,
     month: number,
     publicHolidayDates: string[],
-    workDaysPerWeek: number = 6
+    workDaysPerWeek: number = 6,
+    /** Optional: if provided, count workdays from this date instead of the 1st of the month */
+    startFromDate?: Date
 ): number {
     // Build a Set of holiday date strings for O(1) lookup
     const holidaySet = new Set(publicHolidayDates);
 
-    const firstDay = new Date(year, month - 1, 1);
-    const lastDay = new Date(year, month, 0); // last day of month
+    const monthStart = new Date(year, month - 1, 1);
+    const lastDay   = new Date(year, month, 0); // last day of month
+
+    // Use the later of monthStart or startFromDate
+    const firstDay = startFromDate && startFromDate > monthStart
+        ? new Date(startFromDate.getFullYear(), startFromDate.getMonth(), startFromDate.getDate())
+        : new Date(monthStart);
 
     let count = 0;
     for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
@@ -39,6 +46,7 @@ export function computeWorkDays(
     }
     return count;
 }
+
 
 export const MONTH_INDEX: Record<string, number> = {
     jan: 1, feb: 2, mar: 3, apr: 4,

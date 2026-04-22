@@ -288,12 +288,35 @@ export function Payroll() {
 
             const isFieldStaff = emp.staffType === 'FIELD';
 
+            // ── Pro-rata for mid-month joiners ──────────────────────────────
+            // If this employee's startDate falls inside the current payroll month
+            // (and they didn't join on the 1st), scale their salary down to only
+            // cover the workdays from their joining date → end of month.
+            // We do NOT mark earlier days as absent — those days pre-date employment.
+            let salaryBase = standardSalary;
+            if (emp.startDate) {
+              const empJoin = new Date(emp.startDate);
+              const joinYear  = empJoin.getFullYear();
+              const joinMonth = empJoin.getMonth() + 1; // 1-indexed
+              const joinDay   = empJoin.getDate();
+
+              const isJoinMonth = joinYear === year && joinMonth === selectedMonthIndex && joinDay > 1;
+              if (isJoinMonth) {
+                // Workdays available FROM the joining date to end of month
+                const workdaysFromJoin = computeWorkDays(
+                  year, selectedMonthIndex, holidayDates, empWorkDaysPerWeek, empJoin
+                );
+                // Pro-rate: only pay for the fraction of the month they were employed
+                salaryBase = standardSalary * (workdaysFromJoin / empOfficialWorkdays);
+              }
+            }
+
             if (isFieldStaff) {
               // Field staff: paid only for days actually attended
               salary = dailyRate * daysWorked;
             } else {
-              // Office / Non-Employee staff: full salary, deduct explicit absent days
-              salary = standardSalary - (dailyRate * daysAbsent);
+              // Office / Non-Employee staff: pro-rated base, deduct explicit absent days
+              salary = salaryBase - (dailyRate * daysAbsent);
               if (salary < 0) salary = 0;
             }
 
