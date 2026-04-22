@@ -23,7 +23,6 @@ import { useAuth } from '@/src/hooks/useAuth';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useUserStore } from '@/src/store/userStore';
 import { supabase } from '@/src/integrations/supabase/client';
-import { mapReminderToCamel } from '@/src/contexts/AppDataContext';
 import { useTheme } from '@/src/hooks/useTheme';
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
@@ -74,7 +73,7 @@ function PopupCard({
   onNavigate: (popup: TaskPopup) => void;
   isDark: boolean;
 }) {
-  const url = popup.subtaskUrl || popup.taskUrl;
+  const url = popup.taskUrl;  // Always open the main task detail page
 
   return (
     <motion.div
@@ -132,7 +131,7 @@ function PopupCard({
 /* ─── Main component ─────────────────────────────────────────────────────── */
 export function TaskPopupNotifications() {
   const { user } = useAuth();
-  const { subtasks, mainTasks, comments } = useAppData();
+  const { subtasks, mainTasks, comments, reminders } = useAppData();
   const currentUser = useUserStore(s => s.getCurrentUser());
   const navigate = useNavigate();
   const { isDark } = useTheme();
@@ -163,7 +162,8 @@ export function TaskPopupNotifications() {
   }, []);
 
   const handleNavigate = useCallback((popup: TaskPopup) => {
-    const url = popup.subtaskUrl || popup.taskUrl;
+    // Always navigate to the main task detail page, not the subtask slip
+    const url = popup.taskUrl;
     if (url) navigate(url);
     dismiss(popup.id);
   }, [navigate, dismiss]);
@@ -176,47 +176,61 @@ export function TaskPopupNotifications() {
     }
   }, [comments]);
 
-  /* ── Real-time: new reminders targeting this user ────────────────────── */
+  /* ── Timer-based: fire reminder popups only when remind_at time arrives ─ */
+  useEffect(() => {
+    if (!user?.id) return;
+    const userId = user.id;
+
+    const checkReminders = () => {
+      const now = Date.now();
+      const WINDOW_MS = 2 * 60 * 1000; // 2-minute window around remind_at
+
+      reminders.forEach(rem => {
+        if (!rem.isActive) return;
+        // Skip mention-type reminders (handled by task_updates listener)
+        if (rem.title?.startsWith('Mentioned')) return;
+
+        const isGlobal    = !rem.recipientIds || rem.recipientIds.length === 0;
+        const isRecipient = isGlobal || rem.recipientIds?.includes(userId);
+        const isSelf      = rem.createdBy === userId;
+        if (!isRecipient || isSelf) return;
+
+        const remindAt = new Date(rem.remindAt).getTime();
+        const diff = now - remindAt;
+
+        // Only fire if within the 2-minute window after the scheduled time
+        if (diff < 0 || diff > WINDOW_MS) return;
+
+        const isNewTask  = rem.title === 'New Task Created';
+        const isAssigned = rem.title?.startsWith('Assigned') || rem.title?.includes('assigned');
+
+        let type: TaskPopup['type'] = 'update';
+        if (isNewTask)  type = 'new_task';
+        else if (isAssigned) type = 'assignment';
+
+        pushPopup({
+          type,
+          title: isNewTask ? '🆕 New Task' : isAssigned ? '✅ Task Assigned' : '🔔 Reminder',
+          body:  rem.body || rem.title || 'You have a reminder',
+          taskUrl:   rem.mainTaskId ? `/tasks?openTask=${rem.mainTaskId}` : undefined,
+          dedupeKey: `rem-popup-${rem.id}`,
+        });
+      });
+    };
+
+    // Check immediately and then every 30 seconds
+    checkReminders();
+    const interval = setInterval(checkReminders, 30_000);
+    return () => clearInterval(interval);
+  }, [user?.id, reminders, pushPopup]);
+
+  /* ── Real-time: new comment / subtask changes ───────────────────────── */
   useEffect(() => {
     if (!user?.id) return;
     const userId = user.id;
 
     const channel = supabase
       .channel(`task-popups-${userId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'reminders' },
-        payload => {
-          const rem = mapReminderToCamel(payload.new);
-
-          // Check if this reminder targets the current user
-          const isGlobal    = !rem.recipientIds || rem.recipientIds.length === 0;
-          const isRecipient = isGlobal || rem.recipientIds?.includes(userId);
-          const isSelf      = rem.createdBy === userId;
-          if (!isRecipient || isSelf) return;
-
-          const isMention  = rem.title?.startsWith('Mentioned');
-          // The task_updates subscription natively handles mentions with the comment body.
-          // Skip mention reminders here to prevent duplicate popups.
-          if (isMention) return;
-
-          const isNewTask  = rem.title === 'New Task Created';
-          const isAssigned = rem.title?.startsWith('Assigned') || rem.title?.includes('assigned');
-
-          let type: TaskPopup['type'] = 'update';
-          if (isNewTask)  type = 'new_task';
-          else if (isAssigned) type = 'assignment';
-
-          pushPopup({
-            type,
-            title: isNewTask ? '🆕 New Task' : isAssigned ? '✅ Task Assigned' : '🔔 Task Update',
-            body: rem.body || rem.title || 'New notification',
-            taskUrl:    rem.mainTaskId ? `/tasks?openTask=${rem.mainTaskId}` : undefined,
-            subtaskUrl: rem.subtaskId  ? `/tasks?open=${rem.subtaskId}`     : undefined,
-            dedupeKey:  `rem-popup-${rem.id}`,
-          });
-        }
-      )
       // Real-time: new comment on a task the user is assigned to
       .on(
         'postgres_changes',
