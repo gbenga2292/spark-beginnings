@@ -10,12 +10,11 @@ interface AssetAnalyticsDialogProps {
 
 function StatCard({ label, value, sub, color = 'slate' }: { label: string; value: string | number; sub?: string; color?: string }) {
   const colors: Record<string, string> = {
-    slate:   'bg-muted/40 border-border text-foreground',
-    blue:    'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400',
-    rose:    'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400',
-    amber:   'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400',
+    slate: 'bg-muted/40 border-border text-foreground',
+    blue: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400',
+    rose: 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400',
+    amber: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400',
     emerald: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400',
-    blue:    'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400',
   };
   return (
     <div className={cn('rounded-xl border p-3.5 flex flex-col gap-1', colors[color] || colors.slate)}>
@@ -38,11 +37,10 @@ function SectionTitle({ icon, label }: { icon: React.ReactNode; label: string })
 function ProgressBar({ value, max, color = 'teal' }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   const bar: Record<string, string> = {
-    blue:    'bg-blue-500',
-    rose:    'bg-rose-500',
-    amber:   'bg-amber-500',
+    blue: 'bg-blue-500',
+    rose: 'bg-rose-500',
+    amber: 'bg-amber-500',
     emerald: 'bg-emerald-500',
-    blue:    'bg-blue-500',
   };
   return (
     <div className="h-1.5 rounded-full bg-muted overflow-hidden">
@@ -58,10 +56,10 @@ function ProgressBar({ value, max, color = 'teal' }: { value: number; max: numbe
 function EquipmentAnalytics({ asset }: { asset: Asset }) {
   const total = asset.quantity;
   const available = asset.availableQuantity || 0;
-  const reserved  = asset.reservedQuantity  || 0;
-  const damaged   = asset.damagedQuantity   || 0;
-  const missing   = asset.missingQuantity   || 0;
-  const utilRate  = total > 0 ? Math.round(((total - available) / total) * 100) : 0;
+  const reserved = asset.reservedQuantity || 0;
+  const damaged = asset.damagedQuantity || 0;
+  const missing = asset.missingQuantity || 0;
+  const utilRate = total > 0 ? Math.round(((total - available) / total) * 100) : 0;
   const healthRate = total > 0 ? Math.round(((total - damaged - missing) / total) * 100) : 100;
 
   return (
@@ -72,7 +70,7 @@ function EquipmentAnalytics({ asset }: { asset: Asset }) {
         <div className="grid grid-cols-2 gap-2">
           <StatCard label="Utilization Rate" value={`${utilRate}%`} sub="of total fleet deployed" color={utilRate > 70 ? 'rose' : utilRate > 40 ? 'amber' : 'blue'} />
           <StatCard label="Fleet Health" value={`${healthRate}%`} sub="units in good condition" color={healthRate >= 90 ? 'emerald' : healthRate >= 70 ? 'amber' : 'rose'} />
-          <StatCard label="Reserved" value={reserved} sub={`${total > 0 ? Math.round((reserved/total)*100) : 0}% of total`} color="blue" />
+          <StatCard label="Reserved" value={reserved} sub={`${total > 0 ? Math.round((reserved / total) * 100) : 0}% of total`} color="blue" />
           <StatCard label="Available Now" value={available} sub="units ready to deploy" color="blue" />
         </div>
       </div>
@@ -82,10 +80,10 @@ function EquipmentAnalytics({ asset }: { asset: Asset }) {
         <SectionTitle icon={<Package className="h-4 w-4" />} label="Stock Breakdown" />
         <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
           {[
-            { label: 'Available',  val: available, max: total, color: 'blue'   },
-            { label: 'Reserved',   val: reserved,  max: total, color: 'blue'   },
-            { label: 'Damaged',    val: damaged,   max: total, color: 'amber'  },
-            { label: 'Missing',    val: missing,   max: total, color: 'rose'   },
+            { label: 'Available', val: available, max: total, color: 'blue' },
+            { label: 'Reserved', val: reserved, max: total, color: 'blue' },
+            { label: 'Damaged', val: damaged, max: total, color: 'amber' },
+            { label: 'Missing', val: missing, max: total, color: 'rose' },
           ].map(row => (
             <div key={row.label} className="space-y-1">
               <div className="flex justify-between text-xs font-semibold text-muted-foreground">
@@ -140,13 +138,13 @@ function EquipmentAnalytics({ asset }: { asset: Asset }) {
 
 /* ─── TOOLS ANALYTICS ─────────────────────────────────────────── */
 function ToolsAnalytics({ asset }: { asset: Asset }) {
-  const total   = asset.quantity;
-  const used    = asset.usedQuantity    || 0;
+  const total = asset.quantity;
+  const used = asset.usedQuantity || 0;
   const missing = asset.missingQuantity || 0;
   const damaged = asset.damagedQuantity || 0;
   const available = asset.availableQuantity || 0;
-  const reserved  = asset.reservedQuantity  || 0;
-  const lossRate   = total > 0 ? Math.round(((missing + damaged) / total) * 100) : 0;
+  const reserved = asset.reservedQuantity || 0;
+  const lossRate = total > 0 ? Math.round(((missing + damaged) / total) * 100) : 0;
   const checkoutRate = total > 0 ? Math.round((reserved / total) * 100) : 0;
 
   return (
@@ -155,10 +153,10 @@ function ToolsAnalytics({ asset }: { asset: Asset }) {
       <div>
         <SectionTitle icon={<TrendingUp className="h-4 w-4" />} label="Usage Metrics" />
         <div className="grid grid-cols-2 gap-2">
-          <StatCard label="Checkout Rate"  value={`${checkoutRate}%`} sub="currently checked out" color={checkoutRate > 80 ? 'rose' : 'blue'} />
-          <StatCard label="Loss Rate"      value={`${lossRate}%`}     sub="missing or damaged"    color={lossRate > 10 ? 'rose' : lossRate > 5 ? 'amber' : 'emerald'} />
-          <StatCard label="Times Used"     value={used}               sub="cumulative usage"       color="blue" />
-          <StatCard label="Available"      value={available}           sub="in stock now"           color="blue" />
+          <StatCard label="Checkout Rate" value={`${checkoutRate}%`} sub="currently checked out" color={checkoutRate > 80 ? 'rose' : 'blue'} />
+          <StatCard label="Loss Rate" value={`${lossRate}%`} sub="missing or damaged" color={lossRate > 10 ? 'rose' : lossRate > 5 ? 'amber' : 'emerald'} />
+          <StatCard label="Times Used" value={used} sub="cumulative usage" color="blue" />
+          <StatCard label="Available" value={available} sub="in stock now" color="blue" />
         </div>
       </div>
 
@@ -167,11 +165,11 @@ function ToolsAnalytics({ asset }: { asset: Asset }) {
         <SectionTitle icon={<Wrench className="h-4 w-4" />} label="Inventory State" />
         <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
           {[
-            { label: 'Available', val: available, max: total, color: 'blue'   },
-            { label: 'Reserved',  val: reserved,  max: total, color: 'blue'   },
-            { label: 'Used',      val: used,       max: total, color: 'emerald'},
-            { label: 'Missing',   val: missing,    max: total, color: 'rose'   },
-            { label: 'Damaged',   val: damaged,    max: total, color: 'amber'  },
+            { label: 'Available', val: available, max: total, color: 'blue' },
+            { label: 'Reserved', val: reserved, max: total, color: 'blue' },
+            { label: 'Used', val: used, max: total, color: 'emerald' },
+            { label: 'Missing', val: missing, max: total, color: 'rose' },
+            { label: 'Damaged', val: damaged, max: total, color: 'amber' },
           ].map(row => (
             <div key={row.label} className="space-y-1">
               <div className="flex justify-between text-xs font-semibold text-muted-foreground">
@@ -206,13 +204,13 @@ function ToolsAnalytics({ asset }: { asset: Asset }) {
 
 /* ─── REUSABLES ANALYTICS ─────────────────────────────────────── */
 function ReusablesAnalytics({ asset }: { asset: Asset }) {
-  const total       = asset.quantity;
-  const available   = asset.availableQuantity || 0;
-  const reserved    = asset.reservedQuantity  || 0;
-  const used        = asset.usedQuantity       || 0;
-  const missing     = asset.missingQuantity   || 0;
-  const cycleCount  = used;
-  const returnRate  = (reserved + available) > 0 ? Math.round((available / (reserved + available)) * 100) : 100;
+  const total = asset.quantity;
+  const available = asset.availableQuantity || 0;
+  const reserved = asset.reservedQuantity || 0;
+  const used = asset.usedQuantity || 0;
+  const missing = asset.missingQuantity || 0;
+  const cycleCount = used;
+  const returnRate = (reserved + available) > 0 ? Math.round((available / (reserved + available)) * 100) : 100;
   const circulation = total > 0 ? Math.round((reserved / total) * 100) : 0;
 
   return (
@@ -221,10 +219,10 @@ function ReusablesAnalytics({ asset }: { asset: Asset }) {
       <div>
         <SectionTitle icon={<RefreshCw className="h-4 w-4" />} label="Cycle Metrics" />
         <div className="grid grid-cols-2 gap-2">
-          <StatCard label="Cycle Count"    value={cycleCount}       sub="total usage cycles"     color="blue" />
+          <StatCard label="Cycle Count" value={cycleCount} sub="total usage cycles" color="blue" />
           <StatCard label="In Circulation" value={`${circulation}%`} sub="currently checked out" color={circulation > 80 ? 'amber' : 'blue'} />
-          <StatCard label="Return Rate"    value={`${returnRate}%`}  sub="returned vs outstanding" color={returnRate >= 80 ? 'emerald' : returnRate >= 50 ? 'amber' : 'rose'} />
-          <StatCard label="Available"      value={available}          sub="ready to issue"        color="blue" />
+          <StatCard label="Return Rate" value={`${returnRate}%`} sub="returned vs outstanding" color={returnRate >= 80 ? 'emerald' : returnRate >= 50 ? 'amber' : 'rose'} />
+          <StatCard label="Available" value={available} sub="ready to issue" color="blue" />
         </div>
       </div>
 
@@ -233,10 +231,10 @@ function ReusablesAnalytics({ asset }: { asset: Asset }) {
         <SectionTitle icon={<Package className="h-4 w-4" />} label="Circulation Breakdown" />
         <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
           {[
-            { label: 'Available (in)',    val: available, max: total, color: 'blue'   },
-            { label: 'Out / Reserved',    val: reserved,  max: total, color: 'blue'   },
-            { label: 'Cycles Completed',  val: used,       max: Math.max(total, used, 1), color: 'emerald' },
-            { label: 'Missing / Lost',    val: missing,   max: total, color: 'rose'   },
+            { label: 'Available (in)', val: available, max: total, color: 'blue' },
+            { label: 'Out / Reserved', val: reserved, max: total, color: 'blue' },
+            { label: 'Cycles Completed', val: used, max: Math.max(total, used, 1), color: 'emerald' },
+            { label: 'Missing / Lost', val: missing, max: total, color: 'rose' },
           ].map(row => (
             <div key={row.label} className="space-y-1">
               <div className="flex justify-between text-xs font-semibold text-muted-foreground">
@@ -278,21 +276,21 @@ function ReusablesAnalytics({ asset }: { asset: Asset }) {
 
 /* ─── CONSUMABLE ANALYTICS ────────────────────────────────────── */
 function ConsumableAnalytics({ asset }: { asset: Asset }) {
-  const total     = asset.quantity;
+  const total = asset.quantity;
   const available = asset.availableQuantity || 0;
-  const used      = asset.usedQuantity       || 0;
+  const used = asset.usedQuantity || 0;
   const depletion = total > 0 ? Math.round((used / total) * 100) : 0;
-  const latest    = asset.restockHistory?.slice(-1)[0];
+  const latest = asset.restockHistory?.slice(-1)[0];
 
   return (
     <div className="space-y-5">
       <div>
         <SectionTitle icon={<TrendingUp className="h-4 w-4" />} label="Consumption Metrics" />
         <div className="grid grid-cols-2 gap-2">
-          <StatCard label="Total Used" value={used}                sub="units consumed" color="amber" />
-          <StatCard label="Remaining"  value={available}            sub="units left"     color={available < (asset.criticalStockLevel ?? 5) ? 'rose' : 'blue'} />
-          <StatCard label="Depletion"  value={`${depletion}%`}      sub="of original stock" color={depletion > 80 ? 'rose' : depletion > 50 ? 'amber' : 'emerald'} />
-          <StatCard label="Restocked"  value={asset.restockHistory?.length ?? 0} sub="times" color="blue" />
+          <StatCard label="Total Used" value={used} sub="units consumed" color="amber" />
+          <StatCard label="Remaining" value={available} sub="units left" color={available < (asset.criticalStockLevel ?? 5) ? 'rose' : 'blue'} />
+          <StatCard label="Depletion" value={`${depletion}%`} sub="of original stock" color={depletion > 80 ? 'rose' : depletion > 50 ? 'amber' : 'emerald'} />
+          <StatCard label="Restocked" value={asset.restockHistory?.length ?? 0} sub="times" color="blue" />
         </div>
       </div>
 
@@ -300,8 +298,8 @@ function ConsumableAnalytics({ asset }: { asset: Asset }) {
         <SectionTitle icon={<Package className="h-4 w-4" />} label="Stock Level" />
         <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
           {[
-            { label: 'Available',   val: available, max: total, color: 'blue'  },
-            { label: 'Consumed',    val: used,       max: total, color: 'amber' },
+            { label: 'Available', val: available, max: total, color: 'blue' },
+            { label: 'Consumed', val: used, max: total, color: 'amber' },
           ].map(row => (
             <div key={row.label} className="space-y-1">
               <div className="flex justify-between text-xs font-semibold text-muted-foreground">
@@ -341,10 +339,10 @@ function ConsumableAnalytics({ asset }: { asset: Asset }) {
 
 /* ─── TYPE CONFIG ─────────────────────────────────────────────── */
 const typeConfig = {
-  equipment:        { icon: <Cpu className="h-4 w-4 text-primary" />,      bg: 'bg-primary/10',    label: 'Equipment Analytics'  },
-  tools:            { icon: <Wrench className="h-4 w-4 text-blue-600" />,   bg: 'bg-blue-500/10',   label: 'Tools Analytics'      },
-  reusables:        { icon: <RefreshCw className="h-4 w-4 text-emerald-600" />, bg: 'bg-emerald-500/10', label: 'Reusables Analytics' },
-  consumable:       { icon: <Package className="h-4 w-4 text-amber-600" />, bg: 'bg-amber-500/10',  label: 'Consumable Analytics' },
+  equipment: { icon: <Cpu className="h-4 w-4 text-primary" />, bg: 'bg-primary/10', label: 'Equipment Analytics' },
+  tools: { icon: <Wrench className="h-4 w-4 text-blue-600" />, bg: 'bg-blue-500/10', label: 'Tools Analytics' },
+  reusables: { icon: <RefreshCw className="h-4 w-4 text-emerald-600" />, bg: 'bg-emerald-500/10', label: 'Reusables Analytics' },
+  consumable: { icon: <Package className="h-4 w-4 text-amber-600" />, bg: 'bg-amber-500/10', label: 'Consumable Analytics' },
   'non-consumable': { icon: <Package className="h-4 w-4 text-muted-foreground" />, bg: 'bg-muted', label: 'Asset Analytics' },
 };
 
@@ -376,9 +374,9 @@ export function AssetAnalyticsDialog({ asset, onClose }: AssetAnalyticsDialogPro
 
         {/* Body */}
         <div className="overflow-y-auto max-h-[75vh] no-scrollbar p-5">
-          {asset.type === 'equipment'  && <EquipmentAnalytics  asset={asset} />}
-          {asset.type === 'tools'      && <ToolsAnalytics      asset={asset} />}
-          {asset.type === 'reusables'  && <ReusablesAnalytics  asset={asset} />}
+          {asset.type === 'equipment' && <EquipmentAnalytics asset={asset} />}
+          {asset.type === 'tools' && <ToolsAnalytics asset={asset} />}
+          {asset.type === 'reusables' && <ReusablesAnalytics asset={asset} />}
           {(asset.type === 'consumable' || asset.type === 'non-consumable') && <ConsumableAnalytics asset={asset} />}
         </div>
       </DialogContent>
