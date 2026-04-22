@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import {
-  ArrowLeft, Download, Eye, Calendar, User, Car, MapPin, Package, X, FileText, Share2
+  ArrowLeft, Download, Eye, Calendar, User, Car, MapPin, Package, X, FileText, Share2, CheckCircle2
 } from 'lucide-react';
 import { Waybill } from '../types/operations';
+import { useOperations } from '../contexts/OperationsContext';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogContent } from '@/src/components/ui/dialog';
+import { Label } from '@/src/components/ui/label';
+import { Input } from '@/src/components/ui/input';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { jsPDF } from 'jspdf';
 import logoSrc from '@/logo/logo-2.png';
@@ -17,8 +20,12 @@ interface WaybillDetailViewProps {
 }
 
 export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) {
+  const { updateWaybillStatus } = useOperations();
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [pdfDataUri, setPdfDataUri] = useState<string>('');
+  const [showDateDialog, setShowDateDialog] = useState(false);
+  const [sentDate, setSentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [returnConditions, setReturnConditions] = useState<Record<string, { good: number, damaged: number, missing: number }>>({});
 
   const generatePdfDoc = () => {
     const doc = new jsPDF();
@@ -99,6 +106,29 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
     }
   };
 
+  const handleMarkAsSent = () => {
+    updateWaybillStatus(waybill.id, 'sent_to_site', sentDate);
+    setShowDateDialog(false);
+    onClose(); // Optional: could stay on page, but usually you return to list
+  };
+
+  const handleOpenReturnDialog = () => {
+    if (waybill.type === 'return') {
+      const initial: Record<string, { good: number, damaged: number, missing: number }> = {};
+      waybill.items.forEach(item => {
+        initial[item.assetId] = { good: item.quantity, damaged: 0, missing: 0 };
+      });
+      setReturnConditions(initial);
+    }
+    setShowDateDialog(true);
+  };
+
+  const handleMarkReturnCompleted = () => {
+    updateWaybillStatus(waybill.id, 'return_completed', sentDate, returnConditions);
+    setShowDateDialog(false);
+    onClose();
+  };
+
   // ── Page header ──────────────────────────────────────────────────────────────
   useSetPageTitle(
     `${waybill.type === 'return' ? 'Return' : 'Waybill'} ${waybill.id}`,
@@ -127,6 +157,24 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
       >
         <Download className="h-4 w-4" /> Download
       </Button>
+      {waybill.type === 'waybill' && waybill.status === 'outstanding' && (
+        <Button
+          size="sm"
+          className="h-9 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm"
+          onClick={() => setShowDateDialog(true)}
+        >
+          <CheckCircle2 className="h-4 w-4" /> Mark as Sent
+        </Button>
+      )}
+      {waybill.type === 'return' && waybill.status === 'outstanding' && (
+        <Button
+          size="sm"
+          className="h-9 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm"
+          onClick={handleOpenReturnDialog}
+        >
+          <CheckCircle2 className="h-4 w-4" /> Complete Return
+        </Button>
+      )}
     </div>,
     [waybill.id]
   );
@@ -165,6 +213,22 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
           >
             <Download className="h-4 w-4" /> Download PDF
           </Button>
+          {waybill.type === 'waybill' && waybill.status === 'outstanding' && (
+            <Button
+              className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs mt-2"
+              onClick={() => setShowDateDialog(true)}
+            >
+              <CheckCircle2 className="h-4 w-4" /> Mark as Sent
+            </Button>
+          )}
+          {waybill.type === 'return' && waybill.status === 'outstanding' && (
+            <Button
+              className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs mt-2"
+              onClick={handleOpenReturnDialog}
+            >
+              <CheckCircle2 className="h-4 w-4" /> Complete Return
+            </Button>
+          )}
         </div>
 
         {/* ── Waybill info card ─────────────────────────────────────────────── */}
@@ -305,6 +369,106 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
                 className="w-full h-full border-0"
                 title="Waybill PDF Preview"
               />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ── Date Picker Dialog ─────────────────────────────────────────────────── */}
+      {showDateDialog && (
+        <Dialog open onOpenChange={setShowDateDialog}>
+          <DialogContent className="sm:max-w-[425px] p-6 rounded-2xl">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800 dark:text-white">
+                  {waybill.type === 'waybill' ? 'Mark as Sent to Site' : 'Complete Return'}
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  {waybill.type === 'waybill' 
+                    ? 'Select the date the assets were delivered to the site. This will transfer the inventory stock.'
+                    : 'Select the date the assets were returned to the warehouse. This will restore the inventory stock.'}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-700">
+                  {waybill.type === 'waybill' ? 'Delivery Date' : 'Return Date'}
+                </Label>
+                <Input 
+                  type="date"
+                  value={sentDate}
+                  onChange={(e) => setSentDate(e.target.value)}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+
+              {waybill.type === 'return' && (
+                <div className="space-y-3 max-h-60 overflow-y-auto no-scrollbar">
+                  <Label className="text-xs font-bold text-slate-700 border-b pb-2 block">Item Conditions</Label>
+                  {waybill.items.map(item => (
+                    <div key={item.assetId} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{item.assetName}</span>
+                        <span className="text-xs font-bold text-teal-600 dark:text-teal-400">Total: {item.quantity}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase text-emerald-600">Good</Label>
+                          <Input 
+                            type="number" 
+                            min={0}
+                            max={item.quantity - (returnConditions[item.assetId]?.damaged || 0) - (returnConditions[item.assetId]?.missing || 0)}
+                            value={returnConditions[item.assetId]?.good || 0}
+                            onChange={(e) => setReturnConditions(prev => ({
+                              ...prev,
+                              [item.assetId]: { ...prev[item.assetId], good: parseInt(e.target.value) || 0 }
+                            }))}
+                            className="h-8 text-xs border-emerald-200 focus-visible:ring-emerald-500"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase text-amber-600">Damaged</Label>
+                          <Input 
+                            type="number" 
+                            min={0}
+                            value={returnConditions[item.assetId]?.damaged || 0}
+                            onChange={(e) => setReturnConditions(prev => ({
+                              ...prev,
+                              [item.assetId]: { ...prev[item.assetId], damaged: parseInt(e.target.value) || 0 }
+                            }))}
+                            className="h-8 text-xs border-amber-200 focus-visible:ring-amber-500"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase text-rose-600">Missing</Label>
+                          <Input 
+                            type="number" 
+                            min={0}
+                            value={returnConditions[item.assetId]?.missing || 0}
+                            onChange={(e) => setReturnConditions(prev => ({
+                              ...prev,
+                              [item.assetId]: { ...prev[item.assetId], missing: parseInt(e.target.value) || 0 }
+                            }))}
+                            className="h-8 text-xs border-rose-200 focus-visible:ring-rose-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end pt-4">
+                <Button variant="ghost" onClick={() => setShowDateDialog(false)} className="rounded-xl">
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={waybill.type === 'waybill' ? handleMarkAsSent : handleMarkReturnCompleted} 
+                  className={waybill.type === 'waybill' ? "bg-blue-600 hover:bg-blue-700 text-white rounded-xl" : "bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl"}
+                >
+                  {waybill.type === 'waybill' ? 'Confirm Delivery' : 'Confirm Return'}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { cn } from '@/src/lib/utils';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { WaybillForm } from './WaybillForm';
@@ -37,6 +38,7 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
   const [activeTab, setActiveTab] = useState<TabId>('materials');
   const [showReturnWaybill, setShowReturnWaybill] = useState(false);
   const [showTransactions, setShowTransactions] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
 
   // All waybills for this site
   const siteWaybills = waybills.filter(w =>
@@ -98,6 +100,46 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
   ];
 
   const services = questionnaire?.phase3?.dewateringMethods || ['Dewatering'];
+
+  const handleDownloadMaterialsReport = () => {
+    const headers = ['Asset ID', 'Asset Name', 'Category', 'Quantity', 'Unit', 'Last Updated'];
+    const rows = allItems.map(item => [
+      item.assetId,
+      `"${item.assetName}"`,
+      item.type || 'non-consumable',
+      item.quantity,
+      item.unit || 'pcs',
+      item.lastUpdated ? new Date(item.lastUpdated).toLocaleDateString('en-GB') : ''
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${site.name.replace(/\s+/g, '_')}_Materials_Report.csv`;
+    a.click();
+    setShowReportDialog(false);
+  };
+
+  const handleDownloadTransactionsReport = () => {
+    const headers = ['Waybill ID', 'Type', 'Status', 'Date', 'Driver', 'Items Count'];
+    const rows = siteWaybills.map(wb => [
+      wb.id,
+      wb.type,
+      wb.status,
+      wb.issueDate ? new Date(wb.issueDate).toLocaleDateString('en-GB') : '',
+      `"${wb.driverName}"`,
+      wb.items.length
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${site.name.replace(/\s+/g, '_')}_Transactions_Report.csv`;
+    a.click();
+    setShowReportDialog(false);
+  };
 
   if (showReturnWaybill) {
     return (
@@ -177,6 +219,7 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
             variant="outline"
             size="icon"
             className="h-9 w-9"
+            onClick={() => setShowReportDialog(true)}
           >
             <FileText className="h-3.5 w-3.5" />
           </Button>
@@ -387,6 +430,31 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
         Return Waybill is now handled at the top level 
         of this component when showReturnWaybill is true 
       */}
+
+      {/* Report Generation Dialog */}
+      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+        <DialogContent className="sm:max-w-[500px] p-6 rounded-2xl">
+          <DialogHeader className="mb-2">
+            <DialogTitle className="text-xl text-center text-slate-800">Generate Report</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 mt-2">
+            <button 
+              onClick={handleDownloadMaterialsReport}
+              className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 border-blue-500 bg-blue-50 hover:bg-blue-100 transition-all text-blue-700"
+            >
+              <Package className="h-6 w-6" />
+              <span className="font-semibold text-sm">Materials On Site</span>
+            </button>
+            <button 
+              onClick={handleDownloadTransactionsReport}
+              className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl border border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 transition-all text-slate-700"
+            >
+              <Activity className="h-6 w-6 text-blue-600" />
+              <span className="font-semibold text-sm">Site Transactions</span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

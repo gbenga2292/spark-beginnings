@@ -5,10 +5,13 @@ import { Badge } from '@/src/components/ui/badge';
 import { useTheme } from '@/src/hooks/useTheme';
 import { cn } from '@/src/lib/utils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { AssetForm } from './AssetForm';
+import { useState } from 'react';
 
 export function Dashboard() {
   const { assets, waybills, getAssetAnalytics } = useOperations();
   const { isDark } = useTheme();
+  const [showAssetForm, setShowAssetForm] = useState(false);
   const stats = getAssetAnalytics();
 
   useSetPageTitle(
@@ -22,6 +25,10 @@ export function Dashboard() {
     { title: 'Pending Returns', value: waybills.filter(w => w.type === 'return' && w.status === 'outstanding').length, icon: ArrowRightLeft, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/30' },
     { title: 'Low Stock Alerts', value: assets.filter(a => a.availableQuantity < 5).length, icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-100 dark:bg-rose-900/30' },
   ];
+
+  if (showAssetForm) {
+    return <AssetForm onClose={() => setShowAssetForm(false)} />;
+  }
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
@@ -118,7 +125,9 @@ export function Dashboard() {
           </div>
 
           <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
-            <button className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-xs font-semibold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+            <button 
+              onClick={() => setShowAssetForm(true)}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-xs font-semibold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
               <Package className="h-4 w-4" />
               Register New Asset
             </button>

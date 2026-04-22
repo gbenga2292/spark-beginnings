@@ -2,7 +2,7 @@ import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { 
-  Plus, Search, Eye, Edit2, Trash2, Truck, ArrowRightLeft, ListFilter
+  Plus, Search, Eye, Edit2, Trash2, Truck, ArrowRightLeft, ListFilter, Calendar
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
@@ -14,6 +14,8 @@ import { Card } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import { Input } from '@/src/components/ui/input';
+import { Dialog, DialogContent } from '@/src/components/ui/dialog';
+import { Label } from '@/src/components/ui/label';
 
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 
@@ -37,6 +39,9 @@ export function WaybillManager() {
   const [returnSearch, setReturnSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewingWaybill, setViewingWaybill] = useState<Waybill | null>(null);
+  const [editingWaybill, setEditingWaybill] = useState<Waybill | null>(null);
+  const [waybillToSend, setWaybillToSend] = useState<Waybill | null>(null);
+  const [sentDate, setSentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [activeTab, setActiveTab] = useState<'waybill' | 'return'>('waybill');
 
   const outgoingWaybills = waybills.filter(w => w.type === 'waybill');
@@ -69,8 +74,19 @@ export function WaybillManager() {
   const setCurrentSearch = activeTab === 'waybill' ? setWaybillSearch : setReturnSearch;
 
   // ── Full-page detail view (replaces list entirely) ────────────────────
+  const handleSendWaybill = () => {
+    if (waybillToSend) {
+      updateWaybillStatus(waybillToSend.id, 'sent_to_site', sentDate);
+      setWaybillToSend(null);
+    }
+  };
+
   if (viewingWaybill) {
     return <WaybillDetailView waybill={viewingWaybill} onClose={() => setViewingWaybill(null)} />;
+  }
+
+  if (editingWaybill) {
+    return <WaybillForm onClose={() => setEditingWaybill(null)} editWaybill={editingWaybill} />;
   }
 
   if (showCreateModal) {
@@ -182,9 +198,18 @@ export function WaybillManager() {
                         </Button>
                         {activeTab === 'waybill' && (
                           <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20"
+                              onClick={() => setEditingWaybill(wb)}>
                               <Edit2 className="h-4 w-4" />
                             </Button>
+                            {wb.status === 'outstanding' && (
+                              <Button 
+                                size="sm" 
+                                className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs ml-1"
+                                onClick={() => setWaybillToSend(wb)}>
+                                <Calendar className="h-3.5 w-3.5" /> Send
+                              </Button>
+                            )}
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
                               onClick={() => deleteWaybill(wb.id)}>
                               <Trash2 className="h-4 w-4" />
@@ -200,6 +225,41 @@ export function WaybillManager() {
           </table>
         </div>
       </Card>
+
+      {/* ── Send Waybill Date Picker Dialog ─────────────────────────────────────────────────── */}
+      {waybillToSend && (
+        <Dialog open onOpenChange={() => setWaybillToSend(null)}>
+          <DialogContent className="sm:max-w-[425px] p-6 rounded-2xl">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800 dark:text-white">Send Waybill to Site</h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  Select the date the assets were delivered to the site.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-700">Delivery Date</Label>
+                <Input 
+                  type="date"
+                  value={sentDate}
+                  onChange={(e) => setSentDate(e.target.value)}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end pt-4">
+                <Button variant="ghost" onClick={() => setWaybillToSend(null)} className="rounded-xl">
+                  Cancel
+                </Button>
+                <Button onClick={handleSendWaybill} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl gap-2">
+                  <Calendar className="h-4 w-4" /> Confirm Send
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

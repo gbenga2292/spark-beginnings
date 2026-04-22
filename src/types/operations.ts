@@ -50,6 +50,9 @@ export interface WaybillItem {
   assetId: string;
   assetName: string;
   quantity: number;
+  returnedGood?: number;
+  returnedDamaged?: number;
+  returnedMissing?: number;
 }
 
 export interface Waybill {
@@ -61,6 +64,7 @@ export interface Waybill {
   driverName?: string;
   vehicle?: string;
   issueDate: string;
+  sentToSiteDate?: string;
   items: WaybillItem[];
   created_at?: string;
 }

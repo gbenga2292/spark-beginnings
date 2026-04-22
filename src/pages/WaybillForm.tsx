@@ -6,7 +6,7 @@ import {
   MapPin, Package, Search, CheckCircle2, ChevronDown
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
-import { WaybillType } from '../types/operations';
+import { WaybillType, Waybill } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
@@ -18,22 +18,29 @@ interface WaybillFormProps {
   onClose: () => void;
   initialType?: WaybillType;
   prefillSiteName?: string;
+  editWaybill?: Waybill;
 }
 
 const SERVICES = ['Dewatering', 'Waterproofing', 'Jetting', 'Tiling', 'General'] as const;
 
-export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName = '' }: WaybillFormProps) {
-  const { assets, createWaybill, vehicles } = useOperations();
+export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName = '', editWaybill }: WaybillFormProps) {
+  const { assets, createWaybill, updateWaybill, vehicles } = useOperations();
   const { sites, employees } = useAppStore();
 
+  const isEditing = !!editWaybill;
+
   const [purpose, setPurpose] = useState('Operational Activities');
-  const [siteName, setSiteName] = useState(prefillSiteName);
-  const [driverName, setDriverName] = useState('');
-  const [vehicleName, setVehicleName] = useState('');
+  const [siteName, setSiteName] = useState(editWaybill?.siteName || prefillSiteName);
+  const [driverName, setDriverName] = useState(editWaybill?.driverName || '');
+  const [vehicleName, setVehicleName] = useState(editWaybill?.vehicle || '');
   const [service, setService] = useState('Dewatering');
   const [expectedReturnDate, setExpectedReturnDate] = useState('');
   const [itemMode, setItemMode] = useState<'single' | 'bulk'>('single');
-  const [items, setItems] = useState<{ rowId: string; assetId: string; quantity: number }[]>([]);
+  const [items, setItems] = useState<{ rowId: string; assetId: string; quantity: number }[]>(
+    editWaybill
+      ? editWaybill.items.map(i => ({ rowId: `row-${i.assetId}`, assetId: i.assetId, quantity: i.quantity }))
+      : []
+  );
   const [bulkText, setBulkText] = useState('');
   const [parsedItems, setParsedItems] = useState<{ id: string; originalText: string; quantity: number; matchedAssetId: string | null; isRematching?: boolean }[]>([]);
 
@@ -98,10 +105,10 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
   };
 
   useSetPageTitle(
-    initialType === 'waybill' ? 'Create Waybill' : 'Create Return Sheet',
-    'Issue assets for delivery to project sites',
+    isEditing ? 'Edit Waybill' : (initialType === 'waybill' ? 'Create Waybill' : 'Create Return Sheet'),
+    isEditing ? `Editing ${editWaybill?.id}` : 'Issue assets for delivery to project sites',
     null,
-    [initialType]
+    [initialType, isEditing]
   );
 
   const handleSubmit = () => {
@@ -114,19 +121,32 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
       toast.error('Add at least one valid item to the waybill');
       return;
     }
-    createWaybill({
-      siteId: sites.find(s => s.name === siteName)?.id || `site-${Date.now()}`,
-      siteName,
-      type: initialType,
-      issueDate: new Date().toISOString(),
-      driverName,
-      vehicle: vehicleName,
-      items: validItems.map(i => {
-        const asset = assets.find(a => a.id === i.assetId);
-        return { assetId: i.assetId, assetName: asset?.name || 'Unknown', quantity: i.quantity };
-      }),
+    const mappedItems = validItems.map(i => {
+      const asset = assets.find(a => a.id === i.assetId);
+      return { assetId: i.assetId, assetName: asset?.name || 'Unknown', quantity: i.quantity };
     });
-    toast.success(`Waybill created successfully for ${siteName}`);
+
+    if (isEditing && editWaybill) {
+      updateWaybill(editWaybill.id, {
+        siteName,
+        siteId: sites.find(s => s.name === siteName)?.id || editWaybill.siteId,
+        driverName,
+        vehicle: vehicleName,
+        items: mappedItems,
+      });
+      toast.success(`Waybill ${editWaybill.id} updated successfully`);
+    } else {
+      createWaybill({
+        siteId: sites.find(s => s.name === siteName)?.id || `site-${Date.now()}`,
+        siteName,
+        type: initialType,
+        issueDate: new Date().toISOString(),
+        driverName,
+        vehicle: vehicleName,
+        items: mappedItems,
+      });
+      toast.success(`Waybill created successfully for ${siteName}`);
+    }
     onClose();
   };
 
@@ -447,9 +467,10 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                 })
               )}
             </div>
-          </div>
+          )}
         </div>
-        {/* Footer */}
+      </div>
+      {/* Footer */}
         <div className="p-6 sm:px-8 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-800/30">
           <Button variant="outline" onClick={onClose} className="h-11 px-6 rounded-xl font-bold text-xs uppercase text-slate-600 dark:text-slate-400 hover:text-slate-900 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
             Cancel
