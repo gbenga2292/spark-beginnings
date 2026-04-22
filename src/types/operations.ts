@@ -96,6 +96,7 @@ export interface Checkout {
   employeeName: string;
   checkoutDate: string;
   returnInDays: number;
+  expectedReturnDate?: string;
   status: CheckoutStatus;
 }
 
@@ -141,12 +142,19 @@ export interface MaintenanceSession {
     remark?: string;
   }[];
 }
+export interface VehicleDocumentType {
+  id: string;
+  name: string;
+  created_at?: string;
+}
+
 export interface Vehicle {
   id: string;
   name: string;
   type?: string;
   registration_number: string;
   status: 'active' | 'inactive';
+  documents?: Record<string, string>; // Mapping of document type name (or ID) to expiry date
   created_at?: string;
   updated_at?: string;
 }

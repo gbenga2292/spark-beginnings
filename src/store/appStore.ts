@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { db } from '@/src/lib/supabaseService';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
-import { Vehicle, VehicleTripLeg } from '@/src/types/operations';
+import { Vehicle, VehicleTripLeg, VehicleDocumentType } from '@/src/types/operations';
 
 export interface CommLog {
   id: string;
@@ -581,6 +581,7 @@ interface AppState {
   staffMeritRecords: StaffMeritRecord[];
   vehicles: Vehicle[];
   vehicleTrips: VehicleTripLeg[];
+  vehicleDocumentTypes: VehicleDocumentType[];
   addSite: (site: Site) => void;
   setSites: (sites: Site[]) => void;
   updateSite: (id: string, site: Partial<Site>) => void;
@@ -689,6 +690,9 @@ interface AppState {
   updateVehicle: (id: string, vehicle: Partial<Vehicle>) => void;
   deleteVehicle: (id: string) => void;
   addVehicleTripRecords: (logs: any[]) => void;
+  addVehicleDocumentType: (type: VehicleDocumentType) => void;
+  deleteVehicleDocumentType: (id: string) => void;
+  updateVehicleDocument: (vehicleId: string, docTypeName: string, date: string) => void;
 
   payrollVariables: {
     basic: number;
@@ -802,6 +806,7 @@ export const useAppStore = create<AppState>()(
       staffMeritRecords: [],
       vehicles: [],
       vehicleTrips: [],
+      vehicleDocumentTypes: [],
 
       payrollVariables: {
         basic: 40, housing: 30, transport: 20, otherAllowances: 10,
@@ -1192,6 +1197,17 @@ export const useAppStore = create<AppState>()(
       updateVehicle: (id, vehicle) => { set((s) => ({ vehicles: s.vehicles.map(v => v.id === id ? { ...v, ...vehicle } : v) })); db.updateVehicle(id, vehicle); },
       deleteVehicle: (id) => { set((s) => ({ vehicles: s.vehicles.filter(v => v.id !== id) })); db.deleteVehicle(id); },
       addVehicleTripRecords: (logs) => { set((s) => ({ vehicleTrips: [...logs, ...s.vehicleTrips] })); db.insertVehicleTripRecords(logs); },
+      addVehicleDocumentType: (type) => { set((s) => ({ vehicleDocumentTypes: [...s.vehicleDocumentTypes, type] })); db.insertVehicleDocumentType(type); },
+      deleteVehicleDocumentType: (id) => { set((s) => ({ vehicleDocumentTypes: s.vehicleDocumentTypes.filter(t => t.id !== id) })); db.deleteVehicleDocumentType(id); },
+      updateVehicleDocument: (vehicleId, docTypeName, date) => {
+        set((s) => {
+          const vehicle = s.vehicles.find(v => v.id === vehicleId);
+          if (!vehicle) return s;
+          const updatedDocs = { ...vehicle.documents, [docTypeName]: date };
+          db.updateVehicleDocument(vehicleId, updatedDocs);
+          return { vehicles: s.vehicles.map(v => v.id === vehicleId ? { ...v, documents: updatedDocs } : v) };
+        });
+      },
     }),
     {
       name: 'dcel-hr-storage',

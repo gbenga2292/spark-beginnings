@@ -133,7 +133,7 @@ function AppContent() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/setup" element={<SuperAdminSetup />} />
-      <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
+      <Route path="/" element={<AuthGuard><OperationsProvider><Layout /></OperationsProvider></AuthGuard>}>
         <Route index element={<Page label="Task Dashboard"><ProtectedRoute requiredModule="tasks"><TaskDashboard /></ProtectedRoute></Page>} />
         
         {/* ── Restricted Modules (Hidden in Web Build) ────────────────────────── */}
@@ -178,7 +178,7 @@ function AppContent() {
             <Route path="operations/*" element={
               <Page label="Operations">
                 <ProtectedRoute requiredModule="operations">
-                  <OperationsProvider>
+                  <>
                     <Routes>
                       <Route index element={<OperationsDashboard />} />
                       <Route path="assets" element={<ProtectedRoute requiredModule="opsInventory"><AssetManager /></ProtectedRoute>} />
@@ -190,7 +190,7 @@ function AppContent() {
                       <Route path="analytics" element={<ProtectedRoute requiredModule="opsCheckout"><EmployeeAnalytics /></ProtectedRoute>} />
                       <Route path="*" element={<Navigate to="/operations" replace />} />
                     </Routes>
-                  </OperationsProvider>
+                  </>
                 </ProtectedRoute>
               </Page>
             } />

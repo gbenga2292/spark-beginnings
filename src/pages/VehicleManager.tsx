@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
-import { Vehicle, VehicleTripLeg } from '../types/operations';
+import { Vehicle, VehicleTripLeg, VehicleDocumentType } from '../types/operations';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
@@ -24,14 +24,18 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 
 export function VehicleManager() {
   const { 
-    vehicles, vehicleTrips, addVehicle, updateVehicle, deleteVehicle, addVehicleTripRecords 
+    vehicles, vehicleTrips, addVehicle, updateVehicle, deleteVehicle, addVehicleTripRecords,
+    vehicleDocumentTypes, updateVehicleDocument
   } = useOperations();
   const { sites, pendingSites, employees } = useAppStore();
   
-  const [activeTab, setActiveTab] = useState<'fleet' | 'logs'>('fleet');
+  const [activeTab, setActiveTab] = useState<'fleet' | 'logs' | 'documents'>('fleet');
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [showTripForm, setShowTripForm] = useState(false);
+  const [editingDocVehicle, setEditingDocVehicle] = useState<Vehicle | null>(null);
+  const [showDocUpdateForm, setShowDocUpdateForm] = useState(false);
+  const [docUpdateForm, setDocUpdateForm] = useState({ type: '', date: '' });
   const [search, setSearch] = useState('');
 
   // 1. Vehicle Form State
@@ -326,6 +330,12 @@ export function VehicleManager() {
         >
           Movement Logs
         </button>
+        <button 
+          className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'documents' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+          onClick={() => setActiveTab('documents')}
+        >
+          Vehicle Documents
+        </button>
       </div>
 
       {activeTab === 'fleet' ? (
@@ -415,6 +425,110 @@ export function VehicleManager() {
                       </tr>
                     ))
                   )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      ) : activeTab === 'documents' ? (
+        <div className="space-y-6">
+          {/* Document Legend */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1">
+            <div className="flex flex-wrap gap-2">
+              {vehicleDocumentTypes.map(type => (
+                <Badge key={type.id} variant="secondary" className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-none">
+                  {type.name}
+                </Badge>
+              ))}
+            </div>
+          </div>
+
+
+          {showDocUpdateForm && editingDocVehicle && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+              <Card className="w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
+                <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b">
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider">Update Document Date</CardTitle>
+                  <p className="text-xs text-slate-500">{editingDocVehicle.name} ({editingDocVehicle.registration_number})</p>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
+                  <div className="space-y-2">
+                    <Label>Document Type</Label>
+                    <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950"
+                      value={docUpdateForm.type} onChange={e => setDocUpdateForm({...docUpdateForm, type: e.target.value})}>
+                      <option value="">Select Document</option>
+                      {vehicleDocumentTypes.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Expiry Date</Label>
+                    <Input type="date" value={docUpdateForm.date} onChange={e => setDocUpdateForm({...docUpdateForm, date: e.target.value})} />
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <Button className="flex-1 bg-teal-600" onClick={() => {
+                      if (docUpdateForm.type && docUpdateForm.date) {
+                        updateVehicleDocument(editingDocVehicle.id, docUpdateForm.type, docUpdateForm.date);
+                        setShowDocUpdateForm(false);
+                      }
+                    }}>Update</Button>
+                    <Button variant="outline" className="flex-1" onClick={() => setShowDocUpdateForm(false)}>Cancel</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
+            <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 border-b dark:border-slate-800 flex justify-between items-center">
+               <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-teal-500" /> Vehicle Document Tracking
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-100 dark:bg-slate-800/50 text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                    <th className="px-6 py-3 whitespace-nowrap sticky left-0 bg-slate-100 dark:bg-slate-800 z-10">Vehicle Details</th>
+                    <th className="px-6 py-3 whitespace-nowrap">Reg No</th>
+                    {vehicleDocumentTypes.map(type => (
+                      <th key={type.id} className="px-6 py-3 whitespace-nowrap">{type.name}</th>
+                    ))}
+                    <th className="px-6 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredVehicles.map(v => (
+                    <tr key={v.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                      <td className="px-6 py-4 whitespace-nowrap sticky left-0 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800/50 z-10 border-r dark:border-slate-800">
+                        <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{v.name}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap font-mono text-xs font-bold text-teal-600">{v.registration_number}</td>
+                      {vehicleDocumentTypes.map(type => {
+                        const date = v.documents?.[type.name];
+                        return (
+                          <td key={type.id} className="px-6 py-4 whitespace-nowrap">
+                            {date ? (
+                              <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                                {formatDisplayDate(date)}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">Not set</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="px-6 py-4 text-right">
+                        <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase font-bold text-teal-600" 
+                          onClick={() => {
+                            setEditingDocVehicle(v);
+                            setDocUpdateForm({ type: '', date: '' });
+                            setShowDocUpdateForm(true);
+                          }}>
+                          Update
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

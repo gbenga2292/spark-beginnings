@@ -331,8 +331,17 @@ export function dbToVehicle(r: any): Vehicle {
     type: r.type || undefined,
     registration_number: r.registration_number,
     status: r.status as 'active' | 'inactive',
+    documents: r.documents || {},
     created_at: r.created_at,
     updated_at: r.updated_at,
+  };
+}
+
+export function dbToVehicleDocumentType(r: any): any {
+  return {
+    id: r.id,
+    name: r.name,
+    created_at: r.created_at,
   };
 }
 
@@ -685,6 +694,7 @@ function vehicleToDb(v: Vehicle) {
     type: v.type || null,
     registration_number: v.registration_number,
     status: v.status,
+    documents: v.documents || {},
   };
 }
 
@@ -730,6 +740,7 @@ export async function fetchAllAppData(privs?: any) {
     staffMeritRes,
     vehiclesRes,
     vehicleTripsRes,
+    vehicleDocTypesRes,
     dailyJournalsRes,
     siteJournalEntriesRes,
   ] = await Promise.all([
@@ -763,6 +774,7 @@ export async function fetchAllAppData(privs?: any) {
     supabase.from('staff_merit_record').select('*').order('incident_date', { ascending: false }),
     supabase.from('vehicles').select('*').order('name'),
     supabase.from('vehicle_movement_log').select('*').order('departure_time', { ascending: false }).limit(500),
+    supabase.from('vehicle_document_types').select('*').order('name'),
     supabase.from('daily_journals').select('*').order('date', { ascending: false }),
     supabase.from('site_journal_entries').select('*'),
   ]);
@@ -802,7 +814,8 @@ export async function fetchAllAppData(privs?: any) {
     staffMeritRecords: (staffMeritRes.data || []).map(dbToStaffMerit),
     vehicles: (vehiclesRes.data || []).map(dbToVehicle),
     vehicleTrips: (vehicleTripsRes.data || []).map(dbToVehicleMovement),
-    dailyJournals: (dailyJournalsRes?.data || []).map(dbToDailyJournal),
+    vehicleDocumentTypes: (vehicleDocTypesRes.data || []).map(dbToVehicleDocumentType),
+    ledgerEntries: (lEntRes.data || []).map(dbToLedgerEntry),
     siteJournalEntries: (siteJournalEntriesRes?.data || []).map(dbToSiteJournalEntry),
     positions: (positionsRes.data || []).map((p: any) => ({
       id: p.id,
@@ -1758,9 +1771,11 @@ export const db = {
     const { error } = await supabase.from('vehicles').update(update).eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
   },
-  async deleteVehicle(id: string) {
-    const { error } = await supabase.from('vehicles').delete().eq('id', id);
-    if (error) { console.error('Database error:', error); throw error; }
+  async deleteVehicle(id: string) { await supabase.from('vehicles').delete().eq('id', id); },
+  async insertVehicleDocumentType(type: any) { await supabase.from('vehicle_document_types').insert(type); },
+  async deleteVehicleDocumentType(id: string) { await supabase.from('vehicle_document_types').delete().eq('id', id); },
+  async updateVehicleDocument(vehicleId: string, documents: any) {
+    await supabase.from('vehicles').update({ documents }).eq('id', vehicleId);
   },
 
   // Vehicle Trip Logs

@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useOperations } from '../contexts/OperationsContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
-import { Plus, Trash2, Save, Download, Upload, BookOpen, Settings2, Briefcase, X, ChevronRight, Edit2 } from 'lucide-react';
+import { Plus, Trash2, Save, Download, Upload, BookOpen, Settings2, Briefcase, X, ChevronRight, Edit2, Truck } from 'lucide-react';
 import { useAppStore, Employee, AttendanceRecord, Site, Invoice, PendingInvoice, LeaveRecord, LedgerEntry, CompanyExpense, CommLog, DEFAULT_LEAVE_TYPES } from '@/src/store/appStore';
 import { NairaSign } from '@/src/components/ui/naira-sign';
 import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
@@ -97,8 +98,13 @@ export function Variables() {
   const [newVendorTin, setNewVendorTin] = useState('');
   const [newBenBankName, setNewBenBankName] = useState('');
 
-  // Top-level section switch: 'system' | 'ledger' | 'services'
-  const [varSection, setVarSection] = useState<'system' | 'ledger' | 'services'>('system');
+  // Top-level section switch: 'system' | 'ledger' | 'services' | 'operations'
+  const [varSection, setVarSection] = useState<'system' | 'ledger' | 'services' | 'operations'>('system');
+  
+  const { 
+    vehicleDocumentTypes, addVehicleDocumentType, deleteVehicleDocumentType 
+  } = useOperations();
+  const [newVehicleDocType, setNewVehicleDocType] = useState('');
 
   const updateDepartmentTasks = useAppStore((state) => state.updateDepartmentTasks);
 
@@ -1005,9 +1011,79 @@ export function Variables() {
           <Briefcase className="h-4 w-4" />
           Project Services
         </button>
+        <button
+          onClick={() => setVarSection('operations')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            varSection === 'operations'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <Truck className="h-4 w-4" />
+          Operations
+        </button>
       </div>
 
-      {varSection === 'services' ? (
+      {varSection === 'operations' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
+              <CardTitle className="text-slate-800">Vehicle Document Types</CardTitle>
+              <CardDescription>Manage types of documents tracked for the fleet (e.g. Insurance, Permits).</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-6">
+              <div className="flex gap-2">
+                <Input 
+                  value={newVehicleDocType} 
+                  onChange={e => setNewVehicleDocType(e.target.value)} 
+                  placeholder="New Document Type" 
+                />
+                <Button 
+                  disabled={!priv.canEdit} 
+                  onClick={() => { 
+                    if(newVehicleDocType) { 
+                      addVehicleDocumentType(newVehicleDocType); 
+                      setNewVehicleDocType(''); 
+                    } 
+                  }}
+                >
+                  Add
+                </Button>
+              </div>
+              <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
+                <div className="overflow-x-auto">
+                <Table>
+                  <TableBody>
+                    {vehicleDocumentTypes.map(type => (
+                      <TableRow key={type.id}>
+                        <TableCell className="font-medium text-slate-700">{type.name}</TableCell>
+                        <TableCell className="w-[50px]">
+                          {priv.canEdit && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={async () => { 
+                                const conf = await showConfirm(`Delete document type "${type.name}"?`, { variant: 'danger' }); 
+                                if (conf) deleteVehicleDocumentType(type.id); 
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-rose-500" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {vehicleDocumentTypes.length === 0 && (
+                      <TableRow><TableCell className="text-slate-400 text-center text-sm py-6 italic">No document types defined.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : varSection === 'services' ? (
         <div className="flex flex-col gap-6">
           <Card className="shadow-sm border-slate-200 border-t-4 border-t-cyan-500">
             <CardHeader className="bg-cyan-50/30 rounded-t-lg border-b border-cyan-100">

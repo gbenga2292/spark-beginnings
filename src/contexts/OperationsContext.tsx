@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import {
   Asset, Waybill, AssetCategory, AssetType, AssetStatus, WaybillStatus, WaybillType, 
   Checkout, MaintenanceAsset, MaintenanceSession, MaintenanceLogType, ServiceStatus,
-  Vehicle, VehicleTripLeg
+  Vehicle, VehicleTripLeg, VehicleDocumentType
 } from '../types/operations';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useAppStore } from '../store/appStore';
@@ -49,6 +49,10 @@ interface OperationsContextType {
   updateVehicle: (id: string, updates: Partial<Vehicle>) => void;
   deleteVehicle: (id: string) => void;
   addVehicleTripRecords: (logs: any[]) => void;
+  vehicleDocumentTypes: VehicleDocumentType[];
+  addVehicleDocumentType: (name: string) => void;
+  deleteVehicleDocumentType: (id: string) => void;
+  updateVehicleDocument: (vehicleId: string, docTypeName: string, date: string) => void;
 }
 
 const OperationsContext = createContext<OperationsContextType | undefined>(undefined);
@@ -69,10 +73,14 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const { 
     vehicles, 
     vehicleTrips, 
+    vehicleDocumentTypes,
     addVehicle: storeAddVehicle, 
     updateVehicle: storeUpdateVehicle, 
     deleteVehicle: storeDeleteVehicle, 
-    addVehicleTripRecords: storeAddVehicleTripRecords 
+    addVehicleTripRecords: storeAddVehicleTripRecords,
+    addVehicleDocumentType: storeAddVehicleDocumentType,
+    deleteVehicleDocumentType: storeDeleteVehicleDocumentType,
+    updateVehicleDocument: storeUpdateVehicleDocument
   } = useAppStore();
 
   useEffect(() => {
@@ -434,12 +442,17 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     supabase.from('operations_waybills').delete().eq('id', id).then();
   };
 
-  const addCheckout = (checkout: Omit<Checkout, 'id' | 'status' | 'checkoutDate' | 'returnedQuantity'>) => {
+  const addCheckout = (checkout: Omit<Checkout, 'id' | 'status' | 'checkoutDate' | 'returnedQuantity' | 'expectedReturnDate'>) => {
+    const checkoutDate = new Date();
+    const expectedDate = new Date();
+    expectedDate.setDate(checkoutDate.getDate() + (checkout.returnInDays || 0));
+
     const newCheckout: Checkout = {
       ...checkout,
       id: `CH-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
       status: 'outstanding',
-      checkoutDate: new Date().toISOString(),
+      checkoutDate: checkoutDate.toISOString(),
+      expectedReturnDate: expectedDate.toISOString().split('T')[0],
       returnedQuantity: 0,
     };
     setCheckouts(prev => [newCheckout, ...prev]);
@@ -619,6 +632,12 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         const logsWithIds = logs.map(l => ({ ...l, id: crypto.randomUUID() }));
         storeAddVehicleTripRecords(logsWithIds);
       },
+      vehicleDocumentTypes,
+      addVehicleDocumentType: (name) => {
+        storeAddVehicleDocumentType({ id: crypto.randomUUID(), name });
+      },
+      deleteVehicleDocumentType: storeDeleteVehicleDocumentType,
+      updateVehicleDocument: storeUpdateVehicleDocument
     }}>
       {children}
     </OperationsContext.Provider>
