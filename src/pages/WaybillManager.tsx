@@ -24,7 +24,7 @@ function WaybillManagerHeader({ onCreate }: { onCreate: () => void }) {
     'Logistics Management',
     'Track and manage asset deliveries (Waybills) and site returns',
     <div className="hidden sm:flex items-center gap-2">
-      <Button size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9" onClick={onCreate}>
+      <Button size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9" onClick={onCreate}>
         <Plus className="h-4 w-4" /> Create Waybill
       </Button>
     </div>
@@ -99,7 +99,7 @@ export function WaybillManager() {
 
       {/* Mobile Actions */}
       <div className="flex sm:hidden flex-wrap gap-2 px-1">
-        <Button className="flex-1 gap-2 bg-teal-600 hover:bg-teal-700 text-white shadow-sm" onClick={() => setShowCreateModal(true)}>
+        <Button className="flex-1 gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm" onClick={() => setShowCreateModal(true)}>
           <Plus className="h-4 w-4" /> Create Waybill
         </Button>
       </div>
@@ -108,7 +108,7 @@ export function WaybillManager() {
       <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
         <div className="border-b border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50 dark:bg-slate-800/30">
           <div className="flex items-center gap-2 ml-1">
-            <div className="h-8 w-8 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center text-teal-600">
+            <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
               <ListFilter className="h-4 w-4" />
             </div>
             <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
@@ -124,19 +124,19 @@ export function WaybillManager() {
               ].map(tab => (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
-                    activeTab === tab.id ? 'bg-white dark:bg-slate-700 text-teal-700 dark:text-teal-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    activeTab === tab.id ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   {tab.label}
                   <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-bold",
-                    activeTab === tab.id ? "bg-teal-100 dark:bg-teal-900/30 text-teal-700" : "bg-slate-100 dark:bg-slate-700 text-slate-500"
+                    activeTab === tab.id ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700" : "bg-slate-100 dark:bg-slate-700 text-slate-500"
                   )}>{tab.count}</span>
                 </button>
               ))}
             </div>
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <Input placeholder="Search by ID, driver, or vehicle..." className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-9 text-sm focus-visible:ring-teal-500/50 rounded-lg shadow-sm"
+              <Input placeholder="Search by ID, driver, or vehicle..." className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-9 text-sm focus-visible:ring-blue-500/50 rounded-lg shadow-sm"
                 value={currentSearch} onChange={e => setCurrentSearch(e.target.value)} />
             </div>
           </div>
@@ -145,7 +145,7 @@ export function WaybillManager() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-teal-700 border-b border-teal-800 text-teal-50 uppercase text-[11px] tracking-wider font-bold">
+              <tr className="bg-blue-700 border-b border-blue-800 text-blue-50 uppercase text-[11px] tracking-wider font-bold">
                 <th className="px-5 py-4 whitespace-nowrap">{activeTab === 'waybill' ? 'Waybill' : 'Return'} ID</th>
                 <th className="px-5 py-4 whitespace-nowrap">Driver & Vehicle</th>
                 <th className="px-5 py-4 whitespace-nowrap">{activeTab === 'waybill' ? 'Destination' : 'Source Site'}</th>
@@ -180,7 +180,7 @@ export function WaybillManager() {
                     <td className="px-5 py-4">
                       <div className="flex flex-col">
                         <span className="font-semibold text-slate-700 dark:text-slate-200 text-xs">{wb.siteName}</span>
-                        <span className="text-xs text-slate-400">{activeTab === 'waybill' ? 'from Warehouse' : 'Return to Warehouse'}</span>
+                        <span className="text-xs text-slate-400">from Warehouse</span>
                       </div>
                     </td>
                     <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">
@@ -192,13 +192,13 @@ export function WaybillManager() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20"
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                           onClick={() => setViewingWaybill(wb)}>
                           <Eye className="h-4 w-4" />
                         </Button>
                         {activeTab === 'waybill' && (
                           <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20"
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                               onClick={() => setEditingWaybill(wb)}>
                               <Edit2 className="h-4 w-4" />
                             </Button>

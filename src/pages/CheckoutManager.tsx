@@ -49,14 +49,14 @@ export function CheckoutManager() {
                   <div className={cn(
                     "flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold border transition-all",
                     activeStep >= i 
-                      ? "bg-teal-600 border-teal-600 text-white" 
+                      ? "bg-blue-600 border-blue-600 text-white" 
                       : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400"
                   )}>
                     {i + 1}
                   </div>
                   <span className={cn(
                     "text-xs font-semibold",
-                    activeStep >= i ? "text-teal-600" : "text-slate-400"
+                    activeStep >= i ? "text-blue-600" : "text-slate-400"
                   )}>{label}</span>
                   {i < 2 && <ChevronRight className="h-3 w-3 text-slate-300 dark:text-slate-700 mx-1" />}
                 </div>
@@ -72,7 +72,7 @@ export function CheckoutManager() {
                       <Input 
                         value={selectedAssetId}
                         onChange={(e) => setSelectedAssetId(e.target.value)}
-                        className="w-full h-11 pl-10 pr-4 rounded-lg text-sm font-medium placeholder:text-slate-400 focus-visible:ring-teal-500/50 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                        className="w-full h-11 pl-10 pr-4 rounded-lg text-sm font-medium placeholder:text-slate-400 focus-visible:ring-blue-500/50 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
                         placeholder="Type asset name or scan ID..."
                       />
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -87,11 +87,11 @@ export function CheckoutManager() {
                         className={cn(
                           "p-3 rounded-lg border text-left transition-all active:scale-95 group relative overflow-hidden",
                           selectedAssetId === a.id 
-                            ? "bg-teal-600 border-teal-600 text-white shadow-md" 
-                            : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 hover:border-teal-300"
+                            ? "bg-blue-600 border-blue-600 text-white shadow-md" 
+                            : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 hover:border-blue-300"
                         )}
                       >
-                        <Package className={cn("h-4 w-4 mb-2", selectedAssetId === a.id ? "text-white" : "text-teal-500")} />
+                        <Package className={cn("h-4 w-4 mb-2", selectedAssetId === a.id ? "text-white" : "text-blue-500")} />
                         <p className="text-[11px] font-semibold text-current opacity-60 capitalize mb-0.5">{a.category}</p>
                         <p className="font-semibold text-xs truncate leading-tight">{a.name}</p>
                         {selectedAssetId === a.id && (
@@ -104,17 +104,17 @@ export function CheckoutManager() {
                   </div>
 
                   {selectedAsset && (
-                    <div className="p-4 rounded-lg bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-800 flex items-center justify-between animate-in zoom-in-95 duration-300">
+                    <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 flex items-center justify-between animate-in zoom-in-95 duration-300">
                       <div className="flex items-center gap-3">
-                        <ShieldCheck className="h-5 w-5 text-teal-600" />
+                        <ShieldCheck className="h-5 w-5 text-blue-600" />
                         <div>
-                          <p className="text-xs font-bold text-teal-800 dark:text-teal-300">{selectedAsset.name}</p>
-                          <p className="text-xs text-teal-600/70 font-medium mt-0.5">{selectedAsset.availableQuantity} in Stock</p>
+                          <p className="text-xs font-bold text-blue-800 dark:text-blue-300">{selectedAsset.name}</p>
+                          <p className="text-xs text-blue-600/70 font-medium mt-0.5">{selectedAsset.availableQuantity} in Stock</p>
                         </div>
                       </div>
                       <div className="flex bg-white dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700 shadow-sm items-center">
                         <button onClick={() => setQuantity(Math.max(1, quantity-1))} className="w-7 h-7 flex items-center justify-center font-semibold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 rounded transition-all">-</button>
-                        <span className="w-8 h-7 flex items-center justify-center font-bold text-teal-600 text-sm">{quantity}</span>
+                        <span className="w-8 h-7 flex items-center justify-center font-bold text-blue-600 text-sm">{quantity}</span>
                         <button onClick={() => setQuantity(quantity+1)} className="w-7 h-7 flex items-center justify-center font-semibold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 rounded transition-all">+</button>
                       </div>
                     </div>
@@ -130,7 +130,7 @@ export function CheckoutManager() {
                       <Input 
                         value={employeeName}
                         onChange={(e) => setEmployeeName(e.target.value)}
-                        className="w-full h-11 pl-10 pr-4 rounded-lg text-sm font-medium placeholder:text-slate-400 focus-visible:ring-teal-500/50 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                        className="w-full h-11 pl-10 pr-4 rounded-lg text-sm font-medium placeholder:text-slate-400 focus-visible:ring-blue-500/50 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
                         placeholder="Enter full name or employee ID..."
                       />
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -160,7 +160,7 @@ export function CheckoutManager() {
                   }
                 }}
                 disabled={!selectedAssetId || (activeStep === 1 && !employeeName)}
-                className="bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm transition-all shadow-sm px-8 h-10"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-sm px-8 h-10"
               >
                 {activeStep < 2 ? 'Next Step' : 'Confirm Issue'}
               </Button>
@@ -174,7 +174,7 @@ export function CheckoutManager() {
             <CardContent className="p-5 sm:p-6">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-700 dark:text-white">
-                  <Clock className="h-4 w-4 text-teal-500" />
+                  <Clock className="h-4 w-4 text-blue-500" />
                   Recent Issuances
                 </h3>
                 <div className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -202,16 +202,16 @@ export function CheckoutManager() {
           </Card>
 
           {/* Quick Stats Card */}
-          <Card className="border-none shadow-sm bg-gradient-to-br from-teal-600 to-teal-800 text-white overflow-hidden relative group">
+          <Card className="border-none shadow-sm bg-gradient-to-br from-blue-600 to-blue-800 text-white overflow-hidden relative group">
             <div className="absolute -top-10 -right-10 h-32 w-32 bg-white/10 rounded-full group-hover:scale-150 transition-transform duration-700" />
             <CardContent className="p-5 sm:p-6 relative z-10 space-y-4">
               <div className="flex items-center justify-between">
-                <ArrowRightLeft className="h-6 w-6 text-teal-200" />
+                <ArrowRightLeft className="h-6 w-6 text-blue-200" />
                 <Badge className="bg-white/20 text-white border-0 text-[11px] font-semibold px-2 py-0.5">LIVE</Badge>
               </div>
               <div>
                 <h4 className="text-3xl font-bold">24</h4>
-                <p className="text-xs text-teal-200 mt-1">Items Issued Today</p>
+                <p className="text-xs text-blue-200 mt-1">Items Issued Today</p>
               </div>
               <div className="pt-3 border-t border-white/10 flex items-center justify-between">
                 <span className="text-xs text-white/70">Efficiency</span>

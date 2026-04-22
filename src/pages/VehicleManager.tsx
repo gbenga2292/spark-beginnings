@@ -85,7 +85,7 @@ export function VehicleManager() {
       )}
       {activeTab === 'fleet' && (
         <Button 
-          size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9"
+          size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9"
           onClick={() => {
             setEditingVehicle(null);
             setVForm({ name: '', registration_number: '', type: 'van', status: 'active' });
@@ -214,7 +214,7 @@ export function VehicleManager() {
               </div>
               <div className="space-y-2">
                 <Label>Vehicle Type</Label>
-                <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus:outline-none focus:ring-2 focus:ring-teal-500/50 dark:border-slate-800 dark:bg-slate-950 dark:ring-offset-slate-950"
+                <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:border-slate-800 dark:bg-slate-950 dark:ring-offset-slate-950"
                   value={vForm.type} onChange={e => setVForm({...vForm, type: e.target.value})}>
                   <option value="van">Van</option>
                   <option value="truck">Truck</option>
@@ -224,7 +224,7 @@ export function VehicleManager() {
                 </select>
               </div>
               <div className="flex gap-3 pt-2">
-                <Button className="flex-1 bg-teal-600 hover:bg-teal-700" onClick={handleSaveVehicle}>Save Vehicle</Button>
+                <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={handleSaveVehicle}>Save Vehicle</Button>
                 <Button variant="outline" className="flex-1" onClick={() => setShowVehicleForm(false)}>Cancel</Button>
               </div>
             </CardContent>
@@ -239,7 +239,7 @@ export function VehicleManager() {
             <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b sticky top-0 z-10">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center text-teal-600">
+                  <div className="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
                     <ClipboardList className="h-5 w-5" />
                   </div>
                   <div>
@@ -279,11 +279,11 @@ export function VehicleManager() {
               {/* Trip Legs */}
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-teal-600 flex items-center gap-2">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-blue-600 flex items-center gap-2">
                     <MapPin className="h-4 w-4" /> {editingTrip ? 'Trip Details' : 'Trip Leg(s) / Site Visits'}
                   </h3>
                   {!editingTrip && (
-                    <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 hover:bg-teal-50 h-8 gap-1"
+                    <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 gap-1"
                       onClick={() => setTForm({...tForm, legs: [...tForm.legs, { site_name: '', purpose: '', departure_time: '', arrival_time: '', remark: '', odometer_start: undefined, odometer_end: undefined }]})}>
                       <PlusCircle className="h-4 w-4" /> Add Leg
                     </Button>
@@ -380,7 +380,7 @@ export function VehicleManager() {
               </div>
             </CardContent>
             <CardHeader className="bg-slate-50 dark:bg-slate-800 border-t flex flex-row gap-3 pt-4">
-              <Button className="flex-1 bg-teal-600 hover:bg-teal-700" onClick={handleSaveTrip}>{editingTrip ? 'Update Entry' : 'Submit Entry'}</Button>
+              <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={handleSaveTrip}>{editingTrip ? 'Update Entry' : 'Submit Entry'}</Button>
               <Button variant="outline" className="flex-1" onClick={() => { setShowTripForm(false); setEditingTrip(null); }}>Discard</Button>
             </CardHeader>
           </Card>
@@ -390,19 +390,19 @@ export function VehicleManager() {
       {/* Tabs */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-8 px-2 mx-1">
         <button 
-          className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'fleet' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+          className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'fleet' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
           onClick={() => setActiveTab('fleet')}
         >
           Vehicle Fleet
         </button>
         <button 
-          className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'logs' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+          className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'logs' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
           onClick={() => setActiveTab('logs')}
         >
           Movement Logs
         </button>
         <button 
-          className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'documents' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+          className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'documents' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
           onClick={() => setActiveTab('documents')}
         >
           Vehicle Documents
@@ -413,9 +413,9 @@ export function VehicleManager() {
         <div className="space-y-6">
           {/* Stats Bar */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 px-1">
-            <Card className="border-none shadow-sm bg-teal-50 dark:bg-teal-900/10">
+            <Card className="border-none shadow-sm bg-blue-50 dark:bg-blue-900/10">
               <CardContent className="p-4 flex items-center gap-4">
-                <div className="h-10 w-10 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center text-teal-600">
+                <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
                   <Truck className="h-5 w-5" />
                 </div>
                 <div>
@@ -429,7 +429,7 @@ export function VehicleManager() {
           <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
             <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row gap-4 justify-between items-center border-b dark:border-slate-800">
               <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
-                <Truck className="h-4 w-4 text-teal-500" /> Fleet Overview
+                <Truck className="h-4 w-4 text-blue-500" /> Fleet Overview
               </h3>
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -464,7 +464,7 @@ export function VehicleManager() {
                             <span className="font-bold text-slate-700 dark:text-slate-200">{v.name}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 font-mono text-xs font-bold text-teal-600 dark:text-teal-400">{v.registration_number}</td>
+                        <td className="px-6 py-4 font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{v.registration_number}</td>
                         <td className="px-6 py-4">
                           <Badge variant="outline" className="capitalize text-[10px] bg-slate-50 dark:bg-slate-800">{v.type}</Badge>
                         </td>
@@ -536,7 +536,7 @@ export function VehicleManager() {
                     <Input type="date" value={docUpdateForm.date} onChange={e => setDocUpdateForm({...docUpdateForm, date: e.target.value})} />
                   </div>
                   <div className="flex gap-3 pt-2">
-                    <Button className="flex-1 bg-teal-600" onClick={() => {
+                    <Button className="flex-1 bg-blue-600" onClick={() => {
                       if (docUpdateForm.type && docUpdateForm.date) {
                         updateVehicleDocument(editingDocVehicle.id, docUpdateForm.type, docUpdateForm.date);
                         setShowDocUpdateForm(false);
@@ -552,7 +552,7 @@ export function VehicleManager() {
           <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
             <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 border-b dark:border-slate-800 flex justify-between items-center">
                <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-teal-500" /> Vehicle Document Tracking
+                <ClipboardList className="h-4 w-4 text-blue-500" /> Vehicle Document Tracking
               </h3>
             </div>
             <div className="overflow-x-auto">
@@ -573,7 +573,7 @@ export function VehicleManager() {
                       <td className="px-6 py-4 whitespace-nowrap sticky left-0 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800/50 z-10 border-r dark:border-slate-800">
                         <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{v.name}</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap font-mono text-xs font-bold text-teal-600">{v.registration_number}</td>
+                      <td className="px-6 py-4 whitespace-nowrap font-mono text-xs font-bold text-blue-600">{v.registration_number}</td>
                       {vehicleDocumentTypes.map(type => {
                         const date = v.documents?.[type.name];
                         const dateValue = date ? new Date(date) : null;
@@ -605,7 +605,7 @@ export function VehicleManager() {
                         );
                       })}
                       <td className="px-6 py-4 text-right">
-                        <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase font-bold text-teal-600" 
+                        <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase font-bold text-blue-600" 
                           onClick={() => {
                             setEditingDocVehicle(v);
                             setDocUpdateForm({ type: '', date: '' });
@@ -625,7 +625,7 @@ export function VehicleManager() {
         <div className="space-y-6">
           <div className="flex items-center justify-between px-1">
              <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
-              <History className="h-4 w-4 text-teal-500" /> {viewMode === 'list' ? 'Recent Movements' : 'Monthly Movement Calendar'}
+              <History className="h-4 w-4 text-blue-500" /> {viewMode === 'list' ? 'Recent Movements' : 'Monthly Movement Calendar'}
             </h3>
             <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
               <Button 
@@ -675,7 +675,7 @@ export function VehicleManager() {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex flex-col">
-                              <span className="font-bold text-teal-600 dark:text-teal-400 text-xs flex items-center gap-1">
+                              <span className="font-bold text-blue-600 dark:text-blue-400 text-xs flex items-center gap-1">
                                 <MapPin className="h-3 w-3" /> {trip.site_name}
                               </span>
                               <span className="text-[10px] text-slate-500 italic">{trip.purpose}</span>
@@ -693,7 +693,7 @@ export function VehicleManager() {
                               <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Start:</span> {trip.odometer_start || '—'}</div>
                               <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">End:</span> {trip.odometer_end || '—'}</div>
                               {trip.odometer_start && trip.odometer_end && (
-                                <div className="text-[8px] text-teal-500 mt-0.5">Total: {trip.odometer_end - trip.odometer_start} km</div>
+                                <div className="text-[8px] text-blue-500 mt-0.5">Total: {trip.odometer_end - trip.odometer_start} km</div>
                               )}
                             </div>
                           </td>
@@ -736,7 +736,7 @@ export function VehicleManager() {
                 </div>
                 <div className="flex gap-4">
                    <div className="flex items-center gap-2">
-                     <div className="h-2 w-2 rounded-full bg-teal-500"></div>
+                     <div className="h-2 w-2 rounded-full bg-blue-500"></div>
                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Site Visit</span>
                    </div>
                 </div>
@@ -760,11 +760,11 @@ export function VehicleManager() {
                     <div key={idx} className={cn(
                       "border-r border-b dark:border-slate-800 p-2 relative group",
                       !isCurrentMonth && "bg-slate-50/50 dark:bg-slate-900/50",
-                      isToday && "bg-teal-50/30 dark:bg-teal-900/10"
+                      isToday && "bg-blue-50/30 dark:bg-blue-900/10"
                     )}>
                       <span className={cn(
                         "text-[10px] font-bold",
-                        isToday ? "text-teal-600" : isCurrentMonth ? "text-slate-500" : "text-slate-300"
+                        isToday ? "text-blue-600" : isCurrentMonth ? "text-slate-500" : "text-slate-300"
                       )}>
                         {format(day, 'd')}
                       </span>
@@ -773,11 +773,11 @@ export function VehicleManager() {
                         {dayTrips.map(trip => (
                           <div 
                             key={trip.id} 
-                            className="bg-teal-50 dark:bg-teal-900/20 border-l-2 border-teal-500 p-1 rounded-sm cursor-pointer hover:bg-teal-100 transition-colors group/item"
+                            className="bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-500 p-1 rounded-sm cursor-pointer hover:bg-blue-100 transition-colors group/item"
                             onClick={() => handleEditTrip(trip)}
                           >
                             <div className="flex justify-between items-start gap-1">
-                              <span className="text-[8px] font-bold text-teal-700 dark:text-teal-400 truncate leading-tight uppercase" title={trip.site_name}>
+                              <span className="text-[8px] font-bold text-blue-700 dark:text-blue-400 truncate leading-tight uppercase" title={trip.site_name}>
                                 {trip.site_name}
                               </span>
                               <span className="text-[7px] text-slate-400 font-mono shrink-0">

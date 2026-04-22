@@ -73,7 +73,7 @@ export function SiteManager() {
       {/* Filter Bar */}
       <div className="bg-card rounded-xl shadow-sm border border-border p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-center mb-6">
         <div className="flex items-center gap-2">
-          <div className="h-10 w-10 bg-teal-50 dark:bg-teal-950/50 rounded-lg flex items-center justify-center text-teal-600 dark:text-teal-400">
+          <div className="h-10 w-10 bg-blue-50 dark:bg-blue-950/50 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400">
             <ListFilter className="h-5 w-5" />
           </div>
           <span className="font-semibold text-foreground text-base">Sites ({totalCount})</span>
@@ -98,7 +98,7 @@ export function SiteManager() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Search site name or client..." 
-              className="pl-9 bg-background border-border h-10 text-sm focus-visible:ring-teal-500/50 rounded-xl shadow-sm font-medium"
+              className="pl-9 bg-background border-border h-10 text-sm focus-visible:ring-blue-500/50 rounded-xl shadow-sm font-medium"
               value={searchTerm} 
               onChange={(e) => setSearchTerm(e.target.value)} 
             />
@@ -117,8 +117,8 @@ export function SiteManager() {
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex gap-3 items-center">
-                    <div className="h-10 w-10 rounded-lg bg-teal-50 dark:bg-teal-950/50 flex items-center justify-center shrink-0">
-                      <MapPin className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+                    <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center shrink-0">
+                      <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div className="overflow-hidden">
                       <h3 className="text-base font-bold text-foreground uppercase truncate leading-tight" title={site.name}>{site.name}</h3>
@@ -127,7 +127,7 @@ export function SiteManager() {
                       </div>
                     </div>
                   </div>
-                  <Badge variant="outline" className={cn("text-[10px] uppercase font-bold shrink-0 ml-2 px-2.5 py-0.5 rounded-full border", site.status === 'Ended' ? 'text-muted-foreground border-border' : site.status === 'Active' ? 'text-teal-600 dark:text-teal-400 border-teal-200 dark:border-teal-900/50 bg-teal-50/50 dark:bg-teal-950/20' : 'text-orange-500 dark:text-orange-400 border-orange-200 dark:border-orange-900/50 bg-orange-50/50 dark:bg-orange-950/20')}>
+                  <Badge variant="outline" className={cn("text-[10px] uppercase font-bold shrink-0 ml-2 px-2.5 py-0.5 rounded-full border", site.status === 'Ended' ? 'text-muted-foreground border-border' : site.status === 'Active' ? 'text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20' : 'text-orange-500 dark:text-orange-400 border-orange-200 dark:border-orange-900/50 bg-orange-50/50 dark:bg-orange-950/20')}>
                     {site.status}
                   </Badge>
                 </div>
@@ -148,7 +148,7 @@ export function SiteManager() {
                     </div>
                   </div>
                   <div className="flex justify-end">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-all"
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
                       onClick={(e) => { e.stopPropagation(); setInventorySite({ site, q: q || null }); }}>
                       <Eye className="h-4 w-4" />
                     </Button>

@@ -190,7 +190,7 @@ export function QuickCheckout() {
         <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
           <CardHeader className="p-5 sm:p-6 pb-2">
             <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-800 dark:text-white">
-              <ShoppingCart className="h-5 w-5 text-teal-600" />
+              <ShoppingCart className="h-5 w-5 text-blue-600" />
               Direct Checkout
             </CardTitle>
             <CardDescription className="text-xs">Assign assets to employees instantly</CardDescription>
@@ -201,7 +201,7 @@ export function QuickCheckout() {
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Select Asset *</label>
                 <select 
                   value={selectedAsset} onChange={(e) => setSelectedAsset(e.target.value)}
-                  className="w-full h-11 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-teal-500/20 font-medium text-slate-600 dark:text-slate-300 px-3 outline-none text-sm"
+                  className="w-full h-11 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500/20 font-medium text-slate-600 dark:text-slate-300 px-3 outline-none text-sm"
                 >
                   <option value="" disabled>Choose asset to checkout</option>
                   {assets.map(a => (
@@ -214,12 +214,12 @@ export function QuickCheckout() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Quantity *</label>
                   <Input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))}
-                    className="h-11 rounded-md bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-teal-500/20 font-semibold text-center text-sm" />
+                    className="h-11 rounded-md bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-blue-500/20 font-semibold text-center text-sm" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Duration (days)</label>
                   <Input type="number" value={returnDays} onChange={(e) => setReturnDays(Number(e.target.value))}
-                    className="h-11 rounded-md bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-teal-500/20 font-semibold text-center text-sm" />
+                    className="h-11 rounded-md bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-blue-500/20 font-semibold text-center text-sm" />
                 </div>
               </div>
 
@@ -227,7 +227,7 @@ export function QuickCheckout() {
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">Assign To *</label>
                 <select 
                   value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)}
-                  className="w-full h-11 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-teal-500/20 font-medium text-slate-600 dark:text-slate-300 px-3 outline-none text-sm"
+                  className="w-full h-11 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500/20 font-medium text-slate-600 dark:text-slate-300 px-3 outline-none text-sm"
                 >
                   <option value="" disabled>Select site personnel</option>
                   {opsStaff.map(emp => (
@@ -240,7 +240,7 @@ export function QuickCheckout() {
             <Button 
               onClick={handleCheckout}
               disabled={!selectedAsset || !selectedEmployee}
-              className="w-full h-11 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm gap-2 shadow-sm disabled:opacity-50 mt-2"
+              className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm gap-2 shadow-sm disabled:opacity-50 mt-2"
             >
               <ShoppingCart className="h-4 w-4" />
               Confirm Checkout
@@ -276,7 +276,7 @@ export function QuickCheckout() {
                       <h4 className="font-semibold text-slate-800 dark:text-white text-sm">{c.assetName}</h4>
                       <p className="text-xs text-slate-400 mt-1">
                         {c.employeeName} • {formatDisplayDate(c.checkoutDate)}
-                        {c.returnedQuantity > 0 && <span className="text-teal-500 ml-2">Returned: {c.returnedQuantity}</span>}
+                        {c.returnedQuantity > 0 && <span className="text-blue-500 ml-2">Returned: {c.returnedQuantity}</span>}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1">

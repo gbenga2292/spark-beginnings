@@ -162,7 +162,7 @@ function AssetActionsMenu({
       <DropdownMenuContent align="end" className="w-44 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl p-1">
         <DropdownMenuItem
           onClick={() => onAction('edit')}
-          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold cursor-pointer text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold cursor-pointer text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-400 transition-colors"
         >
           <Edit2 className="h-3.5 w-3.5" />
           Edit Form
@@ -225,7 +225,7 @@ export function AssetManager() {
       <Button variant="outline" size="sm" className="gap-2 h-9" onClick={() => setShowRestockModal(true)}>
         <Package className="h-4 w-4" /> Restock
       </Button>
-      <Button size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9" onClick={() => setShowAddForm(true)}>
+      <Button size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9" onClick={() => setShowAddForm(true)}>
         <Plus className="h-4 w-4" /> Add Asset
       </Button>
     </div>
@@ -295,7 +295,7 @@ export function AssetManager() {
 
       {/* Mobile Actions */}
       <div className="flex sm:hidden flex-wrap gap-2 px-1">
-        <Button className="flex-1 gap-2 bg-teal-600 hover:bg-teal-700 text-white shadow-sm" onClick={() => setShowAddForm(true)}>
+        <Button className="flex-1 gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm" onClick={() => setShowAddForm(true)}>
           <Plus className="h-4 w-4" /> Add Asset
         </Button>
       </div>
@@ -305,7 +305,7 @@ export function AssetManager() {
         {/* Toolbar */}
         <div className="border-b border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50 dark:bg-slate-800/30">
           <div className="flex items-center gap-2 ml-1">
-            <div className="h-8 w-8 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center text-teal-600">
+            <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
               <ListFilter className="h-4 w-4" />
             </div>
             <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
@@ -318,7 +318,7 @@ export function AssetManager() {
                 <button key={tab} onClick={() => setFilter(tab)}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all capitalize ${
                     filter === tab
-                      ? 'bg-white dark:bg-slate-700 text-teal-700 dark:text-teal-400 shadow-sm'
+                      ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-400 shadow-sm'
                       : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
@@ -330,7 +330,7 @@ export function AssetManager() {
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input
                 placeholder="Search assets..."
-                className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-9 text-sm focus-visible:ring-teal-500/50 rounded-lg shadow-sm"
+                className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-9 text-sm focus-visible:ring-blue-500/50 rounded-lg shadow-sm"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
@@ -342,7 +342,7 @@ export function AssetManager() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-teal-700 border-b border-teal-800 text-teal-50 uppercase text-[11px] tracking-wider font-bold">
+              <tr className="bg-blue-700 border-b border-blue-800 text-blue-50 uppercase text-[11px] tracking-wider font-bold">
                 <th className="px-5 py-4 whitespace-nowrap">Asset Name</th>
                 <th className="px-5 py-4 whitespace-nowrap text-center">Total Stock</th>
                 <th className="px-5 py-4 whitespace-nowrap text-center">Reserved</th>
@@ -374,7 +374,7 @@ export function AssetManager() {
 
                     {/* Total Stock */}
                     <td className="px-5 py-4 text-center">
-                      <span className="font-bold text-teal-600 dark:text-teal-400 text-sm">{asset.quantity} {asset.unitOfMeasurement}</span>
+                      <span className="font-bold text-blue-600 dark:text-blue-400 text-sm">{asset.quantity} {asset.unitOfMeasurement}</span>
                     </td>
 
                     {/* Reserved */}
@@ -389,7 +389,7 @@ export function AssetManager() {
                         {[
                           { label: 'Missing:', val: asset.missingQuantity || 0, cls: (v: number) => v > 0 ? 'text-red-500'   : 'text-slate-400' },
                           { label: 'Damaged:', val: asset.damagedQuantity || 0, cls: (v: number) => v > 0 ? 'text-amber-500' : 'text-slate-400' },
-                          { label: 'Used:',    val: asset.usedQuantity    || 0, cls: (v: number) => v > 0 ? 'text-teal-500'  : 'text-slate-400' },
+                          { label: 'Used:',    val: asset.usedQuantity    || 0, cls: (v: number) => v > 0 ? 'text-blue-500'  : 'text-slate-400' },
                         ].map(row => (
                           <div key={row.label} className="flex items-center justify-between gap-4">
                             <span className="text-slate-400 font-semibold">{row.label}</span>
@@ -402,7 +402,7 @@ export function AssetManager() {
                     {/* Category | Type */}
                     <td className="px-5 py-4">
                       <div className="flex flex-col gap-1">
-                        <span className="inline-block px-2 py-1 text-[11px] font-semibold bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800 rounded-full capitalize w-fit">{asset.category}</span>
+                        <span className="inline-block px-2 py-1 text-[11px] font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-full capitalize w-fit">{asset.category}</span>
                         <span className="inline-block px-2 py-1 text-[11px] font-semibold bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-full capitalize w-fit">{asset.type}</span>
                       </div>
                     </td>

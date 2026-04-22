@@ -154,7 +154,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
     <div className="max-w-5xl mx-auto w-full pb-10 flex flex-col gap-6 animate-in fade-in duration-300">
       <button
         onClick={onClose}
-        className="flex items-center gap-2 text-sm text-slate-500 hover:text-teal-700 dark:hover:text-teal-400 font-semibold transition-colors w-fit"
+        className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-700 dark:hover:text-blue-400 font-semibold transition-colors w-fit"
       >
         <ArrowLeft className="h-4 w-4" /> Back to Waybills
       </button>
@@ -293,7 +293,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                   <button
                     type="button"
                     onClick={addItem}
-                    className="flex items-center gap-1.5 text-xs font-bold bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 px-3 py-1.5 rounded-lg transition-all hover:bg-teal-200 dark:hover:bg-teal-900/50"
+                    className="flex items-center gap-1.5 text-xs font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-3 py-1.5 rounded-lg transition-all hover:bg-blue-200 dark:hover:bg-blue-900/50"
                   >
                     <Plus className="h-3.5 w-3.5" /> Add Item
                   </button>
@@ -310,7 +310,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                     onChange={e => setBulkText(e.target.value)}
                     rows={4}
                     placeholder={`DEWATERING PUMP`}
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/30 resize-none"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
                   />
                   <div className="flex gap-2">
                     <Button 
@@ -358,7 +358,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                                   <select
                                     value={item.matchedAssetId || ''}
                                     onChange={e => setParsedItems(parsedItems.map(p => p.id === item.id ? { ...p, matchedAssetId: e.target.value, isRematching: false } : p))}
-                                    className="w-full h-9 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/30 appearance-none"
+                                    className="w-full h-9 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none"
                                   >
                                     <option value="">Select correct asset...</option>
                                     {assets.map(a => <option key={a.id} value={a.id}>{a.name} ({a.availableQuantity})</option>)}
@@ -433,7 +433,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                             <select
                               value={item.assetId}
                               onChange={(e) => updateItemAsset(item.rowId, e.target.value)}
-                              className="w-full h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 text-sm font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/30 appearance-none"
+                              className="w-full h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 text-sm font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30 appearance-none"
                             >
                               <option value="">Select asset</option>
                               {assets.map(a => (
@@ -451,7 +451,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                             min="1"
                             value={item.quantity}
                             onChange={(e) => updateItemQuantity(item.rowId, parseInt(e.target.value) || 1)}
-                            className="h-10 rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-sm font-medium focus-visible:ring-teal-500/30"
+                            className="h-10 rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-sm font-medium focus-visible:ring-blue-500/30"
                           />
                         </div>
 
@@ -478,7 +478,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
           <Button
             onClick={handleSubmit}
             disabled={items.length === 0 || !siteName || !driverName}
-            className="h-11 px-8 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-widest gap-2 shadow-sm disabled:opacity-50"
+            className="h-11 px-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-widest gap-2 shadow-sm disabled:opacity-50"
           >
             <CheckCircle2 className="h-4 w-4" /> Create Waybill
           </Button>

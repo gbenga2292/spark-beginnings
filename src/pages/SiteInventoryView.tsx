@@ -404,7 +404,7 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
                             className={cn(
                               "text-[10px] font-semibold px-2 py-0",
                               wb.status === 'outstanding' ? "bg-amber-50 text-amber-700 border-amber-200" :
-                              wb.status === 'sent_to_site' ? "bg-teal-50 text-teal-700 border-teal-200" :
+                              wb.status === 'sent_to_site' ? "bg-blue-50 text-blue-700 border-blue-200" :
                               "bg-emerald-50 text-emerald-700 border-emerald-200"
                             )}
                           >

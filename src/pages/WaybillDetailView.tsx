@@ -145,14 +145,14 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
       <Button
         variant="outline"
         size="sm"
-        className="h-9 gap-2 text-teal-700 border-teal-200 bg-teal-50 hover:bg-teal-100 font-semibold text-xs"
+        className="h-9 gap-2 text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100 font-semibold text-xs"
         onClick={handleShare}
       >
         <Share2 className="h-4 w-4" /> Share
       </Button>
       <Button
         size="sm"
-        className="h-9 gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs shadow-sm"
+        className="h-9 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm"
         onClick={handleDownload}
       >
         <Download className="h-4 w-4" /> Download
@@ -169,7 +169,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
       {waybill.type === 'return' && waybill.status === 'outstanding' && (
         <Button
           size="sm"
-          className="h-9 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm"
+          className="h-9 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm"
           onClick={handleOpenReturnDialog}
         >
           <CheckCircle2 className="h-4 w-4" /> Complete Return
@@ -186,7 +186,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
         {/* ── Back button ──────────────────────────────────────────────────────── */}
         <button
           onClick={onClose}
-          className="flex items-center gap-2 text-sm text-slate-500 hover:text-teal-700 dark:hover:text-teal-400 font-semibold transition-colors w-fit"
+          className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-700 dark:hover:text-blue-400 font-semibold transition-colors w-fit"
         >
           <ArrowLeft className="h-4 w-4" /> Back to Waybills
         </button>
@@ -202,13 +202,13 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
           </Button>
           <Button
             variant="outline"
-            className="flex-1 gap-2 text-teal-700 border-teal-200 bg-teal-50 font-semibold text-xs"
+            className="flex-1 gap-2 text-blue-700 border-blue-200 bg-blue-50 font-semibold text-xs"
             onClick={handleShare}
           >
             <Share2 className="h-4 w-4" /> Share
           </Button>
           <Button
-            className="w-full gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs"
+            className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs"
             onClick={handleDownload}
           >
             <Download className="h-4 w-4" /> Download PDF
@@ -223,7 +223,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
           )}
           {waybill.type === 'return' && waybill.status === 'outstanding' && (
             <Button
-              className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs mt-2"
+              className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs mt-2"
               onClick={handleOpenReturnDialog}
             >
               <CheckCircle2 className="h-4 w-4" /> Complete Return
@@ -235,7 +235,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
         <div className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
           {/* Card header */}
           <div className="border-b border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex items-center gap-2 bg-slate-50/50 dark:bg-slate-800/30">
-            <div className="h-8 w-8 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center text-teal-600">
+            <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
               <MapPin className="h-4 w-4" />
             </div>
             <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
@@ -267,7 +267,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
         <div className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
           {/* Card header */}
           <div className="border-b border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex items-center gap-2 bg-slate-50/50 dark:bg-slate-800/30">
-            <div className="h-8 w-8 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center text-teal-600">
+            <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
               <Package className="h-4 w-4" />
             </div>
             <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
@@ -279,7 +279,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-teal-700 border-b border-teal-800 text-teal-50 uppercase text-[11px] tracking-wider font-bold">
+                <tr className="bg-blue-700 border-b border-blue-800 text-blue-50 uppercase text-[11px] tracking-wider font-bold">
                   <th className="px-5 py-4 whitespace-nowrap">#</th>
                   <th className="px-5 py-4 whitespace-nowrap">Asset Name</th>
                   <th className="px-5 py-4 whitespace-nowrap">Qty Expected</th>
@@ -337,7 +337,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
             {/* Modal header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center text-teal-600">
+                <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
                   <FileText className="h-4 w-4" />
                 </div>
                 <div>
@@ -348,7 +348,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
-                  className="h-8 gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs"
+                  className="h-8 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs"
                   onClick={handleDownload}
                 >
                   <Download className="h-3.5 w-3.5" /> Download
@@ -409,7 +409,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
                     <div key={item.assetId} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{item.assetName}</span>
-                        <span className="text-xs font-bold text-teal-600 dark:text-teal-400">Total: {item.quantity}</span>
+                        <span className="text-xs font-bold text-blue-600 dark:text-blue-400">Total: {item.quantity}</span>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         <div className="space-y-1">
@@ -464,7 +464,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
                 </Button>
                 <Button 
                   onClick={waybill.type === 'waybill' ? handleMarkAsSent : handleMarkReturnCompleted} 
-                  className={waybill.type === 'waybill' ? "bg-blue-600 hover:bg-blue-700 text-white rounded-xl" : "bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl"}
+                  className={waybill.type === 'waybill' ? "bg-blue-600 hover:bg-blue-700 text-white rounded-xl" : "bg-blue-600 hover:bg-blue-700 text-white rounded-xl"}
                 >
                   {waybill.type === 'waybill' ? 'Confirm Delivery' : 'Confirm Return'}
                 </Button>

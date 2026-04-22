@@ -20,8 +20,8 @@ export function Dashboard() {
   );
 
   const cards = [
-    { title: 'Total Assets', value: stats.totalAssets, icon: Package, color: 'text-teal-600', bg: 'bg-teal-100 dark:bg-teal-900/30' },
-    { title: 'Active Waybills', value: stats.activeWaybills, icon: Truck, color: 'text-teal-600', bg: 'bg-teal-100 dark:bg-teal-900/30' },
+    { title: 'Total Assets', value: stats.totalAssets, icon: Package, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
+    { title: 'Active Waybills', value: stats.activeWaybills, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
     { title: 'Pending Returns', value: waybills.filter(w => w.type === 'return' && w.status === 'outstanding').length, icon: ArrowRightLeft, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/30' },
     { title: 'Low Stock Alerts', value: assets.filter(a => a.availableQuantity < 5).length, icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-100 dark:bg-rose-900/30' },
   ];
@@ -63,7 +63,7 @@ export function Dashboard() {
         )}>
           <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
             <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-200">Recent Logistics Activity</h3>
-            <button className="text-xs text-teal-600 hover:text-teal-700 font-semibold">View All</button>
+            <button className="text-xs text-blue-600 hover:text-blue-700 font-semibold">View All</button>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {waybills.slice(0, 5).map((wb) => (
@@ -71,7 +71,7 @@ export function Dashboard() {
                 <div className="flex items-center gap-3">
                   <div className={cn(
                     "p-2 rounded-lg flex-shrink-0",
-                    wb.type === 'waybill' ? "bg-teal-100 dark:bg-teal-900/30 text-teal-600" : "bg-amber-100 dark:bg-amber-900/30 text-amber-600"
+                    wb.type === 'waybill' ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600" : "bg-amber-100 dark:bg-amber-900/30 text-amber-600"
                   )}>
                     {wb.type === 'waybill' ? <Truck className="h-4 w-4" /> : <ArrowRightLeft className="h-4 w-4" />}
                   </div>
@@ -86,7 +86,7 @@ export function Dashboard() {
                   <Badge variant="outline" className={cn(
                     "hidden sm:inline-flex text-[11px] font-semibold rounded-full px-2",
                     wb.status === 'sent_to_site'
-                      ? "bg-teal-50 dark:bg-teal-900/20 text-teal-700 border-teal-200"
+                      ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 border-blue-200"
                       : "bg-amber-50 dark:bg-amber-900/20 text-amber-700 border-amber-200"
                   )}>
                     {wb.status.replace(/_/g, ' ')}
@@ -116,7 +116,7 @@ export function Dashboard() {
                 </div>
                 <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-teal-500 rounded-full" 
+                    className="h-full bg-blue-500 rounded-full" 
                     style={{ width: `${((count as number) / Math.max(stats.totalAssets, 1)) * 100}%` }}
                   ></div>
                 </div>

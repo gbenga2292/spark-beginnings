@@ -11,7 +11,7 @@ export function MaintenanceDashboard() {
   const stats = getMaintenanceStats();
 
   const mainStats = [
-    { label: 'Total Equipment', value: stats.totalMachines + stats.totalVehicles, sub: `${stats.totalActive} active`, icon: BarChart3, color: 'text-teal-600' },
+    { label: 'Total Equipment', value: stats.totalMachines + stats.totalVehicles, sub: `${stats.totalActive} active`, icon: BarChart3, color: 'text-blue-600' },
     { label: 'Due Soon', value: stats.dueSoon, sub: 'Next 14 days', icon: Clock, color: 'text-amber-500' },
     { label: 'Overdue', value: stats.overdue, sub: 'Requires attention', icon: AlertCircle, color: 'text-rose-500' },
     { label: 'This Month', value: '₦0', sub: 'Maintenance cost', icon: Info, color: 'text-slate-800 dark:text-white' },
