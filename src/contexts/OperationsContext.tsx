@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import {
   Asset, Waybill, AssetCategory, AssetType, AssetStatus, WaybillStatus, WaybillType, 
   Checkout, MaintenanceAsset, MaintenanceSession, MaintenanceLogType, ServiceStatus,
-  Vehicle, VehicleTripLeg, VehicleDocumentType
+  Vehicle, VehicleTripLeg, VehicleDocumentType, DailyMachineLog
 } from '../types/operations';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useAppStore } from '../store/appStore';
@@ -14,6 +14,7 @@ interface OperationsContextType {
   checkouts: Checkout[];
   maintenanceAssets: MaintenanceAsset[];
   maintenanceSessions: MaintenanceSession[];
+  dailyMachineLogs: DailyMachineLog[];
   
   // Asset methods
   addAsset: (asset: Omit<Asset, 'id' | 'availableQuantity'>) => void;
@@ -54,6 +55,9 @@ interface OperationsContextType {
   addVehicleDocumentType: (name: string) => void;
   deleteVehicleDocumentType: (id: string) => void;
   updateVehicleDocument: (vehicleId: string, docTypeName: string, date: string) => void;
+  
+  // Daily Machine Logs
+  logDailyActivity: (log: Omit<DailyMachineLog, 'id' | 'created_at'>) => Promise<void>;
 }
 
 const OperationsContext = createContext<OperationsContextType | undefined>(undefined);
@@ -69,6 +73,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const [waybills, setWaybills] = useState<Waybill[]>(initialWaybills);
   const [checkouts, setCheckouts] = useState<Checkout[]>(initialCheckouts);
   const [maintenanceSessions, setMaintenanceSessions] = useState<MaintenanceSession[]>([]);
+  const [dailyMachineLogs, setDailyMachineLogs] = useState<DailyMachineLog[]>([]);
 
   const { 
     vehicles, 
@@ -152,11 +157,18 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [{ data: dbAssets }, { data: dbWaybills }, { data: dbCheckouts }, { data: dbMaintenance }] = await Promise.all([
+        const [
+          { data: dbAssets }, 
+          { data: dbWaybills }, 
+          { data: dbCheckouts }, 
+          { data: dbMaintenance },
+          { data: dbDailyLogs }
+        ] = await Promise.all([
           supabase.from('operations_assets').select('*'),
           supabase.from('operations_waybills').select('*'),
           supabase.from('operations_checkouts').select('*'),
-          supabase.from('operations_maintenance').select('*')
+          supabase.from('operations_maintenance').select('*'),
+          supabase.from('operations_daily_logs').select('*')
         ]);
 
         if (dbAssets) {
@@ -211,8 +223,28 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             quantity: c.quantity,
             status: c.status,
             checkoutDate: c.checkout_date,
-            returnInDays: c.return_in_days || 0,
+            expectedReturnDate: c.expected_return_date,
             returnedQuantity: c.returned_quantity,
+            returnInDays: c.return_in_days || 0
+          })));
+        }
+
+        if (dbDailyLogs) {
+          setDailyMachineLogs(dbDailyLogs.map((log: any) => ({
+            id: log.id,
+            assetId: log.asset_id,
+            assetName: log.asset_name,
+            siteId: log.site_id,
+            siteName: log.site_name,
+            date: log.date,
+            isActive: log.is_active,
+            downtimeEntries: log.downtime_entries || [],
+            maintenanceDetails: log.maintenance_details,
+            clientFeedback: log.client_feedback,
+            issuesOnSite: log.issues_on_site,
+            dieselUsage: Number(log.diesel_usage || 0),
+            supervisorOnSite: log.supervisor_on_site,
+            created_at: log.created_at
           })));
         }
 
@@ -344,7 +376,14 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       status: asset.status,
       location: asset.location,
       condition: asset.condition,
-      description: asset.description
+      description: asset.description,
+      requires_logging: asset.requiresLogging,
+      serial_number: asset.serialNumber,
+      service_interval_months: asset.serviceIntervalMonths,
+      power_source: asset.powerSource,
+      cost: asset.cost,
+      low_stock_level: asset.lowStockLevel,
+      critical_stock_level: asset.criticalStockLevel
     }))).then();
   };
 
@@ -764,7 +803,67 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         storeAddVehicleDocumentType({ id: crypto.randomUUID(), name });
       },
       deleteVehicleDocumentType: storeDeleteVehicleDocumentType,
-      updateVehicleDocument: storeUpdateVehicleDocument
+      updateVehicleDocument: storeUpdateVehicleDocument,
+      dailyMachineLogs,
+      logDailyActivity: async (logData: Omit<DailyMachineLog, 'id' | 'created_at'>) => {
+        try {
+          const payload = {
+            asset_id: logData.assetId,
+            asset_name: logData.assetName,
+            site_id: logData.siteId,
+            site_name: logData.siteName,
+            date: logData.date,
+            is_active: logData.isActive,
+            downtime_entries: logData.downtimeEntries,
+            maintenance_details: logData.maintenanceDetails,
+            client_feedback: logData.clientFeedback,
+            issues_on_site: logData.issuesOnSite,
+            diesel_usage: logData.dieselUsage,
+            supervisor_on_site: logData.supervisorOnSite
+          };
+
+          const { data, error } = await supabase
+            .from('operations_daily_logs')
+            .upsert(payload, { onConflict: 'asset_id,date' })
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          const newLog: DailyMachineLog = {
+            id: data.id,
+            assetId: data.asset_id,
+            assetName: data.asset_name,
+            siteId: data.site_id,
+            siteName: data.site_name,
+            date: data.date,
+            isActive: data.is_active,
+            downtimeEntries: data.downtime_entries || [],
+            maintenanceDetails: data.maintenance_details,
+            clientFeedback: data.client_feedback,
+            issuesOnSite: data.issues_on_site,
+            dieselUsage: Number(data.diesel_usage || 0),
+            supervisorOnSite: data.supervisor_on_site,
+            created_at: data.created_at
+          };
+
+          setDailyMachineLogs(prev => {
+            const index = prev.findIndex(l => l.assetId === newLog.assetId && l.date === newLog.date);
+            if (index >= 0) {
+              const updated = [...prev];
+              updated[index] = newLog;
+              return updated;
+            }
+            return [newLog, ...prev];
+          });
+
+          // toast.success('Daily activity logged successfully'); // Need to import toast or use a different feedback mechanism
+        } catch (error) {
+          console.error('Error logging daily activity:', error);
+          // toast.error('Failed to log daily activity');
+          throw error;
+        }
+      }
     }}>
       {children}
     </OperationsContext.Provider>

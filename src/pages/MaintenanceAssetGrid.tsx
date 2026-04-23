@@ -12,14 +12,15 @@ import { MaintenanceAssetDetailView } from './MaintenanceAssetDetailView';
 
 interface MaintenanceAssetGridProps {
   category: 'machine' | 'vehicle';
+  selectedAssetId: string | null;
+  onSelectAsset: (id: string | null) => void;
 }
 
-export function MaintenanceAssetGrid({ category }: MaintenanceAssetGridProps) {
+export function MaintenanceAssetGrid({ category, selectedAssetId, onSelectAsset }: MaintenanceAssetGridProps) {
   const { maintenanceAssets } = useOperations();
   const { isDark } = useTheme();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
   const filteredAssets = maintenanceAssets
     .filter(a => a.category === category)
@@ -41,7 +42,7 @@ export function MaintenanceAssetGrid({ category }: MaintenanceAssetGridProps) {
     return (
       <MaintenanceAssetDetailView 
         asset={selectedAsset} 
-        onBack={() => setSelectedAssetId(null)} 
+        onBack={() => onSelectAsset(null)} 
       />
     );
   }
@@ -112,7 +113,7 @@ export function MaintenanceAssetGrid({ category }: MaintenanceAssetGridProps) {
 
               <div className="grid grid-cols-2 gap-3">
                 <Button 
-                  onClick={() => setSelectedAssetId(asset.id)}
+                  onClick={() => onSelectAsset(asset.id)}
                   variant="outline" 
                   size="sm" 
                   className="rounded-lg border-border font-semibold text-xs text-muted-foreground hover:text-foreground gap-2 h-9"

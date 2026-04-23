@@ -85,6 +85,14 @@ export function DialogTitle({ children, className }: SharedProps) {
   );
 }
 
+export function DialogDescription({ children, className }: SharedProps) {
+  return (
+    <p className={cn("text-sm text-slate-500 dark:text-slate-400 mt-1.5", className)}>
+      {children}
+    </p>
+  );
+}
+
 // DialogClose: reads close fn from context automatically; onClick prop is still
 // supported as an override for cases that need custom behaviour.
 export function DialogClose({

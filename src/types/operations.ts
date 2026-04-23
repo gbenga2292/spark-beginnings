@@ -199,3 +199,27 @@ export interface VehicleDailyLog {
   driver_employee_id?: string;
   legs: VehicleTripLeg[];
 }
+export interface DowntimeEntry {
+  id: string;
+  reason: string;
+  durationHours: number;
+  severity: 'low' | 'medium' | 'high';
+  timestamp: string;
+}
+
+export interface DailyMachineLog {
+  id: string;
+  assetId: string;
+  assetName: string;
+  siteId: string;
+  siteName: string;
+  date: string;
+  isActive: boolean;
+  downtimeEntries: DowntimeEntry[];
+  maintenanceDetails?: string;
+  clientFeedback?: string;
+  issuesOnSite?: string;
+  dieselUsage: number;
+  supervisorOnSite?: string;
+  created_at?: string;
+}

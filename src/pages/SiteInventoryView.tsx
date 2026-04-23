@@ -15,6 +15,7 @@ import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { WaybillForm } from './WaybillForm';
 import { CreateReturnWaybill } from './CreateReturnWaybill';
 import { SiteTransactionsView } from './SiteTransactionsView';
+import { DailyLogManager } from './DailyLogManager';
 
 interface SiteInventoryViewProps {
   site: Site;
@@ -39,6 +40,7 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
   const [showReturnWaybill, setShowReturnWaybill] = useState(false);
   const [showTransactions, setShowTransactions] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
+  const [selectedMachine, setSelectedMachine] = useState<{ id: string, name: string } | null>(null);
 
   // All waybills for this site
   const siteWaybills = waybills.filter(w =>
@@ -90,12 +92,16 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
     !['consumable', 'equipment'].includes(i.type || '') &&
     i.type !== 'consumable'
   );
-  const machineItems = assets.filter(a => a.type === 'equipment' && allItems.find(i => i.assetId === a.id));
+  const machineItems = assets.filter(a => 
+    a.type === 'equipment' && 
+    a.requiresLogging && 
+    allItems.find(i => i.assetId === a.id)
+  );
   const consumableItems = allItems.filter(i => i.type === 'consumable');
 
   const tabs: { id: TabId; label: string; count: number; icon: React.ElementType }[] = [
-    { id: 'materials', label: 'Materials', count: allItems.length, icon: Package },
-    { id: 'machines', label: 'Machines', count: maintenanceAssets.filter(m => m.site === site.name).length, icon: Wrench },
+    { id: 'materials', label: 'Materials', count: materialItems.length, icon: Package },
+    { id: 'machines', label: 'Machines', count: machineItems.length, icon: Wrench },
     { id: 'consumables', label: 'Consumables', count: consumableItems.length, icon: Layers },
     { id: 'waybills', label: 'Waybills', count: siteWaybills.length, icon: Truck },
   ];
@@ -148,6 +154,18 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
         site={site}
         inventoryItems={allItems}
         onBack={() => setShowReturnWaybill(false)}
+      />
+    );
+  }
+
+  if (selectedMachine) {
+    return (
+      <DailyLogManager
+        assetId={selectedMachine.id}
+        assetName={selectedMachine.name}
+        siteId={site.id}
+        siteName={site.name}
+        onBack={() => setSelectedMachine(null)}
       />
     );
   }
@@ -298,43 +316,51 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
               </div>
             )}
 
-            {/* Machines Tab */}
             {activeTab === 'machines' && (
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                {maintenanceAssets.filter(m => m.category === 'machine').length === 0 ? (
+                {machineItems.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 text-slate-300">
                     <Wrench className="h-12 w-12 mb-3" />
                     <p className="text-sm font-medium text-slate-400">No machines assigned to this site</p>
                   </div>
-                ) : maintenanceAssets.filter(m => m.category === 'machine').map(machine => (
-                  <div
-                    key={machine.id}
-                    className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-500 shrink-0">
-                        <Wrench className="h-4 w-4" />
+                ) : machineItems.map(machine => {
+                  const mAsset = maintenanceAssets.find(ma => ma.id === machine.id);
+                  return (
+                    <div
+                      key={machine.id}
+                      onClick={() => setSelectedMachine({ id: machine.id, name: machine.name })}
+                      className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-500 shrink-0 group-hover:scale-110 transition-transform">
+                          <Wrench className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800 dark:text-white group-hover:text-blue-600 transition-colors">{machine.name}</p>
+                          <p className="text-xs text-slate-400">
+                            S/N: {machine.serialNumber || 'N/A'} · {mAsset ? `Next service: ${new Date(mAsset.nextServiceDate).toLocaleDateString()}` : 'No service info'}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800 dark:text-white">{machine.name}</p>
-                        <p className="text-xs text-slate-400">
-                          Last service: {machine.lastServiceDate}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        {mAsset && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] font-bold px-2 py-0.5",
+                              mAsset.status === 'ok' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                              mAsset.status === 'due_soon' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                              "bg-rose-50 text-rose-700 border-rose-200"
+                            )}
+                          >
+                            {mAsset.status.replace('_', ' ')}
+                          </Badge>
+                        )}
+                        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
                       </div>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-[10px] font-bold px-2 py-0.5",
-                        machine.status === 'ok' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                        machine.status === 'due_soon' ? "bg-amber-50 text-amber-700 border-amber-200" :
-                        "bg-rose-50 text-rose-700 border-rose-200"
-                      )}
-                    >
-                      {machine.status.replace('_', ' ')}
-                    </Badge>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
