@@ -12,7 +12,7 @@ import {
   ArrowDownLeft, ArrowUpRight, Plus, Search, Filter,
   Trash2, Pencil, X, Save, ChevronDown, ChevronUp,
   Bell, BellOff, CheckCircle2, MapPin, Building2,
-  UserCheck, AlertCircle, ClipboardList, ListPlus,
+  UserCheck, AlertCircle, ClipboardList, ListPlus, Briefcase,
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -589,11 +589,7 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
           </div>
         )}
 
-        {/* Contact Person — below Link To, above Subject */}
-        <div>
-          <div className={labelCls}>Contact Person</div>
-          <input
-          {/* Contact Person (External) / Reported By (Internal) */}
+        {/* Contact Person (External) / Reported By (Internal) */}
         {form.isInternal ? (
           <div>
             <div className={labelCls}>Reported By</div>

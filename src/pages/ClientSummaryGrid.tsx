@@ -275,7 +275,6 @@ export function ClientSummaryGrid() {
           </div>
         </div>
       )}
-    </div>
 
     {/* Client Contacts Modal */}
     {contactsFor && (
