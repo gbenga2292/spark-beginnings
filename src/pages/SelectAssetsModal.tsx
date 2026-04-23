@@ -78,7 +78,9 @@ export function SelectAssetsModal({ isOpen, onClose, selectedIds, onSelect }: Se
                     "font-semibold text-sm uppercase tracking-tight truncate",
                     selectedIds.includes(asset.id) ? "text-primary" : "text-foreground"
                   )}>{asset.name}</h4>
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{asset.site} • {asset.id}</span>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    {asset.site} {asset.serialNumber ? `• S/N: ${asset.serialNumber}` : ''}
+                  </span>
                 </div>
                 {asset.isActive && (
                   <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-bold uppercase tracking-widest text-[9px] px-2 py-0.5 rounded-md shrink-0">active</Badge>

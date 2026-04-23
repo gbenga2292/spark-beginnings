@@ -14,7 +14,7 @@ export function MaintenanceDashboard() {
     { label: 'Total Equipment', value: stats.totalMachines + stats.totalVehicles, sub: `${stats.totalActive} active`, icon: BarChart3, color: 'text-blue-600' },
     { label: 'Due Soon', value: stats.dueSoon, sub: 'Next 14 days', icon: Clock, color: 'text-amber-500' },
     { label: 'Overdue', value: stats.overdue, sub: 'Requires attention', icon: AlertCircle, color: 'text-rose-500' },
-    { label: 'This Month', value: '₦0', sub: 'Maintenance cost', icon: Info, color: 'text-slate-800 dark:text-white' },
+    { label: 'This Month', value: `₦${stats.monthlyCost.toLocaleString()}`, sub: 'Maintenance cost', icon: Info, color: 'text-slate-800 dark:text-white' },
   ];
 
   return (
@@ -23,13 +23,13 @@ export function MaintenanceDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {mainStats.map((stat, i) => (
           <Card key={i} className={cn(
-            "rounded-xl border shadow-sm overflow-hidden",
+            "rounded-xl border shadow-sm overflow-hidden transition-all hover:shadow-md",
             isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
           )}>
             <CardContent className="p-5 sm:p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
                   <h3 className={cn("text-2xl sm:text-3xl font-bold mt-1", stat.color)}>{stat.value}</h3>
                   <p className="text-xs font-medium mt-1 text-slate-400">{stat.sub}</p>
                 </div>
@@ -46,17 +46,17 @@ export function MaintenanceDashboard() {
           "rounded-xl border shadow-sm p-5 sm:p-6",
           isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
         )}>
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-white mb-5">This Month's Activity</h3>
+          <h3 className="text-sm font-black uppercase tracking-tight text-slate-700 dark:text-white mb-5">This Month's Activity</h3>
           <div className="space-y-4">
             {[
-              { label: 'Total Downtime', value: '0h' },
+              { label: 'Total Downtime', value: `${stats.totalDowntime}h` },
               { label: 'Unscheduled Maintenance', value: '0' },
             ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{item.label}</span>
+              <div key={i} className="flex items-center justify-between group">
+                <span className="text-sm font-medium text-slate-500 dark:text-slate-400 group-hover:text-foreground transition-colors">{item.label}</span>
                 <span className={cn(
-                  "px-3 py-1 rounded-full text-xs font-semibold",
-                  isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"
+                  "px-4 py-1 rounded-full text-xs font-bold",
+                  isDark ? "bg-slate-800 text-slate-300" : "bg-slate-50 text-slate-600 border border-slate-100"
                 )}>{item.value}</span>
               </div>
             ))}

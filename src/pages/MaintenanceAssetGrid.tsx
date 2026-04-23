@@ -8,6 +8,7 @@ import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
+import { MaintenanceAssetDetailView } from './MaintenanceAssetDetailView';
 
 interface MaintenanceAssetGridProps {
   category: 'machine' | 'vehicle';
@@ -18,11 +19,14 @@ export function MaintenanceAssetGrid({ category }: MaintenanceAssetGridProps) {
   const { isDark } = useTheme();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
   const filteredAssets = maintenanceAssets
     .filter(a => a.category === category)
     .filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()))
     .filter(a => statusFilter === 'all' || a.status === statusFilter);
+
+  const selectedAsset = maintenanceAssets.find(a => a.id === selectedAssetId);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -32,6 +36,15 @@ export function MaintenanceAssetGrid({ category }: MaintenanceAssetGridProps) {
       default: return null;
     }
   };
+
+  if (selectedAsset) {
+    return (
+      <MaintenanceAssetDetailView 
+        asset={selectedAsset} 
+        onBack={() => setSelectedAssetId(null)} 
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -66,8 +79,7 @@ export function MaintenanceAssetGrid({ category }: MaintenanceAssetGridProps) {
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors uppercase truncate">{asset.name}</h3>
                   <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground font-medium">
-                    <span>{asset.id}</span>
-                    {asset.serialNumber && <span>• S/N: {asset.serialNumber}</span>}
+                    {asset.serialNumber && <span>S/S: {asset.serialNumber}</span>}
                   </div>
                 </div>
                 <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold text-[11px] shrink-0 uppercase tracking-wider">
@@ -99,7 +111,12 @@ export function MaintenanceAssetGrid({ category }: MaintenanceAssetGridProps) {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" size="sm" className="rounded-lg border-border font-semibold text-xs text-muted-foreground hover:text-foreground gap-2 h-9">
+                <Button 
+                  onClick={() => setSelectedAssetId(asset.id)}
+                  variant="outline" 
+                  size="sm" 
+                  className="rounded-lg border-border font-semibold text-xs text-muted-foreground hover:text-foreground gap-2 h-9"
+                >
                   <Eye className="h-3.5 w-3.5" /> Details
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-lg border-border font-semibold text-xs text-muted-foreground hover:text-foreground gap-2 h-9">

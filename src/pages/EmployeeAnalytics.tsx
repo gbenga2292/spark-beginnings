@@ -29,6 +29,7 @@ import { Label } from '@/src/components/ui/label';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { toast } from '@/src/components/ui/toast';
 import { Asset, Checkout } from '../types/operations';
+import { getPositionIndex } from '@/src/lib/hierarchy';
 
 export function EmployeeAnalytics() {
   const navigate = useNavigate();
@@ -70,6 +71,12 @@ export function EmployeeAnalytics() {
       const matchesSearch = `${emp.firstname} ${emp.surname}`.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             (emp.position || '').toLowerCase().includes(searchTerm.toLowerCase());
       return matchesSearch && emp.staffType !== 'NON-EMPLOYEE';
+    })
+    .sort((a, b) => {
+      const rankA = getPositionIndex(a.position);
+      const rankB = getPositionIndex(b.position);
+      if (rankA !== rankB) return rankA - rankB;
+      return `${a.firstname} ${a.surname}`.localeCompare(`${b.firstname} ${b.surname}`);
     });
 
   const selectedEmployee = staffList.find(emp => emp.id === selectedEmployeeId);

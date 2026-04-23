@@ -35,7 +35,6 @@ interface OperationsContextType {
 
   // Maintenance methods
   logMaintenance: (session: Omit<MaintenanceSession, 'id'>) => void;
-  updateMaintenanceAsset: (id: string, updates: Partial<MaintenanceAsset>) => void;
   
   // Analytics
   getAssetAnalytics: () => any;
@@ -69,7 +68,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const [assets, setAssets] = useState<Asset[]>(initialAssets);
   const [waybills, setWaybills] = useState<Waybill[]>(initialWaybills);
   const [checkouts, setCheckouts] = useState<Checkout[]>(initialCheckouts);
-  const [maintenanceAssets, setMaintenanceAssets] = useState<MaintenanceAsset[]>(initialMaintenanceAssets);
   const [maintenanceSessions, setMaintenanceSessions] = useState<MaintenanceSession[]>([]);
 
   const { 
@@ -86,6 +84,70 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     deleteVehicleDocumentType: storeDeleteVehicleDocumentType,
     updateVehicleDocument: storeUpdateVehicleDocument
   } = useAppStore();
+
+  const maintenanceAssets = React.useMemo(() => {
+    // 1. Machines: Assets with type 'equipment' and requiresLogging = true
+    const machines = assets
+      .filter(a => a.type === 'equipment' && a.requiresLogging)
+      .map(a => {
+        const sessions = maintenanceSessions.filter(s => s.assets.some(sa => sa.assetId === a.id));
+        const lastSession = sessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
+        
+        const nextDate = lastSession ? new Date(lastSession.date) : new Date();
+        nextDate.setMonth(nextDate.getMonth() + (a.serviceIntervalMonths || 2));
+        
+        const now = new Date();
+        let status: ServiceStatus = 'ok';
+        if (now > nextDate) status = 'overdue';
+        else if (nextDate.getTime() - now.getTime() < 14 * 24 * 60 * 60 * 1000) status = 'due_soon';
+
+        return {
+          id: a.id,
+          name: a.name,
+          serialNumber: a.serialNumber,
+          category: 'machine' as const,
+          site: a.location || 'Main Store',
+          lastServiceDate: lastSession?.date || '',
+          nextServiceDate: nextDate.toISOString(),
+          serviceIntervalMonths: a.serviceIntervalMonths || 2,
+          status,
+          pattern: 'Routine',
+          totalMaintenanceRecords: sessions.length,
+          isActive: a.status === 'active'
+        };
+      });
+
+    // 2. Vehicles: All vehicles from the vehicle page
+    const mappedVehicles = vehicles.map(v => {
+      const sessions = maintenanceSessions.filter(s => s.assets.some(sa => sa.assetId === v.id));
+      const lastSession = sessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
+      
+      const nextDate = lastSession ? new Date(lastSession.date) : new Date();
+      nextDate.setMonth(nextDate.getMonth() + 3); // Default 3 months
+      
+      const now = new Date();
+      let status: ServiceStatus = 'ok';
+      if (now > nextDate) status = 'overdue';
+      else if (nextDate.getTime() - now.getTime() < 14 * 24 * 60 * 60 * 1000) status = 'due_soon';
+
+      return {
+        id: v.id,
+        name: v.name,
+        serialNumber: v.registration_number,
+        category: 'vehicle' as const,
+        site: 'Main Office',
+        lastServiceDate: lastSession?.date || '',
+        nextServiceDate: nextDate.toISOString(),
+        serviceIntervalMonths: 3,
+        status,
+        pattern: 'Routine',
+        totalMaintenanceRecords: sessions.length,
+        isActive: v.status === 'active'
+      };
+    });
+
+    return [...machines, ...mappedVehicles];
+  }, [assets, vehicles, maintenanceSessions]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -113,7 +175,10 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             status: a.status,
             location: a.location,
             condition: a.condition,
-            description: a.description
+            description: a.description,
+            requiresLogging: a.requires_logging,
+            serialNumber: a.serial_number,
+            serviceIntervalMonths: a.service_interval_months || 2
           })));
         }
 
@@ -180,7 +245,10 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       status: asset.status,
       location: asset.location,
       condition: asset.condition,
-      description: asset.description
+      description: asset.description,
+      requires_logging: asset.requiresLogging,
+      serial_number: asset.serialNumber,
+      service_interval_months: asset.serviceIntervalMonths
     });
   };
 
@@ -524,27 +592,31 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       ...session,
       id: `MS-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
     };
+
+    // Update inventory for parts used
+    session.assets.forEach(assetLog => {
+      assetLog.parts?.forEach(part => {
+        if (part.type === 'inventory' && (part as any).id) {
+          const partId = (part as any).id;
+          setAssets(prev => prev.map(a => {
+            if (a.id === partId) {
+              const newQty = Math.max(0, a.quantity - (part.quantity || 1));
+              const updated: Asset = {
+                ...a,
+                quantity: newQty,
+                availableQuantity: Math.max(0, newQty - ((a.reservedQuantity || 0) + (a.usedQuantity || 0) + (a.missingQuantity || 0) + (a.damagedQuantity || 0)))
+              };
+              persistAsset(updated);
+              return updated;
+            }
+            return a;
+          }));
+        }
+      });
+    });
+
     setMaintenanceSessions(prev => [newSession, ...prev]);
     persistMaintenance(newSession);
-    
-    // Update asset total records
-    setMaintenanceAssets(prev => prev.map(a => {
-      const isIncluded = session.assets.some(as => as.assetId === a.id);
-      if (isIncluded) {
-        return {
-          ...a,
-          totalMaintenanceRecords: a.totalMaintenanceRecords + 1,
-          lastServiceDate: session.date,
-          // Calculate next service date based on interval
-          nextServiceDate: new Date(new Date(session.date).setMonth(new Date(session.date).getMonth() + a.serviceIntervalMonths)).toISOString().split('T')[0],
-        };
-      }
-      return a;
-    }));
-  };
-
-  const updateMaintenanceAsset = (id: string, updates: Partial<MaintenanceAsset>) => {
-    setMaintenanceAssets(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
   };
 
   const getAssetAnalytics = () => {
@@ -563,11 +635,35 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     const dueSoon = maintenanceAssets.filter(a => a.status === 'due_soon').length;
     const overdue = maintenanceAssets.filter(a => a.status === 'overdue').length;
     
+    // Calculate monthly cost
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    let monthlyCost = 0;
+    let totalDowntime = 0;
+    
+    maintenanceSessions.forEach(session => {
+      const sessionDate = new Date(session.date);
+      if (sessionDate.getMonth() === currentMonth && sessionDate.getFullYear() === currentYear) {
+        session.assets.forEach(assetLog => {
+          monthlyCost += (assetLog.cost || 0);
+          if (assetLog.shutdown) {
+            // Assuming 8 hours for each shutdown if not specified, 
+            // though we could add a downtimeHours field to the log
+            totalDowntime += 8; 
+          }
+        });
+      }
+    });
+    
     return {
       totalMachines,
       totalVehicles,
       dueSoon,
       overdue,
+      monthlyCost,
+      totalDowntime,
       totalActive: maintenanceAssets.filter(a => a.isActive).length,
       statusDistribution: {
         ok: maintenanceAssets.filter(a => a.status === 'ok').length,
@@ -632,7 +728,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       updateCheckoutStatus,
       deleteCheckout,
       logMaintenance,
-      updateMaintenanceAsset,
       getAssetAnalytics,
       getSiteAnalytics,
       getMaintenanceStats,

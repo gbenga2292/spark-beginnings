@@ -43,7 +43,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
     // Details
     doc.setFontSize(10);
     doc.setFont('times', 'normal');
-    doc.text(`Waybill No: ${waybill.id}`, 20, 48);
+    doc.text(`Waybill No: REF-${waybill.id.substring(0, 8).toUpperCase()}`, 20, 48);
     doc.text(`Date: ${formatDisplayDate(waybill.issueDate)}`, 20, 55);
     doc.text(`Driver Name: ${waybill.driverName}`, 20, 62);
     doc.text(`Vehicle: ${waybill.vehicle || 'L200'}`, 20, 69);
@@ -83,7 +83,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
   };
 
   const handleDownload = () => {
-    generatePdfDoc().save(`${waybill.id}.pdf`);
+    generatePdfDoc().save(`WB-${waybill.id.substring(0, 8).toUpperCase()}.pdf`);
   };
 
   const handleShare = async () => {
@@ -92,10 +92,10 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
       const pdfBlob = doc.output('blob');
       
       if (navigator.share) {
-        const file = new File([pdfBlob], `${waybill.id}.pdf`, { type: 'application/pdf' });
+        const file = new File([pdfBlob], `WB-${waybill.id.substring(0, 8).toUpperCase()}.pdf`, { type: 'application/pdf' });
         await navigator.share({
-          title: `Waybill ${waybill.id}`,
-          text: `Please find attached the Waybill ${waybill.id}`,
+          title: `Waybill REF-${waybill.id.substring(0, 8).toUpperCase()}`,
+          text: `Please find attached the Waybill REF-${waybill.id.substring(0, 8).toUpperCase()}`,
           files: [file],
         });
       } else {
@@ -131,7 +131,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
 
   // ── Page header ──────────────────────────────────────────────────────────────
   useSetPageTitle(
-    `${waybill.type === 'return' ? 'Return' : 'Waybill'} ${waybill.id}`,
+    `${waybill.type === 'return' ? 'Return' : 'Waybill'} REF-${waybill.id.substring(0, 8).toUpperCase()}`,
     waybill.siteName || 'Logistics Management',
     <div className="hidden sm:flex items-center gap-2">
       <Button
@@ -342,7 +342,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
                 </div>
                 <div>
                   <p className="font-bold text-slate-800 dark:text-white text-sm">PDF Preview</p>
-                  <p className="text-xs text-slate-400 font-medium">{waybill.id} · {waybill.siteName}</p>
+                  <p className="text-xs text-slate-400 font-medium">REF-{waybill.id.substring(0, 8).toUpperCase()} · {waybill.siteName}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">

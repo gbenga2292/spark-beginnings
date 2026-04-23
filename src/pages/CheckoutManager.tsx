@@ -14,16 +14,23 @@ import { Badge } from '@/src/components/ui/badge';
 
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { toast } from '@/src/components/ui/toast';
+import { useAppStore } from '@/src/store/appStore';
+import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
+import { getPositionIndex } from '@/src/lib/hierarchy';
 
 export function CheckoutManager() {
   const { assets, checkouts, addCheckout } = useOperations();
+  const allEmployees = useAppStore(state => state.employees);
   const { isDark } = useTheme();
   const [selectedAssetId, setSelectedAssetId] = useState('');
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [employeeName, setEmployeeName] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [returnInDays, setReturnInDays] = useState(7);
   const [activeStep, setActiveStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showEmployeeList, setShowEmployeeList] = useState(false);
 
   const selectedAsset = assets.find(a => a.id === selectedAssetId);
 
@@ -122,17 +129,80 @@ export function CheckoutManager() {
 
               {activeStep === 1 && (
                 <div className="space-y-5 animate-in slide-in-from-right-4 duration-300">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block ml-1">Employee Name / ID</label>
+                  <div className="space-y-2 relative">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block ml-1">Search & Select Personnel</label>
                     <div className="relative">
                       <Input 
-                        value={employeeName}
-                        onChange={(e) => setEmployeeName(e.target.value)}
+                        value={employeeName || employeeSearch}
+                        onChange={(e) => {
+                          setEmployeeSearch(e.target.value);
+                          setEmployeeName('');
+                          setSelectedEmployeeId('');
+                          setShowEmployeeList(true);
+                        }}
+                        onFocus={() => setShowEmployeeList(true)}
                         className="w-full h-11 pl-10 pr-4 rounded-lg text-sm font-medium placeholder:text-slate-400 focus-visible:ring-blue-500/50 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-                        placeholder="Enter full name or employee ID..."
+                        placeholder="Search by name or position..."
                       />
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     </div>
+
+                    {showEmployeeList && (
+                      <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl max-h-64 overflow-y-auto no-scrollbar py-2 animate-in fade-in slide-in-from-top-2">
+                        {allEmployees
+                          .filter(emp => emp.status === 'Active' || emp.status === 'On Leave')
+                          .filter(emp => 
+                            `${emp.firstname} ${emp.surname}`.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+                            (emp.position || '').toLowerCase().includes(employeeSearch.toLowerCase())
+                          )
+                          .sort((a, b) => {
+                            const rankA = getPositionIndex(a.position);
+                            const rankB = getPositionIndex(b.position);
+                            if (rankA !== rankB) return rankA - rankB;
+                            return `${a.firstname} ${a.surname}`.localeCompare(`${b.firstname} ${b.surname}`);
+                          })
+                          .map(emp => (
+                            <button
+                              key={emp.id}
+                              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left group"
+                              onClick={() => {
+                                setEmployeeName(`${emp.firstname} ${emp.surname}`);
+                                setSelectedEmployeeId(emp.id);
+                                setEmployeeSearch('');
+                                setShowEmployeeList(false);
+                              }}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8 border border-slate-200 dark:border-slate-700 shadow-sm">
+                                  <AvatarFallback className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500">
+                                    {emp.firstname[0]}{emp.surname[0]}
+                                  </AvatarFallback>
+                                  {emp.avatar && <AvatarImage src={emp.avatar} />}
+                                </Avatar>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200 group-hover:text-blue-600 transition-colors">
+                                    {emp.firstname} {emp.surname}
+                                  </span>
+                                  <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider truncate">
+                                    {emp.position || 'No Position'}
+                                  </span>
+                                </div>
+                              </div>
+                              <Badge 
+                                variant="outline" 
+                                className={cn(
+                                  "text-[8px] h-4 px-1.5 font-black tracking-tighter uppercase",
+                                  emp.staffType === 'OFFICE' 
+                                    ? "bg-purple-50 text-purple-600 border-purple-100" 
+                                    : "bg-blue-50 text-blue-600 border-blue-100"
+                                )}
+                              >
+                                {emp.staffType}
+                              </Badge>
+                            </button>
+                          ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -199,7 +269,7 @@ export function CheckoutManager() {
                         assetId: selectedAssetId,
                         assetName: selectedAsset?.name || 'Unknown',
                         quantity,
-                        employeeId: 'EMP-TEMP', // In a real app, this would be selected from a list
+                        employeeId: selectedEmployeeId || 'EMP-TEMP',
                         employeeName,
                         returnInDays
                       });

@@ -33,6 +33,8 @@ export interface Asset {
   location: string;
   powerSource?: string;
   requiresLogging?: boolean;
+  serialNumber?: string;
+  serviceIntervalMonths?: number;
   restockHistory?: RestockRecord[];
   created_at?: string;
 }
@@ -130,17 +132,32 @@ export interface MaintenanceAsset {
   isActive: boolean;
 }
 
+export interface MaintenanceAssetLog {
+  assetId: string;
+  assetName: string;
+  remark?: string;
+  workDone?: string;
+  location?: string;
+  shutdown?: boolean;
+  cost: number;
+  parts?: {
+    type: 'inventory' | 'custom';
+    name: string;
+    quantity: number;
+    cost: number;
+  }[];
+  date?: string;
+  technician?: string;
+  type?: MaintenanceLogType;
+}
+
 export interface MaintenanceSession {
   id: string;
   date: string;
   type: MaintenanceLogType;
   technician: string;
   generalRemark?: string;
-  assets: {
-    assetId: string;
-    assetName: string;
-    remark?: string;
-  }[];
+  assets: MaintenanceAssetLog[];
 }
 export interface VehicleDocumentType {
   id: string;

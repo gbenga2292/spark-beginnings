@@ -56,7 +56,28 @@ export function LogMaintenanceForm() {
     }
     logMaintenance({
       date, type, technician, generalRemark,
-      assets: selectedAssets.map(a => ({ assetId: a.id, assetName: a.name, remark: assetData[a.id]?.remark || '' }))
+      assets: selectedAssets.map(a => {
+        const data = assetData[a.id] || {};
+        const parts = data.parts || [];
+        const totalCost = parts.reduce((acc: number, p: any) => acc + (p.cost || 0), 0);
+        
+        return {
+          assetId: a.id,
+          assetName: a.name,
+          remark: data.remark || '',
+          workDone: data.workDone || '',
+          location: data.location || '',
+          shutdown: data.shutdown || false,
+          cost: totalCost,
+          parts: parts.map((p: any) => ({
+            id: p.id,
+            type: p.type,
+            name: p.name,
+            quantity: p.quantity || p.addedQty || 1,
+            cost: p.cost || 0
+          }))
+        };
+      })
     });
     toast.success(`Successfully logged maintenance for ${selectedAssetIds.length} assets.`);
     setDate(new Date().toISOString().split('T')[0]);

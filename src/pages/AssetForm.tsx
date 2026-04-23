@@ -26,6 +26,8 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
   const [isCustomLoc, setIsCustomLoc]       = useState(false);
   const [powerSource, setPowerSource]       = useState(assetToEdit?.powerSource || '');
   const [requiresLogging, setLogging]       = useState(assetToEdit?.requiresLogging || false);
+  const [serialNumber, setSerialNumber]     = useState(assetToEdit?.serialNumber || '');
+  const [serviceInterval, setServiceInterval] = useState(assetToEdit?.serviceIntervalMonths || 2);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -36,6 +38,8 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
       type: assetType, lowStockLevel, criticalStockLevel, location: finalLocation,
       powerSource: assetType === 'equipment' ? powerSource : undefined,
       requiresLogging: assetType === 'equipment' ? requiresLogging : undefined,
+      serialNumber: assetType === 'equipment' ? serialNumber : undefined,
+      serviceIntervalMonths: assetType === 'equipment' ? serviceInterval : undefined,
       status: assetToEdit?.status || 'active',
       condition: assetToEdit?.condition || 'good',
     };
@@ -251,6 +255,24 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
                     </select>
                     <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Serial Number</label>
+                  <input
+                    value={serialNumber}
+                    onChange={e => setSerialNumber(e.target.value)}
+                    placeholder="e.g. KSF164HM"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Service Interval (Months)</label>
+                  <input
+                    type="number"
+                    value={serviceInterval}
+                    onChange={e => setServiceInterval(Number(e.target.value))}
+                    className={inputCls}
+                  />
                 </div>
               </div>
             </div>

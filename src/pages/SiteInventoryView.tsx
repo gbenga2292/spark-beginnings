@@ -399,7 +399,7 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-bold text-slate-800 dark:text-white font-mono">{wb.id}</p>
+                          <p className="text-sm font-bold text-slate-800 dark:text-white font-mono">REF-{wb.id.substring(0, 8).toUpperCase()}</p>
                           <Badge
                             variant="outline"
                             className={cn(

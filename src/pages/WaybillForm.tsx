@@ -13,6 +13,7 @@ import { Label } from '@/src/components/ui/label';
 import { toast } from '@/src/components/ui/toast';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { ArrowLeft } from 'lucide-react';
+import { getPositionIndex } from '@/src/lib/hierarchy';
 
 interface WaybillFormProps {
   onClose: () => void;
@@ -44,10 +45,16 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
   const [bulkText, setBulkText] = useState('');
   const [parsedItems, setParsedItems] = useState<{ id: string; originalText: string; quantity: number; matchedAssetId: string | null; isRematching?: boolean }[]>([]);
 
-  const driverOptions = [
-    ...employees.filter(e => ['Driver', 'Foreman', 'Site Supervisor', 'Assistant Supervisor'].includes(e.position || ''))
-      .map(e => `${e.firstname} ${e.surname}`),
-  ];
+  const driverOptions = employees
+    .filter(e => e.status === 'Active' || e.status === 'On Leave')
+    .sort((a, b) => {
+      const rankA = getPositionIndex(a.position);
+      const rankB = getPositionIndex(b.position);
+      if (rankA !== rankB) return rankA - rankB;
+      return `${a.firstname} ${a.surname}`.localeCompare(`${b.firstname} ${b.surname}`);
+    })
+    .map(e => `${e.firstname} ${e.surname}`);
+  
   const uniqueDrivers = Array.from(new Set(driverOptions));
 
   const vehicleOptions = vehicles.map(v => v.name);
