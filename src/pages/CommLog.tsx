@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '@/src/store/appStore';
-import type { CommLog } from '@/src/store/appStore';
+import type { CommLog, ClientContact } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { useTheme } from '@/src/hooks/useTheme';
 import { cn, generateId } from '@/src/lib/utils';
@@ -92,6 +92,8 @@ function emptyForm() {
     followUpDone: false,
     createTask: false,
     parentId: undefined as string | undefined,
+    isInternal: false,
+    reportedBy: [] as string[],
   };
 }
 
@@ -190,8 +192,14 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
   const pendingSites = useAppStore(s => s.pendingSites);
   const storeClients = useAppStore(s => s.clients);
   const commLogs = useAppStore(s => s.commLogs);
+  const employees = useAppStore(s => s.employees);
+  const clientContacts = useAppStore(s => s.clientContacts);
   const addPendingSite = useAppStore(s => s.addPendingSite);
   const deletePendingSite = useAppStore(s => s.deletePendingSite);
+
+  // Reported-by dropdown state (internal logs)
+  const [reportedByInput, setReportedByInput] = useState('');
+  const [reportedByOpen, setReportedByOpen] = useState(false);
 
   const allClients = useMemo(() => {
     // Combine clients from the clients table, existing sites, and pending sites
@@ -305,8 +313,36 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
     <div className={cn('rounded-xl border shadow-sm flex flex-col', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200')}>
       <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
         <h2 className={cn("text-lg font-semibold", isDark ? 'text-slate-100' : 'text-slate-900')}>
-          {isEdit ? 'Edit Log' : 'New Communication'}
+          {isEdit ? 'Edit Log' : form.isInternal ? 'Internal Communication' : 'External Communication'}
         </h2>
+
+        {/* Internal / External Toggle */}
+        <div className={cn('flex rounded-lg p-0.5', isDark ? 'bg-slate-800' : 'bg-slate-100')}>
+          <button
+            type="button"
+            onClick={() => onChange({ isInternal: false, reportedBy: [] })}
+            className={cn(
+              'flex-1 py-1 px-3 rounded-md text-xs font-semibold transition-all',
+              !form.isInternal
+                ? (isDark ? 'bg-slate-600 text-indigo-300 shadow-sm' : 'bg-white text-indigo-700 shadow-sm')
+                : (isDark ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
+            )}
+          >
+            🌐 External
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange({ isInternal: true, contactPerson: '' })}
+            className={cn(
+              'flex-1 py-1 px-3 rounded-md text-xs font-semibold transition-all',
+              form.isInternal
+                ? (isDark ? 'bg-slate-600 text-indigo-300 shadow-sm' : 'bg-white text-indigo-700 shadow-sm')
+                : (isDark ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
+            )}
+          >
+            🏢 Internal
+          </button>
+        </div>
         <Button variant="ghost" size="icon" onClick={onCancel} className={cn("h-8 w-8", isDark ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}>
           <X className="w-4 h-4" />
         </Button>
@@ -557,13 +593,137 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
         <div>
           <div className={labelCls}>Contact Person</div>
           <input
-            type="text"
-            placeholder="e.g. Mr. Adeyemi, Site Manager"
-            value={form.contactPerson}
-            onChange={e => onChange({ contactPerson: e.target.value })}
-            className={inputCls}
-          />
-        </div>
+          {/* Contact Person (External) / Reported By (Internal) */}
+        {form.isInternal ? (
+          <div>
+            <div className={labelCls}>Reported By</div>
+            {/* Selected reporters chips */}
+            {form.reportedBy.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {form.reportedBy.map((name, i) => (
+                  <span
+                    key={i}
+                    className={cn(
+                      'inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium',
+                      isDark ? 'bg-indigo-900/40 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+                    )}
+                  >
+                    👤 {name}
+                    <button
+                      type="button"
+                      onClick={() => onChange({ reportedBy: form.reportedBy.filter((_, idx) => idx !== i) })}
+                      className="ml-0.5 hover:text-red-500 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {/* Employee multi-select dropdown */}
+            <div className="relative">
+              <div
+                onClick={() => setReportedByOpen(o => !o)}
+                className={cn(inputCls, 'cursor-pointer flex items-center justify-between')}
+              >
+                <span className={cn('text-sm', form.reportedBy.length === 0 && (isDark ? 'text-slate-500' : 'text-slate-400'))}>
+                  {form.reportedBy.length === 0 ? 'Select reporter(s)…' : `${form.reportedBy.length} selected`}
+                </span>
+                <ChevronDown className="w-4 h-4 shrink-0" />
+              </div>
+              {reportedByOpen && (
+                <div className={cn(
+                  'absolute top-full left-0 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border shadow-xl z-50 style-scroll',
+                  isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+                )}>
+                  {employees
+                    .filter(e => e.status === 'Active' || e.status === 'On Leave')
+                    .sort((a, b) => `${a.firstname} ${a.surname}`.localeCompare(`${b.firstname} ${b.surname}`))
+                    .map(emp => {
+                      const fullName = `${emp.firstname} ${emp.surname}`;
+                      const isSelected = form.reportedBy.includes(fullName);
+                      return (
+                        <div
+                          key={emp.id}
+                          onClick={() => {
+                            onChange({
+                              reportedBy: isSelected
+                                ? form.reportedBy.filter(n => n !== fullName)
+                                : [...form.reportedBy, fullName],
+                            });
+                          }}
+                          className={cn(
+                            'flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors text-sm',
+                            isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-50'
+                          )}
+                        >
+                          <div className={cn(
+                            'w-4 h-4 rounded border flex items-center justify-center shrink-0',
+                            isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : isDark ? 'border-slate-500' : 'border-slate-300'
+                          )}>
+                            {isSelected && <CheckCircle2 className="w-3 h-3" />}
+                          </div>
+                          <span className={cn('font-medium truncate', isDark ? 'text-slate-200' : 'text-slate-800')}>{fullName}</span>
+                          <span className={cn('text-xs ml-auto shrink-0', isDark ? 'text-slate-500' : 'text-slate-400')}>{emp.staffType}</span>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+            {/* Free-text add (for names not in employee list) */}
+            <div className="flex gap-2 mt-2">
+              <input
+                type="text"
+                placeholder="+ Add name not in employee list…"
+                value={reportedByInput}
+                onChange={e => setReportedByInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && reportedByInput.trim()) {
+                    e.preventDefault();
+                    const name = reportedByInput.trim();
+                    if (!form.reportedBy.includes(name)) onChange({ reportedBy: [...form.reportedBy, name] });
+                    setReportedByInput('');
+                  }
+                }}
+                className={cn(inputCls, 'flex-1')}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const name = reportedByInput.trim();
+                  if (name && !form.reportedBy.includes(name)) {
+                    onChange({ reportedBy: [...form.reportedBy, name] });
+                    setReportedByInput('');
+                  }
+                }}
+                className={cn('px-3 h-9 rounded-md text-xs font-semibold border transition-colors shrink-0',
+                  isDark ? 'bg-slate-700 border-slate-600 text-slate-200 hover:bg-slate-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                )}
+              >
+                + Add
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className={labelCls}>Contact Person</div>
+            {/* Show known contacts as a datalist suggestion */}
+            <datalist id="cl-known-contacts">
+              {clientContacts
+                .filter(c => c.clientName === form.client && c.isActive)
+                .map(c => <option key={c.id} value={c.name} />)}
+            </datalist>
+            <input
+              type="text"
+              list="cl-known-contacts"
+              placeholder="e.g. Mr. Adeyemi, Site Manager"
+              value={form.contactPerson}
+              onChange={e => onChange({ contactPerson: e.target.value })}
+              className={inputCls}
+            />
+          </div>
+        )}
 
         {/* Subject */}
         {!form.parentId && (
@@ -1057,16 +1217,21 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
       'hover:shadow-md',
       isChild && (isDark ? 'ml-8 border-l-2 border-l-slate-600 bg-slate-900/50' : 'ml-8 border-l-2 border-l-slate-300 bg-slate-50')
     )}>
-      <div className={cn('h-1', log.direction === 'Incoming' ? 'bg-emerald-500' : 'bg-blue-500')} />
+      <div className={cn(
+        'h-1',
+        log.isInternal ? (isDark ? 'bg-slate-700' : 'bg-slate-400') : (log.direction === 'Incoming' ? 'bg-emerald-500' : 'bg-blue-500')
+      )} />
 
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
             <div className={cn(
               'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
+              log.isInternal ? (isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500') :
               log.direction === 'Incoming' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
             )}>
-              {log.direction === 'Incoming' ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
+              {log.isInternal ? <Briefcase className="w-5 h-5" /> : 
+               log.direction === 'Incoming' ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
             </div>
 
             <div className="flex-1 min-w-0">
@@ -1078,8 +1243,8 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
                 <span className={cn('inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium', channelColor(log.channel))}>
                   {channelIcon(log.channel)} {log.channel}
                 </span>
-                <span className={cn('inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-bold shadow-sm', contactTypeColor(log.contactType))}>
-                  {contactTypeIcon(log.contactType)}
+                <span className={cn('inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-bold shadow-sm', log.isInternal ? (isDark ? 'bg-slate-800 text-slate-300 border border-slate-700' : 'bg-slate-100 text-slate-700 border border-slate-200') : contactTypeColor(log.contactType))}>
+                  {log.isInternal ? '🏢 INTERNAL' : contactTypeIcon(log.contactType)}
                   {log.client || (log.contactType === 'Client' ? 'Existing Client' : log.contactType)}
                 </span>
                 {log.siteName && (
@@ -1087,14 +1252,28 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
                     📍 {log.siteName}
                   </span>
                 )}
-                {log.contactPerson && (
-                  <span className={cn('inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium', isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700')}>
-                    👤 {log.contactPerson}
+                {log.isInternal ? (
+                  (log.reportedBy?.length ?? 0) > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {log.reportedBy!.map((name, i) => (
+                        <span key={i} className={cn('inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium', isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600')}>
+                          👤 {name}
+                        </span>
+                      ))}
+                    </div>
+                  )
+                ) : (
+                  log.contactPerson && (
+                    <span className={cn('inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium', isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700')}>
+                      👤 {log.contactPerson}
+                    </span>
+                  )
+                )}
+                {!log.isInternal && (
+                  <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', log.direction === 'Incoming' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700')}>
+                    {log.direction}
                   </span>
                 )}
-                <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', log.direction === 'Incoming' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700')}>
-                  {log.direction}
-                </span>
               </div>
 
               <div className={cn('text-sm flex flex-wrap items-center gap-2', isDark ? 'text-slate-200' : 'text-slate-800')}>
@@ -1308,12 +1487,13 @@ export function CommLog() {
   // Derived stats
   const stats = useMemo(() => {
     const total = commLogs.length;
-    const incoming = commLogs.filter(l => l.direction === 'Incoming').length;
-    const outgoing = commLogs.filter(l => l.direction === 'Outgoing').length;
+    const incoming = commLogs.filter(l => l.direction === 'Incoming' && !l.isInternal).length;
+    const outgoing = commLogs.filter(l => l.direction === 'Outgoing' && !l.isInternal).length;
+    const internal = commLogs.filter(l => l.isInternal).length;
     const pendingFollowUp = commLogs.filter(l => l.followUpDate && !l.followUpDone).length;
     const overdueFollowUp = commLogs.filter(l => l.followUpDate && !l.followUpDone && isBefore(parseISO(l.followUpDate), startOfDay(new Date()))).length;
     const potentialClients = new Set(commLogs.filter(l => l.contactType === 'Potential Client').map(l => l.client)).size;
-    return { total, incoming, outgoing, pendingFollowUp, overdueFollowUp, potentialClients };
+    return { total, incoming, outgoing, internal, pendingFollowUp, overdueFollowUp, potentialClients };
   }, [commLogs]);
 
   // Filtered list
@@ -1371,17 +1551,21 @@ export function CommLog() {
         client: form.client || undefined,
         siteId: form.siteId || undefined,
         siteName: form.siteName || undefined,
-        contactPerson: form.contactPerson || undefined,
+        contactPerson: form.isInternal ? undefined : (form.contactPerson || undefined),
         subject: form.subject || undefined,
         notes: form.notes,
         outcome: form.outcome || undefined,
         followUpDate: form.followUpDate || undefined,
         followUpDone: form.followUpDone,
         parentId: form.parentId || undefined,
+        isInternal: form.isInternal,
+        reportedBy: form.isInternal ? (form.reportedBy.length > 0 ? form.reportedBy : undefined) : undefined,
       });
       toast.success('Log updated');
       setEditingId(null);
     } else {
+      const addClientContact = useAppStore.getState().addClientContact;
+      const existingContacts = useAppStore.getState().clientContacts;
       addCommLog({
         id: generateId(),
         date: form.date,
@@ -1392,7 +1576,7 @@ export function CommLog() {
         client: form.client || undefined,
         siteId: form.siteId || undefined,
         siteName: form.siteName || undefined,
-        contactPerson: form.contactPerson || undefined,
+        contactPerson: form.isInternal ? undefined : (form.contactPerson || undefined),
         subject: form.subject || undefined,
         notes: form.notes,
         outcome: form.outcome || undefined,
@@ -1401,8 +1585,28 @@ export function CommLog() {
         loggedBy,
         parentId: form.parentId || undefined,
         createdAt: new Date().toISOString(),
+        isInternal: form.isInternal,
+        reportedBy: form.isInternal ? (form.reportedBy.length > 0 ? form.reportedBy : undefined) : undefined,
       });
-      toast.success('Communication logged');
+      // Auto-save new external contact person
+      if (!form.isInternal && form.contactPerson.trim() && form.client.trim()) {
+        const already = existingContacts.some(
+          c => c.clientName === form.client && c.name.toLowerCase() === form.contactPerson.trim().toLowerCase()
+        );
+        if (!already) {
+          addClientContact({
+            id: generateId(),
+            name: form.contactPerson.trim(),
+            clientName: form.client,
+            siteIds: form.siteId ? [form.siteId] : [],
+            siteNames: form.siteName ? [form.siteName] : [],
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+      toast.success(form.isInternal ? 'Internal communication logged' : 'Communication logged');
       if (form.createTask) {
         let parentSubject: string | undefined;
         let initialTitle = form.subject.trim() || `Follow-up: ${form.channel} with ${form.client || 'contact'}`;
@@ -1445,6 +1649,8 @@ export function CommLog() {
       followUpDone: log.followUpDone,
       createTask: false,
       parentId: log.parentId,
+      isInternal: log.isInternal || false,
+      reportedBy: log.reportedBy || [],
     });
     setEditingId(log.id);
     setShowForm(true);
@@ -1524,8 +1730,8 @@ export function CommLog() {
             { label: 'Total', value: stats.total, color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-100' },
             { label: 'Incoming', value: stats.incoming, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-100' },
             { label: 'Outgoing', value: stats.outgoing, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-100' },
+            { label: 'Internal', value: stats.internal, color: 'text-slate-600', bg: 'bg-slate-100 border-slate-200' },
             { label: 'Follow-ups', value: stats.pendingFollowUp, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-100' },
-            { label: 'Overdue', value: stats.overdueFollowUp, color: 'text-red-600', bg: 'bg-red-50 border-red-100' },
             { label: 'Prospects', value: stats.potentialClients, color: 'text-orange-600', bg: 'bg-orange-50 border-orange-100' },
           ].map(s => (
             <div key={s.label} className={cn('rounded-lg border p-2 text-center', isDark ? 'bg-slate-900 border-slate-800' : s.bg)}>

@@ -21,8 +21,25 @@ export interface CommLog {
   followUpDate?: string;
   followUpDone: boolean;
   loggedBy: string;
-  parentId?: string; // Links this log to its parent conversation
+  parentId?: string;
+  isInternal?: boolean;   // true = internal staff comm, false/undefined = external client comm
+  reportedBy?: string[];  // for internal logs: list of reporter names
   createdAt: string;
+}
+
+export interface ClientContact {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  position?: string;
+  note?: string;
+  clientName: string;
+  siteIds?: string[];
+  siteNames?: string[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DailyJournal {
@@ -549,6 +566,12 @@ interface AppState {
   updateCommLog: (id: string, log: Partial<CommLog>) => void;
   deleteCommLog: (id: string) => void;
 
+  clientContacts: ClientContact[];
+  addClientContact: (contact: ClientContact) => void;
+  updateClientContact: (id: string, updates: Partial<ClientContact>) => void;
+  deleteClientContact: (id: string) => void;
+  setClientContacts: (contacts: ClientContact[]) => void;
+
   dailyJournals: DailyJournal[];
   siteJournalEntries: SiteJournalEntry[];
   addDailyJournal: (journal: DailyJournal, entries: SiteJournalEntry[]) => void;
@@ -809,6 +832,7 @@ export const useAppStore = create<AppState>()(
       vehicles: [],
       vehicleTrips: [],
       vehicleDocumentTypes: [],
+      clientContacts: [],
 
       payrollVariables: {
         basic: 40, housing: 30, transport: 20, otherAllowances: 10,
@@ -857,6 +881,20 @@ export const useAppStore = create<AppState>()(
       addCommLog: (log) => { set((s) => ({ commLogs: [...s.commLogs, log] })); db.insertCommLog(log); },
       updateCommLog: (id, log) => { set((s) => ({ commLogs: s.commLogs.map(l => l.id === id ? { ...l, ...log } : l) })); db.updateCommLog(id, log); },
       deleteCommLog: (id) => { set((s) => ({ commLogs: s.commLogs.filter(l => l.id !== id) })); db.deleteCommLog(id); },
+
+      // Client Contacts
+      addClientContact: (contact) => set((s) => ({ clientContacts: [...s.clientContacts, contact] })),
+      updateClientContact: (id, updates) => set((s) => {
+        const oldContact = s.clientContacts.find(c => c.id === id);
+        const updatedContacts = s.clientContacts.map(c => c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c);
+        // Cascade name change to all comm logs referencing this contact
+        const updatedLogs = (updates.name && oldContact && updates.name !== oldContact.name)
+          ? s.commLogs.map(l => (!l.isInternal && l.contactPerson === oldContact.name) ? { ...l, contactPerson: updates.name } : l)
+          : s.commLogs;
+        return { clientContacts: updatedContacts, commLogs: updatedLogs };
+      }),
+      deleteClientContact: (id) => set((s) => ({ clientContacts: s.clientContacts.filter(c => c.id !== id) })),
+      setClientContacts: (contacts) => set({ clientContacts: contacts }),
 
       // Daily Journals
       addDailyJournal: (journal, entries) => {
