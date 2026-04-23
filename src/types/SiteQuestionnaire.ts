@@ -73,4 +73,7 @@ export interface SiteQuestionnaire {
 
   createdAt: string;
   updatedAt: string;
+
+  // Dynamic fields from the onboarding template (keyed by field ID → value string)
+  customFields?: Record<string, string>;
 }

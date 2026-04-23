@@ -188,6 +188,33 @@ export interface ServiceTemplate {
   subtasks: { title: string; assignee: string; description?: string }[];
 }
 
+export type FieldType = 'text' | 'number' | 'select' | 'checkbox' | 'date';
+
+export interface FieldDefinition {
+  id: string; // The property key it maps to (e.g., 'dischargeLocation')
+  label: string;
+  type: FieldType;
+  options?: string[]; // For 'select' dropdowns
+  requiredForActivation?: boolean; 
+  placeholder?: string;
+}
+
+export interface PhaseDefinition {
+  title: string;
+  fields: FieldDefinition[];
+}
+
+export interface OnboardingTemplate {
+  serviceName: string; // e.g. "Waterproofing", "Dewatering"
+  phases: {
+    phase1: PhaseDefinition;
+    phase2: PhaseDefinition;
+    phase3: PhaseDefinition;
+    phase4: PhaseDefinition;
+    phase5: PhaseDefinition;
+  };
+}
+
 export interface LeaveType {
   id: string;
   name: string;
@@ -773,6 +800,9 @@ interface AppState {
   getServiceTemplates: () => ServiceTemplate[];
   updateServiceTemplate: (template: ServiceTemplate) => void;
   removeServiceTemplate: (serviceName: string) => void;
+  onboardingTemplates: OnboardingTemplate[];
+  updateOnboardingTemplate: (template: OnboardingTemplate) => void;
+  removeOnboardingTemplate: (serviceName: string) => void;
   leaves: LeaveRecord[];
   addLeave: (leave: LeaveRecord) => void;
   updateLeave: (id: string, leave: Partial<LeaveRecord>) => void;
@@ -833,6 +863,117 @@ export const useAppStore = create<AppState>()(
       vehicleTrips: [],
       vehicleDocumentTypes: [],
       clientContacts: [],
+      
+      onboardingTemplates: [
+        {
+          serviceName: 'Dewatering',
+          phases: {
+            phase1: {
+              title: 'Phase 1',
+              fields: [
+                { id: 'isNewSite', label: 'Is New Site', type: 'checkbox', requiredForActivation: false },
+                { id: 'isNewClient', label: 'Is New Client', type: 'checkbox', requiredForActivation: false },
+                { id: 'whatIsBeingBuilt', label: 'What is being built', type: 'text', requiredForActivation: true },
+                { id: 'excavationDepthMeters', label: 'Excavation Depth (m)', type: 'number', requiredForActivation: true },
+                { id: 'siteLength', label: 'Site Length (m)', type: 'number', requiredForActivation: true },
+                { id: 'siteWidth', label: 'Site Width (m)', type: 'number', requiredForActivation: true },
+                { id: 'geotechnicalReportAvailable', label: 'Geotechnical Report Available', type: 'checkbox', requiredForActivation: false },
+                { id: 'hydrogeologicalDataAvailable', label: 'Hydrogeological Data Available', type: 'checkbox', requiredForActivation: false },
+              ]
+            },
+            phase2: {
+              title: 'Phase 2',
+              fields: [
+                { id: 'knownObstacles', label: 'Known Obstacles', type: 'text', requiredForActivation: false },
+                { id: 'dischargeLocation', label: 'Discharge Location', type: 'text', requiredForActivation: true },
+                { id: 'dieselSupplyStrategy', label: 'Diesel Supply Strategy', type: 'select', options: ['Client', 'DCEL'], requiredForActivation: true },
+              ]
+            },
+            phase3: {
+              title: 'Phase 3',
+              fields: [
+                { id: 'totalWellpointsRequired', label: 'Total Wellpoints Required', type: 'number', requiredForActivation: true },
+                { id: 'totalHeadersRequired', label: 'Total Headers Required', type: 'number', requiredForActivation: true },
+                { id: 'totalPumpsRequired', label: 'Total Pumps Required', type: 'number', requiredForActivation: true },
+                { id: 'expectedDailyDieselUsage', label: 'Expected Daily Diesel Usage (Liters)', type: 'number', requiredForActivation: true },
+              ]
+            },
+            phase4: {
+              title: 'Phase 4',
+              fields: [
+                { id: 'scopeOfWorkSummary', label: 'Scope of Work Summary', type: 'text', requiredForActivation: true },
+                { id: 'scopeExclusionsSummary', label: 'Scope Exclusions Summary', type: 'text', requiredForActivation: true },
+              ]
+            },
+            phase5: {
+              title: 'Phase 5',
+              fields: [
+                { id: 'safetyPlanIntegrated', label: 'Safety Plan Integrated', type: 'checkbox', requiredForActivation: true },
+                { id: 'stage1AdvanceReceived', label: 'Stage 1 Advance Received', type: 'checkbox', requiredForActivation: true },
+                { id: 'stage2InstallationComplete', label: 'Stage 2 Installation Complete', type: 'checkbox', requiredForActivation: true },
+                { id: 'stage2FirstInvoiceIssued', label: 'Stage 2 First Invoice Issued', type: 'checkbox', requiredForActivation: true },
+                { id: 'stage3TimelyBilling', label: 'Stage 3 Timely Billing Ongoing', type: 'checkbox', requiredForActivation: true },
+                { id: 'stage4DemobilizationComplete', label: 'Stage 4 Demobilization Complete', type: 'checkbox', requiredForActivation: true },
+                { id: 'stage4FinalInvoiceIssued', label: 'Stage 4 Final Invoice Issued', type: 'checkbox', requiredForActivation: true },
+              ]
+            }
+          }
+        },
+        {
+          serviceName: 'Waterproofing',
+          phases: {
+            phase1: {
+              title: 'Phase 1',
+              fields: [
+                { id: 'isNewSite', label: 'Is New Site', type: 'checkbox', requiredForActivation: false },
+                { id: 'isNewClient', label: 'Is New Client', type: 'checkbox', requiredForActivation: false },
+                { id: 'whatIsBeingBuilt', label: 'What is being built', type: 'text', requiredForActivation: true },
+                { id: 'excavationDepthMeters', label: 'Excavation Depth (m)', type: 'number', requiredForActivation: true },
+                { id: 'siteLength', label: 'Site Length (m)', type: 'number', requiredForActivation: true },
+                { id: 'siteWidth', label: 'Site Width (m)', type: 'number', requiredForActivation: true },
+                { id: 'geotechnicalReportAvailable', label: 'Geotechnical Report Available', type: 'checkbox', requiredForActivation: false },
+                { id: 'hydrogeologicalDataAvailable', label: 'Hydrogeological Data Available', type: 'checkbox', requiredForActivation: false },
+              ]
+            },
+            phase2: {
+              title: 'Phase 2',
+              fields: [
+                { id: 'knownObstacles', label: 'Known Obstacles', type: 'text', requiredForActivation: false },
+                { id: 'dischargeLocation', label: 'Discharge Location', type: 'text', requiredForActivation: true },
+                { id: 'dieselSupplyStrategy', label: 'Diesel Supply Strategy', type: 'select', options: ['Client', 'DCEL'], requiredForActivation: true },
+              ]
+            },
+            phase3: {
+              title: 'Phase 3',
+              fields: [
+                { id: 'totalWellpointsRequired', label: 'Total Wellpoints Required', type: 'number', requiredForActivation: true },
+                { id: 'totalHeadersRequired', label: 'Total Headers Required', type: 'number', requiredForActivation: true },
+                { id: 'totalPumpsRequired', label: 'Total Pumps Required', type: 'number', requiredForActivation: true },
+                { id: 'expectedDailyDieselUsage', label: 'Expected Daily Diesel Usage (Liters)', type: 'number', requiredForActivation: true },
+              ]
+            },
+            phase4: {
+              title: 'Phase 4',
+              fields: [
+                { id: 'scopeOfWorkSummary', label: 'Scope of Work Summary', type: 'text', requiredForActivation: true },
+                { id: 'scopeExclusionsSummary', label: 'Scope Exclusions Summary', type: 'text', requiredForActivation: true },
+              ]
+            },
+            phase5: {
+              title: 'Phase 5',
+              fields: [
+                { id: 'safetyPlanIntegrated', label: 'Safety Plan Integrated', type: 'checkbox', requiredForActivation: true },
+                { id: 'stage1AdvanceReceived', label: 'Stage 1 Advance Received', type: 'checkbox', requiredForActivation: true },
+                { id: 'stage2InstallationComplete', label: 'Stage 2 Installation Complete', type: 'checkbox', requiredForActivation: true },
+                { id: 'stage2FirstInvoiceIssued', label: 'Stage 2 First Invoice Issued', type: 'checkbox', requiredForActivation: true },
+                { id: 'stage3TimelyBilling', label: 'Stage 3 Timely Billing Ongoing', type: 'checkbox', requiredForActivation: true },
+                { id: 'stage4DemobilizationComplete', label: 'Stage 4 Demobilization Complete', type: 'checkbox', requiredForActivation: true },
+                { id: 'stage4FinalInvoiceIssued', label: 'Stage 4 Final Invoice Issued', type: 'checkbox', requiredForActivation: true },
+              ]
+            }
+          }
+        }
+      ],
 
       payrollVariables: {
         basic: 40, housing: 30, transport: 20, otherAllowances: 10,
@@ -1179,12 +1320,26 @@ export const useAppStore = create<AppState>()(
 
       // Service Templates (piggybacking on department_tasks DB)
       getServiceTemplates: () => {
-        return get().departmentTasksList
+        const fromTasks = get().departmentTasksList
           .filter(d => d.department.startsWith('__SERVICE__'))
           .map(d => ({
             serviceName: d.department.replace('__SERVICE__', ''),
             subtasks: d.onboardingTasks
           }));
+        
+        const fromTemplates = get().onboardingTemplates.map(t => ({
+          serviceName: t.serviceName,
+          subtasks: [] // subtasks are managed separately if needed
+        }));
+
+        // Merge and unique by serviceName
+        const all = [...fromTasks];
+        fromTemplates.forEach(t => {
+          if (!all.find(a => a.serviceName === t.serviceName)) {
+            all.push(t);
+          }
+        });
+        return all;
       },
       updateServiceTemplate: (template) => {
         get().updateDepartmentTasks({
@@ -1202,6 +1357,7 @@ export const useAppStore = create<AppState>()(
           offboardingTasks: []
         });
       },
+
 
       // Leave Types
       addLeaveType: (name) => {
@@ -1255,6 +1411,20 @@ export const useAppStore = create<AppState>()(
       deleteVehicleTripRecord: (id) => {
         set((s) => ({ vehicleTrips: s.vehicleTrips.filter(t => t.id !== id) }));
         db.deleteVehicleTripRecord(id);
+      },
+
+      // Onboarding Templates
+      updateOnboardingTemplate: (template) => {
+        set((s) => ({
+          onboardingTemplates: s.onboardingTemplates.some(t => t.serviceName === template.serviceName)
+            ? s.onboardingTemplates.map(t => t.serviceName === template.serviceName ? template : t)
+            : [...s.onboardingTemplates, template],
+        }));
+      },
+      removeOnboardingTemplate: (serviceName) => {
+        set((s) => ({
+          onboardingTemplates: s.onboardingTemplates.filter(t => t.serviceName !== serviceName),
+        }));
       },
     }),
     {

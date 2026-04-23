@@ -78,6 +78,82 @@ export function Variables() {
     return () => setIsDirty(false);
   }, []);
 
+  // ── Seed Default Onboarding Templates if empty ──
+  const onboardingTemplates = useAppStore(s => s.onboardingTemplates);
+  const updateOnboardingTemplate = useAppStore(s => s.updateOnboardingTemplate);
+  
+  useEffect(() => {
+    if (!onboardingTemplates || onboardingTemplates.length === 0) {
+      updateOnboardingTemplate({
+        serviceName: 'Dewatering',
+        phases: {
+          phase1: {
+            title: 'Phase 1',
+            fields: [
+              { id: 'isNewSite', label: 'Is New Site', type: 'checkbox', requiredForActivation: false },
+              { id: 'isNewClient', label: 'Is New Client', type: 'checkbox', requiredForActivation: false },
+              { id: 'siteLength', label: 'Length (m)', type: 'number', requiredForActivation: true },
+              { id: 'siteWidth', label: 'Width (m)', type: 'number', requiredForActivation: true },
+              { id: 'excavationDepthMeters', label: 'Depth of excavation (m)', type: 'number', requiredForActivation: true },
+              { id: 'timelineStartDate', label: 'Timeline start date', type: 'date', requiredForActivation: true },
+              { id: 'geotechnicalReportAvailable', label: 'Geotechnical Report Available', type: 'checkbox', requiredForActivation: false },
+              { id: 'hydrogeologicalDataAvailable', label: 'Hydrogeological Data Available', type: 'checkbox', requiredForActivation: false },
+            ]
+          },
+          phase2: {
+            title: 'Phase 2',
+            fields: [
+              { id: 'siteVisited', label: 'Site Visited', type: 'checkbox', requiredForActivation: true },
+              { id: 'walkthroughCompleted', label: 'Walkthrough Completed', type: 'checkbox', requiredForActivation: true },
+              { id: 'knownObstacles', label: 'Known Obstacles', type: 'text', requiredForActivation: false },
+              { id: 'dischargeLocation', label: 'Discharge Location', type: 'text', requiredForActivation: true },
+              { id: 'dieselSupplyStrategy', label: 'Diesel Supply Strategy', type: 'select', options: ['Client', 'DCEL'], requiredForActivation: true },
+            ]
+          },
+          phase3: {
+            title: 'Phase 3',
+            fields: [
+              { id: 'dewateringMethods', label: 'Dewatering Method(s)', type: 'text', requiredForActivation: true },
+              { id: 'totalHeadersRequired', label: 'Total Headers Required', type: 'number', requiredForActivation: true },
+              { id: 'totalWellpointsRequired', label: 'Total Wellpoints Required', type: 'number', requiredForActivation: true },
+              { id: 'totalPumpsRequired', label: 'Total Pumps Required', type: 'number', requiredForActivation: true },
+              { id: 'expectedDailyDieselUsage', label: 'Expected Daily Diesel Usage (Liters)', type: 'number', requiredForActivation: true },
+            ]
+          },
+          phase4: {
+            title: 'Phase 4',
+            fields: [
+              { id: 'quotationSent', label: 'Quotation Sent', type: 'checkbox', requiredForActivation: true },
+              { id: 'clientFeedbackReceived', label: 'Client Feedback Received', type: 'checkbox', requiredForActivation: true },
+              { id: 'proposalAccepted', label: 'Proposal Accepted', type: 'checkbox', requiredForActivation: true },
+              { id: 'clientTaxStatus', label: 'Client Tax Status', type: 'select', options: ['Mainland (Add 7.5% VAT)', 'Mainland (Yes 7.5% VAT)', 'Free Trade Zone (0% VAT)'], requiredForActivation: true },
+              { id: 'scopeOfWorkSummary', label: 'Scope of Work Summary', type: 'text', requiredForActivation: true },
+              { id: 'scopeExclusionsSummary', label: 'Scope Exclusions Summary', type: 'text', requiredForActivation: true },
+              { id: 'timelineConfirmed', label: 'Timeline Confirmed', type: 'checkbox', requiredForActivation: true },
+              { id: 'permittingResponsibilityOutlined', label: 'Permitting Responsibility Outlined', type: 'checkbox', requiredForActivation: true },
+              { id: 'tinProvided', label: 'TIN Provided', type: 'checkbox', requiredForActivation: true },
+              { id: 'clientTinNumber', label: 'Client TIN Number', type: 'text', requiredForActivation: false },
+              { id: 'mobilizationAdvancePercentage', label: 'Mobilization Advance Percentage', type: 'number', requiredForActivation: true },
+            ]
+          },
+          phase5: {
+            title: 'Phase 5',
+            fields: [
+              { id: 'safetyPlanIntegrated', label: 'Safety Plan Integrated', type: 'checkbox', requiredForActivation: true },
+              { id: 'stage1AdvanceReceived', label: 'Stage 1 Advance Received', type: 'checkbox', requiredForActivation: true },
+              { id: 'stage2InstallationComplete', label: 'Stage 2 Installation Complete', type: 'checkbox', requiredForActivation: true },
+              { id: 'stage2FirstInvoiceIssued', label: 'Stage 2 First Invoice Issued', type: 'checkbox', requiredForActivation: true },
+              { id: 'stage3TimelyBilling', label: 'Stage 3 Timely Billing Ongoing', type: 'checkbox', requiredForActivation: true },
+              { id: 'stage4DemobilizationComplete', label: 'Stage 4 Demobilization Complete', type: 'checkbox', requiredForActivation: true },
+              { id: 'stage4FinalInvoiceIssued', label: 'Stage 4 Final Invoice Issued', type: 'checkbox', requiredForActivation: true },
+              { id: 'actualEndDate', label: 'Actual End Date', type: 'date', requiredForActivation: false },
+            ]
+          }
+        }
+      });
+    }
+  }, [onboardingTemplates, updateOnboardingTemplate]);
+
   // ── Ledger variables ───────────────────────────────────────
   const ledgerCategories = useAppStore((state) => state.ledgerCategories);
   const ledgerBanks = useAppStore((state) => state.ledgerBanks);
@@ -119,6 +195,16 @@ export function Variables() {
   const [newServiceName, setNewServiceName] = useState('');
   const [newServiceTaskTitle, setNewServiceTaskTitle] = useState('');
   const [newServiceTaskAssignee, setNewServiceTaskAssignee] = useState('');
+
+  // Site Onboarding Builder State
+  const [activeBuilderPhase, setActiveBuilderPhase] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [newFieldLabel, setNewFieldLabel] = useState('');
+  const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'date' | 'select' | 'checkbox'>('text');
+  const [newFieldRequired, setNewFieldRequired] = useState(false);
+  const [newFieldOptions, setNewFieldOptions] = useState(''); // comma separated for select type
+  const [newFieldPlaceholder, setNewFieldPlaceholder] = useState('');
+
+
 
   // Navigation blocker removed because it requires react-router v6 createBrowserRouter data routers
   // Relying only on window.addEventListener('beforeunload') below
@@ -1242,7 +1328,170 @@ export function Variables() {
                   </div>
                 </div>
               )}
+
+              {/* Onboarding Form Builder */}
+              {selectedService && (
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50/20 overflow-hidden mt-6">
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-100/60 border-b border-indigo-200">
+                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-800">
+                      Onboarding Form Builder for {selectedService}
+                    </span>
+                  </div>
+                  <div className="p-4 space-y-4">
+                    {/* Select Phase */}
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {[1, 2, 3, 4, 5].map((phase) => (
+                        <button
+                          key={phase}
+                          onClick={() => setActiveBuilderPhase(phase as any)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                            activeBuilderPhase === phase 
+                              ? 'bg-indigo-600 text-white border-indigo-700' 
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          Phase {phase}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* New Field Form */}
+                    {priv.canEdit && (
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-2 p-3 bg-white rounded-lg border border-indigo-100 shadow-sm items-center">
+                        <Input 
+                          placeholder="Field Label (e.g. Dimensions)" 
+                          value={newFieldLabel} 
+                          onChange={(e) => setNewFieldLabel(e.target.value)} 
+                          className="md:col-span-3 h-9" 
+                        />
+                        <select 
+                          className="md:col-span-2 h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" 
+                          value={newFieldType} 
+                          onChange={(e) => setNewFieldType(e.target.value as any)}
+                        >
+                          <option value="text">Text Input</option>
+                          <option value="number">Number</option>
+                          <option value="date">Date</option>
+                          <option value="checkbox">Yes/No (Checkbox)</option>
+                          <option value="select">Dropdown</option>
+                        </select>
+                        {newFieldType === 'select' && (
+                          <Input 
+                            placeholder="Options (comma separated)" 
+                            value={newFieldOptions} 
+                            onChange={(e) => setNewFieldOptions(e.target.value)} 
+                            className="md:col-span-3 h-9" 
+                          />
+                        )}
+                        <label className="md:col-span-2 flex items-center gap-2 text-sm text-slate-700 pl-2">
+                          <input 
+                            type="checkbox" 
+                            checked={newFieldRequired} 
+                            onChange={e => setNewFieldRequired(e.target.checked)} 
+                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                          /> Required
+                        </label>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => {
+                            if (!newFieldLabel) return;
+                            const phaseKey = `phase${activeBuilderPhase}` as 'phase1' | 'phase2' | 'phase3' | 'phase4' | 'phase5';
+                            const emptyPhases = {
+                              phase1: { title: 'Phase 1: Initial Inquiry', fields: [] },
+                              phase2: { title: 'Phase 2: Site Visit & Assessment', fields: [] },
+                              phase3: { title: 'Phase 3: System Design', fields: [] },
+                              phase4: { title: 'Phase 4: Commercial Proposal', fields: [] },
+                              phase5: { title: 'Phase 5: Kick-off & Handover', fields: [] },
+                            };
+                            const currentTemplate = onboardingTemplates.find(t => t.serviceName === selectedService) || { serviceName: selectedService, phases: emptyPhases };
+                            const currentPhase = currentTemplate.phases[phaseKey] || { title: `Phase ${activeBuilderPhase}`, fields: [] };
+                            const newField = {
+                              id: Math.random().toString(36).slice(2),
+                              label: newFieldLabel,
+                              type: newFieldType as any,
+                              requiredForActivation: newFieldRequired,
+                              options: newFieldType === 'select' ? newFieldOptions.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+                              placeholder: newFieldPlaceholder || undefined,
+                            };
+                            updateOnboardingTemplate({
+                              ...currentTemplate,
+                              phases: {
+                                ...currentTemplate.phases,
+                                [phaseKey]: { ...currentPhase, fields: [...(currentPhase.fields || []), newField] }
+                              }
+                            } as any);
+                            setNewFieldLabel('');
+                            setNewFieldOptions('');
+                            setNewFieldPlaceholder('');
+                            setNewFieldRequired(false);
+                            setNewFieldType('text');
+                          }} 
+                          className={`gap-1 border-indigo-300 text-indigo-700 hover:bg-indigo-50 h-9 ${newFieldType === 'select' ? 'md:col-span-2' : 'md:col-span-5'}`}
+                          disabled={!newFieldLabel || (newFieldType === 'select' && !newFieldOptions)}
+                        >
+                          <Plus className="h-4 w-4" /> Add Field
+                        </Button>
+                      </div>
+                    )}
+
+
+                    {/* Field List */}
+                    <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                      {(() => {
+                        const phaseKey = `phase${activeBuilderPhase}` as 'phase1' | 'phase2' | 'phase3' | 'phase4' | 'phase5';
+                        const template = onboardingTemplates.find(t => t.serviceName === selectedService);
+                        const phaseFields = (template?.phases?.[phaseKey]?.fields || []);
+                        if (phaseFields.length === 0) {
+                          return (
+                            <p className="text-sm text-slate-400 text-center py-6 italic border-2 border-dashed border-slate-200 rounded-lg">
+                              No custom fields defined for Phase {activeBuilderPhase} yet. Add one above.
+                            </p>
+                          );
+                        }
+                        return phaseFields.map((f, idx) => (
+                          <div key={f.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200 shadow-sm group hover:border-indigo-300 transition-colors">
+                            <span className="h-6 w-6 rounded-full bg-indigo-100/50 text-indigo-700 text-[11px] font-bold flex items-center justify-center shrink-0 border border-indigo-200">
+                              {idx + 1}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-800 flex items-center gap-2">
+                                {f.label} 
+                                {f.requiredForActivation && <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Required</span>}
+                              </p>
+                              <p className="text-[11px] text-slate-500 mt-0.5">Type: {f.type} {f.options && f.options.length > 0 && `(${f.options.join(', ')})`}</p>
+                            </div>
+                            {priv.canEdit && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 shrink-0 text-slate-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity" 
+                                onClick={() => {
+                                  const templ = onboardingTemplates.find(s => s.serviceName === selectedService);
+                                  if (templ) {
+                                    const curPhase = templ.phases?.[phaseKey] || { title: `Phase ${activeBuilderPhase}`, fields: [] };
+                                    updateOnboardingTemplate({
+                                      ...templ,
+                                      phases: {
+                                        ...templ.phases,
+                                        [phaseKey]: { ...curPhase, fields: (curPhase.fields || []).filter(field => field.id !== f.id) }
+                                      }
+                                    } as any);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        ));
+                      })()}
+                    </div>
+
+                  </div>
+                </div>
+              )}
             </CardContent>
+
           </Card>
         </div>
       ) : varSection === 'ledger' ? (
