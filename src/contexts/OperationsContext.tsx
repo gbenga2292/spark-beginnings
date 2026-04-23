@@ -178,7 +178,11 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             description: a.description,
             requiresLogging: a.requires_logging,
             serialNumber: a.serial_number,
-            serviceIntervalMonths: a.service_interval_months || 2
+            serviceIntervalMonths: a.service_interval_months || 2,
+            powerSource: a.power_source,
+            cost: a.cost,
+            lowStockLevel: a.low_stock_level,
+            criticalStockLevel: a.critical_stock_level
           })));
         }
 
@@ -248,7 +252,11 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       description: asset.description,
       requires_logging: asset.requiresLogging,
       serial_number: asset.serialNumber,
-      service_interval_months: asset.serviceIntervalMonths
+      service_interval_months: asset.serviceIntervalMonths,
+      power_source: asset.powerSource,
+      cost: asset.cost,
+      low_stock_level: asset.lowStockLevel,
+      critical_stock_level: asset.criticalStockLevel
     });
   };
 
