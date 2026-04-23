@@ -7,7 +7,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check, Bell } from 'lucide-react';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check, Bell, UserCheck } from 'lucide-react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
@@ -27,6 +27,7 @@ import { normalizeDate } from '@/src/lib/dateUtils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { cn } from '../lib/utils';
 import { ClientSummaryGrid } from './ClientSummaryGrid';
+import { ClientContactsPanel } from './ClientContactsPanel';
 
 const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive' | 'Ended', startDate: new Date().toISOString().split('T')[0], endDate: '' };
 
@@ -205,6 +206,7 @@ export function Sites() {
   const [editForm, setEditForm] = useState({ ...EMPTY_FORM });
   const [addError, setAddError] = useState('');
   const [narrativeSite, setNarrativeSite] = useState<{ site: any; q: SiteQuestionnaire | null } | null>(null);
+  const [contactsFor, setContactsFor] = useState<string | null>(null);
 
 
   const buildNarrative = (site: any, q: SiteQuestionnaire | null): string => {
@@ -286,6 +288,7 @@ export function Sites() {
   const clientProfiles = useAppStore((s) => s.clientProfiles);
   const addClientProfile = useAppStore((s) => s.addClientProfile);
   const updateClientProfile = useAppStore((s) => s.updateClientProfile);
+  const clientContacts = useAppStore((s) => s.clientContacts);
   const invoices = useAppStore((s) => s.invoices);
   const commLogs = useAppStore((s) => s.commLogs);
   
@@ -911,7 +914,7 @@ export function Sites() {
           )}
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            {activeTab !== 'clients' && (
+            {activeTab !== 'clients' && !selectedClient && (
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
@@ -922,7 +925,7 @@ export function Sites() {
                 />
               </div>
             )}
-            {activeTab === 'active' && (
+            {(activeTab === 'active' || selectedClient) && (
               <>
                 <select 
                   className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
@@ -950,6 +953,23 @@ export function Sites() {
                     <LayoutGrid className="h-4 w-4" />
                   </button>
                 </div>
+                
+                {selectedClient && (
+                  <Button
+                    variant="outline"
+                    className="h-9 border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 font-semibold flex items-center gap-2"
+                    onClick={() => setContactsFor(selectedClient.name)}
+                  >
+                    <UserCheck className="w-4 h-4" />
+                    <span className="hidden sm:inline">Client Contacts</span>
+                    {(() => {
+                      const count = clientContacts.filter(c => c.clientName === selectedClient.name).length;
+                      return count > 0 ? (
+                        <span className="bg-indigo-200 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">{count}</span>
+                      ) : null;
+                    })()}
+                  </Button>
+                )}
               </>
             )}
           </div>
@@ -1416,7 +1436,14 @@ export function Sites() {
           </div>
         )}
       </div>
-
+      
+      {/* Client Contacts Modal */}
+      {contactsFor && (
+        <ClientContactsPanel
+          clientName={contactsFor}
+          onClose={() => setContactsFor(null)}
+        />
+      )}
 
       {/* ── Site Narrative Info Modal ── */}
       {narrativeSite && (

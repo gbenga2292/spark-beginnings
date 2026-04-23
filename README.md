@@ -6,16 +6,24 @@
 
 DCEL Office Suite is a comprehensive HR and Finance management system designed for construction companies. It integrates daily attendance tracking, automated payroll computation, healthcare (HMO) management, and financial reporting into a unified desktop and mobile application.
 
-## 🚀 Recent Updates (v1.4.3)
+## 🚀 Recent Updates (v1.4.4)
+
+### 🏗️ Site & Client Operations
+- **Client Contacts Relocation**: Moved "Client Contacts" to the top-right header of client site pages for streamlined access.
+- **Enhanced Site Views**: Added Card/Table view toggles and sorting options to the individual client view in Sites management.
+- **Internal Site Diary**: Refactored the Site Diary to aggregate entries from internal communications (commLogs) instead of the daily journal.
+
+### 🛠️ UX & Stability
+- **Grid Layout Fixes**: Resolved critical JSX parsing and tag mismatch errors in the Client Summary Grid.
+- **Dynamic Header Badges**: Added contact count indicators to the client header for quick information reference.
+
+---
+
+## 🚀 Previous Updates (v1.4.3)
 
 ### 📊 Operations & Asset Management
 - **Asset Logging Reliability**: Resolved data persistence issues where asset logging requirements would reset after page refresh.
-- **Operations UI Finalization**: Completed the transition from teal to the primary blue theme across all Operations modules, including Waybill and Site Inventory views.
-- **Data Sync Enhancements**: Improved real-time synchronization between Supabase and the UI for vehicle movements and logistics logs.
-
-### 🛠️ Stability & Performance
-- **Critical Crash Fixes**: Resolved `ReferenceError: Label is not defined` in `DailyLogManager` and improved overall component error handling.
-- **Hydration Improvements**: Refined data loading logic in `useDataLoader` to ensure accurate state restoration on initial load.
+- **Operations UI Finalization**: Completed the transition from teal to the primary blue theme across all Operations modules.
 
 ---
 
@@ -58,6 +66,8 @@ DCEL Office Suite is a comprehensive HR and Finance management system designed f
 ---
 
 ## 🏗️ Version History
+- **v1.4.4**: Client contacts relocation, enhanced site view toggles, and internal site diary refactor.
+- **v1.4.3**: Asset logging reliability and Operations theme finalization.
 - **v1.4.2**: Modern Task UI, Operations theme standardization, and multi-machine billing.
 - **v1.4.1**: HMO Management and automated renewal task synchronization.
 - **v1.4.0**: Comprehensive Payroll, Loans, and Reporting upgrade.

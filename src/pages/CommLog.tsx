@@ -1455,6 +1455,7 @@ export function CommLog() {
   const [filterDirection, setFilterDirection] = useState('All');
   const [filterChannel, setFilterChannel] = useState('All');
   const [filterContactType, setFilterContactType] = useState('All');
+  const [filterInternal, setFilterInternal] = useState('All'); // 'All', 'External', 'Internal'
   const [filterClient, setFilterClient] = useState('All');
   const [filterFollowUp, setFilterFollowUp] = useState('All');
   const [showFilters, setShowFilters] = useState(false);
@@ -1499,6 +1500,8 @@ export function CommLog() {
         if (filterDirection !== 'All' && l.direction !== filterDirection) return false;
         if (filterChannel !== 'All' && l.channel !== filterChannel) return false;
         if (filterContactType !== 'All' && l.contactType !== filterContactType) return false;
+        if (filterInternal === 'Internal' && !l.isInternal) return false;
+        if (filterInternal === 'External' && l.isInternal) return false;
         if (filterClient !== 'All' && l.client !== filterClient) return false;
         if (filterFollowUp === 'Pending' && !(l.followUpDate && !l.followUpDone)) return false;
         if (filterFollowUp === 'Overdue' && !(l.followUpDate && !l.followUpDone && isBefore(parseISO(l.followUpDate), startOfDay(new Date())))) return false;
@@ -1521,7 +1524,7 @@ export function CommLog() {
         if (dateDiff !== 0) return dateDiff;
         return (b.time || '').localeCompare(a.time || '');
       });
-  }, [commLogs, filterDirection, filterChannel, filterContactType, filterClient, filterFollowUp, searchTerm, dateFrom, dateTo]);
+  }, [commLogs, filterDirection, filterChannel, filterContactType, filterInternal, filterClient, filterFollowUp, searchTerm, dateFrom, dateTo]);
 
   const allLogClients = useMemo(() => {
     return [...new Set(commLogs.map(l => l.client).filter(Boolean))].sort();
@@ -1912,6 +1915,12 @@ export function CommLog() {
                   <option value="Both">Both</option>
                 </select>
 
+                <select value={filterInternal} onChange={e => setFilterInternal(e.target.value)} className={selectCls}>
+                  <option value="All">All Sources</option>
+                  <option value="External">🌐 External Only</option>
+                  <option value="Internal">🏢 Internal Only</option>
+                </select>
+
                 <select value={filterFollowUp} onChange={e => setFilterFollowUp(e.target.value)} className={selectCls}>
                   <option value="All">All Follow-ups</option>
                   <option value="Pending">Pending</option>
@@ -1944,7 +1953,7 @@ export function CommLog() {
                     {allLogClients.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                   <button
-                    onClick={() => { setFilterDirection('All'); setFilterChannel('All'); setFilterContactType('All'); setFilterClient('All'); setFilterFollowUp('All'); setDateFrom(''); setDateTo(''); setSearchTerm(''); }}
+                    onClick={() => { setFilterDirection('All'); setFilterChannel('All'); setFilterContactType('All'); setFilterInternal('All'); setFilterClient('All'); setFilterFollowUp('All'); setDateFrom(''); setDateTo(''); setSearchTerm(''); }}
                     className="text-xs text-red-500 hover:text-red-700 underline"
                   >
                     Clear all filters
@@ -1985,8 +1994,9 @@ export function CommLog() {
                     seenRootIds.add(parentId);
 
                     const parentLog = commLogs.find(l => l.id === parentId) || log;
+                    // Only show children that are ALSO in the filtered set
                     const children = commLogs
-                      .filter(l => l.parentId === parentId)
+                      .filter(l => l.parentId === parentId && filtered.some(fl => fl.id === l.id))
                       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
                     const clientKey = parentLog.client || '(No Client)';
@@ -2036,10 +2046,12 @@ export function CommLog() {
                             {threads.map(({ parentLog, children }) => {
                               const isThreadCollapsed = collapsedThreadIds.has(parentLog.id);
                               const hasChildren = children.length > 0;
+                              const isParentMatch = filtered.some(fl => fl.id === parentLog.id);
 
                               return (
-                                <div key={`thread-${parentLog.id}`} className="">
-                                  <div className={hasChildren ? 'pl-2' : ''}>
+                                <div key={`thread-${parentLog.id}`} className="space-y-1">
+                                  {isParentMatch && (
+                                    <div className={hasChildren ? 'pl-2' : ''}>
                                       <LogCard
                                         log={parentLog}
                                         isDark={isDark}
@@ -2069,31 +2081,31 @@ export function CommLog() {
                                         onToggleThread={() => toggleThread(parentLog.id)}
                                       />
                                     </div>
-                                    {/* Thread collapse indicator when has children */}
-                                    {hasChildren && isThreadCollapsed && (
-                                      <button
-                                        onClick={() => toggleThread(parentLog.id)}
-                                        className={cn(
-                                          'w-full flex items-center gap-2 px-4 py-1.5 text-xs font-medium transition-colors border-t',
-                                          isDark
-                                            ? 'bg-indigo-950/40 text-indigo-400 border-slate-700 hover:bg-indigo-950/60'
-                                            : 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100'
-                                        )}
-                                      >
-                                        <ChevronDown className="w-3.5 h-3.5" />
-                                        {children.length} follow-up{children.length !== 1 ? 's' : ''} hidden — click to expand
-                                      </button>
-                                    )}
+                                  )}
 
-                                  {/* Follow-up children — hidden when thread is collapsed */}
-                                  {!isThreadCollapsed && children.map(child => (
+                                  {hasChildren && isThreadCollapsed && isParentMatch && (
+                                    <button
+                                      onClick={() => toggleThread(parentLog.id)}
+                                      className={cn(
+                                        'w-full flex items-center gap-2 px-4 py-1.5 text-xs font-medium transition-colors border-t',
+                                        isDark
+                                          ? 'bg-indigo-950/40 text-indigo-400 border-slate-700 hover:bg-indigo-950/60'
+                                          : 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100'
+                                      )}
+                                    >
+                                      <ChevronDown className="w-3.5 h-3.5" />
+                                      {children.length} follow-up{children.length !== 1 ? 's' : ''} hidden — click to expand
+                                    </button>
+                                  )}
+
+                                  {(!isThreadCollapsed || !isParentMatch) && children.map(child => (
                                     <div key={child.id} className={cn(
-                                      'pl-2 border-l-2',
-                                      isDark ? 'border-indigo-800/60' : 'border-indigo-200'
+                                      isParentMatch && 'pl-2 border-l-2',
+                                      isParentMatch && (isDark ? 'border-indigo-800/60' : 'border-indigo-200')
                                     )}>
                                       <LogCard
                                         log={child}
-                                        isChild
+                                        isChild={isParentMatch}
                                         isDark={isDark}
                                         expanded={expandedIds.has(child.id)}
                                         onToggleExpand={() => toggleExpand(child.id)}

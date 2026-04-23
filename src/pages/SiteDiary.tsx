@@ -8,25 +8,24 @@ import { Button } from '@/src/components/ui/button';
 export function SiteDiary() {
   const { siteId } = useParams();
   const navigate = useNavigate();
-  const { siteJournalEntries, dailyJournals, sites } = useAppStore();
+  const { commLogs, sites } = useAppStore();
 
   const site = useMemo(() => sites.find(s => s.id === siteId), [sites, siteId]);
 
   const entries = useMemo(() => {
     if (!siteId) return [];
-    return siteJournalEntries
-      .filter(e => e.siteId === siteId)
+    return commLogs
+      .filter(e => e.siteId === siteId && e.isInternal === true)
       .map(entry => {
-        const journal = dailyJournals.find(j => j.id === entry.journalId);
         return {
-          ...entry,
-          date: journal?.date || '',
-          loggedBy: journal?.loggedBy || 'Unknown'
+          id: entry.id,
+          date: entry.date,
+          loggedBy: entry.loggedBy || 'Unknown',
+          narration: entry.notes
         };
       })
-      .filter(e => e.date !== '')
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [siteJournalEntries, dailyJournals, siteId]);
+  }, [commLogs, siteId]);
 
   if (!site) {
     return (
