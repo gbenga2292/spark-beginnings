@@ -14,7 +14,7 @@ import { cn } from '@/src/lib/utils';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { Card } from '@/src/components/ui/card';
 import { Input } from '@/src/components/ui/input';
-import { Label } from '@/src/components/ui/label';
+
 import { Textarea } from '@/src/components/ui/textarea';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription 
@@ -344,7 +344,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
 
                 {/* Supervisor Field */}
                 <div className="space-y-3">
-                  <Label className="text-[13px] font-bold text-slate-700 dark:text-slate-300 ml-1">Supervisor on Site</Label>
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Supervisor on Site</label>
                   <div className="relative group">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                     <select

@@ -1,7 +1,9 @@
 {
   "name": "dcel-hr-app",
   "private": true,
-  "version": "1.4.2",
+  "version": "1.4.3",
+  "description": "DCEL Office Suite - Comprehensive HR and Operations Management for Construction",
+  "author": "Gbenga",
   "type": "module",
   "main": "electron/main.cjs",
   "repository": {

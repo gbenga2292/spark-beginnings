@@ -350,18 +350,6 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
           </div>
         </div>
 
-        {/* Contact Person */}
-        <div>
-          <div className={labelCls}>Contact Person</div>
-          <input
-            type="text"
-            placeholder="e.g. Mr. Adeyemi, Site Manager"
-            value={form.contactPerson}
-            onChange={e => onChange({ contactPerson: e.target.value })}
-            className={inputCls}
-          />
-        </div>
-
         {/* Linked & Site Block */}
         <div className={cn("p-3 rounded-lg border space-y-4", isDark ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50/50 border-slate-100')}>
           <div>
@@ -564,6 +552,18 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
             </div>
           </div>
         )}
+
+        {/* Contact Person — below Link To, above Subject */}
+        <div>
+          <div className={labelCls}>Contact Person</div>
+          <input
+            type="text"
+            placeholder="e.g. Mr. Adeyemi, Site Manager"
+            value={form.contactPerson}
+            onChange={e => onChange({ contactPerson: e.target.value })}
+            className={inputCls}
+          />
+        </div>
 
         {/* Subject */}
         {!form.parentId && (

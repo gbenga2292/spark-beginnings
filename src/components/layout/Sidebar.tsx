@@ -89,7 +89,6 @@ const navigation: NavCategory[] = [
     icon: ListTodo,
     items: [
       { name: 'Task Register', href: '/tasks', icon: ClipboardCheck, privKey: 'tasks', privField: 'canViewMyTasks' },
-      { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'commLog', privField: 'canView' },
       { name: 'Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'tasks', privField: 'canViewReminders' },
       { name: 'Reports', href: '/tasks/reports', icon: BarChart3, privKey: 'tasks', privField: 'canViewReports' },
     ],
@@ -100,7 +99,6 @@ const navigation: NavCategory[] = [
     icon: Users,
     items: [
       { name: 'HR Dashboard', href: '/hr-dashboard', icon: LayoutDashboard, privKey: 'dashboard', privField: 'canView' },
-      { name: 'Daily Journal', href: '/daily-journal', icon: BookOpen, privKey: 'dashboard', privField: 'canView' },
       { name: 'Daily Register', href: '/attendance', icon: CalendarClock, privKey: 'attendance', privField: 'canView' },
       { name: 'Employees', href: '/employees', icon: Users, privKey: 'employees', privField: 'canView' },
       { name: 'Onboarding', href: '/onboarding', icon: UserPlus, privKey: 'onboarding', privField: 'canView' },
@@ -132,6 +130,8 @@ const navigation: NavCategory[] = [
     icon: Building2,
     items: [
       { name: 'Sites Overview', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView' },
+      { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'commLog', privField: 'canView' },
+      { name: 'Daily Journal', href: '/daily-journal', icon: BookOpen, privKey: 'dashboard', privField: 'canView' },
     ],
   },
   // ── Account ───────────────────────────────────────────────────────────────

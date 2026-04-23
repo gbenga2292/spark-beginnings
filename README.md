@@ -6,21 +6,30 @@
 
 DCEL Office Suite is a comprehensive HR and Finance management system designed for construction companies. It integrates daily attendance tracking, automated payroll computation, healthcare (HMO) management, and financial reporting into a unified desktop and mobile application.
 
-## 🚀 Recent Updates (v1.4.2)
+## 🚀 Recent Updates (v1.4.3)
+
+### 📊 Operations & Asset Management
+- **Asset Logging Reliability**: Resolved data persistence issues where asset logging requirements would reset after page refresh.
+- **Operations UI Finalization**: Completed the transition from teal to the primary blue theme across all Operations modules, including Waybill and Site Inventory views.
+- **Data Sync Enhancements**: Improved real-time synchronization between Supabase and the UI for vehicle movements and logistics logs.
+
+### 🛠️ Stability & Performance
+- **Critical Crash Fixes**: Resolved `ReferenceError: Label is not defined` in `DailyLogManager` and improved overall component error handling.
+- **Hydration Improvements**: Refined data loading logic in `useDataLoader` to ensure accurate state restoration on initial load.
+
+---
+
+## 🚀 Previous Updates (v1.4.2)
 
 ### 💬 Modern Task Experience
-- **WhatsApp-Style Updates**: Reimagined task communications with a bubble-based chat interface, sender avatars, and colored names.
-- **Improved Attachments**: Enhanced file sharing and subtask creation within the task update pane.
-- **Smart Notifications**: Refined reminder logic to trigger only at specified times with direct navigation to task details.
-
-### 🏗️ Operations & Logistics (Standardized)
-- **Blue Theme Integration**: Completed the visual migration of the Operations module, ensuring consistent primary blue branding across Site Inventory, Waybills, and Checkouts.
-- **Vehicle Tracking 2.0**: Robust movement log persistence with real-time Supabase sync and improved data hydration.
-- **Unified Site/Client Hub**: Consolidated module for managing Sites and Clients with a unified site diary and conversation history.
+- **WhatsApp-Style Updates**: Reimagined task communications with a bubble-based chat interface.
+- **Smart Notifications**: Refined reminder logic to trigger only at specified times with direct navigation.
 
 ### 💰 Billing & Payroll Refinements
 - **Pro-rated Salaries**: Automated salary adjustments for employees joining mid-month.
-- **Multi-Machine Invoicing**: Granular control over machine rates and durations in billing, supporting complex multi-asset projects.
+- **Multi-Machine Invoicing**: Granular control over machine rates and durations in billing.
+
+---
 
 ---
 

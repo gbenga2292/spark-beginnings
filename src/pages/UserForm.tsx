@@ -38,11 +38,6 @@ const PRIV_GROUPS: PG[] = [
           { key: 'canDeleteTasks', label: 'Delete Tasks', danger: true },
         ]
       },
-      { key: 'commLog', label: 'External Communications', parentKey: 'commLog', masterField: 'canView',
-        fields: [
-          { key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add/Log' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canExport', label: 'Export' }
-        ]
-      },
     ],
   },
   {
@@ -105,7 +100,7 @@ const PRIV_GROUPS: PG[] = [
     ],
   },
   {
-    name: 'Clients', icon: Building2, color: 'indigo',
+    name: 'Clients & Sites', icon: Building2, color: 'indigo',
     pages: [
       { key: 'clients', label: 'Clients Directory', parentKey: 'clients', masterField: 'canView',
         fields: [
@@ -116,6 +111,14 @@ const PRIV_GROUPS: PG[] = [
           { key: 'canView', label: 'View' }, { key: 'canAddSite', label: 'Add Site' }, { key: 'canEditSite', label: 'Edit Site' }, { key: 'canDeleteSite', label: 'Delete Site', danger: true },
           { key: 'canAddClient', label: 'Add Client (Legacy)' }, { key: 'canEditClient', label: 'Edit Client (Legacy)' }, { key: 'canDeleteClient', label: 'Delete Client (Legacy)', danger: true },
           { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' },
+        ] },
+      { key: 'commLog', label: 'External Communications', parentKey: 'commLog', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add/Log' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canExport', label: 'Export' },
+        ] },
+      { key: 'dailyJournalAccess', label: 'Daily Journal', parentKey: 'dashboard', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View Daily Journal' },
         ] },
     ],
   },
