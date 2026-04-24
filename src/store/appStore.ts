@@ -794,7 +794,7 @@ interface AppState {
     payeeTypes?: string[];
   };
   updateHrVariables: (variables: Partial<AppState['hrVariables']>) => void;
-  saveAllSettings: (payroll: AppState['payrollVariables'], paye: AppState['payeTaxVariables'], months: AppState['monthValues'], hr: AppState['hrVariables']) => void;
+  saveAllSettings: (payroll: AppState['payrollVariables'], paye: AppState['payeTaxVariables'], months: AppState['monthValues'], hr: AppState['hrVariables'], onboarding: AppState['onboardingTemplates']) => void;
   publicHolidays: { id: string; date: string; name: string }[];
   addPublicHoliday: (holiday: { id: string; date: string; name: string }) => void;
   removePublicHoliday: (id: string) => void;
