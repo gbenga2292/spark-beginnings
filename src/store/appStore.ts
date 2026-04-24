@@ -57,6 +57,8 @@ export interface SiteJournalEntry {
   siteName: string;
   clientName: string;
   narration: string;
+  createdAt: string;
+  loggedBy: string;
 }
 
 export interface StaffMeritRecord {
@@ -604,6 +606,7 @@ interface AppState {
   addDailyJournal: (journal: DailyJournal, entries: SiteJournalEntry[]) => void;
   updateDailyJournal: (journalId: string, journal: Partial<DailyJournal>, newEntries: SiteJournalEntry[]) => void;
   deleteDailyJournal: (journalId: string) => void;
+  deleteSiteJournalEntry: (entryId: string) => void;
 
   sites: Site[];
   pendingSites: SiteQuestionnaire[];
@@ -1058,6 +1061,12 @@ export const useAppStore = create<AppState>()(
           siteJournalEntries: s.siteJournalEntries.filter((e) => e.journalId !== journalId),
         }));
         db.deleteDailyJournal(journalId);
+      },
+      deleteSiteJournalEntry: (entryId) => {
+        set((s) => ({
+          siteJournalEntries: s.siteJournalEntries.filter((e) => e.id !== entryId),
+        }));
+        db.deleteSiteJournalEntry(entryId);
       },
 
       // Leaves

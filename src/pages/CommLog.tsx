@@ -1440,10 +1440,10 @@ export function CommLog() {
   const [form, setForm] = useState(emptyForm());
   // expandedIds = card body expanded (shows notes/outcome)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  // collapsedThreadIds = parent log is collapsed (hides follow-ups)
-  const [collapsedThreadIds, setCollapsedThreadIds] = useState<Set<string>>(new Set());
-  // collapsedClients = client section is collapsed
-  const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set());
+  // expandedThreadIds = parent log is expanded (shows follow-ups)
+  const [expandedThreadIds, setExpandedThreadIds] = useState<Set<string>>(new Set());
+  // expandedClients = client section is expanded
+  const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
 
   // Task-from-log dialog state
   const [taskDialog, setTaskDialog] = useState<{ open: boolean; title: string; description: string; parentLogSubject?: string }>(
@@ -1682,7 +1682,7 @@ export function CommLog() {
   };
 
   const toggleThread = (id: string) => {
-    setCollapsedThreadIds(prev => {
+    setExpandedThreadIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
@@ -1690,7 +1690,7 @@ export function CommLog() {
   };
 
   const toggleClient = (client: string) => {
-    setCollapsedClients(prev => {
+    setExpandedClients(prev => {
       const next = new Set(prev);
       if (next.has(client)) next.delete(client); else next.add(client);
       return next;
@@ -2009,7 +2009,7 @@ export function CommLog() {
 
                   return sortedClients.map(clientName => {
                     const threads = clientMap.get(clientName)!;
-                    const isClientCollapsed = collapsedClients.has(clientName);
+                    const isClientCollapsed = !expandedClients.has(clientName);
                     const threadCount = threads.length;
                     const replyCount = threads.reduce((sum, t) => sum + t.children.length, 0);
 
@@ -2044,7 +2044,7 @@ export function CommLog() {
                         {!isClientCollapsed && (
                           <div className="divide-y divide-slate-100 dark:divide-slate-800">
                             {threads.map(({ parentLog, children }) => {
-                              const isThreadCollapsed = collapsedThreadIds.has(parentLog.id);
+                              const isThreadCollapsed = !expandedThreadIds.has(parentLog.id);
                               const hasChildren = children.length > 0;
                               const isParentMatch = filtered.some(fl => fl.id === parentLog.id);
 

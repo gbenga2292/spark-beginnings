@@ -70,7 +70,7 @@ export interface LedgerPriv { canView: boolean; canAdd: boolean; canEdit: boolea
 
 // ─── Settings ────────────────────────────────────────────────
 export interface VariablesPriv { canView: boolean; canEdit: boolean; canImport: boolean; canExport: boolean; canBackup: boolean; canRestore: boolean; }
-export interface UsersPriv     { canView: boolean; canManage: boolean; }
+export interface UsersPriv     { canView: boolean; canManage: boolean; canOverrideDiaryDelete: boolean; }
 export interface ActivityLogPriv { canView: boolean; canExport: boolean; }
 
 // ─── Missing Bundled Pages ───────────────────────────────────
@@ -151,7 +151,7 @@ export const FULL_ACCESS: UserPrivileges = {
   financialReports: { canView: true, canExport: true, canViewAmounts: true, canViewPayrollSummary: true, canViewLoansAndAdvances: true },
   ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
   variables:        { canView: true, canEdit: true, canImport: true, canExport: true, canBackup: true, canRestore: true },
-  users:            { canView: true, canManage: true },
+  users:            { canView: true, canManage: true, canOverrideDiaryDelete: true },
   tasks:            { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: true },
   operations:       { canView: true, canViewAnalytics: true },
   opsInventory:     { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
@@ -185,7 +185,7 @@ export const NO_ACCESS: UserPrivileges = {
   financialReports: { canView: false, canExport: false, canViewAmounts: false, canViewPayrollSummary: false, canViewLoansAndAdvances: false },
   ledger:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
   variables:        { canView: false, canEdit: false, canImport: false, canExport: false, canBackup: false, canRestore: false },
-  users:            { canView: false, canManage: false },
+  users:            { canView: false, canManage: false, canOverrideDiaryDelete: false },
   tasks:            { canView: false, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false },
   operations:       { canView: false, canViewAnalytics: false },
   opsInventory:     { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },

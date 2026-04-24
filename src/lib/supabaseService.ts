@@ -382,6 +382,8 @@ export function dbToSiteJournalEntry(r: any): SiteJournalEntry {
     siteName: r.site_name,
     clientName: r.client_name,
     narration: r.narration,
+    createdAt: r.created_at,
+    loggedBy: r.logged_by,
   };
 }
 
@@ -403,6 +405,8 @@ export function siteJournalEntryToDb(e: SiteJournalEntry): any {
     site_name: e.siteName,
     client_name: e.clientName,
     narration: e.narration,
+    created_at: e.createdAt,
+    logged_by: e.loggedBy,
     workspace_id: getWS(),
   };
 }
@@ -1833,5 +1837,9 @@ export const db = {
   async deleteDailyJournal(id: string) {
     const { error } = await supabase.from('daily_journals').delete().eq('id', id);
     if (error) { console.error('deleteDailyJournal:', error); throw error; }
+  },
+  async deleteSiteJournalEntry(id: string) {
+    const { error } = await supabase.from('site_journal_entries').delete().eq('id', id);
+    if (error) { console.error('deleteSiteJournalEntry:', error); throw error; }
   }
 };

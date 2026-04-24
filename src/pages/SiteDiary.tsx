@@ -4,28 +4,50 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useAppStore } from '@/src/store/appStore';
 import { Calendar, BookOpen, ArrowLeft, Building2 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
+import { format } from 'date-fns';
+import { cn } from '@/src/lib/utils';
 
 export function SiteDiary() {
   const { siteId } = useParams();
   const navigate = useNavigate();
-  const { commLogs, sites } = useAppStore();
+  const { commLogs, sites, siteJournalEntries, dailyJournals } = useAppStore();
 
   const site = useMemo(() => sites.find(s => s.id === siteId), [sites, siteId]);
 
   const entries = useMemo(() => {
     if (!siteId) return [];
-    return commLogs
+    
+    // Get internal comm logs
+    const internalLogs = commLogs
       .filter(e => e.siteId === siteId && e.isInternal === true)
+      .map(entry => ({
+        id: entry.id,
+        date: entry.date,
+        timestamp: entry.createdAt,
+        loggedBy: entry.loggedBy || 'Unknown',
+        narration: entry.notes,
+        type: 'Comm Log'
+      }));
+
+    // Get site journal entries
+    const journalEntries = siteJournalEntries
+      .filter(e => e.siteId === siteId)
       .map(entry => {
+        const parent = dailyJournals.find(j => j.id === entry.journalId);
         return {
           id: entry.id,
-          date: entry.date,
+          date: parent?.date || entry.createdAt.split('T')[0],
+          timestamp: entry.createdAt,
           loggedBy: entry.loggedBy || 'Unknown',
-          narration: entry.notes
+          narration: entry.narration,
+          type: 'Journal'
         };
       })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [commLogs, siteId]);
+      .filter(e => e.date !== undefined);
+
+    return [...internalLogs, ...journalEntries]
+      .sort((a, b) => new Date(b.timestamp || b.date).getTime() - new Date(a.timestamp || a.date).getTime());
+  }, [commLogs, siteJournalEntries, dailyJournals, siteId]);
 
   if (!site) {
     return (
@@ -72,10 +94,25 @@ export function SiteDiary() {
                   {/* Content card */}
                   <div className="bg-white border text-sm border-slate-200 rounded-lg p-5 shadow-sm w-full">
                     <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-3">
-                      <span className="font-bold text-slate-800 text-base">
-                        {new Date(entry.date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-                      </span>
-                      <span className="text-xs text-slate-400 font-medium">by {entry.loggedBy}</span>
+                      <div className="flex flex-col">
+                        <span className="font-bold text-slate-800 text-base">
+                          {new Date(entry.date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                        </span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {entry.timestamp && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded flex items-center gap-1">
+                              {format(new Date(entry.timestamp), 'HH:mm')}
+                            </span>
+                          )}
+                          <span className={cn(
+                            "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider",
+                            entry.type === 'Journal' ? "bg-blue-100 text-blue-600" : "bg-indigo-100 text-indigo-600"
+                          )}>
+                            {entry.type}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-xs text-slate-400 font-medium italic">by {entry.loggedBy}</span>
                     </div>
                     <p className="text-slate-700 whitespace-pre-line leading-relaxed text-[15px]">
                       {entry.narration}

@@ -149,7 +149,7 @@ const PRIV_GROUPS: PG[] = [
     name: 'Settings', icon: Settings, color: 'slate',
     pages: [
       { key: 'users', label: 'User Management', parentKey: 'users', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View Users' }, { key: 'canManage', label: 'Add / Edit Users', danger: true }] },
+        fields: [{ key: 'canView', label: 'View Users' }, { key: 'canManage', label: 'Add / Edit Users', danger: true }, { key: 'canOverrideDiaryDelete', label: 'Override Site Diary Delete (Admin)', danger: true }] },
       { key: 'variables', label: 'App Settings & Variables', parentKey: 'variables', masterField: 'canView',
         fields: [
           { key: 'canView', label: 'View Settings' },
