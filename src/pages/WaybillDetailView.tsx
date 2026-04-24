@@ -364,8 +364,9 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
 
             {/* PDF iframe */}
             <div className="flex-1 overflow-hidden bg-slate-100 dark:bg-slate-950">
-              <iframe
+              <embed
                 src={pdfDataUri}
+                type="application/pdf"
                 className="w-full h-full border-0"
                 title="Waybill PDF Preview"
               />

@@ -299,7 +299,7 @@ export function DailyJournal() {
                 </div>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span className="text-xs text-muted-foreground">{entries.length} log points · {group.journals.length} session{group.journals.length !== 1 ? 's' : ''}</span>
-                  {[...new Set(entries.map(e => e.siteName))].slice(0, 3).map(s => (
+                  {[...new Set(entries.map(e => e.siteName))].map(s => (
                     <span key={s} className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
                       <MapPin className="h-2.5 w-2.5" />{s}
                     </span>
@@ -425,7 +425,7 @@ export function DailyJournal() {
             </div>
           </div>
           <div className="flex-1 overflow-hidden bg-slate-100 dark:bg-slate-950">
-            <iframe src={pdfDataUri} className="w-full h-full border-0" title="Diary PDF Preview" />
+            <embed src={pdfDataUri} type="application/pdf" className="w-full h-full border-0" title="Diary PDF Preview" />
           </div>
         </DialogContent>
       </Dialog>

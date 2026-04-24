@@ -117,7 +117,7 @@ export function Users() {
   );
 
   return (
-    <div className="flex flex-col gap-6 h-full pb-10">
+    <div className="flex flex-col gap-6 h-full pb-4">
       {/* ── Mobile Actions ── */}
       <div className="sm:hidden grid grid-cols-2 gap-2 mb-2">
         <Button 
@@ -151,10 +151,10 @@ export function Users() {
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1">
-          <div className="overflow-x-auto min-h-[400px]">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
+          <div className="overflow-auto flex-1">
             <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase font-semibold">
+              <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase font-semibold sticky top-0 z-10">
                 <tr>
                   <th className="px-6 py-4 w-[30%]">User</th>
                   <th className="px-4 py-4 w-[10%]">Status</th>

@@ -90,7 +90,7 @@ export function DiaryDetailView({
                 {t}
               </span>
             ))}
-            {sites.slice(0, 4).map(site => (
+            {sites.map(site => (
               <span key={site} className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/30">
                 <MapPin className="h-3 w-3" />{site}
               </span>

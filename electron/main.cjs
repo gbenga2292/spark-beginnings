@@ -416,6 +416,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
+      plugins: true,
     },
     show: false, // wait for ready-to-show for a flash-free launch
   });

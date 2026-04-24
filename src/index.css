@@ -11,11 +11,11 @@
 /* ── Visible scrollbars — slim & tasteful ───────────────────────────── */
 * {
   scrollbar-width: thin;                     /* Firefox */
-  scrollbar-color: #cbd5e1 transparent;      /* Firefox: thumb track */
+  scrollbar-color: #94a3b8 transparent;      /* Firefox: thumb track */
 }
 *::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 10px;
+  height: 10px;
 }
 *::-webkit-scrollbar-track {
   background: transparent;

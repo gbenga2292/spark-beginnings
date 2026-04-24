@@ -203,13 +203,15 @@ export function useDataLoader(isAuthenticated: boolean) {
           return { ...remoteUser, privileges: remotePrivs };
         });
 
-        // Preserve locally-created users not yet in Supabase
-        const localOnlyUsers = localUsers.filter((u) => !remoteIds.has(u.id));
+        // We do NOT preserve locally-created users not yet in Supabase.
+        // Users are always created via the edge function, so if they are missing
+        // from Supabase, it means they were deleted by an admin.
+        // Preserving them here would cause deleted users to be immortalized across page reloads.
 
         // ── Set currentUserId to the logged-in Supabase user ────────
         const currentSupabaseId = authUser?.id ?? useUserStore.getState().currentUserId;
 
-        let finalUsers = [...mergedUsers, ...localOnlyUsers];
+        let finalUsers = [...mergedUsers];
         if (currentUserProfile && !finalUsers.some((u) => u.id === currentUserProfile.id)) {
           finalUsers.push({
             ...currentUserProfile,
