@@ -16,6 +16,8 @@ import {
   startOfWeek, endOfWeek, addDays, isSameDay, 
   format, startOfDay, addMonths, subMonths 
 } from 'date-fns';
+import { usePriv } from '../hooks/usePriv';
+import { useEffect } from 'react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -35,8 +37,23 @@ export function VehicleManager() {
     vehicleDocumentTypes, updateVehicleDocument
   } = useOperations();
   const { sites, pendingSites, employees } = useAppStore();
+  const priv = usePriv('opsVehicles');
   
-  const [activeTab, setActiveTab] = useState<'fleet' | 'logs' | 'documents'>('fleet');
+  const [activeTab, setActiveTab] = useState<'fleet' | 'logs' | 'documents'>('logs');
+
+  // Ensure user is on a permitted tab
+  useEffect(() => {
+    if (activeTab === 'logs' && !priv.canViewLogs) {
+      if (priv.canViewFleet) setActiveTab('fleet');
+      else if (priv.canViewDocuments) setActiveTab('documents');
+    } else if (activeTab === 'fleet' && !priv.canViewFleet) {
+      if (priv.canViewLogs) setActiveTab('logs');
+      else if (priv.canViewDocuments) setActiveTab('documents');
+    } else if (activeTab === 'documents' && !priv.canViewDocuments) {
+      if (priv.canViewLogs) setActiveTab('logs');
+      else if (priv.canViewFleet) setActiveTab('fleet');
+    }
+  }, [priv, activeTab]);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -75,7 +92,7 @@ export function VehicleManager() {
     'Vehicle Management',
     'Manage company fleet and track daily movement logs',
     <div className="hidden sm:flex items-center gap-2">
-      {activeTab === 'logs' && (
+      {activeTab === 'logs' && priv.canAddLogs && (
         <Button 
           variant="outline" size="sm" className="gap-2 h-9"
           onClick={() => setShowTripForm(true)}
@@ -83,7 +100,7 @@ export function VehicleManager() {
           <ClipboardList className="h-4 w-4" /> Record Trip
         </Button>
       )}
-      {activeTab === 'fleet' && (
+      {activeTab === 'fleet' && priv.canAddFleet && (
         <Button 
           size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9"
           onClick={() => {
@@ -389,24 +406,30 @@ export function VehicleManager() {
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-8 px-2 mx-1">
-        <button 
-          className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'fleet' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-          onClick={() => setActiveTab('fleet')}
-        >
-          Vehicle Fleet
-        </button>
-        <button 
-          className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'logs' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-          onClick={() => setActiveTab('logs')}
-        >
-          Movement Logs
-        </button>
-        <button 
-          className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'documents' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-          onClick={() => setActiveTab('documents')}
-        >
-          Vehicle Documents
-        </button>
+        {priv.canViewLogs && (
+          <button 
+            className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'logs' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+            onClick={() => setActiveTab('logs')}
+          >
+            Movement Logs
+          </button>
+        )}
+        {priv.canViewFleet && (
+          <button 
+            className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'fleet' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+            onClick={() => setActiveTab('fleet')}
+          >
+            Vehicle Fleet
+          </button>
+        )}
+        {priv.canViewDocuments && (
+          <button 
+            className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'documents' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+            onClick={() => setActiveTab('documents')}
+          >
+            Vehicle Documents
+          </button>
+        )}
       </div>
 
       {activeTab === 'fleet' ? (
@@ -481,16 +504,20 @@ export function VehicleManager() {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
-                              setEditingVehicle(v);
-                              setVForm({ name: v.name, registration_number: v.registration_number, type: v.type || 'van', status: v.status });
-                              setShowVehicleForm(true);
-                            }}>
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicle(v.id)}>
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                            {priv.canEditFleet && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                                setEditingVehicle(v);
+                                setVForm({ name: v.name, registration_number: v.registration_number, type: v.type || 'van', status: v.status });
+                                setShowVehicleForm(true);
+                              }}>
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {priv.canDeleteFleet && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicle(v.id)}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -605,14 +632,16 @@ export function VehicleManager() {
                         );
                       })}
                       <td className="px-6 py-4 text-right">
-                        <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase font-bold text-blue-600" 
-                          onClick={() => {
-                            setEditingDocVehicle(v);
-                            setDocUpdateForm({ type: '', date: '' });
-                            setShowDocUpdateForm(true);
-                          }}>
-                          Update
-                        </Button>
+                        {priv.canEditDocuments && (
+                          <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase font-bold text-blue-600" 
+                            onClick={() => {
+                              setEditingDocVehicle(v);
+                              setDocUpdateForm({ type: '', date: '' });
+                              setShowDocUpdateForm(true);
+                            }}>
+                            Update
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -702,12 +731,16 @@ export function VehicleManager() {
                           </td>
                           <td className="px-6 py-4 text-right">
                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditTrip(trip)}>
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicleTripRecord(trip.id)}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                              {priv.canEditLogs && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditTrip(trip)}>
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              {priv.canDeleteLogs && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicleTripRecord(trip.id)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>

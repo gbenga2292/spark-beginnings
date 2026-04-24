@@ -93,7 +93,20 @@ const PRIV_GROUPS: PG[] = [
         ] },
       { key: 'opsVehicles', label: 'Vehicles', parentKey: 'opsVehicles', masterField: 'canView',
         fields: [
-          { key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true },
+          { key: 'canView', label: 'Master View' }, 
+          // Logs
+          { key: 'canViewLogs', label: 'View Logs' },
+          { key: 'canAddLogs', label: 'Record Trips', special: true },
+          { key: 'canEditLogs', label: 'Edit Logs' },
+          { key: 'canDeleteLogs', label: 'Delete Logs', danger: true },
+          // Fleet
+          { key: 'canViewFleet', label: 'View Fleet' },
+          { key: 'canAddFleet', label: 'Add Vehicle', special: true },
+          { key: 'canEditFleet', label: 'Edit Vehicle' },
+          { key: 'canDeleteFleet', label: 'Delete Vehicle', danger: true },
+          // Documents
+          { key: 'canViewDocuments', label: 'View Docs' },
+          { key: 'canEditDocuments', label: 'Update Docs', special: true },
         ] },
       { key: 'opsSites', label: 'Ops Site Manager', parentKey: 'opsSites', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View Assigned Sites' }] },

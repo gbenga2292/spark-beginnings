@@ -180,7 +180,7 @@ function AppContent() {
             {/* Operations & Analytics — Restricted on Web */}
             <Route path="operations/*" element={
               <Page label="Operations">
-                <ProtectedRoute requiredModule="operations">
+                <ProtectedRoute requiredModule={['operations', 'opsInventory', 'opsWaybills', 'opsCheckout', 'opsMaintenance', 'opsVehicles', 'opsSites']}>
                   <>
                     <Routes>
                       <Route index element={<OperationsDashboard />} />

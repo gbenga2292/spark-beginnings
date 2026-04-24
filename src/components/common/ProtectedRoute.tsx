@@ -5,7 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredModule?: keyof UserPrivileges;
+  requiredModule?: keyof UserPrivileges | (keyof UserPrivileges)[];
 }
 
 export function ProtectedRoute({ children, requiredModule }: ProtectedRouteProps) {
@@ -25,11 +25,14 @@ export function ProtectedRoute({ children, requiredModule }: ProtectedRouteProps
   // Check privileges if a specific module is required
   if (requiredModule && appUser) {
     const privs = appUser.privileges as any;
-    const hasAccess = privs?.[requiredModule]?.canView;
+    const modules = Array.isArray(requiredModule) ? requiredModule : [requiredModule];
+    
+    // Check if user has access to ANY of the required modules
+    const hasAccess = modules.some(m => privs?.[m]?.canView);
 
-    if (hasAccess === false) {
-      console.warn(`Access denied to module: ${requiredModule}`);
-      if (requiredModule === 'dashboard') {
+    if (!hasAccess) {
+      console.warn(`Access denied to modules: ${modules.join(', ')}`);
+      if (modules.includes('dashboard')) {
          return <div className="p-10 text-center text-red-500 font-bold">Access Denied: You do not have permission to view the dashboard. Please contact an administrator.</div>;
       }
       return <Navigate to="/" replace />;
