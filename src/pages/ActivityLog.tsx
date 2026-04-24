@@ -87,7 +87,9 @@ export function ActivityLog() {
       clients: 'Client',
       main_tasks: 'Main Task',
       subtasks: 'Subtask',
-      task_updates: 'Task Update'
+      task_updates: 'Task Update',
+      daily_journals: 'Daily Journal',
+      site_journal_entries: 'Site Journal Entry'
     };
     return map[name] || name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };

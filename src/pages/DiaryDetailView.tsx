@@ -36,10 +36,6 @@ export function DiaryDetailView({
         <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-500 hover:text-indigo-600 font-semibold transition-colors">
           <ArrowLeft className="h-4 w-4" /> Back to Calendar
         </button>
-        <button onClick={() => onExportPdf(date)}
-          className="flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow transition-all active:scale-95">
-          <FileText className="h-3.5 w-3.5" /> Export PDF
-        </button>
       </div>
 
       {/* Diary card */}
@@ -108,14 +104,17 @@ export function DiaryDetailView({
             <div className="text-center py-16">
               <BookOpen className="h-12 w-12 mx-auto mb-3 text-slate-300" />
               <p className={cn('font-medium text-sm', isDark ? 'text-slate-400' : 'text-slate-500')}>No entries for this day yet.</p>
-              <button onClick={() => onAddSession(date)} className="mt-4 px-5 py-2 rounded-full bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-500 transition-colors">
-                + Add First Entry
-              </button>
+              {currentUser?.privileges?.dailyJournal?.canAdd && (
+                <button onClick={() => onAddSession(date)} className="mt-4 px-5 py-2 rounded-full bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-500 transition-colors">
+                  + Add First Entry
+                </button>
+              )}
             </div>
           ) : (
             journals.map((journal, ji) => {
               const jEntries = allEntries.filter(e => e.journalId === journal.id);
-              const canEdit = journal.loggedBy === currentUser?.name || currentUser?.privileges?.users?.canManage;
+              const isAuthor = journal.loggedBy === currentUser?.name;
+              const canEdit = isAuthor;
               return (
                 <div key={journal.id}>
                   {/* Session header */}
@@ -147,7 +146,8 @@ export function DiaryDetailView({
                   {/* Site entries */}
                   <div className="ml-11 space-y-4">
                     {jEntries.map(entry => {
-                      const canDel = entry.loggedBy === currentUser?.name || currentUser?.privileges?.users?.canManage;
+                      const isEntryAuthor = (entry.loggedBy || journal.loggedBy) === currentUser?.name;
+                      const canDel = isEntryAuthor;
                       return (
                         <div key={entry.id} className={cn(
                           'relative rounded-xl p-5 border-l-4 border-l-emerald-400 group',
@@ -170,7 +170,7 @@ export function DiaryDetailView({
                               ) : (
                                 <p className="text-xs text-slate-400 italic">No narration recorded.</p>
                               )}
-                              <p className="text-[10px] text-slate-400 mt-2">Logged by {entry.loggedBy}</p>
+                              <p className="text-[10px] text-slate-400 mt-2">Logged by {entry.loggedBy || journal.loggedBy}</p>
                             </div>
                             {canDel && (
                               <button onClick={() => onDeleteEntry(entry.id)}

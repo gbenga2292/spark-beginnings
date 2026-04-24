@@ -131,7 +131,7 @@ const navigation: NavCategory[] = [
     items: [
       { name: 'Sites Overview', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView' },
       { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'commLog', privField: 'canView' },
-      { name: 'Daily Journal', href: '/daily-journal', icon: BookOpen, privKey: 'dashboard', privField: 'canView' },
+      { name: 'Daily Journal', href: '/daily-journal', icon: BookOpen, privKey: 'dailyJournal', privField: 'canView' },
     ],
   },
   // ── Account ───────────────────────────────────────────────────────────────

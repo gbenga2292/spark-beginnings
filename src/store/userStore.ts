@@ -76,6 +76,7 @@ export interface ActivityLogPriv { canView: boolean; canExport: boolean; }
 // ─── Missing Bundled Pages ───────────────────────────────────
 export interface CommLogPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean; }
 export interface BeneficiariesPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canImport: boolean; canExport: boolean; }
+export interface DailyJournalPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean; }
 
 // ─── Master interface ─────────────────────────────────────────
 export interface UserPrivileges {
@@ -109,6 +110,7 @@ export interface UserPrivileges {
   activityLog:       ActivityLogPriv;
   commLog:           CommLogPriv;
   beneficiaries:     BeneficiariesPriv;
+  dailyJournal:      DailyJournalPriv;
 }
 
 export interface AppUser {
@@ -163,6 +165,7 @@ export const FULL_ACCESS: UserPrivileges = {
   activityLog:      { canView: true, canExport: true },
   commLog:          { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
   beneficiaries:    { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
+  dailyJournal:     { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
 };
 
 // ─── NO ACCESS ───────────────────────────────────────────────
@@ -197,6 +200,7 @@ export const NO_ACCESS: UserPrivileges = {
   activityLog:      { canView: false, canExport: false },
   commLog:          { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
   beneficiaries:    { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
+  dailyJournal:     { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
 };
 
 // ─── DEFAULT PRESETS ─────────────────────────────────────────

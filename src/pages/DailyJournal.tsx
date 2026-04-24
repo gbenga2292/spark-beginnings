@@ -6,7 +6,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
 import { toast } from '@/src/components/ui/toast';
-import { Search, Plus, Calendar, MapPin, X, ChevronLeft, ChevronRight, FileText, Download } from 'lucide-react';
+import { Search, Plus, Calendar, MapPin, X, ChevronLeft, ChevronRight, FileText, Download, Filter } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay } from 'date-fns';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { DiaryDetailView } from './DiaryDetailView';
@@ -31,7 +31,17 @@ export function DailyJournal() {
   const [pdfDataUri, setPdfDataUri] = useState('');
   const [pdfExportDate, setPdfExportDate] = useState('');
 
+  // Export Filter States
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportFilters, setExportFilters] = useState({
+    startDate: format(subMonths(new Date(), 1), 'yyyy-MM-dd'),
+    endDate: format(new Date(), 'yyyy-MM-dd'),
+    siteId: '',
+    author: ''
+  });
+
   const activeSites = useMemo(() => sites.filter(s => s.status === 'Active'), [sites]);
+  const authors = useMemo(() => [...new Set(dailyJournals.map(j => j.loggedBy))], [dailyJournals]);
 
   const grouped = useMemo(() => {
     const groups: Record<string, DailyJournalType[]> = {};
@@ -41,6 +51,24 @@ export function DailyJournal() {
       .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
       .map(d => ({ date: d, journals: groups[d] }));
   }, [dailyJournals, searchTerm]);
+
+  // Logic to find journals matching the advanced export filters
+  const matchingExportJournals = useMemo(() => {
+    const matching = dailyJournals.filter(j => {
+      const isDateInRange = j.date >= exportFilters.startDate && j.date <= exportFilters.endDate;
+      const matchesAuthor = !exportFilters.author || j.loggedBy === exportFilters.author;
+      
+      const dayEntries = siteJournalEntries.filter(e => e.journalId === j.id);
+      const matchesSite = !exportFilters.siteId || dayEntries.some(e => e.siteId === exportFilters.siteId);
+      
+      return isDateInRange && matchesAuthor && matchesSite;
+    });
+    
+    // Group by date for the report
+    const groups: Record<string, DailyJournalType[]> = {};
+    matching.forEach(j => { if (!groups[j.date]) groups[j.date] = []; groups[j.date].push(j); });
+    return Object.keys(groups).sort().map(d => ({ date: d, journals: groups[d] }));
+  }, [dailyJournals, siteJournalEntries, exportFilters]);
 
   const openModal = (journal?: DailyJournalType, date?: string) => {
     if (journal) {
@@ -72,89 +100,121 @@ export function DailyJournal() {
     toast.success('Deleted'); setDeleteConfirm(null);
   };
 
-  const generateDiaryPdf = (date: string) => {
-    const journals = dailyJournals.filter(j => j.date === date).sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
-    const entries = siteJournalEntries.filter(e => journals.some(j => j.id === e.journalId));
+  const generateDiaryPdf = (groupedJournals: {date: string, journals: DailyJournalType[]}[], reportTitle?: string) => {
     const doc = new jsPDF();
     const W = doc.internal.pageSize.getWidth();
     const H = doc.internal.pageSize.getHeight();
 
-    // Watermark (logo, 10% opacity, centred)
-    try {
-      doc.saveGraphicsState();
-      // @ts-ignore
-      doc.setGState(new doc.GState({ opacity: 0.1 }));
-      doc.addImage(logoSrc, 'PNG', W / 2 - 45, H / 2 - 17, 90, 34);
-      doc.restoreGraphicsState();
-    } catch (_) {}
+    groupedJournals.forEach((group, idx) => {
+      if (idx > 0) doc.addPage();
+      
+      // Watermark (logo, 10% opacity, centred)
+      try {
+        doc.saveGraphicsState();
+        // @ts-ignore
+        doc.setGState(new doc.GState({ opacity: 0.1 }));
+        doc.addImage(logoSrc, 'PNG', W / 2 - 45, H / 2 - 17, 90, 34);
+        doc.restoreGraphicsState();
+      } catch (_) {}
 
-    // Logo top-left
-    try { doc.addImage(logoSrc, 'PNG', 14, 10, 55, 20); } catch (_) {}
+      // Logo top-left
+      try { doc.addImage(logoSrc, 'PNG', 14, 10, 50, 18); } catch (_) {}
 
-    // Header
-    const dateObj = new Date(date + 'T00:00:00');
-    doc.setDrawColor(99, 102, 241);
-    doc.setLineWidth(0.5);
-    doc.line(14, 36, W - 14, 36);
-    doc.setFontSize(20); doc.setFont('times', 'bold'); doc.setTextColor(30, 30, 50);
-    doc.text('SITE DIARY', W / 2, 46, { align: 'center' });
-    doc.setFontSize(12); doc.setFont('times', 'italic'); doc.setTextColor(80, 80, 120);
-    doc.text(`${format(dateObj, 'EEEE, MMMM d, yyyy')}`, W / 2, 54, { align: 'center' });
-    doc.setLineWidth(0.3); doc.line(14, 58, W - 14, 58);
+      // Header
+      const dateObj = new Date(group.date + 'T00:00:00');
+      doc.setDrawColor(99, 102, 241);
+      doc.setLineWidth(0.5);
+      doc.line(14, 32, W - 14, 32);
+      
+      doc.setFontSize(18); doc.setFont('times', 'bold'); doc.setTextColor(30, 30, 50);
+      doc.text('SITE DIARY', W / 2, 42, { align: 'center' });
+      
+      doc.setFontSize(11); doc.setFont('times', 'italic'); doc.setTextColor(80, 80, 120);
+      doc.text(`${format(dateObj, 'EEEE, MMMM d, yyyy')}`, W / 2, 48, { align: 'center' });
+      
+      if (reportTitle) {
+        doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(150, 150, 170);
+        doc.text(reportTitle, W - 14, 15, { align: 'right' });
+      }
 
-    let y = 68;
-    journals.forEach((journal, ji) => {
-      const jEntries = entries.filter(e => e.journalId === journal.id);
-      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(99, 102, 241);
-      doc.text(`Session ${ji + 1}  ·  ${journal.loggedBy}${journal.createdAt ? '  ' + format(new Date(journal.createdAt), 'HH:mm') : ''}`, 14, y);
-      y += 4; doc.setDrawColor(200, 200, 220); doc.setLineWidth(0.2); doc.line(14, y, W - 14, y); y += 6;
-      jEntries.forEach(entry => {
-        if (y > H - 30) { doc.addPage(); y = 20; }
-        doc.setFillColor(52, 211, 153); doc.circle(17, y - 1.5, 1.5, 'F');
-        doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 50);
-        doc.text(entry.siteName, 22, y);
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 140);
-        doc.text(`Client: ${entry.clientName}`, 22, y + 4.5); y += 10;
-        if (entry.narration) {
-          doc.setFont('times', 'italic'); doc.setFontSize(9); doc.setTextColor(60, 60, 80);
-          const lines = doc.splitTextToSize(entry.narration, W - 36);
-          lines.forEach((line: string) => {
-            if (y > H - 30) { doc.addPage(); y = 20; }
-            doc.text(line, 22, y); y += 5;
-          });
-        }
-        y += 4;
+      doc.setLineWidth(0.3); doc.line(14, 52, W - 14, 52);
+
+      let y = 62;
+      group.journals.forEach((journal, ji) => {
+        const jEntries = siteJournalEntries.filter(e => e.journalId === journal.id && (!exportFilters.siteId || e.siteId === exportFilters.siteId));
+        if (jEntries.length === 0) return;
+
+        if (y > H - 40) { doc.addPage(); y = 30; }
+
+        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(99, 102, 241);
+        doc.text(`Session ${ji + 1}  ·  ${journal.loggedBy}${journal.createdAt ? '  ' + format(new Date(journal.createdAt), 'HH:mm') : ''}`, 14, y);
+        y += 3; doc.setDrawColor(220, 220, 240); doc.setLineWidth(0.1); doc.line(14, y, W - 14, y); y += 7;
+
+        jEntries.forEach(entry => {
+          if (y > H - 30) { doc.addPage(); y = 30; }
+          doc.setFillColor(52, 211, 153); doc.circle(17, y - 1.5, 1.2, 'F');
+          doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 50);
+          doc.text(entry.siteName, 22, y);
+          doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(120, 120, 140);
+          doc.text(`Client: ${entry.clientName}`, 22, y + 4.5); 
+          y += 10;
+
+          if (entry.narration) {
+            doc.setFont('times', 'italic'); doc.setFontSize(9); doc.setTextColor(60, 60, 80);
+            const lines = doc.splitTextToSize(entry.narration, W - 40);
+            lines.forEach((line: string) => {
+              if (y > H - 25) { doc.addPage(); y = 30; }
+              doc.text(line, 22, y); y += 5;
+            });
+          }
+          y += 5;
+        });
+        y += 5;
       });
-      y += 6;
+
+      // Footer
+      doc.setFontSize(7); doc.setFont('helvetica', 'italic'); doc.setTextColor(180, 180, 200);
+      doc.text(`Page ${idx + 1} · Dewatering Construction Etc Limited · Generated ${format(new Date(), 'PPP')}`, W / 2, H - 10, { align: 'center' });
     });
 
-    doc.setFontSize(8); doc.setFont('helvetica', 'italic'); doc.setTextColor(160, 160, 180);
-    doc.text(`Generated ${format(new Date(), 'PPP')} · Dewatering Construction Etc Limited`, W / 2, H - 10, { align: 'center' });
     return doc;
   };
 
-  const handleExportPdf = (date: string) => {
-    setPdfExportDate(date);
-    setPdfDataUri(generateDiaryPdf(date).output('datauristring'));
+  const handleRunExport = () => {
+    if (matchingExportJournals.length === 0) return toast.error('No logs found for selected criteria');
+    const title = `Report: ${exportFilters.startDate} to ${exportFilters.endDate}`;
+    setPdfDataUri(generateDiaryPdf(matchingExportJournals, title).output('datauristring'));
     setShowPdfPreview(true);
+    setIsExportModalOpen(false);
   };
 
   useSetPageTitle('Site Diary', 'Daily field activity register', (
     <div className="flex items-center gap-3">
-      <div className="flex items-center rounded border border-slate-200 bg-white p-0.5 shadow-sm">
-        {(['list', 'calendar'] as const).map(v => (
-          <button key={v} onClick={() => { setViewMode(v); setDiaryDate(null); }}
-            className={cn('px-3 py-1.5 text-xs font-bold rounded transition-all', viewMode === v && !diaryDate ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:text-slate-700')}>
-            {v === 'list' ? 'List' : 'Calendar'}
-          </button>
-        ))}
-      </div>
-      <Button size="sm" onClick={() => openModal(undefined, diaryDate || undefined)}
-        className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md active:scale-95">
-        <Plus className="w-4 h-4" /><span className="hidden sm:inline">New Log</span>
-      </Button>
+      {currentUser?.privileges?.dailyJournal?.canExport && (
+        <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(true)} className="h-9 px-4 gap-2 border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight">
+          <FileText className="w-4 h-4" /> Export Report
+        </Button>
+      )}
+      {!diaryDate && (
+        <>
+          <div className="flex items-center rounded border border-slate-200 bg-white p-0.5 shadow-sm">
+            {(['list', 'calendar'] as const).map(v => (
+              <button key={v} onClick={() => { setViewMode(v); setDiaryDate(null); }}
+                className={cn('px-3 py-1.5 text-xs font-bold rounded transition-all', viewMode === v && !diaryDate ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:text-slate-700')}>
+                {v === 'list' ? 'List' : 'Calendar'}
+              </button>
+            ))}
+          </div>
+          {currentUser?.privileges?.dailyJournal?.canAdd && (
+            <Button size="sm" onClick={() => openModal(undefined, diaryDate || undefined)}
+              className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md active:scale-95">
+              <Plus className="w-4 h-4" /><span className="hidden sm:inline">New Log</span>
+            </Button>
+          )}
+        </>
+      )}
     </div>
-  ), [viewMode, diaryDate]);
+  ), [viewMode, diaryDate, dailyJournals, currentUser]);
 
   // Diary detail page
   if (diaryDate) {
@@ -167,9 +227,15 @@ export function DailyJournal() {
           onEditJournal={openModal}
           onDeleteJournal={id => setDeleteConfirm({ id, type: 'journal' })}
           onDeleteEntry={id => setDeleteConfirm({ id, type: 'entry' })}
-          onExportPdf={handleExportPdf}
+          onExportPdf={() => {
+            const single = dailyJournals.filter(j => j.date === diaryDate);
+            const grouped = [{ date: diaryDate, journals: single }];
+            setPdfDataUri(generateDiaryPdf(grouped).output('datauristring'));
+            setPdfExportDate(diaryDate);
+            setShowPdfPreview(true);
+          }}
         />
-        {renderModal()} {renderDeleteConfirm()} {renderPdfPreview()}
+        {renderModal()} {renderDeleteConfirm()} {renderPdfPreview()} {renderExportModal()}
       </>
     );
   }
@@ -190,10 +256,12 @@ export function DailyJournal() {
             <span className={cn('text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full transition-colors', isT ? 'bg-indigo-600 text-white' : 'text-muted-foreground group-hover:text-indigo-600')}>
               {format(day, 'd')}
             </span>
-            <button onClick={e => { e.stopPropagation(); openModal(undefined, ds); }}
-              className="w-5 h-5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-sm text-[11px] font-black">
-              +
-            </button>
+            {currentUser?.privileges?.dailyJournal?.canAdd && (
+              <button onClick={e => { e.stopPropagation(); openModal(undefined, ds); }}
+                className="w-5 h-5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-sm text-[11px] font-black">
+                +
+              </button>
+            )}
           </div>
           {dayJs.length > 0 && (
             <button onClick={() => setDiaryDate(ds)} className="mt-1 text-left w-full">
@@ -212,7 +280,9 @@ export function DailyJournal() {
     return grouped.length === 0 ? (
       <div className="text-center py-24 bg-card border border-indigo-100 dark:border-indigo-900/30 rounded-xl">
         <p className="text-base font-medium text-foreground">No diary entries yet</p>
-        <button onClick={() => openModal()} className="mt-4 px-5 py-2 rounded-full bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-500 transition-colors">+ New Log</button>
+        {currentUser?.privileges?.dailyJournal?.canAdd && (
+          <button onClick={() => openModal()} className="mt-4 px-5 py-2 rounded-full bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-500 transition-colors">+ New Log</button>
+        )}
       </div>
     ) : (
       <div className="space-y-2">
@@ -338,13 +408,16 @@ export function DailyJournal() {
               </div>
               <div>
                 <p className="font-bold text-sm">PDF Preview</p>
-                <p className="text-xs text-muted-foreground">{pdfExportDate && format(new Date(pdfExportDate + 'T00:00:00'), 'EEEE, MMMM d yyyy')}</p>
+                <p className="text-xs text-muted-foreground">Review report content before downloading</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" onClick={() => generateDiaryPdf(pdfExportDate).save(`SiteDiary-${pdfExportDate}.pdf`)}
+              <Button size="sm" onClick={() => {
+                const doc = generateDiaryPdf(matchingExportJournals.length > 0 ? matchingExportJournals : [{date: pdfExportDate, journals: dailyJournals.filter(j => j.date === pdfExportDate)}]);
+                doc.save(`SiteDiary-Report.pdf`);
+              }}
                 className="h-8 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs">
-                <Download className="h-3.5 w-3.5" /> Download
+                <Download className="h-3.5 w-3.5" /> Download PDF
               </Button>
               <button onClick={() => setShowPdfPreview(false)} className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors">
                 <X className="h-4 w-4" />
@@ -354,6 +427,83 @@ export function DailyJournal() {
           <div className="flex-1 overflow-hidden bg-slate-100 dark:bg-slate-950">
             <iframe src={pdfDataUri} className="w-full h-full border-0" title="Diary PDF Preview" />
           </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  function renderExportModal() {
+    return (
+      <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
+        <DialogContent className="max-w-md p-0 overflow-hidden border-0 shadow-2xl">
+          <DialogHeader className="px-6 py-5 bg-gradient-to-r from-slate-50 to-white dark:from-slate-900 dark:to-slate-950 border-b border-border m-0">
+            <DialogTitle className="text-xl font-black text-foreground flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                <FileText className="h-4 w-4" />
+              </div>
+              Export Diary Report
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground mt-2 font-medium text-left">Configure your report parameters before generating a PDF.</p>
+          </DialogHeader>
+          
+          <div className="px-6 py-6 space-y-5 bg-white dark:bg-slate-950">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <Calendar className="h-3 w-3" /> From Date
+                </label>
+                <Input type="date" value={exportFilters.startDate} onChange={e => setExportFilters(f => ({ ...f, startDate: e.target.value }))} className="h-10 text-sm font-medium bg-slate-50 dark:bg-slate-900 border-slate-200 focus:ring-indigo-500" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <Calendar className="h-3 w-3" /> To Date
+                </label>
+                <Input type="date" value={exportFilters.endDate} onChange={e => setExportFilters(f => ({ ...f, endDate: e.target.value }))} className="h-10 text-sm font-medium bg-slate-50 dark:bg-slate-900 border-slate-200 focus:ring-indigo-500" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <MapPin className="h-3 w-3" /> Filter by Site
+              </label>
+              <select value={exportFilters.siteId} onChange={e => setExportFilters(f => ({ ...f, siteId: e.target.value }))}
+                className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-700 dark:text-slate-300">
+                <option value="">All Sites</option>
+                {sites.map(s => <option key={s.id} value={s.id}>{s.name} ({s.client})</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <Filter className="h-3 w-3" /> Filter by Author
+              </label>
+              <select value={exportFilters.author} onChange={e => setExportFilters(f => ({ ...f, author: e.target.value }))}
+                className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-700 dark:text-slate-300">
+                <option value="">All Authors</option>
+                {authors.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+
+            <div className={cn("p-4 rounded-xl border flex items-center justify-between transition-all mt-6", matchingExportJournals.length > 0 ? "bg-indigo-50 border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-800/50 shadow-sm" : "bg-slate-50 border-slate-200 dark:bg-slate-900 dark:border-slate-800")}>
+              <div className="flex items-center gap-3">
+                <div className={cn("h-8 w-8 rounded-full flex items-center justify-center", matchingExportJournals.length > 0 ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-800 dark:text-indigo-300" : "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400")}>
+                  <FileText className="h-4 w-4" />
+                </div>
+                <span className={cn("text-sm font-bold", matchingExportJournals.length > 0 ? "text-indigo-900 dark:text-indigo-200" : "text-slate-500 dark:text-slate-400")}>
+                  Logs Found
+                </span>
+              </div>
+              <span className={cn("text-xl font-black", matchingExportJournals.length > 0 ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400 dark:text-slate-500")}>
+                {matchingExportJournals.length} day{matchingExportJournals.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+          <DialogFooter className="px-6 py-4 bg-slate-50 dark:bg-slate-900 border-t border-border flex items-center justify-end gap-2 m-0 sm:justify-end">
+            <Button variant="ghost" onClick={() => setIsExportModalOpen(false)} className="h-10 px-4 text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:text-slate-200">Cancel</Button>
+            <Button onClick={handleRunExport} disabled={matchingExportJournals.length === 0} className="h-10 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md active:scale-95 transition-all gap-2 rounded-lg">
+              Generate Preview
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     );
@@ -398,6 +548,7 @@ export function DailyJournal() {
       {renderModal()}
       {renderDeleteConfirm()}
       {renderPdfPreview()}
+      {renderExportModal()}
     </div>
   );
 }

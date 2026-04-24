@@ -841,6 +841,7 @@ export async function fetchAllAppData(privs?: any) {
     payeTaxVariables: settings?.paye_tax_variables || undefined,
     monthValues: settings?.month_values || undefined,
     hrVariables: settings?.hr_variables || undefined,
+    onboardingTemplates: settings?.onboarding_templates || [],
     superAdminCreated: settings?.super_admin_created ?? false,
     superAdminSignupEnabled: settings?.super_admin_signup_enabled ?? true,
     settingsId: settings?.id,
@@ -1422,6 +1423,7 @@ export const db = {
     payeTaxVariables?: any;
     monthValues?: any;
     hrVariables?: any;
+    onboardingTemplates?: any;
     superAdminCreated?: boolean;
     superAdminSignupEnabled?: boolean;
   }) {
@@ -1430,6 +1432,7 @@ export const db = {
     if (data.payeTaxVariables !== undefined) update.paye_tax_variables = data.payeTaxVariables;
     if (data.monthValues !== undefined) update.month_values = data.monthValues;
     if (data.hrVariables !== undefined) update.hr_variables = data.hrVariables;
+    if (data.onboardingTemplates !== undefined) update.onboarding_templates = data.onboardingTemplates;
     if (data.superAdminCreated !== undefined) update.super_admin_created = data.superAdminCreated;
     if (data.superAdminSignupEnabled !== undefined) update.super_admin_signup_enabled = data.superAdminSignupEnabled;
     update.updated_at = new Date().toISOString();

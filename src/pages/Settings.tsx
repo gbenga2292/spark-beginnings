@@ -135,6 +135,10 @@ export function Settings() {
       backupDate: new Date().toISOString(),
       appVersion,
       data: {
+        commLogs: state.commLogs,
+        clientContacts: state.clientContacts,
+        dailyJournals: state.dailyJournals,
+        siteJournalEntries: state.siteJournalEntries,
         sites: state.sites,
         clients: state.clients,
         employees: state.employees,
@@ -162,6 +166,10 @@ export function Settings() {
         ledgerBanks: state.ledgerBanks,
         ledgerEntries: state.ledgerEntries,
         hrVariables: state.hrVariables,
+        staffMeritRecords: state.staffMeritRecords,
+        vehicles: state.vehicles,
+        vehicleTrips: state.vehicleTrips,
+        vehicleDocumentTypes: state.vehicleDocumentTypes,
         // User Store
         users: userState.users,
         presets: userState.presets,
@@ -263,6 +271,14 @@ export function Settings() {
         if (d.ledgerBanks)          useAppStore.setState({ ledgerBanks: d.ledgerBanks });
         if (d.ledgerEntries)        useAppStore.setState({ ledgerEntries: d.ledgerEntries });
         if (d.hrVariables)          useAppStore.setState({ hrVariables: d.hrVariables });
+        if (d.commLogs)             useAppStore.setState({ commLogs: d.commLogs });
+        if (d.clientContacts)       useAppStore.setState({ clientContacts: d.clientContacts });
+        if (d.dailyJournals)        useAppStore.setState({ dailyJournals: d.dailyJournals });
+        if (d.siteJournalEntries)   useAppStore.setState({ siteJournalEntries: d.siteJournalEntries });
+        if (d.staffMeritRecords)    useAppStore.setState({ staffMeritRecords: d.staffMeritRecords });
+        if (d.vehicles)             useAppStore.setState({ vehicles: d.vehicles });
+        if (d.vehicleTrips)         useAppStore.setState({ vehicleTrips: d.vehicleTrips });
+        if (d.vehicleDocumentTypes) useAppStore.setState({ vehicleDocumentTypes: d.vehicleDocumentTypes });
 
         const bDate = new Date(backup.backupDate).toLocaleString();
         toast.success(`Data restored from backup dated ${bDate}`);

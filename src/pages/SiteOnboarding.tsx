@@ -351,15 +351,16 @@ export function SiteOnboarding() {
         
         if (matchingSite) {
           const updates: any = {};
-          if (form.phase1.timelineStartDate && form.phase1.timelineStartDate !== matchingSite.startDate) {
-            updates.startDate = form.phase1.timelineStartDate;
+          const effectiveStartDate = form.customFields?.timelineStartDate || form.phase1.timelineStartDate;
+          if (effectiveStartDate && effectiveStartDate !== matchingSite.startDate) {
+            updates.startDate = effectiveStartDate;
           }
           if (form.phase5.actualEndDate !== matchingSite.endDate) {
             updates.endDate = form.phase5.actualEndDate || '';
           }
           
-          const taxStatus = (form.phase4.clientTaxStatus as string) || '';
-          const newVat = taxStatus === 'Add' ? 'Add' : taxStatus === 'Yes' ? 'Yes' : 'No';
+          const taxStatus = (form.customFields?.clientTaxStatus || form.phase4.clientTaxStatus || '') as string;
+          const newVat = taxStatus.includes('Add') ? 'Add' : taxStatus.includes('Yes') ? 'Yes' : 'No';
           
           if (newVat !== matchingSite.vat) {
             updates.vat = newVat;
@@ -387,9 +388,9 @@ export function SiteOnboarding() {
     form.phase1.completed &&
     form.phase2.completed &&
     form.phase3.completed &&
-    form.phase4.quotationSent &&
-    form.phase4.proposalAccepted &&
-    form.phase5.stage1AdvanceReceived;
+    (form.phase4.quotationSent || form.customFields?.quotationSent === 'true') &&
+    (form.phase4.proposalAccepted || form.customFields?.proposalAccepted === 'true') &&
+    (form.phase5.stage1AdvanceReceived || form.customFields?.stage1AdvanceReceived === 'true');
 
   const handleActivate = () => {
     if (!canActivate) return;
@@ -399,8 +400,11 @@ export function SiteOnboarding() {
       name: form.siteName,
       client: form.clientName,
       status: 'Active',
-      vat: (() => { const ts = (form.phase4.clientTaxStatus as string) || ''; return ts === 'Add' ? 'Add' : ts === 'Yes' ? 'Yes' : 'No'; })() as 'Yes' | 'No' | 'Add',
-      startDate: form.phase1.timelineStartDate || new Date().toISOString().split('T')[0],
+      vat: (() => { 
+        const ts = (form.customFields?.clientTaxStatus || form.phase4.clientTaxStatus || '') as string; 
+        return ts.includes('Add') ? 'Add' : ts.includes('Yes') ? 'Yes' : 'No'; 
+      })() as 'Yes' | 'No' | 'Add',
+      startDate: form.customFields?.timelineStartDate || form.phase1.timelineStartDate || new Date().toISOString().split('T')[0],
       endDate: ''
     });
     const activated = { ...form, status: 'Active' as const, updatedAt: new Date().toISOString() };
@@ -719,27 +723,7 @@ export function SiteOnboarding() {
                       ))}
                     </select>
                   </div>
-                  <div className="space-y-1">
-                    <PhaseTextField
-                      label="Timeline start date"
-                      value={form.phase1.timelineStartDate}
-                      onChange={v => updPhase('phase1', { timelineStartDate: v })}
-                      type="date"
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <PhaseCheck
-                    label="Geotechnical Report Available"
-                    checked={form.phase1.geotechnicalReportAvailable}
-                    onChange={v => updPhase('phase1', { geotechnicalReportAvailable: v })}
-                  />
-                  <PhaseCheck
-                    label="Hydrogeological Data Available"
-                    checked={form.phase1.hydrogeologicalDataAvailable}
-                    onChange={v => updPhase('phase1', { hydrogeologicalDataAvailable: v })}
-                  />
                   <PhaseTextField
                     label="Perimeter (m) (Auto-calculated)"
                     value={
@@ -773,20 +757,7 @@ export function SiteOnboarding() {
                   </div>
                   {form.phase2.completed && <Badge variant="success">Complete</Badge>}
                 </div>
-                <div className="grid grid-cols-2 gap-5">
-                  <div className="flex flex-col gap-3">
-                    <PhaseCheck
-                      label="Site Visited"
-                      checked={form.phase2.siteVisited}
-                      onChange={v => updPhase('phase2', { siteVisited: v })}
-                    />
-                    <PhaseCheck
-                      label="Walkthrough Completed"
-                      checked={form.phase2.walkthroughCompleted}
-                      onChange={v => updPhase('phase2', { walkthroughCompleted: v })}
-                    />
-                  </div>
-                </div>
+
                 <DynamicPhaseFields serviceName={form.phase1.whatIsBeingBuilt} phaseKey="phase2" form={form} updCustom={updCustom} />
                 <Button
                   onClick={() => markDone(2)}
@@ -830,72 +801,7 @@ export function SiteOnboarding() {
                   {form.phase4.completed && <Badge variant="success">Complete</Badge>}
                 </div>
 
-                <div className="grid grid-cols-2 gap-5">
-                  <div className="space-y-3">
-                    <PhaseCheck
-                      label="Quotation Sent to Client"
-                      checked={form.phase4.quotationSent}
-                      onChange={v => updPhase('phase4', { quotationSent: v })}
-                    />
-                    <PhaseCheck
-                      label="Client Feedback Received"
-                      checked={form.phase4.clientFeedbackReceived}
-                      onChange={v => updPhase('phase4', { clientFeedbackReceived: v })}
-                    />
-                    <PhaseCheck
-                      label="Proposal Accepted by Client"
-                      checked={form.phase4.proposalAccepted}
-                      onChange={v => updPhase('phase4', { proposalAccepted: v })}
-                    />
-                    <PhaseCheck
-                      label="Timeline Confirmed"
-                      checked={form.phase4.timelineConfirmed}
-                      onChange={v => updPhase('phase4', { timelineConfirmed: v })}
-                    />
-                    <PhaseCheck
-                      label="Permitting Responsibility Outlined"
-                      checked={form.phase4.permittingResponsibilityOutlined}
-                      onChange={v => updPhase('phase4', { permittingResponsibilityOutlined: v })}
-                    />
-                    <PhaseCheck
-                      label="Client TIN Provided"
-                      checked={form.phase4.tinProvided}
-                      onChange={v => updPhase('phase4', { tinProvided: v })}
-                    />
-                    {form.phase4.tinProvided && (
-                      <PhaseTextField
-                        label="Client TIN Number"
-                        value={form.phase4.clientTinNumber || ''}
-                        onChange={v => updPhase('phase4', { clientTinNumber: v })}
-                        placeholder="e.g. 19283746-0001"
-                      />
-                    )}
-                  </div>
 
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium text-slate-700">Client Tax Status (VAT)</label>
-                      <select
-                        className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                        value={form.phase4.clientTaxStatus || ''}
-                        onChange={e => updPhase('phase4', { clientTaxStatus: e.target.value as any })}
-                      >
-                        <option value="">-- Select --</option>
-                        <option value="Add">Add (Add 7.5% VAT on top)</option>
-                        <option value="Yes">Yes (VAT Inclusive)</option>
-                        <option value="No">No (VAT Exempt)</option>
-                      </select>
-                    </div>
-
-                    <PhaseTextField
-                      label="Mobilization Advance Percentage (%)"
-                      type="number"
-                      value={form.phase4.mobilizationAdvancePercentage || ''}
-                      onChange={v => updPhase('phase4', { mobilizationAdvancePercentage: v })}
-                      placeholder="e.g. 50"
-                    />
-                  </div>
-                </div>
                 <DynamicPhaseFields serviceName={form.phase1.whatIsBeingBuilt} phaseKey="phase4" form={form} updCustom={updCustom} />
                 <Button
                   onClick={() => markDone(4)}
@@ -949,21 +855,31 @@ export function SiteOnboarding() {
                   </div>
                   {form.phase5.completed && <Badge variant="success">Complete</Badge>}
                 </div>
-                <div className="grid grid-cols-2 gap-y-4 gap-x-6">
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium text-slate-700">Actual End Date</label>
-                      <input
-                        type="date"
-                        className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                        value={form.phase5.actualEndDate || ''}
-                        onChange={e => updPhase('phase5', { actualEndDate: e.target.value })}
-                      />
-                      <p className="text-[10px] text-slate-400">When the site was officially closed</p>
+
+                <DynamicPhaseFields serviceName={form.phase1.whatIsBeingBuilt} phaseKey="phase5" form={form} updCustom={updCustom} />
+                
+                {/* Activation CTA — only when conditions met and still pending */}
+                {canActivate && (
+                  <div className="p-5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="h-6 w-6 text-emerald-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <h3 className="font-semibold text-emerald-800">Ready for Activation!</h3>
+                        <p className="text-sm text-emerald-700 mt-1">
+                          Phases 1–3 complete, quotation accepted, AND {Number(form.phase4.mobilizationAdvancePercentage) > 0 ? `${form.phase4.mobilizationAdvancePercentage}%` : '70%'} mobilization payment confirmed.
+                          Move this site to the <strong>Active Sites</strong> list now.
+                        </p>
+                        <Button
+                          onClick={handleActivate}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white mt-3 gap-2"
+                        >
+                          <CheckCircle2 className="h-4 w-4" /> Convert to Active Site
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <DynamicPhaseFields serviceName={form.phase1.whatIsBeingBuilt} phaseKey="phase5" form={form} updCustom={updCustom} />
+                )}
+
                 <Button
                   onClick={() => markDone(5)}
                   variant={form.phase5.completed ? 'outline' : 'default'}

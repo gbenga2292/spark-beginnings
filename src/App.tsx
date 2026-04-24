@@ -211,7 +211,7 @@ function AppContent() {
         <Route path="tasks/reports" element={<Page label="Task Reports"><ProtectedRoute requiredModule="tasks"><TaskReports /></ProtectedRoute></Page>} />
         
         <Route path="comm-log" element={<Page label="Communication Log"><ProtectedRoute requiredModule="commLog"><CommLog /></ProtectedRoute></Page>} />
-        <Route path="daily-journal" element={<Page label="Daily Journal"><ProtectedRoute requiredModule="dashboard"><DailyJournal /></ProtectedRoute></Page>} />
+        <Route path="daily-journal" element={<Page label="Daily Journal"><ProtectedRoute requiredModule="dailyJournal"><DailyJournal /></ProtectedRoute></Page>} />
         <Route path="notifications" element={<Page label="Notifications"><ProtectedRoute><NotificationsPage /></ProtectedRoute></Page>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />

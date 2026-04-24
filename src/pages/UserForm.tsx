@@ -116,9 +116,9 @@ const PRIV_GROUPS: PG[] = [
         fields: [
           { key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add/Log' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canExport', label: 'Export' },
         ] },
-      { key: 'dailyJournalAccess', label: 'Daily Journal', parentKey: 'dashboard', masterField: 'canView',
+      { key: 'dailyJournal', label: 'Site Daily Journal', parentKey: 'dailyJournal', masterField: 'canView',
         fields: [
-          { key: 'canView', label: 'View Daily Journal' },
+          { key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add/Log' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canExport', label: 'Export' },
         ] },
     ],
   },

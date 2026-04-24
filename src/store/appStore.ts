@@ -1275,18 +1275,20 @@ export const useAppStore = create<AppState>()(
         });
       },
 
-      saveAllSettings: (payroll, paye, months, hr) => {
+      saveAllSettings: (payroll, paye, months, hr, onboarding) => {
         set(() => ({
           payrollVariables: payroll,
           payeTaxVariables: paye,
           monthValues: months,
-          hrVariables: hr
+          hrVariables: hr,
+          onboardingTemplates: onboarding
         }));
         db.updateSettings({
           payrollVariables: payroll,
           payeTaxVariables: paye,
           monthValues: months,
-          hrVariables: hr
+          hrVariables: hr,
+          onboardingTemplates: onboarding
         });
       },
 
@@ -1341,16 +1343,27 @@ export const useAppStore = create<AppState>()(
           subtasks: [] // subtasks are managed separately if needed
         }));
 
-        // Merge and unique by serviceName
-        const all = [...fromTasks];
+        // Merge and unique by serviceName (case-insensitive)
+        const all: ServiceTemplate[] = [...fromTasks];
         fromTemplates.forEach(t => {
-          if (!all.find(a => a.serviceName === t.serviceName)) {
+          if (!all.find(a => a.serviceName.toLowerCase() === t.serviceName.toLowerCase())) {
             all.push(t);
           }
         });
         return all;
       },
       updateServiceTemplate: (template) => {
+        const s = get();
+        // Check for case-insensitive naming conflicts in onboardingTemplates
+        const conflict = s.onboardingTemplates.find(t => 
+          t.serviceName.toLowerCase() === template.serviceName.toLowerCase()
+        );
+        
+        if (conflict && conflict.serviceName !== template.serviceName) {
+           // If there's a conflict with a different case, we should probably align them or block.
+           // For now, we'll just allow the update but the uniqueness check in getServiceTemplates handles the display.
+        }
+
         get().updateDepartmentTasks({
           department: `__SERVICE__${template.serviceName}`,
           onboardingTasks: template.subtasks,
@@ -1424,16 +1437,21 @@ export const useAppStore = create<AppState>()(
 
       // Onboarding Templates
       updateOnboardingTemplate: (template) => {
-        set((s) => ({
-          onboardingTemplates: s.onboardingTemplates.some(t => t.serviceName === template.serviceName)
-            ? s.onboardingTemplates.map(t => t.serviceName === template.serviceName ? template : t)
-            : [...s.onboardingTemplates, template],
-        }));
+        set((s) => {
+          const updated = s.onboardingTemplates.some(t => t.serviceName.toLowerCase() === template.serviceName.toLowerCase())
+            ? s.onboardingTemplates.map(t => t.serviceName.toLowerCase() === template.serviceName.toLowerCase() ? template : t)
+            : [...s.onboardingTemplates, template];
+          
+          db.updateSettings({ onboardingTemplates: updated });
+          return { onboardingTemplates: updated };
+        });
       },
       removeOnboardingTemplate: (serviceName) => {
-        set((s) => ({
-          onboardingTemplates: s.onboardingTemplates.filter(t => t.serviceName !== serviceName),
-        }));
+        set((s) => {
+          const updated = s.onboardingTemplates.filter(t => t.serviceName.toLowerCase() !== serviceName.toLowerCase());
+          db.updateSettings({ onboardingTemplates: updated });
+          return { onboardingTemplates: updated };
+        });
       },
     }),
     {

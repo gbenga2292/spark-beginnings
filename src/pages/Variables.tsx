@@ -203,6 +203,7 @@ export function Variables() {
   const [newFieldRequired, setNewFieldRequired] = useState(false);
   const [newFieldOptions, setNewFieldOptions] = useState(''); // comma separated for select type
   const [newFieldPlaceholder, setNewFieldPlaceholder] = useState('');
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
 
 
 
@@ -1405,32 +1406,62 @@ export function Variables() {
                             };
                             const currentTemplate = onboardingTemplates.find(t => t.serviceName === selectedService) || { serviceName: selectedService, phases: emptyPhases };
                             const currentPhase = currentTemplate.phases[phaseKey] || { title: `Phase ${activeBuilderPhase}`, fields: [] };
-                            const newField = {
-                              id: Math.random().toString(36).slice(2),
+                            
+                            const fieldData = {
+                              id: editingFieldId || Math.random().toString(36).slice(2),
                               label: newFieldLabel,
                               type: newFieldType as any,
                               requiredForActivation: newFieldRequired,
                               options: newFieldType === 'select' ? newFieldOptions.split(',').map(s => s.trim()).filter(Boolean) : undefined,
                               placeholder: newFieldPlaceholder || undefined,
                             };
+
+                            let newFields;
+                            if (editingFieldId) {
+                              newFields = currentPhase.fields.map(f => f.id === editingFieldId ? fieldData : f);
+                            } else {
+                              newFields = [...(currentPhase.fields || []), fieldData];
+                            }
+
                             updateOnboardingTemplate({
                               ...currentTemplate,
                               phases: {
                                 ...currentTemplate.phases,
-                                [phaseKey]: { ...currentPhase, fields: [...(currentPhase.fields || []), newField] }
+                                [phaseKey]: { ...currentPhase, fields: newFields }
                               }
                             } as any);
+
+                            // Reset form
                             setNewFieldLabel('');
                             setNewFieldOptions('');
                             setNewFieldPlaceholder('');
                             setNewFieldRequired(false);
                             setNewFieldType('text');
+                            setEditingFieldId(null);
                           }} 
-                          className={`gap-1 border-indigo-300 text-indigo-700 hover:bg-indigo-50 h-9 ${newFieldType === 'select' ? 'md:col-span-2' : 'md:col-span-5'}`}
+                          className={`gap-1 border-indigo-300 text-indigo-700 hover:bg-indigo-50 h-9 ${newFieldType === 'select' ? 'md:col-span-2' : 'md:col-span-4'}`}
                           disabled={!newFieldLabel || (newFieldType === 'select' && !newFieldOptions)}
                         >
-                          <Plus className="h-4 w-4" /> Add Field
+                          {editingFieldId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                          {editingFieldId ? 'Update Field' : 'Add Field'}
                         </Button>
+                        {editingFieldId && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setNewFieldLabel('');
+                              setNewFieldOptions('');
+                              setNewFieldPlaceholder('');
+                              setNewFieldRequired(false);
+                              setNewFieldType('text');
+                              setEditingFieldId(null);
+                            }}
+                            className="md:col-span-1 h-9 text-slate-500"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     )}
 
@@ -1448,42 +1479,156 @@ export function Variables() {
                             </p>
                           );
                         }
-                        return phaseFields.map((f, idx) => (
-                          <div key={f.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200 shadow-sm group hover:border-indigo-300 transition-colors">
-                            <span className="h-6 w-6 rounded-full bg-indigo-100/50 text-indigo-700 text-[11px] font-bold flex items-center justify-center shrink-0 border border-indigo-200">
-                              {idx + 1}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-slate-800 flex items-center gap-2">
-                                {f.label} 
-                                {f.requiredForActivation && <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Required</span>}
-                              </p>
-                              <p className="text-[11px] text-slate-500 mt-0.5">Type: {f.type} {f.options && f.options.length > 0 && `(${f.options.join(', ')})`}</p>
-                            </div>
-                            {priv.canEdit && (
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8 shrink-0 text-slate-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity" 
-                                onClick={() => {
-                                  const templ = onboardingTemplates.find(s => s.serviceName === selectedService);
-                                  if (templ) {
-                                    const curPhase = templ.phases?.[phaseKey] || { title: `Phase ${activeBuilderPhase}`, fields: [] };
-                                    updateOnboardingTemplate({
-                                      ...templ,
-                                      phases: {
-                                        ...templ.phases,
-                                        [phaseKey]: { ...curPhase, fields: (curPhase.fields || []).filter(field => field.id !== f.id) }
+                        return phaseFields.map((f, idx) => {
+                          const isEditing = editingFieldId === f.id;
+                          if (isEditing) {
+                            return (
+                              <div key={f.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 p-3 bg-indigo-50/50 rounded-lg border border-indigo-300 shadow-md items-center">
+                                <Input 
+                                  placeholder="Label" 
+                                  value={newFieldLabel} 
+                                  onChange={(e) => setNewFieldLabel(e.target.value)} 
+                                  className="md:col-span-3 h-8 text-xs" 
+                                />
+                                <select 
+                                  className="md:col-span-2 h-8 rounded-md border border-slate-200 bg-white px-2 text-xs" 
+                                  value={newFieldType} 
+                                  onChange={(e) => setNewFieldType(e.target.value as any)}
+                                >
+                                  <option value="text">Text</option>
+                                  <option value="number">Number</option>
+                                  <option value="date">Date</option>
+                                  <option value="checkbox">Yes/No</option>
+                                  <option value="select">Dropdown</option>
+                                </select>
+                                {newFieldType === 'select' && (
+                                  <Input 
+                                    placeholder="Options" 
+                                    value={newFieldOptions} 
+                                    onChange={(e) => setNewFieldOptions(e.target.value)} 
+                                    className="md:col-span-3 h-8 text-xs" 
+                                  />
+                                )}
+                                <label className="md:col-span-1 flex items-center gap-1 text-[10px] text-slate-700 pl-1">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={newFieldRequired} 
+                                    onChange={e => setNewFieldRequired(e.target.checked)} 
+                                    className="h-3 w-3 rounded border-slate-300 text-indigo-600"
+                                  /> Req
+                                </label>
+                                <div className="md:col-span-3 flex items-center gap-1 justify-end">
+                                  <Button 
+                                    size="sm"
+                                    onClick={() => {
+                                      if (!newFieldLabel) return;
+                                      const phaseKey = `phase${activeBuilderPhase}` as 'phase1' | 'phase2' | 'phase3' | 'phase4' | 'phase5';
+                                      const template = onboardingTemplates.find(t => t.serviceName === selectedService);
+                                      if (!template) return;
+                                      const currentPhase = template.phases[phaseKey];
+                                      
+                                      const fieldData = {
+                                        id: f.id,
+                                        label: newFieldLabel,
+                                        type: newFieldType as any,
+                                        requiredForActivation: newFieldRequired,
+                                        options: newFieldType === 'select' ? newFieldOptions.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+                                        placeholder: newFieldPlaceholder || undefined,
+                                      };
+
+                                      const newFields = currentPhase.fields.map(field => field.id === f.id ? fieldData : field);
+
+                                      updateOnboardingTemplate({
+                                        ...template,
+                                        phases: {
+                                          ...template.phases,
+                                          [phaseKey]: { ...currentPhase, fields: newFields }
+                                        }
+                                      } as any);
+
+                                      setEditingFieldId(null);
+                                      setNewFieldLabel('');
+                                      setNewFieldOptions('');
+                                      setNewFieldPlaceholder('');
+                                      setNewFieldRequired(false);
+                                      setNewFieldType('text');
+                                    }} 
+                                    className="h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px]"
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button 
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingFieldId(null);
+                                      setNewFieldLabel('');
+                                      setNewFieldOptions('');
+                                      setNewFieldPlaceholder('');
+                                      setNewFieldRequired(false);
+                                      setNewFieldType('text');
+                                    }}
+                                    className="h-7 px-2 text-slate-500 text-[10px]"
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div key={f.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200 shadow-sm group hover:border-indigo-300 transition-colors">
+                              <span className="h-6 w-6 rounded-full bg-indigo-100/50 text-indigo-700 text-[11px] font-bold flex items-center justify-center shrink-0 border border-indigo-200">
+                                {idx + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-slate-800 flex items-center gap-2">
+                                  {f.label} 
+                                  {f.requiredForActivation && <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Required</span>}
+                                </p>
+                                <p className="text-[11px] text-slate-500 mt-0.5 capitalize">Type: {f.type}</p>
+                              </div>
+                              {priv.canEdit && (
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" 
+                                    onClick={() => {
+                                      setNewFieldLabel(f.label);
+                                      setNewFieldType(f.type as any);
+                                      setNewFieldRequired(!!f.requiredForActivation);
+                                      setNewFieldOptions(f.options?.join(', ') || '');
+                                      setNewFieldPlaceholder(f.placeholder || '');
+                                      setEditingFieldId(f.id);
+                                    }}
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50" 
+                                    onClick={() => {
+                                      const template = onboardingTemplates.find(t => t.serviceName === selectedService);
+                                      if (template) {
+                                        const phaseKey = `phase${activeBuilderPhase}` as any;
+                                        const newFields = template.phases[phaseKey].fields.filter((_, i) => i !== idx);
+                                        updateOnboardingTemplate({
+                                          ...template,
+                                          phases: { ...template.phases, [phaseKey]: { ...template.phases[phaseKey], fields: newFields } }
+                                        } as any);
                                       }
-                                    } as any);
-                                  }
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        ));
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        });
                       })()}
                     </div>
 
