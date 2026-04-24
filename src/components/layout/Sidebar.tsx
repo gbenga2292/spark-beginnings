@@ -225,12 +225,12 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
     return items.filter((item) => {
       // ── Web Version Hard Restrictions ─────────────────────────────────────
       if (IS_LIMITED_WEB_WEB) {
-        // Allowed paths for Web mode
         const isTaskPath = item.href.startsWith('/tasks') || item.href === '/comm-log';
         const isDashboardPath = item.href === '/';
         const isCompanyExpenses = item.href === '/company-expenses';
+        const isDailyJournal = item.href === '/daily-journal';
         
-        if (!isTaskPath && !isDashboardPath && !isCompanyExpenses) {
+        if (!isTaskPath && !isDashboardPath && !isCompanyExpenses && !isDailyJournal) {
           return false;
         }
       }
@@ -314,7 +314,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
             {navigation.map((category) => {
               // ── Web Version Category Filtering ────────────────────────────────
               if (IS_LIMITED_WEB_WEB) {
-                const allowedCategories = ['Dashboard', 'Tasks', 'Account'];
+                const allowedCategories = ['Dashboard', 'Tasks', 'Account', 'Clients & Sites'];
                 if (!allowedCategories.includes(category.name)) return null;
               }
 

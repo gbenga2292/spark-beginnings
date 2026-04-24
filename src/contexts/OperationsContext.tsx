@@ -7,6 +7,7 @@ import {
 import { supabase } from '@/src/integrations/supabase/client';
 import { useAppStore } from '../store/appStore';
 import { useSetPageTitle } from './PageContext';
+import { toast } from 'sonner';
 
 interface OperationsContextType {
   assets: Asset[];
@@ -266,30 +267,39 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const persistAsset = async (asset: Asset) => {
-    await supabase.from('operations_assets').upsert({
-      id: asset.id,
-      name: asset.name,
-      category: asset.category,
-      type: asset.type,
-      quantity: asset.quantity,
-      available_quantity: asset.availableQuantity,
-      reserved_quantity: asset.reservedQuantity,
-      used_quantity: asset.usedQuantity,
-      missing_quantity: asset.missingQuantity || 0,
-      damaged_quantity: asset.damagedQuantity || 0,
-      unit: asset.unitOfMeasurement,
-      status: asset.status,
-      location: asset.location,
-      condition: asset.condition,
-      description: asset.description,
-      requires_logging: asset.requiresLogging,
-      serial_number: asset.serialNumber,
-      service_interval_months: asset.serviceIntervalMonths,
-      power_source: asset.powerSource,
-      cost: asset.cost,
-      low_stock_level: asset.lowStockLevel,
-      critical_stock_level: asset.criticalStockLevel
-    });
+    try {
+      const { error } = await supabase.from('operations_assets').upsert({
+        id: asset.id,
+        name: asset.name,
+        category: asset.category,
+        type: asset.type,
+        quantity: asset.quantity,
+        available_quantity: asset.availableQuantity,
+        reserved_quantity: asset.reservedQuantity,
+        used_quantity: asset.usedQuantity,
+        missing_quantity: asset.missingQuantity || 0,
+        damaged_quantity: asset.damagedQuantity || 0,
+        unit: asset.unitOfMeasurement,
+        status: asset.status,
+        location: asset.location,
+        condition: asset.condition,
+        description: asset.description,
+        requires_logging: asset.requiresLogging,
+        serial_number: asset.serialNumber,
+        service_interval_months: asset.serviceIntervalMonths,
+        power_source: asset.powerSource,
+        cost: asset.cost,
+        low_stock_level: asset.lowStockLevel,
+        critical_stock_level: asset.criticalStockLevel,
+        updated_at: new Date().toISOString()
+      });
+
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Error persisting asset:', error);
+      toast.error(`Failed to sync asset: ${error.message || 'Unknown error'}`);
+      throw error;
+    }
   };
 
   const persistWaybill = async (waybill: Waybill) => {
@@ -334,7 +344,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const addAsset = (asset: Omit<Asset, 'id' | 'availableQuantity'>) => {
+  const addAsset = async (asset: Omit<Asset, 'id' | 'availableQuantity' | 'reservedQuantity' | 'missingQuantity' | 'damagedQuantity' | 'usedQuantity'>) => {
     const newAsset: Asset = {
       ...asset,
       id: crypto.randomUUID(),
@@ -344,8 +354,16 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       missingQuantity: 0,
       damagedQuantity: 0,
     };
+    
     setAssets(prev => [...prev, newAsset]);
-    persistAsset(newAsset);
+    
+    try {
+      await persistAsset(newAsset);
+      toast.success('Asset added successfully');
+    } catch (error) {
+      // Revert local state if DB save fails
+      setAssets(prev => prev.filter(a => a.id !== newAsset.id));
+    }
   };
 
   const bulkAddAssets = (newAssetsData: Omit<Asset, 'id' | 'availableQuantity'>[]) => {
@@ -387,13 +405,25 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     }))).then();
   };
 
-  const updateAsset = (id: string, updates: Partial<Asset>) => {
+  const updateAsset = async (id: string, updates: Partial<Asset>) => {
+    const originalAssets = assets;
+    let targetAsset: Asset | undefined;
+
     setAssets(prev => {
       const updated = prev.map(a => a.id === id ? { ...a, ...updates } : a);
-      const asset = updated.find(a => a.id === id);
-      if (asset) persistAsset(asset);
+      targetAsset = updated.find(a => a.id === id);
       return updated;
     });
+
+    if (targetAsset) {
+      try {
+        await persistAsset(targetAsset);
+        toast.success('Asset updated successfully');
+      } catch (error) {
+        // Revert local state if DB save fails
+        setAssets(originalAssets);
+      }
+    }
   };
 
   const deleteAsset = (id: string) => {

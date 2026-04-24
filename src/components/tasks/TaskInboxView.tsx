@@ -990,22 +990,8 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
 
     // Capture Assignees (task updated)
     if (subtask.assignedTo) {
-        const assignees = typeof subtask.assignedTo === 'string' ? subtask.assignedTo.split(',').map(s => s.trim()) : (subtask.assignedTo as string[]);
-        assignees.forEach(assigneeId => {
-            if (assigneeId !== currentUser.id && !_notifiedUserIds.has(assigneeId)) {
-                _notifiedUserIds.add(assigneeId);
-                addReminder({
-                    title: `Update on Assigned Task: ${mainTask.title}`,
-                    body: `${users.find(x => x.id === currentUser.id)?.name || currentUser.email?.split('@')[0] || 'Someone'} posted an update on your task.`,
-                    remindAt: new Date().toISOString(),
-                    recipientIds: [assigneeId],
-                    createdBy: currentUser.id,
-                    mainTaskId: mainId,
-                    subtaskId: subtask.id,
-                    isActive: true
-                });
-            }
-        });
+        // Notifications for task updates are handled by the New update on task realtime hook.
+        // Removed redundant addReminder logic to prevent duplicate notifications.
     }
 
     // Pass the attachments directly

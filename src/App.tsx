@@ -144,7 +144,6 @@ function AppContent() {
         {!IS_LIMITED_WEB_WEB && (
           <>
             <Route path="hr-dashboard" element={<Page label="HR Dashboard"><ProtectedRoute requiredModule="dashboard"><Dashboard /></ProtectedRoute></Page>} />
-            <Route path="daily-journal" element={<Page label="Daily Journal"><ProtectedRoute requiredModule="dashboard"><DailyJournal /></ProtectedRoute></Page>} />
             <Route path="attendance" element={<Page label="Attendance"><ProtectedRoute requiredModule="attendance"><Attendance /></ProtectedRoute></Page>} />
             <Route path="employees" element={<Page label="Employees"><ProtectedRoute requiredModule="employees"><Employees /></ProtectedRoute></Page>} />
             <Route path="beneficiaries" element={<Page label="Beneficiaries"><ProtectedRoute requiredModule="beneficiaries"><Beneficiaries /></ProtectedRoute></Page>} />
@@ -212,6 +211,7 @@ function AppContent() {
         <Route path="tasks/reports" element={<Page label="Task Reports"><ProtectedRoute requiredModule="tasks"><TaskReports /></ProtectedRoute></Page>} />
         
         <Route path="comm-log" element={<Page label="Communication Log"><ProtectedRoute requiredModule="commLog"><CommLog /></ProtectedRoute></Page>} />
+        <Route path="daily-journal" element={<Page label="Daily Journal"><ProtectedRoute requiredModule="dashboard"><DailyJournal /></ProtectedRoute></Page>} />
         <Route path="notifications" element={<Page label="Notifications"><ProtectedRoute><NotificationsPage /></ProtectedRoute></Page>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />

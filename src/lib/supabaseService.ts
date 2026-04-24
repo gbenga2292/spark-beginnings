@@ -299,6 +299,7 @@ export function dbToCommLog(r: any): CommLog {
     followUpDone: r.follow_up_done ?? false,
     loggedBy: r.logged_by ?? '',
     parentId: r.parent_id ?? undefined,
+    reportedBy: r.reported_by || [],
     createdAt: r.created_at ?? new Date().toISOString(),
   };
 }
@@ -668,6 +669,7 @@ function commLogToDb(l: CommLog) {
     follow_up_done: l.followUpDone,
     logged_by: l.loggedBy,
     parent_id: l.parentId ?? null,
+    reported_by: l.reportedBy || [],
     created_at: l.createdAt,
   };
 }
@@ -1624,6 +1626,8 @@ export const db = {
     if (l.followUpDone !== undefined) update.follow_up_done = l.followUpDone;
     // parentId maps to parent_id — critical for thread persistence
     if (l.parentId !== undefined) update.parent_id = l.parentId ?? null;
+    if (l.isInternal !== undefined) update.is_internal = l.isInternal;
+    if (l.reportedBy !== undefined) update.reported_by = l.reportedBy || [];
     update.updated_at = new Date().toISOString();
     const { error } = await supabase.from('comm_logs').update(update).eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
