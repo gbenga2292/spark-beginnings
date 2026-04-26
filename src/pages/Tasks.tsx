@@ -438,7 +438,29 @@ function PersonalTasksView() {
                                           {sub.title}
                                         </p>
                                         <div className="flex items-center gap-2 mt-0.5">
-                                          {(sub as SubTask).description && <p className="text-xs text-muted-foreground truncate">{(sub as SubTask).description}</p>}
+                                         {(() => {
+                                           const raw = (sub as SubTask).description || '';
+                                           if (!raw) return null;
+                                           try {
+                                             if (raw.trim().startsWith('{')) {
+                                               const m = JSON.parse(raw);
+                                               if (m.refType) {
+                                                 let label = '';
+                                                 if (m.refType === 'leave' && m.workflowStep) {
+                                                   label = `Step ${m.workflowStep}/4 · ${m.leaveType || ''} Leave Approval${m.duration ? ` · ${m.duration} day(s)` : ''}`;
+                                                 } else if (m.refType === 'hmo') {
+                                                   label = `HMO Renewal Request`;
+                                                 } else if (m.refType === 'salary_advance' || m.refType === 'loan') {
+                                                   label = `${m.refType === 'loan' ? 'Loan' : 'Salary Advance'} Application`;
+                                                 } else if (m.refType === 'site') {
+                                                   label = `Site Onboarding Workflow`;
+                                                 }
+                                                 if (label) return <p className="text-xs text-indigo-500 truncate font-medium">{label}</p>;
+                                               }
+                                             }
+                                           } catch {}
+                                           return <p className="text-xs text-muted-foreground truncate">{raw}</p>;
+                                         })()}
                                         </div>
                                       </div>
                                       {(sub as SubTask).priority && <PriorityBadge priority={(sub as SubTask).priority} size="xs" />}
@@ -1511,7 +1533,29 @@ function AdminTasksView() {
                                           </span>
                                         )}
                                       </div>
-                                      {sub.description && <p className="text-xs text-muted-foreground truncate">{sub.description}</p>}
+                                      {(() => {
+                                        const raw = sub.description || '';
+                                        if (!raw) return null;
+                                        try {
+                                          if (raw.trim().startsWith('{')) {
+                                            const m = JSON.parse(raw);
+                                            if (m.refType) {
+                                              let label = '';
+                                              if (m.refType === 'leave' && m.workflowStep) {
+                                                label = `Step ${m.workflowStep}/4 · ${m.leaveType || ''} Leave Approval${m.duration ? ` · ${m.duration} day(s)` : ''}`;
+                                              } else if (m.refType === 'hmo') {
+                                                label = `HMO Renewal Request`;
+                                              } else if (m.refType === 'salary_advance' || m.refType === 'loan') {
+                                                label = `${m.refType === 'loan' ? 'Loan' : 'Salary Advance'} Application`;
+                                              } else if (m.refType === 'site') {
+                                                label = `Site Onboarding Workflow`;
+                                              }
+                                              if (label) return <p className="text-xs text-indigo-500 truncate font-medium">{label}</p>;
+                                            }
+                                          }
+                                        } catch {}
+                                        return <p className="text-xs text-muted-foreground truncate">{raw}</p>;
+                                      })()}
                                     </div>
                                     {/* Assignee */}
                                     <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
-import { CalendarDays, CheckCircle2, Printer, Eye, X, Plus, Edit, Trash2, Ban, Search, ListFilter, CalendarClock, FileText, ShieldCheck, Clock, XCircle, MoreVertical, ChevronDown } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Printer, Eye, X, Plus, Edit, Trash2, Ban, Search, ListFilter, CalendarClock, FileText, ShieldCheck, Clock, XCircle, MoreVertical, ChevronDown, UserPlus, ChevronRight } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
 import { useAppStore, LeaveRecord } from '@/src/store/appStore';
 import { useNavigate } from 'react-router-dom';
@@ -79,7 +79,7 @@ export function Leaves() {
   /* ── preview form editable state (savable) ── */
   const [previewPersonResponsibleId, setPreviewPersonResponsibleId] = useState('');
   const [previewKeyDuties, setPreviewKeyDuties] = useState<[string, string, string]>(['', '', '']);
-  const [previewEmpSigStatus, setPreviewEmpSigStatus] = useState<'Signed' | 'Unsigned'>('Unsigned');
+  const [previewEmpSigEmployeeId, setPreviewEmpSigEmployeeId] = useState('');
   const [previewEmpSigDate, setPreviewEmpSigDate] = useState('');
   const [previewSupSigStatus, setPreviewSupSigStatus] = useState<'Signed' | 'Unsigned'>('Unsigned');
   const [previewSupSigDate, setPreviewSupSigDate] = useState('');
@@ -90,6 +90,14 @@ export function Leaves() {
   const [previewHrSigStatus, setPreviewHrSigStatus] = useState<'Signed' | 'Unsigned'>('Unsigned');
   const [previewHrSigDate, setPreviewHrSigDate] = useState('');
   const [previewFormDateReturned, setPreviewFormDateReturned] = useState('');
+
+  // HoD fallback picker — shown when no system user can be auto-resolved as HoD
+  const [hodPickerPending, setHodPickerPending] = useState<{
+    hodEmpId?: string;
+    hodSystemUserId: string | null;
+    pendingSubmitArgs: { empName: string; leaveType: string; duration: string; approverId: string; approverName: string; endDate: string; newLeave: any; mainTaskTitle: string };
+  } | null>(null);
+  const [hodPickerSearch, setHodPickerSearch] = useState('');
 
   // Calculate if form is locked due to leave start date reached
   const isStartDateReached = !!formId && !!startDate && new Date(startDate).setHours(0, 0, 0, 0) <= new Date().setHours(0, 0, 0, 0);
@@ -152,7 +160,7 @@ export function Leaves() {
     setPreviewPersonResponsibleId(leave?.personResponsibleId || '');
     const kd = leave?.keyDuties || [];
     setPreviewKeyDuties([kd[0]||'', kd[1]||'', kd[2]||'']);
-    setPreviewEmpSigStatus(leave?.employeeSignature?.signed || 'Unsigned');
+    setPreviewEmpSigEmployeeId(leave?.employeeSignature?.employeeId || '');
     setPreviewEmpSigDate(leave?.employeeSignature?.date || '');
     setPreviewSupSigStatus(leave?.supervisorSignature?.signed || 'Unsigned');
     setPreviewSupSigDate(leave?.supervisorSignature?.date || '');
@@ -248,7 +256,14 @@ export function Leaves() {
         personResponsibleId: previewPersonResponsibleId,
         keyDuties: previewKeyDuties as any,
         formDateReturned: previewFormDateReturned,
-        employeeSignature: { signed: previewEmpSigStatus, date: previewEmpSigDate },
+        employeeSignature: {
+          signed: previewEmpSigEmployeeId ? 'Signed' : 'Unsigned',
+          date: previewEmpSigDate,
+          employeeId: previewEmpSigEmployeeId || undefined,
+          employeeName: previewEmpSigEmployeeId
+            ? (() => { const e = employees.find(x => x.id === previewEmpSigEmployeeId); return e ? `${e.surname} ${e.firstname}` : undefined; })()
+            : undefined,
+        },
         supervisorSignature: { signed: previewSupSigStatus, date: previewSupSigDate },
         managementSignature: { signed: previewMgmtSigStatus, date: previewMgmtSigDate },
         hrSignature: { signed: previewHrSigStatus, date: previewHrSigDate },
@@ -287,10 +302,32 @@ export function Leaves() {
         }
       }
 
-      // Resolve HoD: highest-ranked employee in same dept (lowest index = most senior)
+      // Resolve HoD: level-2 same dept → level-2 any dept → level-3 any dept
       const empDept = emp.department;
-      const deptPeers = employees.filter(e => e.department === empDept && e.id !== staffId && e.status === 'Active' && e.position !== 'CEO');
-      const hodEmp = deptPeers.sort((a, b) => getPositionIndex(a.position) - getPositionIndex(b.position))[0];
+      const activeOthers = employees.filter(e => e.id !== staffId && e.status === 'Active' && e.position !== 'CEO');
+      const sameDeptPeers = activeOthers.filter(e => e.department === empDept);
+      const hodEmp =
+        sameDeptPeers.sort((a, b) => getPositionIndex(a.position) - getPositionIndex(b.position))[0] ??
+        activeOthers.filter(e => (e.level ?? 99) <= 2)
+          .sort((a, b) => (a.level ?? 99) - (b.level ?? 99) || getPositionIndex(a.position) - getPositionIndex(b.position))[0] ??
+        activeOthers.filter(e => (e.level ?? 99) <= 3)
+          .sort((a, b) => (a.level ?? 99) - (b.level ?? 99) || getPositionIndex(a.position) - getPositionIndex(b.position))[0];
+
+      // Resolve HoD system user
+      const hodSystemUser = hodEmp ? approverOptions.find((u: any) =>
+        u.name?.toLowerCase().includes(hodEmp.firstname.toLowerCase()) ||
+        u.name?.toLowerCase().includes(hodEmp.surname.toLowerCase())
+      ) : null;
+
+      // If HoD system user cannot be resolved, pause and show picker
+      if (!hodSystemUser) {
+        setHodPickerPending({
+          hodEmpId: hodEmp?.id,
+          hodSystemUserId: null,
+          pendingSubmitArgs: { empName, leaveType, duration, approverId, approverName, endDate, newLeave: null, mainTaskTitle: `Leave Approval Workflow — ${empName} (${leaveType}, ${duration} days)` },
+        });
+        return; // will resume after user picks HoD
+      }
 
       // Find if line manager is a system user
       const lmEmp = emp.lineManager ? employees.find(e => e.id === emp.lineManager) : null;
@@ -317,7 +354,14 @@ export function Leaves() {
         personResponsibleId: previewPersonResponsibleId,
         keyDuties: previewKeyDuties as any,
         formDateReturned: previewFormDateReturned,
-        employeeSignature: { signed: previewEmpSigStatus, date: previewEmpSigDate },
+        employeeSignature: {
+          signed: previewEmpSigEmployeeId ? 'Signed' : 'Unsigned',
+          date: previewEmpSigDate,
+          employeeId: previewEmpSigEmployeeId || undefined,
+          employeeName: previewEmpSigEmployeeId
+            ? (() => { const e = employees.find(x => x.id === previewEmpSigEmployeeId); return e ? `${e.surname} ${e.firstname}` : undefined; })()
+            : undefined,
+        },
         hrApprovedFrom: previewHrFrom,
         hrApprovedTo: previewHrTo,
       };
@@ -348,7 +392,9 @@ export function Leaves() {
             empName,
             leaveType,
             duration,
-            hodUserId: hodEmp?.id,  // pass HoD so step 1 approval can create step 2
+            hodUserId: hodEmp?.id,
+            hodSystemUserId: hodSystemUser?.id || null,  // resolved at submission — no DB roundtrip needed later
+            mgmtUserId: approverId,                      // management approver already selected
           });
           const lmSub = await addSubtask({
             title: `[Step 1/4] Line Manager Approval — ${empName} ${leaveType} Leave`,
@@ -373,6 +419,116 @@ export function Leaves() {
       toast.success(`Leave filed! Step 1 of 4 — awaiting Line Manager approval.`);
       setShowFormOverlay(false);
     }
+  };
+
+  const resumeSubmissionWithHod = async (hodSystemUserId: string | null) => {
+    if (!hodPickerPending) return;
+    const { hodEmpId, pendingSubmitArgs } = hodPickerPending;
+    const { empName, leaveType, duration, approverId, approverName, endDate, mainTaskTitle } = pendingSubmitArgs;
+
+    const emp = employees.find(e => e.id === staffId);
+    if (!emp) return;
+
+    // Determine line manager system user
+    const lmEmp = emp.lineManager ? employees.find(e => e.id === emp.lineManager) : null;
+    const lmSystemUser = lmEmp ? approverOptions.find((u: any) =>
+      u.name?.toLowerCase().includes(lmEmp.firstname.toLowerCase()) ||
+      u.name?.toLowerCase().includes(lmEmp.surname.toLowerCase())
+    ) : null;
+
+    let nextLeaveNumber = '';
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    if (!formId) {
+      let maxSeq = 0;
+      leaves.forEach(l => {
+        if (l.leaveNumber?.startsWith(`LA${yy}-${mm}-`)) {
+          const seqStr = l.leaveNumber.split('-')[2];
+          const seq = parseInt(seqStr, 10);
+          if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+        }
+      });
+      nextLeaveNumber = `LA${yy}-${mm}-${String(maxSeq + 1).padStart(2, '0')}`;
+    }
+
+    const newLeave: LeaveRecord = {
+      id: crypto.randomUUID(),
+      employeeId: staffId,
+      employeeName: empName,
+      leaveType, startDate, duration: parseInt(duration),
+      expectedEndDate: endDate, reason, dateReturned,
+      canBeContacted, status: 'Active',
+      nasFilePath, supervisor, management: approverName,
+      approvedById: approverId,
+      approvedByName: approverName,
+      approvalStatus: 'Pending',
+      leaveNumber: nextLeaveNumber,
+      workflowStep: 1,
+      hodEmployeeId: hodEmpId,
+
+      personResponsibleId: previewPersonResponsibleId,
+      keyDuties: previewKeyDuties as any,
+      formDateReturned: previewFormDateReturned,
+      employeeSignature: {
+        signed: previewEmpSigEmployeeId ? 'Signed' : 'Unsigned',
+        date: previewEmpSigDate,
+        employeeId: previewEmpSigEmployeeId || undefined,
+        employeeName: previewEmpSigEmployeeId
+          ? (() => { const e = employees.find(x => x.id === previewEmpSigEmployeeId); return e ? `${e.surname} ${e.firstname}` : undefined; })()
+          : undefined,
+      },
+      hrApprovedFrom: previewHrFrom,
+      hrApprovedTo: previewHrTo,
+    };
+    addLeave(newLeave);
+    setTimeout(() => syncEmployeeStatus(staffId), 100);
+
+    try {
+      const today430 = new Date();
+      today430.setHours(16, 30, 0, 0);
+
+      const mainTask = await createMainTask({
+        title: mainTaskTitle,
+        description: `Sequential 4-step approval: LM → HoD → Management → HR.\nSubmitted by ${currentUser?.user_metadata?.name || 'HR'} on ${format(new Date(), 'dd/MM/yyyy')}.`,
+        createdBy: currentUser?.id,
+        teamId: 'dcel-team',
+        workspaceId: 'dcel-team',
+        assignedTo: lmSystemUser?.id || approverId,
+        deadline: today430.toISOString(),
+      });
+
+      if (mainTask?.id) {
+        const lmDesc = JSON.stringify({
+          refType: 'leave', refId: newLeave.id, workflowStep: 1,
+          empName, leaveType, duration,
+          hodUserId: hodEmpId,
+          hodSystemUserId,
+          mgmtUserId: approverId,
+        });
+        const lmSub = await addSubtask({
+          title: `[Step 1/4] Line Manager Approval — ${empName} ${leaveType} Leave`,
+          description: lmDesc,
+          mainTaskId: mainTask.id,
+          assignedTo: lmSystemUser?.id || null,
+          status: 'not_started',
+          priority: 'high',
+          deadline: today430.toISOString(),
+        });
+        if ((lmSub as any)?.id) {
+          updateLeave(newLeave.id, {
+            approvalTaskId: mainTask.id,
+            lineManagerTaskId: (lmSub as any).id,
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to create leave approval task:', e);
+    }
+
+    toast.success(`Leave filed! Step 1 of 4 — awaiting Line Manager approval.`);
+    setHodPickerPending(null);
+    setShowFormOverlay(false);
   };
 
   const handleDelete = async (leave: LeaveRecord) => {
@@ -727,13 +883,15 @@ export function Leaves() {
           manualSigned, setManualSigned, manualDate, setManualDate,
         }: {
           label: string; stepNum: number;
-          sigData?: { signed: 'Signed' | 'Unsigned'; date?: string };
+          sigData?: { signed: 'Signed' | 'Unsigned'; date?: string; name?: string; employeeName?: string };
           isManual?: boolean;
           manualSigned?: 'Signed' | 'Unsigned'; setManualSigned?: (v: 'Signed' | 'Unsigned') => void;
           manualDate?: string; setManualDate?: (v: string) => void;
         }) => {
           const isSigned = sigData?.signed === 'Signed' || manualSigned === 'Signed';
           const sigDate = sigData?.date || manualDate || '';
+          // who signed — from stored name or employeeName
+          const signerName = sigData?.name || sigData?.employeeName || '';
           const isPendingStep = !wfRejected && wfStep === stepNum && !!formId;
           const isFutureStep = !wfRejected && wfStep < stepNum && !!formId;
           const bgColor = wfRejected ? '#fff1f1' : isSigned ? '#f0fdf4' : isPendingStep ? '#fffbeb' : '#fafafa';
@@ -744,6 +902,12 @@ export function Leaves() {
           return (
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 10, padding: '5px 8px', background: bgColor, border: `1px solid ${borderColor}`, borderRadius: 4 }}>
               <span style={{ fontSize: 9, fontWeight: 'bold', flexShrink: 0, paddingBottom: 1, whiteSpace: 'nowrap' }}>{label}:</span>
+              {/* Signer name — shown when available */}
+              {signerName && (
+                <span className="sig-value" style={{ fontSize: 9, fontWeight: 'bold', color: '#111', flexShrink: 0, paddingBottom: 1, marginRight: 4, whiteSpace: 'nowrap' }}>
+                  {signerName}
+                </span>
+              )}
               {isManual && !isPreviewLocked ? (
                 <select className="sig-value" value={manualSigned} onChange={e => setManualSigned!(e.target.value as 'Signed' | 'Unsigned')}
                   style={{ border: 'none', flex: 1, minHeight: 14, fontSize: 9, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1, color: statusColor, fontWeight: isSigned ? 'bold' : 'normal' }}>
@@ -769,6 +933,7 @@ export function Leaves() {
             </div>
           );
         };
+
 
         return (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -997,11 +1162,40 @@ export function Leaves() {
                       Approval workflow: Employee → Line Manager → Head of Department → Management → HR
                     </div>
 
-                    {/* Step 0: Employee — always manual */}
-                    <WfSigRow label="Employee Signature" stepNum={0} isManual={true}
-                      sigData={liveLeave?.employeeSignature}
-                      manualSigned={previewEmpSigStatus} setManualSigned={setPreviewEmpSigStatus}
-                      manualDate={previewEmpSigDate} setManualDate={setPreviewEmpSigDate} />
+                    {/* Step 0: Employee — admin selects which employee signed (FIELD + OFFICE only) */}
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 10, padding: '5px 8px',
+                      background: previewEmpSigEmployeeId ? '#f0fdf4' : '#fafafa',
+                      border: `1px solid ${previewEmpSigEmployeeId ? '#86efac' : '#d1d5db'}`, borderRadius: 4 }}>
+                      <span style={{ fontSize: 9, fontWeight: 'bold', flexShrink: 0, paddingBottom: 1, whiteSpace: 'nowrap' }}>Employee Signature:</span>
+                      {isPreviewLocked ? (
+                        <span className="sig-value" style={{ flex: 1, fontSize: 9, fontWeight: 'bold', color: '#111', paddingBottom: 1 }}>
+                          {liveLeave?.employeeSignature?.employeeName || (previewEmpSigEmployeeId ? (() => { const e = employees.find(x => x.id === previewEmpSigEmployeeId); return e ? `${e.surname} ${e.firstname}` : '' })() : '— Unsigned')}
+                        </span>
+                      ) : (
+                        <select
+                          className="sig-value hide-on-print"
+                          value={previewEmpSigEmployeeId}
+                          onChange={e => setPreviewEmpSigEmployeeId(e.target.value)}
+                          style={{ border: 'none', borderBottom: '1px solid #999', flex: 1, minHeight: 14, fontSize: 9, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1, color: previewEmpSigEmployeeId ? '#16a34a' : '#9ca3af', fontWeight: previewEmpSigEmployeeId ? 'bold' : 'normal' }}
+                        >
+                          <option value="">— Select employee who signed —</option>
+                          {internalEmployees.map((e: any) => (
+                            <option key={e.id} value={e.id}>{e.surname} {e.firstname}</option>
+                          ))}
+                        </select>
+                      )}
+                      <span className="sig-empty-dash" style={{ display: 'none', flex: 1, borderBottom: '1px solid #111', minHeight: 14 }}></span>
+                      <span style={{ fontSize: 9, flexShrink: 0, paddingBottom: 1, marginLeft: 8 }}>Date:</span>
+                      {isPreviewLocked ? (
+                        <span className="sig-date" style={{ fontSize: 9, minWidth: 80, paddingBottom: 1, color: '#555' }}>
+                          {previewEmpSigDate ? format(parseISO(previewEmpSigDate), 'dd/MM/yyyy') : ''}
+                        </span>
+                      ) : (
+                        <input className="sig-date" type="date" value={previewEmpSigDate} onChange={e => setPreviewEmpSigDate(e.target.value)}
+                          style={{ border: 'none', borderBottom: '1px solid #999', width: 90, fontSize: 9, outline: 'none', background: 'transparent', cursor: 'pointer', paddingBottom: 1 }} />
+                      )}
+                      <span className="sig-empty-dash" style={{ display: 'none', minWidth: 80, width: 80, borderBottom: '1px solid #111', minHeight: 14 }}></span>
+                    </div>
 
                     {/* Step 1: Line Manager — manual (LM may not be a system user) */}
                     <WfSigRow label="Line Manager / Supervisor Approval" stepNum={1} isManual={true}
@@ -1073,6 +1267,82 @@ export function Leaves() {
           </div>
         );
       })()}
+
+      {/* Fallback HoD Picker Modal */}
+      {hodPickerPending && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-indigo-50/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800 tracking-tight">Select HoD Approver</h3>
+                  <p className="text-xs text-slate-500">Auto-resolution failed. Choose the system user to assign Step 2.</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setHodPickerPending(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-4 bg-slate-50 border-b border-slate-100">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search active users..."
+                  value={hodPickerSearch}
+                  onChange={e => setHodPickerSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="max-h-64 overflow-y-auto p-2">
+              {approverOptions
+                .filter(u => u.name?.toLowerCase().includes(hodPickerSearch.toLowerCase()))
+                .map(user => (
+                  <button
+                    key={user.id}
+                    onClick={() => resumeSubmissionWithHod(user.id)}
+                    className="w-full flex items-center gap-3 p-3 text-left rounded-xl hover:bg-indigo-50 transition-colors"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-slate-200 flex flex-shrink-0 items-center justify-center text-slate-500 font-bold text-xs">
+                      {(user.name || 'U').substring(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 truncate">{user.name}</p>
+                      <p className="text-[10px] font-medium text-slate-500 truncate">{user.department || 'No department'}</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
+                  </button>
+              ))}
+              {approverOptions.length > 0 && approverOptions.filter(u => u.name?.toLowerCase().includes(hodPickerSearch.toLowerCase())).length === 0 && (
+                <div className="text-center py-6 text-slate-500 text-sm">No users match "{hodPickerSearch}"</div>
+              )}
+            </div>
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+              <button
+                onClick={() => setHodPickerPending(null)}
+                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors"
+              >
+                Cancel Submission
+              </button>
+              <button
+                onClick={() => resumeSubmissionWithHod(null)}
+                className="px-4 py-2 text-sm font-semibold bg-white border border-slate-200 shadow-sm text-slate-700 hover:bg-slate-50 hover:border-slate-300 rounded-xl transition-all"
+              >
+                Skip (No System User)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

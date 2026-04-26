@@ -250,11 +250,11 @@ export interface LeaveRecord {
   personResponsibleId?: string;
   keyDuties?: string[];
   formDateReturned?: string;
-  employeeSignature?: { signed: 'Signed' | 'Unsigned'; date?: string };
-  supervisorSignature?: { signed: 'Signed' | 'Unsigned'; date?: string };
-  hodSignature?: { signed: 'Signed' | 'Unsigned'; date?: string };
-  managementSignature?: { signed: 'Signed' | 'Unsigned'; date?: string };
-  hrSignature?: { signed: 'Signed' | 'Unsigned'; date?: string };
+  employeeSignature?: { signed: 'Signed' | 'Unsigned'; date?: string; employeeId?: string; employeeName?: string };
+  supervisorSignature?: { signed: 'Signed' | 'Unsigned'; date?: string; name?: string };
+  hodSignature?: { signed: 'Signed' | 'Unsigned'; date?: string; name?: string };
+  managementSignature?: { signed: 'Signed' | 'Unsigned'; date?: string; name?: string };
+  hrSignature?: { signed: 'Signed' | 'Unsigned'; date?: string; name?: string };
   hrApprovedFrom?: string;
   hrApprovedTo?: string;
   leaveNumber?: string;

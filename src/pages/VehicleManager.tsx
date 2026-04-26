@@ -576,79 +576,70 @@ export function VehicleManager() {
             </div>
           )}
 
-          <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
-            <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 border-b dark:border-slate-800 flex justify-between items-center">
-               <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-blue-500" /> Vehicle Document Tracking
-              </h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-slate-100 dark:bg-slate-800/50 text-[10px] uppercase font-bold tracking-wider text-slate-500">
-                    <th className="px-6 py-3 whitespace-nowrap sticky left-0 bg-slate-100 dark:bg-slate-800 z-10">Vehicle Details</th>
-                    <th className="px-6 py-3 whitespace-nowrap">Reg No</th>
-                    {vehicleDocumentTypes.map(type => (
-                      <th key={type.id} className="px-6 py-3 whitespace-nowrap">{type.name}</th>
-                    ))}
-                    <th className="px-6 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {filteredVehicles.map(v => (
-                    <tr key={v.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                      <td className="px-6 py-4 whitespace-nowrap sticky left-0 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800/50 z-10 border-r dark:border-slate-800">
-                        <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{v.name}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap font-mono text-xs font-bold text-blue-600">{v.registration_number}</td>
-                      {vehicleDocumentTypes.map(type => {
-                        const date = v.documents?.[type.name];
-                        const dateValue = date ? new Date(date) : null;
-                        const today = new Date();
-                        const isExpiringSoon = dateValue && (
-                          isSameMonth(dateValue, today) || 
-                          isBefore(dateValue, today)
-                        );
-
-                        return (
-                          <td key={type.id} className={cn(
-                            "px-6 py-4 whitespace-nowrap transition-colors",
-                            isExpiringSoon && "bg-rose-50 dark:bg-rose-900/20"
-                          )}>
-                            {date ? (
-                              <span className={cn(
-                                "text-[10px] font-bold",
-                                isExpiringSoon ? "text-rose-600 dark:text-rose-400" : "text-slate-600 dark:text-slate-300"
-                              )}>
-                                {formatDisplayDate(date)}
-                                {isExpiringSoon && (
-                                  <AlertCircle className="inline-block h-3 w-3 ml-1 text-rose-500 animate-pulse" />
+          {filteredVehicles.length === 0 ? (
+            <Card className="border-none shadow-sm bg-white dark:bg-slate-900 p-10 text-center text-slate-400 text-sm italic">
+              No vehicles found
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredVehicles.map(v => (
+                <Card key={v.id} className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex flex-col">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800/30 border-b dark:border-slate-800 flex justify-between items-start">
+                    <div>
+                      <h4 className="font-bold text-sm text-slate-700 dark:text-slate-200">{v.name}</h4>
+                      <p className="text-xs font-mono font-bold text-blue-600">{v.registration_number}</p>
+                    </div>
+                    {priv.canEditDocuments && (
+                      <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase font-bold text-blue-600 px-2" 
+                        onClick={() => {
+                          setEditingDocVehicle(v);
+                          setDocUpdateForm({ type: '', date: '' });
+                          setShowDocUpdateForm(true);
+                        }}>
+                        Update
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex-1 p-0">
+                    <table className="w-full text-left text-xs">
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {vehicleDocumentTypes.map(type => {
+                          const date = v.documents?.[type.name];
+                          const dateValue = date ? new Date(date) : null;
+                          const today = new Date();
+                          const isExpiringSoon = dateValue && (
+                            isSameMonth(dateValue, today) || 
+                            isBefore(dateValue, today)
+                          );
+                          return (
+                            <tr key={type.id} className={cn(
+                              "hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors", 
+                              isExpiringSoon && "bg-rose-50/50 dark:bg-rose-900/10"
+                            )}>
+                              <td className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400">{type.name}</td>
+                              <td className="px-4 py-3 text-right">
+                                {date ? (
+                                  <span className={cn(
+                                    "font-bold flex items-center justify-end gap-1.5", 
+                                    isExpiringSoon ? "text-rose-600 dark:text-rose-400" : "text-slate-700 dark:text-slate-300"
+                                  )}>
+                                    {formatDisplayDate(date)}
+                                    {isExpiringSoon && <AlertCircle className="h-3 w-3 text-rose-500 animate-pulse" />}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 italic">Not set</span>
                                 )}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-slate-400 italic">Not set</span>
-                            )}
-                          </td>
-                        );
-                      })}
-                      <td className="px-6 py-4 text-right">
-                        {priv.canEditDocuments && (
-                          <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase font-bold text-blue-600" 
-                            onClick={() => {
-                              setEditingDocVehicle(v);
-                              setDocUpdateForm({ type: '', date: '' });
-                              setShowDocUpdateForm(true);
-                            }}>
-                            Update
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              ))}
             </div>
-          </Card>
+          )}
         </div>
       ) : (
         <div className="space-y-6">

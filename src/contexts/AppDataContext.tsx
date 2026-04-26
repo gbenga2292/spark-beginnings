@@ -522,18 +522,23 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             if (data?.description) {
                 const meta = JSON.parse(data.description);
                 if (meta.refType && meta.refId) {
+                    // Find approver name
+                    const actorId = userId || user?.id;
+                    const approverUser = users.find(u => u.id === actorId);
+                    const approverName = approverUser?.name || '';
+
                     // Post a comment
                     const mainTask = mainTasks.find(m => m.id === data.mainTaskId || m.id === data.main_task_id);
                     if (mainTask) {
                         const creator = users.find(u => u.id === mainTask.createdBy);
                         const mention = creator?.name ? `@${creator.name.split(' ')[0].toLowerCase()}` : '';
                         const stepLabel = meta.workflowStep === 1 ? 'Line Manager' : meta.workflowStep === 2 ? 'Head of Department' : meta.workflowStep === 3 ? 'Management' : 'HR';
-                        const text = `**${stepLabel} Approved** ✅\n${mention} Step ${meta.workflowStep} of 4 approved.`;
+                        const text = `**${stepLabel} Approved** ✅\n${mention} Step ${meta.workflowStep} of 4 approved${approverName ? ` by ${approverName}` : ''}.`;
                         const { data: cData, error: cErr } = await supabase.from('task_updates').insert({
                             subtask_id: id,
                             main_task_id: mainTask.id,
                             text,
-                            author_id: userId || user?.id
+                            author_id: actorId
                         }).select().single();
                         if (cData && !cErr) setComments(prev => [...prev, cData]);
                     }
@@ -544,18 +549,39 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                         const mainTaskId = data.mainTaskId || data.main_task_id;
                         const deadline = new Date(); deadline.setHours(16, 30, 0, 0);
 
-                        if (step === 1) {
-                            // LM approved → create HoD subtask
-                            const { data: leaveRow } = await supabase.from('leaves').select('*').eq('id', meta.refId).single();
-                            const hodUserId = meta.hodUserId; // passed in the subtask description
-                            // Find the HoD system user if any
-                            const hodSystemUser = hodUserId ? users.find((u: any) => u.employeeId === hodUserId || u.id === hodUserId) : null;
+                        // Authority bypass: check if approver holds a top-level position (CEO / Head-level)
+                        const { getPositionIndex } = await import('@/src/lib/hierarchy');
+                        const appStore = useAppStore.getState();
+                        const approverEmp = appStore.employees.find(e =>
+                            approverUser?.name?.toLowerCase().includes(e.firstname.toLowerCase()) ||
+                            approverUser?.name?.toLowerCase().includes(e.surname.toLowerCase())
+                        );
+                        const posIdx = getPositionIndex(approverEmp?.position);
+                        const isHighAuthority = posIdx <= 1; // CEO or Head-level
 
-                            const hodSubDesc = JSON.stringify({ refType: 'leave', refId: meta.refId, workflowStep: 2, empName: meta.empName, leaveType: meta.leaveType, duration: meta.duration, hodUserId });
+                        if (isHighAuthority) {
+                            // High-authority approval — skip all remaining steps, fully approve immediately
+                            const sigUpdate: Record<string, any> = { approvalStatus: 'Approved', approvedAt: now, workflowStep: 5 };
+                            if (step <= 1) sigUpdate.supervisorSignature = { signed: 'Signed', date: now, name: approverName };
+                            if (step <= 2) sigUpdate.hodSignature = { signed: 'Signed', date: now, name: approverName };
+                            if (step <= 3) sigUpdate.managementSignature = { signed: 'Signed', date: now, name: approverName };
+                            sigUpdate.hrSignature = { signed: 'Signed', date: now, name: approverName };
+                            appStore.updateLeave(meta.refId, sigUpdate);
+                        } else if (step === 1) {
+                            // LM approved → create HoD subtask using pre-resolved IDs from JSON
+                            const hodSystemUserId = meta.hodSystemUserId || null;
+
+                            const hodSubDesc = JSON.stringify({
+                                refType: 'leave', refId: meta.refId, workflowStep: 2,
+                                empName: meta.empName, leaveType: meta.leaveType, duration: meta.duration,
+                                hodUserId: meta.hodUserId,
+                                hodSystemUserId: meta.hodSystemUserId,
+                                mgmtUserId: meta.mgmtUserId,  // carry forward
+                            });
                             const { data: hodSub } = await supabase.from('subtasks').insert({
                                 title: `[Step 2/4] HoD Approval — ${meta.empName} ${meta.leaveType} Leave`,
                                 description: hodSubDesc,
-                                assignedTo: hodSystemUser?.id || null,
+                                assignedTo: hodSystemUserId,
                                 status: 'not_started',
                                 priority: 'high',
                                 mainTaskId,
@@ -563,23 +589,26 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                             }).select().single();
                             if (hodSub) setSubtasks(prev => [...prev, hodSub]);
 
-                            useAppStore.getState().updateLeave(meta.refId, {
+                            appStore.updateLeave(meta.refId, {
                                 approvalStatus: 'Pending',
                                 workflowStep: 2,
-                                supervisorSignature: { signed: 'Signed', date: now },
+                                supervisorSignature: { signed: 'Signed', date: now, name: approverName },
                                 hodTaskId: hodSub?.id,
                             });
 
                         } else if (step === 2) {
-                            // HoD approved → create Management subtask
-                            const { data: leaveRow } = await supabase.from('leaves').select('approved_by_id').eq('id', meta.refId).single();
-                            const mgmtUserId = leaveRow?.approved_by_id;
+                            // HoD approved → create Management subtask using pre-resolved mgmtUserId from JSON
+                            const mgmtUserId = meta.mgmtUserId || null;
 
-                            const mgmtSubDesc = JSON.stringify({ refType: 'leave', refId: meta.refId, workflowStep: 3, empName: meta.empName, leaveType: meta.leaveType, duration: meta.duration });
+                            const mgmtSubDesc = JSON.stringify({
+                                refType: 'leave', refId: meta.refId, workflowStep: 3,
+                                empName: meta.empName, leaveType: meta.leaveType, duration: meta.duration,
+                                mgmtUserId,  // carry forward
+                            });
                             const { data: mgmtSub } = await supabase.from('subtasks').insert({
                                 title: `[Step 3/4] Management Approval — ${meta.empName} ${meta.leaveType} Leave`,
                                 description: mgmtSubDesc,
-                                assignedTo: mgmtUserId || null,
+                                assignedTo: mgmtUserId,
                                 status: 'not_started',
                                 priority: 'high',
                                 mainTaskId,
@@ -587,15 +616,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                             }).select().single();
                             if (mgmtSub) setSubtasks(prev => [...prev, mgmtSub]);
 
-                            useAppStore.getState().updateLeave(meta.refId, {
+                            appStore.updateLeave(meta.refId, {
                                 workflowStep: 3,
-                                hodSignature: { signed: 'Signed', date: now },
+                                hodSignature: { signed: 'Signed', date: now, name: approverName },
                                 managementTaskId: mgmtSub?.id,
                             });
 
                         } else if (step === 3) {
                             // Management approved → create HR subtask
-                            // Find an HR user (any user whose department is 'HR' or 'Human Resources')
                             const hrUser = users.find((u: any) =>
                                 (u.department || '').toLowerCase().includes('hr') ||
                                 (u.department || '').toLowerCase().includes('human resource')
@@ -613,19 +641,19 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                             }).select().single();
                             if (hrSub) setSubtasks(prev => [...prev, hrSub]);
 
-                            useAppStore.getState().updateLeave(meta.refId, {
+                            appStore.updateLeave(meta.refId, {
                                 workflowStep: 4,
-                                managementSignature: { signed: 'Signed', date: now },
+                                managementSignature: { signed: 'Signed', date: now, name: approverName },
                                 hrTaskId: hrSub?.id,
                             });
 
                         } else if (step === 4) {
                             // HR approved → fully approved!
-                            useAppStore.getState().updateLeave(meta.refId, {
+                            appStore.updateLeave(meta.refId, {
                                 approvalStatus: 'Approved',
                                 approvedAt: now,
                                 workflowStep: 5,
-                                hrSignature: { signed: 'Signed', date: now },
+                                hrSignature: { signed: 'Signed', date: now, name: approverName },
                             });
                         }
                     } else if (meta.refType === 'salary_advance') {
