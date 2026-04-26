@@ -200,14 +200,14 @@ export function DailyJournal() {
           <div className="flex items-center rounded border border-slate-200 bg-white p-0.5 shadow-sm">
             {(['list', 'calendar'] as const).map(v => (
               <button key={v} onClick={() => { setViewMode(v); setDiaryDate(null); }}
-                className={cn('px-3 py-1.5 text-xs font-bold rounded transition-all', viewMode === v && !diaryDate ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:text-slate-700')}>
+                className={cn('px-3 py-1.5 text-xs font-medium rounded transition-all', viewMode === v && !diaryDate ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
                 {v === 'list' ? 'List' : 'Calendar'}
               </button>
             ))}
           </div>
           {currentUser?.privileges?.dailyJournal?.canAdd && (
             <Button size="sm" onClick={() => openModal(undefined, diaryDate || undefined)}
-              className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md active:scale-95">
+              className="h-9 px-4 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs tracking-tight shadow-sm active:scale-95">
               <Plus className="w-4 h-4" /><span className="hidden sm:inline">New Log</span>
             </Button>
           )}
@@ -251,21 +251,21 @@ export function DailyJournal() {
       const entryCount = siteJournalEntries.filter(e => dayJs.some(j => j.id === e.journalId)).length;
       const isT = isSameDay(day, new Date());
       return (
-        <div key={ds} className={cn('border-b border-r border-border p-2 flex flex-col min-h-[100px] group relative', isT && 'bg-indigo-50/50 dark:bg-indigo-950/20')}>
+        <div key={ds} className={cn('border-b border-r border-border p-2 flex flex-col min-h-[100px] group relative', isT && 'bg-blue-50/50 dark:bg-blue-950/20')}>
           <div className="flex items-center justify-between mb-1">
-            <span className={cn('text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full transition-colors', isT ? 'bg-indigo-600 text-white' : 'text-muted-foreground group-hover:text-indigo-600')}>
+            <span className={cn('text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full transition-colors', isT ? 'bg-blue-600 text-white' : 'text-muted-foreground group-hover:text-blue-600')}>
               {format(day, 'd')}
             </span>
             {currentUser?.privileges?.dailyJournal?.canAdd && (
               <button onClick={e => { e.stopPropagation(); openModal(undefined, ds); }}
-                className="w-5 h-5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-sm text-[11px] font-black">
-                +
+                className="w-5 h-5 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-sm text-xs">
+                <Plus className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
           {dayJs.length > 0 && (
             <button onClick={() => setDiaryDate(ds)} className="mt-1 text-left w-full">
-              <div className="text-[10px] font-semibold px-1.5 py-1 rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 hover:bg-indigo-200 transition-colors">
+              <div className="text-[10px] font-medium px-1.5 py-1 rounded bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-100 transition-colors">
                 {entryCount} log{entryCount !== 1 ? 's' : ''} · {dayJs.length} session{dayJs.length !== 1 ? 's' : ''}
               </div>
             </button>
@@ -278,10 +278,10 @@ export function DailyJournal() {
 
   function renderListView() {
     return grouped.length === 0 ? (
-      <div className="text-center py-24 bg-card border border-indigo-100 dark:border-indigo-900/30 rounded-xl">
-        <p className="text-base font-medium text-foreground">No diary entries yet</p>
+      <div className="text-center py-24 bg-card border border-border rounded-lg">
+        <p className="text-sm font-medium text-muted-foreground">No diary entries yet</p>
         {currentUser?.privileges?.dailyJournal?.canAdd && (
-          <button onClick={() => openModal()} className="mt-4 px-5 py-2 rounded-full bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-500 transition-colors">+ New Log</button>
+          <button onClick={() => openModal()} className="mt-4 px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">New Log</button>
         )}
       </div>
     ) : (
@@ -290,23 +290,23 @@ export function DailyJournal() {
           const entries = siteJournalEntries.filter(e => group.journals.some(j => j.id === e.journalId));
           return (
             <button key={group.date} onClick={() => setDiaryDate(group.date)}
-              className="w-full text-left bg-card border border-border rounded-xl px-4 py-3.5 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 hover:shadow-sm transition-all border-l-4 border-l-indigo-400 flex items-center gap-3">
-              <Calendar className="h-4 w-4 text-indigo-500 flex-shrink-0" />
+              className="w-full text-left bg-card border border-border rounded-lg px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-900/50 hover:shadow-sm transition-all flex items-center gap-4">
+              <Calendar className="h-4 w-4 text-slate-400 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-foreground">{format(new Date(group.date + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}</p>
-                  {isSameDay(new Date(group.date + 'T00:00:00'), new Date()) && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-600">TODAY</span>}
+                  {isSameDay(new Date(group.date + 'T00:00:00'), new Date()) && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">TODAY</span>}
                 </div>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span className="text-xs text-muted-foreground">{entries.length} log points · {group.journals.length} session{group.journals.length !== 1 ? 's' : ''}</span>
                   {[...new Set(entries.map(e => e.siteName))].map(s => (
-                    <span key={s} className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
-                      <MapPin className="h-2.5 w-2.5" />{s}
+                    <span key={s} className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      <MapPin className="h-3 w-3" />{s}
                     </span>
                   ))}
                 </div>
               </div>
-              <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 flex-shrink-0">
+              <span className="text-xs font-medium px-2 py-1 text-slate-500 flex-shrink-0">
                 {entries.length} entries
               </span>
             </button>
@@ -345,27 +345,26 @@ export function DailyJournal() {
               </div>
             </div>
             {formEntries.length === 0 ? (
-              <div className="border-2 border-dashed border-slate-200 rounded-xl py-10 text-center">
+              <div className="border-2 border-dashed border-slate-200 rounded-lg py-10 text-center">
                 <MapPin className="h-8 w-8 text-slate-200 mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">No sites added yet</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {formEntries.map((entry, idx) => (
-                  <div key={idx} className="bg-card border border-border rounded-xl p-4 border-l-4 border-l-emerald-400">
+                  <div key={idx} className="bg-card border border-border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-emerald-400" />
                         <span className="text-sm font-semibold">{entry.siteName}</span>
                         <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted">{entry.clientName}</span>
                       </div>
-                      <button onClick={() => setFormEntries(p => p.filter((_, i) => i !== idx))} className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors">
+                      <button onClick={() => setFormEntries(p => p.filter((_, i) => i !== idx))} className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors">
                         <X className="h-4 w-4" />
                       </button>
                     </div>
                     <textarea value={entry.narration || ''} onChange={e => { const n = [...formEntries]; n[idx].narration = e.target.value; setFormEntries(n); }}
                       rows={3} placeholder={`Field notes for ${entry.siteName}...`}
-                      className="w-full text-sm border border-slate-200 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-background" />
+                      className="w-full text-sm border border-slate-200 rounded-md p-3 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500 bg-background" />
                   </div>
                 ))}
               </div>
@@ -373,7 +372,7 @@ export function DailyJournal() {
           </div>
           <DialogFooter className="px-6 py-4 border-t border-border bg-muted/30">
             <Button variant="outline" onClick={() => setIsModalOpen(false)} className="h-9">Cancel</Button>
-            <Button onClick={handleSave} className="h-9 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold">Publish Log</Button>
+            <Button onClick={handleSave} className="h-9 px-6 bg-blue-600 hover:bg-blue-700 text-white">Publish Log</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -522,7 +521,7 @@ export function DailyJournal() {
 
       {/* Calendar View */}
       {viewMode === 'calendar' && (
-        <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+        <div className="bg-card border border-border rounded-lg overflow-hidden shadow-sm">
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <h2 className="text-base font-semibold text-foreground">{format(currentMonth, 'MMMM yyyy')}</h2>
             <div className="flex items-center gap-2">

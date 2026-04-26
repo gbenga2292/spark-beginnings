@@ -180,19 +180,19 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] bg-white dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm animate-in fade-in duration-200">
+    <div className="flex flex-col h-[calc(100vh-8rem)] bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm animate-in fade-in duration-200">
       {/* Top Bar */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
         <div className="flex items-center gap-4">
           <button
             onClick={onBack}
-            className="flex items-center justify-center h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-slate-500"
+            className="flex items-center justify-center h-8 w-8 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-slate-500"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
 
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+            <div className="h-8 w-8 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
               <MapPin className="h-4 w-4" />
             </div>
             <div>
@@ -221,7 +221,7 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
           <Button
             variant="outline"
             size="sm"
-            className="gap-2 h-9 text-xs font-semibold"
+            className="gap-2 h-9 rounded-md text-xs font-medium"
             onClick={() => setShowReturnWaybill(true)}
           >
             <RotateCcw className="h-3.5 w-3.5" /> Return Waybill
@@ -229,7 +229,7 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
           <Button
             variant="outline"
             size="sm"
-            className="gap-2 h-9 text-xs font-semibold"
+            className="gap-2 h-9 rounded-md text-xs font-medium"
             onClick={() => setShowTransactions(true)}
           >
             <Activity className="h-3.5 w-3.5" /> Transactions
@@ -237,7 +237,7 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
           <Button
             variant="outline"
             size="icon"
-            className="h-9 w-9"
+            className="h-9 w-9 rounded-md"
             onClick={() => setShowReportDialog(true)}
           >
             <FileText className="h-3.5 w-3.5" />

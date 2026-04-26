@@ -477,7 +477,7 @@ export function Variables() {
     const ok = await showConfirm('Are you sure you want to save all changes to the database? This will update global system parameters.', { title: 'Save Changes' });
     if (!ok) return;
 
-    saveAllSettingsStore(localPayrollVars, localPayeVars, localMonthVals, localHrVars);
+    saveAllSettingsStore(localPayrollVars, localPayeVars, localMonthVals, localHrVars, onboardingTemplates);
     setIsDirty(false);
     toast.success('Variables saved successfully!');
   };

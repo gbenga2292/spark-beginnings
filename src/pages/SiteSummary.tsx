@@ -214,28 +214,6 @@ export function SiteSummary({ filterYear, filterMonth }: { filterYear?: string, 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col">
         <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            {(!filterYear || !filterMonth) && (
-              <>
-                <select
-                  value={selectedYear}
-                  onChange={e => setInternalYear(e.target.value)}
-                  className="h-9 px-3 border border-slate-200 rounded-md bg-white text-sm font-medium"
-                >
-                  {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(y => (
-                    <option key={y} value={y.toString()}>{y}</option>
-                  ))}
-                </select>
-                <select
-                  value={selectedMonth}
-                  onChange={e => setInternalMonth(Number(e.target.value))}
-                  className="h-9 px-3 border border-slate-200 rounded-md bg-white text-sm font-medium"
-                >
-                  {monthNames.map((m, i) => (
-                    <option key={m} value={i + 1}>{m}</option>
-                  ))}
-                </select>
-              </>
-            )}
             <div className="text-sm text-slate-500">
               Work Days: <span className="font-semibold text-slate-700">{workDays}</span> |
               Overtime Rate: <span className="font-semibold text-slate-700">{overtimeRate}</span>

@@ -3,10 +3,11 @@ import {
   ArrowLeft, Calendar, Clock, AlertTriangle, 
   CheckCircle2, Fuel, User, MessageSquare, 
   BarChart3, History, Plus, Save, Trash2, Edit2, Wrench, Activity,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, ChevronDown, Eye, Lock
 } from 'lucide-react';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore } from '../store/appStore';
+import { useUserStore } from '../store/userStore';
 import { DailyMachineLog, DowntimeEntry } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
@@ -32,8 +33,10 @@ interface DailyLogManagerProps {
 export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }: DailyLogManagerProps) {
   const { dailyMachineLogs, logDailyActivity, waybills } = useOperations();
   const { employees } = useAppStore();
-  const [view, setView] = useState<'history' | 'form' | 'analytics' | 'calendar'>('history');
+  const currentUser = useUserStore(s => s.getCurrentUser());
+  const [view, setView] = useState<'history' | 'form' | 'analytics' | 'calendar' | 'detail'>('history');
   const [selectedLog, setSelectedLog] = useState<DailyMachineLog | null>(null);
+  const [viewingLog, setViewingLog] = useState<DailyMachineLog | null>(null);
   
   // Dewatering field staff for supervisor dropdown
   const dewateringStaff = employees.filter(e => 
@@ -95,7 +98,8 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
         clientFeedback,
         maintenanceDetails,
         issuesOnSite,
-        downtimeEntries
+        downtimeEntries,
+        loggedBy: currentUser?.name || 'Unknown'
       });
       setView('history');
       resetForm();
@@ -129,21 +133,26 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
     setView('form');
   };
 
+  const openDetailView = (log: DailyMachineLog) => {
+    setViewingLog(log);
+    setView('detail');
+  };
+
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-4">
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800/60 p-4 sm:p-5 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+        <div className="flex items-center gap-3">
           <button 
             onClick={onBack}
-            className="h-9 w-9 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all shadow-sm"
+            className="h-8 w-8 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all shadow-sm"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div>
-            <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <h2 className="text-base font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
               {assetName}
-              <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 px-2 py-0">Daily Logs</Badge>
+              <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300 px-2 py-0">Daily Logs</Badge>
             </h2>
             <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
               <Calendar className="h-3 w-3" /> Site: {siteName}
@@ -152,38 +161,35 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-lg">
+            <button 
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${view === 'history' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+              onClick={() => setView('history')}
+            >
+              History
+            </button>
+            <button 
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${view === 'analytics' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+              onClick={() => setView('analytics')}
+            >
+              Analytics
+            </button>
+            <button 
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${view === 'calendar' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+              onClick={() => setView('calendar')}
+            >
+              Calendar
+            </button>
+          </div>
           <Button 
-            variant={view === 'history' ? 'default' : 'outline'} 
-            size="sm" 
-            className="gap-2 h-9 text-xs font-semibold px-4 rounded-xl transition-all"
-            onClick={() => setView('history')}
-          >
-            <History className="h-3.5 w-3.5" /> History
-          </Button>
-          <Button 
-            variant={view === 'analytics' ? 'default' : 'outline'} 
-            size="sm" 
-            className="gap-2 h-9 text-xs font-semibold px-4 rounded-xl transition-all"
-            onClick={() => setView('analytics')}
-          >
-            <BarChart3 className="h-3.5 w-3.5" /> Analytics
-          </Button>
-          <Button 
-            variant={view === 'calendar' ? 'default' : 'outline'} 
-            size="sm" 
-            className="gap-2 h-9 text-xs font-semibold px-4 rounded-xl transition-all"
-            onClick={() => setView('calendar')}
-          >
-            <Calendar className="h-3.5 w-3.5" /> Calendar
-          </Button>
-          <Button 
-            className="gap-2 h-9 text-xs font-bold px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md transition-all"
+            size="sm"
+            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 ml-2"
             onClick={() => {
               resetForm();
               setView('form');
             }}
           >
-            <Plus className="h-3.5 w-3.5" /> New Log
+            <Plus className="h-4 w-4" /> File Log
           </Button>
         </div>
       </div>
@@ -209,11 +215,11 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
               </div>
             ) : (
               logs.map(log => (
-                <Card key={log.id} className="p-5 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all rounded-3xl group overflow-hidden border-l-4 border-l-blue-500">
-                  <div className="flex justify-between items-start mb-4">
+                <Card key={log.id} className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all rounded-lg group overflow-hidden">
+                  <div className="flex justify-between items-start p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
                     <div className="flex items-center gap-3">
-                      <div className="h-12 w-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 shrink-0">
-                        <Calendar className="h-6 w-6" />
+                      <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                        <Calendar className="h-5 w-5" />
                       </div>
                       <div>
                         <p className="text-base font-bold text-slate-800 dark:text-white">{formatDisplayDate(log.date)}</p>
@@ -233,17 +239,17 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
                       </div>
                     </div>
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600" onClick={() => editLog(log)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => editLog(log)}>
                         <Edit2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4 border-t border-slate-50 dark:border-slate-800">
+                  <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-6">
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Supervisor</p>
-                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                        <User className="h-3.5 w-3.5 text-slate-400" /> {log.supervisorOnSite || 'N/A'}
+                      <p className="text-sm font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                        <User className="h-3.5 w-3.5 text-slate-400" /> {log.supervisorOnSite || '—'}
                       </p>
                     </div>
                     <div className="space-y-1">
@@ -261,8 +267,9 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
                   </div>
 
                   {(log.issuesOnSite || log.maintenanceDetails) && (
-                    <div className="mt-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 space-y-3 border border-slate-100 dark:border-slate-800">
-                      {log.issuesOnSite && (
+                    <div className="px-4 pb-4">
+                      <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 space-y-2 border border-slate-100 dark:border-slate-800">
+                        {log.issuesOnSite && (
                         <div className="flex gap-3">
                           <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                           <p className="text-xs text-slate-600 dark:text-slate-400">
@@ -274,10 +281,11 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
                         <div className="flex gap-3">
                           <Wrench className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
                           <p className="text-xs text-slate-600 dark:text-slate-400">
-                            <span className="font-bold text-slate-700 dark:text-slate-200">Maintenance:</span> {log.maintenanceDetails}
+                            <span className="font-semibold text-slate-700 dark:text-slate-200">Maintenance:</span> {log.maintenanceDetails}
                           </p>
                         </div>
                       )}
+                    </div>
                     </div>
                   )}
                 </Card>
@@ -288,30 +296,30 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
 
         {view === 'form' && (
           <div className="max-w-4xl mx-auto pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden">
-              <div className="p-8 space-y-8">
+            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden rounded-lg">
+              <div className="p-6 space-y-6">
                 {/* Basic Info Section */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Log Date</label>
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Log Date</label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                       <Input 
                         type="date" 
                         value={date} 
                         onChange={e => setDate(e.target.value)}
-                        className="pl-10 h-11 bg-slate-50 dark:bg-slate-800 border-none rounded-xl focus:ring-2 focus:ring-blue-500"
+                        className="pl-9 h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Operational Status</label>
-                    <div className="flex p-1 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Operational Status</label>
+                    <div className="flex p-1 bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-md">
                       <button 
                         onClick={() => setIsActive(true)}
                         className={cn(
-                          "flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all",
-                          isActive ? "bg-white dark:bg-slate-700 text-emerald-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                          "flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-semibold rounded transition-all",
+                          isActive ? "bg-white dark:bg-slate-700 text-emerald-600 shadow-sm border border-slate-200/50 dark:border-slate-600" : "text-slate-500 hover:text-slate-700"
                         )}
                       >
                         <CheckCircle2 className="h-3.5 w-3.5" /> ACTIVE
@@ -319,8 +327,8 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
                       <button 
                         onClick={() => setIsActive(false)}
                         className={cn(
-                          "flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all",
-                          !isActive ? "bg-white dark:bg-slate-700 text-rose-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                          "flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-semibold rounded transition-all",
+                          !isActive ? "bg-white dark:bg-slate-700 text-rose-600 shadow-sm border border-slate-200/50 dark:border-slate-600" : "text-slate-500 hover:text-slate-700"
                         )}
                       >
                         <AlertTriangle className="h-3.5 w-3.5" /> DOWN
@@ -328,14 +336,14 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Diesel Usage (L)</label>
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Diesel Usage (L)</label>
                     <div className="relative">
                       <Fuel className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                       <Input 
                         type="number" 
                         value={dieselUsage} 
                         onChange={e => setDieselUsage(e.target.value)}
-                        className="pl-10 h-11 bg-slate-50 dark:bg-slate-800 border-none rounded-xl focus:ring-2 focus:ring-blue-500"
+                        className="pl-9 h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500"
                         placeholder="0.00"
                       />
                     </div>
@@ -343,14 +351,14 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
                 </div>
 
                 {/* Supervisor Field */}
-                <div className="space-y-3">
-                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Supervisor on Site</label>
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Supervisor on Site</label>
                   <div className="relative group">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                     <select
                       value={supervisorOnSite}
                       onChange={(e) => setSupervisorOnSite(e.target.value)}
-                      className="w-full h-12 pl-11 pr-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer"
+                      className="w-full h-10 pl-9 pr-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer"
                     >
                       <option value="">Select Supervisor</option>
                       {dewateringStaff.map(staff => (
@@ -359,54 +367,54 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
                         </option>
                       ))}
                     </select>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                      <Plus className="h-3.5 w-3.5 rotate-45" />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                      <ChevronDown className="h-4 w-4" />
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Issues on Site</label>
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Issues on Site</label>
                     <Textarea 
                       value={issuesOnSite} 
                       onChange={e => setIssuesOnSite(e.target.value)}
-                      className="min-h-[100px] bg-slate-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 p-4"
+                      className="min-h-[100px] border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500 p-3"
                       placeholder="Describe any environmental or site-specific issues..."
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Maintenance Performed</label>
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Maintenance Performed</label>
                     <Textarea 
                       value={maintenanceDetails} 
                       onChange={e => setMaintenanceDetails(e.target.value)}
-                      className="min-h-[100px] bg-slate-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 p-4"
+                      className="min-h-[100px] border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500 p-3"
                       placeholder="Any onsite repairs or maintenance done today?"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Client Feedback</label>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Client Feedback</label>
                   <Textarea 
                     value={clientFeedback} 
                     onChange={e => setClientFeedback(e.target.value)}
-                    className="min-h-[80px] bg-slate-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 p-4"
+                    className="min-h-[80px] border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500 p-3"
                     placeholder="What did the client say about the machine performance?"
                   />
                 </div>
 
                 {/* Downtime Section */}
-                <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div className="space-y-4 pt-6 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Clock className="h-5 w-5 text-rose-500" />
-                      <h3 className="font-bold text-slate-800 dark:text-white">Downtime Incidents</h3>
+                      <Clock className="h-4 w-4 text-rose-500" />
+                      <h3 className="font-semibold text-slate-800 dark:text-white">Downtime Incidents</h3>
                     </div>
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="gap-2 h-9 text-xs font-bold rounded-xl border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-900/30 dark:hover:bg-rose-900/20"
+                      className="gap-2 h-8 text-xs font-medium rounded-md border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-900/30 dark:hover:bg-rose-900/20"
                       onClick={() => setShowDowntimeDialog(true)}
                     >
                       <Plus className="h-3.5 w-3.5" /> Add Incident
@@ -414,25 +422,25 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
                   </div>
 
                   {downtimeEntries.length === 0 ? (
-                    <div className="py-8 px-6 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-center">
-                      <p className="text-xs font-medium text-slate-400">No downtime incidents recorded for this period.</p>
+                    <div className="py-6 px-4 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-center">
+                      <p className="text-sm font-medium text-slate-500">No downtime incidents recorded for this period.</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {downtimeEntries.map(entry => (
-                        <div key={entry.id} className="flex items-center justify-between p-4 rounded-2xl bg-rose-50/50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/20 group animate-in zoom-in-95 duration-200">
-                          <div className="flex items-center gap-4">
+                        <div key={entry.id} className="flex items-center justify-between p-3 rounded-lg bg-rose-50/30 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/20 group">
+                          <div className="flex items-center gap-3">
                             <div className={cn(
-                              "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
+                              "h-8 w-8 rounded-md flex items-center justify-center shrink-0",
                               entry.severity === 'high' ? "bg-rose-100 text-rose-600" :
                               entry.severity === 'medium' ? "bg-amber-100 text-amber-600" :
                               "bg-blue-100 text-blue-600"
                             )}>
-                              <AlertTriangle className="h-5 w-5" />
+                              <AlertTriangle className="h-4 w-4" />
                             </div>
                             <div>
-                              <p className="text-sm font-bold text-slate-800 dark:text-white">{entry.reason}</p>
-                              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{entry.reason}</p>
+                              <p className="text-[11px] text-slate-500 font-medium">
                                 {entry.durationHours} Hours · {entry.severity} Severity
                               </p>
                             </div>
@@ -440,7 +448,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-8 w-8 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-900/30"
+                            className="h-8 w-8 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-900/30"
                             onClick={() => setDowntimeEntries(downtimeEntries.filter(e => e.id !== entry.id))}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -452,32 +460,32 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
                 </div>
               </div>
 
-              <div className="bg-slate-50 dark:bg-slate-800/50 p-6 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="bg-slate-50/50 dark:bg-slate-800/50 p-4 sm:p-5 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800 rounded-b-lg">
                 <Button 
                   variant="outline" 
-                  className="h-11 px-8 rounded-xl font-bold border-slate-200"
+                  className="rounded-md border-slate-200"
                   onClick={() => setView('history')}
                 >
                   Cancel
                 </Button>
                 <Button 
-                  className="h-11 px-10 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20 gap-2"
+                  className="rounded-md bg-blue-600 hover:bg-blue-700 text-white gap-2"
                   onClick={handleSaveLog}
                 >
                   <Save className="h-4 w-4" /> {selectedLog ? 'Update Log' : 'Save Daily Log'}
                 </Button>
               </div>
-            </div>
+            </Card>
           </div>
         )}
 
         {view === 'calendar' && (
-          <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-12">
-            <Card className="p-8 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-[32px] shadow-xl overflow-hidden">
-              <div className="flex items-center justify-between mb-8">
+          <div className="max-w-4xl mx-auto space-y-6 pb-12">
+            <Card className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-sm">
+              <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-xl font-bold text-slate-800 dark:text-white">Operation Schedule</h3>
-                  <p className="text-sm text-slate-400 mt-1">Timeline of machine presence and daily logging.</p>
+                  <h3 className="text-base font-semibold text-slate-800 dark:text-white">Operation Schedule</h3>
+                  <p className="text-sm text-slate-500 mt-1">Timeline of machine presence and daily logging.</p>
                 </div>
                 <div className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800 p-1.5 rounded-2xl">
                   <Button 

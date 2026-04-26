@@ -931,16 +931,16 @@ export function AccountsReportBuilder({
               onClick={() => onOpenChange(false)}
               aria-label="Close report builder"
               className={[
-                'flex items-center justify-center',
-                'w-8 h-8 shrink-0 mr-1',
+                'flex items-center justify-center gap-1.5',
+                'px-4 h-8 shrink-0 mr-1 cursor-pointer',
                 'bg-red-600 hover:bg-red-500 active:bg-red-700',
-                'text-white rounded',
+                'text-white text-xs font-semibold rounded',
                 'transition-all duration-100',
                 'active:scale-95',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-900',
               ].join(' ')}
             >
-              <X className="h-3.5 w-3.5" strokeWidth={2.5} />
+              Close
             </button>
 
             {/* ── Breadcrumb + title ── */}

@@ -197,9 +197,10 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
   const addPendingSite = useAppStore(s => s.addPendingSite);
   const deletePendingSite = useAppStore(s => s.deletePendingSite);
 
-  // Reported-by dropdown state (internal logs)
+  // Reported-by combobox state (internal logs)
   const [reportedByInput, setReportedByInput] = useState('');
   const [reportedByOpen, setReportedByOpen] = useState(false);
+  const [reportedByFocused, setReportedByFocused] = useState(false);
 
   const allClients = useMemo(() => {
     // Combine clients from the clients table, existing sites, and pending sites
@@ -593,112 +594,214 @@ function LogForm({ form, onChange, onSave, onCancel, isEdit, editingId, isDark }
         {form.isInternal ? (
           <div>
             <div className={labelCls}>Reported By</div>
-            {/* Selected reporters chips */}
-            {form.reportedBy.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-2">
+
+            {/* ── Unified combobox ── */}
+            <div
+              className="relative"
+              onBlur={e => {
+                // Close only when focus leaves the entire widget
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setReportedByOpen(false);
+                  setReportedByFocused(false);
+                }
+              }}
+            >
+              {/* Token / tag row + search input combined */}
+              <div
+                className={cn(
+                  'min-h-[36px] flex flex-wrap gap-1.5 items-center px-2 py-1.5 rounded-md border transition-colors cursor-text',
+                  reportedByFocused
+                    ? 'ring-2 ring-indigo-500 border-indigo-400'
+                    : isDark ? 'border-slate-600' : 'border-slate-200',
+                  isDark ? 'bg-slate-800' : 'bg-white'
+                )}
+                onClick={() => {
+                  const inp = document.getElementById('reported-by-search') as HTMLInputElement | null;
+                  inp?.focus();
+                }}
+              >
+                {/* Selected chips */}
                 {form.reportedBy.map((name, i) => (
                   <span
                     key={i}
                     className={cn(
                       'inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium',
-                      isDark ? 'bg-indigo-900/40 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+                      isDark ? 'bg-indigo-900/50 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
                     )}
                   >
-                    👤 {name}
+                    {name}
                     <button
                       type="button"
-                      onClick={() => onChange({ reportedBy: form.reportedBy.filter((_, idx) => idx !== i) })}
-                      className="ml-0.5 hover:text-red-500 transition-colors"
+                      tabIndex={-1}
+                      onClick={e => {
+                        e.stopPropagation();
+                        onChange({ reportedBy: form.reportedBy.filter((_, idx) => idx !== i) });
+                      }}
+                      className="ml-0.5 hover:text-red-500 transition-colors rounded-full"
                     >
                       <X className="w-3 h-3" />
                     </button>
                   </span>
                 ))}
+
+                {/* Inline search input */}
+                <input
+                  id="reported-by-search"
+                  type="text"
+                  autoComplete="off"
+                  placeholder={form.reportedBy.length === 0 ? 'Type a name to search or add…' : 'Add another…'}
+                  value={reportedByInput}
+                  onChange={e => {
+                    setReportedByInput(e.target.value);
+                    setReportedByOpen(true);
+                  }}
+                  onFocus={() => {
+                    setReportedByFocused(true);
+                    setReportedByOpen(true);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const q = reportedByInput.trim();
+                      if (!q) return;
+                      // If there's exactly one filtered match, pick it; else add as custom
+                      const filtered = employees
+                        .filter(em => em.status === 'Active' || em.status === 'On Leave')
+                        .filter(em => {
+                          const full = `${em.firstname} ${em.surname}`;
+                          return full.toLowerCase().includes(q.toLowerCase());
+                        });
+                      const nameToAdd = filtered.length === 1
+                        ? `${filtered[0].firstname} ${filtered[0].surname}`
+                        : q;
+                      if (!form.reportedBy.includes(nameToAdd)) {
+                        onChange({ reportedBy: [...form.reportedBy, nameToAdd] });
+                      }
+                      setReportedByInput('');
+                      setReportedByOpen(false);
+                    } else if (e.key === 'Backspace' && !reportedByInput && form.reportedBy.length > 0) {
+                      // Backspace with empty input removes last chip
+                      onChange({ reportedBy: form.reportedBy.slice(0, -1) });
+                    } else if (e.key === 'Escape') {
+                      setReportedByOpen(false);
+                    }
+                  }}
+                  className={cn(
+                    'flex-1 min-w-[140px] bg-transparent text-sm outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500',
+                    isDark ? 'text-slate-100' : 'text-slate-900'
+                  )}
+                />
               </div>
-            )}
-            {/* Employee multi-select dropdown */}
-            <div className="relative">
-              <div
-                onClick={() => setReportedByOpen(o => !o)}
-                className={cn(inputCls, 'cursor-pointer flex items-center justify-between')}
-              >
-                <span className={cn('text-sm', form.reportedBy.length === 0 && (isDark ? 'text-slate-500' : 'text-slate-400'))}>
-                  {form.reportedBy.length === 0 ? 'Select reporter(s)…' : `${form.reportedBy.length} selected`}
-                </span>
-                <ChevronDown className="w-4 h-4 shrink-0" />
-              </div>
-              {reportedByOpen && (
-                <div className={cn(
-                  'absolute top-full left-0 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border shadow-xl z-50 style-scroll',
-                  isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-                )}>
-                  {employees
-                    .filter(e => e.status === 'Active' || e.status === 'On Leave')
-                    .sort((a, b) => `${a.firstname} ${a.surname}`.localeCompare(`${b.firstname} ${b.surname}`))
-                    .map(emp => {
+
+              {/* Dropdown suggestion list */}
+              {reportedByOpen && (() => {
+                const q = reportedByInput.trim().toLowerCase();
+                const filtered = employees
+                  .filter(em => em.status === 'Active' || em.status === 'On Leave')
+                  .filter(em => {
+                    if (!q) return true;
+                    return `${em.firstname} ${em.surname}`.toLowerCase().includes(q);
+                  })
+                  .sort((a, b) => `${a.firstname} ${a.surname}`.localeCompare(`${b.firstname} ${b.surname}`));
+
+                const showCustom = q.length > 0 && !employees.some(
+                  em => `${em.firstname} ${em.surname}`.toLowerCase() === q
+                ) && !form.reportedBy.includes(reportedByInput.trim());
+
+                if (filtered.length === 0 && !showCustom) return null;
+
+                return (
+                  <div className={cn(
+                    'absolute top-full left-0 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border shadow-xl z-50 style-scroll',
+                    isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+                  )}>
+                    {filtered.map(emp => {
                       const fullName = `${emp.firstname} ${emp.surname}`;
                       const isSelected = form.reportedBy.includes(fullName);
                       return (
                         <div
                           key={emp.id}
+                          tabIndex={0}
+                          role="option"
+                          aria-selected={isSelected}
+                          onMouseDown={e => e.preventDefault()} // keep input focused
                           onClick={() => {
-                            onChange({
-                              reportedBy: isSelected
-                                ? form.reportedBy.filter(n => n !== fullName)
-                                : [...form.reportedBy, fullName],
-                            });
+                            if (!isSelected) {
+                              onChange({ reportedBy: [...form.reportedBy, fullName] });
+                            } else {
+                              onChange({ reportedBy: form.reportedBy.filter(n => n !== fullName) });
+                            }
+                            setReportedByInput('');
+                            setReportedByOpen(false);
+                            (document.getElementById('reported-by-search') as HTMLInputElement | null)?.focus();
                           }}
                           className={cn(
-                            'flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors text-sm',
-                            isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-50'
+                            'flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors text-sm select-none',
+                            isSelected
+                              ? (isDark ? 'bg-indigo-900/30' : 'bg-indigo-50')
+                              : (isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-50')
                           )}
                         >
+                          {/* checkmark indicator */}
                           <div className={cn(
-                            'w-4 h-4 rounded border flex items-center justify-center shrink-0',
-                            isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : isDark ? 'border-slate-500' : 'border-slate-300'
+                            'w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors',
+                            isSelected
+                              ? 'bg-indigo-600 border-indigo-600 text-white'
+                              : isDark ? 'border-slate-600' : 'border-slate-300'
                           )}>
                             {isSelected && <CheckCircle2 className="w-3 h-3" />}
                           </div>
-                          <span className={cn('font-medium truncate', isDark ? 'text-slate-200' : 'text-slate-800')}>{fullName}</span>
-                          <span className={cn('text-xs ml-auto shrink-0', isDark ? 'text-slate-500' : 'text-slate-400')}>{emp.staffType}</span>
+                          {/* Avatar initial */}
+                          <div className={cn(
+                            'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0',
+                            isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
+                          )}>
+                            {emp.firstname?.[0]}{emp.surname?.[0]}
+                          </div>
+                          <span className={cn('font-medium flex-1 truncate', isDark ? 'text-slate-200' : 'text-slate-800')}>
+                            {fullName}
+                          </span>
+                          <span className={cn(
+                            'text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0',
+                            emp.staffType === 'OFFICE'
+                              ? (isDark ? 'bg-sky-900/40 text-sky-400' : 'bg-sky-50 text-sky-600')
+                              : emp.staffType === 'NON-EMPLOYEE'
+                                ? (isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500')
+                                : (isDark ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-50 text-emerald-600')
+                          )}>
+                            {emp.staffType}
+                          </span>
                         </div>
                       );
                     })}
-                </div>
-              )}
-            </div>
-            {/* Free-text add (for names not in employee list) */}
-            <div className="flex gap-2 mt-2">
-              <input
-                type="text"
-                placeholder="+ Add name not in employee list…"
-                value={reportedByInput}
-                onChange={e => setReportedByInput(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && reportedByInput.trim()) {
-                    e.preventDefault();
-                    const name = reportedByInput.trim();
-                    if (!form.reportedBy.includes(name)) onChange({ reportedBy: [...form.reportedBy, name] });
-                    setReportedByInput('');
-                  }
-                }}
-                className={cn(inputCls, 'flex-1')}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const name = reportedByInput.trim();
-                  if (name && !form.reportedBy.includes(name)) {
-                    onChange({ reportedBy: [...form.reportedBy, name] });
-                    setReportedByInput('');
-                  }
-                }}
-                className={cn('px-3 h-9 rounded-md text-xs font-semibold border transition-colors shrink-0',
-                  isDark ? 'bg-slate-700 border-slate-600 text-slate-200 hover:bg-slate-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                )}
-              >
-                + Add
-              </button>
+
+                    {/* "Add custom" option for names not in the employee list */}
+                    {showCustom && (
+                      <div
+                        onMouseDown={e => e.preventDefault()}
+                        onClick={() => {
+                          const name = reportedByInput.trim();
+                          if (name && !form.reportedBy.includes(name)) {
+                            onChange({ reportedBy: [...form.reportedBy, name] });
+                          }
+                          setReportedByInput('');
+                          setReportedByOpen(false);
+                          (document.getElementById('reported-by-search') as HTMLInputElement | null)?.focus();
+                        }}
+                        className={cn(
+                          'flex items-center gap-2.5 px-3 py-2.5 cursor-pointer transition-colors text-sm border-t select-none',
+                          isDark
+                            ? 'border-slate-700 text-indigo-400 hover:bg-slate-700'
+                            : 'border-slate-100 text-indigo-600 hover:bg-indigo-50'
+                        )}
+                      >
+                        <ListPlus className="w-4 h-4 shrink-0" />
+                        <span>Add <strong>&quot;{reportedByInput.trim()}&quot;</strong> as custom reporter</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         ) : (

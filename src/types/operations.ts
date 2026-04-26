@@ -221,5 +221,6 @@ export interface DailyMachineLog {
   issuesOnSite?: string;
   dieselUsage: number;
   supervisorOnSite?: string;
+  loggedBy?: string;
   created_at?: string;
 }

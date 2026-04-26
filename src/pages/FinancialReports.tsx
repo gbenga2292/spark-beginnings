@@ -1244,15 +1244,7 @@ export function FinancialReports() {
           return (
             <div className="space-y-6">
               {/* Controls */}
-              <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-500 uppercase">Year</span>
-                  <select value={filterYear} onChange={e => setFilterYear(e.target.value)}
-                    className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
-                    <option value="All">All Years</option>
-                    {ledgerYears.map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                 <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
                   {(['category', 'bank', 'client', 'site'] as const).map(v => (
                     <button key={v} onClick={() => setLedgerSummaryView(v)}
@@ -1371,26 +1363,6 @@ export function FinancialReports() {
         })()
       ) : mainTab === 'client-account' ? (
         <>
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-            <div className="flex items-center gap-2 text-slate-800">
-              <Filter className="w-5 h-5 text-indigo-600" />
-              <h2 className="text-sm font-bold uppercase tracking-wide">Filters</h2>
-            </div>
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-          
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Client</span>
-            <select value={filterClient} onChange={(e) => setFilterClient(e.target.value)}
-              className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 w-32 md:w-48">
-              <option value="All">All Clients</option>
-              {availableClients.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-        </div>
-      </div>
-
-
       {/* Top Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="shadow-sm border-slate-200">
@@ -1979,15 +1951,7 @@ export function FinancialReports() {
 
               return (
                 <>
-                  <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-slate-700">Year:</label>
-                      <select value={filterYear === 'All' ? String(currentYear) : filterYear} onChange={e => setFilterYear(e.target.value)}
-                        className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20">
-                        <option value="All">All Years</option>
-                        {years.map(y => <option key={y} value={String(y)}>{y}</option>)}
-                      </select>
-                    </div>
+                  <div className="flex items-center justify-end mb-4 flex-wrap gap-3">
                     {priv.canExport && (
                       <div className="flex gap-2">
                         <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportPayrollSummaryCsv}>
