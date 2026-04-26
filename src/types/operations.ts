@@ -224,3 +224,18 @@ export interface DailyMachineLog {
   loggedBy?: string;
   created_at?: string;
 }
+
+export interface ConsumableUsageLog {
+  id: string;
+  assetId: string;
+  assetName: string;
+  siteId: string;
+  siteName: string;
+  date: string;
+  quantityUsed: number;
+  usedBy: string;
+  usedFor: string;
+  notes?: string;
+  loggedBy?: string;
+  created_at?: string;
+}

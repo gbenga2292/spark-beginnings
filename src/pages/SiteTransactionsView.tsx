@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useOperations } from '../contexts/OperationsContext';
 import { Site } from '@/src/store/appStore';
 import { Button } from '@/src/components/ui/button';
@@ -69,63 +70,61 @@ export function SiteTransactionsView({ site, onBack }: SiteTransactionsViewProps
     }
   };
 
+  useSetPageTitle(
+    `${site.name} - Transaction History`,
+    'View all asset movements and transactions for this site',
+    (
+      <div className="flex gap-3">
+        <div className="relative">
+          <Button
+            variant="outline"
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="bg-white border-slate-200 text-slate-700 text-xs font-bold h-9 shadow-sm rounded-xl px-4 hover:bg-slate-50 transition-all gap-2 min-w-[120px] justify-between uppercase tracking-wider"
+          >
+            {viewMode} <ChevronDown className="h-4 w-4 text-slate-400" />
+          </Button>
+          
+          {isDropdownOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setIsDropdownOpen(false)} />
+              <div className="absolute top-full right-0 mt-2 w-[160px] bg-white border border-slate-100 rounded-xl shadow-lg z-20 py-1.5 p-1.5 flex flex-col gap-1">
+                {(['Table View', 'Tree View', 'Flow View'] as const).map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => {
+                      setViewMode(mode);
+                      setIsDropdownOpen(false);
+                    }}
+                    className={cn(
+                      "w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-colors",
+                      viewMode === mode 
+                        ? "bg-[#80b18f] text-white" 
+                        : "text-slate-600 hover:bg-slate-50"
+                    )}
+                  >
+                    {viewMode === mode && <span className="mr-2 opacity-80">✓</span>}
+                    {mode}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        <Button
+          variant="outline"
+          onClick={onBack}
+          className="bg-white border-slate-200 text-slate-700 text-xs font-bold h-9 shadow-sm rounded-xl px-4 hover:bg-slate-50 transition-all shrink-0 gap-2 uppercase tracking-wider"
+        >
+          <Eye className="h-4 w-4" /> Back to Site Inventory
+        </Button>
+      </div>
+    ),
+    [site.name, viewMode, isDropdownOpen, onBack]
+  );
+
   return (
     <div className="flex flex-col h-full bg-slate-50/30">
-      {/* Fixed Header */}
-      <div className="flex-none bg-white border-b border-slate-200 px-6 py-4 md:px-8 shadow-sm z-10 w-full relative">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-[24px] font-bold text-blue-500 mb-1">{site.name} - Transaction History</h1>
-            <p className="text-[15px] font-medium text-slate-400/80">View all asset movements and transactions for this site</p>
-          </div>
-          <div className="flex gap-3">
-            <div className="relative">
-              <Button
-                variant="outline"
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="bg-white border-slate-200 text-slate-700 text-sm font-semibold h-11 shadow-sm rounded-xl px-4 hover:bg-slate-50 transition-all gap-2 min-w-[140px] justify-between"
-              >
-                {viewMode} <ChevronDown className="h-4 w-4 text-slate-400" />
-              </Button>
-              
-              {isDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setIsDropdownOpen(false)} />
-                  <div className="absolute top-full mt-2 left-0 w-full bg-white border border-slate-100 rounded-xl shadow-lg z-20 py-1.5 p-1.5 flex flex-col gap-1">
-                    {(['Table View', 'Tree View', 'Flow View'] as const).map(mode => (
-                      <button
-                        key={mode}
-                        onClick={() => {
-                          setViewMode(mode);
-                          setIsDropdownOpen(false);
-                        }}
-                        className={cn(
-                          "w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition-colors",
-                          viewMode === mode 
-                            ? "bg-[#80b18f] text-white" 
-                            : "text-slate-600 hover:bg-slate-50"
-                        )}
-                      >
-                        {viewMode === mode && <span className="mr-2 opacity-80">✓</span>}
-                        {mode}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <Button
-              variant="outline"
-              onClick={onBack}
-              className="bg-white border-slate-200 text-slate-700 text-sm font-semibold h-11 shadow-sm rounded-xl px-5 hover:bg-slate-50 transition-all shrink-0 gap-2"
-            >
-              <Eye className="h-4 w-4" /> Back to Site Inventory
-            </Button>
-          </div>
-        </div>
-      </div>
-
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto w-full">
         <div className="p-6 md:p-8 max-w-7xl mx-auto w-full">

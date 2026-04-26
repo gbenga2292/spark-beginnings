@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { Button } from '@/src/components/ui/button';
@@ -99,20 +100,31 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
     onBack();
   };
 
+  useSetPageTitle(
+    `Create Return Waybill - ${site.name}`,
+    'Create a return waybill for materials from this site',
+    (
+      <div className="flex items-center gap-3">
+        <Button 
+          variant="outline" 
+          onClick={onBack} 
+          className="gap-2 text-slate-600 font-bold h-9"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSubmit}
+          className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md font-semibold h-9"
+        >
+          <Package className="h-4 w-4" /> Create Return
+        </Button>
+      </div>
+    ),
+    [site.name, onBack, handleSubmit]
+  );
+
   return (
     <div className="flex flex-col h-full bg-slate-50/30">
-      {/* Fixed Header */}
-      <div className="flex-none bg-white border-b border-slate-200 px-6 py-4 md:px-8 shadow-sm z-10">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-[22px] font-bold text-blue-600 mb-1">Create Return Waybill - {site.name}</h1>
-            <p className="text-sm font-medium text-slate-500">Create a return waybill for materials from this site</p>
-          </div>
-          <Button variant="outline" onClick={onBack} className="bg-white border-slate-200 text-slate-700 font-semibold h-10 shadow-sm rounded-xl px-5 hover:bg-slate-50 disabled:opacity-50 transition-all shrink-0">
-            Back to Site Inventory
-          </Button>
-        </div>
-      </div>
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto w-full">
@@ -256,14 +268,6 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
             <span className="text-sm font-bold text-slate-700 select-none pb-0.5" onClick={() => setAddSignature(!addSignature)}>Add my signature to return waybill PDF</span>
           </label>
 
-          <div className="flex flex-col sm:flex-row items-center gap-4 pt-8 border-t border-slate-100">
-            <Button variant="ghost" onClick={onBack} className="w-full sm:w-auto h-12 px-8 text-sm font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl">
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit} className="w-full flex-1 h-12 bg-[#8da8ef] hover:bg-[#7b99ed] text-white font-bold text-[15px] rounded-xl shadow-sm gap-2">
-              <Package className="h-5 w-5" /> Create Return
-            </Button>
-          </div>
           </div>
         </div>
       </div>

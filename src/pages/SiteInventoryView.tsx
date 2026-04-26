@@ -12,10 +12,14 @@ import { Button } from '@/src/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { cn } from '@/src/lib/utils';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { ConsumableUsageLog } from '@/src/types/operations';
 import { WaybillForm } from './WaybillForm';
 import { CreateReturnWaybill } from './CreateReturnWaybill';
 import { SiteTransactionsView } from './SiteTransactionsView';
 import { DailyLogManager } from './DailyLogManager';
+import { ConsumableDetailView } from './ConsumableDetailView';
+import { BulkConsumableLogModal } from './BulkConsumableLogModal';
+import { SiteConsumablesAnalyticsModal } from './SiteConsumablesAnalyticsModal';
 
 interface SiteInventoryViewProps {
   site: Site;
@@ -41,6 +45,11 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
   const [showTransactions, setShowTransactions] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState<{ id: string, name: string } | null>(null);
+  const [selectedConsumable, setSelectedConsumable] = useState<SiteItem | null>(null);
+  const [showBulkLog, setShowBulkLog] = useState(false);
+  const [showConsumablesAnalytics, setShowConsumablesAnalytics] = useState(false);
+
+  const { consumableLogs, addConsumableLogs } = useAppStore();
 
   // All waybills for this site
   const siteWaybills = waybills.filter(w =>
@@ -84,6 +93,15 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
         }
       });
     });
+
+  // Subtract consumed usages
+  const siteConsumableLogs = consumableLogs.filter(log => log.siteId === site.id);
+  siteConsumableLogs.forEach(log => {
+    const existing = inventoryMap.get(log.assetId);
+    if (existing) {
+      existing.quantity = Math.max(0, existing.quantity - log.quantityUsed);
+    }
+  });
 
   const allItems = Array.from(inventoryMap.values()).filter(i => i.quantity > 0);
 
@@ -166,6 +184,17 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
         siteId={site.id}
         siteName={site.name}
         onBack={() => setSelectedMachine(null)}
+      />
+    );
+  }
+
+  if (selectedConsumable) {
+    return (
+      <ConsumableDetailView
+        item={selectedConsumable}
+        site={site}
+        logs={siteConsumableLogs.filter(l => l.assetId === selectedConsumable.assetId)}
+        onBack={() => setSelectedConsumable(null)}
       />
     );
   }
@@ -366,38 +395,102 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
 
             {/* Consumables Tab */}
             {activeTab === 'consumables' && (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Site Consumables</h3>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-2 border-slate-200 hover:bg-slate-50 text-slate-700"
+                      onClick={() => setShowBulkLog(true)}
+                    >
+                      <Layers className="h-4 w-4" /> Bulk Log
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-2 border-slate-200 hover:bg-slate-50 text-slate-700"
+                      onClick={() => setShowConsumablesAnalytics(true)}
+                    >
+                      <Activity className="h-4 w-4" /> Site Analytics
+                    </Button>
+                  </div>
+                </div>
+
                 {consumableItems.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-slate-300">
+                  <div className="flex flex-col items-center justify-center py-20 text-slate-300 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
                     <Layers className="h-12 w-12 mb-3" />
                     <p className="text-sm font-medium text-slate-400">No consumables recorded</p>
                   </div>
-                ) : consumableItems.map(item => (
-                  <div
-                    key={item.assetId}
-                    className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="h-9 w-9 rounded-xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-500 shrink-0">
-                        <Layers className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800 dark:text-white">{item.assetName}</p>
-                        <p className="text-xs text-slate-400 capitalize">consumable</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                        {item.quantity} <span className="text-slate-400 font-normal text-xs">{item.unit || 'pcs'}</span>
-                      </p>
-                      {item.lastUpdated && (
-                        <p className="text-[10px] text-slate-400">
-                          {new Date(item.lastUpdated).toLocaleDateString('en-GB', { day: 'numeric', month: 'numeric', year: '2-digit' })}
-                        </p>
-                      )}
-                    </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {consumableItems.map(item => {
+                      const itemLogs = siteConsumableLogs.filter(l => l.assetId === item.assetId);
+                      const totalUsed = itemLogs.reduce((acc, log) => acc + log.quantityUsed, 0);
+
+                      return (
+                        <div
+                          key={item.assetId}
+                          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                        >
+                          <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-600 shrink-0">
+                              <Layers className="h-5 w-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{item.assetName}</h4>
+                              <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Consumable</p>
+                            </div>
+                          </div>
+                          
+                          <div className="p-4 grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                            <div className="flex flex-col items-center justify-center px-2">
+                              <p className="text-xs text-slate-500 mb-1">At Site</p>
+                              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{item.quantity} <span className="text-[10px] font-normal text-slate-400">{item.unit || 'pcs'}</span></p>
+                            </div>
+                            <div className="flex flex-col items-center justify-center px-2">
+                              <p className="text-xs text-slate-500 mb-1">Total Used</p>
+                              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{totalUsed} <span className="text-[10px] font-normal text-slate-400">{item.unit || 'pcs'}</span></p>
+                            </div>
+                            <div className="flex flex-col items-center justify-center px-2">
+                              <p className="text-xs text-slate-500 mb-1">Usage Count</p>
+                              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{itemLogs.length}</p>
+                            </div>
+                          </div>
+
+                          <div className="p-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
+                            <Button 
+                              size="sm" 
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 h-8 px-3 rounded-lg font-medium shadow-sm"
+                              onClick={() => setSelectedConsumable(item)}
+                            >
+                              + Log Usage
+                            </Button>
+                            <div className="flex items-center gap-1.5">
+                              <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="h-8 w-8 rounded-lg border-slate-200 hover:bg-slate-50 hover:text-blue-600"
+                                onClick={() => setSelectedConsumable(item)}
+                              >
+                                <Info className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="h-8 w-8 rounded-lg border-slate-200 hover:bg-slate-50 hover:text-amber-600"
+                                onClick={() => setSelectedConsumable(item)}
+                              >
+                                <Activity className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
+                )}
               </div>
             )}
 
@@ -482,6 +575,21 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
           </div>
         </DialogContent>
       </Dialog>
+
+      <BulkConsumableLogModal
+        isOpen={showBulkLog}
+        onClose={() => setShowBulkLog(false)}
+        site={site}
+        consumables={consumableItems}
+      />
+
+      <SiteConsumablesAnalyticsModal
+        isOpen={showConsumablesAnalytics}
+        onClose={() => setShowConsumablesAnalytics(false)}
+        site={site}
+        consumables={consumableItems}
+        logs={siteConsumableLogs}
+      />
     </div>
   );
 }

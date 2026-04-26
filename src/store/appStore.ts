@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { db } from '@/src/lib/supabaseService';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
-import { Vehicle, VehicleTripLeg, VehicleDocumentType } from '@/src/types/operations';
+import { Vehicle, VehicleTripLeg, VehicleDocumentType, ConsumableUsageLog } from '@/src/types/operations';
 
 export interface CommLog {
   id: string;
@@ -635,6 +635,8 @@ interface AppState {
   vehicles: Vehicle[];
   vehicleTrips: VehicleTripLeg[];
   vehicleDocumentTypes: VehicleDocumentType[];
+  consumableLogs: ConsumableUsageLog[];
+  addConsumableLogs: (logs: ConsumableUsageLog[]) => void;
   addSite: (site: Site) => void;
   setSites: (sites: Site[]) => void;
   updateSite: (id: string, site: Partial<Site>) => void;
@@ -865,6 +867,7 @@ export const useAppStore = create<AppState>()(
       vehicles: [],
       vehicleTrips: [],
       vehicleDocumentTypes: [],
+      consumableLogs: [],
       clientContacts: [],
       
       onboardingTemplates: [
@@ -1433,6 +1436,11 @@ export const useAppStore = create<AppState>()(
       deleteVehicleTripRecord: (id) => {
         set((s) => ({ vehicleTrips: s.vehicleTrips.filter(t => t.id !== id) }));
         db.deleteVehicleTripRecord(id);
+      },
+
+      // Consumables
+      addConsumableLogs: (logs) => {
+        set((s) => ({ consumableLogs: [...logs, ...s.consumableLogs] }));
       },
 
       // Onboarding Templates

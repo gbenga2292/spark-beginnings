@@ -111,13 +111,6 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
     toast.success(`Imported ${newItems.length} items successfully`);
   };
 
-  useSetPageTitle(
-    isEditing ? 'Edit Waybill' : (initialType === 'waybill' ? 'Create Waybill' : 'Create Return Sheet'),
-    isEditing ? `Editing ${editWaybill?.id}` : 'Issue assets for delivery to project sites',
-    null,
-    [initialType, isEditing]
-  );
-
   const handleSubmit = () => {
     if (!siteName || !driverName) {
       toast.error('Please fill in all required fields');
@@ -157,36 +150,39 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
     onClose();
   };
 
-  return (
-    <div className="max-w-5xl mx-auto w-full pb-10 flex flex-col gap-6 animate-in fade-in duration-300">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
-        <button
-          onClick={onClose}
-          className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-700 dark:hover:text-blue-400 font-semibold transition-colors w-fit"
+  useSetPageTitle(
+    isEditing ? 'Edit Waybill' : (initialType === 'waybill' ? 'Create Waybill' : 'Create Return Sheet'),
+    isEditing ? `Editing ${editWaybill?.id}` : 'Issue assets for delivery to project sites',
+    (
+      <div className="flex items-center gap-3">
+        <Button 
+          variant="outline" 
+          onClick={onClose} 
+          className="gap-2 text-slate-600 font-bold h-9"
         >
-          <ArrowLeft className="h-4 w-4" /> BACK TO WAYBILLS
-        </button>
-
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            onClick={onClose} 
-            className="h-10 px-6 rounded-xl font-bold text-xs uppercase text-slate-600 dark:text-slate-400 hover:text-slate-900 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm tracking-wider"
-          >
-            CANCEL
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={items.length === 0 || !siteName || !driverName}
-            className="h-10 px-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-widest gap-2 shadow-sm disabled:opacity-50"
-          >
-            <CheckCircle2 className="h-4 w-4" /> 
-            {isEditing ? 'UPDATE' : 'CREATE'} {initialType === 'waybill' ? 'WAYBILL' : 'RETURN SHEET'}
-          </Button>
-        </div>
+          <ArrowLeft className="h-4 w-4" /> Cancel
+        </Button>
+        <Button
+          onClick={handleSubmit}
+          disabled={items.length === 0 || !siteName || !driverName}
+          className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md font-semibold h-9"
+        >
+          <CheckCircle2 className="h-4 w-4" /> 
+          <span className="hidden sm:inline">{isEditing ? 'Update' : 'Create'} {initialType === 'waybill' ? 'Waybill' : 'Return Sheet'}</span>
+          <span className="sm:hidden">{isEditing ? 'Update' : 'Create'}</span>
+        </Button>
       </div>
+    ),
+    [initialType, isEditing, editWaybill, items, siteName, driverName, onClose] // Added items and other deps
+  );
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+  return (
+    <div className="flex flex-col h-[calc(100vh-4rem)] bg-slate-50/30 -mx-6 -my-6 sm:-mx-8 sm:-my-8">
+
+
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto w-full p-6 sm:p-8">
+        <div className="max-w-5xl mx-auto bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col animate-in fade-in duration-300">
         <div className="p-6 sm:p-8 space-y-8">
           {/* Waybill Information */}
           <div className="space-y-4">
@@ -251,7 +247,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                     className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
                   >
                     <option value="">Select Site</option>
-                    {siteOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                    {sites.map(s => <option key={s.id} value={s.name}>{s.name} ({s.client})</option>)}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 </div>
@@ -495,6 +491,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                 )}
               </div>
             )}
+          </div>
           </div>
         </div>
       </div>
