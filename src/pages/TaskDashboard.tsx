@@ -1,17 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useAppData, deriveMainTaskStatus, getMainTaskProgress } from "@/src/contexts/AppDataContext";
 import { useWorkspace } from "@/src/hooks/use-workspace";
+import { useAppStore as useStore } from "@/src/store/appStore";
 import {
   CheckCircle2, AlertTriangle, TrendingUp, ArrowRight,
   Circle, Loader2, Calendar, Clock, Users, BarChart2,
   Flame, Zap, Award, Flag, Lock, Target, ListTodo, Activity,
   CheckCheck, Layers, ArrowUpRight, Sparkles, ChevronRight, ChevronDown,
+  Archive, RotateCcw, Trash2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, isToday, isTomorrow, isPast, differenceInHours } from "date-fns";
 import { TaskDetailSheet } from "@/src/components/tasks/TaskDetailSheet";
+import { Button } from "@/src/components/ui/button";
+import { toast, showConfirm } from "@/src/components/ui/toast";
+import { supabase } from "@/src/integrations/supabase/client";
 import type { TaskPriority } from "@/src/types/tasks";
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } };
@@ -555,18 +560,13 @@ function UserDashboard() {
   const { wsTasks, wsMembers } = useWorkspace();
   const navigate = useNavigate();
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
-  const [taskFilter, setTaskFilter] = useState<'my_tasks' | 'urgent' | 'all' | 'completed' | 'under_review'>('my_tasks');
+  const { hrVariables } = useStore();
+  const { restoreSubtask, deleteSubtaskPermanently } = useAppData();
 
-  const wsTaskIds = new Set(wsTasks.map(mt => mt.id));
-  const teamSubs = subtasks.filter(s => wsTaskIds.has(s.mainTaskId!));
-  const mySubs = teamSubs.filter(s => {
-    if (!currentUser?.id) return false;
-    const isAssigned = s.assignedTo?.includes(currentUser.id);
-    const mt = wsTasks.find(m => m.id === s.mainTaskId);
-    const isCreator = (s as any).createdBy === currentUser.id || mt?.createdBy === currentUser.id;
-    return isAssigned || isCreator;
-  });
+  const [taskFilter, setTaskFilter] = useState<'my_tasks' | 'urgent' | 'all' | 'completed' | 'under_review'>('my_tasks');
   const myCreatedTasks = wsTasks.filter(mt => mt.createdBy === currentUser?.id);
+  const mySubs = subtasks.filter(s => s.assignedTo?.includes(currentUser?.id as string) && !s.is_deleted);
+
 
   const myDone = mySubs.filter(s => s.status === 'completed').length;
   const myProgress = mySubs.filter(s => s.status === 'in_progress').length;
@@ -583,7 +583,7 @@ function UserDashboard() {
       case 'under_review':
         return [...mySubs].filter(s => s.status === 'pending_approval').sort((a, b) => urgencyScore(a) - urgencyScore(b));
       case 'all':
-        return [...teamSubs].sort((a, b) => urgencyScore(a) - urgencyScore(b)).slice(0, 50);
+        return [...mySubs].sort((a, b) => urgencyScore(a) - urgencyScore(b)).slice(0, 50);
       case 'my_tasks':
       default:
         return [...mySubs].filter(s => s.status !== 'completed').sort((a, b) => urgencyScore(a) - urgencyScore(b));
@@ -615,9 +615,15 @@ function UserDashboard() {
                 {myPendingApproval > 0 && <span className="text-amber-200"> · {myPendingApproval} awaiting approval</span>}
               </p>
             </div>
-            <button onClick={() => navigate('/tasks')} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white text-sm font-semibold transition-all">
-              All Tasks <ArrowRight className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => navigate('/tasks/archive')} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-semibold transition-all">
+                <Archive className="w-4 h-4" />
+                Archive
+              </button>
+              <button onClick={() => navigate('/tasks')} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white text-sm font-semibold transition-all">
+                All Tasks <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
           <div className="relative mt-5 grid grid-cols-4 gap-2">
             {[
@@ -722,7 +728,7 @@ function UserDashboard() {
                 const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== 'completed';
                 return (
                   <div key={sub.id ?? i} onClick={() => setOpenSubtaskId(sub.id ?? null)}
-                    className="flex items-center gap-3 px-5 py-3 hover:bg-muted/40 cursor-pointer transition-colors group">
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-muted/40 transition-colors group cursor-pointer">
                     <span className="text-[11px] font-bold text-muted-foreground/40 w-4 text-center tabular-nums">{i + 1}</span>
                     <div className={`w-1 h-10 rounded-full flex-shrink-0 ${isOverdue ? 'bg-red-500' : sub.status === 'in_progress' ? 'bg-primary' : sub.status === 'pending_approval' ? 'bg-amber-400' : 'bg-muted-foreground/20'}`} />
                     <div className="flex-1 min-w-0">
@@ -737,11 +743,13 @@ function UserDashboard() {
                         </>}
                       </div>
                     </div>
-                    {mt?.priority && <PriorityPill priority={mt.priority} />}
-                    <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 flex-shrink-0 ${sc.pillClass}`}>
-                      <StatusIcon className="w-3 h-3" />{sc.label}
-                    </span>
-                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-primary transition-colors" />
+                    <>
+                      {mt?.priority && <PriorityPill priority={mt.priority} />}
+                      <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 flex-shrink-0 ${sc.pillClass}`}>
+                        <StatusIcon className="w-3 h-3" />{sc.label}
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-primary transition-colors" />
+                    </>
                   </div>
                 );
               })}
@@ -761,7 +769,7 @@ function UserDashboard() {
               </div>
               <div className="divide-y divide-border/50">
                 {myCreatedTasks.slice(0, 4).map(mt => {
-                  const subs = teamSubs.filter(s => s.mainTaskId === mt.id);
+                  const subs = subtasks.filter(s => s.mainTaskId === mt.id);
                   const done = subs.filter(s => s.status === 'completed').length;
                   const penApproval = subs.filter(s => s.status === 'pending_approval').length;
                   const pct = subs.length > 0 ? Math.round(done / subs.length * 100) : 0;

@@ -794,6 +794,7 @@ interface AppState {
     enableAutomaticEvaluationPenalty?: boolean; 
     sanctionThresholds?: { action: string; points: number }[];
     payeeTypes?: string[];
+    taskArchiveRetentionDays: number;
   };
   updateHrVariables: (variables: Partial<AppState['hrVariables']>) => void;
   saveAllSettings: (payroll: AppState['payrollVariables'], paye: AppState['payeTaxVariables'], months: AppState['monthValues'], hr: AppState['hrVariables'], onboarding: AppState['onboardingTemplates']) => void;
@@ -1019,7 +1020,8 @@ export const useAppStore = create<AppState>()(
           { action: 'Suspension', points: -8 },
           { action: 'Termination', points: -12 }
         ],
-        payeeTypes: []
+        payeeTypes: [],
+        taskArchiveRetentionDays: 30
       },
 
       // ── Actions with Supabase sync ──

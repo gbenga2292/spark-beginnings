@@ -27,6 +27,10 @@ interface AppDataContextType {
     addSubtask: (sub: any) => Promise<void>;
     updateSubtask: (id: string, p: any) => Promise<void>;
     deleteSubtask: (id: string) => Promise<void>;
+    restoreMainTask: (id: string) => Promise<void>;
+    restoreSubtask: (id: string) => Promise<void>;
+    deleteMainTaskPermanently: (id: string) => Promise<void>;
+    deleteSubtaskPermanently: (id: string) => Promise<void>;
     assignSubtask: (id: string, userId: string) => Promise<void>;
     updateSubtaskStatus: (id: string, status: string, userId?: string, bypassApproval?: boolean) => Promise<void>;
     approveSubtask: (id: string, userId?: string, note?: string) => Promise<void>;
@@ -37,6 +41,8 @@ interface AppDataContextType {
     getMainTaskComments: (id: string) => any[];
     getSubtaskComments: (subtaskId: string) => any[];
     getMainTaskWorkflow: (mainTaskId: string) => any[];
+    fetchArchivedSubtasks: (workspaceId: string, retentionDays: number) => Promise<any[]>;
+    fetchArchivedMainTasks: (workspaceId: string, retentionDays: number) => Promise<any[]>;
 }
 
 export const TaskContext = createContext<AppDataContextType | null>(null);
@@ -115,7 +121,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             try {
                 const [mtRes, stRes, pRes, projRes, commRes, remRes] = await Promise.all([
                     supabase.from('main_tasks').select('*').eq('is_deleted', false),
-                    supabase.from('subtasks').select('*'),
+                    supabase.from('subtasks').select('*').eq('is_deleted', false),
                     supabase.from('profiles').select('*'),
                     supabase.from('sites').select('*'),
                     supabase.from('task_updates').select('*').order('created_at', { ascending: true }),
@@ -195,8 +201,35 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             }
         };
 
+        const pruneExpiredArchive = async () => {
+            const state = useAppStore.getState();
+            const retentionDays = state.hrVariables?.taskArchiveRetentionDays || 30;
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+            const isoCutoff = cutoffDate.toISOString();
+
+            try {
+                await supabase
+                    .from('subtasks')
+                    .delete()
+                    .eq('is_deleted', true)
+                    .lt('deleted_at', isoCutoff);
+
+                await supabase
+                    .from('main_tasks')
+                    .delete()
+                    .eq('is_deleted', true)
+                    .lt('deleted_at', isoCutoff);
+            } catch (err) {
+                console.error('Failed to prune expired archive:', err);
+            }
+        };
+
         fetchTimeout = setTimeout(() => {
-            if (isActive) fetchAll();
+            if (isActive) {
+                fetchAll();
+                pruneExpiredArchive();
+            }
         }, 150);
 
         // ── Real-time subscriptions ───────────────────────────────────────────
@@ -227,7 +260,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 });
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'subtasks' }, (payload) => {
-                setSubtasks(prev => prev.map(s => s.id === payload.new.id ? payload.new : s));
+                if (payload.new.is_deleted) {
+                    setSubtasks(prev => prev.filter(s => s.id !== payload.new.id));
+                } else {
+                    setSubtasks(prev => prev.map(s => s.id === payload.new.id ? payload.new : s));
+                }
             })
             .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'subtasks' }, (payload) => {
                 setSubtasks(prev => prev.filter(s => s.id !== payload.old.id));
@@ -375,14 +412,35 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const deleteMainTask = useCallback(async (id: string) => {
-        const { error } = await supabase.from('main_tasks').update({ is_deleted: true }).eq('id', id);
+        const { error } = await supabase.from('main_tasks').update({ is_deleted: true, deleted_at: new Date().toISOString() }).eq('id', id);
         if (error) {
             console.error('deleteMainTask error:', error);
             toast.error('Failed to delete task.');
             return;
         }
         setMainTasks(prev => prev.filter(t => t.id !== id));
-        toast.success('Task deleted');
+        toast.success('Task moved to archive');
+    }, []);
+
+    const restoreMainTask = useCallback(async (id: string) => {
+        const { data, error } = await supabase.from('main_tasks').update({ is_deleted: false, deleted_at: null }).eq('id', id).select().single();
+        if (error) {
+            console.error('restoreMainTask error:', error);
+            toast.error('Failed to restore task.');
+            return;
+        }
+        if (data) setMainTasks(prev => [...prev, data]);
+        toast.success('Task restored');
+    }, []);
+
+    const deleteMainTaskPermanently = useCallback(async (id: string) => {
+        const { error } = await supabase.from('main_tasks').delete().eq('id', id);
+        if (error) {
+            console.error('deleteMainTaskPermanently error:', error);
+            toast.error('Failed to delete task permanently.');
+            return;
+        }
+        toast.success('Task permanently deleted');
     }, []);
 
     const addSubtask = useCallback(async (sub: any) => {
@@ -423,14 +481,68 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const deleteSubtask = useCallback(async (id: string) => {
-        const { error } = await supabase.from('subtasks').delete().eq('id', id);
+        const { error } = await supabase.from('subtasks').update({ is_deleted: true, deleted_at: new Date().toISOString() }).eq('id', id);
         if (error) {
             console.error('deleteSubtask error:', error);
             toast.error('Failed to delete subtask.');
             return;
         }
         setSubtasks(prev => prev.filter(s => s.id !== id));
+        toast.success('Subtask moved to archive');
     }, []);
+
+    const restoreSubtask = useCallback(async (id: string) => {
+        const { data, error } = await supabase.from('subtasks').update({ is_deleted: false, deleted_at: null }).eq('id', id).select().single();
+        if (error) {
+            console.error('restoreSubtask error:', error);
+            toast.error('Failed to restore subtask.');
+            return;
+        }
+        if (data) setSubtasks(prev => [...prev, data]);
+        toast.success('Subtask restored');
+    }, []);
+
+    const deleteSubtaskPermanently = async (id: string) => {
+        const { error } = await supabase.from('subtasks').delete().eq('id', id);
+        if (error) toast.error("Failed to delete subtask permanently");
+        else toast.success("Subtask deleted permanently");
+    };
+
+    const fetchArchivedSubtasks = async (workspaceId: string, retentionDays: number) => {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+
+        const { data, error } = await supabase
+            .from('subtasks')
+            .select('*, main_tasks!inner(workspace_id)')
+            .eq('is_deleted', true)
+            .eq('main_tasks.workspace_id', workspaceId)
+            .gt('deleted_at', cutoffDate.toISOString());
+
+        if (error) {
+            console.error("Error fetching archived subtasks:", error);
+            return [];
+        }
+        return data;
+    };
+
+    const fetchArchivedMainTasks = async (workspaceId: string, retentionDays: number) => {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+
+        const { data, error } = await supabase
+            .from('main_tasks')
+            .select('*')
+            .eq('is_deleted', true)
+            .eq('workspace_id', workspaceId)
+            .gt('deleted_at', cutoffDate.toISOString());
+
+        if (error) {
+            console.error("Error fetching archived main tasks:", error);
+            return [];
+        }
+        return data;
+    };
 
     const assignSubtask = useCallback(async (id: string, userId: string) => {
         const { data, error } = await supabase.from('subtasks').update({ assignedTo: userId }).eq('id', id).select().single();
@@ -1041,12 +1153,19 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         getMainTaskComments,
         getSubtaskComments,
         getMainTaskWorkflow,
+        restoreMainTask,
+        restoreSubtask,
+        deleteMainTaskPermanently,
+        deleteSubtaskPermanently,
+        fetchArchivedSubtasks,
+        fetchArchivedMainTasks
     }), [mainTasks, subtasks, users, comments, projects, reminders,
         createMainTask, updateMainTask, deleteMainTask,
         addSubtask, updateSubtask, deleteSubtask, assignSubtask,
         updateSubtaskStatus, approveSubtask, rejectSubtask,
         postComment, updateComment, deleteComment, getMainTaskComments, getSubtaskComments, getMainTaskWorkflow,
-        addReminder, updateReminder, deleteReminder, toggleReminderActive, snoozeReminder]);
+        addReminder, updateReminder, deleteReminder, toggleReminderActive, snoozeReminder,
+        restoreMainTask, restoreSubtask, deleteMainTaskPermanently, deleteSubtaskPermanently, fetchArchivedSubtasks, fetchArchivedMainTasks]);
 
     return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;
 }

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from '@/src/hooks/useAuth';
-import { toast } from '@/src/components/ui/toast';
+import { toast, showConfirm } from '@/src/components/ui/toast';
 import { useAppData, deriveMainTaskStatus, getMainTaskProgress } from '@/src/contexts/AppDataContext';
 import { useWorkspace } from '@/src/hooks/use-workspace';
 import { useAppStore } from '@/src/store/appStore';
@@ -15,7 +15,7 @@ import { AddSubtaskInline } from './Tasks/AddSubtaskInline';
 import { AssignUserDialog } from './Tasks/AssignUserDialog';
 import type { AppUser } from "@/src/store/userStore";
 import type { TaskPriority } from "@/src/types/tasks";
-import { RotateCcw, Reply, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, Plus, Search, Circle, Loader2, Calendar, X, Users, Clock, ChevronDown, ChevronRight, UserCheck, ArrowUpDown, Flag, MessageSquare, Send, Pencil, Lock, User, FolderOpen, List, Bell, RefreshCw, Link as LinkIcon, FileText, Paperclip, AtSign } from 'lucide-react';
+import { RotateCcw, Reply, Trash2, Archive, LayoutGrid, BarChart2, CheckCircle2, History, Plus, Search, Circle, Loader2, Calendar, X, Users, Clock, ChevronDown, ChevronRight, UserCheck, ArrowUpDown, Flag, MessageSquare, Send, Pencil, Lock, User, FolderOpen, List, Bell, RefreshCw, Link as LinkIcon, FileText, Paperclip, AtSign } from 'lucide-react';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useTaskReadTracker } from '@/src/hooks/useTaskReadTracker';
 import { Button } from '@/src/components/ui/button';
@@ -105,7 +105,8 @@ function applySortToMainTasks(tasks: MainTask[], sortBy: SortOption, allSubtasks
 ═══════════════════════════════════════════════════════════════════════════════ */
 function PersonalTasksView() {
   const { mainTasks, subtasks, users, createMainTask, addSubtask, deleteSubtask,
-    updateSubtask, updateSubtaskStatus, deleteMainTask, updateMainTask, comments, reminders } = useAppData();
+    updateSubtask, updateSubtaskStatus, deleteMainTask, updateMainTask, comments, reminders,
+    fetchArchivedSubtasks, restoreSubtask, deleteSubtaskPermanently } = useAppData();
   const { user: currentUser } = useAuth();
   const { wsTasks, workspace } = useWorkspace();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -119,6 +120,7 @@ function PersonalTasksView() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
+  const { hrVariables } = useAppStore();
   
   const [viewMode, setViewModeState] = useState<TaskViewMode>(() => (localStorage.getItem('tf_default_view') as TaskViewMode) || loadDefaultView());
 
@@ -158,6 +160,7 @@ function PersonalTasksView() {
        }, { replace: true });
     }
   }, [searchParams, setSearchParams, subtasks]);
+
 
   const wsTaskIds = new Set(wsTasks.map(mt => mt.id));
   const wsSubs = subtasks.filter(s => wsTaskIds.has(s.mainTaskId));
@@ -214,6 +217,15 @@ function PersonalTasksView() {
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <Button 
+        size="sm" 
+        variant="outline"
+        onClick={() => navigate('/tasks/archive')}
+        className="h-9 px-4 gap-2 border-slate-200 text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50"
+      >
+        <Archive className="w-4 h-4 text-slate-400" /> <span className="hidden sm:inline">Archive</span>
+      </Button>
 
       <Button 
         size="sm" 
@@ -311,7 +323,9 @@ function PersonalTasksView() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0">
             {STATUS_TABS.map(tab => {
               const isActive = statusFilter === tab.value;
-              const count = tab.value === "all" ? wsTasks.filter(mt => deriveMainTaskStatus(mt.id, wsSubs) !== 'completed').length : wsTasks.filter(mt => deriveMainTaskStatus(mt.id, wsSubs) === tab.value).length;
+              const count = tab.value === "all" 
+                ? wsTasks.filter(mt => deriveMainTaskStatus(mt.id, wsSubs) !== 'completed').length 
+                : wsTasks.filter(mt => deriveMainTaskStatus(mt.id, wsSubs) === tab.value).length;
               if (tab.value !== 'all' && count === 0) return null;
               return (
                 <button key={tab.value} onClick={() => setStatusFilter(tab.value)}
@@ -556,7 +570,8 @@ function PersonalTasksView() {
 function AdminTasksView() {
   const { mainTasks, subtasks, users, comments, createMainTask, addSubtask, assignSubtask,
     updateSubtask, deleteSubtask, updateSubtaskStatus, deleteMainTask, updateMainTask,
-    postComment, getMainTaskComments, projects, createProject, reminders } = useAppData();
+    postComment, getMainTaskComments, projects, createProject, reminders,
+    fetchArchivedSubtasks, restoreSubtask, deleteSubtaskPermanently } = useAppData();
   const { user: currentUser } = useAuth();
   const { readMap, markRead } = useTaskReadTracker();
   const myId = currentUser?.id;
@@ -595,8 +610,15 @@ function AdminTasksView() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const { hrVariables } = useAppStore();
+  const { wsTasks: teamTasks, wsMembers, workspace: teamWs } = useWorkspace();
 
   const handleSetDefault = () => localStorage.setItem('tf_default_sort', sortBy);
+
+
+
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [myStatusFilter, setMyStatusFilter] = useState<string>("all");
 
   useEffect(() => {
     const openId = searchParams.get("open");
@@ -651,7 +673,7 @@ function AdminTasksView() {
          return next;
        }, { replace: true });
     }
-  }, [searchParams, setSearchParams, subtasks, projects, mainTasks]);
+  }, [searchParams, setSearchParams, subtasks, projects, mainTasks, statusFilter, myStatusFilter, teamWs?.id, hrVariables.taskArchiveRetentionDays]);
 
   // Mark task + parent as read whenever the detail sheet opens
   React.useEffect(() => {
@@ -660,7 +682,6 @@ function AdminTasksView() {
     markRead(openSubtaskId, sub?.mainTaskId);
   }, [openSubtaskId, subtasks, markRead]);
 
-  const { wsTasks: teamTasks, wsMembers, workspace: teamWs } = useWorkspace();
   const employees = useAppStore(state => state.employees);
   const activeEmpIds = new Set(employees.filter(e => e.status === 'Active' || e.status === 'On Leave').map(e => e.id));
   
@@ -701,8 +722,6 @@ function AdminTasksView() {
     { label: "Done", value: "completed" },
   ] as const;
 
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [myStatusFilter, setMyStatusFilter] = useState<string>("all");
 
   const filtered = teamTasks.filter(mt => {
     const tMatch = mt.title?.toLowerCase().includes(search.toLowerCase());
@@ -772,6 +791,15 @@ function AdminTasksView() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <Button 
+        size="sm" 
+        variant="outline"
+        onClick={() => navigate('/tasks/archive')}
+        className="h-9 px-4 gap-2 border-slate-200 text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50"
+      >
+        <Archive className="w-4 h-4 text-slate-400" /> <span className="hidden lg:inline">Archive</span>
+      </Button>
 
       <Button 
         size="sm" 
@@ -1163,7 +1191,8 @@ function AdminTasksView() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0 overflow-x-auto">
             {MY_STATUS_TABS.map(tab => {
               const isActive = myStatusFilter === tab.value;
-              const count = tab.value === "all" ? mySubs.filter(s => s.status !== 'completed').length : mySubs.filter(s => s.status === tab.value).length;
+              const count = tab.value === "all" ? mySubs.filter(s => s.status !== 'completed').length 
+                : mySubs.filter(s => s.status === tab.value).length;
               if (tab.value !== 'all' && count === 0) return null;
               return (
                 <button key={tab.value} onClick={() => setMyStatusFilter(tab.value)}

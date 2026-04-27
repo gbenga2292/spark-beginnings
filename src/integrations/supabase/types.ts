@@ -1440,6 +1440,7 @@ export type Database = {
           description: string | null
           id: string
           is_deleted: boolean | null
+          deleted_at: string | null
           is_project: boolean | null
           priority: string | null
           teamId: string | null
@@ -1458,6 +1459,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_deleted?: boolean | null
+          deleted_at?: string | null
           is_project?: boolean | null
           priority?: string | null
           teamId?: string | null
@@ -1476,6 +1478,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_deleted?: boolean | null
+          deleted_at?: string | null
           is_project?: boolean | null
           priority?: string | null
           teamId?: string | null
@@ -2444,6 +2447,8 @@ export type Database = {
           deadline: string | null
           description: string | null
           id: string
+          is_deleted: boolean | null
+          deleted_at: string | null
           main_task_id: string | null
           mainTaskId: string | null
           pendingApprovalSince: string | null
@@ -2463,6 +2468,8 @@ export type Database = {
           deadline?: string | null
           description?: string | null
           id?: string
+          is_deleted?: boolean | null
+          deleted_at?: string | null
           main_task_id?: string | null
           mainTaskId?: string | null
           pendingApprovalSince?: string | null
@@ -2482,6 +2489,8 @@ export type Database = {
           deadline?: string | null
           description?: string | null
           id?: string
+          is_deleted?: boolean | null
+          deleted_at?: string | null
           main_task_id?: string | null
           mainTaskId?: string | null
           pendingApprovalSince?: string | null

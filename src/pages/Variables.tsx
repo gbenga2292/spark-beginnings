@@ -2513,6 +2513,17 @@ export function Variables() {
                   <p className="text-[10px] text-slate-400 font-medium">Maximum allowable suspension period per violation according to policy.</p>
                 </div>
 
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Task Archive Retention (Days)</label>
+                  <Input 
+                    type="number" 
+                    value={localHrVars.taskArchiveRetentionDays ?? 30} 
+                    onChange={e => updateLocalHrVariables({ taskArchiveRetentionDays: Number(e.target.value) })}
+                    className="h-10 border-slate-200"
+                  />
+                  <p className="text-[10px] text-slate-400 font-medium">Number of days deleted tasks are kept in the archive before permanent removal.</p>
+                </div>
+
                 <div className="pt-4 border-t border-rose-100 flex flex-col gap-4">
                   <label className="text-xs font-bold text-slate-500 uppercase">Sanction Thresholds (Points based)</label>
                   <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
