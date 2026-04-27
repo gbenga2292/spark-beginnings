@@ -1775,6 +1775,17 @@ export const db = {
     const { error } = await supabase.from('vehicles').insert(vehicleToDb(v));
     if (error) { console.error('Database error:', error); throw error; }
   },
+  async insertVehicles(vehicles: Vehicle[]) {
+    const { error } = await supabase.from('vehicles').insert(vehicles.map(vehicleToDb));
+    if (error) { console.error('Database error:', error); throw error; }
+  },
+  async setVehicles(vehicles: Vehicle[]) {
+    await supabase.from('vehicles').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (vehicles.length > 0) {
+      const { error } = await supabase.from('vehicles').insert(vehicles.map(vehicleToDb));
+      if (error) { console.error('Database error:', error); throw error; }
+    }
+  },
   async updateVehicle(id: string, v: Partial<Vehicle>) {
     const update: any = {};
     if (v.name !== undefined) update.name = v.name;
@@ -1795,6 +1806,13 @@ export const db = {
   async insertVehicleTripRecords(logs: any[]) {
     const { error } = await supabase.from('vehicle_movement_log').insert(logs.map(vehicleMovementToDb));
     if (error) { console.error('Database error:', error); throw error; }
+  },
+  async setVehicleTripRecords(logs: any[]) {
+    await supabase.from('vehicle_movement_log').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (logs.length > 0) {
+      const { error } = await supabase.from('vehicle_movement_log').insert(logs.map(vehicleMovementToDb));
+      if (error) { console.error('Database error:', error); throw error; }
+    }
   },
   async updateVehicleTripRecord(id: string, log: any) {
     const { error } = await supabase.from('vehicle_movement_log').update(vehicleMovementToDb(log)).eq('id', id);

@@ -59,6 +59,7 @@ export interface OpsVehiclesPriv {
   canViewFleet: boolean; canAddFleet: boolean; canEditFleet: boolean; canDeleteFleet: boolean;
   canViewLogs: boolean; canAddLogs: boolean; canEditLogs: boolean; canDeleteLogs: boolean;
   canViewDocuments: boolean; canEditDocuments: boolean;
+  canImport: boolean; canExport: boolean;
 }
 // Ops Site Manager
 export interface OpsSitesPriv { canView: boolean; }
@@ -173,7 +174,8 @@ export const FULL_ACCESS: UserPrivileges = {
     canAdd: true, canEdit: true, canDelete: true,
     canViewFleet: true, canAddFleet: true, canEditFleet: true, canDeleteFleet: true,
     canViewLogs: true, canAddLogs: true, canEditLogs: true, canDeleteLogs: true,
-    canViewDocuments: true, canEditDocuments: true
+    canViewDocuments: true, canEditDocuments: true,
+    canImport: true, canExport: true
   },
   opsSites:         { canView: true },
   activityLog:      { canView: true, canExport: true },
@@ -214,7 +216,8 @@ export const NO_ACCESS: UserPrivileges = {
     canAdd: false, canEdit: false, canDelete: false,
     canViewFleet: false, canAddFleet: false, canEditFleet: false, canDeleteFleet: false,
     canViewLogs: false, canAddLogs: false, canEditLogs: false, canDeleteLogs: false,
-    canViewDocuments: false, canEditDocuments: false
+    canViewDocuments: false, canEditDocuments: false,
+    canImport: false, canExport: false
   },
   opsSites:         { canView: false },
   activityLog:      { canView: false, canExport: false },
@@ -283,7 +286,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       opsWaybills:      { canView: true, canAdd: false, canEdit: false, canDelete: false, canExport: false },
       opsCheckout:      { canView: true, canAdd: false },
       opsMaintenance:   { canView: true, canAdd: false, canEdit: false, canDelete: false },
-      opsVehicles:      { canView: true, canAdd: false, canEdit: false, canDelete: false, canViewFleet: true, canAddFleet: false, canEditFleet: false, canDeleteFleet: false, canViewLogs: true, canAddLogs: false, canEditLogs: false, canDeleteLogs: false, canViewDocuments: true, canEditDocuments: false },
+      opsVehicles:      { canView: true, canAdd: false, canEdit: false, canDelete: false, canViewFleet: true, canAddFleet: false, canEditFleet: false, canDeleteFleet: false, canViewLogs: true, canAddLogs: false, canEditLogs: false, canDeleteLogs: false, canViewDocuments: true, canEditDocuments: false, canImport: false, canExport: false },
       opsSites:         { canView: true },
       activityLog:      { canView: true, canExport: false },
       commLog:          { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },

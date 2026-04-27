@@ -632,7 +632,7 @@ interface AppState {
   companyExpenses: CompanyExpense[];
   pendingLedgerEntries: CompanyExpense[];
   staffMeritRecords: StaffMeritRecord[];
-  vehicles: Vehicle[];
+   vehicles: Vehicle[];
   vehicleTrips: VehicleTripLeg[];
   vehicleDocumentTypes: VehicleDocumentType[];
   consumableLogs: ConsumableUsageLog[];
@@ -742,9 +742,12 @@ interface AppState {
   deleteStaffMeritRecord: (id: string) => void;
   setStaffMeritRecords: (records: StaffMeritRecord[]) => void;
   addVehicle: (vehicle: Vehicle) => void;
+  insertVehicles: (vehicles: Vehicle[]) => void;
+  setVehicles: (vehicles: Vehicle[]) => void;
   updateVehicle: (id: string, vehicle: Partial<Vehicle>) => void;
   deleteVehicle: (id: string) => void;
   addVehicleTripRecords: (logs: any[]) => void;
+  setVehicleTripRecords: (logs: any[]) => void;
   addVehicleDocumentType: (type: VehicleDocumentType) => void;
   deleteVehicleDocumentType: (id: string) => void;
   updateVehicleDocument: (vehicleId: string, docTypeName: string, date: string) => void;
@@ -1417,9 +1420,12 @@ export const useAppStore = create<AppState>()(
 
       // Vehicles
       addVehicle: (vehicle) => { set((s) => ({ vehicles: [...s.vehicles, vehicle] })); db.insertVehicle(vehicle); },
+      insertVehicles: (vehicles) => { set((s) => ({ vehicles: [...s.vehicles, ...vehicles] })); db.insertVehicles(vehicles); },
+      setVehicles: async (vehicles) => { set({ vehicles }); await db.setVehicles(vehicles); },
       updateVehicle: (id, vehicle) => { set((s) => ({ vehicles: s.vehicles.map(v => v.id === id ? { ...v, ...vehicle } : v) })); db.updateVehicle(id, vehicle); },
       deleteVehicle: (id) => { set((s) => ({ vehicles: s.vehicles.filter(v => v.id !== id) })); db.deleteVehicle(id); },
       addVehicleTripRecords: (logs) => { set((s) => ({ vehicleTrips: [...logs, ...s.vehicleTrips] })); db.insertVehicleTripRecords(logs); },
+      setVehicleTripRecords: async (logs) => { set({ vehicleTrips: logs }); await db.setVehicleTripRecords(logs); },
       addVehicleDocumentType: (type) => { set((s) => ({ vehicleDocumentTypes: [...s.vehicleDocumentTypes, type] })); db.insertVehicleDocumentType(type); },
       deleteVehicleDocumentType: (id) => { set((s) => ({ vehicleDocumentTypes: s.vehicleDocumentTypes.filter(t => t.id !== id) })); db.deleteVehicleDocumentType(id); },
       updateVehicleDocument: (vehicleId: string, docTypeName, date) => {

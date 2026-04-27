@@ -8,6 +8,7 @@ import { supabase } from '@/src/integrations/supabase/client';
 import { useAppStore } from '../store/appStore';
 import { useSetPageTitle } from './PageContext';
 import { toast } from 'sonner';
+import { useAuth } from '../hooks/useAuth';
 
 interface OperationsContextType {
   assets: Asset[];
@@ -47,9 +48,12 @@ interface OperationsContextType {
   vehicles: Vehicle[];
   vehicleTrips: VehicleTripLeg[];
   addVehicle: (vehicle: Omit<Vehicle, 'id' | 'created_at' | 'updated_at'>) => void;
+  insertVehicles: (vehicles: Vehicle[]) => void;
+  setVehicles: (vehicles: Vehicle[]) => void;
   updateVehicle: (id: string, updates: Partial<Vehicle>) => void;
   deleteVehicle: (id: string) => void;
   addVehicleTripRecords: (logs: any[]) => void;
+  setVehicleTripRecords: (logs: any[]) => void;
   updateVehicleTripRecord: (id: string, log: any) => void;
   deleteVehicleTripRecord: (id: string) => void;
   vehicleDocumentTypes: VehicleDocumentType[];
@@ -70,6 +74,7 @@ const initialCheckouts: Checkout[] = [];
 const initialMaintenanceAssets: MaintenanceAsset[] = [];
 
 export const OperationsProvider = ({ children }: { children: ReactNode }) => {
+  const { user } = useAuth();
   const [assets, setAssets] = useState<Asset[]>(initialAssets);
   const [waybills, setWaybills] = useState<Waybill[]>(initialWaybills);
   const [checkouts, setCheckouts] = useState<Checkout[]>(initialCheckouts);
@@ -81,9 +86,12 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     vehicleTrips, 
     vehicleDocumentTypes,
     addVehicle: storeAddVehicle, 
+    insertVehicles: storeInsertVehicles,
+    setVehicles: storeSetVehicles,
     updateVehicle: storeUpdateVehicle, 
     deleteVehicle: storeDeleteVehicle, 
     addVehicleTripRecords: storeAddVehicleTripRecords,
+    setVehicleTripRecords: storeSetVehicleTripRecords,
     updateVehicleTripRecord: storeUpdateVehicleTripRecord,
     deleteVehicleTripRecord: storeDeleteVehicleTripRecord,
     addVehicleDocumentType: storeAddVehicleDocumentType,
@@ -264,8 +272,10 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         console.error("Error fetching operations data:", error);
       }
     };
-    fetchData();
-  }, []);
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
   const persistAsset = async (asset: Asset) => {
     try {
@@ -823,9 +833,15 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       },
       updateVehicle: storeUpdateVehicle,
       deleteVehicle: storeDeleteVehicle,
+      insertVehicles: storeInsertVehicles,
+      setVehicles: storeSetVehicles,
       addVehicleTripRecords: (logs) => {
         const logsWithIds = logs.map(l => ({ ...l, id: crypto.randomUUID() }));
         storeAddVehicleTripRecords(logsWithIds);
+      },
+      setVehicleTripRecords: (logs) => {
+        const logsWithIds = logs.map(l => ({ ...l, id: l.id || crypto.randomUUID() }));
+        storeSetVehicleTripRecords(logsWithIds);
       },
       updateVehicleTripRecord: storeUpdateVehicleTripRecord,
       deleteVehicleTripRecord: storeDeleteVehicleTripRecord,

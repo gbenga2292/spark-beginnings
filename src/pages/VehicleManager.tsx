@@ -5,12 +5,13 @@ import {
   Plus, Search, Truck, MapPin, Clock, Calendar, 
   Edit2, Trash2, History, AlertCircle, ChevronRight,
   MoreHorizontal, PlusCircle, X, Check, ClipboardList,
-  LayoutGrid, List, ChevronLeft
+  LayoutGrid, List, ChevronLeft, Download, Upload, FileSpreadsheet
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 import { Vehicle, VehicleTripLeg, VehicleDocumentType } from '../types/operations';
-import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { 
   isSameMonth, isBefore, startOfMonth, endOfMonth, 
   startOfWeek, endOfWeek, addDays, isSameDay, 
@@ -19,7 +20,8 @@ import {
 import { usePriv } from '../hooks/usePriv';
 import { useEffect } from 'react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
+import { toast } from 'sonner';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import { Input } from '@/src/components/ui/input';
@@ -34,12 +36,17 @@ export function VehicleManager() {
   const { 
     vehicles, vehicleTrips, addVehicle, updateVehicle, deleteVehicle, addVehicleTripRecords,
     updateVehicleTripRecord, deleteVehicleTripRecord,
-    vehicleDocumentTypes, updateVehicleDocument
+    vehicleDocumentTypes, updateVehicleDocument,
+    insertVehicles, setVehicles, setVehicleTripRecords
   } = useOperations();
   const { sites, pendingSites, employees } = useAppStore();
   const priv = usePriv('opsVehicles');
   
   const [activeTab, setActiveTab] = useState<'fleet' | 'logs' | 'documents'>('logs');
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importType, setImportType] = useState<'vehicles' | 'logs'>('vehicles');
+  const [importMode, setImportMode] = useState<'append' | 'replace'>('append');
+  const [isImporting, setIsImporting] = useState(false);
 
   // Ensure user is on a permitted tab
   useEffect(() => {
@@ -54,6 +61,46 @@ export function VehicleManager() {
       else if (priv.canViewFleet) setActiveTab('fleet');
     }
   }, [priv, activeTab]);
+
+  // Document Expiry Notifications
+  useEffect(() => {
+    if (!vehicles || vehicles.length === 0) return;
+    
+    const today = new Date();
+    const expired: string[] = [];
+    const expiringThisMonth: string[] = [];
+
+    vehicles.forEach(v => {
+      vehicleDocumentTypes.forEach(type => {
+        const date = v.documents?.[type.name];
+        if (date) {
+          const normalized = normalizeDate(date);
+          if (normalized) {
+            const dateValue = new Date(normalized);
+            if (isBefore(dateValue, startOfDay(today))) {
+              expired.push(`${v.registration_number} - ${type.name}`);
+            } else if (isSameMonth(dateValue, today)) {
+              expiringThisMonth.push(`${v.registration_number} - ${type.name}`);
+            }
+          }
+        }
+      });
+    });
+
+    if (expired.length > 0) {
+      toast.error(`${expired.length} document(s) have EXPIRED`, {
+        description: expired.slice(0, 3).join('\n') + (expired.length > 3 ? `\n...and ${expired.length - 3} more` : ''),
+        duration: 10000,
+      });
+    }
+
+    if (expiringThisMonth.length > 0) {
+      toast.info(`${expiringThisMonth.length} document(s) expire this month`, {
+        description: expiringThisMonth.slice(0, 3).join('\n') + (expiringThisMonth.length > 3 ? `\n...and ${expiringThisMonth.length - 3} more` : ''),
+        duration: 8000,
+      });
+    }
+  }, [vehicles]);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -92,6 +139,27 @@ export function VehicleManager() {
     'Vehicle Management',
     'Manage company fleet and track daily movement logs',
     <div className="hidden sm:flex items-center gap-2">
+      {priv.canImport && (
+        <Button 
+          variant="outline" size="sm" 
+          className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
+          onClick={() => {
+            setImportType(activeTab === 'logs' ? 'logs' : 'vehicles');
+            setShowImportDialog(true);
+          }}
+        >
+          <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
+        </Button>
+      )}
+      {priv.canExport && (
+        <Button 
+          variant="outline" size="sm" 
+          className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
+          onClick={() => handleExport()}
+        >
+          <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export
+        </Button>
+      )}
       {activeTab === 'logs' && priv.canAddLogs && (
         <Button 
           variant="outline" size="sm" className="gap-2 h-9"
@@ -161,6 +229,146 @@ export function VehicleManager() {
       driver_name: '',
       legs: [{ site_name: '', purpose: '', departure_time: '', arrival_time: '', remark: '', odometer_start: undefined, odometer_end: undefined }]
     });
+  };
+
+  const handleExport = () => {
+    let data: any[] = [];
+    let fileName = '';
+
+    if (activeTab === 'logs') {
+      fileName = 'Vehicle_Movement_Logs.xlsx';
+      data = (vehicleTrips || []).map(t => ({
+        'Date': new Date(t.departure_time).toLocaleDateString(),
+        'Vehicle Reg': t.vehicle_reg,
+        'Driver': t.driver_name,
+        'Site': t.site_name,
+        'Purpose': t.purpose,
+        'Departure': new Date(t.departure_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        'Arrival': t.arrival_time ? new Date(t.arrival_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+        'Odometer Start': t.odometer_start || '',
+        'Odometer End': t.odometer_end || '',
+        'Remark': t.remark || ''
+      }));
+
+      if (data.length === 0) {
+        data = [{
+          'Date': '', 'Vehicle Reg': '', 'Driver': '', 'Site': '', 'Purpose': '',
+          'Departure': '', 'Arrival': '', 'Odometer Start': '', 'Odometer End': '', 'Remark': ''
+        }];
+      }
+    } else {
+      fileName = 'Vehicle_Fleet_Inventory.xlsx';
+      const docHeaders = vehicleDocumentTypes.map(d => d.name);
+      data = (vehicles || []).map(v => {
+        const row: any = {
+          'Fleet': v.name,
+          'Reg No': v.registration_number,
+          'Type': v.type || 'van',
+          'Status': v.status
+        };
+        docHeaders.forEach(h => {
+          row[h] = v.documents?.[h] || '';
+        });
+        return row;
+      });
+
+      if (data.length === 0) {
+        const emptyRow: any = { 'Fleet': '', 'Reg No': '', 'Type': '', 'Status': '' };
+        docHeaders.forEach(h => { emptyRow[h] = ''; });
+        data = [emptyRow];
+      }
+    }
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Data');
+    XLSX.writeFile(wb, fileName);
+    toast.success('Exported successfully');
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws, { raw: false });
+
+        if (data.length === 0) {
+          toast.error('The file is empty');
+          return;
+        }
+
+        if (importType === 'vehicles') {
+          const newVehicles: Vehicle[] = data.map((row: any) => {
+            const docs: Record<string, string> = {};
+            vehicleDocumentTypes.forEach(d => {
+              if (row[d.name]) docs[d.name] = String(row[d.name]);
+            });
+
+            return {
+              id: crypto.randomUUID(),
+              name: row['Fleet'] || row['name'] || 'Unknown',
+              registration_number: row['Reg No'] || row['registration_number'] || '',
+              type: (row['Type'] || row['type'] || 'van').toLowerCase() as any,
+              status: (row['Status'] || row['status'] || 'active').toLowerCase() as any,
+              documents: docs,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+          }).filter(v => v.registration_number);
+
+          if (importMode === 'replace') {
+            await setVehicles(newVehicles);
+          } else {
+            const existingRegs = new Set(vehicles.map(v => v.registration_number.toLowerCase()));
+            const uniqueNew = newVehicles.filter(v => !existingRegs.has(v.registration_number.toLowerCase()));
+            await insertVehicles(uniqueNew);
+          }
+          toast.success(`Imported ${newVehicles.length} vehicles`);
+        } else {
+          const newLogs = data.map((row: any) => {
+            const vehicle = vehicles.find(v => 
+              v.registration_number.toLowerCase() === (row['Vehicle Reg'] || row['vehicle_reg'] || '').toLowerCase()
+            );
+            
+            return {
+              id: crypto.randomUUID(),
+              vehicle_id: vehicle?.id || 'manual',
+              vehicle_reg: row['Vehicle Reg'] || row['vehicle_reg'] || '',
+              driver_name: row['Driver'] || row['driver_name'] || '',
+              site_name: row['Site'] || row['site_name'] || '',
+              purpose: row['Purpose'] || row['purpose'] || '',
+              departure_time: row['Departure'] ? new Date(`${row['Date']} ${row['Departure']}`).toISOString() : new Date().toISOString(),
+              arrival_time: row['Arrival'] ? new Date(`${row['Date']} ${row['Arrival']}`).toISOString() : undefined,
+              odometer_start: Number(row['Odometer Start'] || row['odometer_start'] || 0),
+              odometer_end: Number(row['Odometer End'] || row['odometer_end'] || 0),
+              remark: row['Remark'] || row['remark'] || ''
+            };
+          });
+
+          if (importMode === 'replace') {
+            await setVehicleTripRecords(newLogs);
+          } else {
+            await addVehicleTripRecords(newLogs);
+          }
+          toast.success(`Imported ${newLogs.length} movement logs`);
+        }
+        setShowImportDialog(false);
+      } catch (err) {
+        console.error('Import error:', err);
+        toast.error('Failed to parse file. Check headers.');
+      } finally {
+        setIsImporting(false);
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
   const handleEditTrip = (trip: VehicleTripLeg) => {
@@ -404,6 +612,92 @@ export function VehicleManager() {
         </div>
       )}
 
+      {/* Import Dialog */}
+      {showImportDialog && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200">
+            <CardHeader className="space-y-1">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <FileSpreadsheet className="h-5 w-5 text-blue-600" />
+                  Import Data
+                </CardTitle>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setShowImportDialog(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <CardDescription>Configure how you want to import your data</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label>What would you like to import?</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    className={`p-3 rounded-lg border-2 text-left transition-all ${importType === 'vehicles' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-100 dark:border-slate-800'}`}
+                    onClick={() => setImportType('vehicles')}
+                  >
+                    <Truck className={`h-5 w-5 mb-1 ${importType === 'vehicles' ? 'text-blue-600' : 'text-slate-400'}`} />
+                    <div className="text-sm font-bold">Vehicle Info</div>
+                    <div className="text-[10px] text-slate-500">Fleet & Documents</div>
+                  </button>
+                  <button 
+                    className={`p-3 rounded-lg border-2 text-left transition-all ${importType === 'logs' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-100 dark:border-slate-800'}`}
+                    onClick={() => setImportType('logs')}
+                  >
+                    <ClipboardList className={`h-5 w-5 mb-1 ${importType === 'logs' ? 'text-blue-600' : 'text-slate-400'}`} />
+                    <div className="text-sm font-bold">Movement Log</div>
+                    <div className="text-[10px] text-slate-500">Daily Trip Records</div>
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Import Mode</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    className={`p-3 rounded-lg border-2 text-left transition-all ${importMode === 'append' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-100 dark:border-slate-800'}`}
+                    onClick={() => setImportMode('append')}
+                  >
+                    <div className="text-sm font-bold">Append</div>
+                    <div className="text-[10px] text-slate-500">Add to existing data</div>
+                  </button>
+                  <button 
+                    className={`p-3 rounded-lg border-2 text-left transition-all ${importMode === 'replace' ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-100 dark:border-slate-800'}`}
+                    onClick={() => setImportMode('replace')}
+                  >
+                    <div className="text-sm font-bold text-red-600">Replace</div>
+                    <div className="text-[10px] text-slate-500">Wipe & overwrite all</div>
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls"
+                    onChange={handleImportFile}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                    disabled={isImporting}
+                  />
+                  <Button className="w-full bg-blue-600 hover:bg-blue-700 h-12 gap-2" disabled={isImporting}>
+                    {isImporting ? (
+                      <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                    {isImporting ? 'Processing File...' : 'Select Excel File'}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-center mt-2 text-slate-500 italic">
+                  Note: Ensure headers match system expectations. Export first to get a template.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-8 px-2 mx-1">
         {priv.canViewLogs && (
@@ -605,12 +899,12 @@ export function VehicleManager() {
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {vehicleDocumentTypes.map(type => {
                           const date = v.documents?.[type.name];
-                          const dateValue = date ? new Date(date) : null;
+                          const normalized = date ? normalizeDate(date) : null;
+                          const dateValue = normalized ? new Date(normalized) : null;
                           const today = new Date();
-                          const isExpiringSoon = dateValue && (
-                            isSameMonth(dateValue, today) || 
-                            isBefore(dateValue, today)
-                          );
+                          const isExpired = dateValue && isBefore(dateValue, startOfDay(today));
+                          const isExpiringThisMonth = dateValue && isSameMonth(dateValue, today);
+                          const isExpiringSoon = isExpired || isExpiringThisMonth;
                           return (
                             <tr key={type.id} className={cn(
                               "hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors", 

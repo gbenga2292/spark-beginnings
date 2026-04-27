@@ -138,7 +138,7 @@ function AppContent() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/setup" element={<SuperAdminSetup />} />
-      <Route path="/" element={<AuthGuard><OperationsProvider><Layout /></OperationsProvider></AuthGuard>}>
+      <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
         <Route index element={<Page label="Task Dashboard"><ProtectedRoute requiredModule="tasks"><TaskDashboard /></ProtectedRoute></Page>} />
         
         {/* ── Restricted Modules (Hidden in Web Build) ────────────────────────── */}
@@ -228,7 +228,8 @@ export default function App() {
     <AuthProvider>
       <TaskProvider>
         <PageProvider>
-          <ErrorBoundary>
+          <OperationsProvider>
+            <ErrorBoundary>
             <div className={`flex flex-col h-[100dvh] transition-colors duration-200 ${isDark ? 'dark bg-slate-950' : 'bg-slate-50'}`}>
               <TitleBar />
               <div className="flex-1 min-h-0 relative">
@@ -241,7 +242,8 @@ export default function App() {
               </div>
             </div>
           </ErrorBoundary>
-        </PageProvider>
+        </OperationsProvider>
+      </PageProvider>
       </TaskProvider>
     </AuthProvider>
   );
