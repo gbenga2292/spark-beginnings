@@ -132,6 +132,7 @@ const navigation: NavCategory[] = [
       { name: 'Sites Overview', href: '/sites', icon: MapPin, privKey: 'sites', privField: 'canView' },
       { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'commLog', privField: 'canView' },
       { name: 'Daily Journal', href: '/daily-journal', icon: BookOpen, privKey: 'dailyJournal', privField: 'canView' },
+      { name: 'Weekly Report', href: '/weekly-report', icon: BarChart2, privKey: 'sites', privField: 'canView' },
     ],
   },
   // ── Account ───────────────────────────────────────────────────────────────

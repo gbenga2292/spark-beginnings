@@ -58,6 +58,7 @@ const Tasks = lazy(() => import('./pages/Tasks').then(m => ({ default: m.Tasks }
 const TaskReports = lazy(() => import('./pages/TaskReports').then(m => ({ default: m.TaskReports })));
 const CommLog = lazy(() => import('./pages/CommLog').then(m => ({ default: m.CommLog })));
 const DailyJournal = lazy(() => import('./pages/DailyJournal').then(m => ({ default: m.DailyJournal })));
+const WeeklyReport = lazy(() => import('./pages/WeeklyReport').then(m => ({ default: m.WeeklyReport })));
 const TaskArchive = lazy(() => import('./pages/TaskArchive').then(m => ({ default: m.TaskArchive })));
 const OperationsDashboard = lazy(() => import('./pages/OperationsDashboard').then(m => ({ default: m.Dashboard })));
 const AssetManager = lazy(() => import('./pages/AssetManager').then(m => ({ default: m.AssetManager })));
@@ -214,6 +215,7 @@ function AppContent() {
         
         <Route path="comm-log" element={<Page label="Communication Log"><ProtectedRoute requiredModule="commLog"><CommLog /></ProtectedRoute></Page>} />
         <Route path="daily-journal" element={<Page label="Daily Journal"><ProtectedRoute requiredModule="dailyJournal"><DailyJournal /></ProtectedRoute></Page>} />
+        <Route path="weekly-report" element={<Page label="Weekly Report"><ProtectedRoute requiredModule="sites"><WeeklyReport /></ProtectedRoute></Page>} />
         <Route path="notifications" element={<Page label="Notifications"><ProtectedRoute><NotificationsPage /></ProtectedRoute></Page>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
