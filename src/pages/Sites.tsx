@@ -566,6 +566,9 @@ export function Sites() {
       submitStatus = 'Ended';
     } else if (editForm.startDate && nowStr < editForm.startDate) {
       submitStatus = 'Inactive';
+    } else if (submitStatus === 'Ended') {
+      // If end date was cleared, it can't be "Ended" anymore
+      submitStatus = 'Active';
     }
 
     updateSite(editingId, {
@@ -593,7 +596,7 @@ export function Sites() {
         },
         phase5: {
           ...linkedPS.phase5,
-          actualEndDate: editForm.endDate || linkedPS.phase5?.actualEndDate || ''
+          actualEndDate: editForm.endDate // Correctly pass empty string if cleared
         }
       });
     }

@@ -26,7 +26,10 @@ export function DiaryDetailView({
   const journals = dailyJournals.filter(j => j.date === date)
     .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
   const allEntries = siteJournalEntries.filter(e => journals.some(j => j.id === e.journalId));
-  const sites = [...new Set(allEntries.map(e => e.siteName))];
+  const uniqueSites = [...new Set(allEntries.map(e => `${e.siteName}|${e.clientName}`))].map(str => {
+    const [site, client] = str.split('|');
+    return { site, client };
+  });
   const isToday = isSameDay(diaryDate, new Date());
 
   return (
@@ -75,9 +78,9 @@ export function DiaryDetailView({
                 {t}
               </span>
             ))}
-            {sites.map(site => (
-              <span key={site} className="flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-md bg-teal-50 text-teal-700 border border-teal-100 dark:bg-teal-900/20 dark:text-teal-400 dark:border-teal-800/30">
-                <MapPin className="h-3.5 w-3.5" />{site}
+            {uniqueSites.map(item => (
+              <span key={`${item.site}-${item.client}`} className="flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-md bg-teal-50 text-teal-700 border border-teal-100 dark:bg-teal-900/20 dark:text-teal-400 dark:border-teal-800/30">
+                <MapPin className="h-3.5 w-3.5" />{item.site}({item.client})
               </span>
             ))}
           </div>
@@ -142,10 +145,7 @@ export function DiaryDetailView({
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap mb-2">
                                 <span className={cn('font-semibold text-sm', isDark ? 'text-white' : 'text-slate-800')}>
-                                  {entry.siteName}
-                                </span>
-                                <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full', isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600')}>
-                                  {entry.clientName}
+                                  {entry.siteName}({entry.clientName})
                                 </span>
                               </div>
                               {entry.narration ? (

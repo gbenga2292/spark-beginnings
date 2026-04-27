@@ -59,7 +59,7 @@ export function SiteDiary() {
   }
 
   useSetPageTitle(
-    site ? `${site.name} Diary` : 'Site Diary',
+    site ? `${site.name}(${site.client})` : 'Site Diary',
     site ? `Client: ${site.client}` : 'View aggregated daily journal entries',
     <Button 
       variant="outline" 

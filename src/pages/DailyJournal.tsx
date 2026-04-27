@@ -154,7 +154,7 @@ export function DailyJournal() {
           if (y > H - 30) { doc.addPage(); y = 30; }
           doc.setFillColor(52, 211, 153); doc.circle(17, y - 1.5, 1.2, 'F');
           doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 50);
-          doc.text(entry.siteName, 22, y);
+          doc.text(`${entry.siteName}(${entry.clientName})`, 22, y);
           doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(120, 120, 140);
           doc.text(`Client: ${entry.clientName}`, 22, y + 4.5); 
           y += 10;
@@ -301,7 +301,7 @@ export function DailyJournal() {
                   <span className="text-xs text-muted-foreground">{entries.length} log points · {group.journals.length} session{group.journals.length !== 1 ? 's' : ''}</span>
                   {[...new Set(entries.map(e => e.siteName))].map(s => (
                     <span key={s} className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                      <MapPin className="h-3 w-3" />{s}
+                      <MapPin className="h-3 w-3" />{s} ({entries.find(e => e.siteName === s)?.clientName || 'Unknown'})
                     </span>
                   ))}
                 </div>
@@ -334,7 +334,7 @@ export function DailyJournal() {
                 <select value={selectedSiteId} onChange={e => setSelectedSiteId(e.target.value)}
                   className="flex-1 h-10 rounded-md border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-slate-900 dark:border-slate-700">
                   <option value="">Select site...</option>
-                  {activeSites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {activeSites.map(s => <option key={s.id} value={s.id}>{s.name} ({s.client})</option>)}
                 </select>
                 <Button onClick={() => {
                   const s = sites.find(x => x.id === selectedSiteId);
@@ -355,8 +355,7 @@ export function DailyJournal() {
                   <div key={idx} className="bg-card border border-border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold">{entry.siteName}</span>
-                        <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted">{entry.clientName}</span>
+                        <span className="text-sm font-semibold">{entry.siteName}({entry.clientName})</span>
                       </div>
                       <button onClick={() => setFormEntries(p => p.filter((_, i) => i !== idx))} className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors">
                         <X className="h-4 w-4" />
