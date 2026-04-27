@@ -2110,7 +2110,7 @@ export function Employees() {
             </label>
           )}
         </div>
-        {selectedIds.length > 0 && (
+        {selectedIds.length > 0 && priv.canBulkEdit && (
           <Button 
             className="w-full gap-2 bg-amber-500 hover:bg-amber-600 text-white"
             onClick={() => { setBulkFormData({}); setIsBulkEditing(true); }}
