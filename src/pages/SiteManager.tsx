@@ -30,8 +30,8 @@ export function SiteManager() {
   const totalCount = sites.length;
 
   useSetPageTitle(
-    'Site Management',
-    `${activeCount} of ${totalCount} sites currently active`
+    inventorySite ? '' : 'Site Management',
+    inventorySite ? '' : `${activeCount} of ${totalCount} sites currently active`
   );
 
   const filteredSites = sites.filter(s => {
