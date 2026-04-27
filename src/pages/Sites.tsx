@@ -894,7 +894,7 @@ export function Sites() {
               </div>
             </div>
           ) : (
-            <div className="flex bg-slate-200/50 p-1 rounded-lg">
+            <div className="flex flex-wrap bg-slate-200/50 p-1 rounded-lg w-full sm:w-auto">
               <button
                 className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${activeTab === 'clients' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 onClick={() => { setActiveTab('clients'); setSearchTerm(''); }}

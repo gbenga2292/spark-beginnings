@@ -362,9 +362,9 @@ export function TaskReminders() {
     const eveningReminders = selectedReminders.filter(r => { const h = getHours(parseISO(r.remindAt)); return h >= 17; });
 
     return (
-      <div className="flex h-full min-h-0 gap-4">
+      <div className="flex flex-col lg:flex-row h-full min-h-0 gap-4 overflow-y-auto lg:overflow-hidden pb-20 lg:pb-0">
         {/* Calendar Grid */}
-        <div className="flex-1 flex flex-col bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+        <div className="flex-1 flex flex-col bg-card border border-border rounded-xl overflow-hidden shadow-sm min-h-[500px] lg:min-h-0">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border bg-muted/10">
             <h2 className="text-lg font-bold text-foreground">{format(currentDate, 'MMMM yyyy')}</h2>
@@ -377,7 +377,10 @@ export function TaskReminders() {
           {/* Weekdays */}
           <div className="grid grid-cols-7 border-b border-border bg-muted/20">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="py-2.5 text-center text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{day}</div>
+              <div key={day} className="py-2.5 text-center text-[10px] lg:text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+                <span className="hidden sm:inline">{day}</span>
+                <span className="sm:hidden">{day[0]}</span>
+              </div>
             ))}
           </div>
           {/* Days */}
@@ -416,7 +419,7 @@ export function TaskReminders() {
         </div>
 
         {/* Sidebar */}
-        <div className="w-[300px] flex flex-col bg-card border border-border rounded-xl overflow-hidden shadow-sm flex-shrink-0">
+        <div className="w-full lg:w-[300px] flex flex-col bg-card border border-border rounded-xl overflow-hidden shadow-sm flex-shrink-0">
           <div className="p-4 border-b border-border flex flex-col gap-1 bg-muted/10">
             <h3 className="font-bold text-base text-foreground">{format(selectedDate, 'EEEE, MMMM d')}</h3>
             <div className="text-xs font-medium text-muted-foreground flex items-center justify-between">
