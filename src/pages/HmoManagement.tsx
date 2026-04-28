@@ -133,12 +133,21 @@ export function HmoManagement() {
 
         if (!mainTaskId) return;
 
-        const existingSubtask = taskContext.subtasks.find((s: any) =>
-          (s.mainTaskId === mainTaskId || s.main_task_id === mainTaskId) &&
-          s.title.includes(emp.firstname) &&
-          s.title.includes(emp.surname) &&
-          s.status !== 'completed'
-        );
+        const existingSubtask = taskContext.subtasks.find((s: any) => {
+          const isRelated = (s.mainTaskId === mainTaskId || s.main_task_id === mainTaskId);
+          if (!isRelated || s.is_deleted || s.status === 'completed') return false;
+
+          // Metadata match
+          try {
+            if (s.description && s.description.trim().startsWith('{')) {
+              const meta = JSON.parse(s.description);
+              if (meta.refType === 'hmo' && meta.employeeId === emp.id) return true;
+            }
+          } catch (e) {}
+
+          // Title match fallback
+          return s.title === `HMO Renewal - ${emp.surname} ${emp.firstname}`;
+        });
 
         if (!existingSubtask) {
           const hrUser = taskContext.users.find((u: any) =>
@@ -148,7 +157,11 @@ export function HmoManagement() {
           try {
             await taskContext.addSubtask({
               title: `HMO Renewal - ${emp.surname} ${emp.firstname}`,
-              description: JSON.stringify({ refType: 'hmo', employeeId: emp.id }),
+              description: JSON.stringify({ 
+                refType: 'hmo', 
+                employeeId: emp.id,
+                narration: `HMO Policy for ${emp.surname} ${emp.firstname} is due for renewal on ${formatDate(end)}. Please process with LASHMA.`
+              }),
               priority: daysToExpiry < 0 ? 'urgent' : 'high',
               deadline: end,
               mainTaskId,

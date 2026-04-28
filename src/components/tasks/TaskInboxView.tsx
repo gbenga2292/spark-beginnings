@@ -384,6 +384,8 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                       }
                       if (meta.refType === 'salary_advance' || meta.refType === 'loan') { link = '/salary-loans'; label = 'View Loan'; privKey = 'salaryLoans'; }
                       if (meta.refId && (meta.refType === 'site' || mtTitle.includes('onboard'))) { link = `/sites/onboarding/${meta.refId}`; label = 'View Onboarding'; privKey = 'sites'; }
+                      if (meta.refType === 'vehicle_doc_renewal') { link = '/operations/vehicles'; label = 'View Vehicle'; privKey = 'operations'; }
+                      if (meta.refType === 'employee' || meta.refType === 'new_hire') { link = `/employees`; label = 'View Employee'; privKey = 'employees'; }
                     } catch(e) {}
 
                     if (!link) {
@@ -395,9 +397,13 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                         link = '/sites';
                         label = 'View Sites';
                         privKey = 'sites';
-                      } else if (mtTitle.includes('asset') || stTitle.includes('asset')) {
-                        link = '/operations';
+                      } else if (mtTitle.includes('asset') || stTitle.includes('asset') || stTitle.includes('maintenance')) {
+                        link = '/operations/assets';
                         label = 'View Assets';
+                        privKey = 'operations';
+                      } else if (mtTitle.includes('vehicle') || stTitle.includes('vehicle')) {
+                        link = '/operations/vehicles';
+                        label = 'View Vehicles';
                         privKey = 'operations';
                       } else if (mtTitle.includes('waybill') || stTitle.includes('waybill')) {
                         link = '/operations/waybills';
@@ -488,7 +494,24 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                                 updateSubtaskStatus(activeSubtask.id!, 'completed', currentUser?.id, true);
                                 postComment(activeSubtask.id!, activeMainTask.id, `✅ **Approved** — Task marked as completed.`, currentUser?.id);
                               } else {
-                                approveSubtask(activeSubtask.id!, currentUser?.id);
+                                // Check if it's a vehicle doc renewal
+                                let isVehicleDoc = false;
+                                try {
+                                  const meta = JSON.parse(activeSubtask.description || '{}');
+                                  if (meta.refType === 'vehicle_doc_renewal') isVehicleDoc = true;
+                                } catch (e) {}
+
+                                if (isVehicleDoc) {
+                                  const newDate = window.prompt("Enter the NEW expiry date (YYYY-MM-DD):", activeSubtask.deadline?.split('T')[0]);
+                                  if (!newDate) return;
+                                  if (isNaN(new Date(newDate).getTime())) {
+                                    toast.error("Invalid date format. Please use YYYY-MM-DD.");
+                                    return;
+                                  }
+                                  approveSubtask(activeSubtask.id!, currentUser?.id, newDate);
+                                } else {
+                                  approveSubtask(activeSubtask.id!, currentUser?.id);
+                                }
                               }
                             }}
                             disabled={!isApprover || hasActed}
@@ -662,24 +685,35 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                 {/* Task Narration & Description */}
                 {(() => {
                   let isMainDescJson = false;
+                  let mainNarration = "";
                   try {
                     if (activeMainTask.description && activeMainTask.description.trim().startsWith('{')) {
                       const meta = JSON.parse(activeMainTask.description);
-                      if (meta && meta.refType) isMainDescJson = true;
+                      if (meta && meta.refType) {
+                        isMainDescJson = true;
+                        mainNarration = meta.narration || "";
+                      }
                     }
                   } catch (e) {}
 
                   let isSubDescJson = false;
+                  let subNarration = "";
                   try {
                     if (activeSubtask.description && activeSubtask.description.trim().startsWith('{')) {
                       const meta = JSON.parse(activeSubtask.description);
-                      if (meta && meta.refType) isSubDescJson = true;
+                      if (meta && meta.refType) {
+                        isSubDescJson = true;
+                        subNarration = meta.narration || "";
+                      }
                     }
                   } catch (e) {}
 
-                  const hasMainDesc = !!activeMainTask.description && !isMainDescJson;
-                  const hasSubDesc = !!activeSubtask.description && !isSubDescJson;
-                  const isDuplicate = hasMainDesc && hasSubDesc && activeMainTask.description === activeSubtask.description;
+                  const hasMainDesc = (!!activeMainTask.description && !isMainDescJson) || !!mainNarration;
+                  const hasSubDesc = (!!activeSubtask.description && !isSubDescJson) || !!subNarration;
+                  
+                  const mainContent = mainNarration || activeMainTask.description;
+                  const subContent = subNarration || activeSubtask.description;
+                  const isDuplicate = hasMainDesc && hasSubDesc && mainContent === subContent;
 
                   if (!hasMainDesc && !hasSubDesc) return null;
 
@@ -689,7 +723,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                         <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Task Description</h3>
                         <div className="flex items-start gap-4 p-5 rounded-2xl border border-indigo-100 bg-indigo-50/30 shadow-sm transition-all hover:bg-white hover:border-indigo-200">
                           <FileText className="w-5 h-5 text-indigo-500 mt-0.5 flex-shrink-0" />
-                          <p className="text-[14px] text-slate-700 leading-relaxed whitespace-pre-wrap">{activeSubtask.description}</p>
+                          <p className="text-[14px] text-slate-700 leading-relaxed whitespace-pre-wrap">{subContent}</p>
                         </div>
                       </div>
                     );
@@ -702,7 +736,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                           <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Task Narration (Project Context)</h3>
                           <div className="flex items-start gap-3 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-900/20 shadow-sm">
                             <FileText className="w-5 h-5 text-emerald-500 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
-                            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{activeMainTask.description}</p>
+                            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{mainContent}</p>
                           </div>
                         </div>
                       )}
@@ -712,7 +746,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                           <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Subtask Details</h3>
                           <div className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:border-indigo-200">
                             <MessageSquare className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
-                            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{activeSubtask.description}</p>
+                            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{subContent}</p>
                           </div>
                         </div>
                       )}

@@ -458,6 +458,8 @@ function PersonalTasksView() {
                                            try {
                                              if (raw.trim().startsWith('{')) {
                                                const m = JSON.parse(raw);
+                                               if (m.narration) return <p className="text-xs text-indigo-500 truncate font-medium">{m.narration}</p>;
+                                               
                                                if (m.refType) {
                                                  let label = '';
                                                  if (m.refType === 'leave' && m.workflowStep) {
@@ -468,6 +470,8 @@ function PersonalTasksView() {
                                                    label = `${m.refType === 'loan' ? 'Loan' : 'Salary Advance'} Application`;
                                                  } else if (m.refType === 'site') {
                                                    label = `Site Onboarding Workflow`;
+                                                 } else if (m.refType === 'vehicle_doc_renewal') {
+                                                   label = `Vehicle Document Renewal`;
                                                  }
                                                  if (label) return <p className="text-xs text-indigo-500 truncate font-medium">{label}</p>;
                                                }
@@ -1568,6 +1572,8 @@ function AdminTasksView() {
                                         try {
                                           if (raw.trim().startsWith('{')) {
                                             const m = JSON.parse(raw);
+                                            if (m.narration) return <p className="text-xs text-indigo-500 truncate font-medium">{m.narration}</p>;
+
                                             if (m.refType) {
                                               let label = '';
                                               if (m.refType === 'leave' && m.workflowStep) {
@@ -1578,6 +1584,8 @@ function AdminTasksView() {
                                                 label = `${m.refType === 'loan' ? 'Loan' : 'Salary Advance'} Application`;
                                               } else if (m.refType === 'site') {
                                                 label = `Site Onboarding Workflow`;
+                                              } else if (m.refType === 'vehicle_doc_renewal') {
+                                                label = `Vehicle Document Renewal`;
                                               }
                                               if (label) return <p className="text-xs text-indigo-500 truncate font-medium">{label}</p>;
                                             }

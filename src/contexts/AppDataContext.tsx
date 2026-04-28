@@ -768,6 +768,26 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                                 hrSignature: { signed: 'Signed', date: now, name: approverName },
                             });
                         }
+                    } else if (meta.refType === 'vehicle_doc_renewal') {
+                        const { vehicleId, docTypeName } = meta;
+                        const newExpiryDate = note; // We expect the approver to provide the new date in the note
+                        if (vehicleId && docTypeName && newExpiryDate) {
+                            // Update the vehicle document in the store
+                            useAppStore.getState().updateVehicleDocument(vehicleId, docTypeName, newExpiryDate);
+                            
+                            // Post a comment about the update
+                            const mainTask = mainTasks.find(m => m.id === data.mainTaskId || m.id === data.main_task_id);
+                            if (mainTask) {
+                                const actorId = userId || user?.id;
+                                const text = `✅ **Document Renewed**\nVehicle document **"${docTypeName}"** updated with new expiry date: **${newExpiryDate}**.`;
+                                await supabase.from('task_updates').insert({
+                                    subtask_id: id,
+                                    main_task_id: mainTask.id,
+                                    text,
+                                    author_id: actorId
+                                });
+                            }
+                        }
                     } else if (meta.refType === 'salary_advance') {
                         const { error: saErr } = await supabase.from('salary_advances').update({ status: 'Approved', approved_at: new Date().toISOString() }).eq('id', meta.refId);
                         if (saErr) console.error('Failed to update salary advance status:', saErr);
@@ -1092,7 +1112,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         createProject: async (projectData: any) => {
             const taskPayload = {
                 title: projectData.name,
-                description: `Project for ${projectData.serviceType || 'Internal Project'}`,
+                description: projectData.description || `Project for ${projectData.serviceType || 'Internal Project'}`,
                 createdBy: projectData.createdBy,
                 teamId: projectData.teamId,
                 workspaceId: projectData.workspaceId,
@@ -1122,7 +1142,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 const subsToInsert = projectData.subtasks.map((st: any) => ({
                     main_task_id: mainTask.id,
                     title: st.title,
-                    description: '',
+                    description: st.description || JSON.stringify({
+                        refType: 'site',
+                        narration: `Automated onboarding step: ${st.title}`
+                    }),
                     status: 'not_started',
                     category: 'General',
                     assigned_department: st.assignee || 'Engineering',

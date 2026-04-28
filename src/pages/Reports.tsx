@@ -72,6 +72,9 @@ export function Reports() {
   const [summaryChartView, setSummaryChartView] = useState<'table' | 'heatmap' | 'bar'>('table');
   const [siteStaffTypeFilter, setSiteStaffTypeFilter] = useState<'All' | 'OFFICE' | 'FIELD'>('All');
   const [summaryStaffTypeFilter, setSummaryStaffTypeFilter] = useState<'All' | 'OFFICE' | 'FIELD'>('All');
+  const [otStaffTypeFilter, setOtStaffTypeFilter] = useState<'All' | 'OFFICE' | 'FIELD'>('All');
+  const [otYear, setOtYear] = useState<number>(currentYear);
+  const [otChartView, setOtChartView] = useState<'table' | 'heatmap' | 'bar'>('table');
 
   const [meritFilter, setMeritFilter] = useState<'All Time' | 'Year' | 'Month'>('All Time');
   const [meritFilterYear, setMeritFilterYear] = useState<number>(currentYear);
@@ -459,6 +462,116 @@ export function Reports() {
 
     return { totalDaysWorked, totalOTDays, totalDaysAbsent, monthTotals };
   }, [monthlyWorkSummary, staffTotals]);
+
+  // ── Monthly Overtime Detail Report ──
+  const otBaseStaff = useMemo(() => {
+    return employees.filter(emp =>
+      emp.status === 'Active' &&
+      emp.position !== 'Engineer' &&
+      emp.position !== 'CEO'
+    );
+  }, [employees]);
+
+  const otFilteredStaff = useMemo(() => {
+    if (otStaffTypeFilter === 'All') return otBaseStaff;
+    return otBaseStaff.filter(emp => (emp.staffType?.toUpperCase() || '') === otStaffTypeFilter);
+  }, [otBaseStaff, otStaffTypeFilter]);
+
+  const monthlyOvertimeDetail = useMemo(() => {
+    const otData: Record<string, { 
+      name: string; 
+      position: string;
+      months: Record<number, {
+        sites: Record<string, number>;
+        dates: string[];
+      }>;
+    }> = {};
+
+    // Initialize
+    otFilteredStaff.forEach(emp => {
+      otData[emp.id] = {
+        name: `${emp.surname} ${emp.firstname}`,
+        position: emp.position,
+        months: {}
+      };
+      for (let m = 1; m <= 12; m++) {
+        otData[emp.id].months[m] = {
+          sites: {},
+          dates: []
+        };
+      }
+    });
+
+    const yearRecords = attendanceRecords.filter(rec => {
+      const recDate = new Date(rec.date);
+      return recDate.getFullYear() === otYear;
+    });
+
+    yearRecords.forEach(rec => {
+      const empId = rec.staffId;
+      if (otData[empId] && (rec.ot ?? 0) > 0) {
+        const month = rec.mth || new Date(rec.date).getMonth() + 1;
+        if (month >= 1 && month <= 12) {
+          const siteId = rec.otSite || rec.daySite || rec.nightSite || 'Unspecified';
+          const site = sites.find(s => s.id === siteId)?.name || siteId;
+          otData[empId].months[month].sites[site] = (otData[empId].months[month].sites[site] || 0) + 1;
+          otData[empId].months[month].dates.push(`${formatDisplayDate(rec.date)} (${site})`);
+        }
+      }
+    });
+
+    return otData;
+  }, [attendanceRecords, otYear, otFilteredStaff]);
+
+  const exportOtReportExcel = () => {
+    const wb = XLSX.utils.book_new();
+    const headers = ['Full Name', 'Position'];
+    months.forEach(m => headers.push(m.label));
+    headers.push('Total OT Days');
+
+    const data = otFilteredStaff.map(emp => {
+      const staffData = monthlyOvertimeDetail[emp.id];
+      const row: (string | number)[] = [staffData?.name || '', staffData?.position || ''];
+      
+      let totalOT = 0;
+      for (let m = 1; m <= 12; m++) {
+        const monthData = staffData?.months[m] || { sites: {}, dates: [] };
+        const monthSites = monthData.sites;
+        const monthTotal = Object.values(monthSites).reduce((a, b) => a + b, 0);
+        totalOT += monthTotal;
+        
+        const siteDetails = Object.entries(monthSites)
+          .map(([site, count]) => `${site}: ${count}`)
+          .join(', ');
+        
+        row.push(siteDetails || 0);
+      }
+      row.push(totalOT);
+      return row;
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+    XLSX.utils.book_append_sheet(wb, ws, "Overtime Detail");
+    const fileName = `overtime_detail_report_${otYear}.xlsx`;
+    
+    if (window.electronAPI?.savePathDialog) {
+      window.electronAPI.savePathDialog({
+        title: 'Export Overtime Detail (Excel)',
+        defaultPath: fileName,
+        filters: [{ name: 'Excel Files', extensions: ['xlsx'] }]
+      }).then(filePath => {
+        if (filePath) {
+          const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+          window.electronAPI.writeFile(filePath, buf, 'binary').then(success => {
+            if (success) toast.success(`Exported to ${filePath}`);
+            else toast.error('Failed to save file.');
+          });
+        }
+      });
+    } else {
+      XLSX.writeFile(wb, fileName);
+    }
+  };
 
   // Export function for monthly work summary
   const exportMonthlyWorkSummary = () => {
@@ -2050,7 +2163,257 @@ export function Reports() {
         </CardContent>
       </Card>
 
+      {/* Monthly Overtime Detail Report */}
+      <Card className="bg-white border-slate-200">
+        <CardHeader className="border-b border-slate-100 pb-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <CardTitle className="text-slate-900 flex items-center gap-2">
+              <CalendarClock className="h-5 w-5 text-amber-600" />
+              Monthly Overtime Detail
+            </CardTitle>
+            {/* View toggle */}
+            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+              <button
+                onClick={() => setOtChartView('table')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  otChartView === 'table' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" /> Table
+              </button>
+              <button
+                onClick={() => setOtChartView('heatmap')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  otChartView === 'heatmap' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <Flame className="h-3.5 w-3.5" /> Heat Map
+              </button>
+              <button
+                onClick={() => setOtChartView('bar')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  otChartView === 'bar' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <BarChart2 className="h-3.5 w-3.5" /> Bar Chart
+              </button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap items-center gap-4 mb-6">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-slate-700">Year:</label>
+              <select
+                value={otYear}
+                onChange={(e) => setOtYear(Number(e.target.value))}
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              >
+                {years.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-slate-700">Staff Type:</label>
+              <select
+                value={otStaffTypeFilter}
+                onChange={(e) => setOtStaffTypeFilter(e.target.value as any)}
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              >
+                <option value="All">All</option>
+                <option value="OFFICE">Office</option>
+                <option value="FIELD">Field</option>
+              </select>
+            </div>
+            <div className="ml-auto">
+              <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportOtReportExcel}>
+                <FileSpreadsheet className="h-4 w-4" /> Export Excel
+              </Button>
+            </div>
+          </div>
+
+          {otChartView === 'table' ? (
+            <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <Table className="max-h-[420px]">
+                <TableHeader className="sticky top-0 z-10">
+                  <TableRow className="bg-gradient-to-r from-slate-800 to-slate-700">
+                    <TableHead className="text-left font-semibold text-white py-2 px-3 whitespace-nowrap sticky left-0 bg-slate-800 z-20">Full Name</TableHead>
+                    {months.map(m => (
+                      <TableHead key={m.value} className="text-center font-semibold text-white border-l border-slate-600 py-1.5 px-1 text-xs">
+                        {m.label.substring(0, 3)}
+                      </TableHead>
+                    ))}
+                    <TableHead className="text-center font-semibold text-white bg-amber-600 align-middle py-2 px-2 whitespace-nowrap">Total OT</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {otFilteredStaff.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={14} className="text-center py-8 text-slate-500">
+                        No staff found for the selected filter.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    otFilteredStaff.map((emp, idx) => {
+                      const data = monthlyOvertimeDetail[emp.id];
+                      let annualTotalOT = 0;
+                      return (
+                        <TableRow key={emp.id} className={`hover:bg-amber-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}`}>
+                          <TableCell className={`font-medium text-slate-800 sticky left-0 py-1.5 px-3 text-sm whitespace-nowrap ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+                            {data?.name || `${emp.surname} ${emp.firstname}`}
+                          </TableCell>
+                          {months.map(m => {
+                            const monthData = data?.months[m.value] || { sites: {}, dates: [] };
+                            const monthSites = monthData.sites;
+                            const monthTotal = Object.values(monthSites).reduce((a, b) => a + b, 0);
+                            annualTotalOT += monthTotal;
+                            return (
+                              <TableCell 
+                                key={m.value} 
+                                className="text-center py-1 px-1 text-[10px] text-slate-700 border-l border-slate-100"
+                                title={monthData.dates.length > 0 ? `Dates:\n${monthData.dates.join('\n')}` : ''}
+                              >
+                                {monthTotal > 0 ? (
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="font-bold text-amber-600">{monthTotal}</span>
+                                    <div className="text-[8px] text-slate-400 leading-tight max-w-[100px] mx-auto overflow-hidden text-ellipsis">
+                                      {Object.entries(monthSites).map(([site, count]) => `${site}(${count})`).join(', ')}
+                                    </div>
+                                  </div>
+                                ) : '—'}
+                              </TableCell>
+                            );
+                          })}
+                          <TableCell className="text-center py-1.5 px-2 font-bold text-amber-700 bg-amber-50">
+                            {annualTotalOT}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          ) : otChartView === 'heatmap' ? (
+             /* Heatmap for OT */
+             (() => {
+                let maxOt = 1;
+                otFilteredStaff.forEach(emp => {
+                  months.forEach(m => {
+                    const monthData = monthlyOvertimeDetail[emp.id]?.months[m.value] || { sites: {}, dates: [] };
+                    const ot = Object.values(monthData.sites).reduce((a, b) => a + b, 0);
+                    if (ot > maxOt) maxOt = ot;
+                  });
+                });
+
+                return (
+                  <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <div className="overflow-y-auto" style={{ maxHeight: '480px' }}>
+                        <div style={{ minWidth: '720px' }}>
+                          <div className="flex sticky top-0 z-20 bg-slate-800">
+                            <div className="flex-shrink-0 w-44 px-3 py-2.5 border-r border-slate-700">
+                              <span className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Employee</span>
+                            </div>
+                            {months.map(m => (
+                              <div key={m.value} className="flex-1 min-w-[52px] text-center py-2.5 border-r border-slate-700 last:border-0">
+                                <div className="text-xs font-bold text-slate-200">{m.label.substring(0, 3)}</div>
+                              </div>
+                            ))}
+                            <div className="flex-shrink-0 w-28 text-center py-2.5 bg-amber-600 border-l border-slate-700">
+                              <span className="text-xs font-semibold text-white">Annual Total</span>
+                            </div>
+                          </div>
+                          {otFilteredStaff.map((emp, idx) => {
+                            const data = monthlyOvertimeDetail[emp.id];
+                            let annualTotalOT = 0;
+                            return (
+                              <div key={emp.id} className={`flex border-b border-slate-100 last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
+                                <div className={`flex-shrink-0 w-44 px-3 py-2 border-r border-slate-200 flex flex-col justify-center ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+                                  <div className="text-xs font-semibold text-slate-800 leading-tight truncate">{data?.name}</div>
+                                </div>
+                                {months.map(m => {
+                                  const monthData = data?.months[m.value] || { sites: {}, dates: [] };
+                                  const monthSites = monthData.sites;
+                                  const ot = Object.values(monthSites).reduce((a, b) => a + b, 0);
+                                  annualTotalOT += ot;
+                                  const intensity = ot > 0 ? Math.min(0.2 + (ot / maxOt) * 0.8, 1) : 0;
+                                  const tooltip = ot > 0 
+                                    ? `Dates:\n${monthData.dates.join('\n')}\n\nSites:\n${Object.entries(monthSites).map(([site, count]) => `${site}: ${count}`).join('\n')}` 
+                                    : 'No overtime';
+                                  return (
+                                    <div
+                                      key={m.value}
+                                      className="flex-1 min-w-[52px] border-r border-white/60 last:border-0 flex flex-col items-center justify-center py-1.5 transition-all hover:brightness-90"
+                                      style={{ backgroundColor: ot > 0 ? `rgba(245, 158, 11, ${intensity})` : '#f8fafc', color: intensity > 0.6 ? '#fff' : '#92400e' }}
+                                      title={tooltip}
+                                    >
+                                      <span className="text-xs font-bold">{ot > 0 ? ot : '—'}</span>
+                                    </div>
+                                  );
+                                })}
+                                <div className="flex-shrink-0 w-28 py-2 px-2 flex items-center justify-center bg-amber-50 border-l border-amber-100">
+                                  <span className="font-bold text-amber-700 text-sm">{annualTotalOT}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+             })()
+          ) : (
+            /* Bar Chart for OT */
+            (() => {
+              const barData = months.map(m => {
+                let totalOT = 0;
+                otFilteredStaff.forEach(emp => {
+                  const monthData = monthlyOvertimeDetail[emp.id]?.months[m.value] || { sites: {}, dates: [] };
+                  totalOT += Object.values(monthData.sites).reduce((a, b) => a + b, 0);
+                });
+                return {
+                  month: m.label.substring(0, 3),
+                  'Overtime': totalOT
+                };
+              });
+
+              return (
+                <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-6">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Team Monthly Overtime</span>
+                    <span className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
+                      <span className="inline-block w-3 h-3 rounded-sm bg-amber-400"></span> Total Overtime
+                    </span>
+                  </div>
+                  <div className="p-4">
+                    <div className="h-[340px]">
+                      <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
+                        <BarChart data={barData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }} barSize={30}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                          <XAxis dataKey="month" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                          <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
+                          <RechartsTooltip
+                            contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', fontSize: 12 }}
+                            cursor={{ fill: 'rgba(245,158,11,0.06)' }}
+                          />
+                          <Bar dataKey="Overtime" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()
+          )}
+
+        </CardContent>
+      </Card>
+
       {/* ───────────────── HR REPORTS ───────────────── */}
+
       <Card className="bg-white border-slate-200">
         <CardHeader className="border-b border-slate-100 pb-4">
           <div className="flex items-center justify-between flex-wrap gap-3">

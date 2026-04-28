@@ -129,7 +129,13 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
           deadline: today430.toISOString(),
         });
         if (mainTask?.id) {
-          const subtaskDesc = JSON.stringify({ refType: 'salary_advance', refId: newAdvance.id, amount: Number(amount), employeeName: empName });
+          const subtaskDesc = JSON.stringify({ 
+            refType: 'salary_advance', 
+            refId: newAdvance.id, 
+            amount: Number(amount), 
+            employeeName: empName,
+            narration: `Salary Advance request for ${empName} (Amount: ${Number(amount).toLocaleString()}) is awaiting management approval.`
+          });
           const sub = await addSubtask({
             title: `Approve: ${empName} — ₦${Number().toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Salary Advance`,
             description: subtaskDesc,
@@ -189,7 +195,13 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
           deadline: today430.toISOString(),
         });
         if (mainTask?.id) {
-          const subtaskDesc = JSON.stringify({ refType: 'loan', refId: newLoan.id, amount: principal, employeeName: empName });
+          const subtaskDesc = JSON.stringify({ 
+            refType: 'loan', 
+            refId: newLoan.id, 
+            amount: principal, 
+            employeeName: empName,
+            narration: `Loan request for ${empName} (Principal: ${principal.toLocaleString()}) is awaiting management approval.`
+          });
           const sub = await addSubtask({
             title: `Approve: ${empName} — ₦${principal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${requestType}`,
             description: subtaskDesc,

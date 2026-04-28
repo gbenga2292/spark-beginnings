@@ -395,6 +395,7 @@ export function Leaves() {
             hodUserId: hodEmp?.id,
             hodSystemUserId: hodSystemUser?.id || null,  // resolved at submission — no DB roundtrip needed later
             mgmtUserId: approverId,                      // management approver already selected
+            narration: `Leave request for ${empName} (${leaveType}, ${duration} days) is awaiting Step 1/4 (Line Manager) approval.`
           });
           const lmSub = await addSubtask({
             title: `[Step 1/4] Line Manager Approval — ${empName} ${leaveType} Leave`,
@@ -505,6 +506,7 @@ export function Leaves() {
           hodUserId: hodEmpId,
           hodSystemUserId,
           mgmtUserId: approverId,
+          narration: `Leave request for ${empName} (${leaveType}, ${duration} days) is awaiting Step 1/4 (Line Manager) approval.`
         });
         const lmSub = await addSubtask({
           title: `[Step 1/4] Line Manager Approval — ${empName} ${leaveType} Leave`,
