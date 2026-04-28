@@ -7,7 +7,7 @@ import { supabase } from '@/src/integrations/supabase/client';
 import { Search, Save, Trash2, Calendar as CalendarIcon, Database, Filter, Users, Download, Upload, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
-import { format } from 'date-fns';
+import { format, parseISO, isSunday, isWithinInterval, lastDayOfMonth, subDays, isAfter, startOfDay } from 'date-fns';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import * as XLSX from 'xlsx';
 import { usePriv } from '@/src/hooks/usePriv';
@@ -32,7 +32,6 @@ import {
 } from "@/src/components/task_ui/popover";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
-import { parseISO, isSunday, isWithinInterval } from 'date-fns';
 import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
 
 
@@ -155,6 +154,20 @@ export function Attendance() {
   const [dbSiteFilter, setDbSiteFilter] = useState('All');
   const [dbShiftFilter, setDbShiftFilter] = useState('All');
   const [dbDateFilter, setDbDateFilter] = useState<Date | undefined>(undefined);
+  
+  // ─── Max Selectable Date Logic ─────────────────────────────
+  const maxSelectableDate = useMemo(() => {
+    const now = new Date();
+    const todayStr = format(now, 'yyyy-MM-dd');
+    const endOfMth = lastDayOfMonth(now);
+    const fiveDaysBeforeEnd = subDays(endOfMth, 5);
+    
+    // If today is on or after 5 days before the end of the month, allow up to end of month
+    if (now >= startOfDay(fiveDaysBeforeEnd)) {
+      return format(endOfMth, 'yyyy-MM-dd');
+    }
+    return todayStr;
+  }, []);
 
   // ─── Calendar Status Logic ─────────────────────────────────
   const attendanceStatusMap = useMemo(() => {
@@ -974,8 +987,7 @@ export function Attendance() {
     setLastEntryDate(registerDate);
     // Increment date to next day only if it won't be a future date
     const nextDay = getNextDayStr(registerDate);
-    const today = format(new Date(), 'yyyy-MM-dd');
-    setRegisterDate(nextDay <= today ? nextDay : today);
+    setRegisterDate(nextDay <= maxSelectableDate ? nextDay : maxSelectableDate);
     setAttendanceData({});
     toast.success(`Successfully saved ${records.length} records to the database!`);
   };
@@ -1089,7 +1101,7 @@ export function Attendance() {
                   <Input
                     type="date"
                     value={registerDate}
-                    max={format(new Date(), 'yyyy-MM-dd')}
+                    max={maxSelectableDate}
                     onChange={(e) => setRegisterDate(e.target.value)}
                     className="h-9 pl-9 text-xs bg-white dark:bg-slate-800 shadow-sm border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition-colors uppercase font-medium text-slate-700 dark:text-slate-200 w-full"
                   />
@@ -1100,11 +1112,11 @@ export function Attendance() {
                   size="icon"
                   onClick={() => {
                     const nextDate = getNextDayStr(registerDate, 1);
-                    if (nextDate <= format(new Date(), 'yyyy-MM-dd')) {
+                    if (nextDate <= maxSelectableDate) {
                       setRegisterDate(nextDate);
                     }
                   }}
-                  disabled={registerDate >= format(new Date(), 'yyyy-MM-dd')}
+                  disabled={registerDate >= maxSelectableDate}
                   className="h-9 w-9 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex-shrink-0 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Next Day"
                 >
@@ -1121,7 +1133,7 @@ export function Attendance() {
                      <DayPicker
                         defaultMonth={parseISO(registerDate)}
                         onDayClick={(date) => { setRegisterDate(format(date, 'yyyy-MM-dd')) }}
-                        disabled={{ after: new Date() }}
+                        disabled={{ after: parseISO(maxSelectableDate) }}
                         modifiers={{
                           fully: (date) => attendanceStatusMap[format(date, 'yyyy-MM-dd')] === 'fully',
                           special: (date) => attendanceStatusMap[format(date, 'yyyy-MM-dd')] === 'special',
