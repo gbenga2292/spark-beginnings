@@ -50,12 +50,30 @@ export function Attendance() {
   const publicHolidaysStore = useAppStore((state) => state.publicHolidays);
   const monthValues = useAppStore((state) => state.monthValues);
 
+  // ─── Department Ancestry Helper ────────────────────────────
+  // Returns true if a department (by name) is Operations or Engineering,
+  // OR is a sub-department of one of those (walks parentDepartmentId chain).
+  const isOpsOrEngDept = (deptName: string): boolean => {
+    const OPS_ROOTS = ['OPERATIONS', 'ENGINEERING'];
+    let current = departments.find(d => d.name.toUpperCase() === deptName.toUpperCase());
+    const visited = new Set<string>();
+    while (current) {
+      if (visited.has(current.id)) break; // guard against circular refs
+      visited.add(current.id);
+      if (OPS_ROOTS.includes(current.name.toUpperCase())) return true;
+      if (!current.parentDepartmentId) break;
+      current = departments.find(d => d.id === current!.parentDepartmentId);
+    }
+    return false;
+  };
+
   const [registerDate, setRegisterDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [lastEntryDate, setLastEntryDate] = useState(format(new Date(Date.now() - 86400000), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('entry');
   const [staffTypeFilter, setStaffTypeFilter] = useState<'OFFICE' | 'FIELD' | 'NON-EMPLOYEE'>('FIELD');
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   type SortConfig = { key: keyof AttendanceRecord; direction: 'asc' | 'desc' };
   const [sortConfig, setSortConfig] = useState<SortConfig[]>([]);
@@ -172,32 +190,30 @@ export function Attendance() {
   // ─── Calendar Status Logic ─────────────────────────────────
   const attendanceStatusMap = useMemo(() => {
     const map: Record<string, 'fully' | 'special' | 'partial' | 'none'> = {};
-    
-    const opsFieldEmployees = employees.filter(emp => 
-      emp.staffType === 'FIELD' && ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase())
+
+    // O(1) Set instead of O(N) .some() per record
+    const opsFieldSet = new Set(
+      employees
+        .filter(emp => emp.staffType === 'FIELD' && isOpsOrEngDept(emp.department))
+        .map(emp => emp.id)
     );
-    const totalNeeded = opsFieldEmployees.length;
-    if (totalNeeded === 0) return map;
+    if (opsFieldSet.size === 0) return map;
 
-    const groupedRecords = attendanceRecords.reduce((acc, rec) => {
-      const isOpsField = opsFieldEmployees.some(emp => emp.id === rec.staffId);
-      if (isOpsField) {
-        if (!acc[rec.date]) acc[rec.date] = new Set();
-        acc[rec.date].add(rec.staffId);
-      }
-      return acc;
-    }, {} as Record<string, Set<string>>);
+    // O(1) holiday lookup
+    const holidaySet = new Set(publicHolidaysStore.map(h => h.date));
 
-    // Check all dates present in the store
-    Object.keys(groupedRecords).forEach(dateStr => {
-      const recordedCount = groupedRecords[dateStr].size;
-      const isPublicHoliday = publicHolidaysStore.some(h => h.date === dateStr);
+    const groupedRecords = new Map<string, Set<string>>();
+    attendanceRecords.forEach(rec => {
+      if (!opsFieldSet.has(rec.staffId)) return;  // O(1)
+      if (!groupedRecords.has(rec.date)) groupedRecords.set(rec.date, new Set());
+      groupedRecords.get(rec.date)!.add(rec.staffId);
+    });
+
+    groupedRecords.forEach((staffSet, dateStr) => {
+      const isPublicHoliday = holidaySet.has(dateStr);  // O(1)
       const isSun = isSunday(parseISO(dateStr));
-      
-      // If any records exist for the date among ops field staff, it is considered filled
-      if (recordedCount > 0) {
-        if (isPublicHoliday || isSun) map[dateStr] = 'special';
-        else map[dateStr] = 'fully';
+      if (staffSet.size > 0) {
+        map[dateStr] = (isPublicHoliday || isSun) ? 'special' : 'fully';
       } else {
         map[dateStr] = 'none';
       }
@@ -225,6 +241,19 @@ export function Attendance() {
       }
     }
     return latestRaw;
+  }, [attendanceRecords]);
+
+  // ─── Date-keyed index (built once on records change) ────────
+  // Converts O(N) filter on every date-switch into O(1) Map lookup.
+  const recordsByDate = useMemo(() => {
+    const map = new Map<string, typeof attendanceRecords>();
+    attendanceRecords.forEach(r => {
+      const nd = normalizeDate(r.date);
+      if (!nd) return;
+      if (!map.has(nd)) map.set(nd, []);
+      map.get(nd)!.push(r);
+    });
+    return map;
   }, [attendanceRecords]);
 
   const [dbSelectedIds, setDbSelectedIds] = useState<Set<string>>(new Set());
@@ -296,12 +325,11 @@ export function Attendance() {
     return opts;
   };
 
-  // Auto-load existing records when date changes
+  // Auto-load existing records when date changes — O(1) via recordsByDate index
   useEffect(() => {
-    // Normalizing both sides for safety against different string formats
     const normDate = normalizeDate(registerDate);
-    const existingRecords = attendanceRecords.filter(r => normalizeDate(r.date) === normDate);
-    
+    const existingRecords = normDate ? (recordsByDate.get(normDate) ?? []) : [];
+
     if (existingRecords.length > 0) {
       const loadedData: Record<string, { day: string, night: string, overtime: boolean, overtimeDetails: string }> = {};
       existingRecords.forEach(r => {
@@ -316,7 +344,7 @@ export function Attendance() {
     } else {
       setAttendanceData({});
     }
-  }, [registerDate, attendanceRecords]);
+  }, [registerDate, recordsByDate]);
 
   const filteredEmployees = useMemo(() => {
     const searchLow = searchTerm.toLowerCase();
@@ -759,7 +787,7 @@ export function Attendance() {
 
   const handleOvertimeToggle = (empId: string, checked: boolean) => {
     const emp = employees.find(e => e.id === empId);
-    const isOps = emp ? ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase()) : false;
+    const isOps = emp ? isOpsOrEngDept(emp.department) : false;
     setAttendanceData(prev => ({
       ...prev,
       [empId]: {
@@ -833,8 +861,10 @@ export function Attendance() {
   };
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const normDate = normalizeDate(registerDate);
-    const existingRecords = attendanceRecords.filter(r => normalizeDate(r.date) === normDate);
+    const existingRecords = normDate ? (recordsByDate.get(normDate) ?? []) : [];  // O(1) Map lookup
     if (existingRecords.length > 0) {
       const ok = await showConfirm(`Entries already exist for ${formatDisplayDate(registerDate)}. Click OK to overwrite them, or Cancel to abort.`, { confirmLabel: 'Overwrite' });
       if (!ok) return;
@@ -843,8 +873,25 @@ export function Attendance() {
 
     const dateObj = new Date(registerDate + 'T00:00:00');
     const dow = getDOW(registerDate);
-    const isSunday = dow === 7;
     const dateIsHoliday = isHoliday(registerDate);
+
+    // ─── Pre-build O(1) lookup structures (avoids repeated O(N) scans inside the loop) ───
+    // Map: site name → client name
+    const siteClientMap = new Map<string, string>(sites.map(s => [s.name, s.client]));
+    // Map: dept name → Department object
+    const deptByName = new Map(departments.map(d => [d.name, d]));
+    // Set: dept names that are Operations/Engineering descendants (resolves ancestry once per unique dept)
+    const uniqueDeptNames = new Set(employees.map(e => e.department));
+    const opsEngDeptNames = new Set<string>();
+    uniqueDeptNames.forEach(name => { if (isOpsOrEngDept(name)) opsEngDeptNames.add(name); });
+
+    // Slice: only next-2-days records for NDW lookup (replaces full 10k scan in calculateAttendanceMetrics)
+    const nextDayStr = getNextDayStr(registerDate);
+    const nextNextDayStr = getNextDayStr(registerDate, 2);
+    const nextDaysRecords = attendanceRecords.filter(r => {
+      const nd = normalizeDate(r.date);
+      return nd === nextDayStr || nd === nextNextDayStr;
+    });
 
     // First pass: build raw records with day/night/site info
     type RawRecord = {
@@ -864,27 +911,27 @@ export function Attendance() {
     const rawRecords: RawRecord[] = [];
 
     employees.forEach(emp => {
-      const deptObj = departments.find(d => d.name === emp.department);
+      const deptObj = deptByName.get(emp.department);           // O(1) Map lookup
       const defaultDays = emp.staffType === 'FIELD' ? 6 : 5;
       const wd = deptObj?.workDaysPerWeek ?? defaultDays;
       const isWorkday = (dow <= wd) && !dateIsHoliday;
 
       const onLeave = employeesOnLeaveForRegisterDate.has(emp.id);
-      
-      // If on leave and it's a workday, force 'On Leave' status for Day shift. 
+
+      // If on leave and it's a workday, force 'On Leave' status for Day shift.
       // If it's NOT a workday, leave status doesn't apply (it is just a regular non-workday).
       const formDaySite = (onLeave && isWorkday) ? 'On Leave' : (!onLeave ? (attendanceData[emp.id]?.day || '') : '');
-      
+
       // If on leave, they CANNOT have the night shift pre-filled.
-      const formNightSite = (onLeave) ? '' : (attendanceData[emp.id]?.night || '');
+      const formNightSite = onLeave ? '' : (attendanceData[emp.id]?.night || '');
 
       let staffHasWorkEntry = false;
       if (formDaySite && !isAbsentStatus(formDaySite)) staffHasWorkEntry = true;
       if (formNightSite && !isAbsentStatus(formNightSite)) staffHasWorkEntry = true;
 
-      // Default: on weekdays that aren't holidays, Operations staff are at Office for day shift
+      // Default: on weekdays that aren't holidays, Operations staff are at Office for day shift.
       // Other departments only get an entry if manually specified (status, day, night, or overtime).
-      const isOperations = ['OPERATIONS', 'ENGINEERING'].includes(emp.department.toUpperCase());
+      const isOperations = opsEngDeptNames.has(emp.department);  // O(1) Set lookup
       const fillData = isOperations ? isWorkday : false;
       const hasOvertime = attendanceData[emp.id]?.overtime;
       if (!fillData && !staffHasWorkEntry && !formDaySite && !formNightSite && !hasOvertime) return;
@@ -908,9 +955,9 @@ export function Attendance() {
       const finalDaySite = isAbsentStatus(daySite) ? '' : daySite;
       const finalNightSite = isAbsentStatus(nightSite) ? '' : nightSite;
 
-      const dayClient = sites.find(s => s.name === finalDaySite)?.client
-        || (hasOvertime && !isOperations ? 'DCEL' : '');
-      const nightClient = sites.find(s => s.name === finalNightSite)?.client || '';
+      // O(1) Map lookups instead of sites.find() called twice per employee
+      const dayClient = siteClientMap.get(finalDaySite) || (hasOvertime && !isOperations ? 'DCEL' : '');
+      const nightClient = siteClientMap.get(finalNightSite) || '';
 
       rawRecords.push({
         empId: emp.id,
@@ -932,15 +979,6 @@ export function Attendance() {
       return;
     }
 
-    // Second pass: calculate NDW (needs to look at next day's records)
-    // NDW checks if this staff works the next day (or day after if next day is Sunday/holiday)
-    const nextDayStr = getNextDayStr(registerDate);
-    const nextNextDayStr = getNextDayStr(registerDate, 2);
-    const existingNextDay = attendanceRecords.filter(r => normalizeDate(r.date) === nextDayStr);
-    const existingNextNextDay = attendanceRecords.filter(r => normalizeDate(r.date) === nextNextDayStr);
-
-    const mth = dateObj.getMonth() + 1;
-
     const records: AttendanceRecord[] = rawRecords.map(raw => {
       const partialRec: Partial<AttendanceRecord> = {
         date: registerDate,
@@ -954,7 +992,8 @@ export function Attendance() {
         overtimeDetails: raw.overtimeDetails,
       };
 
-      const met = calculateAttendanceMetrics(partialRec, publicHolidays, payrollVariables, monthValues as any, attendanceRecords);
+      // Pass only next-2-days records instead of all 10k — reduces NDW scan from O(N) to ~O(50)
+      const met = calculateAttendanceMetrics(partialRec, publicHolidays, payrollVariables, monthValues as any, nextDaysRecords);
 
       return {
         id: generateId(),
@@ -970,7 +1009,6 @@ export function Attendance() {
         night: raw.night,
         absentStatus: raw.absentStatus,
         overtimeDetails: raw.overtimeDetails,
-        // The following are now transients/redundant but kept for DB compatibility if needed
         nightWk: met.nightWk,
         ot: met.ot,
         otSite: met.otSite,
@@ -983,13 +1021,20 @@ export function Attendance() {
       };
     });
 
-    await addAttendanceRecords(records);
-    setLastEntryDate(registerDate);
-    // Increment date to next day only if it won't be a future date
-    const nextDay = getNextDayStr(registerDate);
-    setRegisterDate(nextDay <= maxSelectableDate ? nextDay : maxSelectableDate);
-    setAttendanceData({});
-    toast.success(`Successfully saved ${records.length} records to the database!`);
+    try {
+      await addAttendanceRecords(records);
+      setLastEntryDate(registerDate);
+      // Advance to next day only if it won't be a future date
+      const nextDay = getNextDayStr(registerDate);
+      setRegisterDate(nextDay <= maxSelectableDate ? nextDay : maxSelectableDate);
+      setAttendanceData({});
+      toast.success(`Successfully saved ${records.length} records to the database!`);
+    } catch (err: any) {
+      console.error('[Attendance] handleSubmit — DB write failed:', err);
+      toast.error(`Failed to save attendance: ${err?.message ?? 'Network error'}. Please try again.`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const filledCount = Object.keys(attendanceData).filter(k => attendanceData[k]?.day || attendanceData[k]?.night).length;
@@ -1216,8 +1261,9 @@ export function Attendance() {
                 </Button>
               )}
               {priv.canAdd ? (
-                <Button onClick={handleSubmit} size="sm" className="h-9 text-[11px] font-bold uppercase tracking-tight gap-1.5 bg-slate-900 hover:bg-indigo-600 text-white shadow-md transition-all active:scale-[0.98]">
-                  <Save className="h-3.5 w-3.5" /> Submit
+                <Button onClick={handleSubmit} disabled={isSubmitting} size="sm" className="h-9 text-[11px] font-bold uppercase tracking-tight gap-1.5 bg-slate-900 hover:bg-indigo-600 text-white shadow-md transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed">
+                  {isSubmitting ? <span className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full" /> : <Save className="h-3.5 w-3.5" />}
+                  {isSubmitting ? 'Saving…' : 'Submit'}
                 </Button>
               ) : (
                 <Button disabled size="sm" className="h-9 text-[11px] font-bold uppercase tracking-tight gap-1.5 opacity-40 cursor-not-allowed bg-slate-300 text-slate-500" title="You don't have permission to submit attendance">
