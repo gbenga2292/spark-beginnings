@@ -979,6 +979,9 @@ export function Attendance() {
       return;
     }
 
+    const currentDayRecords = recordsByDate.get(registerDate) || [];
+    const idMap = new Map(currentDayRecords.map(r => [r.staffId, r.id]));
+
     const records: AttendanceRecord[] = rawRecords.map(raw => {
       const partialRec: Partial<AttendanceRecord> = {
         date: registerDate,
@@ -996,7 +999,7 @@ export function Attendance() {
       const met = calculateAttendanceMetrics(partialRec, publicHolidays, payrollVariables, monthValues as any, nextDaysRecords);
 
       return {
-        id: generateId(),
+        id: idMap.get(raw.empId) || generateId(),
         date: registerDate,
         staffId: raw.empId,
         staffName: raw.staffName,

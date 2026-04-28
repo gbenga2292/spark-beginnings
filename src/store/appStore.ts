@@ -1113,7 +1113,15 @@ export const useAppStore = create<AppState>()(
       deleteEmployee: (id) => { set((s) => ({ employees: s.employees.filter(emp => emp.id !== id) })); db.deleteEmployee(id); },
 
       // Attendance
-      addAttendanceRecords: async (records) => { await db.insertAttendanceRecords(records); set((s) => ({ attendanceRecords: [...s.attendanceRecords, ...records] })); },
+      addAttendanceRecords: async (records) => { 
+        await db.insertAttendanceRecords(records); 
+        set((s) => {
+          // Deduplicate: remove any existing records that match (staffId, date) of the new records
+          const newKeys = new Set(records.map(r => `${r.staffId}-${r.date}`));
+          const filtered = s.attendanceRecords.filter(r => !newKeys.has(`${r.staffId}-${r.date}`));
+          return { attendanceRecords: [...filtered, ...records] };
+        }); 
+      },
       updateAttendanceRecord: async (id, record) => { set((s) => ({ attendanceRecords: s.attendanceRecords.map(r => r.id === id ? { ...r, ...record } : r) })); await db.updateAttendanceRecord(id, record); },
       removeAttendanceRecordsByDate: async (date) => { set((s) => ({ attendanceRecords: s.attendanceRecords.filter(r => r.date !== date) })); await db.deleteAttendanceByDate(date); },
       deleteAttendanceRecords: async (ids) => { set((s) => ({ attendanceRecords: s.attendanceRecords.filter(r => !ids.includes(r.id)) })); await db.deleteAttendanceByIds(ids); },

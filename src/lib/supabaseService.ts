@@ -755,7 +755,7 @@ export async function fetchAllAppData(privs?: any) {
     supabase.from('sites').select('*').order('created_at'),
     supabase.from('clients').select('*').order('name'),
     canView('employees') ? supabase.from('employees').select('*').order('surname') : Promise.resolve({ data: [] }),
-    canView('attendance') ? supabase.from('attendance_records').select('*').order('date').limit(10000) : Promise.resolve({ data: [] }),
+    canView('attendance') ? supabase.from('attendance_records').select('*').order('date', { ascending: false }).limit(10000) : Promise.resolve({ data: [] }),
     canView('billing') ? supabase.from('invoices').select('*').order('date', { ascending: false }) : Promise.resolve({ data: [] }),
     canView('billing') ? supabase.from('pending_invoices').select('*').order('created_at') : Promise.resolve({ data: [] }),
     canView('salaryLoans') ? supabase.from('salary_advances').select('*').order('request_date', { ascending: false }) : Promise.resolve({ data: [] }),
@@ -1088,7 +1088,7 @@ export const db = {
       const chunk = rows.slice(i, i + CHUNK_SIZE);
       const { error } = await supabase
         .from('attendance_records')
-        .upsert(chunk, { onConflict: 'id' });
+        .upsert(chunk, { onConflict: 'staff_id, date' });
       if (error) { console.error(`insertAttendance chunk ${i / CHUNK_SIZE + 1}:`, error); throw error; }
     }
   },
