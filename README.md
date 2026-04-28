@@ -6,18 +6,25 @@
 
 DCEL Office Suite is a comprehensive HR and Finance management system designed for construction companies. It integrates daily attendance tracking, automated payroll computation, healthcare (HMO) management, and financial reporting into a unified desktop and mobile application.
 
-## 🚀 Recent Updates (v1.4.4)
+## 🚀 Recent Updates (v1.4.6)
 
-### 🏗️ Site & Client Operations
-- **Client Contacts Relocation**: Moved "Client Contacts" to the top-right header of client site pages for streamlined access.
-- **Enhanced Site Views**: Added Card/Table view toggles and sorting options to the individual client view in Sites management.
-- **Internal Site Diary**: Refactored the Site Diary to aggregate entries from internal communications (commLogs) instead of the daily journal.
+### 📊 Operations & Reporting
+- **Professional Operations Reports**: Launched a comprehensive reporting module for high-level business intelligence and operational tracking.
+- **Enhanced Data Visualization**: Improved reporting dashboards with professional styling and clearer data presentation.
 
-### 🛠️ UX & Stability
-- **Grid Layout Fixes**: Resolved critical JSX parsing and tag mismatch errors in the Client Summary Grid.
-- **Dynamic Header Badges**: Added contact count indicators to the client header for quick information reference.
+### 🛠️ Task & UX Optimization
+- **Mobile Task Experience**: Refactored the Task Detail view for full mobile responsiveness and improved accessibility.
+- **Smart Task Automation**: Optimized Vehicle Document renewal workflows with strict metadata-based idempotency to prevent duplicate tasks.
+- **Task Stability**: Resolved issues causing redundant task generation in the vehicle tracking system.
+
+### 💰 Payroll & Attendance
+- **Staff Attendance Portal**: Created a dedicated Attendance page for streamlined tracking and management of staff records.
+- **Precision Payroll Logic**: Synchronized payroll cycles with calendar months and corrected UTC boundary errors for accurate period calculations.
+- **Holiday-Aware Calculations**: Integrated public holiday subtraction logic to ensure precise daily rate divisors.
 
 ---
+
+## 🚀 Previous Updates (v1.4.4)
 
 ## 🚀 Previous Updates (v1.4.3)
 
@@ -66,6 +73,8 @@ DCEL Office Suite is a comprehensive HR and Finance management system designed f
 ---
 
 ## 🏗️ Version History
+- **v1.4.6**: Operations Reporting, Mobile Task UI, Staff Attendance, and Payroll precision logic.
+- **v1.4.5**: Stability improvements and internal state management updates.
 - **v1.4.4**: Client contacts relocation, enhanced site view toggles, and internal site diary refactor.
 - **v1.4.3**: Asset logging reliability and Operations theme finalization.
 - **v1.4.2**: Modern Task UI, Operations theme standardization, and multi-machine billing.
