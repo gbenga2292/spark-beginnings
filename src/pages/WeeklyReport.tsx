@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useContext } from 'react';
 import { useAppStore } from '@/src/store/appStore';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { useAppData } from '@/src/contexts/AppDataContext';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, parseISO, isWithinInterval, addWeeks, subWeeks } from 'date-fns';
 import { 
   ChevronLeft, ChevronRight, Users, Fuel, Truck, BookOpen, UserPlus, 
@@ -22,6 +23,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/src/components/ui/dialog";
+
+// Import logo for PDF
+import logoImg from '../../logo/logo-1.png';
 
 function getWeekRange(anchor: Date) {
   const start = startOfWeek(anchor, { weekStartsOn: 1 });
@@ -47,6 +51,10 @@ export function WeeklyReport() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // ── Context data ──────────────────────────────────────
+  const { mainTasks, subtasks, comments, users } = useAppData();
+  const { dailyMachineLogs, waybills } = useOperations();
+
   // ── Store data ────────────────────────────────────────
   const sites            = useAppStore(s => s.sites);
   const employees        = useAppStore(s => s.employees);
@@ -63,8 +71,6 @@ export function WeeklyReport() {
   const disciplinary     = useAppStore(s => s.disciplinaryRecords);
   const evaluations      = useAppStore(s => s.evaluations);
   const leaves           = useAppStore(s => s.leaves);
-
-  const { dailyMachineLogs, waybills } = useOperations();
 
   // ── Week-filtered data ────────────────────────────────
   const weekAttendance = useMemo(() => attendance.filter(r => inWeek(r.date, start, end)), [attendance, start, end]);
@@ -90,6 +96,22 @@ export function WeeklyReport() {
   const weekPayments = useMemo(() => payments.filter(p => inWeek(p.date, start, end)), [payments, start, end]);
   const weekVats = useMemo(() => vatPayments.filter(v => inWeek(v.date, start, end)), [vatPayments, start, end]);
   const weekCompanyExpenses = useMemo(() => companyExpenses.filter(e => inWeek(e.date, start, end)), [companyExpenses, start, end]);
+
+  // Tasks filtered by week (created or deadline in week)
+  const weekTasks = useMemo(() => mainTasks.filter(t => 
+    inWeek(t.createdAt || t.created_at, start, end) || 
+    (t.deadline && inWeek(t.deadline, start, end))
+  ), [mainTasks, start, end]);
+
+  const weekSubtasks = useMemo(() => {
+    const taskIds = new Set(weekTasks.map(t => t.id));
+    return subtasks.filter(s => taskIds.has(s.main_task_id || s.mainTaskId));
+  }, [weekTasks, subtasks]);
+
+  const weekComments = useMemo(() => {
+    const taskIds = new Set(weekTasks.map(t => t.id));
+    return comments.filter(c => taskIds.has(c.main_task_id || c.task_id));
+  }, [weekTasks, comments]);
 
   // ── Summary Stats ─────────────────────────────────────
   const uniqueStaffDeployed = useMemo(() => new Set(weekAttendance.filter(r => r.day === 'Yes' || r.night === 'Yes').map(r => r.staffId)).size, [weekAttendance]);
@@ -138,162 +160,271 @@ export function WeeklyReport() {
   async function generateProfessionalPDF(mode: 'preview' | 'download') {
     setIsGenerating(true);
     const doc = new jsPDF();
-    const primaryColor = [15, 23, 42]; // slate-900
-    const accentColor = [37, 99, 235]; // blue-600
-    const textColor = [51, 65, 85]; // slate-700
-    const headerTextColor = [255, 255, 255];
     
-    const periodStr = `${format(start, 'dd MMM yyyy')} - ${format(end, 'dd MMM yyyy')}`;
+    // Design Tokens
+    const colors = {
+      primary: [15, 23, 42],    // Slate 900
+      secondary: [51, 65, 85],  // Slate 700
+      accent: [37, 99, 235],    // Blue 600
+      muted: [148, 163, 184],   // Slate 400
+      light: [248, 250, 252],   // Slate 50
+      white: [255, 255, 255],
+      border: [226, 232, 240]   // Slate 200
+    };
 
-    // 1. HEADER SECTION
-    // Dark background header bar
-    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(0, 0, 210, 45, 'F');
+    const margin = 20;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const contentWidth = pageWidth - (margin * 2);
     
-    // Title & Subtitle
-    doc.setTextColor(headerTextColor[0], headerTextColor[1], headerTextColor[2]);
-    doc.setFontSize(24);
+    let currentY = margin;
+
+    // Helper: Header Line
+    const drawDivider = (y: number, color = colors.border) => {
+      doc.setDrawColor(color[0], color[1], color[2]);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, pageWidth - margin, y);
+    };
+
+    // 1. BRANDING & TITLE (Letterhead Style)
+    // Add Logo
+    try {
+      doc.addImage(logoImg, 'PNG', margin, currentY, 25, 25);
+    } catch (e) {
+      console.warn("Logo failed to load for PDF");
+    }
+
+    doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
     doc.setFont('helvetica', 'bold');
-    doc.text('SPARK BEGINNINGS', 15, 22);
+    doc.setFontSize(22);
+    doc.text('SPARK BEGINNINGS', margin + 30, currentY + 12);
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(colors.muted[0], colors.muted[1], colors.muted[2]);
+    doc.text('ENTERPRISE OPERATIONS & LOGISTICS SOLUTIONS', margin + 30, currentY + 18);
+    doc.text('INDUSTRIAL PARK WAY, LAGOS, NIGERIA', margin + 30, currentY + 23);
+
+    currentY += 35;
+    drawDivider(currentY, colors.primary);
+    currentY += 10;
+
+    // 2. MEMORANDUM HEADER
+    doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('WEEKLY OPERATIONS SUMMARY', margin, currentY);
     
     doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('WEEKLY OPERATIONS & PERFORMANCE LEDGER', 15, 28);
-    
+    doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+    doc.text(`REPORTING PERIOD: ${format(start, 'MMMM dd')} - ${format(end, 'MMMM dd, yyyy')}`, pageWidth - margin, currentY, { align: 'right' });
+
+    currentY += 12;
+
+    // Memo details
+    const memoDetails = [
+      ['TO:', 'Executive Management Team'],
+      ['FROM:', 'Operations Manager'],
+      ['DATE:', format(new Date(), 'MMMM dd, yyyy')],
+      ['SUBJECT:', `Weekly Operational Performance & Resource Ledger [Week ${format(start, 'ww')}]`]
+    ];
+
+    memoDetails.forEach(([label, value]) => {
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, margin, currentY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(value, margin + 25, currentY);
+      currentY += 6;
+    });
+
+    currentY += 4;
+    drawDivider(currentY);
+    currentY += 12;
+
+    // 3. EXECUTIVE NARRATIVE (The "Human" bit)
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text(periodStr.toUpperCase(), 210 - 15, 28, { align: 'right' });
+    doc.text('01. EXECUTIVE OVERVIEW', margin, currentY);
+    currentY += 8;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
     
-    // Bottom border for header
-    doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
-    doc.setLineWidth(2);
-    doc.line(0, 45, 210, 45);
+    const narrativeSummary = `During the operational week concluding on ${format(end, 'dd MMMM')}, Spark Beginnings maintained a robust deployment across all active sites. A total of ${uniqueStaffDeployed} personnel were active, supporting operations that utilized approximately ${totalDiesel.toFixed(1)} liters of diesel fuel. Financially, the week registered a total revenue inflow of NGN ${totalIncome.toLocaleString()} against operational expenditures of NGN ${totalExpenses.toLocaleString()}. This report details HR activity, machine performance, and task progress recorded during this interval.`;
+    
+    const splitSummary = doc.splitTextToSize(narrativeSummary, contentWidth);
+    doc.text(splitSummary, margin, currentY);
+    currentY += (splitSummary.length * 5) + 10;
 
-    let currentY = 55;
+    // 4. PERFORMANCE METRICS (Mini Table)
+    autoTable(doc, {
+      startY: currentY,
+      head: [['KEY PERFORMANCE INDICATORS', 'VALUE']],
+      body: [
+        ['Total Workforce Deployed', `${uniqueStaffDeployed} Staff`],
+        ['Resource Consumption (Diesel)', `${totalDiesel.toFixed(1)} Liters`],
+        ['Logistical Movements (Vehicle Trips)', `${weekTrips.length} Records`],
+        ['Communications Logged (Internal/External)', `${weekCommLogs.length} Entries`],
+        ['Net Cash Position (Weekly)', `NGN ${(totalIncome - totalExpenses).toLocaleString()}`]
+      ],
+      theme: 'grid',
+      styles: { fontSize: 9, cellPadding: 4, font: 'helvetica' },
+      headStyles: { fillColor: colors.primary, textColor: colors.white, fontStyle: 'bold' },
+      columnStyles: { 0: { fontStyle: 'bold', width: 100 }, 1: { halign: 'right' } },
+      margin: { left: margin, right: margin }
+    });
 
-    // 2. EXECUTIVE SUMMARY GRID
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setFontSize(14);
+    currentY = (doc as any).lastAutoTable.finalY + 15;
+
+    // 5. SITE OPERATIONS & MACHINE STATUS
+    if (currentY > pageHeight - 40) { doc.addPage(); currentY = margin; }
     doc.setFont('helvetica', 'bold');
-    doc.text('EXECUTIVE SUMMARY', 15, currentY);
+    doc.setFontSize(12);
+    doc.text('02. SITE OPERATIONS & ASSET UTILIZATION', margin, currentY);
     currentY += 8;
 
     autoTable(doc, {
       startY: currentY,
-      head: [['METRIC', 'VALUE', 'METRIC', 'VALUE']],
-      body: [
-        ['Staff Deployed', uniqueStaffDeployed.toString(), 'Diesel Consumed', `${totalDiesel.toFixed(1)} L`],
-        ['Net Cashflow', `NGN ${ (totalIncome - totalExpenses).toLocaleString() }`, 'Total Absences', totalAbsences.toString()],
-        ['Movement Logs', weekTrips.length.toString(), 'Communications', weekCommLogs.length.toString()]
-      ],
-      theme: 'plain',
-      styles: { fontSize: 9, cellPadding: 3, font: 'helvetica' },
-      headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
-      columnStyles: {
-        0: { fontStyle: 'bold', textColor: [100, 116, 139], width: 40 },
-        1: { fontStyle: 'bold', textColor: primaryColor, width: 50 },
-        2: { fontStyle: 'bold', textColor: [100, 116, 139], width: 40 },
-        3: { fontStyle: 'bold', textColor: primaryColor, width: 50 }
-      }
-    });
-    
-    currentY = (doc as any).lastAutoTable.finalY + 15;
-
-    // 3. HUMAN RESOURCES SECTION
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('01. HUMAN RESOURCES', 15, currentY);
-    currentY += 5;
-
-    autoTable(doc, {
-      startY: currentY,
-      head: [['STAFF NAME', 'POSITION', 'SITE LOCATION', 'SHIFTS', 'STATUS']],
-      body: weekAttendance.map(r => [
-        r.staffName.toUpperCase(),
-        r.position,
-        r.daySite || r.nightSite || 'N/A',
-        `${r.day === 'Yes' ? 'DAY' : ''}${r.day === 'Yes' && r.night === 'Yes' ? ' & ' : ''}${r.night === 'Yes' ? 'NIGHT' : ''}`,
-        r.absentStatus || 'PRESENT'
-      ]),
-      styles: { fontSize: 8, cellPadding: 2.5 },
-      headStyles: { fillColor: primaryColor, textColor: headerTextColor, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      margin: { left: 15, right: 15 }
-    });
-
-    currentY = (doc as any).lastAutoTable.finalY + 15;
-
-    // 4. OPERATIONS & MACHINE ACTIVITY
-    if (currentY > 240) { doc.addPage(); currentY = 20; }
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('02. OPERATIONS & MACHINES', 15, currentY);
-    currentY += 5;
-
-    autoTable(doc, {
-      startY: currentY,
-      head: [['DATE', 'SITE', 'MACHINE', 'STATUS', 'DIESEL', 'SUPERVISOR']],
-      body: weekMachineLogs.map(l => [
-        l.date,
+      head: [['DATE', 'SITE LOCATION', 'MACHINE ASSET', 'UTILIZATION STATUS', 'DIESEL']],
+      body: weekMachineLogs.slice(0, 15).map(l => [
+        format(parseISO(l.date), 'dd MMM'),
         l.siteName,
         l.assetName,
-        l.isActive ? 'OPERATIONAL' : 'DOWN',
-        `${l.dieselUsage} L`,
-        l.supervisorOnSite || 'N/A'
+        l.isActive ? 'OPERATIONAL' : 'DOWNTIME',
+        `${l.dieselUsage} L`
       ]),
-      styles: { fontSize: 8, cellPadding: 2.5 },
-      headStyles: { fillColor: primaryColor, textColor: headerTextColor, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      margin: { left: 15, right: 15 }
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: colors.accent, textColor: colors.white, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: colors.light },
+      margin: { left: margin, right: margin }
     });
 
     currentY = (doc as any).lastAutoTable.finalY + 15;
 
-    // 5. FINANCIALS
-    if (currentY > 240) { doc.addPage(); currentY = 20; }
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setFontSize(14);
+    // 6. TASK PROGRESS & PROJECT UPDATES
+    if (currentY > pageHeight - 60) { doc.addPage(); currentY = margin; }
     doc.setFont('helvetica', 'bold');
-    doc.text('03. FINANCIAL SUMMARY', 15, currentY);
-    currentY += 5;
+    doc.setFontSize(12);
+    doc.text('03. STRATEGIC TASKS & PROJECT PROGRESS', margin, currentY);
+    currentY += 8;
 
-    const financeBody = [
-      ...weekPayments.map(p => [p.date, 'REVENUE', p.client || 'N/A', 'CLIENT PAYMENT', p.amount]),
-      ...weekLedger.map(e => [e.date, 'EXPENSE', e.site || 'N/A', e.description || 'N/A', -e.amount]),
-      ...weekVats.map(v => [v.date, 'TAX', v.client || 'N/A', 'VAT PAYMENT', -v.amount]),
-      ...weekCompanyExpenses.map(e => [e.date, 'OVERHEAD', 'COMPANY', e.description || 'N/A', -e.amount])
-    ].sort((a: any, b: any) => new Date(a[0]).getTime() - new Date(b[0]).getTime());
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`A total of ${weekTasks.length} primary tasks were managed this week. Below is the status of critical sub-deliverables.`, margin, currentY);
+    currentY += 8;
+
+    const taskRows = weekSubtasks.slice(0, 10).map(s => {
+      const mainTask = weekTasks.find(t => t.id === (s.main_task_id || s.mainTaskId));
+      const statusLabel = s.status === 'completed' ? 'COMPLETED' : s.status === 'pending_approval' ? 'AWAITING REVIEW' : 'IN PROGRESS';
+      return [
+        mainTask?.title || 'N/A',
+        s.title,
+        s.assignedTo ? (employees.find(e => e.id === s.assignedTo)?.firstname || 'Assigned') : 'Unassigned',
+        statusLabel
+      ];
+    });
 
     autoTable(doc, {
       startY: currentY,
-      head: [['DATE', 'CLASS', 'TARGET', 'PARTICULARS', 'AMOUNT']],
-      body: financeBody.map(row => [
-        row[0], row[1], row[2], row[3], 
-        new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(row[4] as number)
-      ]),
-      styles: { fontSize: 8, cellPadding: 2.5 },
-      headStyles: { fillColor: primaryColor, textColor: headerTextColor, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      margin: { left: 15, right: 15 },
-      columnStyles: {
-        4: { halign: 'right', fontStyle: 'bold' }
-      }
+      head: [['PARENT TASK', 'SUB-TASK / DELIVERABLE', 'ASSIGNEE', 'STATUS']],
+      body: taskRows.length > 0 ? taskRows : [['-', 'No active tasks recorded in this window', '-', '-']],
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: colors.primary, textColor: colors.white, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: colors.light },
+      margin: { left: margin, right: margin }
     });
 
-    // 6. FOOTER (PAGE NUMBERS)
+    currentY = (doc as any).lastAutoTable.finalY + 15;
+
+    // 7. TASK UPDATES & COMMENTS
+    if (weekComments.length > 0) {
+      if (currentY > pageHeight - 60) { doc.addPage(); currentY = margin; }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('04. RECENT TASK COMMUNICATIONS', margin, currentY);
+      currentY += 8;
+
+      const commentData = weekComments.slice(0, 8).map(c => {
+        const author = users.find(u => u.id === c.author_id)?.name || 'System';
+        return [
+          format(parseISO(c.created_at || c.createdAt), 'dd/MM HH:mm'),
+          author,
+          c.text.substring(0, 120) + (c.text.length > 120 ? '...' : '')
+        ];
+      });
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [['TIMESTAMP', 'AUTHOR', 'UPDATE / COMMENT']],
+        body: commentData,
+        styles: { fontSize: 7.5, cellPadding: 3, font: 'helvetica' },
+        headStyles: { fillColor: [71, 85, 105], textColor: colors.white },
+        margin: { left: margin, right: margin },
+        columnStyles: { 2: { width: 120 } }
+      });
+      
+      currentY = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // 8. FINANCIAL OVERVIEW
+    if (currentY > pageHeight - 60) { doc.addPage(); currentY = margin; }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('05. FINANCIAL RECONCILIATION (SUMMARY)', margin, currentY);
+    currentY += 8;
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [['CLASSIFICATION', 'ITEM COUNT', 'TOTAL VOLUME (NGN)']],
+      body: [
+        ['Client Invoices / Revenue', weekPayments.length.toString(), totalIncome.toLocaleString()],
+        ['Site Operational Expenses', weekLedger.length.toString(), weekLedger.reduce((s, e) => s + e.amount, 0).toLocaleString()],
+        ['VAT / Tax Obligations', weekVats.length.toString(), weekVats.reduce((s, e) => s + e.amount, 0).toLocaleString()],
+        ['Corporate Overheads', weekCompanyExpenses.length.toString(), weekCompanyExpenses.reduce((s, e) => s + e.amount, 0).toLocaleString()]
+      ],
+      styles: { fontSize: 9, cellPadding: 4 },
+      headStyles: { fillColor: colors.primary, textColor: colors.white },
+      columnStyles: { 2: { halign: 'right', fontStyle: 'bold' } },
+      margin: { left: margin, right: margin }
+    });
+
+    // 9. CONCLUSION & SIGN-OFF
+    currentY = (doc as any).lastAutoTable.finalY + 20;
+    if (currentY > pageHeight - 40) { doc.addPage(); currentY = margin; }
+
+    drawDivider(currentY);
+    currentY += 10;
+    
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9);
+    doc.text('This document serves as an official record of operations for Spark Beginnings. Any discrepancies should be reported to the IT/Operations department immediately.', margin, currentY);
+    
+    currentY += 20;
+    doc.setFont('helvetica', 'bold');
+    doc.text('PREPARED BY:', margin, currentY);
+    doc.text('REVIEWED BY:', pageWidth / 2, currentY);
+    
+    currentY += 10;
+    doc.setFont('helvetica', 'normal');
+    doc.text('__________________________', margin, currentY);
+    doc.text('__________________________', pageWidth / 2, currentY);
+    
+    doc.text('Operations Manager', margin, currentY + 5);
+    doc.text('Executive Management', pageWidth / 2, currentY + 5);
+
+    // 10. FOOTER (PAGE NUMBERS)
     const pageCount = doc.internal.getNumberOfPages();
-    doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184); // slate-400
+    doc.setFontSize(7);
+    doc.setTextColor(colors.muted[0], colors.muted[1], colors.muted[2]);
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
-      doc.text(`Spark Beginnings Internal Operations Report | Generated on ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 15, 285);
-      doc.text(`Page ${i} of ${pageCount}`, 210 - 15, 285, { align: 'right' });
+      doc.text(`Spark Beginnings Internal Operations Report | Generated: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, margin, pageHeight - 10);
+      doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
     }
 
     if (mode === 'download') {
-      doc.save(`Weekly_Report_${format(start, 'yyyy_MM_dd')}.pdf`);
+      doc.save(`Spark_Weekly_Report_${format(start, 'yyyy_MM_dd')}.pdf`);
     } else {
       const blobUrl = doc.output('bloburl').toString();
       setPdfPreviewUrl(blobUrl);
