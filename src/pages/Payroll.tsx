@@ -1,4 +1,4 @@
-import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { formatDisplayDate, getPayrollPeriodDates } from '@/src/lib/dateUtils';
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/ta
 import { Input } from '@/src/components/ui/input';
 import { Download, Upload, CreditCard, ChevronDown, X, Printer } from 'lucide-react';
 import { useAppStore, Employee } from '@/src/store/appStore';
-import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
+import { computeWorkDays, computeWorkDaysInRange, MONTH_INDEX } from '@/src/lib/workdays';
 import logoSrc from '../../logo/logo-2.png';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
@@ -182,8 +182,11 @@ export function Payroll() {
     const calculatePayrollForMonth = useCallback((monthKey: string, year: number = selectedYear) => {
       const mKey = monthKey as keyof typeof employees[0]['monthlySalaries'];
       const selectedMonthIndex = months.findIndex(m => m.key === monthKey) + 1;
+      
+      // Get custom payroll period dates
+      const { start: periodStart, end: periodEnd } = getPayrollPeriodDates(year, selectedMonthIndex, payrollVariables.periodStartDay);
 
-      // Auto-compute workdays for this month from public holidays
+      // Auto-compute workdays divisor using the CALENDAR month (Jan 1 - Jan 31)
       const holidayDates = publicHolidays.map(h => h.date);
       const fallbackWorkdays = computeWorkDays(year, selectedMonthIndex, holidayDates, 6);
 
@@ -194,17 +197,14 @@ export function Payroll() {
 
       return employees
         .filter(e => {
-          // Date-based eligibility
-          const startOfViewingMonth = new Date(year, selectedMonthIndex - 1, 1);
-          const endOfViewingMonth = new Date(year, selectedMonthIndex, 0);
-          
+          // Date-based eligibility using the CUSTOM payroll period boundaries
           if (e.startDate) {
             const empStart = new Date(e.startDate);
-            if (empStart > endOfViewingMonth) return false;
+            if (empStart > periodEnd) return false;
           }
           if (e.endDate) {
             const empEnd = new Date(e.endDate);
-            if (empEnd < startOfViewingMonth) return false;
+            if (empEnd < periodStart) return false;
           }
 
           // If current status is not Active or On Leave, only show if they were active in the viewed month
@@ -254,12 +254,10 @@ export function Payroll() {
           let totalOTInstances = 0;
 
           for (const r of attendanceRecords) {
-            if (!r.date) continue;
-            const [yStr, mStr] = r.date.split('-');
-            const recordYear = parseInt(yStr, 10);
-            const recordMonth = parseInt(mStr, 10);
+            if (!r.date || r.staffId !== emp.id) continue;
             
-            if (r.staffId === emp.id && recordMonth === selectedMonthIndex && recordYear === year) {
+            const recordDate = new Date(r.date + 'T12:00:00'); // Normalize to noon for comparison
+            if (recordDate >= periodStart && recordDate <= periodEnd) {
               const metrics = calculateAttendanceMetrics(r, holidayDates, payrollVariables, monthValues as any, attendanceRecords);
               
               if (metrics.ot > 0) totalOTInstances += 1;
@@ -296,17 +294,16 @@ export function Payroll() {
             let salaryBase = standardSalary;
             if (emp.startDate) {
               const empJoin = new Date(emp.startDate);
-              const joinYear  = empJoin.getFullYear();
-              const joinMonth = empJoin.getMonth() + 1; // 1-indexed
-              const joinDay   = empJoin.getDate();
-
-              const isJoinMonth = joinYear === year && joinMonth === selectedMonthIndex && joinDay > 1;
-              if (isJoinMonth) {
-                // Workdays available FROM the joining date to end of month
-                const workdaysFromJoin = computeWorkDays(
-                  year, selectedMonthIndex, holidayDates, empWorkDaysPerWeek, empJoin
+              const isJoinWithinPeriod = empJoin > periodStart && empJoin <= periodEnd;
+              if (isJoinWithinPeriod) {
+                // Workdays available FROM the joining date to end of CUSTOM period
+                const workdaysFromJoin = computeWorkDaysInRange(
+                  empJoin > periodStart ? empJoin : periodStart,
+                  periodEnd,
+                  holidayDates,
+                  empWorkDaysPerWeek
                 );
-                // Pro-rate: only pay for the fraction of the month they were employed
+                // Pro-rate: only pay for the fraction of the cycle they were employed
                 salaryBase = standardSalary * (workdaysFromJoin / empOfficialWorkdays);
               }
             }
@@ -408,10 +405,8 @@ export function Payroll() {
             if (a.employeeId !== emp.id) return false;
             if (a.status !== 'Approved' && a.status !== 'Deducted') return false;
             if (!a.requestDate) return false;
-            const dateParts = a.requestDate.split('-');
-            const advanceYear = parseInt(dateParts[0], 10);
-            const advanceMonth = parseInt(dateParts[1], 10);
-            return advanceYear === year && advanceMonth === selectedMonthIndex;
+            const advanceDate = new Date(a.requestDate + 'T12:00:00');
+            return advanceDate >= periodStart && advanceDate <= periodEnd;
           });
           const advanceDeduction = empAdvances.reduce((sum, a) => sum + a.amount, 0);
 
@@ -419,11 +414,14 @@ export function Payroll() {
             if (l.employeeId !== emp.id) return false;
             if (l.status !== 'Active' && l.status !== 'Completed' && l.status !== 'Approved') return false;
             if (!l.paymentStartDate) return false;
-            const dateParts = l.paymentStartDate.split('-');
-            const startYear = parseInt(dateParts[0], 10);
-            const startMonth = parseInt(dateParts[1], 10);
-
-            const monthsElapsed = (year - startYear) * 12 + (selectedMonthIndex - startMonth);
+            
+            // Check if the current payroll period falls within the loan duration
+            const loanStart = new Date(l.paymentStartDate + 'T12:00:00');
+            // Normalize both to months since year 0 for easy comparison
+            const periodStartMonth = year * 12 + selectedMonthIndex - 1;
+            const loanStartMonth = loanStart.getFullYear() * 12 + loanStart.getMonth();
+            const monthsElapsed = periodStartMonth - loanStartMonth;
+            
             return monthsElapsed >= 0 && monthsElapsed < l.duration;
           });
           const loanDeduction = empLoans.reduce((sum, l) => sum + l.monthlyDeduction, 0);

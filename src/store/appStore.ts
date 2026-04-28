@@ -764,6 +764,7 @@ interface AppState {
     nsitfRate: number;
     vatRate: number;
     withholdingTaxRate: number;
+    periodStartDay: number;
     departmentWorkDays?: Record<string, number>;
   };
   updatePayrollVariables: (variables: Partial<AppState['payrollVariables']>) => void;
@@ -809,6 +810,7 @@ interface AppState {
   getServiceTemplates: () => ServiceTemplate[];
   updateServiceTemplate: (template: ServiceTemplate) => void;
   removeServiceTemplate: (serviceName: string) => void;
+  renameServiceTemplate: (oldName: string, newName: string) => void;
   onboardingTemplates: OnboardingTemplate[];
   updateOnboardingTemplate: (template: OnboardingTemplate) => void;
   removeOnboardingTemplate: (serviceName: string) => void;
@@ -989,6 +991,7 @@ export const useAppStore = create<AppState>()(
         basic: 40, housing: 30, transport: 20, otherAllowances: 10,
         employeePensionRate: 8, employerPensionRate: 10,
         nsitfRate: 1, vatRate: 7.5, withholdingTaxRate: 5,
+        periodStartDay: 1,
       },
       payeTaxVariables: {
         craBase: 800000, rentReliefRate: 0.20,
@@ -1379,13 +1382,29 @@ export const useAppStore = create<AppState>()(
         });
       },
       removeServiceTemplate: (serviceName) => {
-        // Technically this leaves an empty record or we can just empty it to hide it. 
-        // We'll empty it to effectively "remove" it.
-        get().updateDepartmentTasks({
-          department: `__SERVICE__${serviceName}`,
-          onboardingTasks: [],
-          offboardingTasks: []
-        });
+        const oldDept = `__SERVICE__${serviceName}`;
+        set((s) => ({
+          departmentTasksList: s.departmentTasksList.filter(d => d.department !== oldDept)
+        }));
+        db.deleteDepartmentTasks(oldDept);
+      },
+      renameServiceTemplate: (oldName, newName) => {
+        const s = get();
+        const oldDept = `__SERVICE__${oldName}`;
+        const newDept = `__SERVICE__${newName}`;
+        
+        const taskMatch = s.departmentTasksList.find(d => d.department === oldDept);
+        if (taskMatch) {
+          s.updateDepartmentTasks({ ...taskMatch, department: newDept });
+          set(state => ({ departmentTasksList: state.departmentTasksList.filter(d => d.department !== oldDept) }));
+          db.deleteDepartmentTasks(oldDept);
+        }
+
+        const onboardingMatch = s.onboardingTemplates.find(t => t.serviceName === oldName);
+        if (onboardingMatch) {
+          s.updateOnboardingTemplate({ ...onboardingMatch, serviceName: newName });
+          s.removeOnboardingTemplate(oldName);
+        }
       },
 
 

@@ -8,10 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Trash2, Save, Download, Upload, BookOpen, Settings2, Briefcase, X, ChevronRight, Edit2, Truck } from 'lucide-react';
 import { useAppStore, Employee, AttendanceRecord, Site, Invoice, PendingInvoice, LeaveRecord, LedgerEntry, CompanyExpense, CommLog, DEFAULT_LEAVE_TYPES } from '@/src/store/appStore';
 import { NairaSign } from '@/src/components/ui/naira-sign';
-import { computeWorkDays, MONTH_INDEX } from '@/src/lib/workdays';
+import { computeWorkDays, computeWorkDaysInRange, MONTH_INDEX } from '@/src/lib/workdays';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
-import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
+import { formatDisplayDate, normalizeDate, getPayrollPeriodDates } from '@/src/lib/dateUtils';
 import { generateId } from '@/src/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/src/components/ui/dialog';
 import * as XLSX from 'xlsx';
@@ -188,6 +188,7 @@ export function Variables() {
   const getServiceTemplates = useAppStore((state) => state.getServiceTemplates);
   const updateServiceTemplate = useAppStore((state) => state.updateServiceTemplate);
   const removeServiceTemplateStore = useAppStore((state) => state.removeServiceTemplate);
+  const renameServiceTemplateStore = useAppStore((state) => state.renameServiceTemplate);
 
   const serviceTemplates = useMemo(() => getServiceTemplates(), [departmentTasksList]);
   
@@ -581,6 +582,28 @@ export function Variables() {
     toast.success(`Cleanup complete: Removed ${totalOriginal - totalCleaned} duplicate tasks.`);
   };
 
+  const handleMoveOnboardingField = (id: string, direction: 'up' | 'down') => {
+    const template = onboardingTemplates.find(t => t.serviceName === selectedService);
+    if (!template) return;
+    const phaseKey = `phase${activeBuilderPhase}` as 'phase1' | 'phase2' | 'phase3' | 'phase4' | 'phase5';
+    const fields = [...(template.phases[phaseKey]?.fields || [])];
+    const idx = fields.findIndex(f => f.id === id);
+    if (idx === -1) return;
+    
+    if (direction === 'up' && idx > 0) {
+      [fields[idx - 1], fields[idx]] = [fields[idx], fields[idx - 1]];
+    } else if (direction === 'down' && idx < fields.length - 1) {
+      [fields[idx + 1], fields[idx]] = [fields[idx], fields[idx + 1]];
+    } else {
+      return;
+    }
+    
+    updateOnboardingTemplate({
+      ...template,
+      phases: { ...template.phases, [phaseKey]: { ...template.phases[phaseKey], fields } }
+    } as any);
+  };
+
   const currentTaskView = departmentTasksList.find(d => d.department === taskDeptFilter) ||
     { department: taskDeptFilter, onboardingTasks: [], offboardingTasks: [] };
 
@@ -612,9 +635,9 @@ export function Variables() {
       XLSX.utils.book_append_sheet(wb, leaveSheet, 'Leave_Types');
 
       // Public Holidays
-      const phData = publicHolidays.map(h => ({ Date: h.date, Name: h.name }));
-      const phSheet = phData.length > 0 ? XLSX.utils.json_to_sheet(phData, { header: ['Date', 'Name'] }) : XLSX.utils.aoa_to_sheet([['Date', 'Name']]);
-      XLSX.utils.book_append_sheet(wb, phSheet, 'Public_Holidays');
+      const holData = publicHolidays.map(h => ({ Date: h.date, Holiday: h.name }));
+      const holSheet = holData.length > 0 ? XLSX.utils.json_to_sheet(holData, { header: ['Date', 'Holiday'] }) : XLSX.utils.aoa_to_sheet([['Date', 'Holiday']]);
+      XLSX.utils.book_append_sheet(wb, holSheet, 'Public_Holidays');
 
       // Payroll Variables
       const payrollData = [
@@ -625,6 +648,7 @@ export function Variables() {
         { Key: 'Employee Pension (%)', Value: localPayrollVars.employeePensionRate },
         { Key: 'Employer Pension (%)', Value: localPayrollVars.employerPensionRate },
         { Key: 'NSITF (%)', Value: localPayrollVars.nsitfRate },
+        { Key: 'Period Start Day', Value: localPayrollVars.periodStartDay || 1 },
       ];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payrollData), 'Payroll_Variables');
 
@@ -641,13 +665,6 @@ export function Variables() {
         'UpTo (₦)': b.upTo === null ? 'INFINITY' : b.upTo
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taxBracketsData), 'PAYE_Tax_Brackets');
-
-      const extraConditionsData = localPayeVars.extraConditions.map(c => ({
-        Label: c.label,
-        'Amount (₦)': c.amount,
-        Enabled: c.enabled
-      }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(extraConditionsData), 'PAYE_Extra_Conditions');
 
       // Task Templates
       const taskData: any[] = [];
@@ -667,23 +684,6 @@ export function Variables() {
       });
       const taskSheet = taskData.length > 0 ? XLSX.utils.json_to_sheet(taskData, { header: ['Department', 'Type', 'Title', 'Assignee'] }) : XLSX.utils.aoa_to_sheet([['Department', 'Type', 'Title', 'Assignee']]);
       XLSX.utils.book_append_sheet(wb, taskSheet, 'Task_Templates');
-
-      // Ledger Variables
-      const lCatData = ledgerCategories.map(c => ({ Category: c.name }));
-      const lCatSheet = lCatData.length > 0 ? XLSX.utils.json_to_sheet(lCatData, { header: ['Category'] }) : XLSX.utils.aoa_to_sheet([['Category']]);
-      XLSX.utils.book_append_sheet(wb, lCatSheet, 'Ledger_Categories');
-
-      const lVenData = ledgerVendors.map(v => ({ Vendor: v.name, TIN: v.tinNumber }));
-      const lVenSheet = lVenData.length > 0 ? XLSX.utils.json_to_sheet(lVenData, { header: ['Vendor', 'TIN'] }) : XLSX.utils.aoa_to_sheet([['Vendor', 'TIN']]);
-      XLSX.utils.book_append_sheet(wb, lVenSheet, 'Ledger_Vendors');
-
-      const lBankData = ledgerBanks.map(b => ({ Bank: b.name }));
-      const lBankSheet = lBankData.length > 0 ? XLSX.utils.json_to_sheet(lBankData, { header: ['Bank'] }) : XLSX.utils.aoa_to_sheet([['Bank']]);
-      XLSX.utils.book_append_sheet(wb, lBankSheet, 'Ledger_Banks');
-
-      const lBenData = ledgerBeneficiaryBanks.map(b => ({ Bank: b.name }));
-      const lBenSheet = lBenData.length > 0 ? XLSX.utils.json_to_sheet(lBenData, { header: ['Bank'] }) : XLSX.utils.aoa_to_sheet([['Bank']]);
-      XLSX.utils.book_append_sheet(wb, lBenSheet, 'Ledger_Beneficiary_Banks');
 
       // Service Templates
       const srvData: any[] = [];
@@ -707,35 +707,30 @@ export function Variables() {
       ];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(hrData), 'HR_Variables');
 
-      const stageLabels = Object.entries(localHrVars.onboardingStageLabels || {}).map(([k, v]) => ({ Step: k, Label: v }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stageLabels), 'Onboarding_Labels');
-
       const monthData = Object.entries(localMonthVals).map(([k, v]) => ({ Month: k, WorkDays: v.workDays, OTRate: v.overtimeRate }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(monthData), 'Month_Variables');
 
-      const fileName = 'System_Variables.xlsx';
-      const win = window as any;
-      if (win.electronAPI?.savePathDialog) {
-        win.electronAPI.savePathDialog({
-          title: 'Export System Variables (Excel)',
-          defaultPath: fileName,
-          filters: [{ name: 'Excel Files', extensions: ['xlsx'] }]
-        }).then((filePath: string) => {
-          if (filePath) {
-            const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-            win.electronAPI.writeFile(filePath, buf, 'binary').then((success: boolean) => {
-              if (success) toast.success(`Exported to ${filePath}`);
-              else toast.error('Failed to save file.');
-            });
-          }
-        });
-      } else {
-        XLSX.writeFile(wb, fileName);
-      }
+      XLSX.writeFile(wb, `DCEL_System_Variables_${new Date().toISOString().split('T')[0]}.xlsx`);
       toast.success('System variables exported successfully.');
     } catch (error) {
+      console.error(error);
       toast.error('Failed to export variables.');
     }
+  };
+
+  const handleRenameService = async (oldName: string) => {
+    const newName = prompt('Enter new name for service:', oldName);
+    if (!newName || newName === oldName) return;
+
+    const exists = serviceTemplates.find(s => s.serviceName.toLowerCase() === newName.toLowerCase());
+    if (exists) {
+      toast.error('Service with this name already exists.');
+      return;
+    }
+
+    renameServiceTemplateStore(oldName, newName);
+    setSelectedService(newName);
+    toast.success('Service renamed successfully.');
   };
 
   const handleImportVariables = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1223,23 +1218,34 @@ export function Variables() {
                   >
                     {s.serviceName}
                     {priv.canEdit && selectedService === s.serviceName && (
-                      <span
-                        className="p-0.5 rounded-full hover:bg-red-500/20 text-white/70 hover:text-white transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          showConfirm(
-                            `Are you sure you want to completely remove the ${s.serviceName} service and its tasks?`,
-                            { title: 'Remove Service' }
-                          ).then(confirmed => {
-                            if (confirmed) {
-                              removeServiceTemplateStore(s.serviceName);
-                              if (selectedService === s.serviceName) setSelectedService('');
-                            }
-                          });
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <span
+                          className="p-0.5 rounded-full hover:bg-white/20 text-white/70 hover:text-white transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRenameService(s.serviceName);
+                          }}
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </span>
+                        <span
+                          className="p-0.5 rounded-full hover:bg-red-500/20 text-white/70 hover:text-white transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            showConfirm(
+                              `Are you sure you want to completely remove the ${s.serviceName} service and its tasks?`,
+                              { title: 'Remove Service' }
+                            ).then(confirmed => {
+                              if (confirmed) {
+                                removeServiceTemplateStore(s.serviceName);
+                                if (selectedService === s.serviceName) setSelectedService('');
+                              }
+                            });
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </span>
+                      </div>
                     )}
                   </button>
                 ))}
@@ -1578,7 +1584,23 @@ export function Variables() {
                           }
 
                           return (
-                            <div key={f.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200 shadow-sm group hover:border-indigo-300 transition-colors">
+                            <div key={f.id} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg group hover:border-indigo-200 hover:shadow-sm transition-all">
+                              <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                  className="h-5 w-5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center disabled:opacity-30 text-[10px]" 
+                                  onClick={() => handleMoveOnboardingField(f.id, 'up')} 
+                                  disabled={idx === 0}
+                                >
+                                  &#9650;
+                                </button>
+                                <button 
+                                  className="h-5 w-5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center disabled:opacity-30 text-[10px]" 
+                                  onClick={() => handleMoveOnboardingField(f.id, 'down')} 
+                                  disabled={idx === phaseFields.length - 1}
+                                >
+                                  &#9660;
+                                </button>
+                              </div>
                               <span className="h-6 w-6 rounded-full bg-indigo-100/50 text-indigo-700 text-[11px] font-bold flex items-center justify-center shrink-0 border border-indigo-200">
                                 {idx + 1}
                               </span>
@@ -2727,6 +2749,17 @@ export function Variables() {
                   />
                   <p className="text-xs text-slate-400">Withholding Tax (5% by default)</p>
                 </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700 uppercase">Payroll Period Start Day</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={localPayrollVars.periodStartDay}
+                    onChange={e => updateLocalPayrollVariables({ periodStartDay: Number(e.target.value) })}
+                  />
+                  <p className="text-xs text-slate-400">Day the payroll cycle begins (default 1)</p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -2773,15 +2806,16 @@ export function Variables() {
                   <TableBody>
                     {monthsList.map(({ key, label }) => {
                       const monthNum = MONTH_INDEX[key];
-                      const startDate = new Date(payrollYear, monthNum - 1, 1);
-                      const endDate = new Date(payrollYear, monthNum, 0);
+                      // The Monthly Config table ALWAYS shows the calendar month (1st to end)
+                      // so users can configure workdays per calendar month.
+                      const { start: startDate, end: endDate } = getPayrollPeriodDates(payrollYear, monthNum, 1);
 
                       // Compute workdays using the department's workDaysPerWeek from the departments table
                       const selectedDefaultDays = monthConfigDept
                         ? (() => { const d = departments.find(dep => dep.name === monthConfigDept); return d?.workDaysPerWeek ?? (d?.staffType === 'FIELD' ? 6 : 5); })()
                         : 6;
                       const deptWorkDaysPerWeek = monthConfigDept ? selectedDefaultDays : 6;
-                      const computedWorkDays = computeWorkDays(payrollYear, monthNum, holidayDateStrings, deptWorkDaysPerWeek);
+                      const computedWorkDays = computeWorkDaysInRange(startDate, endDate, holidayDateStrings, deptWorkDaysPerWeek);
 
                       const data = localMonthVals[key] || { workDays: 0, overtimeRate: 0.5 };
                       const formatDate = (d: Date) =>

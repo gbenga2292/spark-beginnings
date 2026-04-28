@@ -113,3 +113,35 @@ export function formatDisplayDate(dateStr: any): string {
   }
   return '—';
 }
+
+/**
+ * Returns the start and end dates for a payroll period given a year, month, and start day.
+ * If startDay is 1, returns the calendar month.
+ * If startDay is > 1, returns from (month-1, day) to (month, day-1).
+ */
+export function getPayrollPeriodDates(year: number, month: number, startDay: number = 1): { start: Date, end: Date } {
+  if (startDay <= 1) {
+    // Calendar month: Jan 1 to Jan 31
+    return {
+      start: new Date(year, month - 1, 1, 12, 0, 0),
+      end: new Date(year, month, 0, 12, 0, 0)
+    };
+  }
+  
+  // Custom cycle: If month is January (1) and startDay is 26:
+  // We return Dec 26 to Jan 25 (the period ENDING in January)
+  
+  // 1. Start Date: Day X of PREVIOUS month
+  const prevMonthLastDay = new Date(year, month - 1, 0).getDate();
+  const actualStartDay = Math.min(startDay, prevMonthLastDay);
+  const start = new Date(year, month - 2, actualStartDay, 12, 0, 0);
+  
+  // 2. End Date: Day X-1 of CURRENT month
+  const currMonthLastDay = new Date(year, month, 0).getDate();
+  const actualEndDay = Math.min(startDay - 1, currMonthLastDay);
+  
+  // If actualEndDay is 0 (startDay=1), fallback to currMonthLastDay
+  const end = new Date(year, month - 1, actualEndDay || currMonthLastDay, 12, 0, 0);
+  
+  return { start, end };
+}

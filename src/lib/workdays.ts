@@ -10,41 +10,62 @@
  * @param publicHolidayDates  Array of "YYYY-MM-DD" strings that are public holidays
  * @returns Number of working days
  */
+/**
+ * Computes the number of working days in a given date range.
+ * Skips Sundays, and potentially Saturdays depending on workDaysPerWeek.
+ * Also skips public holidays.
+ */
+export function computeWorkDaysInRange(
+    startDate: Date,
+    endDate: Date,
+    publicHolidayDates: string[],
+    workDaysPerWeek: number = 6
+): number {
+    const holidaySet = new Set(publicHolidayDates);
+    let count = 0;
+    
+    // Create a copy to avoid mutating the original
+    const d = new Date(startDate);
+    // Normalize to start of day
+    d.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    for (; d <= end; d.setDate(d.getDate() + 1)) {
+        const dow = d.getDay(); // 0 = Sun, 1 = Mon … 6 = Sat
+        if (dow === 0) continue; // Sunday — always off
+        
+        // Saturday logic
+        if (workDaysPerWeek < 6 && dow === 6) continue;
+        if (workDaysPerWeek < 7 && dow === 0) continue;
+        if (dow > workDaysPerWeek) continue;
+
+        const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (holidaySet.has(iso)) continue;
+
+        count++;
+    }
+    return count;
+}
+
+/**
+ * Computes the number of working days in a given month for a given year.
+ */
 export function computeWorkDays(
     year: number,
     month: number,
     publicHolidayDates: string[],
     workDaysPerWeek: number = 6,
-    /** Optional: if provided, count workdays from this date instead of the 1st of the month */
     startFromDate?: Date
 ): number {
-    // Build a Set of holiday date strings for O(1) lookup
-    const holidaySet = new Set(publicHolidayDates);
-
     const monthStart = new Date(year, month - 1, 1);
-    const lastDay   = new Date(year, month, 0); // last day of month
+    const lastDay   = new Date(year, month, 0);
 
-    // Use the later of monthStart or startFromDate
     const firstDay = startFromDate && startFromDate > monthStart
-        ? new Date(startFromDate.getFullYear(), startFromDate.getMonth(), startFromDate.getDate())
-        : new Date(monthStart);
+        ? new Date(startFromDate)
+        : monthStart;
 
-    let count = 0;
-    for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
-        const dow = d.getDay(); // 0 = Sun, 1 = Mon … 6 = Sat
-        if (dow === 0) continue; // Sunday — always off
-        // Saturday logic
-        if (workDaysPerWeek < 6 && dow === 6) continue;
-        if (workDaysPerWeek < 7 && dow === 0) continue;
-        if (dow > workDaysPerWeek) continue; // fallback for lower bound e.g. 4 days
-
-        // Use LOCAL year/month/day — NOT toISOString() which shifts to UTC
-        const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        if (holidaySet.has(iso)) continue; // Public holiday — skip
-
-        count++;
-    }
-    return count;
+    return computeWorkDaysInRange(firstDay, lastDay, publicHolidayDates, workDaysPerWeek);
 }
 
 

@@ -1349,6 +1349,10 @@ export const db = {
     }, { onConflict: 'department' });
     if (error) { console.error('Database error:', error); throw error; }
   },
+  async deleteDepartmentTasks(department: string) {
+    const { error } = await supabase.from('department_tasks').delete().eq('department', department);
+    if (error) { console.error('Database error:', error); throw error; }
+  },
 
   // Leaves
   async insertLeave(l: LeaveRecord) {
