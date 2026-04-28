@@ -70,72 +70,6 @@ function PhaseTextField({
   );
 }
 
-// ─── Dynamic Field Rendering ──────────────────────────────────────────────────
-function DynamicPhaseFields({ 
-  serviceName, phaseKey, form, updCustom 
-}: { 
-  serviceName: string; 
-  phaseKey: 'phase1'|'phase2'|'phase3'|'phase4'|'phase5';
-  form: SiteQuestionnaire;
-  updCustom: (fieldId: string, value: string) => void;
-}) {
-  const templates = useAppStore(s => s.onboardingTemplates);
-  if (!serviceName) return null;
-  const template = templates.find(t => t.serviceName === serviceName);
-  if (!template) return null;
-  const fields = template.phases?.[phaseKey]?.fields || [];
-  if (fields.length === 0) return null;
-
-  return (
-    <div className="mt-6 pt-6 border-t border-slate-100">
-      <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2">
-        <Building2 className="h-4 w-4 text-indigo-500" />
-        {serviceName} Requirements
-      </h3>
-      <div className="grid grid-cols-2 gap-5">
-        {fields.map(f => {
-          const val = form.customFields?.[f.id] || '';
-          if (f.type === 'checkbox') {
-            return (
-              <PhaseCheck 
-                key={f.id} label={f.label} checked={val === 'true'} 
-                onChange={v => updCustom(f.id, v ? 'true' : 'false')} 
-              />
-            );
-          }
-          if (f.type === 'select') {
-            return (
-              <div key={f.id} className="space-y-1">
-                <label className="text-sm font-medium text-slate-700">
-                  {f.label} {f.requiredForActivation && <span className="text-red-500">*</span>}
-                </label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                  value={val}
-                  onChange={e => updCustom(f.id, e.target.value)}
-                >
-                  <option value="">-- Select --</option>
-                  {(f.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-              </div>
-            );
-          }
-          return (
-            <PhaseTextField
-              key={f.id}
-              label={f.label + (f.requiredForActivation ? ' *' : '')}
-              value={val}
-              onChange={v => updCustom(f.id, v)}
-              type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
-              placeholder={f.placeholder}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ─── Default blank form ───────────────────────────────────────────────────────
 
 const blankForm = (): SiteQuestionnaire => ({
@@ -200,7 +134,6 @@ export function SiteOnboarding() {
   const updateSite = useAppStore(s => s.updateSite);
   const addClient = useAppStore(s => s.addClient);
   const getServiceTemplates = useAppStore(s => s.getServiceTemplates);
-  const onboardingTemplates = useAppStore(s => s.onboardingTemplates);
   const invoices = useAppStore(s => s.invoices);
   const payments = useAppStore(s => s.payments);
 
@@ -313,7 +246,6 @@ export function SiteOnboarding() {
   const updPhase = <K extends 'phase1' | 'phase2' | 'phase3' | 'phase4' | 'phase5'>(
     key: K, patch: Partial<SiteQuestionnaire[K]>
   ) => setForm(p => ({ ...p, [key]: { ...p[key], ...(patch as any) } }));
-  const updCustom = (fieldId: string, value: string) => setForm(p => ({ ...p, customFields: { ...(p.customFields || {}), [fieldId]: value } }));
 
   const markDone = (phase: 1 | 2 | 3 | 4 | 5) => {
     updPhase(`phase${phase}` as any, { completed: true });
@@ -351,16 +283,15 @@ export function SiteOnboarding() {
         
         if (matchingSite) {
           const updates: any = {};
-          const effectiveStartDate = form.customFields?.timelineStartDate || form.phase1.timelineStartDate;
-          if (effectiveStartDate && effectiveStartDate !== matchingSite.startDate) {
-            updates.startDate = effectiveStartDate;
+          if (form.phase1.timelineStartDate && form.phase1.timelineStartDate !== matchingSite.startDate) {
+            updates.startDate = form.phase1.timelineStartDate;
           }
           if (form.phase5.actualEndDate !== matchingSite.endDate) {
             updates.endDate = form.phase5.actualEndDate || '';
           }
           
-          const taxStatus = (form.customFields?.clientTaxStatus || form.phase4.clientTaxStatus || '') as string;
-          const newVat = taxStatus.includes('Add') ? 'Add' : taxStatus.includes('Yes') ? 'Yes' : 'No';
+          const taxStatus = (form.phase4.clientTaxStatus as string) || '';
+          const newVat = taxStatus === 'Add' ? 'Add' : taxStatus === 'Yes' ? 'Yes' : 'No';
           
           if (newVat !== matchingSite.vat) {
             updates.vat = newVat;
@@ -388,9 +319,9 @@ export function SiteOnboarding() {
     form.phase1.completed &&
     form.phase2.completed &&
     form.phase3.completed &&
-    (form.phase4.quotationSent || form.customFields?.quotationSent === 'true') &&
-    (form.phase4.proposalAccepted || form.customFields?.proposalAccepted === 'true') &&
-    (form.phase5.stage1AdvanceReceived || form.customFields?.stage1AdvanceReceived === 'true');
+    form.phase4.quotationSent &&
+    form.phase4.proposalAccepted &&
+    form.phase5.stage1AdvanceReceived;
 
   const handleActivate = () => {
     if (!canActivate) return;
@@ -400,11 +331,8 @@ export function SiteOnboarding() {
       name: form.siteName,
       client: form.clientName,
       status: 'Active',
-      vat: (() => { 
-        const ts = (form.customFields?.clientTaxStatus || form.phase4.clientTaxStatus || '') as string; 
-        return ts.includes('Add') ? 'Add' : ts.includes('Yes') ? 'Yes' : 'No'; 
-      })() as 'Yes' | 'No' | 'Add',
-      startDate: form.customFields?.timelineStartDate || form.phase1.timelineStartDate || new Date().toISOString().split('T')[0],
+      vat: (() => { const ts = (form.phase4.clientTaxStatus as string) || ''; return ts === 'Add' ? 'Add' : ts === 'Yes' ? 'Yes' : 'No'; })() as 'Yes' | 'No' | 'Add',
+      startDate: form.phase1.timelineStartDate || new Date().toISOString().split('T')[0],
       endDate: ''
     });
     const activated = { ...form, status: 'Active' as const, updatedAt: new Date().toISOString() };
@@ -723,20 +651,54 @@ export function SiteOnboarding() {
                       ))}
                     </select>
                   </div>
-
+                  <PhaseTextField
+                    label="Depth of excavation (m)"
+                    value={form.phase1.excavationDepthMeters}
+                    onChange={v => updPhase('phase1', { excavationDepthMeters: v })}
+                    type="number" placeholder="e.g. 8"
+                  />
+                  <PhaseTextField
+                    label="Length (m)"
+                    value={form.phase1.siteLength}
+                    onChange={v => updPhase('phase1', { siteLength: v })}
+                    type="number" placeholder="e.g. 40"
+                  />
+                  <PhaseTextField
+                    label="Width (m)"
+                    value={form.phase1.siteWidth}
+                    onChange={v => updPhase('phase1', { siteWidth: v })}
+                    type="number" placeholder="e.g. 30"
+                  />
                   <PhaseTextField
                     label="Perimeter (m) (Auto-calculated)"
                     value={
-                      form.customFields?.siteLength && form.customFields?.siteWidth
-                        ? String(2 * (Number(form.customFields.siteLength) + Number(form.customFields.siteWidth)))
+                      form.phase1.siteLength && form.phase1.siteWidth
+                        ? String(2 * (Number(form.phase1.siteLength) + Number(form.phase1.siteWidth)))
                         : ''
                     }
                     onChange={() => { }}
                     readOnly={true}
-                    placeholder="Auto-calculated (Requires Length and Width)"
+                    placeholder="Auto-calculated"
+                  />
+                  <PhaseTextField
+                    label="Timeline start date"
+                    value={form.phase1.timelineStartDate}
+                    onChange={v => updPhase('phase1', { timelineStartDate: v })}
+                    type="date"
                   />
                 </div>
-                <DynamicPhaseFields serviceName={form.phase1.whatIsBeingBuilt} phaseKey="phase1" form={form} updCustom={updCustom} />
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <PhaseCheck
+                    label="Geotechnical Report Available"
+                    checked={form.phase1.geotechnicalReportAvailable}
+                    onChange={v => updPhase('phase1', { geotechnicalReportAvailable: v })}
+                  />
+                  <PhaseCheck
+                    label="Hydrogeological Data Available"
+                    checked={form.phase1.hydrogeologicalDataAvailable}
+                    onChange={v => updPhase('phase1', { hydrogeologicalDataAvailable: v })}
+                  />
+                </div>
                 <Button
                   onClick={() => markDone(1)}
                   variant={form.phase1.completed ? 'outline' : 'default'}
@@ -757,8 +719,40 @@ export function SiteOnboarding() {
                   </div>
                   {form.phase2.completed && <Badge variant="success">Complete</Badge>}
                 </div>
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="flex flex-col gap-3">
+                    <PhaseCheck label="Site Visited" checked={form.phase2.siteVisited} onChange={v => updPhase('phase2', { siteVisited: v })} />
+                    <PhaseCheck label="Walkthrough Completed" checked={form.phase2.walkthroughCompleted} onChange={v => updPhase('phase2', { walkthroughCompleted: v })} />
 
-                <DynamicPhaseFields serviceName={form.phase1.whatIsBeingBuilt} phaseKey="phase2" form={form} updCustom={updCustom} />
+                    <div className="space-y-1 mt-2">
+                      <label className="text-sm font-medium text-slate-700">Diesel Supply Strategy</label>
+                      <select
+                        className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                        value={form.phase2.dieselSupplyStrategy || ''}
+                        onChange={e => updPhase('phase2', { dieselSupplyStrategy: e.target.value as any })}
+                      >
+                        <option value="">-- Select --</option>
+                        <option value="Client">Client</option>
+                        <option value="DCEL">DCEL</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <PhaseTextField
+                      label="Known Obstacles"
+                      value={form.phase2.knownObstacles}
+                      onChange={v => updPhase('phase2', { knownObstacles: v })}
+                      placeholder="e.g. Overhead power lines, tight access"
+                    />
+                    <PhaseTextField
+                      label="Discharge Location"
+                      value={form.phase2.dischargeLocation}
+                      onChange={v => updPhase('phase2', { dischargeLocation: v })}
+                      placeholder="e.g. Storm drain, Sanitary sewer, Creek"
+                    />
+                  </div>
+                </div>
                 <Button
                   onClick={() => markDone(2)}
                   variant={form.phase2.completed ? 'outline' : 'default'}
@@ -779,7 +773,62 @@ export function SiteOnboarding() {
                   </div>
                   {form.phase3.completed && <Badge variant="success">Complete</Badge>}
                 </div>
-                <DynamicPhaseFields serviceName={form.phase1.whatIsBeingBuilt} phaseKey="phase3" form={form} updCustom={updCustom} />
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">Dewatering Method(s)</label>
+                    <div className="flex flex-col gap-2">
+                      {['Wellpoints', 'Sump Pumping', 'Deep Wells'].map(method => (
+                        <PhaseCheck
+                          key={method}
+                          label={method}
+                          checked={(form.phase3.dewateringMethods || []).includes(method)}
+                          onChange={checked => {
+                            const methods = [...(form.phase3.dewateringMethods || [])];
+                            if (checked && !methods.includes(method)) methods.push(method);
+                            else if (!checked) methods.splice(methods.indexOf(method), 1);
+                            updPhase('phase3', { dewateringMethods: methods });
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <PhaseTextField
+                        label="Total Headers Required" type="number"
+                        value={form.phase3.totalHeadersRequired}
+                        onChange={v => {
+                          const h = parseFloat(v);
+                          const wp = isNaN(h) ? '' : (h * 6).toString();
+                          updPhase('phase3', { totalHeadersRequired: v, totalWellpointsRequired: wp });
+                        }}
+                        placeholder="e.g. 10"
+                      />
+                      <PhaseTextField
+                        label="Total Wellpoints Required (Auto-calculated: 6/Header)"
+                        value={form.phase3.totalWellpointsRequired}
+                        onChange={() => {}}
+                        readOnly={true}
+                        placeholder="Auto-calculated"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <PhaseTextField
+                        label="Total Pumps Required" type="number"
+                        value={form.phase3.totalPumpsRequired}
+                        onChange={v => updPhase('phase3', { totalPumpsRequired: v })}
+                        placeholder="e.g. 1"
+                      />
+                      <PhaseTextField
+                        label="Expected Daily Diesel Usage"
+                        value={form.phase3.expectedDailyDieselUsage}
+                        onChange={v => updPhase('phase3', { expectedDailyDieselUsage: v })}
+                        placeholder="e.g. 25 Litres"
+                      />
+                    </div>
+                  </div>
+                </div>
                 <Button
                   onClick={() => markDone(3)}
                   variant={form.phase3.completed ? 'outline' : 'default'}
@@ -801,8 +850,68 @@ export function SiteOnboarding() {
                   {form.phase4.completed && <Badge variant="success">Complete</Badge>}
                 </div>
 
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="space-y-3">
+                    <PhaseCheck label="Quotation Sent to Client" checked={form.phase4.quotationSent} onChange={v => updPhase('phase4', { quotationSent: v })} />
+                    <PhaseCheck label="Client Feedback Received" checked={form.phase4.clientFeedbackReceived} onChange={v => updPhase('phase4', { clientFeedbackReceived: v })} />
+                    <PhaseCheck label="Proposal Accepted by Client" checked={form.phase4.proposalAccepted} onChange={v => updPhase('phase4', { proposalAccepted: v })} />
+                    <PhaseCheck label="Timeline Confirmed" checked={form.phase4.timelineConfirmed} onChange={v => updPhase('phase4', { timelineConfirmed: v })} />
+                    <PhaseCheck label="Permitting Responsibility Outlined" checked={form.phase4.permittingResponsibilityOutlined} onChange={v => updPhase('phase4', { permittingResponsibilityOutlined: v })} />
+                    <PhaseCheck label="Client TIN Provided" checked={form.phase4.tinProvided} onChange={v => updPhase('phase4', { tinProvided: v })} />
+                    {form.phase4.tinProvided && (
+                      <PhaseTextField
+                        label="Client TIN Number"
+                        value={form.phase4.clientTinNumber || ''}
+                        onChange={v => updPhase('phase4', { clientTinNumber: v })}
+                        placeholder="e.g. 19283746-0001"
+                      />
+                    )}
+                  </div>
 
-                <DynamicPhaseFields serviceName={form.phase1.whatIsBeingBuilt} phaseKey="phase4" form={form} updCustom={updCustom} />
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-slate-700">Client Tax Status (VAT)</label>
+                      <select
+                        className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                        value={form.phase4.clientTaxStatus || ''}
+                        onChange={e => updPhase('phase4', { clientTaxStatus: e.target.value as any })}
+                      >
+                        <option value="">-- Select --</option>
+                        <option value="Add">Add (Add 7.5% VAT on top)</option>
+                        <option value="Yes">Yes (VAT Inclusive)</option>
+                        <option value="No">No (VAT Exempt)</option>
+                      </select>
+                    </div>
+
+                    <PhaseTextField
+                      label="Mobilization Advance Percentage (%)"
+                      type="number"
+                      value={form.phase4.mobilizationAdvancePercentage || ''}
+                      onChange={v => updPhase('phase4', { mobilizationAdvancePercentage: v })}
+                      placeholder="e.g. 50"
+                    />
+
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-slate-700">Scope of Work Summary</label>
+                      <textarea
+                        className="flex min-h-[60px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm max-h-32"
+                        value={form.phase4.scopeOfWorkSummary || ''}
+                        onChange={e => updPhase('phase4', { scopeOfWorkSummary: e.target.value })}
+                        placeholder="Install wells, run pumps, monitor water levels..."
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-slate-700">Scope Exclusions Summary</label>
+                      <textarea
+                        className="flex min-h-[60px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm max-h-32"
+                        value={form.phase4.scopeExclusionsSummary || ''}
+                        onChange={e => updPhase('phase4', { scopeExclusionsSummary: e.target.value })}
+                        placeholder="General construction site power, disposing of hazardous soil..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <Button
                   onClick={() => markDone(4)}
                   variant={form.phase4.completed ? 'outline' : 'default'}
@@ -855,31 +964,60 @@ export function SiteOnboarding() {
                   </div>
                   {form.phase5.completed && <Badge variant="success">Complete</Badge>}
                 </div>
+                <div className="grid grid-cols-2 gap-y-4 gap-x-6">
+                  <PhaseCheck label="Pre-requisite: Site-Specific Safety Plan Integrated" checked={form.phase5.safetyPlanIntegrated} onChange={v => updPhase('phase5', { safetyPlanIntegrated: v })} />
+                  <div />
 
-                <DynamicPhaseFields serviceName={form.phase1.whatIsBeingBuilt} phaseKey="phase5" form={form} updCustom={updCustom} />
-                
-                {/* Activation CTA — only when conditions met and still pending */}
-                {canActivate && (
-                  <div className="p-5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl">
-                    <div className="flex items-start gap-3">
-                      <CheckCircle2 className="h-6 w-6 text-emerald-600 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <h3 className="font-semibold text-emerald-800">Ready for Activation!</h3>
-                        <p className="text-sm text-emerald-700 mt-1">
-                          Phases 1–3 complete, quotation accepted, AND {Number(form.phase4.mobilizationAdvancePercentage) > 0 ? `${form.phase4.mobilizationAdvancePercentage}%` : '70%'} mobilization payment confirmed.
-                          Move this site to the <strong>Active Sites</strong> list now.
-                        </p>
-                        <Button
-                          onClick={handleActivate}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white mt-3 gap-2"
-                        >
-                          <CheckCircle2 className="h-4 w-4" /> Convert to Active Site
-                        </Button>
+                  {/* Stage 1: Only shown when advance % > 0 */}
+                  {Number(form.phase4.mobilizationAdvancePercentage) > 0 && (
+                    <>
+                      <PhaseCheck label={`Stage 1: ${form.phase4.mobilizationAdvancePercentage}% Advance Received (Proceed to Work)`} checked={form.phase5.stage1AdvanceReceived} onChange={v => updPhase('phase5', { stage1AdvanceReceived: v })} />
+                      <div />
+                    </>
+                  )}
+                  {Number(form.phase4.mobilizationAdvancePercentage) === 0 && (
+                    <>
+                      <div className="col-span-2 text-xs text-slate-400 italic bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+                        No mobilization advance — first payment collected at installation (see Stage 2 below).
                       </div>
-                    </div>
-                  </div>
-                )}
+                    </>
+                  )}
 
+                  <PhaseCheck label="Stage 2: Installation Complete & System Started Up" checked={form.phase5.stage2InstallationComplete} onChange={v => updPhase('phase5', { stage2InstallationComplete: v })} />
+                  <PhaseCheck
+                    label={
+                      Number(form.phase4.mobilizationAdvancePercentage) === 0
+                        ? `Stage 2: 70% First Payment & First Hire Invoice Issued`
+                        : `Stage 2: Remaining ${100 - (Number(form.phase4.mobilizationAdvancePercentage) || 70)}% & First Hire Invoice Issued`
+                    }
+                    checked={form.phase5.stage2FirstInvoiceIssued}
+                    onChange={v => updPhase('phase5', { stage2FirstInvoiceIssued: v })}
+                  />
+
+                  {/* Stage 3 label changes when no advance to show 30% remaining */}
+                  <PhaseCheck
+                    label={
+                      Number(form.phase4.mobilizationAdvancePercentage) === 0
+                        ? `Stage 3: Remaining 30% & Timely Weekly Hire Invoicing Ongoing`
+                        : `Stage 3: Timely Weekly Hire Invoicing Ongoing`
+                    }
+                    checked={form.phase5.stage3TimelyBilling}
+                    onChange={v => updPhase('phase5', { stage3TimelyBilling: v })}
+                  />
+                  <div />
+
+                  <PhaseCheck label="Stage 4: Demobilization Complete" checked={form.phase5.stage4DemobilizationComplete} onChange={v => updPhase('phase5', { stage4DemobilizationComplete: v })} />
+                  <PhaseCheck label="Stage 4: Final Invoice Issued & WHT Credit Requested" checked={form.phase5.stage4FinalInvoiceIssued} onChange={v => updPhase('phase5', { stage4FinalInvoiceIssued: v })} />
+                </div>
+                <div className="pt-2 max-w-xs">
+                  <PhaseTextField
+                    label="Actual End Date"
+                    type="date"
+                    value={form.phase5.actualEndDate || ''}
+                    onChange={v => updPhase('phase5', { actualEndDate: v })}
+                  />
+                  <p className="text-xs text-slate-400 mt-1">This will sync to the End Date column on the Active Sites table when saved.</p>
+                </div>
                 <Button
                   onClick={() => markDone(5)}
                   variant={form.phase5.completed ? 'outline' : 'default'}
