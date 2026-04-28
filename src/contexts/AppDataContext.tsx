@@ -320,6 +320,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
     // ── Memoized action callbacks ─────────────────────────────────────────────
     const createMainTask = useCallback(async (task: any, subs: any[] = []) => {
+        // --- ROGUE TASK INTERCEPTOR ---
+        // Block creation of duplicate "Vehicle Document" main tasks.
+        // Legitimate vehicle tasks must use "Renewal of Vehicle Documents".
+        if (task.title === 'Vehicle Document' || task.title?.toLowerCase() === 'vehicle document') {
+            console.warn('Blocked rogue creation of "Vehicle Document" task. Use "Renewal of Vehicle Documents" instead.');
+            return null;
+        }
+
         const payload = {
             title: task.title,
             description: task.description || null,
