@@ -773,62 +773,70 @@ export function SiteOnboarding() {
                   </div>
                   {form.phase3.completed && <Badge variant="success">Complete</Badge>}
                 </div>
-                <div className="grid grid-cols-2 gap-5">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Dewatering Method(s)</label>
-                    <div className="flex flex-col gap-2">
-                      {['Wellpoints', 'Sump Pumping', 'Deep Wells'].map(method => (
-                        <PhaseCheck
-                          key={method}
-                          label={method}
-                          checked={(form.phase3.dewateringMethods || []).includes(method)}
-                          onChange={checked => {
-                            const methods = [...(form.phase3.dewateringMethods || [])];
-                            if (checked && !methods.includes(method)) methods.push(method);
-                            else if (!checked) methods.splice(methods.indexOf(method), 1);
-                            updPhase('phase3', { dewateringMethods: methods });
-                          }}
-                        />
-                      ))}
+                {form.phase1.whatIsBeingBuilt?.toLowerCase().includes('dewatering') ? (
+                  <div className="grid grid-cols-2 gap-5">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700">Dewatering Method(s)</label>
+                      <div className="flex flex-col gap-2">
+                        {['Wellpoints', 'Sump Pumping', 'Deep Wells'].map(method => (
+                          <PhaseCheck
+                            key={method}
+                            label={method}
+                            checked={(form.phase3.dewateringMethods || []).includes(method)}
+                            onChange={checked => {
+                              const methods = [...(form.phase3.dewateringMethods || [])];
+                              if (checked && !methods.includes(method)) methods.push(method);
+                              else if (!checked) methods.splice(methods.indexOf(method), 1);
+                              updPhase('phase3', { dewateringMethods: methods });
+                            }}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <PhaseTextField
-                        label="Total Headers Required" type="number"
-                        value={form.phase3.totalHeadersRequired}
-                        onChange={v => {
-                          const h = parseFloat(v);
-                          const wp = isNaN(h) ? '' : (h * 6).toString();
-                          updPhase('phase3', { totalHeadersRequired: v, totalWellpointsRequired: wp });
-                        }}
-                        placeholder="e.g. 10"
-                      />
-                      <PhaseTextField
-                        label="Total Wellpoints Required (Auto-calculated: 6/Header)"
-                        value={form.phase3.totalWellpointsRequired}
-                        onChange={() => {}}
-                        readOnly={true}
-                        placeholder="Auto-calculated"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <PhaseTextField
-                        label="Total Pumps Required" type="number"
-                        value={form.phase3.totalPumpsRequired}
-                        onChange={v => updPhase('phase3', { totalPumpsRequired: v })}
-                        placeholder="e.g. 1"
-                      />
-                      <PhaseTextField
-                        label="Expected Daily Diesel Usage"
-                        value={form.phase3.expectedDailyDieselUsage}
-                        onChange={v => updPhase('phase3', { expectedDailyDieselUsage: v })}
-                        placeholder="e.g. 25 Litres"
-                      />
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <PhaseTextField
+                          label="Total Headers Required" type="number"
+                          value={form.phase3.totalHeadersRequired}
+                          onChange={v => {
+                            const h = parseFloat(v);
+                            const wp = isNaN(h) ? '' : (h * 6).toString();
+                            updPhase('phase3', { totalHeadersRequired: v, totalWellpointsRequired: wp });
+                          }}
+                          placeholder="e.g. 10"
+                        />
+                        <PhaseTextField
+                          label="Total Wellpoints Required (Auto-calculated: 6/Header)"
+                          value={form.phase3.totalWellpointsRequired}
+                          onChange={() => {}}
+                          readOnly={true}
+                          placeholder="Auto-calculated"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <PhaseTextField
+                          label="Total Pumps Required" type="number"
+                          value={form.phase3.totalPumpsRequired}
+                          onChange={v => updPhase('phase3', { totalPumpsRequired: v })}
+                          placeholder="e.g. 1"
+                        />
+                        <PhaseTextField
+                          label="Expected Daily Diesel Usage"
+                          value={form.phase3.expectedDailyDieselUsage}
+                          onChange={v => updPhase('phase3', { expectedDailyDieselUsage: v })}
+                          placeholder="e.g. 25 Litres"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-8 text-center">
+                    <LayoutGrid className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+                    <h3 className="text-sm font-semibold text-slate-600">No Engineering Setup Required</h3>
+                    <p className="text-xs text-slate-400 mt-1">Specific calculations are only required for Dewatering services.</p>
+                  </div>
+                )}
                 <Button
                   onClick={() => markDone(3)}
                   variant={form.phase3.completed ? 'outline' : 'default'}

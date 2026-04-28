@@ -522,9 +522,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
         const { data, error } = await supabase
             .from('subtasks')
-            .select('*, main_tasks!inner(workspace_id)')
+            .select('*, main_tasks!inner(workspaceId)')
             .eq('is_deleted', true)
-            .eq('main_tasks.workspace_id', workspaceId)
+            .eq('main_tasks.workspaceId', workspaceId)
             .gt('deleted_at', cutoffDate.toISOString());
 
         if (error) {
@@ -542,7 +542,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             .from('main_tasks')
             .select('*')
             .eq('is_deleted', true)
-            .eq('workspace_id', workspaceId)
+            .eq('workspaceId', workspaceId)
             .gt('deleted_at', cutoffDate.toISOString());
 
         if (error) {

@@ -48,15 +48,9 @@ export function CreateProjectDialog({
     }
   }, [projectStatus, startDate, endDate]);
 
+  const getServiceTemplates = useAppStore(state => state.getServiceTemplates);
   const departmentTasksList = useAppStore(state => state.departmentTasksList);
-  const serviceTemplates = useMemo(() => {
-    return departmentTasksList
-      .filter(d => d.department.startsWith('__SERVICE__'))
-      .map(d => ({
-        serviceName: d.department.replace('__SERVICE__', ''),
-        subtasks: d.onboardingTasks
-      }));
-  }, [departmentTasksList]);
+  const serviceTemplates = useMemo(() => getServiceTemplates(), [departmentTasksList, getServiceTemplates]);
   
   // Local state for subtasks so user can tweak them before creating
   const [subtasks, setSubtasks] = useState<{id?: string, title: string, assignee?: string, deadline?: string, hasUpdate?: boolean}[]>(initialData?.subtasks || []);

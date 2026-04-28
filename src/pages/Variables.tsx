@@ -78,81 +78,9 @@ export function Variables() {
     return () => setIsDirty(false);
   }, []);
 
-  // ── Seed Default Onboarding Templates if empty ──
   const onboardingTemplates = useAppStore(s => s.onboardingTemplates);
   const updateOnboardingTemplate = useAppStore(s => s.updateOnboardingTemplate);
-  
-  useEffect(() => {
-    if (!onboardingTemplates || onboardingTemplates.length === 0) {
-      updateOnboardingTemplate({
-        serviceName: 'Dewatering',
-        phases: {
-          phase1: {
-            title: 'Phase 1',
-            fields: [
-              { id: 'isNewSite', label: 'Is New Site', type: 'checkbox', requiredForActivation: false },
-              { id: 'isNewClient', label: 'Is New Client', type: 'checkbox', requiredForActivation: false },
-              { id: 'siteLength', label: 'Length (m)', type: 'number', requiredForActivation: true },
-              { id: 'siteWidth', label: 'Width (m)', type: 'number', requiredForActivation: true },
-              { id: 'excavationDepthMeters', label: 'Depth of excavation (m)', type: 'number', requiredForActivation: true },
-              { id: 'timelineStartDate', label: 'Timeline start date', type: 'date', requiredForActivation: true },
-              { id: 'geotechnicalReportAvailable', label: 'Geotechnical Report Available', type: 'checkbox', requiredForActivation: false },
-              { id: 'hydrogeologicalDataAvailable', label: 'Hydrogeological Data Available', type: 'checkbox', requiredForActivation: false },
-            ]
-          },
-          phase2: {
-            title: 'Phase 2',
-            fields: [
-              { id: 'siteVisited', label: 'Site Visited', type: 'checkbox', requiredForActivation: true },
-              { id: 'walkthroughCompleted', label: 'Walkthrough Completed', type: 'checkbox', requiredForActivation: true },
-              { id: 'knownObstacles', label: 'Known Obstacles', type: 'text', requiredForActivation: false },
-              { id: 'dischargeLocation', label: 'Discharge Location', type: 'text', requiredForActivation: true },
-              { id: 'dieselSupplyStrategy', label: 'Diesel Supply Strategy', type: 'select', options: ['Client', 'DCEL'], requiredForActivation: true },
-            ]
-          },
-          phase3: {
-            title: 'Phase 3',
-            fields: [
-              { id: 'dewateringMethods', label: 'Dewatering Method(s)', type: 'text', requiredForActivation: true },
-              { id: 'totalHeadersRequired', label: 'Total Headers Required', type: 'number', requiredForActivation: true },
-              { id: 'totalWellpointsRequired', label: 'Total Wellpoints Required', type: 'number', requiredForActivation: true },
-              { id: 'totalPumpsRequired', label: 'Total Pumps Required', type: 'number', requiredForActivation: true },
-              { id: 'expectedDailyDieselUsage', label: 'Expected Daily Diesel Usage (Liters)', type: 'number', requiredForActivation: true },
-            ]
-          },
-          phase4: {
-            title: 'Phase 4',
-            fields: [
-              { id: 'quotationSent', label: 'Quotation Sent', type: 'checkbox', requiredForActivation: true },
-              { id: 'clientFeedbackReceived', label: 'Client Feedback Received', type: 'checkbox', requiredForActivation: true },
-              { id: 'proposalAccepted', label: 'Proposal Accepted', type: 'checkbox', requiredForActivation: true },
-              { id: 'clientTaxStatus', label: 'Client Tax Status', type: 'select', options: ['Mainland (Add 7.5% VAT)', 'Mainland (Yes 7.5% VAT)', 'Free Trade Zone (0% VAT)'], requiredForActivation: true },
-              { id: 'scopeOfWorkSummary', label: 'Scope of Work Summary', type: 'text', requiredForActivation: true },
-              { id: 'scopeExclusionsSummary', label: 'Scope Exclusions Summary', type: 'text', requiredForActivation: true },
-              { id: 'timelineConfirmed', label: 'Timeline Confirmed', type: 'checkbox', requiredForActivation: true },
-              { id: 'permittingResponsibilityOutlined', label: 'Permitting Responsibility Outlined', type: 'checkbox', requiredForActivation: true },
-              { id: 'tinProvided', label: 'TIN Provided', type: 'checkbox', requiredForActivation: true },
-              { id: 'clientTinNumber', label: 'Client TIN Number', type: 'text', requiredForActivation: false },
-              { id: 'mobilizationAdvancePercentage', label: 'Mobilization Advance Percentage', type: 'number', requiredForActivation: true },
-            ]
-          },
-          phase5: {
-            title: 'Phase 5',
-            fields: [
-              { id: 'safetyPlanIntegrated', label: 'Safety Plan Integrated', type: 'checkbox', requiredForActivation: true },
-              { id: 'stage1AdvanceReceived', label: 'Stage 1 Advance Received', type: 'checkbox', requiredForActivation: true },
-              { id: 'stage2InstallationComplete', label: 'Stage 2 Installation Complete', type: 'checkbox', requiredForActivation: true },
-              { id: 'stage2FirstInvoiceIssued', label: 'Stage 2 First Invoice Issued', type: 'checkbox', requiredForActivation: true },
-              { id: 'stage3TimelyBilling', label: 'Stage 3 Timely Billing Ongoing', type: 'checkbox', requiredForActivation: true },
-              { id: 'stage4DemobilizationComplete', label: 'Stage 4 Demobilization Complete', type: 'checkbox', requiredForActivation: true },
-              { id: 'stage4FinalInvoiceIssued', label: 'Stage 4 Final Invoice Issued', type: 'checkbox', requiredForActivation: true },
-              { id: 'actualEndDate', label: 'Actual End Date', type: 'date', requiredForActivation: false },
-            ]
-          }
-        }
-      });
-    }
-  }, [onboardingTemplates, updateOnboardingTemplate]);
+
 
   // ── Ledger variables ───────────────────────────────────────
   const ledgerCategories = useAppStore((state) => state.ledgerCategories);
@@ -190,7 +118,10 @@ export function Variables() {
   const removeServiceTemplateStore = useAppStore((state) => state.removeServiceTemplate);
   const renameServiceTemplateStore = useAppStore((state) => state.renameServiceTemplate);
 
-  const serviceTemplates = useMemo(() => getServiceTemplates(), [departmentTasksList]);
+  const serviceTemplates = useMemo(() => {
+    // Filter out "Dewatering" from the variables page as it's built-in and constant
+    return getServiceTemplates().filter(s => s.serviceName.toLowerCase() !== 'dewatering');
+  }, [departmentTasksList]);
   
   const [selectedService, setSelectedService] = useState('');
   const [newServiceName, setNewServiceName] = useState('');
@@ -722,6 +653,12 @@ export function Variables() {
     const newName = prompt('Enter new name for service:', oldName);
     if (!newName || newName === oldName) return;
 
+    // Block renaming to "Dewatering" (case-insensitive)
+    if (newName.trim().toLowerCase() === 'dewatering') {
+      toast.error('The Dewatering service is a built-in system preset and cannot be modified here.');
+      return;
+    }
+
     const exists = serviceTemplates.find(s => s.serviceName.toLowerCase() === newName.toLowerCase());
     if (exists) {
       toast.error('Service with this name already exists.');
@@ -1189,6 +1126,13 @@ export function Variables() {
                     variant="outline"
                     onClick={() => {
                       if (!newServiceName) return;
+                      
+                      // Block adding "Dewatering" (case-insensitive)
+                      if (newServiceName.trim().toLowerCase() === 'dewatering') {
+                        toast.error('The Dewatering service is a built-in system preset and cannot be modified here.');
+                        return;
+                      }
+
                       const exists = serviceTemplates.find(s => s.serviceName.toLowerCase() === newServiceName.toLowerCase());
                       if (!exists) {
                         updateServiceTemplate({ serviceName: newServiceName, subtasks: [] });
