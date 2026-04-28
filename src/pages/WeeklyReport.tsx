@@ -162,7 +162,7 @@ export function WeeklyReport() {
     const doc = new jsPDF();
     
     // Design Tokens
-    const colors = {
+    const colors: Record<string, [number, number, number]> = {
       primary: [15, 23, 42],    // Slate 900
       secondary: [51, 65, 85],  // Slate 700
       accent: [37, 99, 235],    // Blue 600
@@ -271,7 +271,7 @@ export function WeeklyReport() {
       theme: 'grid',
       styles: { fontSize: 9, cellPadding: 4, font: 'helvetica' },
       headStyles: { fillColor: colors.primary, textColor: colors.white, fontStyle: 'bold' },
-      columnStyles: { 0: { fontStyle: 'bold', width: 100 }, 1: { halign: 'right' } },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 100 }, 1: { halign: 'right' } },
       margin: { left: margin, right: margin }
     });
 
@@ -359,9 +359,9 @@ export function WeeklyReport() {
         head: [['TIMESTAMP', 'AUTHOR', 'UPDATE / COMMENT']],
         body: commentData,
         styles: { fontSize: 7.5, cellPadding: 3, font: 'helvetica' },
-        headStyles: { fillColor: [71, 85, 105], textColor: colors.white },
+        headStyles: { fillColor: [71, 85, 105] as [number, number, number], textColor: colors.white },
         margin: { left: margin, right: margin },
-        columnStyles: { 2: { width: 120 } }
+        columnStyles: { 2: { cellWidth: 120 } }
       });
       
       currentY = (doc as any).lastAutoTable.finalY + 15;
@@ -414,7 +414,7 @@ export function WeeklyReport() {
     doc.text('Executive Management', pageWidth / 2, currentY + 5);
 
     // 10. FOOTER (PAGE NUMBERS)
-    const pageCount = doc.internal.getNumberOfPages();
+    const pageCount = doc.getNumberOfPages();
     doc.setFontSize(7);
     doc.setTextColor(colors.muted[0], colors.muted[1], colors.muted[2]);
     for (let i = 1; i <= pageCount; i++) {
