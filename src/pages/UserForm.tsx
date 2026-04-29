@@ -5,7 +5,7 @@ import { Input } from '@/src/components/ui/input';
 import {
   ArrowLeft, Save, Eye, EyeOff, Shield, ChevronDown, ChevronRight,
   CheckCircle2, X, BookmarkPlus, Trash2,
-  LayoutDashboard, Users as UsersIcon, Building2, Landmark, Settings, Package, Library, History, ListTodo,
+  LayoutDashboard, Users as UsersIcon, Building2, Landmark, Settings, Package, Library, History, ListTodo, FileText
 } from 'lucide-react';
 import { useUserStore, AppUser, UserPrivileges, FULL_ACCESS, NO_ACCESS, PrivilegePreset } from '@/src/store/userStore';
 import { useAppStore } from '@/src/store/appStore';
@@ -156,6 +156,19 @@ const PRIV_GROUPS: PG[] = [
         fields: [{ key: 'canView', label: 'View' }, { key: 'canExport', label: 'Export' }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canViewPayrollSummary', label: 'Payroll Summary Tab' }, { key: 'canViewLoansAndAdvances', label: 'Loans & Advances Tab' }] },
       { key: 'ledger', label: 'Financial Ledger & Expenses', parentKey: 'ledger', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Record Entries' }, { key: 'canEdit', label: 'Edit Variables' }, { key: 'canDelete', label: 'Delete Entries', danger: true }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
+    ],
+  },
+  {
+    name: 'Reporting', icon: FileText, color: 'blue',
+    pages: [
+      { key: 'weeklyReport', label: 'Weekly Operations Report', parentKey: 'weeklyReport', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View Report' },
+          { key: 'canViewHr', label: 'View HR Summary' },
+          { key: 'canViewOps', label: 'View Operational Activity' },
+          { key: 'canViewComm', label: 'View Communications' },
+          { key: 'canViewFinance', label: 'View Financial Reconciliation' },
+        ] },
     ],
   },
   {

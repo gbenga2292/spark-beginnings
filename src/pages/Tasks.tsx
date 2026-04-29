@@ -108,7 +108,8 @@ function PersonalTasksView() {
     updateSubtask, updateSubtaskStatus, deleteMainTask, updateMainTask, comments, reminders,
     fetchArchivedSubtasks, restoreSubtask, deleteSubtaskPermanently } = useAppData();
   const { user: currentUser } = useAuth();
-  const { wsTasks, workspace } = useWorkspace();
+  const { wsTasks: rawWsTasks, workspace } = useWorkspace();
+  const wsTasks = React.useMemo(() => rawWsTasks.filter(mt => mt.is_project || subtasks.some(s => s.mainTaskId === mt.id || (s as any).main_task_id === mt.id)), [rawWsTasks, subtasks]);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -615,7 +616,8 @@ function AdminTasksView() {
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [showCreateProject, setShowCreateProject] = useState(false);
   const { hrVariables } = useAppStore();
-  const { wsTasks: teamTasks, wsMembers, workspace: teamWs } = useWorkspace();
+  const { wsTasks: rawTeamTasks, wsMembers, workspace: teamWs } = useWorkspace();
+  const teamTasks = React.useMemo(() => rawTeamTasks.filter(mt => mt.is_project || subtasks.some(s => s.mainTaskId === mt.id || (s as any).main_task_id === mt.id)), [rawTeamTasks, subtasks]);
 
   const handleSetDefault = () => localStorage.setItem('tf_default_sort', sortBy);
 
@@ -735,6 +737,7 @@ function AdminTasksView() {
 
   const tabFiltered = filtered.filter(mt => {
     const status = deriveMainTaskStatus(mt.id, teamSubtasks);
+
     if (statusFilter === 'all') return status !== 'completed';
     return status === statusFilter;
   });
@@ -894,7 +897,7 @@ function AdminTasksView() {
       {viewMode === 'gantt' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <TaskGanttView
-            mainTasks={scope === 'projects' ? tabFiltered.filter(m => m.is_project) : scope === 'mine' ? mainTasks.filter(m => filteredMySubs.some(s => s.mainTaskId === m.id)) : tabFiltered}
+            mainTasks={scope === 'projects' ? tabFiltered.filter(m => m.is_project) : scope === 'mine' ? teamTasks.filter(m => filteredMySubs.some(s => s.mainTaskId === m.id)) : tabFiltered}
             subtasks={scope === 'mine' ? filteredMySubs as SubTask[] : teamSubtasks}
             users={activeUsers}
             onOpenSubtask={id => setOpenSubtaskId(id)}
@@ -911,7 +914,7 @@ function AdminTasksView() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <TaskFocusView
             subtasks={scope === 'mine' ? mySubs : scope === 'projects' ? teamSubtasks.filter(s => tabFiltered.find(m => m.is_project && m.id === s.mainTaskId)) : teamSubtasks}
-            mainTasks={scope === 'projects' ? tabFiltered.filter(m => m.is_project) : mainTasks}
+            mainTasks={scope === 'projects' ? tabFiltered.filter(m => m.is_project) : teamTasks}
             users={activeUsers}
             onClickSubtask={id => setOpenSubtaskId(id)}
           />
@@ -923,7 +926,7 @@ function AdminTasksView() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <TaskInboxView
             subtasks={scope === 'mine' ? mySubs : scope === 'projects' ? teamSubtasks.filter(s => tabFiltered.find(m => m.is_project && m.id === s.mainTaskId)) : teamSubtasks}
-            mainTasks={scope === 'projects' ? tabFiltered.filter(m => m.is_project) : mainTasks}
+            mainTasks={scope === 'projects' ? tabFiltered.filter(m => m.is_project) : teamTasks}
             users={activeUsers}
             activeSubtaskId={openSubtaskId}
             onSelectSubtask={id => setOpenSubtaskId(id)}

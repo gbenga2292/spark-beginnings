@@ -64,6 +64,15 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
     subtaskId: null
   });
 
+  // Custom Vehicle UI Prompt State
+  const [vehiclePrompt, setVehiclePrompt] = useState<{ isOpen: boolean; subtaskId: string | null; newExpiryDate: string }>({
+    isOpen: false,
+    subtaskId: null,
+    newExpiryDate: new Date().toISOString().split('T')[0],
+  });
+
+  const [showListOnMobile, setShowListOnMobile] = useState(true);
+
   // Group subtasks under their MainTasks — normalize snake_case from Supabase
   const groupedTasks = useMemo(() => {
     const filteredSubs = subtasks.filter(s => {
@@ -135,7 +144,9 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
   useEffect(() => {
     if (!hasAutoSelected.current && !activeSubtaskId && flatSubtasks.length > 0 && flatSubtasks[0]?.id) {
       hasAutoSelected.current = true;
-      onSelectSubtask(flatSubtasks[0].id!);
+      if (window.innerWidth >= 768) {
+        onSelectSubtask(flatSubtasks[0].id!);
+      }
     }
   }, [flatSubtasks, activeSubtaskId, onSelectSubtask]);
 
@@ -163,10 +174,10 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
   };
 
   return (
-    <div className={className || "flex h-[calc(100vh-140px)] rounded-2xl border border-border overflow-hidden shadow-sm"}>
+    <div className={className || "flex flex-col md:flex-row h-[calc(100vh-140px)] rounded-2xl border border-border overflow-hidden shadow-sm bg-white"}>
 
       {/* ── LEFT SIDEBAR ─────────────────────────────────────────────────── */}
-      <div className="w-72 flex-shrink-0 border-r border-border bg-white flex flex-col">
+      <div className={`w-full md:w-72 flex-shrink-0 border-r border-border bg-white flex-col ${(!activeSubtaskId || showListOnMobile) ? 'flex' : 'hidden md:flex'}`}>
         {/* Header */}
         <div className="px-4 pt-5 pb-3 border-b border-border">
           <div className="flex items-center gap-3 mb-4">
@@ -264,7 +275,10 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                       return (
                         <button
                           key={sub.id}
-                          onClick={() => onSelectSubtask(sub.id!)}
+                          onClick={() => {
+                            onSelectSubtask(sub.id!);
+                            setShowListOnMobile(false);
+                          }}
                           className={`group relative w-full flex items-center justify-between pl-6 pr-3 py-2.5 rounded-xl text-left transition-all
                             ${isActive ? 'bg-orange-100/60 ring-1 ring-orange-300 shadow-sm' : 'hover:bg-slate-50'}
                           `}
@@ -283,7 +297,21 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                                 const isAssignee = sub.assignedTo?.split(',').includes(currentUser?.id || '');
                                 const canChange = currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || mainT?.createdBy === currentUser?.id || isAssignee;
                                 if (canChange && currentUser) {
-                                  updateSubtaskStatus(sub.id!, newStatus, currentUser.id);
+                                  let isVehicleDoc = false;
+                                  try {
+                                    const meta = JSON.parse(sub.description || '{}');
+                                    if (meta.refType === 'vehicle_doc_renewal') isVehicleDoc = true;
+                                  } catch (e) {}
+                                  
+                                  if (isVehicleDoc && newStatus === 'completed') {
+                                      setVehiclePrompt({
+                                          isOpen: true,
+                                          subtaskId: sub.id || null,
+                                          newExpiryDate: sub.deadline?.split('T')[0] || new Date().toISOString().split('T')[0]
+                                      });
+                                  } else {
+                                      updateSubtaskStatus(sub.id!, newStatus, currentUser.id);
+                                  }
                                 } else {
                                   toast.error("You don't have permission to change this task's status");
                                 }
@@ -327,19 +355,27 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
 
       {/* ── MIDDLE + RIGHT AREA ───────────────────────────────────────────── */}
       {activeSubtask && activeMainTask ? (
-        <div className="flex-1 flex overflow-hidden min-w-0">
+        <div className={`flex-1 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden min-w-0 ${!showListOnMobile ? 'flex' : 'hidden md:flex'}`}>
 
           {/* MIDDLE: Task Detail */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
+          <div className="flex flex-col xl:flex-1 xl:overflow-hidden bg-slate-50">
             {/* Top nav */}
-            <div className="h-16 border-b border-border bg-slate-50/50 flex items-center justify-between px-6 flex-shrink-0">
-              <button
-                onClick={() => navigateSubtask(-1)}
-                disabled={activeIndex <= 0}
-                className="relative flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-slate-700 text-sm font-bold shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] hover:bg-slate-50 active:translate-y-[3px] active:shadow-[0_0_0_1px_#e2e8f0,0_0_0_0_#cbd5e1] transition-colors disabled:opacity-40 disabled:active:translate-y-0 disabled:active:shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] disabled:cursor-not-allowed select-none"
-              >
-                <ArrowLeft className="w-4 h-4 text-slate-400" /> Previous Task
-              </button>
+            <div className="h-16 border-b border-border bg-slate-50/50 flex items-center justify-between px-4 xl:px-6 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowListOnMobile(true)}
+                  className="md:hidden p-2 -ml-2 rounded-lg hover:bg-slate-200 text-slate-500"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => navigateSubtask(-1)}
+                  disabled={activeIndex <= 0}
+                  className="hidden md:flex relative items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-slate-700 text-sm font-bold shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] hover:bg-slate-50 active:translate-y-[3px] active:shadow-[0_0_0_1px_#e2e8f0,0_0_0_0_#cbd5e1] transition-colors disabled:opacity-40 disabled:active:translate-y-0 disabled:active:shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] disabled:cursor-not-allowed select-none"
+                >
+                  <ArrowLeft className="w-4 h-4 text-slate-400" /> Previous Task
+                </button>
+              </div>
 
               <div className="text-xs font-bold tracking-widest text-slate-400 uppercase">
                 Task Navigation
@@ -348,15 +384,15 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
               <button
                 onClick={() => navigateSubtask(1)}
                 disabled={activeIndex >= flatSubtasks.length - 1 || activeIndex === -1}
-                className="relative flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-slate-700 text-sm font-bold shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] hover:bg-slate-50 active:translate-y-[3px] active:shadow-[0_0_0_1px_#e2e8f0,0_0_0_0_#cbd5e1] transition-colors disabled:opacity-40 disabled:active:translate-y-0 disabled:active:shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] disabled:cursor-not-allowed select-none"
+                className="hidden md:flex relative items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-slate-700 text-sm font-bold shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] hover:bg-slate-50 active:translate-y-[3px] active:shadow-[0_0_0_1px_#e2e8f0,0_0_0_0_#cbd5e1] transition-colors disabled:opacity-40 disabled:active:translate-y-0 disabled:active:shadow-[0_0_0_1px_#e2e8f0,0_3px_0_0_#cbd5e1] disabled:cursor-not-allowed select-none"
               >
                 Next Task <ArrowRight className="w-4 h-4 text-slate-400" />
               </button>
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-8 max-w-3xl">
+            <div className="flex-1 xl:overflow-y-auto">
+              <div className="p-4 md:p-8 max-w-3xl">
 
                 {/* Title & Parent */}
                 <div className="flex items-start justify-between gap-4 mb-6">
@@ -502,13 +538,11 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                                 } catch (e) {}
 
                                 if (isVehicleDoc) {
-                                  const newDate = window.prompt("Enter the NEW expiry date (YYYY-MM-DD):", activeSubtask.deadline?.split('T')[0]);
-                                  if (!newDate) return;
-                                  if (isNaN(new Date(newDate).getTime())) {
-                                    toast.error("Invalid date format. Please use YYYY-MM-DD.");
-                                    return;
-                                  }
-                                  approveSubtask(activeSubtask.id!, currentUser?.id, newDate);
+                                  setVehiclePrompt({
+                                    isOpen: true,
+                                    subtaskId: activeSubtask.id || null,
+                                    newExpiryDate: activeSubtask.deadline?.split('T')[0] || new Date().toISOString().split('T')[0]
+                                  });
                                 } else {
                                   approveSubtask(activeSubtask.id!, currentUser?.id);
                                 }
@@ -566,11 +600,15 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                             // Special intercept logic for HMO tasks
                             let isHmo = false;
                             let hmoEmpId = "";
+                            let isVehicleDoc = false;
                             try {
                               const meta = JSON.parse(activeSubtask.description || '{}');
                               if (meta.refType === 'hmo') {
                                 isHmo = true;
                                 hmoEmpId = meta.employeeId;
+                              }
+                              if (meta.refType === 'vehicle_doc_renewal') {
+                                isVehicleDoc = true;
                               }
                             } catch (e) {}
 
@@ -581,6 +619,15 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                                   startDate: new Date().toISOString().split('T')[0],
                                   employeeId: hmoEmpId,
                                   subtaskId: activeSubtask.id || null
+                               });
+                               return;
+                            }
+                            
+                            if (isVehicleDoc && s === 'completed') {
+                               setVehiclePrompt({
+                                 isOpen: true,
+                                 subtaskId: activeSubtask.id || null,
+                                 newExpiryDate: activeSubtask.deadline?.split('T')[0] || new Date().toISOString().split('T')[0]
                                });
                                return;
                             }
@@ -759,7 +806,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
           </div>
 
           {/* RIGHT: Updates Panel */}
-          <div className="w-[520px] flex-shrink-0 bg-white border-l border-border flex flex-col overflow-hidden">
+          <div className="w-full xl:w-[400px] 2xl:w-[520px] flex-shrink-0 bg-white border-t xl:border-t-0 xl:border-l border-border flex flex-col xl:overflow-hidden min-h-[600px] xl:min-h-0">
             <div className="flex bg-slate-50 border-b border-border" style={{ flexShrink: 0 }}>
               {(['updates', 'workflow', 'files'] as const).map(tab => (
                 <button
@@ -804,7 +851,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
         </div>
       ) : (
         /* Empty state */
-        <div className="flex-1 flex flex-col items-center justify-center bg-[#f7f7f8] text-slate-400 p-8">
+        <div className={`flex-1 flex flex-col items-center justify-center bg-[#f7f7f8] text-slate-400 p-8 ${!showListOnMobile ? 'flex' : 'hidden md:flex'}`}>
           <div className="w-20 h-20 rounded-3xl bg-slate-100 flex items-center justify-center mb-5">
             <CheckCircle2 className="w-10 h-10 text-slate-300" />
           </div>
@@ -862,6 +909,50 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                   className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-2"
                 >
                   <CheckCircle2 className="w-4 h-4" /> Confirm
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {vehiclePrompt.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-sm border border-slate-200 dark:border-slate-800">
+             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                 <h3 className="text-[15px] font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                   <AlertTriangle className="w-5 h-5 text-indigo-500" /> Update Expiry Date
+                 </h3>
+                 <button onClick={() => setVehiclePrompt(p => ({ ...p, isOpen: false }))} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+             </div>
+             <div className="p-5 space-y-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">New Expiry Date</label>
+                  <input 
+                    type="date" 
+                    value={vehiclePrompt.newExpiryDate} 
+                    onChange={e => setVehiclePrompt(p => ({ ...p, newExpiryDate: e.target.value }))}
+                    className="w-full h-10 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                  />
+                </div>
+             </div>
+             <div className="p-5 bg-slate-50 dark:bg-slate-800/50 rounded-b-xl flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                <button onClick={() => setVehiclePrompt(p => ({ ...p, isOpen: false }))} className="px-4 py-2 rounded-lg text-sm font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button 
+                  onClick={() => {
+                     if (!vehiclePrompt.newExpiryDate) return;
+                     if (isNaN(new Date(vehiclePrompt.newExpiryDate).getTime())) {
+                       toast.error("Invalid date format.");
+                       return;
+                     }
+                     if (vehiclePrompt.subtaskId) {
+                       approveSubtask(vehiclePrompt.subtaskId, currentUser?.id, vehiclePrompt.newExpiryDate);
+                     }
+                     toast.success("Task completed and vehicle document updated!");
+                     setVehiclePrompt(p => ({ ...p, isOpen: false }));
+                  }}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-2"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Complete Task
                 </button>
              </div>
           </div>

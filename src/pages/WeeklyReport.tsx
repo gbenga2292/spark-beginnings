@@ -1,4 +1,4 @@
-import { useState, useMemo, useContext } from 'react';
+import { useState, useMemo } from 'react';
 import { useAppStore } from '@/src/store/appStore';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
@@ -8,8 +8,10 @@ import {
   ChevronLeft, ChevronRight, Users, Fuel, Truck, BookOpen, UserPlus, 
   Activity, MapPin, Download, Calendar, BarChart2, Wallet, 
   CreditCard, MessageSquare, ShieldAlert, FileText, LayoutDashboard,
-  ClipboardCheck, TrendingDown, TrendingUp, X, Printer, Search, History
+  ClipboardCheck, TrendingDown, TrendingUp, X, Printer, Search, History,
+  Lock
 } from 'lucide-react';
+import { useUserStore } from '@/src/store/userStore';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
@@ -17,12 +19,7 @@ import { cn } from '@/src/lib/utils';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/src/components/ui/dialog";
+
 
 // Import logo for PDF
 import logoImg from '../../logo/logo-1.png';
@@ -50,6 +47,26 @@ export function WeeklyReport() {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // ── Permissions ───────────────────────────────────────
+  const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId) || null);
+  const privs = currentUser?.privileges?.weeklyReport || { 
+    canView: false, canViewHr: false, canViewOps: false, canViewComm: false, canViewFinance: false 
+  };
+
+  if (!privs.canView && currentUser?.role !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400 gap-4">
+        <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center">
+          <Lock className="h-8 w-8 text-slate-300" />
+        </div>
+        <div className="text-center">
+          <h3 className="text-lg font-bold text-slate-600">Access Restricted</h3>
+          <p className="text-sm">You do not have permission to view the Weekly Operations Report.</p>
+        </div>
+      </div>
+    );
+  }
 
   // ── Context data ──────────────────────────────────────
   const { mainTasks, subtasks, comments, users } = useAppData();
@@ -131,6 +148,49 @@ export function WeeklyReport() {
     return Object.values(map);
   }, [weekMachineLogs]);
 
+  // ── Summarized Attendance ────────────────────────────
+  const summarizedAttendance = useMemo(() => {
+    const staffMap: Record<string, any[]> = {};
+    weekAttendance.forEach(r => {
+      if (!staffMap[r.staffId]) staffMap[r.staffId] = [];
+      staffMap[r.staffId].push(r);
+    });
+
+    return Object.entries(staffMap).map(([staffId, records]) => {
+      const first = records[0];
+      const sites = new Set<string>();
+      const activeDays: string[] = [];
+      let totalShifts = 0;
+
+      records.forEach(r => {
+        const isPresent = r.day === 'Yes' || r.night === 'Yes';
+        if (isPresent) {
+          activeDays.push(format(parseISO(r.date), 'EEE'));
+          if (r.day === 'Yes') {
+             totalShifts++;
+             if (r.daySite) sites.add(r.daySite);
+          }
+          if (r.night === 'Yes') {
+             totalShifts++;
+             if (r.nightSite) sites.add(r.nightSite);
+          }
+        }
+      });
+
+      const summaryText = activeDays.length > 0 
+        ? `Present on ${activeDays.join(', ')}. Total ${totalShifts} shifts at ${Array.from(sites).join(' & ') || 'N/A'}.`
+        : 'No active shifts recorded this week.';
+
+      return {
+        staffId,
+        staffName: first.staffName,
+        position: first.position,
+        summary: summaryText,
+        isPresent: activeDays.length > 0
+      };
+    });
+  }, [weekAttendance]);
+
   const weekLabel = `${format(start, 'dd MMM yyyy')} – ${format(end, 'dd MMM yyyy')}`;
 
   // ── Page Header ───────────────────────────────────────
@@ -186,24 +246,15 @@ export function WeeklyReport() {
       doc.line(margin, y, pageWidth - margin, y);
     };
 
-    // 1. BRANDING & TITLE (Letterhead Style)
-    // Add Logo
-    try {
-      doc.addImage(logoImg, 'PNG', margin, currentY, 25, 25);
-    } catch (e) {
-      console.warn("Logo failed to load for PDF");
-    }
-
     doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
-    doc.text('SPARK BEGINNINGS', margin + 30, currentY + 12);
+    doc.text('PROFESSIONAL SITE OPERATIONS LEDGER', margin, currentY + 12);
     
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(colors.muted[0], colors.muted[1], colors.muted[2]);
-    doc.text('ENTERPRISE OPERATIONS & LOGISTICS SOLUTIONS', margin + 30, currentY + 18);
-    doc.text('INDUSTRIAL PARK WAY, LAGOS, NIGERIA', margin + 30, currentY + 23);
+    doc.text('WEEKLY OPERATIONS & RESOURCES SUMMARY', margin, currentY + 18);
 
     currentY += 35;
     drawDivider(currentY, colors.primary);
@@ -251,7 +302,7 @@ export function WeeklyReport() {
     doc.setFontSize(10);
     doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
     
-    const narrativeSummary = `During the operational week concluding on ${format(end, 'dd MMMM')}, Spark Beginnings maintained a robust deployment across all active sites. A total of ${uniqueStaffDeployed} personnel were active, supporting operations that utilized approximately ${totalDiesel.toFixed(1)} liters of diesel fuel. Financially, the week registered a total revenue inflow of NGN ${totalIncome.toLocaleString()} against operational expenditures of NGN ${totalExpenses.toLocaleString()}. This report details HR activity, machine performance, and task progress recorded during this interval.`;
+    const narrativeSummary = `During the operational week concluding on ${format(end, 'dd MMMM yyyy')}, a total of ${uniqueStaffDeployed} personnel were active across site operations. Asset utilization consumed approximately ${totalDiesel.toFixed(1)} liters of diesel fuel. Financially, the week recorded a total revenue inflow of NGN ${totalIncome.toLocaleString()} against operational expenditures of NGN ${totalExpenses.toLocaleString()}. This ledger provides an authoritative summary of workforce, logistics, assets, and task progression during this reporting interval.`;
     
     const splitSummary = doc.splitTextToSize(narrativeSummary, contentWidth);
     doc.text(splitSummary, margin, currentY);
@@ -398,7 +449,7 @@ export function WeeklyReport() {
     
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(9);
-    doc.text('This document serves as an official record of operations for Spark Beginnings. Any discrepancies should be reported to the IT/Operations department immediately.', margin, currentY);
+    doc.text('This document serves as an official operations ledger. Any discrepancies should be reported immediately.', margin, currentY);
     
     currentY += 20;
     doc.setFont('helvetica', 'bold');
@@ -419,12 +470,12 @@ export function WeeklyReport() {
     doc.setTextColor(colors.muted[0], colors.muted[1], colors.muted[2]);
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
-      doc.text(`Spark Beginnings Internal Operations Report | Generated: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, margin, pageHeight - 10);
+      doc.text(`Official Operations Ledger | Generated: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, margin, pageHeight - 10);
       doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
     }
 
     if (mode === 'download') {
-      doc.save(`Spark_Weekly_Report_${format(start, 'yyyy_MM_dd')}.pdf`);
+      doc.save(`Operations_Ledger_${format(start, 'yyyy_MM_dd')}.pdf`);
     } else {
       const blobUrl = doc.output('bloburl').toString();
       setPdfPreviewUrl(blobUrl);
@@ -471,17 +522,43 @@ export function WeeklyReport() {
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950/50 overflow-hidden font-sans pb-10">
       
       {/* Main Content Area */}
+      {pdfPreviewUrl ? (
+        <div className="flex-1 flex flex-col p-4 sm:p-6 space-y-4 max-w-7xl mx-auto w-full h-full overflow-hidden">
+          <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 shrink-0">
+             <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md">
+                   <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                   <h2 className="text-base font-black text-slate-800 dark:text-slate-200 tracking-tight">Report Document Preview</h2>
+                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Professional Site Operations Ledger</p>
+                </div>
+             </div>
+             <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => { setPdfPreviewUrl(null); setIsPreviewOpen(false); }} className="rounded-xl font-bold text-[10px] uppercase gap-2 h-9">
+                   <X className="h-3.5 w-3.5" /> Close Preview
+                </Button>
+                <Button size="sm" onClick={() => generateProfessionalPDF('download')} className="rounded-xl bg-slate-900 hover:bg-black text-white font-bold shadow-lg h-9 px-4 gap-2 text-[10px] uppercase">
+                   <Printer className="h-3.5 w-3.5" /> Save PDF
+                </Button>
+             </div>
+          </div>
+          <div className="flex-1 bg-slate-800/50 rounded-xl overflow-hidden shadow-inner border dark:border-slate-700 relative">
+             <iframe src={`${pdfPreviewUrl}#toolbar=0&navpanes=0`} className="absolute inset-0 w-full h-full bg-white" title="Operations Ledger Preview" />
+          </div>
+        </div>
+      ) : (
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-8 max-w-7xl mx-auto w-full">
         
         {/* Quick Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
           {[
-            { label: 'Staff Deployed', value: uniqueStaffDeployed, icon: Users, color: 'text-blue-600 bg-blue-100/50' },
-            { label: 'Diesel Consumed', value: `${totalDiesel.toFixed(0)}L`, icon: Fuel, color: 'text-amber-600 bg-amber-100/50' },
-            { label: 'Net Cashflow', value: (totalIncome - totalExpenses).toLocaleString(), icon: Wallet, color: totalIncome >= totalExpenses ? 'text-emerald-600 bg-emerald-100/50' : 'text-rose-600 bg-rose-100/50', isCurrency: true },
-            { label: 'Communications', value: weekCommLogs.length, icon: MessageSquare, color: 'text-indigo-600 bg-indigo-100/50' },
-            { label: 'HR Incidents', value: weekMerits.length + weekDisciplinary.length, icon: ShieldAlert, color: 'text-violet-600 bg-violet-100/50' },
-          ].map(stat => (
+            { label: 'Staff Deployed', value: uniqueStaffDeployed, icon: Users, color: 'text-blue-600 bg-blue-100/50', show: privs.canViewHr },
+            { label: 'Diesel Consumed', value: `${totalDiesel.toFixed(0)}L`, icon: Fuel, color: 'text-amber-600 bg-amber-100/50', show: privs.canViewOps },
+            { label: 'Net Cashflow', value: (totalIncome - totalExpenses).toLocaleString(), icon: Wallet, color: totalIncome >= totalExpenses ? 'text-emerald-600 bg-emerald-100/50' : 'text-rose-600 bg-rose-100/50', isCurrency: true, show: privs.canViewFinance },
+            { label: 'Communications', value: weekCommLogs.length, icon: MessageSquare, color: 'text-indigo-600 bg-indigo-100/50', show: privs.canViewComm },
+            { label: 'HR Incidents', value: weekMerits.length + weekDisciplinary.length, icon: ShieldAlert, color: 'text-violet-600 bg-violet-100/50', show: privs.canViewHr },
+          ].filter(s => s.show || currentUser?.role === 'admin').map(stat => (
             <Card key={stat.label} className="border-none shadow-sm bg-white dark:bg-slate-900 rounded-xl overflow-hidden">
               <CardContent className="p-4 flex items-center gap-4">
                 <div className={cn('h-10 w-10 rounded-lg flex items-center justify-center shrink-0', stat.color)}>
@@ -504,6 +581,7 @@ export function WeeklyReport() {
           <div className="lg:col-span-8 space-y-8">
             
             {/* HR SECTION */}
+            {(privs.canViewHr || currentUser?.role === 'admin') && (
             <section className="space-y-4">
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
@@ -512,7 +590,7 @@ export function WeeklyReport() {
                   </div>
                   <h2 className="text-base font-bold text-slate-800 dark:text-slate-200 tracking-tight">Human Resources Summary</h2>
                 </div>
-                <Badge variant="outline" className="bg-white dark:bg-slate-900 border-slate-200 text-slate-500 font-bold text-[10px] px-2 py-0.5">{weekAttendance.length} records</Badge>
+                <Badge variant="outline" className="bg-white dark:bg-slate-900 border-slate-200 text-slate-500 font-bold text-[10px] px-2 py-0.5">{summarizedAttendance.length} Employees</Badge>
               </div>
 
               {/* Attendance Table */}
@@ -524,38 +602,31 @@ export function WeeklyReport() {
                   <table className="w-full text-left">
                     <thead>
                       <tr className="bg-slate-100 dark:bg-slate-800/50 text-[10px] uppercase font-bold tracking-wider text-slate-500">
-                        <th className="px-6 py-3">Date</th>
                         <th className="px-6 py-3">Employee</th>
-                        <th className="px-6 py-3">Shifts</th>
-                        <th className="px-6 py-3">Location</th>
+                        <th className="px-6 py-3">Weekly Summary</th>
                         <th className="px-6 py-3">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {weekAttendance.length === 0 ? (
-                        <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400 italic text-xs">No records for this period</td></tr>
+                      {summarizedAttendance.length === 0 ? (
+                        <tr><td colSpan={3} className="px-6 py-8 text-center text-slate-400 italic text-xs">No records for this period</td></tr>
                       ) : (
-                        weekAttendance.map(r => (
-                          <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                            <td className="px-6 py-4 text-slate-400 font-mono text-[10px] whitespace-nowrap">{r.date}</td>
+                        summarizedAttendance.map(r => (
+                          <tr key={r.staffId} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                             <td className="px-6 py-4">
                               <div className="font-bold text-slate-700 dark:text-slate-200 text-sm">{r.staffName}</div>
                               <div className="text-[10px] text-slate-400 font-bold uppercase">{r.position}</div>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="flex gap-1">
-                                {r.day === 'Yes' && <Badge className="bg-orange-100 text-orange-600 dark:bg-orange-900/20 border-none text-[9px] font-black px-2 py-0">DAY</Badge>}
-                                {r.night === 'Yes' && <Badge className="bg-indigo-100 text-indigo-600 dark:bg-indigo-900/20 border-none text-[9px] font-black px-2 py-0">NIGHT</Badge>}
-                              </div>
+                              <div className="text-xs text-slate-600 dark:text-slate-400 font-medium">{r.summary}</div>
                             </td>
-                            <td className="px-6 py-4 text-slate-600 dark:text-slate-400 font-bold text-xs">{r.daySite || r.nightSite || 'N/A'}</td>
                             <td className="px-6 py-4">
-                              {r.absentStatus ? (
-                                <Badge className="bg-rose-500 text-white border-none text-[9px] font-black px-2 py-0.5">{r.absentStatus}</Badge>
-                              ) : (
+                              {r.isPresent ? (
                                 <div className="flex items-center gap-1.5 font-bold text-[9px] uppercase text-emerald-500">
-                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.5)]" /> Present
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.5)]" /> Active
                                 </div>
+                              ) : (
+                                <Badge className="bg-slate-100 text-slate-400 border-none text-[9px] font-black px-2 py-0.5 uppercase">Inactive</Badge>
                               )}
                             </td>
                           </tr>
@@ -619,8 +690,10 @@ export function WeeklyReport() {
                 </Card>
               </div>
             </section>
+            )}
 
             {/* OPERATIONS SECTION */}
+            {(privs.canViewOps || currentUser?.role === 'admin') && (
             <section className="space-y-4">
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
@@ -709,6 +782,7 @@ export function WeeklyReport() {
                 </div>
               </Card>
             </section>
+            )}
 
           </div>
 
@@ -716,6 +790,7 @@ export function WeeklyReport() {
           <div className="lg:col-span-4 space-y-8">
             
             {/* COMMUNICATIONS SECTION */}
+            {(privs.canViewComm || currentUser?.role === 'admin') && (
             <section className="space-y-4">
               <div className="flex items-center gap-2 border-b-2 border-indigo-500/10 pb-3 px-1">
                 <MessageSquare className="h-5 w-5 text-indigo-600" />
@@ -744,10 +819,25 @@ export function WeeklyReport() {
                                 <span className="text-[8px] font-black text-indigo-500 uppercase tracking-tight bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded border dark:border-slate-800">{l.channel}</span>
                                 <span className="text-[9px] text-slate-300 font-mono font-bold">{l.date}</span>
                              </div>
-                             <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 leading-tight mb-1">{l.subject || 'UNTITLED COMM'}</p>
+                             <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 leading-tight mb-1">
+                                {l.subject || (() => {
+                                  if (!l.notes) return 'Communication Record';
+                                  const n = l.notes.toLowerCase();
+                                  if (n.includes('report')) return 'Site Report Submission';
+                                  if (n.includes('follow up') || n.includes('follow-up')) return 'Follow-up Communication';
+                                  if (n.includes('meeting')) return 'Meeting Notes';
+                                  if (n.includes('call') || n.includes('called')) return 'Phone Call Summary';
+                                  if (n.includes('whatsapp') || n.includes('message')) return 'Instant Messaging Record';
+                                  if (n.includes('email')) return 'Email Correspondence';
+                                  const words = l.notes.split(' ');
+                                  return words.length > 5 ? words.slice(0, 5).join(' ') + '...' : l.notes;
+                                })()}
+                             </p>
                              <p className="text-[10px] text-slate-500 line-clamp-2 italic leading-relaxed">"{l.notes}"</p>
                              <div className="flex items-center justify-between mt-2 pt-2 border-t dark:border-slate-800">
-                                <span className="text-[8px] font-bold text-slate-400 uppercase">With: {l.contactPerson || 'N/A'}</span>
+                                <span className="text-[8px] font-bold text-slate-400 uppercase">
+                                  {l.contactPerson ? `With: ${l.contactPerson}` : 'General Update'}
+                                </span>
                                 <Badge className={cn("text-[8px] border-none font-black px-1.5 py-0", l.isInternal ? "bg-violet-100 text-violet-600" : "bg-indigo-100 text-indigo-600")}>
                                   {l.isInternal ? 'INTERNAL' : 'CLIENT'}
                                 </Badge>
@@ -759,52 +849,13 @@ export function WeeklyReport() {
                 </CardContent>
               </Card>
             </section>
+            )}
 
           </div>
         </div>
 
-      </div>
-
-      {/* PDF PREVIEW MODAL */}
-      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-[95vw] w-[1200px] h-[95vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl bg-slate-900 border-slate-800 shadow-2xl">
-          <DialogHeader className="p-4 sm:p-6 bg-slate-800 border-b border-slate-700 shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg">
-                  <FileText className="h-5 w-5" />
-                </div>
-                <div>
-                  <DialogTitle className="text-lg font-black text-white tracking-tight">Report Document Preview</DialogTitle>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Professional Site Operations Ledger</p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="ghost" onClick={() => setIsPreviewOpen(false)} className="rounded-xl text-slate-400 hover:text-white hover:bg-slate-700 font-bold text-[10px] uppercase">
-                  <X className="h-4 w-4 mr-1.5" /> Close
-                </Button>
-                <Button size="sm" onClick={() => generateProfessionalPDF('download')} className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black shadow-lg shadow-blue-900/20 px-6 gap-2 text-[10px] uppercase">
-                  <Printer className="h-4 w-4" /> Save as PDF
-                </Button>
-              </div>
-            </div>
-          </DialogHeader>
-          <div className="flex-1 bg-slate-800/50 p-4 sm:p-8 flex items-center justify-center overflow-hidden">
-            {pdfPreviewUrl ? (
-              <iframe 
-                src={`${pdfPreviewUrl}#toolbar=0&navpanes=0`} 
-                className="w-full h-full rounded-xl shadow-2xl bg-white border-8 border-slate-700/50" 
-                title="Weekly Report PDF Preview"
-              />
-            ) : (
-              <div className="flex flex-col items-center gap-4 text-slate-400">
-                <div className="h-10 w-10 rounded-full border-4 border-slate-700 border-t-blue-500 animate-spin" />
-                <p className="font-bold tracking-widest uppercase text-[10px]">Generating Ledger...</p>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </div>
   );
 }

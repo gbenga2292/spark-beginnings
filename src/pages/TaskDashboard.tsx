@@ -94,7 +94,12 @@ function PersonalSpaceDashboard() {
   const navigate = useNavigate();
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
 
-  const wsTaskIds = new Set(wsTasks.map(mt => mt.id));
+  const activeWsTasks = wsTasks.filter(mt => {
+    const hasSubs = subtasks.some(s => s.mainTaskId === mt.id || s.main_task_id === mt.id);
+    return hasSubs || mt.is_project;
+  });
+
+  const wsTaskIds = new Set(activeWsTasks.map(mt => mt.id));
   const wsSubs = subtasks.filter(s => wsTaskIds.has(s.mainTaskId!));
 
   const completed = wsSubs.filter(s => s.status === 'completed').length;
@@ -143,7 +148,7 @@ function PersonalSpaceDashboard() {
           {/* Inline mini-stats */}
           <div className="relative mt-5 grid grid-cols-3 gap-3">
             {[
-              { label: 'Total', value: wsTasks.length, icon: Layers },
+              { label: 'Total', value: activeWsTasks.length, icon: Layers },
               { label: 'Active', value: inProgress, icon: Activity },
               { label: 'Done', value: completed, icon: CheckCheck },
             ].map(s => (
@@ -167,7 +172,7 @@ function PersonalSpaceDashboard() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-foreground">Overall Progress</p>
-                <p className="text-[11px] text-muted-foreground">Across {wsTasks.length} task groups</p>
+                <p className="text-[11px] text-muted-foreground">Across {activeWsTasks.length} task groups</p>
               </div>
             </div>
             <span className="text-2xl font-bold text-violet-600 dark:text-violet-400 tabular-nums">{rate}%</span>
@@ -194,9 +199,9 @@ function PersonalSpaceDashboard() {
             ))}
           </div>
           {/* Task group mini-bars */}
-          {wsTasks.length > 0 && (
+          {activeWsTasks.length > 0 && (
             <div className="mt-4 space-y-2">
-              {wsTasks.slice(0, 4).map(mt => {
+              {activeWsTasks.slice(0, 4).map(mt => {
                 const prog = getMainTaskProgress(mt.id, wsSubs);
                 const pct = prog.total > 0 ? Math.round(prog.completed / prog.total * 100) : 0;
                 return (
@@ -250,7 +255,7 @@ function PersonalSpaceDashboard() {
         ) : (
           <div className="divide-y divide-border/50">
             {urgent.map((sub, i) => {
-              const mt = wsTasks.find(m => m.id === sub.mainTaskId);
+              const mt = activeWsTasks.find(m => m.id === sub.mainTaskId);
               const sc = statusConfig[sub.status as keyof typeof statusConfig] ?? statusConfig.not_started;
               const StatusIcon = sc.icon;
               const isOverdue = sub.deadline && isPast(new Date(sub.deadline));
@@ -289,7 +294,11 @@ function PersonalProductivityScore() {
   const { user: currentUser } = useAuth();
   const { subtasks, reminders } = useAppData();
   const { wsTasks } = useWorkspace();
-  const wsTaskIds = new Set(wsTasks.map(mt => mt.id));
+  const activeWsTasks = wsTasks.filter(mt => {
+    const hasSubs = subtasks.some(s => s.mainTaskId === mt.id || s.main_task_id === mt.id);
+    return hasSubs || mt.is_project;
+  });
+  const wsTaskIds = new Set(activeWsTasks.map(mt => mt.id));
   const mySubs = subtasks.filter(s => wsTaskIds.has(s.mainTaskId!));
   const myReminders = reminders.filter(r => r.isActive && r.createdBy === currentUser?.id);
 
@@ -379,7 +388,12 @@ function AdminDashboard() {
   const navigate = useNavigate();
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
 
-  const wsTaskIds = new Set(wsTasks.map(mt => mt.id));
+  const activeWsTasks = wsTasks.filter(mt => {
+    const hasSubs = subtasks.some(s => s.mainTaskId === mt.id || s.main_task_id === mt.id);
+    return hasSubs || mt.is_project;
+  });
+
+  const wsTaskIds = new Set(activeWsTasks.map(mt => mt.id));
   const teamSubs = subtasks.filter(s => wsTaskIds.has(s.mainTaskId!));
 
   const completed = teamSubs.filter(s => s.status === "completed").length;
@@ -389,7 +403,7 @@ function AdminDashboard() {
   const completionRate = teamSubs.length > 0 ? Math.round(completed / teamSubs.length * 100) : 0;
 
   const urgentTasks = [...teamSubs].filter(s => s.status !== "completed").sort((a, b) => urgencyScore(a) - urgencyScore(b)).slice(0, 10);
-  const getMainTask = (id: string) => wsTasks.find(m => m.id === id);
+  const getMainTask = (id: string) => activeWsTasks.find(m => m.id === id);
   const getUser = (id: string | null) => users.find(u => u.id === id);
 
   const name = ((currentUser as any)?.user_metadata?.name || currentUser?.email || 'Admin').split(' ')[0].split('@')[0];
@@ -427,7 +441,7 @@ function AdminDashboard() {
           {/* Stats row */}
           <div className="relative mt-5 grid grid-cols-4 gap-2">
             {[
-              { label: 'Tasks', value: wsTasks.length, icon: Layers },
+              { label: 'Tasks', value: activeWsTasks.length, icon: Layers },
               { label: 'Active', value: inProgress, icon: Activity },
               { label: 'Review', value: pendingApproval, icon: Clock },
               { label: 'Done', value: completed, icon: CheckCheck },
@@ -443,7 +457,7 @@ function AdminDashboard() {
 
       {/* ── Stat Cards ── */}
       <motion.div variants={item} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Team Tasks" value={wsTasks.length} icon={TrendingUp} color="blue" sub="Main tasks" />
+        <StatCard label="Team Tasks" value={activeWsTasks.length} icon={TrendingUp} color="blue" sub="Main tasks" />
         <StatCard label="In Progress" value={inProgress} icon={Loader2} color="blue" sub={`${Math.round(inProgress / Math.max(teamSubs.length, 1) * 100)}% active`} />
         <StatCard label="Completed" value={completed} icon={CheckCircle2} color="green" sub={`${completionRate}% rate`} />
         <StatCard label="Awaiting" value={notStarted} icon={AlertTriangle} color="yellow" sub="Not started" />
@@ -526,7 +540,7 @@ function AdminDashboard() {
               <h4 className="text-sm font-semibold text-foreground">By Main Task</h4>
             </div>
             <div className="space-y-3">
-              {wsTasks.slice(0, 6).map(mt => {
+              {activeWsTasks.slice(0, 6).map(mt => {
                 const prog = getMainTaskProgress(mt.id, teamSubs);
                 const pct = prog.total > 0 ? Math.round(prog.completed / prog.total * 100) : 0;
                 return (
@@ -563,9 +577,15 @@ function UserDashboard() {
   const { hrVariables } = useStore();
   const { restoreSubtask, deleteSubtaskPermanently } = useAppData();
 
+  const activeWsTasks = wsTasks.filter(mt => {
+    const hasSubs = subtasks.some(s => s.mainTaskId === mt.id || s.main_task_id === mt.id);
+    return hasSubs || mt.is_project;
+  });
+
   const [taskFilter, setTaskFilter] = useState<'my_tasks' | 'urgent' | 'all' | 'completed' | 'under_review'>('my_tasks');
-  const myCreatedTasks = wsTasks.filter(mt => mt.createdBy === currentUser?.id);
-  const mySubs = subtasks.filter(s => s.assignedTo?.includes(currentUser?.id as string) && !s.is_deleted);
+  const myCreatedTasks = activeWsTasks.filter(mt => mt.createdBy === currentUser?.id);
+  const wsTaskIds = new Set(activeWsTasks.map(mt => mt.id));
+  const mySubs = subtasks.filter(s => s.assignedTo?.includes(currentUser?.id as string) && !s.is_deleted && wsTaskIds.has((s as any).main_task_id || s.mainTaskId));
 
 
   const myDone = mySubs.filter(s => s.status === 'completed').length;
@@ -722,7 +742,7 @@ function UserDashboard() {
           ) : (
             <div className="divide-y divide-border/40">
               {displayedTasks.map((sub, i) => {
-                const mt = wsTasks.find(m => m.id === sub.mainTaskId);
+                const mt = activeWsTasks.find(m => m.id === sub.mainTaskId);
                 const sc = (statusConfig as Record<string, typeof statusConfig['completed']>)[sub.status] ?? statusConfig.not_started;
                 const StatusIcon = sc.icon;
                 const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== 'completed';

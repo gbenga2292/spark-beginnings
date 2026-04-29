@@ -321,12 +321,6 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     // ── Memoized action callbacks ─────────────────────────────────────────────
     const createMainTask = useCallback(async (task: any, subs: any[] = []) => {
         // --- ROGUE TASK INTERCEPTOR ---
-        // Block creation of duplicate "Vehicle Document" main tasks.
-        // Legitimate vehicle tasks must use "Renewal of Vehicle Documents".
-        if (task.title === 'Vehicle Document' || task.title?.toLowerCase() === 'vehicle document') {
-            console.warn('Blocked rogue creation of "Vehicle Document" task. Use "Renewal of Vehicle Documents" instead.');
-            return null;
-        }
 
         const payload = {
             title: task.title,
@@ -489,6 +483,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const deleteSubtask = useCallback(async (id: string) => {
+        const existingSub = subtasks.find(s => s.id === id);
+        const mainId = existingSub?.mainTaskId || existingSub?.main_task_id;
+
         const { error } = await supabase.from('subtasks').update({ is_deleted: true, deleted_at: new Date().toISOString() }).eq('id', id);
         if (error) {
             console.error('deleteSubtask error:', error);
@@ -497,7 +494,17 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         }
         setSubtasks(prev => prev.filter(s => s.id !== id));
         toast.success('Subtask moved to archive');
-    }, []);
+
+        // Auto-delete parent main task if no subtasks remain
+        if (mainId) {
+             const remainingSubs = subtasks.filter(s => (s.mainTaskId === mainId || s.main_task_id === mainId) && s.id !== id);
+             if (remainingSubs.length === 0) {
+                 supabase.from('main_tasks').update({ is_deleted: true, deleted_at: new Date().toISOString() }).eq('id', mainId).then(() => {
+                     setMainTasks(prev => prev.filter(t => t.id !== mainId));
+                 });
+             }
+        }
+    }, [subtasks]);
 
     const restoreSubtask = useCallback(async (id: string) => {
         const { data, error } = await supabase.from('subtasks').update({ is_deleted: false, deleted_at: null }).eq('id', id).select().single();
@@ -506,7 +513,23 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             toast.error('Failed to restore subtask.');
             return;
         }
-        if (data) setSubtasks(prev => [...prev, data]);
+        if (data) {
+            setSubtasks(prev => [...prev, data]);
+            const mainId = data.mainTaskId || data.main_task_id;
+            // Ensure main task is restored too
+            if (mainId) {
+                supabase.from('main_tasks').update({ is_deleted: false, deleted_at: null }).eq('id', mainId).then(() => {
+                    supabase.from('main_tasks').select('*').eq('id', mainId).single().then(({data: mData}) => {
+                        if (mData) {
+                            setMainTasks(prev => {
+                                if (!prev.some(t => t.id === mainId)) return [...prev, mData];
+                                return prev;
+                            });
+                        }
+                    });
+                });
+            }
+        }
         toast.success('Subtask restored');
     }, []);
 
@@ -524,7 +547,6 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             .from('subtasks')
             .select('*, main_tasks!inner(workspaceId)')
             .eq('is_deleted', true)
-            .eq('main_tasks.workspaceId', workspaceId)
             .gt('deleted_at', cutoffDate.toISOString());
 
         if (error) {
@@ -542,7 +564,6 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             .from('main_tasks')
             .select('*')
             .eq('is_deleted', true)
-            .eq('workspaceId', workspaceId)
             .gt('deleted_at', cutoffDate.toISOString());
 
         if (error) {
@@ -630,7 +651,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
     const approveSubtask = useCallback(async (id: string, userId?: string, note?: string) => {
         // Update task itself
-        const { data, error } = await supabase.from('subtasks').update({ status: 'completed', approvedBy: userId || user?.id, approval_note: note }).eq('id', id).select().single();
+        const { data, error } = await supabase.from('subtasks').update({ status: 'completed', approvedBy: userId || user?.id }).eq('id', id).select().single();
         if (error) {
             console.error('approveSubtask error:', error);
             toast.error('Failed to approve task.');
@@ -815,7 +836,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
     const rejectSubtask = useCallback(async (id: string, _userId?: string, note?: string) => {
         // Update task itself
-        const { data, error } = await supabase.from('subtasks').update({ status: 'in_progress', rejectedAt: new Date().toISOString(), approval_note: note }).eq('id', id).select().single();
+        const { data, error } = await supabase.from('subtasks').update({ status: 'in_progress', rejectedAt: new Date().toISOString() }).eq('id', id).select().single();
         if (error) {
             console.error('rejectSubtask error:', error);
             toast.error('Failed to reject task.');

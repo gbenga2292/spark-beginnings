@@ -87,6 +87,15 @@ export interface CommLogPriv { canView: boolean; canAdd: boolean; canEdit: boole
 export interface BeneficiariesPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canBulkEdit: boolean; canDelete: boolean; canImport: boolean; canExport: boolean; }
 export interface DailyJournalPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean; }
 
+// ─── Weekly Report ───────────────────────────────────────────
+export interface WeeklyReportPriv {
+  canView: boolean;
+  canViewHr: boolean;
+  canViewOps: boolean;
+  canViewComm: boolean;
+  canViewFinance: boolean;
+}
+
 // ─── Master interface ─────────────────────────────────────────
 export interface UserPrivileges {
   dashboard:         DashboardPriv;
@@ -120,6 +129,7 @@ export interface UserPrivileges {
   commLog:           CommLogPriv;
   beneficiaries:     BeneficiariesPriv;
   dailyJournal:      DailyJournalPriv;
+  weeklyReport:      WeeklyReportPriv;
 }
 
 export interface AppUser {
@@ -182,6 +192,7 @@ export const FULL_ACCESS: UserPrivileges = {
   commLog:          { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
   beneficiaries:    { canView: true, canAdd: true, canEdit: true, canBulkEdit: true, canDelete: true, canImport: true, canExport: true },
   dailyJournal:     { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
+  weeklyReport:     { canView: true, canViewHr: true, canViewOps: true, canViewComm: true, canViewFinance: true },
 };
 
 // ─── NO ACCESS ───────────────────────────────────────────────
@@ -224,6 +235,7 @@ export const NO_ACCESS: UserPrivileges = {
   commLog:          { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
   beneficiaries:    { canView: false, canAdd: false, canEdit: false, canBulkEdit: false, canDelete: false, canImport: false, canExport: false },
   dailyJournal:     { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
+  weeklyReport:     { canView: false, canViewHr: false, canViewOps: false, canViewComm: false, canViewFinance: false },
 };
 
 // ─── DEFAULT PRESETS ─────────────────────────────────────────
@@ -246,6 +258,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       payroll:     { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true, canViewWithholdingSchedule: true },
       tasks:       { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: false },
       beneficiaries:{ canView: true, canAdd: true, canEdit: true, canBulkEdit: true, canDelete: false, canImport: true, canExport: true },
+      weeklyReport: { canView: true, canViewHr: true, canViewOps: true, canViewComm: true, canViewFinance: true },
     },
   },
   {
