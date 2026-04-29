@@ -15,6 +15,7 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { generateId } from '@/src/lib/utils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/src/components/ui/dropdown-menu';
 import { NumericFormat } from 'react-number-format';
+import { supabase } from '@/src/integrations/supabase/client';
 
 export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
   const sites = useAppStore((state) => state.sites);
@@ -359,7 +360,8 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
         totalCost: data.totalCost,
         vat: data.vat,
         totalCharge: data.totalCharge,
-        totalExclusiveOfVat: data.totalExclusiveOfVat
+        totalExclusiveOfVat: data.totalExclusiveOfVat,
+        machineConfigs: data.machineConfigs,
       };
 
       if (movingFromQuotationToActive) {
@@ -1381,7 +1383,43 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                         <div className="text-slate-500 text-xs">{inv.site || inv.siteName} <span className="ml-1 px-1 rounded bg-slate-100 border text-[10px]">{inv.vatInc || 'No VAT'}</span></div>
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right text-slate-600">
-                        <div><span className="text-slate-400">Mac:</span> {inv.noOfMachine || 0} x {priv?.canViewAmounts === false ? '***' : (inv.dailyRentalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        {/* ── Machine column: use machineConfigs when rates differ ── */}
+                        {(() => {
+                          const configs: any[] | undefined = inv.machineConfigs;
+                          if (configs && configs.length > 0) {
+                            // Resolve effective rates respecting "same as first" flags
+                            const firstRate = parseFloat(configs[0]?.rate) || 0;
+                            const firstDur  = parseFloat(configs[0]?.duration) || 0;
+                            const resolved = configs.map((m: any) => ({
+                              rate: m.sameRateAsFirst ? firstRate : (parseFloat(m.rate) || 0),
+                              duration: m.sameDurationAsFirst ? firstDur : (parseFloat(m.duration) || 0),
+                            }));
+                            // Group by unique rate to build compact display
+                            const groups = new Map<number, number>(); // rate → count
+                            resolved.forEach(m => {
+                              if (m.rate > 0) groups.set(m.rate, (groups.get(m.rate) || 0) + 1);
+                            });
+                            const entries = Array.from(groups.entries());
+                            if (entries.length === 1) {
+                              // All same rate — standard display
+                              const [rate, count] = entries[0];
+                              return <div><span className="text-slate-400">Mac:</span> {count} x {priv?.canViewAmounts === false ? '***' : rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>;
+                            }
+                            // Multiple different rates — show each group
+                            return (
+                              <div className="space-y-0.5">
+                                {entries.map(([rate, count], gi) => (
+                                  <div key={gi} className="text-xs">
+                                    <span className="text-slate-400">M{gi + 1}:</span>{' '}
+                                    {count} x {priv?.canViewAmounts === false ? '***' : rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }
+                          // Fallback: flat field
+                          return <div><span className="text-slate-400">Mac:</span> {inv.noOfMachine || 0} x {priv?.canViewAmounts === false ? '***' : (inv.dailyRentalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>;
+                        })()}
                         <div><span className="text-slate-400">Tech:</span> {inv.noOfTechnician || 0} x {priv?.canViewAmounts === false ? '***' : (inv.techniciansDailyRate || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         <div><span className="text-slate-400">DsLtr:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCostPerLtr || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({(inv.dailyUsage || 0)}L)</div>
                       </TableCell>
@@ -1820,18 +1858,45 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
     if (invoice.printLayout?.items) return invoice.printLayout.items;
     const list = [];
     if (invoice.machineConfigs && invoice.machineConfigs.length > 0) {
-      let isFirst = true;
-      invoice.machineConfigs.forEach((m: any, i: number) => {
-        const mRate = parseFloat(m.rate) || 0;
-        const mDur = parseFloat(m.duration) || 0;
-        const mCost = mRate * mDur;
-        if (mCost > 0) {
-          list.push({ id: generateId(), selected: true, desc: `${isFirst ? 'Phase 1\n' : ''}Lease of 1 Dewatering Pump @ N${mRate.toLocaleString()} per pump for ${mDur} days.`, qty: 1, unitRate: mCost, amount: mCost });
-          isFirst = false;
+      const configs: any[] = invoice.machineConfigs;
+      const firstRate = parseFloat(configs[0]?.rate) || 0;
+      const firstDur  = parseFloat(configs[0]?.duration) || 0;
+
+      // Resolve effective rate/duration per machine, respecting "same as first" flags
+      const resolved = configs.map((m: any) => ({
+        rate:     m.sameRateAsFirst     ? firstRate : (parseFloat(m.rate)     || 0),
+        duration: m.sameDurationAsFirst ? firstDur  : (parseFloat(m.duration) || 0),
+      }));
+
+      // Group machines that share the same rate+duration into a single line item
+      const groups = new Map<string, { rate: number; duration: number; count: number }>();
+      resolved.forEach((m) => {
+        if (m.rate > 0 && m.duration > 0) {
+          const key = `${m.rate}|${m.duration}`;
+          if (!groups.has(key)) groups.set(key, { rate: m.rate, duration: m.duration, count: 0 });
+          groups.get(key)!.count++;
         }
       });
+
+      let phaseNum = 1;
+      groups.forEach((g) => {
+        const unitCost  = g.rate * g.duration;
+        const totalCost = unitCost * g.count;
+        const pumpLabel = g.count > 1 ? `${g.count} Dewatering Pumps` : '1 Dewatering Pump';
+        list.push({
+          id: generateId(),
+          selected: true,
+          desc: `Phase ${phaseNum}\nLease of ${pumpLabel} @ ₦${g.rate.toLocaleString()} per pump for ${g.duration} days.`,
+          qty: g.count,
+          unitRate: unitCost,
+          amount: totalCost,
+        });
+        phaseNum++;
+      });
     } else if (invoice.rentalCost && invoice.rentalCost > 0) {
-      list.push({ id: generateId(), selected: true, desc: `Phase 1\nLease of ${invoice.noOfMachine || 0} Dewatering Pumps @ N${(invoice.dailyRentalCost || 0).toLocaleString()} per pump for ${invoice.duration || 0} days.`, qty: invoice.noOfMachine || 1, unitRate: invoice.rentalCost, amount: invoice.rentalCost });
+      const n = invoice.noOfMachine || 1;
+      const pumpLabel = n > 1 ? `${n} Dewatering Pumps` : '1 Dewatering Pump';
+      list.push({ id: generateId(), selected: true, desc: `Phase 1\nLease of ${pumpLabel} @ ₦${(invoice.dailyRentalCost || 0).toLocaleString()} per pump for ${invoice.duration || 0} days.`, qty: n, unitRate: invoice.rentalCost, amount: invoice.rentalCost });
     }
     if (invoice.techniciansCost && invoice.techniciansCost > 0) {
       list.push({ id: generateId(), selected: true, desc: `Technician Charge for ${invoice.noOfTechnician || 0} dewatering staff @ N${(invoice.techniciansDailyRate || 0).toLocaleString()} per technician per day for ${invoice.duration || 0} days.`, qty: invoice.noOfTechnician || 1, unitRate: invoice.techniciansCost, amount: invoice.techniciansCost });
@@ -1946,7 +2011,9 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
     setTimeout(() => { printWindow.print(); }, 400);
   };
 
-  const handleSaveLayout = () => {
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  const handleSaveLayout = async () => {
     const layout = {
       items,
       invoiceDate,
@@ -1956,33 +2023,43 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
       footerCompany,
       footerContact,
       footerEmail,
-      footerText
+      footerText,
     };
 
     const actionLog = {
       date: new Date().toISOString(),
       action: 'Saved Print Layout',
-      totalCharge: totalCharge
+      totalCharge: totalCharge,
     };
 
     const isPending = 'invoiceNo' in invoice;
     const currentId = invoice.id;
-    
+    const newHistory = [...((invoice as any).historyLog || []), actionLog];
+    const table = isPending ? 'pending_invoices' : 'invoices';
+
+    setIsSaving(true);
     try {
+      // Await the real DB write so errors are surfaced
+      const { error } = await supabase
+        .from(table)
+        .update({ print_layout: layout, history_log: newHistory })
+        .eq('id', currentId);
+
+      if (error) throw error;
+
+      // Only update local state after DB confirms
       if (isPending) {
-        useAppStore.getState().updatePendingInvoice(currentId, { 
-          printLayout: layout, 
-          historyLog: [...((invoice as any).historyLog || []), actionLog] 
-        });
+        useAppStore.getState().updatePendingInvoice(currentId, { printLayout: layout, historyLog: newHistory });
       } else {
-        useAppStore.getState().updateInvoice(currentId, { 
-          printLayout: layout, 
-          historyLog: [...((invoice as any).historyLog || []), actionLog] 
-        });
+        useAppStore.getState().updateInvoice(currentId, { printLayout: layout, historyLog: newHistory });
       }
-      toast.success("Invoice layout successfully saved to history log");
-    } catch (e) {
-      toast.error("Failed to save layout");
+
+      toast.success('Invoice layout saved successfully');
+    } catch (e: any) {
+      console.error('Save layout error:', e);
+      toast.error('Failed to save layout: ' + (e?.message || 'Unknown error'));
+    } finally {
+      setIsSaving(false);
     }
   };
 
