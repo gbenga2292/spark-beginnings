@@ -1,5 +1,5 @@
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, startTransition } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -165,6 +165,39 @@ export function FinancialReports() {
         totalOvertime += row.overtime;
       });
       return { name: m.label.substring(0, 3), Payroll: totalPayroll, Overtime: totalOvertime };
+    });
+  }, [calculatePayrollForMonth, MONTHS]);
+
+  const payrollSummaryData = useMemo(() => {
+    return MONTHS.map(month => {
+      const results = calculatePayrollForMonth(month.key);
+      let salary = 0;
+      let overtime = 0;
+      let grossPay = 0;
+      let employeePension = 0;
+      let loans = 0;
+      let paye = 0;
+
+      results.forEach(r => {
+        salary += r.salary;
+        overtime += r.overtime;
+        grossPay += (r.salary + r.overtime);
+        employeePension += r.pension;
+        loans += r.loanRepayment;
+        paye += r.paye;
+      });
+      const totalPayout = grossPay - (employeePension + loans + paye);
+
+      return {
+        monthLabel: month.label,
+        salary,
+        overtime,
+        grossPay,
+        employeePension,
+        loans,
+        paye,
+        totalPayout
+      };
     });
   }, [calculatePayrollForMonth, MONTHS]);
 
@@ -1107,7 +1140,7 @@ export function FinancialReports() {
             {/* Year */}
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-semibold text-slate-400 uppercase">Year</span>
-              <select value={filterYear} onChange={e => setFilterYear(e.target.value)}
+              <select value={filterYear} onChange={e => startTransition(() => setFilterYear(e.target.value))}
                 className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[110px]">
                 <option value="All">All Years</option>
                 {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
@@ -1116,7 +1149,7 @@ export function FinancialReports() {
             {/* Month */}
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-semibold text-slate-400 uppercase">Month</span>
-              <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+              <select value={filterMonth} onChange={e => startTransition(() => setFilterMonth(e.target.value))}
                 className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[130px]">
                 <option value="All">All Months</option>
                 {MONTHS_LIST.map(m => <option key={m.value} value={String(m.value)}>{m.label}</option>)}
@@ -1125,7 +1158,7 @@ export function FinancialReports() {
             {/* Client */}
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-semibold text-slate-400 uppercase">Client</span>
-              <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
+              <select value={filterClient} onChange={e => startTransition(() => setFilterClient(e.target.value))}
                 className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[140px]">
                 <option value="All">All Clients</option>
                 {availableClients.map(c => <option key={c} value={c}>{c}</option>)}
@@ -1133,7 +1166,7 @@ export function FinancialReports() {
             </div>
             {/* Reset */}
             {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All') && (
-              <button onClick={() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); }}
+              <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); }); }}
                 className="flex items-center gap-1.5 text-xs font-semibold text-rose-500 hover:text-rose-700 px-2 py-1 rounded-md hover:bg-rose-50 transition-colors">
                 <X className="w-3.5 h-3.5" /> Reset
               </button>
@@ -1156,7 +1189,7 @@ export function FinancialReports() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setMainTab(tab.id as any)}
+                  onClick={() => startTransition(() => setMainTab(tab.id as any))}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                     isActive 
                       ? 'bg-indigo-600 text-white shadow-md' 
@@ -1846,39 +1879,12 @@ export function FinancialReports() {
           {accountsTab === 'payroll' ? (
             /* ── PAYROLL SUMMARY ── */
             (() => {
-              const payrollSummaryData = MONTHS.map(month => {
-                const results = calculatePayrollForMonth(month.key);
-                let salary = 0;
-                let overtime = 0;
-                let grossPay = 0;
-                let otherPay = 0;
-                let paye = 0;
-
-                results.forEach(r => {
-                  salary += r.salary;
-                  overtime += r.overtime;
-                  grossPay += (r.salary + r.overtime);
-                  otherPay += r.totalAllowances;
-                  paye += r.paye;
-                });
-                const totalPayout = grossPay + otherPay;
-
-                return {
-                  monthLabel: month.label,
-                  salary,
-                  overtime,
-                  grossPay,
-                  otherPay,
-                  paye,
-                  totalPayout
-                };
-              });
-
               // compute Grand Totals
               const gSalary = payrollSummaryData.reduce((s, row) => s + row.salary, 0);
               const gOvertime = payrollSummaryData.reduce((s, row) => s + row.overtime, 0);
               const gGrossPay = payrollSummaryData.reduce((s, row) => s + row.grossPay, 0);
-              const gOtherPay = payrollSummaryData.reduce((s, row) => s + row.otherPay, 0);
+              const gEmployeePension = payrollSummaryData.reduce((s, row) => s + row.employeePension, 0);
+              const gLoans = payrollSummaryData.reduce((s, row) => s + row.loans, 0);
               const gPaye = payrollSummaryData.reduce((s, row) => s + row.paye, 0);
               const gTotalPayout = payrollSummaryData.reduce((s, row) => s + row.totalPayout, 0);
 
@@ -1886,10 +1892,10 @@ export function FinancialReports() {
               const fmT = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
               const exportPayrollSummaryCsv = () => {
-                const headers = ['MONTH', 'SALARY', 'OVERTIME', 'GROSS PAY', 'OTHER PAY', 'PAYE', 'TOTAL PAYOUT'];
+                const headers = ['MONTH', 'SALARY', 'OVERTIME', 'GROSS PAY', 'EMPLOYEE PENSION', 'LOANS', 'PAYE', 'TOTAL PAYOUT'];
                 const data = [
-                  ...payrollSummaryData.map(r => [r.monthLabel, fm(r.salary), fm(r.overtime), fm(r.grossPay), fm(r.otherPay), fm(r.paye), fm(r.totalPayout)]),
-                  ['GRAND TOTAL', fm(gSalary), fm(gOvertime), fm(gGrossPay), fm(gOtherPay), fm(gPaye), fm(gTotalPayout)]
+                  ...payrollSummaryData.map(r => [r.monthLabel, fm(r.salary), fm(r.overtime), fm(r.grossPay), fm(r.employeePension), fm(r.loans), fm(r.paye), fm(r.totalPayout)]),
+                  ['GRAND TOTAL', fm(gSalary), fm(gOvertime), fm(gGrossPay), fm(gEmployeePension), fm(gLoans), fm(gPaye), fm(gTotalPayout)]
                 ];
                 let csv = 'data:text/csv;charset=utf-8,';
                 csv += headers.join(',') + '\n';
@@ -1916,14 +1922,15 @@ export function FinancialReports() {
               };
 
               const exportPayrollSummaryPdf = () => {
-                const head = [['MONTH', 'SALARY', 'OVERTIME', 'GROSS PAY', 'OTHER PAY', 'PAYE', 'TOTAL PAYOUT']];
+                const head = [['MONTH', 'SALARY', 'OVERTIME', 'GROSS PAY', 'EMPLOYEE PENSION', 'LOANS', 'PAYE', 'TOTAL PAYOUT']];
                 const body = [
                   ...payrollSummaryData.map(r => [
                     r.monthLabel,
                     fm(r.salary),
                     fm(r.overtime),
                     fm(r.grossPay),
-                    fm(r.otherPay),
+                    fm(r.employeePension),
+                    fm(r.loans),
                     fm(r.paye),
                     fm(r.totalPayout)
                   ]),
@@ -1932,7 +1939,8 @@ export function FinancialReports() {
                      fm(gSalary),
                      fm(gOvertime),
                      fm(gGrossPay),
-                     fm(gOtherPay),
+                     fm(gEmployeePension),
+                     fm(gLoans),
                      fm(gPaye),
                      fm(gTotalPayout)
                   ]
@@ -1965,13 +1973,14 @@ export function FinancialReports() {
                   </div>
                   <div className="rounded-2xl border border-slate-200 shadow-lg overflow-hidden" style={{ background: 'linear-gradient(to bottom, #f8fafc, #ffffff)' }}>
                     {/* column legend bar */}
-                    <div className="grid grid-cols-7 text-[10px] font-bold tracking-widest uppercase px-0 bg-gradient-to-r from-[#1a4a5c] via-[#1f6075] to-[#1a4a5c] border-b border-[#0d3344]">
+                    <div className="grid grid-cols-8 text-[10px] font-bold tracking-widest uppercase px-0 bg-gradient-to-r from-[#1a4a5c] via-[#1f6075] to-[#1a4a5c] border-b border-[#0d3344]">
                       {[
                         { label: 'MONTH',        align: 'left',  accent: false, wide: true },
                         { label: 'SALARY',       align: 'right', accent: false },
                         { label: 'OVERTIME',     align: 'right', accent: false },
                         { label: 'GROSS PAY',    align: 'right', accent: true  },
-                        { label: 'OTHER PAY',    align: 'right', accent: false },
+                        { label: 'EMP. PENSION', align: 'right', accent: false },
+                        { label: 'LOANS',        align: 'right', accent: false },
                         { label: 'PAYE',         align: 'right', accent: false },
                         { label: 'TOTAL PAYOUT', align: 'right', accent: true  },
                       ].map(col => (
@@ -1997,7 +2006,7 @@ export function FinancialReports() {
                         return (
                           <div
                             key={row.monthLabel}
-                            className={`grid grid-cols-7 items-center group transition-all duration-150 hover:shadow-md hover:z-10 relative ${
+                            className={`grid grid-cols-8 items-center group transition-all duration-150 hover:shadow-md hover:z-10 relative ${
                               isEven ? 'bg-white' : 'bg-slate-50/70'
                             } hover:bg-teal-50/60`}
                           >
@@ -2023,7 +2032,10 @@ export function FinancialReports() {
                               <span className="text-sm font-mono font-bold text-teal-800">₦{fm(row.grossPay)}</span>
                             </div>
                             <div className="py-3 px-4 text-right">
-                              <span className="text-sm font-mono text-slate-600">₦{fm(row.otherPay)}</span>
+                              <span className="text-sm font-mono text-slate-600">₦{fm(row.employeePension)}</span>
+                            </div>
+                            <div className="py-3 px-4 text-right">
+                              <span className="text-sm font-mono text-slate-600">₦{fm(row.loans)}</span>
                             </div>
                             <div className="py-3 px-4 text-right">
                               <span className="inline-flex items-center gap-1 text-xs font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-0.5">
@@ -2047,15 +2059,15 @@ export function FinancialReports() {
                     </div>
 
                     {/* Grand Total footer */}
-                    <div className="grid grid-cols-7 items-center bg-gradient-to-r from-[#1a4a5c] via-[#1f6075] to-[#1a4a5c] border-t-2 border-[#0d3344] shadow-inner">
+                    <div className="grid grid-cols-8 items-center bg-gradient-to-r from-[#1a4a5c] via-[#1f6075] to-[#1a4a5c] border-t-2 border-[#0d3344] shadow-inner">
                       <div className="py-4 px-4 flex items-center gap-2">
                         <span className="text-xs font-black uppercase tracking-widest text-white/90 bg-white/10 border border-white/20 rounded-lg px-2.5 py-1">
                           GRAND TOTAL
                         </span>
                       </div>
-                      {[gSalary, gOvertime, gGrossPay, gOtherPay, gPaye, gTotalPayout].map((val, i) => {
-                        const isAccent = i === 2 || i === 5;
-                        const isPaye   = i === 4;
+                      {[gSalary, gOvertime, gGrossPay, gEmployeePension, gLoans, gPaye, gTotalPayout].map((val, i) => {
+                        const isAccent = i === 2 || i === 6;
+                        const isPaye   = i === 5;
                         return (
                           <div
                             key={i}

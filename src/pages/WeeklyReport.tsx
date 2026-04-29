@@ -3,7 +3,7 @@ import { useAppStore } from '@/src/store/appStore';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useAppData } from '@/src/contexts/AppDataContext';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, parseISO, isWithinInterval, addWeeks, subWeeks } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isWithinInterval, addWeeks, subWeeks, addMonths, subMonths } from 'date-fns';
 import { 
   ChevronLeft, ChevronRight, Users, Fuel, Truck, BookOpen, UserPlus, 
   Activity, MapPin, Download, Calendar, BarChart2, Wallet, 
@@ -24,10 +24,11 @@ import autoTable from 'jspdf-autotable';
 // Import logo for PDF
 import logoImg from '../../logo/logo-1.png';
 
-function getWeekRange(anchor: Date) {
-  const start = startOfWeek(anchor, { weekStartsOn: 1 });
-  const end = endOfWeek(anchor, { weekStartsOn: 1 });
-  return { start, end };
+function getReportRange(anchor: Date, mode: 'weekly' | 'monthly') {
+  if (mode === 'monthly') {
+    return { start: startOfMonth(anchor), end: endOfMonth(anchor) };
+  }
+  return { start: startOfWeek(anchor, { weekStartsOn: 1 }), end: endOfWeek(anchor, { weekStartsOn: 1 }) };
 }
 
 function inWeek(dateStr: string, start: Date, end: Date) {
@@ -41,8 +42,9 @@ function inWeek(dateStr: string, start: Date, end: Date) {
 }
 
 export function WeeklyReport() {
+  const [reportMode, setReportMode] = useState<'weekly' | 'monthly'>('weekly');
   const [anchor, setAnchor] = useState(new Date());
-  const { start, end } = getWeekRange(anchor);
+  const { start, end } = getReportRange(anchor, reportMode);
 
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -191,28 +193,49 @@ export function WeeklyReport() {
     });
   }, [weekAttendance]);
 
-  const weekLabel = `${format(start, 'dd MMM yyyy')} – ${format(end, 'dd MMM yyyy')}`;
+  const reportLabel = reportMode === 'monthly' ? format(start, 'MMMM yyyy') : `${format(start, 'dd MMM yyyy')} – ${format(end, 'dd MMM yyyy')}`;
 
   // ── Page Header ───────────────────────────────────────
   useSetPageTitle(
-    'Weekly Operations Report',
-    'Aggregated enterprise activity and financial summaries for the week',
+    pdfPreviewUrl ? 'Report Document Preview' : (reportMode === 'monthly' ? 'Monthly Operations Report' : 'Weekly Operations Report'),
+    pdfPreviewUrl ? 'Professional Site Operations Ledger' : 'Aggregated enterprise activity and financial summaries',
     <div className="flex items-center gap-2">
-      <div className="flex items-center gap-1 bg-white rounded-xl p-1 border border-slate-200 shadow-sm mr-2">
-        <button onClick={() => setAnchor(a => subWeeks(a, 1))} className="p-1.5 rounded-lg hover:bg-slate-50 transition-all text-slate-600 hover:text-blue-600">
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <span className="px-3 text-[11px] font-bold text-slate-700 min-w-[180px] text-center font-mono">{weekLabel}</span>
-        <button onClick={() => setAnchor(a => addWeeks(a, 1))} className="p-1.5 rounded-lg hover:bg-slate-50 transition-all text-slate-600 hover:text-blue-600">
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
-      <Button variant="outline" size="sm" onClick={handleExportXLSX} className="gap-2 h-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm">
-        <Download className="h-3.5 w-3.5 text-indigo-500" /> Export Excel
-      </Button>
-      <Button size="sm" onClick={() => generateProfessionalPDF('preview')} className="gap-2 h-9 bg-slate-900 hover:bg-black text-white font-bold text-[11px] uppercase tracking-tight shadow-lg shadow-slate-200">
-        <FileText className="h-3.5 w-3.5" /> View PDF Report
-      </Button>
+      {pdfPreviewUrl ? (
+        <>
+          <Button size="sm" variant="outline" onClick={() => { setPdfPreviewUrl(null); setIsPreviewOpen(false); }} className="gap-2 h-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm">
+             <X className="h-3.5 w-3.5 text-slate-400" /> Close Preview
+          </Button>
+          <Button size="sm" onClick={() => generateProfessionalPDF('download')} className="gap-2 h-9 bg-slate-900 hover:bg-black text-white font-bold text-[11px] uppercase tracking-tight shadow-lg shadow-slate-200">
+             <Printer className="h-3.5 w-3.5" /> Save PDF
+          </Button>
+        </>
+      ) : (
+        <>
+          <select 
+            value={reportMode} 
+            onChange={(e) => setReportMode(e.target.value as 'weekly' | 'monthly')}
+            className="h-9 px-2 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg shadow-sm outline-none cursor-pointer hover:bg-slate-50 uppercase tracking-tight"
+          >
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+          <div className="flex items-center gap-1 bg-white rounded-xl p-1 border border-slate-200 shadow-sm mr-2">
+            <button onClick={() => setAnchor(a => reportMode === 'monthly' ? subMonths(a, 1) : subWeeks(a, 1))} className="p-1.5 rounded-lg hover:bg-slate-50 transition-all text-slate-600 hover:text-blue-600">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="px-3 text-[11px] font-bold text-slate-700 min-w-[150px] text-center font-mono">{reportLabel}</span>
+            <button onClick={() => setAnchor(a => reportMode === 'monthly' ? addMonths(a, 1) : addWeeks(a, 1))} className="p-1.5 rounded-lg hover:bg-slate-50 transition-all text-slate-600 hover:text-blue-600">
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleExportXLSX} className="gap-2 h-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm">
+            <Download className="h-3.5 w-3.5 text-indigo-500" /> Export Excel
+          </Button>
+          <Button size="sm" onClick={() => generateProfessionalPDF('preview')} className="gap-2 h-9 bg-slate-900 hover:bg-black text-white font-bold text-[11px] uppercase tracking-tight shadow-lg shadow-slate-200">
+            <FileText className="h-3.5 w-3.5" /> View PDF Report
+          </Button>
+        </>
+      )}
     </div>
   );
 
@@ -396,25 +419,58 @@ export function WeeklyReport() {
       doc.text('04. RECENT TASK COMMUNICATIONS', margin, currentY);
       currentY += 8;
 
-      const commentData = weekComments.slice(0, 8).map(c => {
+      const commentData = weekComments.slice(0, 15).map(c => {
         const author = users.find(u => u.id === c.author_id)?.name || 'System';
+        const task = weekTasks.find(t => t.id === (c.main_task_id || c.task_id));
+        const taskTitle = task ? task.title : 'General / Unknown Task';
         return [
           format(parseISO(c.created_at || c.createdAt), 'dd/MM HH:mm'),
+          taskTitle,
           author,
-          c.text.substring(0, 120) + (c.text.length > 120 ? '...' : '')
+          c.text
         ];
       });
 
       autoTable(doc, {
         startY: currentY,
-        head: [['TIMESTAMP', 'AUTHOR', 'UPDATE / COMMENT']],
+        head: [['TIMESTAMP', 'TASK / CONTEXT', 'AUTHOR', 'UPDATE / COMMENT']],
         body: commentData,
         styles: { fontSize: 7.5, cellPadding: 3, font: 'helvetica' },
         headStyles: { fillColor: [71, 85, 105] as [number, number, number], textColor: colors.white },
         margin: { left: margin, right: margin },
-        columnStyles: { 2: { cellWidth: 120 } }
+        columnStyles: { 3: { cellWidth: 90 }, 1: { cellWidth: 40 } }
       });
       
+      currentY = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // 7b. GENERAL COMMUNICATIONS
+    if (weekCommLogs.length > 0) {
+      if (currentY > pageHeight - 60) { doc.addPage(); currentY = margin; }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('05. GENERAL COMMUNICATIONS LOG', margin, currentY);
+      currentY += 8;
+
+      const commLogData = weekCommLogs.slice(0, 15).map(l => {
+        const type = l.isInternal ? 'INTERNAL' : 'EXTERNAL';
+        return [
+          format(parseISO(l.date), 'dd/MM/yyyy'),
+          `[${type}] ${l.channel.toUpperCase()}`,
+          l.notes
+        ];
+      });
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [['DATE', 'TYPE / CHANNEL', 'NOTES & DETAILS']],
+        body: commLogData,
+        styles: { fontSize: 7.5, cellPadding: 4, font: 'helvetica' },
+        headStyles: { fillColor: colors.secondary, textColor: colors.white },
+        margin: { left: margin, right: margin },
+        columnStyles: { 2: { cellWidth: 110 } }
+      });
+
       currentY = (doc as any).lastAutoTable.finalY + 15;
     }
 
@@ -422,7 +478,7 @@ export function WeeklyReport() {
     if (currentY > pageHeight - 60) { doc.addPage(); currentY = margin; }
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
-    doc.text('05. FINANCIAL RECONCILIATION (SUMMARY)', margin, currentY);
+    doc.text('06. FINANCIAL RECONCILIATION (SUMMARY)', margin, currentY);
     currentY += 8;
 
     autoTable(doc, {
@@ -519,43 +575,23 @@ export function WeeklyReport() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950/50 overflow-hidden font-sans pb-10">
+    <div className={cn("flex flex-col bg-slate-50 dark:bg-slate-950/50 overflow-hidden font-sans", pdfPreviewUrl ? "h-full" : "h-full pb-10")}>
       
       {/* Main Content Area */}
       {pdfPreviewUrl ? (
-        <div className="flex-1 flex flex-col p-4 sm:p-6 space-y-4 max-w-7xl mx-auto w-full h-full overflow-hidden">
-          <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 shrink-0">
-             <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md">
-                   <FileText className="h-5 w-5" />
-                </div>
-                <div>
-                   <h2 className="text-base font-black text-slate-800 dark:text-slate-200 tracking-tight">Report Document Preview</h2>
-                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Professional Site Operations Ledger</p>
-                </div>
-             </div>
-             <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => { setPdfPreviewUrl(null); setIsPreviewOpen(false); }} className="rounded-xl font-bold text-[10px] uppercase gap-2 h-9">
-                   <X className="h-3.5 w-3.5" /> Close Preview
-                </Button>
-                <Button size="sm" onClick={() => generateProfessionalPDF('download')} className="rounded-xl bg-slate-900 hover:bg-black text-white font-bold shadow-lg h-9 px-4 gap-2 text-[10px] uppercase">
-                   <Printer className="h-3.5 w-3.5" /> Save PDF
-                </Button>
-             </div>
-          </div>
-          <div className="flex-1 bg-slate-800/50 rounded-xl overflow-hidden shadow-inner border dark:border-slate-700 relative">
-             <iframe src={`${pdfPreviewUrl}#toolbar=0&navpanes=0`} className="absolute inset-0 w-full h-full bg-white" title="Operations Ledger Preview" />
-          </div>
+        <div className="flex-1 w-full h-full bg-slate-800 relative z-10">
+           <iframe src={`${pdfPreviewUrl}#toolbar=0&navpanes=0`} className="w-full h-full bg-white" title="Operations Ledger Preview" />
         </div>
       ) : (
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-8 max-w-7xl mx-auto w-full">
         
         {/* Quick Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
-            { label: 'Staff Deployed', value: uniqueStaffDeployed, icon: Users, color: 'text-blue-600 bg-blue-100/50', show: privs.canViewHr },
+            { label: 'Operations Staffs', value: uniqueStaffDeployed, icon: Users, color: 'text-blue-600 bg-blue-100/50', show: privs.canViewHr },
             { label: 'Diesel Consumed', value: `${totalDiesel.toFixed(0)}L`, icon: Fuel, color: 'text-amber-600 bg-amber-100/50', show: privs.canViewOps },
-            { label: 'Net Cashflow', value: (totalIncome - totalExpenses).toLocaleString(), icon: Wallet, color: totalIncome >= totalExpenses ? 'text-emerald-600 bg-emerald-100/50' : 'text-rose-600 bg-rose-100/50', isCurrency: true, show: privs.canViewFinance },
+            { label: 'Income', value: totalIncome.toLocaleString(), icon: TrendingUp, color: 'text-emerald-600 bg-emerald-100/50', isCurrency: true, show: privs.canViewFinance },
+            { label: 'Expenses', value: totalExpenses.toLocaleString(), icon: TrendingDown, color: 'text-rose-600 bg-rose-100/50', isCurrency: true, show: privs.canViewFinance },
             { label: 'Communications', value: weekCommLogs.length, icon: MessageSquare, color: 'text-indigo-600 bg-indigo-100/50', show: privs.canViewComm },
             { label: 'HR Incidents', value: weekMerits.length + weekDisciplinary.length, icon: ShieldAlert, color: 'text-violet-600 bg-violet-100/50', show: privs.canViewHr },
           ].filter(s => s.show || currentUser?.role === 'admin').map(stat => (
@@ -833,7 +869,7 @@ export function WeeklyReport() {
                                   return words.length > 5 ? words.slice(0, 5).join(' ') + '...' : l.notes;
                                 })()}
                              </p>
-                             <p className="text-[10px] text-slate-500 line-clamp-2 italic leading-relaxed">"{l.notes}"</p>
+                             <p className="text-[10px] text-slate-500 italic leading-relaxed">"{l.notes}"</p>
                              <div className="flex items-center justify-between mt-2 pt-2 border-t dark:border-slate-800">
                                 <span className="text-[8px] font-bold text-slate-400 uppercase">
                                   {l.contactPerson ? `With: ${l.contactPerson}` : 'General Update'}
