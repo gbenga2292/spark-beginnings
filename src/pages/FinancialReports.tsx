@@ -296,6 +296,7 @@ export function FinancialReports() {
   // Core Metrics
   const globalStats = useMemo(() => {
     const totalBilled = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const totalVATInvoiced = invoices.reduce((sum, inv) => sum + (inv.vat || 0), 0);
     const totalCollectedCash = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
     const totalWHT = payments.reduce((sum, p) => sum + (p.withholdingTax || 0), 0);
     const totalDiscount = payments.reduce((sum, p) => sum + (p.discount || 0), 0);
@@ -316,7 +317,7 @@ export function FinancialReports() {
     
     const totalVATRemitted = vatPayments.reduce((sum, vp) => sum + (vp.amount || 0), 0);
     const vatDeficit = Math.max(0, totalVATCollected - totalVATRemitted);
-    return { totalBilled, totalCollectedCash, totalValueCleared, totalOutstanding, totalWHT, totalDiscount, totalVATCollected, totalVATRemitted, vatDeficit, vatSources };
+    return { totalBilled, totalVATInvoiced, totalCollectedCash, totalValueCleared, totalOutstanding, totalWHT, totalDiscount, totalVATCollected, totalVATRemitted, vatDeficit, vatSources };
   }, [invoices, payments, vatPayments, sites, vatRate]);
 
   const collectionRate = globalStats.totalBilled > 0
@@ -402,29 +403,72 @@ export function FinancialReports() {
       const siteName = (inv.siteName || (inv as any).site || 'Unknown Site').trim();
       const clientName = (inv.client || '').trim();
       const key = summaryTab === 'client' ? clientName : `${clientName} - ${siteName}`;
-      if (!rowMap.has(key)) rowMap.set(key, { client: clientName, site: siteName, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, discount: 0, withholdingTax: 0, vat: 0 });
+      if (!rowMap.has(key)) rowMap.set(key, { 
+        client: clientName, 
+        site: siteName, 
+        key, 
+        noOfInvoices: 0, 
+        totalInvoices: 0, 
+        totalPayment: 0, 
+        discount: 0, 
+        withholdingTax: 0, 
+        vatInvoiced: 0, 
+        vatPaid: 0, 
+        vatRemitted: 0 
+      });
       rowMap.get(key)!.noOfInvoices += 1;
       rowMap.get(key)!.totalInvoices += (inv.amount || 0);
+      rowMap.get(key)!.vatInvoiced += (inv.vat || 0);
     });
     payments.forEach(pay => {
       const siteName = (pay.site || 'Unknown Site').trim();
       const clientName = (pay.client || '').trim();
       const key = summaryTab === 'client' ? clientName : `${clientName} - ${siteName}`;
-      if (!rowMap.has(key)) rowMap.set(key, { client: clientName, site: siteName, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, discount: 0, withholdingTax: 0, vat: 0 });
+      if (!rowMap.has(key)) rowMap.set(key, { 
+        client: clientName, 
+        site: siteName, 
+        key, 
+        noOfInvoices: 0, 
+        totalInvoices: 0, 
+        totalPayment: 0, 
+        discount: 0, 
+        withholdingTax: 0, 
+        vatInvoiced: 0, 
+        vatPaid: 0, 
+        vatRemitted: 0 
+      });
       rowMap.get(key)!.totalPayment += (pay.amount || 0);
       rowMap.get(key)!.discount += (pay.discount || 0);
       rowMap.get(key)!.withholdingTax += (pay.withholdingTax || 0);
-      rowMap.get(key)!.vat += (pay.vat || 0);
+      rowMap.get(key)!.vatPaid += (pay.vat || 0);
+    });
+
+    // Add VAT Remitted (Payments to FIRS)
+    vatPayments.forEach(vp => {
+      const clientName = (vp.client || '').trim();
+      // We can only attribute this accurately in Client Summary because VatPayment lacks site field
+      if (summaryTab === 'client') {
+        const key = clientName;
+        if (rowMap.has(key)) {
+          rowMap.get(key)!.vatRemitted += (vp.amount || 0);
+        }
+      } else {
+        // In Site Summary, we could try to attribute it if the client only has one site, 
+        // but it's safer to just show it at the client level. 
+        // For now, we'll leave it as 0 for site rows unless we find a better way.
+      }
     });
 
     // Seed rows for clients/sites that only appear in B/F (no current-year activity)
     bfData.forEach((bfVal, key) => {
-      // Only include them if they actually have an outstanding (or overpaid) balance carrying forward
       if (!rowMap.has(key) && Math.abs(bfVal) > 0.01) {
         const parts = key.split(' - ');
         const client = parts[0];
         const site = parts.length > 1 ? parts.slice(1).join(' - ') : 'Unknown Site';
-        rowMap.set(key, { client, site, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, discount: 0, withholdingTax: 0, vat: 0 });
+        rowMap.set(key, { 
+          client, site, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, 
+          discount: 0, withholdingTax: 0, vatInvoiced: 0, vatPaid: 0, vatRemitted: 0 
+        });
       }
     });
 
@@ -441,9 +485,10 @@ export function FinancialReports() {
         balance = 0;
         status = 'FULLY PAID';
       }
-      return { ...r, bf, balance, status };
+      const vatOwed = Math.max(0, r.vatPaid - r.vatRemitted);
+      return { ...r, bf, balance, status, vatOwed };
     }).sort((a, b) => a.client.localeCompare(b.client));
-  }, [invoices, payments, summaryTab, bfData]);
+  }, [invoices, payments, vatPayments, summaryTab, bfData]);
 
   // VAT Pie
   const vatPieData = useMemo(() => [
@@ -717,13 +762,19 @@ export function FinancialReports() {
   };
 
   const exportLedgerPdf = () => {
-    const head = [["Client", summaryTab === 'site' ? "Site" : "", filterYear !== 'All' ? "B/F (₦)" : "", "Balance Due (₦)", "Inv. Qty", "Total Invoiced (₦)", "Total Payments (₦)", "WHT (₦)", "Status"].filter(Boolean)];
+    const head = [["Client", summaryTab === 'site' ? "Site" : "", filterYear !== 'All' ? "B/F (₦)" : "", "Balance Due (₦)", "Inv. Qty", "Total Invoiced (₦)", "Total Payments (₦)", "WHT (₦)", "VAT INV", "VAT PAID", "VAT REMIT", "VAT OWED", "Status"].filter(Boolean)];
     const body = summaryData.map(r => [
       r.client, ...(summaryTab === 'site' ? [r.site] : []),
       ...(filterYear !== 'All' ? [(r.bf || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })] : []),
       (r.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      r.noOfInvoices, (r.totalInvoices || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), (r.totalPayment || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      (r.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), r.status
+      r.noOfInvoices, (r.totalInvoices || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 
+      (r.totalPayment || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      (r.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      (r.vatInvoiced || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      (r.vatPaid || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      (r.vatRemitted || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      (r.vatOwed || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      r.status
     ].filter(v => v !== undefined));
     
     setPreviewModal({
@@ -884,7 +935,19 @@ export function FinancialReports() {
       previewRows.push({ Module: 'Discounts', Scope: `${data.length} records`, Status: 'Included' });
     }
     if (selectedFields.includes('Client Balances')) {
-      const data = summaryData.map(r => ({ Client: r.client, Invoiced: r.totalInvoices, Paid: r.totalPayment, Discount: r.discount, WHT: r.withholdingTax, VAT: r.vat, Balance: r.balance, Status: r.status }));
+      const data = summaryData.map(r => ({ 
+        Client: r.client, 
+        Invoiced: r.totalInvoices, 
+        Paid: r.totalPayment, 
+        Discount: r.discount, 
+        WHT: r.withholdingTax, 
+        VATInvoiced: r.vatInvoiced,
+        VATPaid: r.vatPaid,
+        VATRemitted: r.vatRemitted,
+        VATDeficit: r.vatOwed,
+        Balance: r.balance, 
+        Status: r.status 
+      }));
       const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Client Balances');
       previewRows.push({ Module: 'Client Balances', Scope: `${data.length} clients`, Status: 'Included' });
@@ -912,7 +975,18 @@ export function FinancialReports() {
       previewRows.push({ Module: 'Site Revenue', Scope: `${data.length} sites`, Status: 'Included' });
     }
     if (selectedFields.includes('Collection Efficiency')) {
-      const data = [{ TotalBilled: globalStats.totalBilled, TotalCollected: globalStats.totalCollectedCash, TotalWHT: globalStats.totalWHT, TotalDiscount: globalStats.totalDiscount, TotalOutstanding: globalStats.totalOutstanding, CollectionRate: `${collectionRate}%`, VATCollected: globalStats.totalVATCollected, VATRemitted: globalStats.totalVATRemitted, VATDeficit: globalStats.vatDeficit }];
+      const data = [{ 
+        TotalBilled: globalStats.totalBilled, 
+        TotalVATInvoiced: globalStats.totalVATInvoiced,
+        TotalCollected: globalStats.totalCollectedCash, 
+        TotalWHT: globalStats.totalWHT, 
+        TotalDiscount: globalStats.totalDiscount, 
+        TotalOutstanding: globalStats.totalOutstanding, 
+        CollectionRate: `${collectionRate}%`, 
+        VATCollected: globalStats.totalVATCollected, 
+        VATRemitted: globalStats.totalVATRemitted, 
+        VATDeficit: globalStats.vatDeficit 
+      }];
       const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Efficiency');
       previewRows.push({ Module: 'Collection Efficiency', Scope: 'Global Metrics', Status: 'Included' });
@@ -1514,32 +1588,35 @@ export function FinancialReports() {
             <button className={`pb-3 text-sm font-semibold transition-all border-b-2 ${summaryTab === 'site' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('site')}>Site Summary</button>
           </div>
         </CardHeader>
-        <div className="overflow-x-auto min-h-[300px]">
+        <div className="overflow-auto max-h-[70vh] relative no-scrollbar">
           <Table className="whitespace-nowrap min-w-full text-[13px]">
-            <TableHeader className="bg-slate-900 sticky top-0 z-10 shadow-md">
+            <TableHeader className="bg-slate-900 sticky top-0 z-20 shadow-md">
               <TableRow className="hover:bg-slate-900 border-b border-indigo-500/50">
-                <TableHead className="font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4">Client</TableHead>
-                {summaryTab === 'site' && <TableHead className="font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4">Site</TableHead>}
+                <TableHead className="sticky left-0 z-30 bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 w-[180px] shadow-[2px_0_5px_rgba(0,0,0,0.3)]">Client</TableHead>
+                {summaryTab === 'site' && <TableHead className="sticky left-[180px] z-30 bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 w-[160px] shadow-[2px_0_5px_rgba(0,0,0,0.3)] border-l border-slate-700/50">Site</TableHead>}
                 {filterYear !== 'All' && (
-                  <TableHead className="font-semibold text-xs tracking-wider uppercase text-amber-300 px-5 py-4 text-right" title="Balance carried over from previous years">
+                  <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-amber-300 px-5 py-4 text-right" title="Balance carried over from previous years">
                     B/F
                   </TableHead>
                 )}
-                <TableHead className="font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">Balance Due</TableHead>
-                <TableHead className="font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-center">Inv. Qty</TableHead>
-                <TableHead className="font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Total Invoiced</TableHead>
-                <TableHead className="font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Total Payments</TableHead>
-                <TableHead className="font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Discounts</TableHead>
-                <TableHead className="font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">WHT</TableHead>
-                <TableHead className="font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT</TableHead>
-                <TableHead className="font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-center">Health</TableHead>
+                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">Balance Due</TableHead>
+                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-center">Inv. Qty</TableHead>
+                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Total Invoiced</TableHead>
+                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Total Payments</TableHead>
+                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Discounts</TableHead>
+                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">WHT</TableHead>
+                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT INV</TableHead>
+                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT PAID</TableHead>
+                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT REMIT</TableHead>
+                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">VAT OWED</TableHead>
+                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-center">Health</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {summaryData.map((row, i) => (
                 <TableRow key={i} className={`hover:bg-indigo-50/40 transition-colors border-b border-slate-100 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
-                  <TableCell className="px-5 py-3 font-semibold text-slate-700 bg-white/50">{row.client}</TableCell>
-                  {summaryTab === 'site' && <TableCell className="px-5 py-3 text-slate-500 font-medium bg-white/50">{row.site}</TableCell>}
+                  <TableCell className={`sticky left-0 z-10 px-5 py-3 font-semibold text-slate-700 border-r border-slate-100 shadow-[1px_0_3px_rgba(0,0,0,0.05)] ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.client}</TableCell>
+                  {summaryTab === 'site' && <TableCell className={`sticky left-[180px] z-10 px-5 py-3 text-slate-500 font-medium border-r border-slate-100 shadow-[1px_0_3px_rgba(0,0,0,0.05)] ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.site}</TableCell>}
                   {filterYear !== 'All' && (
                     <TableCell className={`px-5 py-3 text-right font-mono font-semibold ${
                       !row.bf || row.bf === 0 ? 'text-slate-300' : row.bf > 0 ? 'text-amber-600' : 'text-emerald-600'
@@ -1561,7 +1638,10 @@ export function FinancialReports() {
                   <TableCell className="px-5 py-3 text-right font-mono font-medium text-emerald-700">{row.totalPayment ? row.totalPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                   <TableCell className="px-5 py-3 text-right font-mono text-slate-400">{row.discount ? row.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                   <TableCell className="px-5 py-3 text-right font-mono text-indigo-600/70">{row.withholdingTax ? row.withholdingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                  <TableCell className="px-5 py-3 text-right font-mono text-indigo-600/70">{row.vat ? row.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                  <TableCell className="px-5 py-3 text-right font-mono text-indigo-600/70">{row.vatInvoiced ? row.vatInvoiced.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                  <TableCell className="px-5 py-3 text-right font-mono text-emerald-600/70">{row.vatPaid ? row.vatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                  <TableCell className="px-5 py-3 text-right font-mono text-sky-600/70">{row.vatRemitted ? row.vatRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                  <TableCell className="px-5 py-3 text-right font-mono text-rose-600 font-bold">{row.vatOwed ? row.vatOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                   <TableCell className="px-5 py-3 text-center">
                     <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase shadow-sm
                       ${row.status === 'OWING' ? 'bg-rose-100 border border-rose-200 text-rose-700' :
@@ -1578,7 +1658,8 @@ export function FinancialReports() {
                 const totalBalance = summaryData.reduce((sum, r) => sum + (r.balance || 0), 0);
                 return (
                   <TableRow className="bg-slate-900 hover:bg-slate-900 border-t-4 border-indigo-500 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] relative z-10">
-                    <TableCell colSpan={summaryTab === 'site' ? 2 : 1} className="px-5 py-4 font-bold text-slate-200 text-sm tracking-wider uppercase">Grand Total</TableCell>
+                    <TableCell className="sticky left-0 z-20 bg-slate-900 px-5 py-4 font-bold text-slate-200 text-sm tracking-wider uppercase shadow-[2px_0_5px_rgba(0,0,0,0.3)]">Grand Total</TableCell>
+                    {summaryTab === 'site' && <TableCell className="sticky left-[180px] z-20 bg-slate-900 px-5 py-4 shadow-[2px_0_5px_rgba(0,0,0,0.3)]"></TableCell>}
                     {filterYear !== 'All' && (
                       <TableCell className={`px-5 py-4 text-right font-mono font-bold ${
                         totalBF === 0 ? 'text-slate-400' : totalBF > 0 ? 'text-amber-400' : 'text-emerald-400'
@@ -1600,7 +1681,10 @@ export function FinancialReports() {
                     <TableCell className="px-5 py-4 text-right font-mono font-bold text-emerald-400">{globalStats.totalCollectedCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                     <TableCell className="px-5 py-4 text-right font-mono font-medium text-slate-400">{globalStats.totalDiscount ? globalStats.totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                     <TableCell className="px-5 py-4 text-right font-mono font-medium text-indigo-300">{globalStats.totalWHT ? globalStats.totalWHT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                    <TableCell className="px-5 py-4 text-right font-mono font-medium text-indigo-300">{globalStats.totalVATCollected ? globalStats.totalVATCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    <TableCell className="px-5 py-4 text-right font-mono font-medium text-indigo-300">{globalStats.totalVATInvoiced ? globalStats.totalVATInvoiced.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    <TableCell className="px-5 py-4 text-right font-mono font-medium text-emerald-400">{globalStats.totalVATCollected ? globalStats.totalVATCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    <TableCell className="px-5 py-4 text-right font-mono font-medium text-sky-400">{globalStats.totalVATRemitted ? globalStats.totalVATRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    <TableCell className="px-5 py-4 text-right font-mono font-bold text-rose-400">{globalStats.vatDeficit ? globalStats.vatDeficit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                     <TableCell className="px-5 py-4"></TableCell>
                   </TableRow>
                 );

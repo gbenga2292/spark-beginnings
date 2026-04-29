@@ -343,6 +343,7 @@ export function AccountsReportBuilder({
   const [selectedMonths,  setSelectedMonths]  = useState<string[]>(MONTHS.map(m => m.key));
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectedColumns, setSelectedColumns] = useState<string[]>(BUILT_IN_PRESETS[0].columns);
+  const [vatGroupedView,  setVatGroupedView]  = useState(false);
 
   const [userPresets,     setUserPresets]     = useState<ReportPreset[]>([]);
   const [showPresetInput, setShowPresetInput] = useState(false);
@@ -540,8 +541,41 @@ export function AccountsReportBuilder({
     if (selectedSources.length > 1) {
       rows.sort((a, b) => new Date(a._raw.date || 0).getTime() - new Date(b._raw.date || 0).getTime());
     }
+
+    // ── Apply Client Grouping for VAT if enabled ──
+    if (vatGroupedView && selectedSources.length === 1 && selectedSources[0] === 'VAT') {
+      const groupedMap = new Map<string, TaggedRecord>();
+      rows.forEach(rec => {
+        const client = (rec._raw.client || '').trim() || '—';
+        if (!groupedMap.has(client)) {
+          groupedMap.set(client, {
+            _source: 'VAT',
+            _raw: {
+              ...rec._raw,
+              vatDate: '—', remMonth: '—', remYear: '—', date: '—', // Temporal fields disabled
+              vatAmtPaid: 0, vatableAmt: 0, vatOwed: 0, vatPaid: 0, vatBalDue: 0
+            }
+          });
+        }
+        const g = groupedMap.get(client)!;
+        // Derived from payment-based VAT logic
+        const pvVal = rec._raw.payVat || (sites.find(s => s.name === rec._raw.site && s.client === rec._raw.client)?.vat as any) || 'No';
+        const { vat, amountForVat } = getVatDetails(rec._raw.amount || 0, pvVal, vatRate);
+        const mKey = monthNameToKey(rec._raw.month || '');
+        const payYr = rec._raw.date ? normalizeDate(rec._raw.date)?.substring(0, 4) : '';
+        const vatPaidAmt = vatRemittanceMap.get(`${client}_${mKey || ''}_${payYr}`) || 0;
+
+        g._raw.vatAmtPaid += rec._raw.amount || 0;
+        g._raw.vatableAmt += amountForVat;
+        g._raw.vatOwed    += vat;
+        g._raw.vatPaid    += vatPaidAmt;
+        g._raw.vatBalDue  += (vat - vatPaidAmt);
+      });
+      return Array.from(groupedMap.values()).sort((a, b) => a._raw.client.localeCompare(b._raw.client));
+    }
+
     return rows;
-  }, [rawInvoices, rawPayments, rawVatPayments, rawLedgerEntries, sites, payrollCache, selectedSources, selectedYears, selectedMonths, selectedClients, vatRate]);
+  }, [rawInvoices, rawPayments, rawVatPayments, rawLedgerEntries, sites, payrollCache, selectedSources, selectedYears, selectedMonths, selectedClients, vatRate, vatGroupedView, getVatDetails, vatRemittanceMap]);
 
   // ── Aggregated rows (multi-source) ───────────────────────────────────────────
   // Correctly separates period values from ALL-TIME values for accurate balance.
@@ -646,8 +680,12 @@ export function AccountsReportBuilder({
         return col.sources.some(s => selectedSources.includes(s));
       });
     }
-    return TXN_COLUMNS.filter(c => c.sources.some(s => selectedSources.includes(s)));
-  }, [isMultiSource, selectedSources]);
+    let cols = TXN_COLUMNS.filter(c => c.sources.some(s => selectedSources.includes(s)));
+    if (vatGroupedView && selectedSources.length === 1 && selectedSources[0] === 'VAT') {
+      cols = cols.filter(c => !['vatDate', 'remMonth', 'remYear', 'date'].includes(c.id));
+    }
+    return cols;
+  }, [isMultiSource, selectedSources, vatGroupedView]);
 
   const orderedCols = useMemo(
     () => selectedColumns
@@ -713,28 +751,34 @@ export function AccountsReportBuilder({
     const vatOnly = ['vatDate','remMonth','remYear','vatAmtPaid','vatableAmt','vatOwed','vatPaid','vatBalDue'];
     if (vatOnly.includes(colId)) {
       if (src !== 'VAT') return '—';
-      // r is a Payment record (single-source VAT derives from payments received)
+      
+      // If we are in grouped view, the values are already aggregated in the raw record
+      if (vatGroupedView && typeof r[colId] === 'number') {
+        return r[colId];
+      }
+
+      // Detailed view: calculate on the fly from payment record
       const pvVal = r.payVat ||
         (sites.find(s => s.name === r.site && s.client === r.client)?.vat as any) || 'No';
       const { vat, amountForVat } = getVatDetails(r.amount || 0, pvVal, vatRate);
-      // Determine the period month from the payment date
+      
       const norm = normalizeDate(r.date);
       const payMoIdx = norm ? parseInt(norm.substring(5, 7), 10) - 1 : -1;
       const payYr    = norm ? norm.substring(0, 4) : '';
       const mKey     = payMoIdx >= 0 ? (MONTHS[payMoIdx]?.key || '') : '';
       const mLabel   = payMoIdx >= 0 ? (MONTHS[payMoIdx]?.label || '—') : '—';
       const client   = (r.client || '').trim();
-      // Lookup total VAT already remitted for this client + period
       const vatPaidAmt = vatRemittanceMap.get(`${client}_${mKey}_${payYr}`) || 0;
+
       switch (colId) {
         case 'vatDate':    return formatDisplayDate(r.date);
         case 'remMonth':   return mLabel;
         case 'remYear':    return payYr || '—';
-        case 'vatAmtPaid': return r.amount || 0;    // total client payment (incl. VAT)
-        case 'vatableAmt': return amountForVat;      // excl. VAT
-        case 'vatOwed':    return vat;               // VAT component from this payment
-        case 'vatPaid':    return vatPaidAmt;        // what has actually been remitted (from vatPayments)
-        case 'vatBalDue':  return vat - vatPaidAmt;  // still outstanding
+        case 'vatAmtPaid': return r.amount || 0;
+        case 'vatableAmt': return amountForVat;
+        case 'vatOwed':    return vat;
+        case 'vatPaid':    return vatPaidAmt;
+        case 'vatBalDue':  return vat - vatPaidAmt;
         default: return '—';
       }
     }
@@ -1104,6 +1148,22 @@ export function AccountsReportBuilder({
                   })}
                 </div>
                 {selectedSources.includes('VAT') && (
+                  <div className="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-[11px] font-bold text-amber-900 uppercase tracking-wide">Grouping Logic</h4>
+                        <p className="text-[10px] text-amber-700">Concatenate client records</p>
+                      </div>
+                      <button
+                        onClick={() => setVatGroupedView(!vatGroupedView)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${vatGroupedView ? 'bg-amber-600' : 'bg-slate-200'}`}
+                      >
+                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${vatGroupedView ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {selectedSources.includes('VAT') && !vatGroupedView && (
                   <p className="text-[10px] text-slate-400 italic mt-1">VAT: filters by period year, not payment date</p>
                 )}
                 {isMultiSource && (

@@ -1179,10 +1179,10 @@ export function Payroll() {
         </Tabs>
 
         {printDialogOpen && (
-          <div className="fixed inset-0 bg-black/50 flex flex-col z-50 overflow-hidden items-center justify-center p-4">
-            <div className="bg-slate-100 rounded-lg shadow-xl flex flex-col w-full max-w-6xl h-[calc(100vh-2rem)] relative">
+          <div className="fixed inset-0 bg-black/50 flex flex-col z-50 overflow-hidden items-center justify-center">
+            <div className="bg-slate-100 shadow-xl flex flex-col w-screen h-screen relative rounded-none">
 
-              <div className="flex bg-indigo-600 p-4 justify-between items-center rounded-t-lg shrink-0 z-10">
+              <div className="flex bg-indigo-600 p-4 justify-between items-center rounded-none shrink-0 z-10">
                 <h3 className="text-white font-bold text-lg">
                   {printType === 'PAYSLIPS' && "Print Bulk Payslips"}
                   {printType === 'PAYE' && "Generate PAYE Schedule"}
@@ -1421,7 +1421,7 @@ export function Payroll() {
                 </div>
 
                 {/* Preview Area */}
-                <div className="flex-1 p-8 overflow-y-auto bg-slate-200" id="print-area">
+                <div className="flex-1 p-4 md:p-8 overflow-auto bg-slate-200" id="print-area">
                   {payslipsToPrint.length === 0 ? (
                     <div className="h-full flex items-center justify-center text-slate-400 font-medium pb-20">
                       No records match your selection.
@@ -1603,7 +1603,7 @@ export function Payroll() {
                     const colIsNumeric = (id: string) => !['sn','employee_name','month','bank_name','account_number','paye_id','pension_pin','tin'].includes(id);
 
                     return (
-                      <div className="bg-white dark:bg-slate-900 mx-auto shadow-lg max-w-5xl rounded-sm print-break" id="print-area-content"
+                      <div className="bg-white dark:bg-slate-900 mx-auto shadow-lg min-w-fit rounded-sm print-break" id="print-area-content"
                         style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", overflow: 'hidden' }}>
 
                         {/* ── Premium print-safe header ── */}
@@ -1689,12 +1689,12 @@ export function Payroll() {
                                       return (
                                         <tr key={row.record.id} style={{ background: idx % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }} className="hover:bg-indigo-50/30">
                                           {metadataCols.map(col => (
-                                            <td key={col.id} style={{ padding: '11px 10px', textAlign: colIsNumeric(col.id) ? 'right' : 'left', verticalAlign: 'middle' }}>
+                                            <td key={col.id} style={{ padding: '11px 10px', textAlign: colIsNumeric(col.id) ? 'right' : 'left', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                                               {getCellValue(col, dummySlip, idx)}
                                             </td>
                                           ))}
                                           {printSelectedMonths.map(mk => (
-                                            <td key={mk} style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', color: '#0f172a' }}>
+                                            <td key={mk} style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', color: '#0f172a', whiteSpace: 'nowrap' }}>
                                               {row.monthVals[mk] ? fm(row.monthVals[mk]) : '—'}
                                             </td>
                                           ))}
@@ -1752,11 +1752,12 @@ export function Payroll() {
                                     <tr key={idx} style={{ background: idx % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}
                                       className="hover:bg-indigo-50/30">
                                       {orderedCols.map(col => (
-                                        <td key={col.id} style={{
-                                          padding: '11px 10px',
-                                          textAlign: colIsNumeric(col.id) ? 'right' : 'left',
-                                          verticalAlign: 'middle',
-                                        }}>
+                                         <td key={col.id} style={{
+                                           padding: '11px 10px',
+                                           textAlign: colIsNumeric(col.id) ? 'right' : 'left',
+                                           verticalAlign: 'middle',
+                                           whiteSpace: 'nowrap',
+                                         }}>
                                           {getCellValue(col, slip, idx)}
                                         </td>
                                       ))}
@@ -1772,7 +1773,7 @@ export function Payroll() {
                                       </td>
                                     ))}
                                     {orderedCols.slice(labelSpan).map(col => (
-                                      <td key={col.id} style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 800, fontSize: 13, color: col.summable ? '#0f172a' : '#94a3b8' }}>
+                                      <td key={col.id} style={{ padding: '12px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 800, fontSize: 13, color: col.summable ? '#0f172a' : '#94a3b8', whiteSpace: 'nowrap' }}>
                                         {col.summable ? fm(getTotal(col.id)) : '—'}
                                       </td>
                                     ))}
