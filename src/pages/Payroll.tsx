@@ -764,15 +764,15 @@ export function Payroll() {
         </select>
         
         {priv.canGenerate && (
-          <Button variant="outline" size="sm" className="gap-2 h-9 border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm" onClick={() => handleOpenPrintDialog(activeTab === 'processing' ? 'PAYSLIPS' : activeTab.toUpperCase() as any)}>
-            <Printer className="h-4 w-4" /> Print {activeTab === 'processing' ? 'Payslips' : 'Schedule'}
+          <Button variant="outline" size="sm" className="h-9 w-9 border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm" onClick={() => handleOpenPrintDialog(activeTab === 'processing' ? 'PAYSLIPS' : activeTab.toUpperCase() as any)} title={`Print ${activeTab === 'processing' ? 'Payslips' : 'Schedule'}`}>
+            <Printer className="h-5 w-5" />
           </Button>
         )}
         {finRepPriv?.canExport && activeTab === 'processing' && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700">
-                <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export CSV <ChevronDown className="h-3 w-3 opacity-50" />
+              <Button variant="outline" size="sm" className="h-9 w-9 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700" title="Export CSV">
+                <Upload className="h-5 w-5 text-emerald-500" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">

@@ -2,11 +2,13 @@ import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { Button } from '@/src/components/ui/button';
-import { Upload, Printer, Trash2, Save, X, Info } from 'lucide-react';
-import { useAppStore } from '@/src/store/appStore';
+import { Upload, Printer, Trash2, Save, X, Info, Search, Filter, Users, ChevronRight, Check } from 'lucide-react';
+import { useAppStore, Employee } from '@/src/store/appStore';
+import { getPositionIndex } from '@/src/lib/hierarchy';
 import { toast } from '@/src/components/ui/toast';
 import logoSrc from '../../../logo/logo-2.png';
 import { usePayrollCalculator } from '@/src/hooks/usePayrollCalculator';
+import { Input } from '@/src/components/ui/input';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const YEAR_RANGE_START = 2020;
@@ -337,13 +339,22 @@ export function AccountsReportBuilder({
   const pendingSites   = useAppStore(s => s.pendingSites);
   const vatRate        = useAppStore(s => s.payrollVariables.vatRate);
   
+  const employees = useAppStore(state => state.employees).filter(e => e.status !== 'Terminated');
   const { calculatePayrollForMonth } = usePayrollCalculator();
   const [selectedSources, setSelectedSources] = useState<DataSource[]>(['INVOICE']);
   const [selectedYears,   setSelectedYears]   = useState<number[]>([currentYear]);
   const [selectedMonths,  setSelectedMonths]  = useState<string[]>(MONTHS.map(m => m.key));
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectedColumns, setSelectedColumns] = useState<string[]>(BUILT_IN_PRESETS[0].columns);
-  const [vatGroupedView,  setVatGroupedView]  = useState(false);
+  const [isGroupedView,   setIsGroupedView]   = useState(false);
+  const [isPivoted,       setIsPivoted]       = useState(false);
+
+  // ── Payroll Specialized Filters ──
+  const [selectedDepts,   setSelectedDepts]   = useState<string[]>([]);
+  const [selectedPos,     setSelectedPos]     = useState<string[]>([]);
+  const [selectedTypes,   setSelectedTypes]   = useState<string[]>([]);
+  const [showEmpDialog,   setShowEmpDialog]   = useState(false);
+  const [empSearch,       setEmpSearch]       = useState('');
 
   const [userPresets,     setUserPresets]     = useState<ReportPreset[]>([]);
   const [showPresetInput, setShowPresetInput] = useState(false);
@@ -395,6 +406,10 @@ export function AccountsReportBuilder({
     rawLedgerEntries.forEach(x => { if (x.client && x.client !== '—') s.add(x.client.trim()); });
     return Array.from(s).sort();
   }, [sites, rawInvoices, rawPayments, rawVatPayments, rawLedgerEntries]);
+
+  const availableDepts = useMemo(() => Array.from(new Set(employees.map(e => String(e.department || '')).filter(Boolean))).sort(), [employees]);
+  const availablePos   = useMemo(() => Array.from(new Set(employees.map(e => String(e.position || '')).filter(Boolean))).sort((a, b) => getPositionIndex(a) - getPositionIndex(b)), [employees]);
+  const availableTypes = ['OFFICE', 'FIELD', 'NON-EMPLOYEE'];
 
   useEffect(() => {
     if (availableClients.length > 0 && selectedClients.length === 0) {
@@ -504,10 +519,21 @@ export function AccountsReportBuilder({
     if (selectedSources.includes('PAYROLL')) {
       selectedYears.forEach(yr => {
         selectedMonths.forEach(mKey => {
-          const pRows = payrollCache.get(`${yr}_${mKey}`) ?? [];
-          pRows.forEach(r => {
-            rows.push({ _source: 'PAYROLL', _raw: { ...r, month: mKey, year: yr, date: `${yr}-01-01` } });
-          });
+          const pRows = payrollCache.get(`${yr}_${mKey}`);
+          if (!pRows) return;
+          
+          pRows
+            .filter(r => {
+              const fullName = `${r.surname} ${r.firstname}`.trim();
+              if (selectedClients.length > 0 && !selectedClients.includes(fullName)) return false;
+              if (selectedDepts.length > 0   && !selectedDepts.includes(r.department)) return false;
+              if (selectedPos.length > 0     && !selectedPos.includes(r.position)) return false;
+              if (selectedTypes.length > 0   && !selectedTypes.includes(r.staffType)) return false;
+              return true;
+            })
+            .forEach(r => {
+              rows.push({ _source: 'PAYROLL', _raw: { ...r, month: mKey, year: yr, date: `${yr}-01-01` } });
+            });
         });
       });
     }
@@ -542,40 +568,82 @@ export function AccountsReportBuilder({
       rows.sort((a, b) => new Date(a._raw.date || 0).getTime() - new Date(b._raw.date || 0).getTime());
     }
 
-    // ── Apply Client Grouping for VAT if enabled ──
-    if (vatGroupedView && selectedSources.length === 1 && selectedSources[0] === 'VAT') {
-      const groupedMap = new Map<string, TaggedRecord>();
-      rows.forEach(rec => {
-        const client = (rec._raw.client || '').trim() || '—';
-        if (!groupedMap.has(client)) {
-          groupedMap.set(client, {
-            _source: 'VAT',
-            _raw: {
-              ...rec._raw,
-              vatDate: '—', remMonth: '—', remYear: '—', date: '—', // Temporal fields disabled
-              vatAmtPaid: 0, vatableAmt: 0, vatOwed: 0, vatPaid: 0, vatBalDue: 0
-            }
-          });
-        }
-        const g = groupedMap.get(client)!;
-        // Derived from payment-based VAT logic
-        const pvVal = rec._raw.payVat || (sites.find(s => s.name === rec._raw.site && s.client === rec._raw.client)?.vat as any) || 'No';
-        const { vat, amountForVat } = getVatDetails(rec._raw.amount || 0, pvVal, vatRate);
-        const mKey = monthNameToKey(rec._raw.month || '');
-        const payYr = rec._raw.date ? normalizeDate(rec._raw.date)?.substring(0, 4) : '';
-        const vatPaidAmt = vatRemittanceMap.get(`${client}_${mKey || ''}_${payYr}`) || 0;
+    // ── Apply Grouping for VAT or Payroll if enabled ──
+    if (isGroupedView && selectedSources.length === 1) {
+      const src = selectedSources[0];
+      
+      if (src === 'VAT') {
+        const groupedMap = new Map<string, TaggedRecord>();
+        rows.forEach(rec => {
+          const client = (rec._raw.client || '').trim() || '—';
+          if (!groupedMap.has(client)) {
+            groupedMap.set(client, {
+              _source: 'VAT',
+              _raw: {
+                ...rec._raw,
+                vatDate: '—', remMonth: '—', remYear: '—', date: '—',
+                vatAmtPaid: 0, vatableAmt: 0, vatOwed: 0, vatPaid: 0, vatBalDue: 0
+              }
+            });
+          }
+          const g = groupedMap.get(client)!;
+          const pvVal = rec._raw.payVat || (sites.find(s => s.name === rec._raw.site && s.client === rec._raw.client)?.vat as any) || 'No';
+          const { vat, amountForVat } = getVatDetails(rec._raw.amount || 0, pvVal, vatRate);
+          const mKey = monthNameToKey(rec._raw.month || '');
+          const payYr = rec._raw.date ? normalizeDate(rec._raw.date)?.substring(0, 4) : '';
+          const vatPaidAmt = vatRemittanceMap.get(`${client}_${mKey || ''}_${payYr}`) || 0;
 
-        g._raw.vatAmtPaid += rec._raw.amount || 0;
-        g._raw.vatableAmt += amountForVat;
-        g._raw.vatOwed    += vat;
-        g._raw.vatPaid    += vatPaidAmt;
-        g._raw.vatBalDue  += (vat - vatPaidAmt);
-      });
-      return Array.from(groupedMap.values()).sort((a, b) => a._raw.client.localeCompare(b._raw.client));
+          g._raw.vatAmtPaid += rec._raw.amount || 0;
+          g._raw.vatableAmt += amountForVat;
+          g._raw.vatOwed    += vat;
+          g._raw.vatPaid    += vatPaidAmt;
+          g._raw.vatBalDue  += (vat - vatPaidAmt);
+        });
+        return Array.from(groupedMap.values()).sort((a, b) => a._raw.client.localeCompare(b._raw.client));
+      }
+
+      if (src === 'PAYROLL') {
+        const groupedMap = new Map<string, TaggedRecord>();
+        rows.forEach(rec => {
+          const empId = rec._raw.id || rec._raw.employeeId || rec._raw.surname + rec._raw.firstname;
+          if (!groupedMap.has(empId)) {
+            groupedMap.set(empId, {
+              _source: 'PAYROLL',
+              _raw: {
+                ...rec._raw,
+                p_month: '—', p_year: '—', // Temporal fields disabled
+                grossPay: 0, pension: 0, paye: 0, nsitf: 0, takeHomePay: 0
+              }
+            });
+          }
+          const g = groupedMap.get(empId)!;
+          g._raw.grossPay    += rec._raw.grossPay || 0;
+          g._raw.pension     += rec._raw.pension || 0;
+          g._raw.paye        += rec._raw.paye || 0;
+          g._raw.nsitf       += rec._raw.nsitf || 0;
+          g._raw.takeHomePay += rec._raw.takeHomePay || 0;
+
+          // Pivot data: store per-month values
+          if (isPivoted) {
+            const mKey = monthNameToKey(rec._raw.month); // normalize to 'jan', 'feb', etc.
+            if (mKey) {
+              const payeKey = `p_paye_${mKey}`;
+              const netKey  = `p_net_${mKey}`;
+              g._raw[payeKey] = (g._raw[payeKey] || 0) + (rec._raw.paye || 0);
+              g._raw[netKey]  = (g._raw[netKey] || 0) + (rec._raw.takeHomePay || 0);
+            }
+          }
+        });
+        return Array.from(groupedMap.values()).sort((a, b) => getPositionIndex(a._raw.position) - getPositionIndex(b._raw.position));
+      }
+    }
+
+    if (selectedSources.length === 1 && selectedSources[0] === 'PAYROLL') {
+      return rows.sort((a, b) => getPositionIndex(a._raw.position) - getPositionIndex(b._raw.position));
     }
 
     return rows;
-  }, [rawInvoices, rawPayments, rawVatPayments, rawLedgerEntries, sites, payrollCache, selectedSources, selectedYears, selectedMonths, selectedClients, vatRate, vatGroupedView, getVatDetails, vatRemittanceMap]);
+  }, [rawInvoices, rawPayments, rawVatPayments, rawLedgerEntries, sites, payrollCache, selectedSources, selectedYears, selectedMonths, selectedClients, vatRate, isGroupedView, isPivoted, getVatDetails, vatRemittanceMap, selectedDepts, selectedPos, selectedTypes]);
 
   // ── Aggregated rows (multi-source) ───────────────────────────────────────────
   // Correctly separates period values from ALL-TIME values for accurate balance.
@@ -681,17 +749,48 @@ export function AccountsReportBuilder({
       });
     }
     let cols = TXN_COLUMNS.filter(c => c.sources.some(s => selectedSources.includes(s)));
-    if (vatGroupedView && selectedSources.length === 1 && selectedSources[0] === 'VAT') {
-      cols = cols.filter(c => !['vatDate', 'remMonth', 'remYear', 'date'].includes(c.id));
+    if (isGroupedView && selectedSources.length === 1) {
+      if (selectedSources[0] === 'VAT') {
+        cols = cols.filter(c => !['vatDate', 'remMonth', 'remYear', 'date'].includes(c.id));
+      } else if (selectedSources[0] === 'PAYROLL') {
+        cols = cols.filter(c => !['p_month', 'p_year'].includes(c.id));
+        if (isPivoted) {
+          // Filter out main total columns for PAYE and Net Pay to avoid redundancy
+          cols = cols.filter(c => !['p_paye', 'p_net'].includes(c.id));
+          // Inject monthly columns
+          selectedMonths.forEach(mKey => {
+            const mLabel = MONTHS.find(m => m.key === mKey)?.label || mKey;
+            cols.push({ id: `p_paye_${mKey}`, label: `${mLabel} PAYE`, summable: true, sources: ['PAYROLL'] });
+            cols.push({ id: `p_net_${mKey}`,  label: `${mLabel} Net`,  summable: true, sources: ['PAYROLL'] });
+          });
+        }
+      }
     }
     return cols;
-  }, [isMultiSource, selectedSources, vatGroupedView]);
+  }, [isMultiSource, selectedSources, isGroupedView, isPivoted, selectedMonths]);
 
   const orderedCols = useMemo(
-    () => selectedColumns
-      .filter(id => relevantCols.some(c => c.id === id))
-      .map(id => relevantCols.find(c => c.id === id)!),
-    [selectedColumns, relevantCols],
+    () => {
+      let base = selectedColumns.filter(id => relevantCols.some(c => c.id === id));
+      
+      // Auto-append pivoted columns if active
+      if (isPivoted && isGroupedView && selectedSources.length === 1 && selectedSources[0] === 'PAYROLL') {
+        const pivotIds: string[] = [];
+        selectedMonths.forEach(mKey => {
+          pivotIds.push(`p_paye_${mKey}`, `p_net_${mKey}`);
+        });
+        // Find position after 'p_staffType' or 'p_basic' to insert
+        const insertIdx = base.findIndex(id => id === 'p_staffType' || id === 'p_basic');
+        if (insertIdx !== -1) {
+          base.splice(insertIdx + 1, 0, ...pivotIds);
+        } else {
+          base = [...base, ...pivotIds];
+        }
+      }
+      
+      return base.map(id => relevantCols.find(c => c.id === id)!);
+    },
+    [selectedColumns, relevantCols, isPivoted, isGroupedView, selectedSources, selectedMonths],
   );
 
   // ── Cell resolvers ────────────────────────────────────────────────────────────
@@ -752,8 +851,8 @@ export function AccountsReportBuilder({
     if (vatOnly.includes(colId)) {
       if (src !== 'VAT') return '—';
       
-      // If we are in grouped view, the values are already aggregated in the raw record
-      if (vatGroupedView && typeof r[colId] === 'number') {
+      // If we are in grouped/pivot view, check if the value is pre-calculated
+      if (isGroupedView && r[colId] !== undefined) {
         return r[colId];
       }
 
@@ -784,6 +883,15 @@ export function AccountsReportBuilder({
     }
 
     if (src === 'PAYROLL') {
+      // Grouped/Pivot values
+      if (isGroupedView && r[colId] !== undefined) {
+        return r[colId];
+      }
+      // If it's a pivot column but not found on this record (e.g. employee didn't work that month)
+      if (isPivoted && (colId.startsWith('p_paye_') || colId.startsWith('p_net_'))) {
+        return 0;
+      }
+
       switch (colId) {
         case 'p_employee':   return `${r.surname || ''} ${r.firstname || ''}`.trim() || '—';
         case 'p_department': return r.department || '—';
@@ -1104,15 +1212,64 @@ export function AccountsReportBuilder({
                             ? <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border bg-slate-100 text-slate-400 border-slate-200">N/A</span>
                             : <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${SOURCE_PILL[src]}`}>
                                 {['INVOICE','PAYMENT','VAT'].includes(src) ? 'Finance' : src === 'PAYROLL' ? 'HR' : src === 'LEDGER' ? 'Expense' : 'Ops'}
-                              </span>
-                          }
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
+                        </span>
+                      }
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
+          {/* Payroll Filters (Dynamic) */}
+          {selectedSources.includes('PAYROLL') && (
+            <div className="bg-purple-50/50 p-3 rounded-xl border border-purple-100/60 flex flex-col gap-3">
+              <h4 className="font-bold text-[10px] text-purple-900 uppercase tracking-widest flex items-center gap-2">
+                <Filter className="h-3 w-3" /> HR Filters
+              </h4>
+              
+              {/* Dept Filter */}
+              <div>
+                <p className="text-[10px] font-bold text-slate-500 mb-1">Department</p>
+                <div className="flex flex-wrap gap-1">
+                  {availableDepts.map(d => (
+                    <button key={d} onClick={() => setSelectedDepts((prev: string[]) => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-all ${selectedDepts.includes(d) ? 'bg-purple-600 border-purple-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:border-purple-300'}`}>
+                      {d}
+                    </button>
+                  ))}
+                  {availableDepts.length > 0 && <button onClick={() => setSelectedDepts([])} className="text-[10px] text-purple-600 font-bold px-1 hover:underline">Clear</button>}
+                </div>
               </div>
+
+              {/* Staff Type Filter */}
+              <div>
+                <p className="text-[10px] font-bold text-slate-500 mb-1">Staff Type</p>
+                <div className="flex gap-1">
+                  {availableTypes.map(t => (
+                    <button key={t} onClick={() => setSelectedTypes((prev: string[]) => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-all ${selectedTypes.includes(t) ? 'bg-purple-600 border-purple-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:border-purple-300'}`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <button onClick={() => setShowEmpDialog(true)}
+                className="w-full flex items-center justify-between px-3 h-8 rounded-lg bg-white border border-purple-200 text-purple-700 text-xs font-semibold hover:bg-purple-50 transition-colors shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Users className="h-3.5 w-3.5" />
+                  Select Employees
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px]">
+                    {selectedClients.filter(c => employees.some(e => `${e.surname} ${e.firstname}`.trim() === c)).length || 'All'}
+                  </span>
+                  <ChevronRight className="h-3 w-3 opacity-40" />
+                </div>
+              </button>
+            </div>
+          )}
 
               {/* Years */}
               <div>
@@ -1147,23 +1304,42 @@ export function AccountsReportBuilder({
                     );
                   })}
                 </div>
-                {selectedSources.includes('VAT') && (
-                  <div className="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-200">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-[11px] font-bold text-amber-900 uppercase tracking-wide">Grouping Logic</h4>
-                        <p className="text-[10px] text-amber-700">Concatenate client records</p>
+                {selectedSources.length === 1 && (selectedSources.includes('VAT') || selectedSources.includes('PAYROLL')) && (
+                  <div className={`mt-3 p-3 rounded-xl border ${selectedSources.includes('VAT') ? 'bg-amber-50 border-amber-200' : 'bg-purple-50 border-purple-200'}`}>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className={`text-[11px] font-bold uppercase tracking-wide ${selectedSources.includes('VAT') ? 'text-amber-900' : 'text-purple-900'}`}>Grouping Logic</h4>
+                          <p className={`text-[10px] ${selectedSources.includes('VAT') ? 'text-amber-700' : 'text-purple-700'}`}>
+                            {selectedSources.includes('VAT') ? 'Concatenate client records' : 'Consolidate employee totals'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setIsGroupedView(!isGroupedView)}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isGroupedView ? (selectedSources.includes('VAT') ? 'bg-amber-600' : 'bg-purple-600') : 'bg-slate-200'}`}
+                        >
+                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isGroupedView ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => setVatGroupedView(!vatGroupedView)}
-                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${vatGroupedView ? 'bg-amber-600' : 'bg-slate-200'}`}
-                      >
-                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${vatGroupedView ? 'translate-x-4' : 'translate-x-0'}`} />
-                      </button>
+
+                      {isGroupedView && selectedSources.includes('PAYROLL') && (
+                        <div className="pt-2 border-t border-purple-200 flex items-center justify-between">
+                          <div>
+                            <h4 className="text-[11px] font-bold text-purple-900 uppercase tracking-wide">Pivot View</h4>
+                            <p className="text-[10px] text-purple-700">Monthly breakdown columns</p>
+                          </div>
+                          <button
+                            onClick={() => setIsPivoted(!isPivoted)}
+                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isPivoted ? 'bg-purple-600' : 'bg-slate-200'}`}
+                          >
+                            <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isPivoted ? 'translate-x-4' : 'translate-x-0'}`} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
-                {selectedSources.includes('VAT') && !vatGroupedView && (
+                {selectedSources.includes('VAT') && !isGroupedView && (
                   <p className="text-[10px] text-slate-400 italic mt-1">VAT: filters by period year, not payment date</p>
                 )}
                 {isMultiSource && (
@@ -1199,28 +1375,30 @@ export function AccountsReportBuilder({
               </div>
 
               {/* Clients */}
-              <div>
-                <h4 className="font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-2 flex items-center justify-between">
-                  Clients
-                  <div className="flex gap-2">
-                    <button className="text-[10px] text-indigo-600 font-bold hover:underline" onClick={() => setSelectedClients(availableClients)}>All</button>
-                    <span className="text-slate-300">|</span>
-                    <button className="text-[10px] text-indigo-600 font-bold hover:underline" onClick={() => setSelectedClients([])}>None</button>
+              {!selectedSources.includes('PAYROLL') && (
+                <div>
+                  <h4 className="font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-2 flex items-center justify-between">
+                    Clients
+                    <div className="flex gap-2">
+                      <button className="text-[10px] text-indigo-600 font-bold hover:underline" onClick={() => setSelectedClients(availableClients)}>All</button>
+                      <span className="text-slate-300">|</span>
+                      <button className="text-[10px] text-indigo-600 font-bold hover:underline" onClick={() => setSelectedClients([])}>None</button>
+                    </div>
+                  </h4>
+                  <div className="flex flex-col gap-0.5 max-h-[130px] overflow-y-auto pr-1 custom-scrollbar">
+                    {availableClients.map(c => (
+                      <label key={c} className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-50 px-1.5 py-1 rounded select-none">
+                        <input type="checkbox" className="rounded border-slate-300 text-indigo-600 shrink-0 h-3 w-3" checked={selectedClients.includes(c)}
+                          onChange={e => {
+                            if (e.target.checked) setSelectedClients(prev => [...prev, c]);
+                            else setSelectedClients(prev => prev.filter(x => x !== c));
+                          }} />
+                        <span className="truncate">{c}</span>
+                      </label>
+                    ))}
                   </div>
-                </h4>
-                <div className="flex flex-col gap-0.5 max-h-[130px] overflow-y-auto pr-1 custom-scrollbar">
-                  {availableClients.map(c => (
-                    <label key={c} className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-50 px-1.5 py-1 rounded select-none">
-                      <input type="checkbox" className="rounded border-slate-300 text-indigo-600 shrink-0 h-3 w-3" checked={selectedClients.includes(c)}
-                        onChange={e => {
-                          if (e.target.checked) setSelectedClients(prev => [...prev, c]);
-                          else setSelectedClients(prev => prev.filter(x => x !== c));
-                        }} />
-                      <span className="truncate">{c}</span>
-                    </label>
-                  ))}
                 </div>
-              </div>
+              )}
 
               {/* Columns Map Builder */}
               <div>
@@ -1441,6 +1619,81 @@ export function AccountsReportBuilder({
 
         </div>
       </DialogContent>
+
+      {/* ── Employee Selection Dialog ── */}
+      <Dialog open={showEmpDialog} onOpenChange={setShowEmpDialog}>
+        <DialogContent className="max-w-2xl h-[80vh] flex flex-col p-0 overflow-hidden">
+          <div className="p-4 border-b bg-slate-50 flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-slate-900">Select Employees</h3>
+              <p className="text-xs text-slate-500">Filter and choose specific staff for your report</p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setSelectedClients([])}>Clear All</Button>
+              <Button size="sm" className="h-8 text-xs bg-indigo-600" onClick={() => setShowEmpDialog(false)}>Done</Button>
+            </div>
+          </div>
+          
+          <div className="p-4 border-b bg-white">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input 
+                placeholder="Search by name, position, or department..." 
+                className="pl-10 h-10 border-slate-200"
+                value={empSearch}
+                onChange={e => setEmpSearch(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {employees
+                .filter(e => {
+                  const search = empSearch.toLowerCase();
+                  return (
+                    e.surname.toLowerCase().includes(search) ||
+                    e.firstname.toLowerCase().includes(search) ||
+                    e.position.toLowerCase().includes(search) ||
+                    e.department.toLowerCase().includes(search)
+                  );
+                })
+                .sort((a, b) => getPositionIndex(a.position) - getPositionIndex(b.position))
+                .map(emp => {
+                  const fullName = `${emp.surname} ${emp.firstname}`.trim();
+                  const isSelected = selectedClients.includes(fullName);
+                  return (
+                    <button
+                      key={emp.id}
+                      onClick={() => setSelectedClients(prev => isSelected ? prev.filter(x => x !== fullName) : [...prev, fullName])}
+                      className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+                        isSelected 
+                          ? 'bg-indigo-50 border-indigo-200 shadow-sm' 
+                          : 'bg-white border-slate-100 hover:border-slate-200'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                        isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-200'
+                      }`}>
+                        {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-bold truncate ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>
+                          {fullName}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-slate-500 font-medium truncate uppercase">{emp.position}</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-[10px] text-slate-400 truncate">{emp.department}</span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

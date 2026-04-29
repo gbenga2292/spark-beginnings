@@ -241,6 +241,7 @@ export function usePayrollCalculator() {
           employerPension,
           nsitf,
           takeHomePay,
+          staffType: emp.staffType,
           status: 'Pending' as const,
         };
       });

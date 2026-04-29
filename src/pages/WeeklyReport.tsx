@@ -202,11 +202,11 @@ export function WeeklyReport() {
     <div className="flex items-center gap-2">
       {pdfPreviewUrl ? (
         <>
-          <Button size="sm" variant="outline" onClick={() => { setPdfPreviewUrl(null); setIsPreviewOpen(false); }} className="gap-2 h-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm">
-             <X className="h-3.5 w-3.5 text-slate-400" /> Close Preview
+          <Button size="sm" variant="outline" onClick={() => { setPdfPreviewUrl(null); setIsPreviewOpen(false); }} className="h-9 w-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm" title="Close Preview">
+             <X className="h-5 w-5 text-slate-400" />
           </Button>
-          <Button size="sm" onClick={() => generateProfessionalPDF('download')} className="gap-2 h-9 bg-slate-900 hover:bg-black text-white font-bold text-[11px] uppercase tracking-tight shadow-lg shadow-slate-200">
-             <Printer className="h-3.5 w-3.5" /> Save PDF
+          <Button size="sm" onClick={() => generateProfessionalPDF('download')} className="h-9 w-9 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200" title="Save PDF">
+             <Printer className="h-5 w-5" />
           </Button>
         </>
       ) : (
@@ -228,11 +228,11 @@ export function WeeklyReport() {
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
-          <Button variant="outline" size="sm" onClick={handleExportXLSX} className="gap-2 h-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm">
-            <Download className="h-3.5 w-3.5 text-indigo-500" /> Export Excel
+          <Button variant="outline" size="sm" onClick={handleExportXLSX} className="h-9 w-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm" title="Export Excel">
+            <Download className="h-5 w-5 text-indigo-500" />
           </Button>
-          <Button size="sm" onClick={() => generateProfessionalPDF('preview')} className="gap-2 h-9 bg-slate-900 hover:bg-black text-white font-bold text-[11px] uppercase tracking-tight shadow-lg shadow-slate-200">
-            <FileText className="h-3.5 w-3.5" /> View PDF Report
+          <Button size="sm" onClick={() => generateProfessionalPDF('preview')} className="h-9 w-9 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200" title="View PDF Report">
+            <FileText className="h-5 w-5" />
           </Button>
         </>
       )}
