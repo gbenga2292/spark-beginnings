@@ -204,12 +204,22 @@ export function TaskPopupNotifications() {
         // Only fire if within the 2-minute window after the scheduled time
         if (diff < 0 || diff > WINDOW_MS) return;
 
-        // External HR visibility filter
-        const currentUserData = users.find(u => u.id === userId);
-        const isExternalHr = currentUserData?.privileges?.tasks?.isExternalHr;
-        if (isExternalHr) {
-          const mt = mainTasks.find(m => m.id === rem.mainTaskId);
-          if (!mt?.is_hr_task) return;
+        // HR visibility filter: align with Tasks.tsx / TaskDashboard.tsx hasHrAccess pattern
+        const isExternalHr = currentUser?.privileges?.tasks?.isExternalHr;
+        const isHrDept = currentUser?.department?.toLowerCase() === 'hr';
+        const hasHrAccess = isExternalHr || isHrDept;
+
+        const mt = mainTasks.find(m => m.id === rem.mainTaskId);
+        if (mt?.is_hr_task) {
+          // HR tasks: only authorized HR personnel, creators, or assignees get notified
+          const isCreator = mt.created_by === userId || (mt as any).createdBy === userId;
+          const isAssigned = (mt.assignedTo || (mt as any).assigned_to || '').includes(userId);
+          if (!hasHrAccess && !isCreator && !isAssigned) return;
+        } else if (isExternalHr) {
+          // External HR consultants are suppressed from non-HR task reminders unless directly involved
+          const isCreator = mt && (mt.created_by === userId || (mt as any).createdBy === userId);
+          const isAssigned = mt && (mt.assignedTo || (mt as any).assigned_to || '').includes(userId);
+          if (!isCreator && !isAssigned) return;
         }
 
         const isNewTask  = rem.title === 'New Task Created';
@@ -303,10 +313,9 @@ export function TaskPopupNotifications() {
           const isRelevant = subAssignees.includes(userId) || mtAssignees.includes(userId) || isSubCreator || isMtCreator || isMention || isReplyToMe;
           if (!isRelevant) return;
 
-          // External HR visibility filter
-          const currentUserData = users.find(u => u.id === userId);
-          const isExternalHr = currentUserData?.privileges?.tasks?.isExternalHr;
-          if (isExternalHr && mt && !mt.is_hr_task) return;
+          const isExternalHr = currentUser?.privileges?.tasks?.isExternalHr;
+          const isAssigned = mt && (mt.assignedTo || (mt as any).assigned_to || '').includes(userId);
+          if (isExternalHr && mt && !mt.is_hr_task && !isMtCreator && !isAssigned) return;
 
           const taskTitle = mt?.title || sub?.title || 'a task';
 
@@ -327,10 +336,10 @@ export function TaskPopupNotifications() {
         payload => {
           const mt = mainTasks.find(m => m.id === (payload.new.mainTaskId || payload.new.main_task_id));
 
-          // External HR visibility filter
-          const currentUserData = users.find(u => u.id === userId);
-          const isExternalHr = currentUserData?.privileges?.tasks?.isExternalHr;
-          if (isExternalHr && mt && !mt.is_hr_task) return;
+          const isExternalHr = currentUser?.privileges?.tasks?.isExternalHr;
+          const isCreator = mt && (mt.created_by === userId || (mt as any).createdBy === userId);
+          const isAssigned = mt && (mt.assignedTo || (mt as any).assigned_to || '').includes(userId);
+          if (isExternalHr && mt && !mt.is_hr_task && !isCreator && !isAssigned) return;
 
           pushPopup({
             type:      'assignment',
@@ -353,10 +362,10 @@ export function TaskPopupNotifications() {
 
           const mt = mainTasks.find(m => m.id === (payload.new.mainTaskId || payload.new.main_task_id));
 
-          // External HR visibility filter
-          const currentUserData = users.find(u => u.id === userId);
-          const isExternalHr = currentUserData?.privileges?.tasks?.isExternalHr;
-          if (isExternalHr && mt && !mt.is_hr_task) return;
+          const isExternalHr = currentUser?.privileges?.tasks?.isExternalHr;
+          const isCreator = mt && (mt.created_by === userId || (mt as any).createdBy === userId);
+          const isAssigned = mt && (mt.assignedTo || (mt as any).assigned_to || '').includes(userId);
+          if (isExternalHr && mt && !mt.is_hr_task && !isCreator && !isAssigned) return;
 
           pushPopup({
             type:      'assignment',

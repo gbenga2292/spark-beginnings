@@ -381,6 +381,7 @@ export function Leaves() {
           workspaceId: 'dcel-team',
           assignedTo: lmSystemUser?.id || approverId,
           deadline: today430.toISOString(),
+          is_hr_task: true,
         });
 
         if (mainTask?.id) {
@@ -497,6 +498,7 @@ export function Leaves() {
         workspaceId: 'dcel-team',
         assignedTo: lmSystemUser?.id || approverId,
         deadline: today430.toISOString(),
+        is_hr_task: true,
       });
 
       if (mainTask?.id) {

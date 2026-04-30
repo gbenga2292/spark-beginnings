@@ -141,6 +141,7 @@ export interface AppUser {
   avatar?: string;
   avatarColor?: string;
   role?: string;
+  department?: string;
   workspaceId: string;
   privileges: UserPrivileges;
   isActive: boolean;

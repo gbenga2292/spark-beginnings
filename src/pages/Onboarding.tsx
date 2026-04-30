@@ -540,6 +540,7 @@ export function Onboarding() {
           deadline: dueFriday,
           assignedTo: user?.id,
           priority: 'High',
+          is_hr_task: true,
         }, subtasksToCreate);
       }
     } catch (err) {

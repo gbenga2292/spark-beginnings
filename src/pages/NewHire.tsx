@@ -96,6 +96,7 @@ export function NewHire() {
             assignedTo: user.id,
             priority: 'high',
             deadline: start.toISOString(),
+            is_hr_task: true,
           },
           subTasksForCreation
         );

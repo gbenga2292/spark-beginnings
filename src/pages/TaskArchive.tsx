@@ -57,10 +57,14 @@ export function TaskArchive() {
       ]);
 
       if (isExternalHr) {
-        m = m.filter((mt: any) => !!mt.is_hr_task);
+        m = m.filter((mt: any) => {
+          const isAssigned = (mt.assignedTo || mt.assigned_to || '').includes(currentUser?.id || '');
+          return !!mt.is_hr_task || mt.created_by === currentUser?.id || mt.createdBy === currentUser?.id || isAssigned;
+        });
         s = s.filter((st: any) => {
           const mt = st.main_tasks;
-          return mt && !!mt.is_hr_task;
+          const isAssigned = mt && (mt.assignedTo || mt.assigned_to || '').includes(currentUser?.id || '');
+          return mt && (!!mt.is_hr_task || mt.created_by === currentUser?.id || mt.createdBy === currentUser?.id || isAssigned);
         });
       }
 

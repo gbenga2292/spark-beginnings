@@ -108,6 +108,8 @@ function PersonalTasksView() {
     updateSubtask, updateSubtaskStatus, deleteMainTask, updateMainTask, comments, reminders,
     fetchArchivedSubtasks, restoreSubtask, deleteSubtaskPermanently } = useAppData();
   const { user: currentUser } = useAuth();
+  const me = React.useMemo(() => users.find(u => u.id === currentUser?.id), [users, currentUser?.id]);
+  const isHrConsultant = me?.privileges?.tasks?.isExternalHr;
   const { wsTasks: rawWsTasks, workspace } = useWorkspace();
   const wsTasks = React.useMemo(() => rawWsTasks.filter(mt => mt.is_project || subtasks.some(s => s.mainTaskId === mt.id || (s as any).main_task_id === mt.id)), [rawWsTasks, subtasks]);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -530,6 +532,7 @@ function PersonalTasksView() {
           teamId={workspace?.id ?? ""}
           workspaceId={workspace?.id ?? ""}
           isPersonal
+          isExternalHr={isHrConsultant}
         />
       )}
 
@@ -582,6 +585,8 @@ function AdminTasksView() {
   const myId = currentUser?.id;
   const me = React.useMemo(() => users.find(u => u.id === myId), [users, myId]);
   const isExternalHr = me?.privileges?.tasks?.isExternalHr;
+  const isHrDept = me?.department?.toLowerCase() === 'hr';
+  const hasHrAccess = isExternalHr || isHrDept;
   // Derive name from users list (Supabase User has no .name field)
   const myFirstName = React.useMemo(() => {
     return (me?.name || '').split(' ')[0].toLowerCase();
@@ -621,12 +626,21 @@ function AdminTasksView() {
   const teamTasks = React.useMemo(() => {
     return rawTeamTasks.filter(mt => {
       // Primary visibility: projects, HR tasks, or tasks with subtasks
-      const isVisible = mt.is_project || mt.is_hr_task || subtasks.some(s => s.mainTaskId === mt.id || (s as any).main_task_id === mt.id);
+      const isVisible = mt.is_project || mt.is_hr_task || mt.created_by === myId || (mt as any).createdBy === myId || subtasks.some(s => s.mainTaskId === mt.id || (s as any).main_task_id === mt.id);
       if (!isVisible) return false;
 
-      // Access control for External HR
+      // Access control for HR tasks
+      if (mt.is_hr_task) {
+        const isAssigned = (mt.assignedTo || (mt as any).assigned_to || '').includes(myId);
+        const isCreator = mt.created_by === myId || (mt as any).createdBy === myId;
+        // Authorized HR personnel can see all HR tasks; others only see them if assigned or they created them
+        return hasHrAccess || isCreator || isAssigned;
+      }
+
       if (isExternalHr) {
-        return !!mt.is_hr_task;
+        const isAssigned = (mt.assignedTo || (mt as any).assigned_to || '').includes(myId);
+        // External HR (without full admin) restricted to HR tasks, their own, or assigned
+        return mt.created_by === myId || (mt as any).createdBy === myId || isAssigned;
       }
 
       return true;
@@ -712,6 +726,7 @@ function AdminTasksView() {
     if (!currentUser?.id) return false;
     
     const mt = teamTasks.find(m => m.id === s.mainTaskId);
+    const isHr = !!mt?.is_hr_task;
     const isCreator = s.createdBy === currentUser.id || mt?.createdBy === currentUser.id;
     
     let isAssigned = false;
@@ -721,6 +736,9 @@ function AdminTasksView() {
         : Array.isArray(s.assignedTo) ? s.assignedTo : [];
       isAssigned = assignees.includes(currentUser.id);
     }
+
+    if (isHr) return hasHrAccess || isCreator || isAssigned;
+    if (isExternalHr) return isCreator || isAssigned;
 
     return isCreator || isAssigned;
   });
@@ -1701,6 +1719,7 @@ function AdminTasksView() {
           currentUserId={currentUser?.id ?? ""}
           teamId={teamWs?.id ?? ""}
           workspaceId={teamWs?.id ?? ""}
+          isExternalHr={isExternalHr}
         />
       )}
 
@@ -1805,6 +1824,8 @@ function AdminTasksView() {
 function UserTasksView() {
   const { user: currentUser } = useAuth();
   const { subtasks, mainTasks, users, createMainTask, updateSubtaskStatus } = useAppData();
+  const me = React.useMemo(() => users.find(u => u.id === currentUser?.id), [users, currentUser?.id]);
+  const isExternalHr = me?.privileges?.tasks?.isExternalHr;
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -2016,6 +2037,7 @@ function UserTasksView() {
           currentUserId={currentUser?.id ?? ""}
           teamId={teamWs?.id ?? ""}
           workspaceId={teamWs?.id ?? ""}
+          isExternalHr={isExternalHr}
         />
       )}
     </motion.div>

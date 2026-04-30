@@ -333,6 +333,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             priority: task.priority || null,
             is_project: task.is_project || false,
             requires_approval: task.requiresApproval || false,
+            is_hr_task: task.is_hr_task || false,
         };
         const { data, error } = await supabase.from('main_tasks').insert(payload).select().single();
         if (error) {
@@ -402,8 +403,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         if (p.is_project !== undefined)         payload.is_project = p.is_project;
         if (p.isProject !== undefined)          payload.is_project = p.isProject;
         // camelCase → snake_case conversions
-        if (p.requiresApproval !== undefined)   payload.requires_approval = p.requiresApproval;
         if (p.requires_approval !== undefined)  payload.requires_approval = p.requires_approval;
+        if (p.is_hr_task !== undefined)         payload.is_hr_task = p.is_hr_task;
+        if (p.isHrTask !== undefined)           payload.is_hr_task = p.isHrTask;
         const { data, error } = await supabase.from('main_tasks').update(payload).eq('id', id).select().single();
         if (error) {
             console.error('updateMainTask error:', error);

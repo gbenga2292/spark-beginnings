@@ -110,9 +110,12 @@ export function TaskReminders() {
   const isExternalHr = appUser?.privileges?.tasks?.isExternalHr;
 
   const mainTasks = useMemo(() => {
-    if (isExternalHr) return allMainTasks.filter(m => !!m.is_hr_task);
+    if (isExternalHr) return allMainTasks.filter(m => {
+      const isAssigned = (m.assignedTo || (m as any).assigned_to || '').includes(currentUser?.id || '');
+      return !!m.is_hr_task || m.created_by === currentUser?.id || m.createdBy === currentUser?.id || isAssigned;
+    });
     return allMainTasks;
-  }, [allMainTasks, isExternalHr]);
+  }, [allMainTasks, isExternalHr, currentUser?.id]);
 
   const reminders = useMemo(() => {
     if (isExternalHr) {

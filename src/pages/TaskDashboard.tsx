@@ -96,7 +96,7 @@ function PersonalSpaceDashboard() {
 
   const activeWsTasks = wsTasks.filter(mt => {
     const hasSubs = subtasks.some(s => s.mainTaskId === mt.id || s.main_task_id === mt.id);
-    return hasSubs || mt.is_project || mt.is_hr_task;
+    return hasSubs || mt.is_project || mt.is_hr_task || mt.created_by === currentUser?.id || mt.createdBy === currentUser?.id;
   });
 
   const wsTaskIds = new Set(activeWsTasks.map(mt => mt.id));
@@ -296,7 +296,7 @@ function PersonalProductivityScore() {
   const { wsTasks } = useWorkspace();
   const activeWsTasks = wsTasks.filter(mt => {
     const hasSubs = subtasks.some(s => s.mainTaskId === mt.id || s.main_task_id === mt.id);
-    return hasSubs || mt.is_project || mt.is_hr_task;
+    return hasSubs || mt.is_project || mt.is_hr_task || mt.created_by === currentUser?.id || mt.createdBy === currentUser?.id;
   });
   const wsTaskIds = new Set(activeWsTasks.map(mt => mt.id));
   const mySubs = subtasks.filter(s => wsTaskIds.has(s.mainTaskId!));
@@ -392,9 +392,10 @@ function AdminDashboard() {
   const isExternalHr = appUser?.privileges?.tasks?.isExternalHr;
 
   const activeWsTasks = wsTasks.filter(mt => {
-    if (isExternalHr) return !!mt.is_hr_task;
+    const isAssigned = (mt.assignedTo || (mt as any).assigned_to || '').includes(currentUser?.id || '');
+    if (isExternalHr) return !!mt.is_hr_task || mt.created_by === currentUser?.id || mt.createdBy === currentUser?.id || isAssigned;
     const hasSubs = subtasks.some(s => s.mainTaskId === mt.id || s.main_task_id === mt.id);
-    return hasSubs || mt.is_project || mt.is_hr_task;
+    return hasSubs || mt.is_project || mt.is_hr_task || mt.created_by === currentUser?.id || mt.createdBy === currentUser?.id;
   });
 
   const wsTaskIds = new Set(activeWsTasks.map(mt => mt.id));
@@ -587,11 +588,24 @@ function UserDashboard() {
 
   const appUser = users.find(u => u.id === currentUser?.id);
   const isExternalHr = appUser?.privileges?.tasks?.isExternalHr;
+  const isHrDept = appUser?.department?.toLowerCase() === 'hr';
+  const hasHrAccess = isExternalHr || isHrDept;
 
   const activeWsTasks = wsTasks.filter(mt => {
-    if (isExternalHr) return !!mt.is_hr_task;
+    const isAssigned = (mt.assignedTo || (mt as any).assigned_to || '').includes(currentUser?.id || '');
+    const isCreator = mt.created_by === currentUser?.id || mt.createdBy === currentUser?.id;
+    
+    // HR task visibility logic
+    if (mt.is_hr_task) {
+      return hasHrAccess || isCreator || isAssigned;
+    }
+
+    if (isExternalHr) {
+      return isCreator || isAssigned;
+    }
+
     const hasSubs = subtasks.some(s => s.mainTaskId === mt.id || s.main_task_id === mt.id);
-    return hasSubs || mt.is_project || mt.is_hr_task;
+    return hasSubs || mt.is_project || isCreator;
   });
 
   const [taskFilter, setTaskFilter] = useState<'my_tasks' | 'urgent' | 'all' | 'completed' | 'under_review'>('my_tasks');
@@ -600,7 +614,14 @@ function UserDashboard() {
   const mySubs = subtasks.filter(s => {
     const belongsToActive = wsTaskIds.has((s as any).main_task_id || s.mainTaskId);
     if (!belongsToActive || s.is_deleted) return false;
-    if (isExternalHr) return true; // Show all subtasks of HR tasks
+    
+    // Get the parent task to check if it's an HR task
+    const parentTask = activeWsTasks.find(mt => mt.id === ((s as any).main_task_id || s.mainTaskId));
+    const isHr = parentTask?.is_hr_task;
+    
+    if (isHr) return hasHrAccess || s.assignedTo?.includes(currentUser?.id as string);
+    if (isExternalHr) return true; // Consultants see all subtasks of their authorized tasks
+    
     return s.assignedTo?.includes(currentUser?.id as string);
   });
 

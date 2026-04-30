@@ -78,7 +78,6 @@ export function Dashboard() {
     const attendanceRecords = useAppStore((state) => state.attendanceRecords);
     const leaves = useAppStore((state) => state.leaves);
     const holidays = useAppStore((state) => state.publicHolidays);
-    const invoices = useAppStore((state) => state.invoices);
     const salaryAdvances = useAppStore((state) => state.salaryAdvances);
     const loans = useAppStore((state) => state.loans);
     const sites = useAppStore((state) => state.sites).filter(s => s.name?.toUpperCase() !== 'DCEL' && s.name?.toUpperCase() !== 'OFFICE');
@@ -169,8 +168,6 @@ export function Dashboard() {
 
         const attendanceRate = totalPossibleDays > 0 ? Math.min(100, Math.round((totalPresentDays / totalPossibleDays) * 100)) : 0;
 
-        // Unpaid invoices count
-        const unpaidInvoices = invoices.filter(inv => inv.status !== 'Paid').length;
 
         // --- Leave logic ---
         const todayMidnight = new Date();
@@ -213,13 +210,12 @@ export function Dashboard() {
             totalPresentDays,
             totalPossibleDays,
             attendanceRate,
-            unpaidInvoices,
             pendingLeaves,
             pendingAdvances,
             activeLoans,
             activeSites,
         };
-    }, [employees, attendanceRecords, holidays, filterMonth, filterYear, invoices, leaves, salaryAdvances, loans, sites, departments]);
+    }, [employees, attendanceRecords, holidays, filterMonth, filterYear, leaves, salaryAdvances, loans, sites, departments]);
 
     // ── DEPARTMENT BREAKDOWN ──
     const deptData = useMemo(() => {
@@ -536,15 +532,7 @@ export function Dashboard() {
                     </CardContent>
                 </Card>
 
-                <Card className="shadow-sm">
-                    <CardContent className="p-3 sm:p-4 flex flex-col items-center text-center gap-1.5 sm:gap-2">
-                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-sky-50 dark:bg-sky-900/30 flex items-center justify-center">
-                            <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-sky-600 dark:text-sky-400" />
-                        </div>
-                        <div className="text-2xl sm:text-3xl font-black text-sky-600 dark:text-sky-400">{kpiStats.unpaidInvoices}</div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Unpaid Invoices</div>
-                    </CardContent>
-                </Card>
+
 
                 <Card className="shadow-sm">
                     <CardContent className="p-3 sm:p-4 flex flex-col items-center text-center gap-1.5 sm:gap-2">

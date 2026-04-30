@@ -14,9 +14,10 @@ interface CreateTaskDialogProps {
   teamId: string;
   workspaceId?: string;
   isPersonal?: boolean;
+  isExternalHr?: boolean;
 }
 
-export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, workspaceId, isPersonal }: CreateTaskDialogProps) {
+export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, teamId, workspaceId, isPersonal, isExternalHr }: CreateTaskDialogProps) {
   const { addReminder, createMainTask } = useAppData();
 
   const [title, setTitle] = useState("");
@@ -27,7 +28,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
   const [deadlineTime, setDeadlineTime] = useState("");
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
   const [requiresApproval, setRequiresApproval] = useState(false);
-  const [isHrTask, setIsHrTask] = useState(false);
+  const [isHrTask, setIsHrTask] = useState(isExternalHr ?? false);
   const [showSubs, setShowSubs] = useState(true);
   const [subtasks, setSubs] = useState<{ title: string; assignedTo: string[]; deadline: string; deadlineTime: string; priority: TaskPriority | undefined; requiresApproval: boolean }[]>([]);
 

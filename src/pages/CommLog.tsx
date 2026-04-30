@@ -1067,6 +1067,7 @@ function CommLogTaskDialog({ open, onClose, initialTitle, initialDescription, pa
           teamId: 'dcel-team',
           workspaceId: 'dcel-team',
           is_project: false,
+          is_hr_task: true,
         }, []);
         
         if (newMainTask) {
@@ -1079,17 +1080,18 @@ function CommLogTaskDialog({ open, onClose, initialTitle, initialDescription, pa
     } else {
       // Normal flow (Main log task creation)
       const subs = subtasks.map(s => ({ title: s.title, status: 'not_started' }));
-      await createMainTask({
-        title: title.trim(),
-        description: description.trim(),
-        createdBy: user?.id,
-        teamId: 'dcel-team',
-        workspaceId: 'dcel-team',
-        assignedTo: assignee.length > 0 ? assignee.join(',') : null,
-        deadline: deadline || null,
-        priority,
-        is_project: false,
-      }, subs);
+        await createMainTask({
+          title: title.trim(),
+          description: description.trim(),
+          createdBy: user?.id,
+          teamId: 'dcel-team',
+          workspaceId: 'dcel-team',
+          assignedTo: assignee.length > 0 ? assignee.join(',') : null,
+          deadline: deadline || null,
+          priority,
+          is_project: false,
+          is_hr_task: true,
+        }, subs);
     }
 
     setSaving(false);

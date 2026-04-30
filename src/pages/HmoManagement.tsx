@@ -124,6 +124,7 @@ export function HmoManagement() {
               description: 'Manage employee HMO policy renewals',
               is_project: false,
               skipAutoSubtask: true,
+              is_hr_task: true,
             }, []);
             if (newTask) mainTaskId = newTask.id;
           } catch (e) {

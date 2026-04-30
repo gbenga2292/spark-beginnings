@@ -323,6 +323,7 @@ export function dbToProfile(r: any): AppUser {
     password: '', // Not stored in DB
     privileges: r.privileges || {},
     isActive: r.is_active, createdAt: r.created_at,
+    department: r.department || undefined,
   };
 }
 

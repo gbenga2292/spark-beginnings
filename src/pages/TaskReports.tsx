@@ -60,9 +60,12 @@ function AnalyticsDashboard() {
     const isExternalHr = appUser?.privileges?.tasks?.isExternalHr;
 
     const mainTasks = useMemo(() => {
-        if (isExternalHr) return allMainTasks.filter(mt => !!mt.is_hr_task);
+        if (isExternalHr) return allMainTasks.filter(mt => {
+            const isAssigned = (mt.assignedTo || mt.assigned_to || '').includes(currentUser?.id || '');
+            return !!mt.is_hr_task || mt.created_by === currentUser?.id || mt.createdBy === currentUser?.id || isAssigned;
+        });
         return allMainTasks;
-    }, [allMainTasks, isExternalHr]);
+    }, [allMainTasks, isExternalHr, currentUser?.id]);
 
     const subtasks = useMemo(() => {
         if (isExternalHr) {

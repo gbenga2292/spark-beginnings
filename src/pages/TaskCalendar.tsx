@@ -66,9 +66,12 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
   const isExternalHr = appUser?.privileges?.tasks?.isExternalHr;
 
   const mainTasks = useMemo(() => {
-    if (isExternalHr) return allMainTasks.filter(m => !!m.is_hr_task);
+    if (isExternalHr) return allMainTasks.filter(m => {
+      const isAssigned = (m.assignedTo || (m as any).assigned_to || '').includes(currentUser?.id || '');
+      return !!m.is_hr_task || m.created_by === currentUser?.id || m.createdBy === currentUser?.id || isAssigned;
+    });
     return allMainTasks;
-  }, [allMainTasks, isExternalHr]);
+  }, [allMainTasks, isExternalHr, currentUser?.id]);
 
   const subtasks = useMemo(() => {
     if (isExternalHr) {
@@ -167,7 +170,8 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
     if (isExternalHr) {
       relevantReminders = relevantReminders.filter(r => {
         const mt = mainTasks.find(m => m.id === r.mainTaskId);
-        return mt?.is_hr_task;
+        const isAssigned = mt && (mt.assignedTo || (mt as any).assigned_to || '').includes(currentUser?.id || '');
+        return mt && (!!mt.is_hr_task || mt.created_by === currentUser?.id || mt.createdBy === currentUser?.id || isAssigned);
       });
     }
 

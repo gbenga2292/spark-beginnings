@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/src/components/task_ui/sheet";
 import { useAppData } from "@/src/contexts/AppDataContext";
+import { useAuth } from "@/src/hooks/useAuth";
+import { useUserStore } from "@/src/store/userStore";
 import { TaskInboxView } from "./TaskInboxView";
 import { AppUser } from "@/src/types/tasks";
 
@@ -11,7 +13,36 @@ interface TaskDetailSheetProps {
 
 export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
   const { subtasks, mainTasks, users } = useAppData();
-  
+  const { user: currentUser } = useAuth();
+  const appUser = useUserStore(s => s.getCurrentUser());
+
+  // ── HR visibility gate — mirrors Tasks.tsx / TaskDashboard.tsx ──────────
+  const isExternalHr = appUser?.privileges?.tasks?.isExternalHr;
+  const isHrDept = appUser?.department?.toLowerCase() === 'hr';
+  const hasHrAccess = isExternalHr || isHrDept;
+  const myId = currentUser?.id ?? '';
+
+  const visibleMainTasks = mainTasks.filter(mt => {
+    const isCreator = mt.created_by === myId || (mt as any).createdBy === myId;
+    const isAssigned = (mt.assignedTo || (mt as any).assigned_to || '').includes(myId);
+
+    if (mt.is_hr_task) {
+      return hasHrAccess || isCreator || isAssigned;
+    }
+    if (isExternalHr) {
+      // External HR only sees non-HR tasks they explicitly own
+      return isCreator || isAssigned;
+    }
+    return true;
+  });
+
+  const visibleMainTaskIds = new Set(visibleMainTasks.map(mt => mt.id));
+
+  const visibleSubtasks = subtasks.filter(s => {
+    const mtId = (s as any).main_task_id || s.mainTaskId;
+    return visibleMainTaskIds.has(mtId);
+  });
+
   // Track the active subtask ID locally inside the full sheet so the user can navigate via the sidebar!
   const [activeId, setActiveId] = useState<string | null>(subtaskId);
 
@@ -35,8 +66,8 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
           <SheetDescription>View and manage subtask details, comments, and activity.</SheetDescription>
         </div>
         <TaskInboxView
-          subtasks={subtasks}
-          mainTasks={mainTasks}
+          subtasks={visibleSubtasks}
+          mainTasks={visibleMainTasks}
           users={activeUsers}
           activeSubtaskId={activeId}
           onSelectSubtask={setActiveId}

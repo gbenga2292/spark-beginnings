@@ -127,6 +127,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
           workspaceId: 'dcel-team',
           assignedTo: approverId,
           deadline: today430.toISOString(),
+          is_hr_task: true,
         });
         if (mainTask?.id) {
           const subtaskDesc = JSON.stringify({ 
@@ -193,6 +194,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
           workspaceId: 'dcel-team',
           assignedTo: approverId,
           deadline: today430.toISOString(),
+          is_hr_task: true,
         });
         if (mainTask?.id) {
           const subtaskDesc = JSON.stringify({ 
