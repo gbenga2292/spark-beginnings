@@ -1146,6 +1146,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 teamId: projectData.teamId,
                 workspaceId: projectData.workspaceId,
                 is_project: true,
+                is_hr_task: !!projectData.isHrTask,
             };
             const { data: mainTask, error } = await supabase.from('main_tasks').insert(taskPayload).select().single();
             if (error || !mainTask) {

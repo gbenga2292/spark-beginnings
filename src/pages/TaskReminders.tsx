@@ -103,8 +103,24 @@ const toneIconStyles = {
 /* ─── Main Component ────────────────────────────────────────────────────────── */
 export function TaskReminders() {
   const { user: currentUser } = useAuth();
-  const { reminders, addReminder, updateReminder, deleteReminder, toggleReminderActive, users } = useAppData();
-  const { wsMembers: activeUsers, wsTasks: mainTasks } = useWorkspace();
+  const { reminders: allReminders, addReminder, updateReminder, deleteReminder, toggleReminderActive, users } = useAppData();
+  const { wsMembers: activeUsers, wsTasks: allMainTasks } = useWorkspace();
+
+  const appUser = users.find(u => u.id === currentUser?.id);
+  const isExternalHr = appUser?.privileges?.tasks?.isExternalHr;
+
+  const mainTasks = useMemo(() => {
+    if (isExternalHr) return allMainTasks.filter(m => !!m.is_hr_task);
+    return allMainTasks;
+  }, [allMainTasks, isExternalHr]);
+
+  const reminders = useMemo(() => {
+    if (isExternalHr) {
+      const hrTaskIds = new Set(mainTasks.map(m => m.id));
+      return allReminders.filter(r => r.mainTaskId && hrTaskIds.has(r.mainTaskId));
+    }
+    return allReminders;
+  }, [allReminders, mainTasks, isExternalHr]);
   const [searchParams, setSearchParams] = useSearchParams();
 
   /* ── One-time cleanup: remove all system-generated reminders from DB ─── */

@@ -388,7 +388,11 @@ function AdminDashboard() {
   const navigate = useNavigate();
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
 
+  const appUser = users.find(u => u.id === currentUser?.id);
+  const isExternalHr = appUser?.privileges?.tasks?.isExternalHr;
+
   const activeWsTasks = wsTasks.filter(mt => {
+    if (isExternalHr) return !!mt.is_hr_task;
     const hasSubs = subtasks.some(s => s.mainTaskId === mt.id || s.main_task_id === mt.id);
     return hasSubs || mt.is_project;
   });
@@ -430,7 +434,11 @@ function AdminDashboard() {
               </div>
               <h2 className="text-2xl font-bold text-white">{getGreeting()}, {name} 👋</h2>
               <p className="text-white/70 text-sm mt-1">
-                Your team has <span className="font-semibold text-white">{inProgress}</span> tasks in progress
+                {isExternalHr ? (
+                  <><span className="font-semibold text-white">{activeWsTasks.length}</span> total HR tasks authorized</>
+                ) : (
+                  <>Your team has <span className="font-semibold text-white">{inProgress}</span> tasks in progress</>
+                )}
                 {pendingApproval > 0 && <span className="text-amber-200"> · {pendingApproval} awaiting approval</span>}
               </p>
             </div>
@@ -441,7 +449,7 @@ function AdminDashboard() {
           {/* Stats row */}
           <div className="relative mt-5 grid grid-cols-4 gap-2">
             {[
-              { label: 'Tasks', value: activeWsTasks.length, icon: Layers },
+              { label: isExternalHr ? 'HR Tasks' : 'Tasks', value: activeWsTasks.length, icon: Layers },
               { label: 'Active', value: inProgress, icon: Activity },
               { label: 'Review', value: pendingApproval, icon: Clock },
               { label: 'Done', value: completed, icon: CheckCheck },
@@ -457,10 +465,10 @@ function AdminDashboard() {
 
       {/* ── Stat Cards ── */}
       <motion.div variants={item} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Team Tasks" value={activeWsTasks.length} icon={TrendingUp} color="blue" sub="Main tasks" />
+        <StatCard label={isExternalHr ? "HR Tasks" : "Team Tasks"} value={activeWsTasks.length} icon={TrendingUp} color="blue" sub={isExternalHr ? "Authorized tasks" : "Main tasks"} />
         <StatCard label="In Progress" value={inProgress} icon={Loader2} color="blue" sub={`${Math.round(inProgress / Math.max(teamSubs.length, 1) * 100)}% active`} />
         <StatCard label="Completed" value={completed} icon={CheckCircle2} color="green" sub={`${completionRate}% rate`} />
-        <StatCard label="Awaiting" value={notStarted} icon={AlertTriangle} color="yellow" sub="Not started" />
+        <StatCard label={isExternalHr ? "HR System" : "Awaiting"} value={isExternalHr ? activeWsTasks.length : notStarted} icon={AlertTriangle} color="yellow" sub={isExternalHr ? "Visibility active" : "Not started"} />
       </motion.div>
 
       {/* ── Main content ── */}
@@ -577,7 +585,11 @@ function UserDashboard() {
   const { hrVariables } = useStore();
   const { restoreSubtask, deleteSubtaskPermanently } = useAppData();
 
+  const appUser = users.find(u => u.id === currentUser?.id);
+  const isExternalHr = appUser?.privileges?.tasks?.isExternalHr;
+
   const activeWsTasks = wsTasks.filter(mt => {
+    if (isExternalHr) return !!mt.is_hr_task;
     const hasSubs = subtasks.some(s => s.mainTaskId === mt.id || s.main_task_id === mt.id);
     return hasSubs || mt.is_project;
   });
@@ -585,7 +597,12 @@ function UserDashboard() {
   const [taskFilter, setTaskFilter] = useState<'my_tasks' | 'urgent' | 'all' | 'completed' | 'under_review'>('my_tasks');
   const myCreatedTasks = activeWsTasks.filter(mt => mt.createdBy === currentUser?.id);
   const wsTaskIds = new Set(activeWsTasks.map(mt => mt.id));
-  const mySubs = subtasks.filter(s => s.assignedTo?.includes(currentUser?.id as string) && !s.is_deleted && wsTaskIds.has((s as any).main_task_id || s.mainTaskId));
+  const mySubs = subtasks.filter(s => {
+    const belongsToActive = wsTaskIds.has((s as any).main_task_id || s.mainTaskId);
+    if (!belongsToActive || s.is_deleted) return false;
+    if (isExternalHr) return true; // Show all subtasks of HR tasks
+    return s.assignedTo?.includes(currentUser?.id as string);
+  });
 
 
   const myDone = mySubs.filter(s => s.status === 'completed').length;
@@ -631,7 +648,11 @@ function UserDashboard() {
               </div>
               <h2 className="text-2xl font-bold">{getGreeting()}, {name} 👋</h2>
               <p className="text-white/70 text-sm mt-1">
-                You have <span className="font-semibold text-white">{myProgress}</span> tasks in progress
+                {isExternalHr ? (
+                  <><span className="font-semibold text-white">{mySubs.length}</span> total HR tasks available</>
+                ) : (
+                  <>You have <span className="font-semibold text-white">{myProgress}</span> tasks in progress</>
+                )}
                 {myPendingApproval > 0 && <span className="text-amber-200"> · {myPendingApproval} awaiting approval</span>}
               </p>
             </div>
@@ -647,7 +668,7 @@ function UserDashboard() {
           </div>
           <div className="relative mt-5 grid grid-cols-4 gap-2">
             {[
-              { label: 'Assigned', value: mySubs.length },
+              { label: isExternalHr ? 'HR Tasks' : 'Assigned', value: mySubs.length },
               { label: 'Active', value: myProgress },
               { label: 'Approval', value: myPendingApproval },
               { label: 'Done', value: myDone },
@@ -663,10 +684,10 @@ function UserDashboard() {
 
       {/* ── Stat Cards ── */}
       <motion.div variants={item} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Assigned to Me" value={mySubs.length} icon={TrendingUp} color="blue" sub="My subtasks" />
-        <StatCard label="In Progress" value={myProgress} icon={Loader2} color="blue" sub={`${Math.round(myProgress / Math.max(mySubs.length, 1) * 100)}% of mine`} />
+        <StatCard label={isExternalHr ? "HR Tasks" : "Assigned to Me"} value={mySubs.length} icon={TrendingUp} color="blue" sub={isExternalHr ? "Authorized HR tasks" : "My subtasks"} />
+        <StatCard label="In Progress" value={myProgress} icon={Loader2} color="blue" sub={isExternalHr ? `${Math.round(myProgress / Math.max(mySubs.length, 1) * 100)}% active` : `${Math.round(myProgress / Math.max(mySubs.length, 1) * 100)}% of mine`} />
         <StatCard label="Completed" value={myDone} icon={CheckCircle2} color="green" sub={`${myRate}% completion rate`} />
-        <StatCard label="Tasks I Created" value={myCreatedTasks.length} icon={Users} color="yellow" sub="Tasks I initiated" />
+        <StatCard label={isExternalHr ? "HR Support" : "Tasks I Created"} value={isExternalHr ? mySubs.length : myCreatedTasks.length} icon={Users} color="yellow" sub={isExternalHr ? "Task visibility active" : "Tasks I initiated"} />
       </motion.div>
 
       {/* ── Progress ── */}
@@ -674,7 +695,7 @@ function UserDashboard() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <BarChart2 className="w-4 h-4 text-primary" />
-            <span className="text-sm font-semibold text-foreground">My Progress</span>
+            <span className="text-sm font-semibold text-foreground">{isExternalHr ? "HR Task Progress" : "My Progress"}</span>
           </div>
           <span className="text-lg font-bold text-primary tabular-nums">{myRate}%</span>
         </div>
@@ -714,7 +735,7 @@ function UserDashboard() {
                     onChange={(e) => setTaskFilter(e.target.value as any)}
                     className="text-sm font-semibold text-foreground bg-transparent border-none py-0 pl-0 pr-5 focus:ring-0 cursor-pointer appearance-none outline-none z-10"
                   >
-                    <option className="bg-card text-foreground" value="my_tasks">My Tasks</option>
+                    <option className="bg-card text-foreground" value="my_tasks">{isExternalHr ? 'HR Tasks' : 'My Tasks'}</option>
                     <option className="bg-card text-foreground" value="urgent">Urgent Tasks</option>
                     <option className="bg-card text-foreground" value="all">All Tasks</option>
                     <option className="bg-card text-foreground" value="completed">Completed Tasks</option>

@@ -23,6 +23,7 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
   const [deadline, setDeadline] = useState(task.deadline ?? "");
   const [priority, setPriority] = useState<TaskPriority | undefined>(task.priority);
   const [requiresApproval, setRequiresApproval] = useState(task.requiresApproval ?? false);
+  const [isHrTask, setIsHrTask] = useState(task.is_hr_task ?? false);
   const [openDropdown, setOpenDropdown] = useState(false);
 
   const isProj = !!task.is_project;
@@ -32,7 +33,7 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
     e.preventDefault();
     if (!title.trim()) return;
     const assignedToStr = assignedTo.length > 0 ? assignedTo.join(',') : undefined;
-    onSave({ title: title.trim(), description: description.trim(), assignedTo: assignedToStr, deadline: deadline || undefined, priority, requiresApproval });
+    onSave({ title: title.trim(), description: description.trim(), assignedTo: assignedToStr, deadline: deadline || undefined, priority, requiresApproval, is_hr_task: isHrTask });
   };
 
   return (
@@ -172,6 +173,17 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
             <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)}
               className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 transition-all" />
             <span className="text-xs font-medium text-foreground">Requires review before completion</span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer mt-1 group">
+            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isHrTask ? 'bg-rose-500 border-rose-500 text-white' : 'border-border bg-background'}`}>
+              <input type="checkbox" checked={isHrTask} onChange={e => setIsHrTask(e.target.checked)}
+                className="sr-only" />
+              {isHrTask && <CheckCircle2 className="w-3 h-3" />}
+            </div>
+            <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
+              HR Task 
+            </span>
           </label>
 
           <EditTaskReminderSection taskId={task.id} assignedTo={assignedTo.join(',')} users={users} />

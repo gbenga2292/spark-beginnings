@@ -58,15 +58,39 @@ interface CalendarEvent {
   isMain?: boolean;
 }
 
-export default function CalendarPage({ onNavigate }: { onNavigate?: () => void } = {}) {
+export default function CalendarPage({ onNavigate, showCompleted: externalShowCompleted }: { onNavigate?: () => void; showCompleted?: boolean } = {}) {
   const { user: currentUser } = useAuth();
-  const { reminders, mainTasks, subtasks } = useAppData();
+  const { reminders, mainTasks: allMainTasks, subtasks: allSubtasks, users } = useAppData();
+
+  const appUser = users.find(u => u.id === currentUser?.id);
+  const isExternalHr = appUser?.privileges?.tasks?.isExternalHr;
+
+  const mainTasks = useMemo(() => {
+    if (isExternalHr) return allMainTasks.filter(m => !!m.is_hr_task);
+    return allMainTasks;
+  }, [allMainTasks, isExternalHr]);
+
+  const subtasks = useMemo(() => {
+    if (isExternalHr) {
+      const hrIds = new Set(mainTasks.map(m => m.id));
+      return allSubtasks.filter(s => hrIds.has(s.mainTaskId!) || hrIds.has((s as any).main_task_id));
+    }
+    return allSubtasks;
+  }, [allSubtasks, mainTasks, isExternalHr]);
   const navigate = useNavigate();
 
   const [calMonth, setCalMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [showCompleted, setShowCompleted] = useState(externalShowCompleted ?? true);
+  
+  // Update local state if external prop changes
+  useMemo(() => {
+    if (externalShowCompleted !== undefined) {
+      setShowCompleted(externalShowCompleted);
+    }
+  }, [externalShowCompleted]);
   const [previewEvent, setPreviewEvent] = useState<CalendarEvent | null>(null);
 
   const allEvents = useMemo(() => {
@@ -77,9 +101,13 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
     const activeMainTaskIds = new Set(mainTasks.filter(m => !m.isDeleted).map(m => m.id));
 
     // Subtasks
-    const relevantSubtasks = filterMode === 'all'
+    let relevantSubtasks = filterMode === 'all'
       ? subtasks.filter(s => s.deadline && activeMainTaskIds.has((s as any).main_task_id || s.mainTaskId))
       : subtasks.filter(s => s.deadline && s.assignedTo?.includes(currentUser?.id as string) && activeMainTaskIds.has((s as any).main_task_id || s.mainTaskId));
+
+    if (!showCompleted) {
+      relevantSubtasks = relevantSubtasks.filter(s => s.status !== 'completed');
+    }
 
     relevantSubtasks.forEach(s => {
       const deadline = new Date(s.deadline!);
@@ -98,7 +126,7 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
     });
 
     // Main tasks
-    const relevantMainTasks = filterMode === 'all'
+    let relevantMainTasks = filterMode === 'all'
       ? mainTasks.filter(m => m.deadline && !m.isDeleted)
       : mainTasks.filter(m => m.deadline && !m.isDeleted && (m.assignedTo?.includes(currentUser?.id as string) || m.createdBy === currentUser?.id));
 
@@ -129,12 +157,19 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
     });
 
     // Reminders
-    const relevantReminders = filterMode === 'all'
+    let relevantReminders = filterMode === 'all'
       ? reminders.filter(r => r.isActive)
       : reminders.filter(r => {
           if (!r.isActive) return false;
           return r.recipientIds?.includes(currentUser?.id ?? '') || r.createdBy === currentUser?.id;
         });
+
+    if (isExternalHr) {
+      relevantReminders = relevantReminders.filter(r => {
+        const mt = mainTasks.find(m => m.id === r.mainTaskId);
+        return mt?.is_hr_task;
+      });
+    }
 
     relevantReminders.forEach(r => {
       events.push({
@@ -144,7 +179,7 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
     });
 
     return events;
-  }, [reminders, subtasks, mainTasks, currentUser, filterMode]);
+  }, [reminders, subtasks, mainTasks, currentUser, filterMode, showCompleted]);
 
 
   const calDays = useMemo(() => {
@@ -222,6 +257,17 @@ export default function CalendarPage({ onNavigate }: { onNavigate?: () => void }
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowCompleted(!showCompleted)}
+            className={`px-3 py-1.5 rounded-lg border text-xs sm:text-sm font-medium transition-all flex items-center gap-2 ${
+              showCompleted 
+                ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/30' 
+                : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
+            }`}
+          >
+            <CheckSquare className="w-3.5 h-3.5" />
+            {showCompleted ? 'Showing Done' : 'Hidden Done'}
+          </button>
           <select
             value={filterMode}
             onChange={(e) => setFilterMode(e.target.value as FilterMode)}

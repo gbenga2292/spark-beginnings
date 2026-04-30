@@ -36,6 +36,7 @@ const PRIV_GROUPS: PG[] = [
           { key: 'canCreateTasks', label: 'Create Tasks' },
           { key: 'canEditTasks', label: 'Edit Tasks' },
           { key: 'canDeleteTasks', label: 'Delete Tasks', danger: true },
+          { key: 'isExternalHr', label: 'External HR Consultant', special: true },
         ]
       },
     ],

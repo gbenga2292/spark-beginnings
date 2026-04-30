@@ -52,8 +52,25 @@ export function TaskReports() {
 
 /* ─── ANALYTICS CORE ENGINE ────────────────────────────────────────────────── */
 function AnalyticsDashboard() {
-    const { subtasks } = useAppData();
-    const { wsTasks: mainTasks, wsMembers: teamUsers, workspace } = useWorkspace();
+    const { user: currentUser } = useAuth();
+    const { subtasks: allSubtasks, users } = useAppData();
+    const { wsTasks: allMainTasks, wsMembers: teamUsers, workspace } = useWorkspace();
+
+    const appUser = users.find(u => u.id === currentUser?.id);
+    const isExternalHr = appUser?.privileges?.tasks?.isExternalHr;
+
+    const mainTasks = useMemo(() => {
+        if (isExternalHr) return allMainTasks.filter(mt => !!mt.is_hr_task);
+        return allMainTasks;
+    }, [allMainTasks, isExternalHr]);
+
+    const subtasks = useMemo(() => {
+        if (isExternalHr) {
+            const hrTaskIds = new Set(mainTasks.map(mt => mt.id));
+            return allSubtasks.filter(s => hrTaskIds.has(s.mainTaskId!) || hrTaskIds.has((s as any).main_task_id));
+        }
+        return allSubtasks;
+    }, [allSubtasks, mainTasks, isExternalHr]);
 
     // ── Filter state ─────────────────────────────────────────────────────────
     // Rolling window (days) — used when year+month are both blank

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { X, FolderOpen, Plus, Trash2, Building2 } from "lucide-react";
+import { X, FolderOpen, Plus, Trash2, Building2, CheckCircle2 } from "lucide-react";
 import type { AppUser } from "@/src/types/tasks";
 import { useAppStore } from "@/src/store/appStore";
 import { Button } from "@/src/components/ui/button";
@@ -34,6 +34,7 @@ export function CreateProjectDialog({
   const [startDate, setStartDate] = useState(initialData?.startDate ? new Date(initialData.startDate).toISOString().split('T')[0] : (initialStatus === "Pending" ? "" : new Date().toISOString().split('T')[0]));
   const [durationDays, setDurationDays] = useState(initialData?.durationDays ? String(initialData.durationDays) : (initialStatus === "Pending" ? "" : "30"));
   const [endDate, setEndDate] = useState(initialData?.endDate ? new Date(initialData.endDate).toISOString().split('T')[0] : "");
+  const [isHrTask, setIsHrTask] = useState(initialData?.is_hr_task ?? false);
 
   // Auto-calculate duration whenEnded
   useEffect(() => {
@@ -83,6 +84,7 @@ export function CreateProjectDialog({
       teamId,
       workspaceId,
       createdBy: currentUserId,
+      isHrTask: isHrTask,
       subtasks: subtasks // Pass the customized subtasks along
     });
     
@@ -156,6 +158,21 @@ export function CreateProjectDialog({
                   <option value="Ended">Ended</option>
                 </select>
               </div>
+            </div>
+
+            <div className="flex items-center gap-3 bg-rose-50/50 border border-rose-100 p-4 rounded-2xl transition-all">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${isHrTask ? 'bg-rose-500 border-rose-500 text-white' : 'border-rose-200 bg-white'}`}>
+                  <input type="checkbox" checked={isHrTask} onChange={e => setIsHrTask(e.target.checked)}
+                    className="sr-only" />
+                  {isHrTask && <CheckCircle2 className="w-3.5 h-3.5" />}
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-rose-900 flex items-center gap-1.5 uppercase tracking-wide">
+                    HR Project
+                  </span>
+                </div>
+              </label>
             </div>
 
             {projectStatus !== 'Pending' && (

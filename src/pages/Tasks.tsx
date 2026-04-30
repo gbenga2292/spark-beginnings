@@ -580,11 +580,12 @@ function AdminTasksView() {
   const { user: currentUser } = useAuth();
   const { readMap, markRead } = useTaskReadTracker();
   const myId = currentUser?.id;
+  const me = React.useMemo(() => users.find(u => u.id === myId), [users, myId]);
+  const isExternalHr = me?.privileges?.tasks?.isExternalHr;
   // Derive name from users list (Supabase User has no .name field)
   const myFirstName = React.useMemo(() => {
-    const me = users.find(u => u.id === myId);
     return (me?.name || '').split(' ')[0].toLowerCase();
-  }, [users, myId]);
+  }, [me]);
   const sites = useAppStore(s => s.sites);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -617,7 +618,20 @@ function AdminTasksView() {
   const [showCreateProject, setShowCreateProject] = useState(false);
   const { hrVariables } = useAppStore();
   const { wsTasks: rawTeamTasks, wsMembers, workspace: teamWs } = useWorkspace();
-  const teamTasks = React.useMemo(() => rawTeamTasks.filter(mt => mt.is_project || subtasks.some(s => s.mainTaskId === mt.id || (s as any).main_task_id === mt.id)), [rawTeamTasks, subtasks]);
+  const teamTasks = React.useMemo(() => {
+    return rawTeamTasks.filter(mt => {
+      // Primary visibility: projects or tasks with subtasks
+      const isVisible = mt.is_project || subtasks.some(s => s.mainTaskId === mt.id || (s as any).main_task_id === mt.id);
+      if (!isVisible) return false;
+
+      // Access control for External HR
+      if (isExternalHr) {
+        return !!mt.is_hr_task;
+      }
+
+      return true;
+    });
+  }, [rawTeamTasks, subtasks, isExternalHr]);
 
   const handleSetDefault = () => localStorage.setItem('tf_default_sort', sortBy);
 

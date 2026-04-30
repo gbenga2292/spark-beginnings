@@ -204,6 +204,14 @@ export function TaskPopupNotifications() {
         // Only fire if within the 2-minute window after the scheduled time
         if (diff < 0 || diff > WINDOW_MS) return;
 
+        // External HR visibility filter
+        const currentUserData = users.find(u => u.id === userId);
+        const isExternalHr = currentUserData?.privileges?.tasks?.isExternalHr;
+        if (isExternalHr) {
+          const mt = mainTasks.find(m => m.id === rem.mainTaskId);
+          if (!mt?.is_hr_task) return;
+        }
+
         const isNewTask  = rem.title === 'New Task Created';
         const isAssigned = rem.title?.startsWith('Assigned') || rem.title?.includes('assigned');
 
@@ -295,6 +303,11 @@ export function TaskPopupNotifications() {
           const isRelevant = subAssignees.includes(userId) || mtAssignees.includes(userId) || isSubCreator || isMtCreator || isMention || isReplyToMe;
           if (!isRelevant) return;
 
+          // External HR visibility filter
+          const currentUserData = users.find(u => u.id === userId);
+          const isExternalHr = currentUserData?.privileges?.tasks?.isExternalHr;
+          if (isExternalHr && mt && !mt.is_hr_task) return;
+
           const taskTitle = mt?.title || sub?.title || 'a task';
 
           pushPopup({
@@ -312,11 +325,12 @@ export function TaskPopupNotifications() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'subtasks' },
         payload => {
-          const oldAssigned = (payload.old?.assignedTo || payload.old?.assigned_to || '');
-          const newAssigned = (payload.new?.assignedTo  || payload.new?.assigned_to  || '');
-          if (!newAssigned.includes(userId) || oldAssigned.includes(userId)) return;
-
           const mt = mainTasks.find(m => m.id === (payload.new.mainTaskId || payload.new.main_task_id));
+
+          // External HR visibility filter
+          const currentUserData = users.find(u => u.id === userId);
+          const isExternalHr = currentUserData?.privileges?.tasks?.isExternalHr;
+          if (isExternalHr && mt && !mt.is_hr_task) return;
 
           pushPopup({
             type:      'assignment',
@@ -338,6 +352,11 @@ export function TaskPopupNotifications() {
           if (!newAssigned.includes(userId) || creator === userId) return;
 
           const mt = mainTasks.find(m => m.id === (payload.new.mainTaskId || payload.new.main_task_id));
+
+          // External HR visibility filter
+          const currentUserData = users.find(u => u.id === userId);
+          const isExternalHr = currentUserData?.privileges?.tasks?.isExternalHr;
+          if (isExternalHr && mt && !mt.is_hr_task) return;
 
           pushPopup({
             type:      'assignment',

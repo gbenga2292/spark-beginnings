@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Plus, ChevronDown, Clock, RefreshCw, Users, Bell } from 'lucide-react';
+import { X, Plus, ChevronDown, Clock, RefreshCw, Users, Bell, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import type { SubTask, SubTaskStatus, MainTask, AppUser, TaskPriority } from "@/src/types/tasks";
@@ -27,6 +27,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
   const [deadlineTime, setDeadlineTime] = useState("");
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
   const [requiresApproval, setRequiresApproval] = useState(false);
+  const [isHrTask, setIsHrTask] = useState(false);
   const [showSubs, setShowSubs] = useState(true);
   const [subtasks, setSubs] = useState<{ title: string; assignedTo: string[]; deadline: string; deadlineTime: string; priority: TaskPriority | undefined; requiresApproval: boolean }[]>([]);
 
@@ -84,7 +85,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
     const mainAssignedToStr = assignedTo.length > 0 ? assignedTo.join(',') : undefined;
 
     const createdTask = await createMainTask(
-      { title: title.trim(), description: description.trim(), createdBy: currentUserId, teamId, workspaceId: workspaceId ?? teamId, assignedTo: mainAssignedToStr, deadline: combinedDeadline, priority, requiresApproval },
+      { title: title.trim(), description: description.trim(), createdBy: currentUserId, teamId, workspaceId: workspaceId ?? teamId, assignedTo: mainAssignedToStr, deadline: combinedDeadline, priority, requiresApproval, is_hr_task: isHrTask },
       finalSubs
     );
 
@@ -218,6 +219,17 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
             <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)}
               className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 transition-all" />
             <span className="text-xs font-medium text-foreground">Requires review before completion</span>
+          </label>
+          
+          <label className="flex items-center gap-2 cursor-pointer mt-1 group">
+            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isHrTask ? 'bg-rose-500 border-rose-500 text-white' : 'border-border bg-background'}`}>
+              <input type="checkbox" checked={isHrTask} onChange={e => setIsHrTask(e.target.checked)}
+                className="sr-only" />
+              {isHrTask && <CheckCircle2 className="w-3 h-3" />}
+            </div>
+            <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
+              HR Task 
+            </span>
           </label>
 
           <div className="border border-border rounded-xl overflow-hidden">

@@ -15,7 +15,7 @@ import { format, differenceInDays } from "date-fns";
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const item = { hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0 } };
 
-export function TaskArchive() {
+  const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   const { workspace: teamWs } = useWorkspace();
   const { hrVariables } = useAppStore();
@@ -26,8 +26,12 @@ export function TaskArchive() {
     restoreSubtask,
     deleteMainTaskPermanently,
     deleteSubtaskPermanently,
-    mainTasks: allMainTasks
+    mainTasks: allMainTasks,
+    users
   } = useAppData();
+
+  const appUser = users.find(u => u.id === currentUser?.id);
+  const isExternalHr = appUser?.privileges?.tasks?.isExternalHr;
 
   const [archivedMain, setArchivedMain] = useState<any[]>([]);
   const [archivedSubs, setArchivedSubs] = useState<any[]>([]);
@@ -45,10 +49,19 @@ export function TaskArchive() {
   const loadArchive = async () => {
     setLoading(true);
     try {
-      const [m, s] = await Promise.all([
+      let [m, s] = await Promise.all([
         fetchArchivedMainTasks(teamWs!.id, retentionDays),
         fetchArchivedSubtasks(teamWs!.id, retentionDays)
       ]);
+
+      if (isExternalHr) {
+        m = m.filter((mt: any) => !!mt.is_hr_task);
+        s = s.filter((st: any) => {
+          const mt = st.main_tasks;
+          return mt && !!mt.is_hr_task;
+        });
+      }
+
       setArchivedMain(m);
       setArchivedSubs(s);
     } catch (err) {

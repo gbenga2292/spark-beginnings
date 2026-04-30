@@ -47,6 +47,10 @@ export interface AppUser {
     name: string;
     email: string;
     passwordHash: string;
+    canCreateTasks: boolean;
+    canEditTasks: boolean;
+    canDeleteTasks: boolean;
+    isExternalHr: boolean; // Flag to restrict visibility to HR tasks only
     role: UserRole;
     isSuspended: boolean;
     isDeleted: boolean;
@@ -96,6 +100,7 @@ export interface MainTask {
     isDeleted?: boolean;
     is_project?: boolean;
     requiresApproval?: boolean;
+    is_hr_task?: boolean;         // Manual flag for external HR visibility
     createdAt: string;
     updatedAt: string;
     deadline?: string;

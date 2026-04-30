@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
-import { Calendar as CalendarIcon, X } from 'lucide-react';
+import { Calendar as CalendarIcon, X, CheckSquare } from 'lucide-react';
 import CalendarPage from '@/src/pages/TaskCalendar';
 import { useTheme } from '@/src/hooks/useTheme';
 
 export function DesktopFloatingCalendar() {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(true);
   const { isDark } = useTheme();
 
   const isMac = (window as any).electronAPI?.platform === 'darwin';
@@ -114,6 +115,20 @@ export function DesktopFloatingCalendar() {
                   </div>
                 </div>
 
+                <div className="flex items-center gap-4 mr-12">
+                  <button
+                    onClick={() => setShowCompleted(!showCompleted)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all ${
+                      showCompleted
+                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                        : 'bg-white/5 border-white/10 text-white/40'
+                    }`}
+                  >
+                    <CheckSquare className="w-3.5 h-3.5" />
+                    {showCompleted ? 'SHOWING DONE' : 'HIDDEN DONE'}
+                  </button>
+                </div>
+
                 {/* Close Window-like Button */}
                 <div className="absolute top-0 right-0 h-full flex items-center">
                   <button
@@ -129,7 +144,7 @@ export function DesktopFloatingCalendar() {
 
               {/* Body */}
               <div className="flex-1 overflow-hidden bg-[#0f111a] text-white">
-                <CalendarPage onNavigate={() => setOpen(false)} />
+                <CalendarPage onNavigate={() => setOpen(false)} showCompleted={showCompleted} />
               </div>
             </motion.div>
           </motion.div>
