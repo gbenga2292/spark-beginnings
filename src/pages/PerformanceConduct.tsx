@@ -4,7 +4,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog } from '@/src/components/ui/dialog';
-import { Search, Plus, ArrowLeft, Save, Pencil, Trash2, AlertTriangle, Eye, ShieldAlert, CheckCircle2, CheckSquare, BellRing, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Search, Plus, ArrowLeft, Save, Pencil, Trash2, AlertTriangle, Eye, ShieldAlert, CheckCircle2, CheckSquare, BellRing, PanelLeftClose, PanelLeftOpen, Users } from 'lucide-react';
 import { useAppStore, DisciplinaryRecord, Employee } from '@/src/store/appStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -27,6 +27,7 @@ export function PerformanceConduct() {
   // For the 'Notice' functionality inside the single-page layout
   const [showNotices, setShowNotices] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isMobileListOpen, setIsMobileListOpen] = useState(false);
 
   const employees = useAppStore(s => s.employees);
   const records = useAppStore(s => s.disciplinaryRecords);
@@ -431,105 +432,125 @@ export function PerformanceConduct() {
     </div>
   );
 
+  const EmployeeSidebar = () => (
+    <div className={`flex flex-col h-full transition-colors ${showNotices ? 'bg-amber-50/30' : 'bg-slate-50/50'}`}>
+      <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 space-y-3">
+        <div className="flex justify-between items-center">
+          <h2 className={`font-bold flex items-center gap-2 ${showNotices ? 'text-amber-700' : 'text-slate-800'}`}>
+            {showNotices ? <BellRing className="h-5 w-5" /> : <ShieldAlert className="h-5 w-5 text-rose-600" />}
+            {showNotices ? 'Notices Queue' : 'Active Directory'}
+          </h2>
+          {!showNotices && activeCount > 0 && <Badge variant="destructive" className="px-1.5 py-0 min-w-[20px] justify-center">{activeCount}</Badge>}
+        </div>
+        {!showNotices && (
+          <>
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input placeholder="Search employee..." className="pl-9 bg-slate-50 h-9" value={employeeSearch} onChange={e => setEmployeeSearch(e.target.value)} />
+            </div>
+            <select
+              className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-sm focus:ring-rose-500/20"
+              value={filterDepartment}
+              onChange={e => setFilterDepartment(e.target.value)}
+            >
+              <option value="">All Departments</option>
+              {Array.from(new Set(internalEmployees.map(e => e.department).filter(Boolean))).sort().map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </>
+        )}
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {showNotices ? (
+          noticeRecords.length === 0 ? (
+            <div className="p-8 text-center text-sm text-slate-500">
+              <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
+              All active queries have been replied to or processed.
+            </div>
+          ) : (
+            noticeRecords.map(record => {
+              const emp = internalEmployees.find(e => e.id === record.employeeId);
+              const isPastDeadline = record.queryDeadline && new Date(record.queryDeadline) < new Date();
+              return (
+                <div key={record.id} onClick={() => { setSelectedEmployeeId(record.employeeId); startEdit(record); setShowNotices(false); setIsMobileListOpen(false); }} className={`p-4 border-b border-amber-100 cursor-pointer hover:bg-amber-50/50 block w-full text-left bg-white transition-all hover:shadow-sm`}>
+                  <div className="flex justify-between items-start mb-2">
+                    <Badge variant="outline" className={`text-[10px] ${isPastDeadline ? 'text-rose-600 border-rose-200 bg-rose-50' : 'text-amber-600 border-amber-200 bg-amber-50'}`}>
+                      {isPastDeadline ? 'DEADLINE LAPSED' : 'PENDING REPLY'}
+                    </Badge>
+                    <span className="text-[10px] font-mono text-slate-500">{record.date}</span>
+                  </div>
+                  <h4 className="font-bold text-slate-800 text-sm truncate">{emp?.surname} {emp?.firstname}</h4>
+                  <p className="text-xs text-slate-600 truncate mt-1">Type: {record.type}</p>
+                  {record.queryDeadline && <p className={`text-[10px] mt-2 font-semibold ${isPastDeadline ? 'text-rose-500' : 'text-amber-600'}`}>Due: {new Date(record.queryDeadline).toLocaleString()}</p>}
+                </div>
+              );
+            })
+          )
+        ) : (
+          internalEmployees
+            .filter(e => filterDepartment ? e.department === filterDepartment : true)
+            .filter(e => `${e.surname} ${e.firstname}`.toLowerCase().includes(employeeSearch.toLowerCase()))
+            .map(emp => {
+              const hasActiveEvent = records.some(r => r.employeeId === emp.id && r.status === 'Active');
+              const isSelected = selectedEmployeeId === emp.id;
+              return (
+                <div
+                  key={emp.id}
+                  onClick={() => { setSelectedEmployeeId(emp.id); setIsAdding(false); setIsEditing(false); setIsMobileListOpen(false); }}
+                  className={`p-3 border-b border-slate-100 cursor-pointer transition-colors flex items-center justify-between ${isSelected ? 'bg-rose-50 border-l-4 border-l-rose-500' : 'hover:bg-slate-50 border-l-4 border-l-transparent bg-white dark:bg-slate-900'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-9 w-9 border border-slate-200">
+                      <AvatarFallback className={`${isSelected ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'} font-bold text-[10px]`}>
+                        {emp.firstname.charAt(0)}{emp.surname.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h4 className={`text-sm font-bold truncate max-w-[160px] ${isSelected ? 'text-rose-900' : 'text-slate-700'}`}>{emp.surname} {emp.firstname}</h4>
+                      <p className={`text-[10px] font-medium uppercase mt-0.5 ${isSelected ? 'text-rose-600' : 'text-slate-500'}`}>{emp.position}</p>
+                    </div>
+                  </div>
+                  {hasActiveEvent && (
+                    <div className={`h-2 w-2 rounded-full shadow-sm shrink-0 ${records.find(r => r.employeeId === emp.id && r.status === 'Active' && r.points && r.points > 0) ? 'bg-emerald-500' : 'bg-rose-500'}`} title="Active/Recent Event"></div>
+                  )}
+                </div>
+              )
+            })
+        )}
+        {!showNotices && internalEmployees.length === 0 && (
+          <div className="p-4 text-center text-sm text-slate-500">No employees found.</div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] gap-4 relative">
 
+      {/* Mobile employee drawer overlay */}
+      {isMobileListOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setIsMobileListOpen(false)} />
+          <div className="relative z-10 w-80 max-w-[85vw] h-full flex flex-col bg-white shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+              <span className="font-bold text-sm text-slate-800">{showNotices ? 'Notices Queue' : 'Employee Directory'}</span>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsMobileListOpen(false)}>
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <EmployeeSidebar />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        {/* Left Sidebar Layout */}
+        {/* Left Sidebar - hidden on mobile */}
         {!(isAdding || isEditing) && !sidebarCollapsed && (
-          <div className={`w-80 flex-shrink-0 border-r border-slate-200 flex flex-col transition-colors ${showNotices ? 'bg-amber-50/30' : 'bg-slate-50/50'}`}>
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 space-y-3">
-              <div className="flex justify-between items-center">
-                <h2 className={`font-bold flex items-center gap-2 ${showNotices ? 'text-amber-700' : 'text-slate-800'}`}>
-                  {showNotices ? <BellRing className="h-5 w-5" /> : <ShieldAlert className="h-5 w-5 text-rose-600" />}
-                  {showNotices ? 'Notices Queue' : 'Active Directory'}
-                </h2>
-                {!showNotices && activeCount > 0 && <Badge variant="destructive" className="px-1.5 py-0 min-w-[20px] justify-center">{activeCount}</Badge>}
-              </div>
-
-              {!showNotices && (
-                <>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                    <Input placeholder="Search employee..." className="pl-9 bg-slate-50 h-9" value={employeeSearch} onChange={e => setEmployeeSearch(e.target.value)} />
-                  </div>
-                  <select
-                    className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-sm focus:ring-rose-500/20"
-                    value={filterDepartment}
-                    onChange={e => setFilterDepartment(e.target.value)}
-                  >
-                    <option value="">All Departments</option>
-                    {Array.from(new Set(internalEmployees.map(e => e.department).filter(Boolean))).sort().map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </>
-              )}
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-              {showNotices ? (
-                // Display Pending Notice Items directly in the sidebar so they act like tickets
-                noticeRecords.length === 0 ? (
-                  <div className="p-8 text-center text-sm text-slate-500">
-                    <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
-                    All active queries have been replied to or processed.
-                  </div>
-                ) : (
-                  noticeRecords.map(record => {
-                    const emp = internalEmployees.find(e => e.id === record.employeeId);
-                    const isPastDeadline = record.queryDeadline && new Date(record.queryDeadline) < new Date();
-                    return (
-                      <div key={record.id} onClick={() => { setSelectedEmployeeId(record.employeeId); startEdit(record); setShowNotices(false); }} className={`p-4 border-b border-amber-100 cursor-pointer hover:bg-amber-50/50 block w-full text-left bg-white transition-all hover:shadow-sm`}>
-                        <div className="flex justify-between items-start mb-2">
-                          <Badge variant="outline" className={`text-[10px] ${isPastDeadline ? 'text-rose-600 border-rose-200 bg-rose-50' : 'text-amber-600 border-amber-200 bg-amber-50'}`}>
-                            {isPastDeadline ? 'DEADLINE LAPSED' : 'PENDING REPLY'}
-                          </Badge>
-                          <span className="text-[10px] font-mono text-slate-500">{record.date}</span>
-                        </div>
-                        <h4 className="font-bold text-slate-800 text-sm truncate">{emp?.surname} {emp?.firstname}</h4>
-                        <p className="text-xs text-slate-600 truncate mt-1">Type: {record.type}</p>
-                        {record.queryDeadline && <p className={`text-[10px] mt-2 font-semibold ${isPastDeadline ? 'text-rose-500' : 'text-amber-600'}`}>Due: {new Date(record.queryDeadline).toLocaleString()}</p>}
-                      </div>
-                    );
-                  })
-                )
-              ) : (
-                // Standard Employee List Layout
-                internalEmployees
-                  .filter(e => filterDepartment ? e.department === filterDepartment : true)
-                  .filter(e => `${e.surname} ${e.firstname}`.toLowerCase().includes(employeeSearch.toLowerCase()))
-                  .map(emp => {
-                    const hasActiveEvent = records.some(r => r.employeeId === emp.id && r.status === 'Active');
-                    const isSelected = selectedEmployeeId === emp.id;
-                    return (
-                      <div
-                        key={emp.id}
-                        onClick={() => { setSelectedEmployeeId(emp.id); setIsAdding(false); setIsEditing(false); }}
-                        className={`p-3 border-b border-slate-100 cursor-pointer transition-colors flex items-center justify-between ${isSelected ? 'bg-rose-50 border-l-4 border-l-rose-500' : 'hover:bg-slate-50 border-l-4 border-l-transparent bg-white dark:bg-slate-900'}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9 border border-slate-200">
-                            <AvatarFallback className={`${isSelected ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'} font-bold text-[10px]`}>
-                              {emp.firstname.charAt(0)}{emp.surname.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <h4 className={`text-sm font-bold truncate max-w-[160px] ${isSelected ? 'text-rose-900' : 'text-slate-700'}`}>{emp.surname} {emp.firstname}</h4>
-                            <p className={`text-[10px] font-medium uppercase mt-0.5 ${isSelected ? 'text-rose-600' : 'text-slate-500'}`}>{emp.position}</p>
-                          </div>
-                        </div>
-                        {hasActiveEvent && (
-                          <div className={`h-2 w-2 rounded-full shadow-sm shrink-0 ${records.find(r => r.employeeId === emp.id && r.status === 'Active' && r.points && r.points > 0) ? 'bg-emerald-500' : 'bg-rose-500'}`} title="Active/Recent Event"></div>
-                        )}
-                      </div>
-                    )
-                  })
-              )}
-              {!showNotices && internalEmployees.length === 0 && (
-                <div className="p-4 text-center text-sm text-slate-500">No employees found.</div>
-              )}
-            </div>
+          <div className={`hidden md:flex w-80 flex-shrink-0 border-r border-slate-200 flex-col transition-colors ${showNotices ? 'bg-amber-50/30' : 'bg-slate-50/50'}`}>
+            <EmployeeSidebar />
           </div>
         )}
 
@@ -552,21 +573,29 @@ export function PerformanceConduct() {
               </div>
               <div className="text-center max-w-md">
                 <h3 className="font-bold text-xl text-slate-600">Action Center</h3>
-                <p className="text-sm mt-2 text-slate-500 leading-relaxed">Select an employee from the directory on the left to review their record or begin a new Due Process log. Toggle "Pending Notices" at the top to track active queries.</p>
+                <p className="text-sm mt-2 text-slate-500 leading-relaxed">Select an employee from the directory to review their record or begin a new Due Process log.</p>
               </div>
+              <Button className="md:hidden mt-2 bg-rose-600 hover:bg-rose-700 text-white" onClick={() => setIsMobileListOpen(true)}>
+                <Users className="h-4 w-4 mr-2" /> Browse Employees
+              </Button>
             </div>
           ) : (isAdding || isEditing) ? (
             renderForm()
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="bg-white dark:bg-slate-900 border-b border-slate-200 p-6 flex justify-between items-center shrink-0 shadow-sm">
-                <div>
-                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{selectedEmp?.surname} {selectedEmp?.firstname}</h2>
-                  <p className="text-sm font-medium text-slate-500 mt-1 uppercase tracking-wider text-[11px]">{selectedEmp?.position} &bull; {selectedEmp?.department}</p>
+              <div className="bg-white dark:bg-slate-900 border-b border-slate-200 p-4 md:p-6 flex justify-between items-center shrink-0 shadow-sm gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Button variant="ghost" size="icon" className="flex md:hidden shrink-0 h-8 w-8" onClick={() => setIsMobileListOpen(true)}>
+                    <Users className="h-4 w-4" />
+                  </Button>
+                  <div className="min-w-0">
+                    <h2 className="text-lg md:text-2xl font-bold text-slate-900 tracking-tight truncate">{selectedEmp?.surname} {selectedEmp?.firstname}</h2>
+                    <p className="text-[10px] md:text-[11px] font-medium text-slate-500 mt-0.5 uppercase tracking-wider">{selectedEmp?.position} &bull; {selectedEmp?.department}</p>
+                  </div>
                 </div>
                 {priv.canAdd && (
-                  <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-sm px-6" onClick={() => { setFormData({ ...emptyForm, employeeId: selectedEmployeeId ?? undefined }); setIsAdding(true); }}>
-                    <Plus className="h-4 w-4 mr-2" /> Log Performance Action
+                  <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-sm px-3 md:px-6 shrink-0" onClick={() => { setFormData({ ...emptyForm, employeeId: selectedEmployeeId ?? undefined }); setIsAdding(true); }}>
+                    <Plus className="h-4 w-4 md:mr-2" /><span className="hidden md:inline">Log Performance Action</span>
                   </Button>
                 )}
               </div>
@@ -715,6 +744,17 @@ export function PerformanceConduct() {
           )}
         </Dialog>
       </div>
+
+      {/* Mobile FAB */}
+      {!selectedEmployeeId && !isMobileListOpen && !showNotices && (
+        <button
+          onClick={() => setIsMobileListOpen(true)}
+          className="fixed bottom-6 right-6 z-40 md:hidden flex items-center gap-2 bg-rose-600 text-white px-4 py-3 rounded-full shadow-lg hover:bg-rose-700 transition-colors"
+        >
+          <Users className="h-5 w-5" />
+          <span className="text-sm font-semibold">Employees</span>
+        </button>
+      )}
     </div>
   );
 }

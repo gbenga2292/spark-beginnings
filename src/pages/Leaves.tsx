@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
-import { CalendarDays, CheckCircle2, Printer, Eye, X, Plus, Edit, Trash2, Ban, Search, ListFilter, CalendarClock, FileText, ShieldCheck, Clock, XCircle, MoreVertical, ChevronDown, UserPlus, ChevronRight } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Printer, Eye, X, Plus, Edit, Trash2, Ban, Search, ListFilter, CalendarClock, FileText, ShieldCheck, Clock, XCircle, MoreVertical, ChevronDown, UserPlus, ChevronRight, RefreshCw } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
 import { useAppStore, LeaveRecord } from '@/src/store/appStore';
 import { useNavigate } from 'react-router-dom';
@@ -35,7 +35,7 @@ function isOnLeave(leave: LeaveRecord, date: Date): boolean {
 export function Leaves() {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
-  const { users, createMainTask, addSubtask } = useAppData();
+  const { users, createMainTask, addSubtask, mainTasks } = useAppData();
   const {
     employees, leaves, addLeave, updateLeave, deleteLeave,
     leaveTypes, updateEmployee, departments, publicHolidays
@@ -551,6 +551,118 @@ export function Leaves() {
     toast.success('Leave cancelled.');
   };
 
+  /**
+   * Recreate the approval task for a pending leave whose original
+   * main task was deleted before approval was completed.
+   */
+  const handleRecreateApprovalTask = async (leave: LeaveRecord) => {
+    const ok = await showConfirm(
+      `The approval task for ${leave.employeeName}'s leave was deleted. Recreate it so approval can continue?`,
+      { confirmLabel: 'Yes, Recreate Task' }
+    );
+    if (!ok) return;
+
+    const emp = employees.find(e => e.id === leave.employeeId);
+    if (!emp) { toast.error('Employee not found.'); return; }
+
+    const empName = leave.employeeName;
+    const leaveType = leave.leaveType;
+    const duration = leave.duration.toString();
+    const approverId = leave.approvedById || '';
+    const approverName = leave.approvedByName || '';
+
+    // Resolve approver options
+    const approver = approverId ? approverOptions.find((u: any) => u.id === approverId) : null;
+    const approverDisplayName = approver?.name || approverName || 'Unknown';
+
+    // Resolve HoD: level-2 same dept → level-2 any dept → level-3 any dept
+    const empDept = emp.department;
+    const activeOthers = employees.filter(e => e.id !== leave.employeeId && e.status === 'Active' && e.position !== 'CEO');
+    const sameDeptPeers = activeOthers.filter(e => e.department === empDept);
+    const hodEmp =
+      sameDeptPeers.sort((a, b) => getPositionIndex(a.position) - getPositionIndex(b.position))[0] ??
+      activeOthers.filter(e => (e.level ?? 99) <= 2)
+        .sort((a, b) => (a.level ?? 99) - (b.level ?? 99) || getPositionIndex(a.position) - getPositionIndex(b.position))[0] ??
+      activeOthers.filter(e => (e.level ?? 99) <= 3)
+        .sort((a, b) => (a.level ?? 99) - (b.level ?? 99) || getPositionIndex(a.position) - getPositionIndex(b.position))[0];
+
+    const hodSystemUser = hodEmp ? approverOptions.find((u: any) =>
+      u.name?.toLowerCase().includes(hodEmp.firstname.toLowerCase()) ||
+      u.name?.toLowerCase().includes(hodEmp.surname.toLowerCase())
+    ) : null;
+
+    // Resolve line manager
+    const lmEmp = emp.lineManager ? employees.find(e => e.id === emp.lineManager) : null;
+    const lmSystemUser = lmEmp ? approverOptions.find((u: any) =>
+      u.name?.toLowerCase().includes(lmEmp.firstname.toLowerCase()) ||
+      u.name?.toLowerCase().includes(lmEmp.surname.toLowerCase())
+    ) : null;
+
+    try {
+      const today430 = new Date();
+      today430.setHours(16, 30, 0, 0);
+
+      const mainTask = await createMainTask({
+        title: `Leave Approval Workflow — ${empName} (${leaveType}, ${duration} days)`,
+        description: `Sequential 4-step approval: LM → HoD → Management → HR.\nResubmitted by ${currentUser?.user_metadata?.name || 'HR'} on ${format(new Date(), 'dd/MM/yyyy')} (original task was deleted).`,
+        createdBy: currentUser?.id,
+        teamId: 'dcel-team',
+        workspaceId: 'dcel-team',
+        assignedTo: lmSystemUser?.id || approverId,
+        deadline: today430.toISOString(),
+        is_hr_task: true,
+      });
+
+      if (mainTask?.id) {
+        const lmDesc = JSON.stringify({
+          refType: 'leave',
+          refId: leave.id,
+          workflowStep: leave.workflowStep ?? 1,
+          empName,
+          leaveType,
+          duration,
+          hodUserId: hodEmp?.id,
+          hodSystemUserId: hodSystemUser?.id || null,
+          mgmtUserId: approverId,
+          narration: `Leave request for ${empName} (${leaveType}, ${duration} days) — recreated approval task at Step ${leave.workflowStep ?? 1}/4.`
+        });
+        const currentStep = leave.workflowStep ?? 1;
+        const stepLabel = currentStep === 1 ? 'Line Manager'
+          : currentStep === 2 ? 'Head of Department'
+          : currentStep === 3 ? 'Management'
+          : 'HR';
+        const lmSub = await addSubtask({
+          title: `[Step ${currentStep}/4] ${stepLabel} Approval — ${empName} ${leaveType} Leave`,
+          description: lmDesc,
+          mainTaskId: mainTask.id,
+          assignedTo: currentStep === 1 ? (lmSystemUser?.id || null)
+            : currentStep === 2 ? (hodSystemUser?.id || null)
+            : currentStep === 3 ? (approverId || null)
+            : null,
+          status: 'not_started',
+          priority: 'high',
+          deadline: today430.toISOString(),
+        });
+
+        // Re-link the leave to the new task
+        updateLeave(leave.id, {
+          approvalTaskId: mainTask.id,
+          lineManagerTaskId: currentStep === 1 ? (lmSub as any)?.id : leave.lineManagerTaskId,
+          hodTaskId: currentStep === 2 ? (lmSub as any)?.id : leave.hodTaskId,
+          managementTaskId: currentStep === 3 ? (lmSub as any)?.id : leave.managementTaskId,
+          hrTaskId: currentStep === 4 ? (lmSub as any)?.id : leave.hrTaskId,
+        });
+
+        toast.success(`Approval task recreated! Awaiting Step ${currentStep}/4 — ${stepLabel}.`);
+      } else {
+        toast.error('Failed to create the approval task. Please try again.');
+      }
+    } catch (e) {
+      console.error('Failed to recreate leave approval task:', e);
+      toast.error('An error occurred while recreating the task.');
+    }
+  };
+
   /* ── NAS file path picker ── */
   const handleNasFileSelect = (e: React.ChangeEvent<HTMLInputElement>, leaveId?: string) => {
     // We only capture the file name/path — no base64 encoding.
@@ -839,6 +951,20 @@ export function Leaves() {
                             {priv.canDelete && leave.status !== 'Cancelled' && (
                               <DropdownMenuItem className="text-amber-600 focus:text-amber-600 cursor-pointer gap-2" onClick={() => handleCancel(leave)}>
                                 <Ban className="h-4 w-4" /> Cancel Leave
+                              </DropdownMenuItem>
+                            )}
+
+                            {/* Recreate approval task — shown only when leave is pending and its task was deleted */}
+                            {priv.canEdit &&
+                              leave.approvalStatus === 'Pending' &&
+                              leave.status !== 'Cancelled' &&
+                              leave.approvalTaskId &&
+                              !mainTasks.find(t => t.id === leave.approvalTaskId) && (
+                              <DropdownMenuItem
+                                className="text-sky-600 focus:text-sky-600 cursor-pointer gap-2"
+                                onClick={() => handleRecreateApprovalTask(leave)}
+                              >
+                                <RefreshCw className="h-4 w-4" /> Recreate Approval Task
                               </DropdownMenuItem>
                             )}
 

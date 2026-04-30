@@ -4,7 +4,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog } from '@/src/components/ui/dialog';
-import { Search, Plus, ArrowLeft, Save, Pencil, Trash2, ClipboardList, Eye, UserCheck, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Search, Plus, ArrowLeft, Save, Pencil, Trash2, ClipboardList, Eye, UserCheck, PanelLeftClose, PanelLeftOpen, Users } from 'lucide-react';
 import { useAppStore, EvaluationRecord } from '@/src/store/appStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -26,6 +26,7 @@ export function Evaluations() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewingRecord, setViewingRecord] = useState<any | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isMobileListOpen, setIsMobileListOpen] = useState(false);
 
   const employees = useAppStore(s => s.employees);
   const records = useAppStore(s => s.evaluations);
@@ -169,83 +170,105 @@ export function Evaluations() {
     </Button>
   );
 
+  const EmployeeList = () => (
+    <div className={`flex flex-col h-full ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-50/50 border-slate-200'}`}>
+      <div className={`p-4 border-b space-y-3 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+        <div className="flex justify-between items-center">
+          <h2 className={`font-bold flex items-center gap-2 ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
+            <UserCheck className="h-5 w-5 text-indigo-600" />
+            Active Directory
+          </h2>
+          {activeCount > 0 && <Badge variant="default" className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-1.5 py-0 min-w-[20px] justify-center">{activeCount}</Badge>}
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <Input placeholder="Search employee..." className="pl-9 bg-slate-50 h-9" value={employeeSearch} onChange={e => setEmployeeSearch(e.target.value)} />
+        </div>
+        <select
+          className={`h-9 w-full rounded-md border px-3 text-sm focus:ring-indigo-500/20 ${isDark ? 'bg-slate-700 border-slate-600 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-800'}`}
+          value={filterDepartment}
+          onChange={e => setFilterDepartment(e.target.value)}
+        >
+          <option value="">All Departments</option>
+          {Array.from(new Set(internalEmployees.map(e => e.department).filter(Boolean))).sort().map(d => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {internalEmployees
+          .filter(e => filterDepartment ? e.department === filterDepartment : true)
+          .filter(e => `${e.surname} ${e.firstname}`.toLowerCase().includes(employeeSearch.toLowerCase()))
+          .map(emp => {
+            const hasReviewEvent = records.some(r => r.employeeId === emp.id && r.status === 'Review');
+            const isSelected = selectedEmployeeId === emp.id;
+            return (
+              <div
+                key={emp.id}
+                onClick={() => { setSelectedEmployeeId(emp.id); setIsAdding(false); setIsEditing(false); setIsMobileListOpen(false); }}
+                className={`p-3 border-b cursor-pointer transition-colors flex items-center justify-between ${
+                  isSelected
+                    ? 'bg-indigo-50 border-l-4 border-l-indigo-600'
+                    : `border-l-4 border-l-transparent ${isDark ? 'bg-slate-900 border-slate-700/50 hover:bg-slate-800' : 'bg-white border-slate-100 hover:bg-slate-50'}`
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Avatar className={`h-9 w-9 border ${isDark ? 'border-slate-600' : 'border-slate-200'}`}>
+                    <AvatarFallback className={`font-bold text-[10px] ${
+                      isSelected ? 'bg-indigo-200 text-indigo-800' : isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {emp.firstname.charAt(0)}{emp.surname.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h4 className={`text-sm font-bold truncate max-w-[160px] ${
+                      isSelected ? 'text-indigo-900' : isDark ? 'text-slate-200' : 'text-slate-700'
+                    }`}>{emp.surname} {emp.firstname}</h4>
+                    <p className={`text-[10px] font-medium uppercase mt-0.5 ${
+                      isSelected ? 'text-indigo-600' : isDark ? 'text-slate-400' : 'text-slate-500'
+                    }`}>{emp.position}</p>
+                  </div>
+                </div>
+                {hasReviewEvent && (
+                  <div className="h-2 w-2 rounded-full bg-indigo-500 shadow-sm shrink-0" title="In Review"></div>
+                )}
+              </div>
+            )
+          })
+        }
+        {internalEmployees.length === 0 && (
+          <div className="p-4 text-center text-sm text-slate-500">No employees found.</div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] gap-4">
 
+      {/* Mobile employee drawer overlay */}
+      {isMobileListOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setIsMobileListOpen(false)} />
+          <div className={`relative z-10 w-80 max-w-[85vw] h-full flex flex-col shadow-2xl ${isDark ? 'bg-slate-900' : 'bg-white'}`}>
+            <div className={`flex items-center justify-between px-4 py-3 border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+              <span className={`font-bold text-sm ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>Employee Directory</span>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsMobileListOpen(false)}>
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <EmployeeList />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={`flex flex-1 min-h-0 rounded-2xl shadow-sm border overflow-hidden ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-        {/* Left Sidebar */}
+        {/* Left Sidebar - hidden on mobile */}
         {!(isAdding || isEditing) && !sidebarCollapsed && (
-        <div className={`w-80 flex-shrink-0 border-r flex flex-col ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-50/50 border-slate-200'}`}>
-          <div className={`p-4 border-b space-y-3 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <div className="flex justify-between items-center">
-              <h2 className={`font-bold flex items-center gap-2 ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
-                <UserCheck className="h-5 w-5 text-indigo-600" />
-                Active Directory
-              </h2>
-              {activeCount > 0 && <Badge variant="default" className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-1.5 py-0 min-w-[20px] justify-center">{activeCount}</Badge>}
-            </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <Input placeholder="Search employee..." className="pl-9 bg-slate-50 h-9" value={employeeSearch} onChange={e => setEmployeeSearch(e.target.value)} />
-            </div>
-            <select 
-              className={`h-9 w-full rounded-md border px-3 text-sm focus:ring-indigo-500/20 ${isDark ? 'bg-slate-700 border-slate-600 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-800'}`}
-              value={filterDepartment}
-              onChange={e => setFilterDepartment(e.target.value)}
-            >
-              <option value="">All Departments</option>
-              {Array.from(new Set(internalEmployees.map(e => e.department).filter(Boolean))).sort().map(d => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {internalEmployees
-              .filter(e => filterDepartment ? e.department === filterDepartment : true)
-              .filter(e => `${e.surname} ${e.firstname}`.toLowerCase().includes(employeeSearch.toLowerCase()))
-              .map(emp => {
-                const hasReviewEvent = records.some(r => r.employeeId === emp.id && r.status === 'Review');
-                const isSelected = selectedEmployeeId === emp.id;
-                return (
-                  <div 
-                    key={emp.id} 
-                    onClick={() => { setSelectedEmployeeId(emp.id); setIsAdding(false); setIsEditing(false); }}
-                    className={`p-3 border-b cursor-pointer transition-colors flex items-center justify-between ${
-                      isSelected
-                        ? 'bg-indigo-50 border-l-4 border-l-indigo-600'
-                        : `border-l-4 border-l-transparent ${isDark ? 'bg-slate-900 border-slate-700/50 hover:bg-slate-800' : 'bg-white border-slate-100 hover:bg-slate-50'}`
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                        <Avatar className={`h-9 w-9 border ${isDark ? 'border-slate-600' : 'border-slate-200'}`}>
-                          <AvatarFallback className={`font-bold text-[10px] ${
-                            isSelected
-                              ? 'bg-indigo-200 text-indigo-800'
-                              : isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
-                          }`}>
-                            {emp.firstname.charAt(0)}{emp.surname.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <h4 className={`text-sm font-bold truncate max-w-[160px] ${
-                            isSelected ? 'text-indigo-900' : isDark ? 'text-slate-200' : 'text-slate-700'
-                          }`}>{emp.surname} {emp.firstname}</h4>
-                          <p className={`text-[10px] font-medium uppercase mt-0.5 ${
-                            isSelected ? 'text-indigo-600' : isDark ? 'text-slate-400' : 'text-slate-500'
-                          }`}>{emp.position}</p>
-                        </div>
-                    </div>
-                    {hasReviewEvent && (
-                        <div className="h-2 w-2 rounded-full bg-indigo-500 shadow-sm shrink-0" title="In Review"></div>
-                    )}
-                  </div>
-                )
-              })
-            }
-            {internalEmployees.length === 0 && (
-              <div className="p-4 text-center text-sm text-slate-500">No employees found.</div>
-            )}
-          </div>
+        <div className={`hidden md:flex w-80 flex-shrink-0 border-r flex-col ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-50/50 border-slate-200'}`}>
+          <EmployeeList />
         </div>
         )}
 
@@ -258,22 +281,30 @@ export function Evaluations() {
                 </div>
                 <div className="text-center max-w-sm">
                   <h3 className="font-bold text-xl text-slate-600">Action Center</h3>
-                  <p className="text-sm mt-2 text-slate-500 leading-relaxed">Select an employee from the directory on the left to review their performance or log a new evaluation.</p>
+                  <p className="text-sm mt-2 text-slate-500 leading-relaxed">Select an employee from the directory to review their performance or log a new evaluation.</p>
                 </div>
+                <Button className="md:hidden mt-2 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => setIsMobileListOpen(true)}>
+                  <Users className="h-4 w-4 mr-2" /> Browse Employees
+                </Button>
             </div>
           ) : isAdding || isEditing ? (
             renderForm()
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden">
-                <div className={`border-b p-6 flex justify-between items-center shrink-0 shadow-sm ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-                  <div>
-                    <h2 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{selectedEmp?.surname} {selectedEmp?.firstname}</h2>
-                    <p className="text-sm font-medium text-slate-500 mt-1 uppercase tracking-wider text-[11px]">{selectedEmp?.position} &bull; {selectedEmp?.department}</p>
+                <div className={`border-b p-4 md:p-6 flex justify-between items-center shrink-0 shadow-sm gap-2 ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Button variant="ghost" size="icon" className="flex md:hidden shrink-0 h-8 w-8" onClick={() => setIsMobileListOpen(true)}>
+                      <Users className="h-4 w-4" />
+                    </Button>
+                    <div className="min-w-0">
+                      <h2 className={`text-lg md:text-2xl font-bold tracking-tight truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{selectedEmp?.surname} {selectedEmp?.firstname}</h2>
+                      <p className="text-[10px] md:text-[11px] font-medium text-slate-500 mt-0.5 uppercase tracking-wider">{selectedEmp?.position} &bull; {selectedEmp?.department}</p>
+                    </div>
                   </div>
                   {priv.canAdd && (
-                      <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-sm px-6" onClick={() => { setFormData({...emptyForm, employeeId: selectedEmployeeId}); setIsAdding(true); }}>
-                        <Plus className="h-4 w-4 mr-2" /> Log Evaluation
-                      </Button>
+                    <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-sm px-3 md:px-6 shrink-0" onClick={() => { setFormData({...emptyForm, employeeId: selectedEmployeeId}); setIsAdding(true); }}>
+                      <Plus className="h-4 w-4 md:mr-2" /><span className="hidden md:inline">Log Evaluation</span>
+                    </Button>
                   )}
                 </div>
                 
@@ -369,6 +400,17 @@ export function Evaluations() {
           )}
         </Dialog>
       </div>
+
+      {/* Mobile FAB to open employee list */}
+      {!selectedEmployeeId && !isMobileListOpen && (
+        <button
+          onClick={() => setIsMobileListOpen(true)}
+          className="fixed bottom-6 right-6 z-40 md:hidden flex items-center gap-2 bg-indigo-600 text-white px-4 py-3 rounded-full shadow-lg hover:bg-indigo-700 transition-colors"
+        >
+          <Users className="h-5 w-5" />
+          <span className="text-sm font-semibold">Employees</span>
+        </button>
+      )}
     </div>
   );
 }
