@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { useAppData } from "@/src/contexts/AppDataContext";
 import { useWorkspace } from "@/src/hooks/use-workspace";
 import { useAppStore } from "@/src/store/appStore";
+import { useAuth } from "@/src/hooks/useAuth";
 import { Button } from "@/src/components/ui/button";
 import { toast, showConfirm } from "@/src/components/ui/toast";
 import { format, differenceInDays } from "date-fns";
@@ -15,6 +16,7 @@ import { format, differenceInDays } from "date-fns";
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const item = { hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0 } };
 
+export function TaskArchive() {
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   const { workspace: teamWs } = useWorkspace();

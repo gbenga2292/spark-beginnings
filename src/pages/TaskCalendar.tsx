@@ -58,7 +58,7 @@ interface CalendarEvent {
   isMain?: boolean;
 }
 
-export default function CalendarPage({ onNavigate, showCompleted: externalShowCompleted }: { onNavigate?: () => void; showCompleted?: boolean } = {}) {
+export default function CalendarPage({ onNavigate, showCompleted: externalShowCompleted, hideHeaderToggle }: { onNavigate?: () => void; showCompleted?: boolean; hideHeaderToggle?: boolean } = {}) {
   const { user: currentUser } = useAuth();
   const { reminders, mainTasks: allMainTasks, subtasks: allSubtasks, users } = useAppData();
 
@@ -257,17 +257,19 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowCompleted(!showCompleted)}
-            className={`px-3 py-1.5 rounded-lg border text-xs sm:text-sm font-medium transition-all flex items-center gap-2 ${
-              showCompleted 
-                ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/30' 
-                : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
-            }`}
-          >
-            <CheckSquare className="w-3.5 h-3.5" />
-            {showCompleted ? 'Showing Done' : 'Hidden Done'}
-          </button>
+          {!hideHeaderToggle && (
+            <button
+              onClick={() => setShowCompleted(!showCompleted)}
+              className={`px-3 py-1.5 rounded-lg border text-xs sm:text-sm font-medium transition-all flex items-center gap-2 ${
+                showCompleted 
+                  ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/30' 
+                  : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
+              }`}
+            >
+              <CheckSquare className="w-3.5 h-3.5" />
+              {showCompleted ? 'Showing Done' : 'Hidden Done'}
+            </button>
+          )}
           <select
             value={filterMode}
             onChange={(e) => setFilterMode(e.target.value as FilterMode)}

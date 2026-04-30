@@ -96,7 +96,7 @@ function PersonalSpaceDashboard() {
 
   const activeWsTasks = wsTasks.filter(mt => {
     const hasSubs = subtasks.some(s => s.mainTaskId === mt.id || s.main_task_id === mt.id);
-    return hasSubs || mt.is_project;
+    return hasSubs || mt.is_project || mt.is_hr_task;
   });
 
   const wsTaskIds = new Set(activeWsTasks.map(mt => mt.id));
@@ -296,7 +296,7 @@ function PersonalProductivityScore() {
   const { wsTasks } = useWorkspace();
   const activeWsTasks = wsTasks.filter(mt => {
     const hasSubs = subtasks.some(s => s.mainTaskId === mt.id || s.main_task_id === mt.id);
-    return hasSubs || mt.is_project;
+    return hasSubs || mt.is_project || mt.is_hr_task;
   });
   const wsTaskIds = new Set(activeWsTasks.map(mt => mt.id));
   const mySubs = subtasks.filter(s => wsTaskIds.has(s.mainTaskId!));
@@ -394,7 +394,7 @@ function AdminDashboard() {
   const activeWsTasks = wsTasks.filter(mt => {
     if (isExternalHr) return !!mt.is_hr_task;
     const hasSubs = subtasks.some(s => s.mainTaskId === mt.id || s.main_task_id === mt.id);
-    return hasSubs || mt.is_project;
+    return hasSubs || mt.is_project || mt.is_hr_task;
   });
 
   const wsTaskIds = new Set(activeWsTasks.map(mt => mt.id));
@@ -591,7 +591,7 @@ function UserDashboard() {
   const activeWsTasks = wsTasks.filter(mt => {
     if (isExternalHr) return !!mt.is_hr_task;
     const hasSubs = subtasks.some(s => s.mainTaskId === mt.id || s.main_task_id === mt.id);
-    return hasSubs || mt.is_project;
+    return hasSubs || mt.is_project || mt.is_hr_task;
   });
 
   const [taskFilter, setTaskFilter] = useState<'my_tasks' | 'urgent' | 'all' | 'completed' | 'under_review'>('my_tasks');

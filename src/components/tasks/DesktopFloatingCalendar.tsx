@@ -61,11 +61,10 @@ export function DesktopFloatingCalendar() {
         onClick={() => setOpen(true)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        className={`pointer-events-auto fixed bottom-8 right-0 z-[150] flex items-center gap-2 overflow-hidden rounded-l-xl border border-r-0 shadow-lg backdrop-blur-sm cursor-grab active:cursor-grabbing ${
-          isDark
-            ? 'bg-slate-800/90 border-slate-700 text-slate-300 hover:bg-slate-700/90 hover:text-white'
-            : 'bg-white/90 border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-        }`}
+        className={`pointer-events-auto fixed bottom-8 right-0 z-[150] flex items-center gap-2 overflow-hidden rounded-l-xl border border-r-0 shadow-lg backdrop-blur-sm cursor-grab active:cursor-grabbing ${isDark
+          ? 'bg-slate-800/90 border-slate-700 text-slate-300 hover:bg-slate-700/90 hover:text-white'
+          : 'bg-white/90 border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+          }`}
         animate={{ width: hovered ? 140 : 44, paddingRight: hovered ? 16 : 0 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
         title="Drag up/down, click to open Calendar"
@@ -116,17 +115,25 @@ export function DesktopFloatingCalendar() {
                 </div>
 
                 <div className="flex items-center gap-4 mr-12">
-                  <button
-                    onClick={() => setShowCompleted(!showCompleted)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all ${
-                      showCompleted
-                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
-                        : 'bg-white/5 border-white/10 text-white/40'
-                    }`}
-                  >
-                    <CheckSquare className="w-3.5 h-3.5" />
-                    {showCompleted ? 'SHOWING DONE' : 'HIDDEN DONE'}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-[11px] font-bold transition-colors ${showCompleted ? 'text-emerald-400' : 'text-white/40'}`}>
+                      {showCompleted ? '' : ''}
+                    </span>
+                    <button
+                      onClick={() => setShowCompleted(!showCompleted)}
+                      className={`relative w-10 h-5 rounded-full transition-all duration-300 border ${showCompleted
+                        ? 'bg-emerald-500/20 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                        : 'bg-white/5 border-white/10'
+                        }`}
+                    >
+                      <motion.div
+                        animate={{ x: showCompleted ? 20 : 2 }}
+                        initial={false}
+                        className={`absolute top-1 w-2.5 h-2.5 rounded-full transition-colors duration-300 ${showCompleted ? 'bg-emerald-400' : 'bg-white/30'
+                          }`}
+                      />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Close Window-like Button */}
@@ -144,7 +151,7 @@ export function DesktopFloatingCalendar() {
 
               {/* Body */}
               <div className="flex-1 overflow-hidden bg-[#0f111a] text-white">
-                <CalendarPage onNavigate={() => setOpen(false)} showCompleted={showCompleted} />
+                <CalendarPage onNavigate={() => setOpen(false)} showCompleted={showCompleted} hideHeaderToggle={true} />
               </div>
             </motion.div>
           </motion.div>

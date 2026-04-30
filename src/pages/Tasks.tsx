@@ -620,8 +620,8 @@ function AdminTasksView() {
   const { wsTasks: rawTeamTasks, wsMembers, workspace: teamWs } = useWorkspace();
   const teamTasks = React.useMemo(() => {
     return rawTeamTasks.filter(mt => {
-      // Primary visibility: projects or tasks with subtasks
-      const isVisible = mt.is_project || subtasks.some(s => s.mainTaskId === mt.id || (s as any).main_task_id === mt.id);
+      // Primary visibility: projects, HR tasks, or tasks with subtasks
+      const isVisible = mt.is_project || mt.is_hr_task || subtasks.some(s => s.mainTaskId === mt.id || (s as any).main_task_id === mt.id);
       if (!isVisible) return false;
 
       // Access control for External HR
