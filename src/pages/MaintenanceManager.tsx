@@ -64,7 +64,7 @@ export function MaintenanceManager() {
        <Button 
          variant="outline" 
          size="sm" 
-         className="gap-2 h-9 border-slate-200"
+         className="gap-2 h-9 border-slate-200 hidden sm:flex"
          onClick={handleExport}
        >
          <FileDown className="h-4 w-4" /> Export
@@ -75,7 +75,7 @@ export function MaintenanceManager() {
            className="gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-sm" 
            onClick={() => setActiveTab('log')}
          >
-           <Plus className="h-4 w-4" /> Log Service
+           <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Log Service</span>
          </Button>
        )}
     </div>
@@ -92,16 +92,16 @@ export function MaintenanceManager() {
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10 px-4 sm:px-6 lg:px-8">
       {/* Tabs - Hidden if viewing details */}
       {!selectedAssetId && (
-        <div className="flex border-b border-slate-200 dark:border-slate-800 gap-8 px-2 mx-1 mb-2 overflow-x-auto no-scrollbar">
+        <div className="bg-card rounded-xl shadow-sm border border-border flex overflow-x-auto overflow-y-hidden scrollbar-hide shrink-0">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as MaintenanceTab)}
               className={cn(
-                "pb-3 text-sm font-bold transition-all border-b-2 whitespace-nowrap flex items-center gap-2",
+                "flex items-center justify-center gap-2 flex-1 min-w-[120px] py-4 text-sm font-semibold border-b-2 transition-all whitespace-nowrap",
                 activeTab === tab.id 
-                  ? 'border-blue-600 text-blue-600' 
-                  : 'border-transparent text-slate-400 hover:text-slate-600'
+                  ? 'border-blue-600 text-blue-600 bg-blue-50/50 dark:bg-blue-900/10' 
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-slate-50 dark:hover:bg-slate-800/50'
               )}
             >
               <tab.icon className="h-4 w-4" />
@@ -109,7 +109,7 @@ export function MaintenanceManager() {
               {tab.count !== undefined && (
                 <span className={cn(
                   "ml-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter",
-                  activeTab === tab.id ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-400"
+                  activeTab === tab.id ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600" : "bg-slate-100 dark:bg-slate-800 text-slate-400"
                 )}>
                   {tab.count}
                 </span>

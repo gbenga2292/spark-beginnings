@@ -754,7 +754,7 @@ export function VehicleManager() {
               </div>
             </div>
             
-            <div className="overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-slate-100 dark:bg-slate-800/50 text-[10px] uppercase font-bold tracking-wider text-slate-500">
@@ -819,6 +819,57 @@ export function VehicleManager() {
                   )}
                 </tbody>
               </table>
+            </div>
+            {/* Mobile View: Cards */}
+            <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+              {filteredVehicles.length === 0 ? (
+                <div className="px-6 py-10 text-center text-slate-400 text-sm italic">No vehicles found</div>
+              ) : (
+                filteredVehicles.map(v => (
+                  <div key={`mobile-${v.id}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
+                          <Truck className="h-4 w-4" />
+                        </div>
+                        <div className="flex flex-col">
+                           <span className="font-bold text-slate-700 dark:text-slate-200">{v.name}</span>
+                           <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{v.registration_number}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge variant="outline" className="capitalize text-[10px] bg-slate-50 dark:bg-slate-800">{v.type}</Badge>
+                        {v.status === 'active' ? (
+                          <div className="flex items-center gap-1.5 font-bold text-[10px] uppercase text-emerald-500">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 font-bold text-[10px] uppercase text-rose-500">
+                            <span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> Inactive
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-end gap-1 mt-1 pt-2 border-t border-slate-100 dark:border-slate-800">
+                        {priv.canEditFleet && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                            setEditingVehicle(v);
+                            setVForm({ name: v.name, registration_number: v.registration_number, type: v.type || 'van', status: v.status });
+                            setShowVehicleForm(true);
+                          }}>
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {priv.canDeleteFleet && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicle(v.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </Card>
         </div>
@@ -961,7 +1012,7 @@ export function VehicleManager() {
 
           {viewMode === 'list' ? (
             <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900">
-              <div className="overflow-x-auto">
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
                     <tr className="bg-slate-100 dark:bg-slate-800/50 text-[10px] uppercase font-bold tracking-wider text-slate-500">
@@ -1033,6 +1084,62 @@ export function VehicleManager() {
                     )}
                   </tbody>
                 </table>
+              </div>
+              
+              {/* Mobile View: Cards */}
+              <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+                {sortedTrips.length === 0 ? (
+                  <div className="px-6 py-10 text-center text-slate-400 text-sm italic">No logs recorded yet</div>
+                ) : (
+                  sortedTrips.map(trip => (
+                    <div key={`mobile-${trip.id}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                      <div className="flex items-start justify-between">
+                         <div className="flex flex-col">
+                           <span className="font-bold text-slate-700 dark:text-slate-200 text-xs uppercase">{trip.vehicle_reg}</span>
+                           <span className="text-[10px] font-semibold text-slate-400">{trip.driver_name}</span>
+                         </div>
+                         <div className="flex flex-col items-end">
+                           <span className="font-bold text-blue-600 dark:text-blue-400 text-xs flex items-center gap-1">
+                             <MapPin className="h-3 w-3" /> {trip.site_name}
+                           </span>
+                           <span className="text-[10px] text-slate-500 italic">{trip.purpose}</span>
+                         </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                         <div className="flex flex-col text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                           <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Dep:</span> {new Date(trip.departure_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                           <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Arr:</span> {trip.arrival_time ? new Date(trip.arrival_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '—'}</div>
+                           <div className="text-[8px] text-slate-400 mt-0.5">{formatDisplayDate(trip.departure_time)}</div>
+                         </div>
+                         <div className="flex flex-col text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                           <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Start:</span> {trip.odometer_start || '—'}</div>
+                           <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">End:</span> {trip.odometer_end || '—'}</div>
+                           {trip.odometer_start && trip.odometer_end && (
+                             <div className="text-[8px] text-blue-500 mt-0.5">Total: {trip.odometer_end - trip.odometer_start} km</div>
+                           )}
+                         </div>
+                      </div>
+                      
+                      {trip.remark && (
+                          <p className="text-[10px] text-slate-500 mt-1 line-clamp-2" title={trip.remark}>{trip.remark}</p>
+                      )}
+
+                      <div className="flex items-center justify-end gap-1 mt-2 border-t border-slate-100 dark:border-slate-800 pt-2">
+                        {priv.canEditLogs && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditTrip(trip)}>
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {priv.canDeleteLogs && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => deleteVehicleTripRecord(trip.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </Card>
           ) : (

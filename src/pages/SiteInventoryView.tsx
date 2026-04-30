@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/componen
 import { cn } from '@/src/lib/utils';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { ConsumableUsageLog } from '@/src/types/operations';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { WaybillForm } from './WaybillForm';
 import { CreateReturnWaybill } from './CreateReturnWaybill';
 import { SiteTransactionsView } from './SiteTransactionsView';
@@ -166,6 +167,25 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
     setShowReportDialog(false);
   };
 
+  useSetPageTitle(
+    site.name,
+    questionnaire?.contactPersonPhone ? `Contact: ${questionnaire.contactPersonPhone}` : 'Site Overview',
+    <div className="hidden sm:flex items-center gap-2">
+      <Button variant="outline" size="sm" className="gap-2 h-9" onClick={onBack}>
+        <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back</span>
+      </Button>
+      <Button variant="outline" size="sm" className="gap-2 h-9 hidden sm:flex" onClick={() => setShowReturnWaybill(true)}>
+        <RotateCcw className="h-4 w-4" /> Return Waybill
+      </Button>
+      <Button variant="outline" size="sm" className="gap-2 h-9" onClick={() => setShowTransactions(true)}>
+        <Activity className="h-4 w-4" /> <span className="hidden sm:inline">Transactions</span>
+      </Button>
+      <Button variant="outline" size="icon" className="h-9 w-9 hidden sm:flex" onClick={() => setShowReportDialog(true)}>
+        <FileText className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
   if (showReturnWaybill) {
     return (
       <CreateReturnWaybill
@@ -209,76 +229,21 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm animate-in fade-in duration-200">
-      {/* Top Bar */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onBack}
-            className="flex items-center justify-center h-8 w-8 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-slate-500"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
-              <MapPin className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-bold text-slate-800 dark:text-white">{site.name}</h1>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "text-[10px] font-bold px-2 py-0.5 rounded-full",
-                    site.status === 'Active'
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      : "bg-slate-100 text-slate-500 border-slate-200"
-                  )}
-                >
-                  {site.status.toLowerCase()}
-                </Badge>
-              </div>
-              {questionnaire?.contactPersonPhone && (
-                <p className="text-xs text-slate-400 font-medium">{questionnaire.contactPersonPhone}</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2 h-9 rounded-md text-xs font-medium"
-            onClick={() => setShowReturnWaybill(true)}
-          >
-            <RotateCcw className="h-3.5 w-3.5" /> Return Waybill
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2 h-9 rounded-md text-xs font-medium"
-            onClick={() => setShowTransactions(true)}
-          >
-            <Activity className="h-3.5 w-3.5" /> Transactions
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 rounded-md"
-            onClick={() => setShowReportDialog(true)}
-          >
-            <FileText className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+      
+      {/* Mobile action buttons (shown only on small screens) */}
+      <div className="flex sm:hidden items-center gap-2 mb-2">
+        <Button variant="outline" size="sm" className="flex-1 gap-2 h-9" onClick={() => setShowReturnWaybill(true)}>
+          <RotateCcw className="h-4 w-4" /> Return Waybill
+        </Button>
+        <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setShowReportDialog(true)}>
+          <FileText className="h-4 w-4" />
+        </Button>
       </div>
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {/* Tabs */}
-          <div className="flex border-b border-slate-100 dark:border-slate-800 px-6 bg-white dark:bg-slate-900 shrink-0">
+      <div className="bg-card rounded-xl shadow-sm border border-border flex flex-col overflow-hidden">
+        {/* Tabs */}
+        <div className="flex overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
             {tabs.map(tab => (
               <button
                 key={tab.id}
@@ -543,8 +508,6 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
             )}
           </div>
         </div>
-
-      </div>
 
       {/* 
         Return Waybill is now handled at the top level 

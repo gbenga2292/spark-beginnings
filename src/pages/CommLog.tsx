@@ -12,7 +12,7 @@ import {
   ArrowDownLeft, ArrowUpRight, Plus, Search, Filter,
   Trash2, Pencil, X, Save, ChevronDown, ChevronUp,
   Bell, BellOff, CheckCircle2, MapPin, Building2,
-  UserCheck, AlertCircle, ClipboardList, ListPlus, Briefcase,
+  UserCheck, AlertCircle, ClipboardList, ListPlus, Briefcase, BarChart2,
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -1324,7 +1324,7 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
       )} />
 
       <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
             <div className={cn(
               'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
@@ -1336,45 +1336,58 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
             </div>
 
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 mb-1">
+              {/* Row 1: Date, Channel, Direction */}
+              <div className="flex flex-wrap items-center gap-1.5 mb-1">
                 <span className={cn('text-sm font-bold', isDark ? 'text-slate-100' : 'text-slate-900')}>
                   {format(parseISO(log.date), 'dd MMM yyyy')}
                   {log.time && <span className={cn('ml-1 text-xs font-normal', isDark ? 'text-slate-400' : 'text-slate-500')}> at {log.time}</span>}
                 </span>
-                <span className={cn('inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium', channelColor(log.channel))}>
+                
+                <span className={cn('inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider', channelColor(log.channel))}>
                   {channelIcon(log.channel)} {log.channel}
                 </span>
-                <span className={cn('inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-bold shadow-sm', log.isInternal ? (isDark ? 'bg-slate-800 text-slate-300 border border-slate-700' : 'bg-slate-100 text-slate-700 border border-slate-200') : contactTypeColor(log.contactType))}>
-                  {log.isInternal ? '🏢 INTERNAL' : contactTypeIcon(log.contactType)}
-                  {log.client || (log.contactType === 'Client' ? 'Existing Client' : log.contactType)}
-                </span>
-                {log.siteName && (
-                  <span className={cn('inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-semibold shadow-sm', isDark ? 'bg-indigo-950 text-indigo-400 border border-indigo-900/50' : 'bg-indigo-50 text-indigo-700 border border-indigo-100')}>
-                    📍 {log.siteName}
-                  </span>
-                )}
-                {log.isInternal ? (
-                  (log.reportedBy?.length ?? 0) > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {log.reportedBy!.map((name, i) => (
-                        <span key={i} className={cn('inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium', isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600')}>
-                          👤 {name}
-                        </span>
-                      ))}
-                    </div>
-                  )
-                ) : (
-                  log.contactPerson && (
-                    <span className={cn('inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium', isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700')}>
-                      👤 {log.contactPerson}
-                    </span>
-                  )
-                )}
+
                 {!log.isInternal && (
-                  <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', log.direction === 'Incoming' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700')}>
+                  <span className={cn('inline-flex items-center text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider', log.direction === 'Incoming' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700')}>
                     {log.direction}
                   </span>
                 )}
+                {log.isInternal && (
+                  <span className={cn('inline-flex items-center text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider', isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700')}>
+                    INTERNAL
+                  </span>
+                )}
+              </div>
+
+              {/* Row 2: Client/Site/Person text summary */}
+              <div className={cn('text-[13px] mb-1.5 flex flex-wrap items-center gap-1.5', isDark ? 'text-slate-400' : 'text-slate-600')}>
+                 <div className="inline-flex items-center gap-1 font-semibold text-indigo-600 dark:text-indigo-400">
+                    {contactTypeIcon(log.contactType)}
+                    {log.client || (log.contactType === 'Client' ? 'Existing Client' : log.contactType)}
+                 </div>
+                 
+                 {log.siteName && (
+                   <>
+                     <span className="text-slate-300 dark:text-slate-600">•</span>
+                     <span className="inline-flex items-center gap-0.5">📍 {log.siteName}</span>
+                   </>
+                 )}
+
+                 {log.isInternal ? (
+                   (log.reportedBy?.length ?? 0) > 0 && (
+                     <>
+                       <span className="text-slate-300 dark:text-slate-600">•</span>
+                       <span className="inline-flex items-center gap-0.5">👤 {log.reportedBy!.join(', ')}</span>
+                     </>
+                   )
+                 ) : (
+                   log.contactPerson && (
+                     <>
+                       <span className="text-slate-300 dark:text-slate-600">•</span>
+                       <span className="inline-flex items-center gap-0.5">👤 {log.contactPerson}</span>
+                     </>
+                   )
+                 )}
               </div>
 
               <div className={cn('text-sm flex flex-wrap items-center gap-2', isDark ? 'text-slate-200' : 'text-slate-800')}>
@@ -1383,7 +1396,7 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
             </div>
           </div>
 
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center justify-end gap-1 flex-wrap flex-shrink-0 mt-1 sm:mt-0 pl-12 sm:pl-0">
             {/* Follow-up status pill */}
             {log.followUpDate && !log.followUpDone && (
               <button
@@ -1564,6 +1577,8 @@ export function CommLog() {
   const [filterClient, setFilterClient] = useState('All');
   const [filterFollowUp, setFilterFollowUp] = useState('All');
   const [showFilters, setShowFilters] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
@@ -1579,9 +1594,9 @@ export function CommLog() {
     !showForm && (
       <Button
         onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm()); }}
-        className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 shadow-sm h-9 px-4 rounded-lg hidden sm:flex items-center"
+        className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9 px-2 sm:px-4 rounded-lg flex items-center gap-2"
       >
-        <Plus className="w-4 h-4" /> New Log
+        <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Log</span>
       </Button>
     )
   );
@@ -1817,19 +1832,41 @@ export function CommLog() {
       <div className={cn('flex flex-col h-full min-h-0', panelBg)}>
 
         {/* ── Mobile New Log Button ── */}
-        {!showForm && (
-          <div className="sm:hidden px-1 pb-4">
-            <Button
-              onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm()); }}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white gap-2 shadow-md h-12"
-            >
-              <Plus className="w-5 h-5" /> New Communication Log
-            </Button>
-          </div>
-        )}
+        {/* Moved to the page header to save space on mobile */}
+
+        {/* ── Premium Control Chips ── */}
+        <div className="flex items-center gap-2 pb-4 overflow-x-auto no-scrollbar flex-shrink-0 px-1">
+          <button 
+            onClick={() => setShowStats(!showStats)} 
+            className={cn("flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all whitespace-nowrap", 
+              showStats 
+                ? (isDark ? "bg-indigo-900/40 border-indigo-700 text-indigo-400 shadow-sm" : "bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm")
+                : (isDark ? "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50")
+            )}
+          >
+            <BarChart2 className="w-4 h-4" /> 
+            Overview Statistics
+          </button>
+
+          <button 
+            onClick={() => setShowSearch(!showSearch)} 
+            className={cn("flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all whitespace-nowrap", 
+              showSearch 
+                ? (isDark ? "bg-indigo-900/40 border-indigo-700 text-indigo-400 shadow-sm" : "bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm")
+                : (isDark ? "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50")
+            )}
+          >
+            <Search className="w-4 h-4" /> 
+            Search & Filters
+            {(searchTerm || filterClient !== 'All' || filterDirection !== 'All') && !showSearch && (
+              <span className="ml-1 w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+            )}
+          </button>
+        </div>
 
         {/* ── Stats bar ── */}
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-2 flex-shrink-0 pb-4">
+        {showStats && (
+          <div className="flex md:grid md:grid-cols-6 overflow-x-auto no-scrollbar gap-2 flex-shrink-0 pb-4 snap-x animate-in slide-in-from-top-2 fade-in duration-200 px-1">
           {[
             { label: 'Total', value: stats.total, color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-100' },
             { label: 'Incoming', value: stats.incoming, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-100' },
@@ -1838,12 +1875,13 @@ export function CommLog() {
             { label: 'Follow-ups', value: stats.pendingFollowUp, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-100' },
             { label: 'Prospects', value: stats.potentialClients, color: 'text-orange-600', bg: 'bg-orange-50 border-orange-100' },
           ].map(s => (
-            <div key={s.label} className={cn('rounded-lg border p-2 text-center', isDark ? 'bg-slate-900 border-slate-800' : s.bg)}>
+            <div key={s.label} className={cn('rounded-lg border p-2 text-center min-w-[100px] flex-1 snap-center', isDark ? 'bg-slate-900 border-slate-800' : s.bg)}>
               <div className={cn('text-xl font-bold', isDark ? 'text-slate-100' : s.color)}>{s.value}</div>
               <div className={cn('text-xs mt-0.5', isDark ? 'text-slate-500' : 'text-slate-500')}>{s.label}</div>
             </div>
           ))}
         </div>
+        )}
 
         {/* ── Split Panel (form + log list) ── */}
         <div className={cn('flex gap-4 min-h-0 flex-1', showForm ? 'flex-col lg:flex-row' : 'flex-col')}>
@@ -1988,9 +2026,10 @@ export function CommLog() {
             })() : (
               <>
             {/* Filters */}
-            <div className={cn('rounded-xl border p-3 space-y-2 flex-shrink-0', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200')}>
+            {showSearch && (
+              <div className={cn('rounded-xl border p-3 space-y-2 flex-shrink-0 mb-4 animate-in slide-in-from-top-2 fade-in duration-200 mx-1', isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200')}>
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="relative flex-1 min-w-40">
+                <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                   <input
                     type="text"
@@ -2001,46 +2040,57 @@ export function CommLog() {
                   />
                 </div>
 
-                <select value={filterDirection} onChange={e => setFilterDirection(e.target.value)} className={selectCls}>
-                  <option value="All">All Directions</option>
-                  <option value="Incoming">Incoming</option>
-                  <option value="Outgoing">Outgoing</option>
-                </select>
-
-                <select value={filterChannel} onChange={e => setFilterChannel(e.target.value)} className={selectCls}>
-                  <option value="All">All Channels</option>
-                  {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-
-                <select value={filterContactType} onChange={e => setFilterContactType(e.target.value)} className={selectCls}>
-                  <option value="All">All Types</option>
-                  <option value="Client">Existing Client</option>
-                  <option value="Potential Client">Potential Client</option>
-                  <option value="Site">Site</option>
-                  <option value="Both">Both</option>
-                </select>
-
-                <select value={filterInternal} onChange={e => setFilterInternal(e.target.value)} className={selectCls}>
-                  <option value="All">All Sources</option>
-                  <option value="External">🌐 External Only</option>
-                  <option value="Internal">🏢 Internal Only</option>
-                </select>
-
-                <select value={filterFollowUp} onChange={e => setFilterFollowUp(e.target.value)} className={selectCls}>
-                  <option value="All">All Follow-ups</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Overdue">Overdue</option>
-                  <option value="Done">Done</option>
-                </select>
-
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className={cn('h-9 px-3 rounded-md border text-sm flex items-center gap-1.5 transition-colors',
+                  className={cn('md:hidden h-9 px-3 rounded-md border text-sm flex items-center gap-1.5 transition-colors',
                     isDark ? 'border-slate-700 text-slate-400 hover:border-slate-500' : 'border-slate-200 text-slate-500 hover:border-slate-400'
                   )}
                 >
-                  <Filter className="w-4 h-4" /> More
+                  <Filter className="w-4 h-4" /> Filters
                 </button>
+
+                <div className={cn("flex items-center gap-2 flex-wrap w-full md:w-auto", !showFilters && "hidden md:flex")}>
+                  <select value={filterDirection} onChange={e => setFilterDirection(e.target.value)} className={selectCls}>
+                    <option value="All">All Directions</option>
+                    <option value="Incoming">Incoming</option>
+                    <option value="Outgoing">Outgoing</option>
+                  </select>
+
+                  <select value={filterChannel} onChange={e => setFilterChannel(e.target.value)} className={selectCls}>
+                    <option value="All">All Channels</option>
+                    {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+
+                  <select value={filterContactType} onChange={e => setFilterContactType(e.target.value)} className={selectCls}>
+                    <option value="All">All Types</option>
+                    <option value="Client">Existing Client</option>
+                    <option value="Potential Client">Potential Client</option>
+                    <option value="Site">Site</option>
+                    <option value="Both">Both</option>
+                  </select>
+
+                  <select value={filterInternal} onChange={e => setFilterInternal(e.target.value)} className={selectCls}>
+                    <option value="All">All Sources</option>
+                    <option value="External">🌐 External Only</option>
+                    <option value="Internal">🏢 Internal Only</option>
+                  </select>
+
+                  <select value={filterFollowUp} onChange={e => setFilterFollowUp(e.target.value)} className={selectCls}>
+                    <option value="All">All Follow-ups</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Overdue">Overdue</option>
+                    <option value="Done">Done</option>
+                  </select>
+
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={cn('hidden md:flex h-9 px-3 rounded-md border text-sm items-center gap-1.5 transition-colors',
+                      isDark ? 'border-slate-700 text-slate-400 hover:border-slate-500' : 'border-slate-200 text-slate-500 hover:border-slate-400'
+                    )}
+                  >
+                    <Filter className="w-4 h-4" /> More
+                  </button>
+                </div>
               </div>
 
               {showFilters && (
@@ -2070,6 +2120,7 @@ export function CommLog() {
                 Showing {filtered.length} of {commLogs.length} logs
               </div>
             </div>
+            )}
 
             {/* Scrollable log list — grouped by client */}
             <div className="flex-1 overflow-y-auto space-y-3 pr-1 min-h-0">

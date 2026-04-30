@@ -11,7 +11,7 @@ interface SharedProps {
 const DialogCloseContext = createContext<(() => void) | undefined>(undefined);
 
 // ── Flexible Dialog Root ───────────────────────────────────────────────────────
-export function Dialog({ open, onOpenChange, onClose, title, children, className }: any) {
+export function Dialog({ open, onOpenChange, onClose, title, children, className, fullScreenMobile }: any) {
   if (!open) return null;
   const handleClose = onOpenChange ? () => onOpenChange(false) : onClose;
 
@@ -46,7 +46,7 @@ export function Dialog({ open, onOpenChange, onClose, title, children, className
   // Modern component-based API
   return (
     <DialogCloseContext.Provider value={handleClose}>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-20">
+      <div className={cn("fixed inset-0 z-50 flex items-center justify-center", fullScreenMobile ? "p-0 sm:p-4 sm:pt-20" : "p-4 pt-20", className)}>
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} />
         {children}
       </div>

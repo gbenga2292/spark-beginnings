@@ -162,7 +162,7 @@ export function WaybillManager() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-blue-700 border-b border-blue-800 text-blue-50 uppercase text-[11px] tracking-wider font-bold">
@@ -270,6 +270,108 @@ export function WaybillManager() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile View: Cards */}
+        <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+          {currentItems.length === 0 ? (
+            <div className="px-5 py-12 text-center text-slate-500">
+              <div className="flex flex-col items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center border dark:border-slate-700">
+                  <Truck className="h-5 w-5 text-slate-400" />
+                </div>
+                <p>No {activeTab === 'waybill' ? 'waybills' : 'returns'} found.</p>
+              </div>
+            </div>
+          ) : (
+            currentItems.map((wb) => (
+              <div key={`mobile-${wb.id}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                <div className="flex items-start justify-between">
+                  <div className="flex flex-col">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{wb.id}</span>
+                    <span className="text-xs text-slate-400 font-medium">{formatDisplayDate(wb.issueDate)}</span>
+                  </div>
+                  <div>
+                    {getStatusBadge(wb.status)}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-sm mt-1">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Driver & Vehicle</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-200 text-xs mt-0.5">{wb.driverName}</span>
+                    <span className="text-xs text-slate-400">{wb.vehicle || '—'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">{activeTab === 'waybill' ? 'Destination' : 'Source Site'}</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-200 text-xs mt-0.5 truncate">{wb.siteName}</span>
+                    <span className="text-xs text-slate-400">from Warehouse</span>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 mb-1">Items Summary</span>
+                    <span className="text-slate-600 dark:text-slate-400 text-xs line-clamp-2">
+                      {wb.items.map(i => `${i.quantity} ${i.assetName}`).join(', ')}
+                    </span>
+                </div>
+
+                <div className="flex items-center justify-end gap-1 mt-2 border-t border-slate-100 dark:border-slate-800 pt-3">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    onClick={() => setViewingWaybill(wb)}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  {activeTab === 'waybill' ? (
+                    <>
+                      {wb.status === 'outstanding' && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                          onClick={() => setEditingWaybill(wb)}>
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {wb.status === 'outstanding' && (
+                        <Button 
+                          size="sm" 
+                          className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs ml-1"
+                          onClick={() => setWaybillToSend(wb)}>
+                          <Calendar className="h-3.5 w-3.5" /> Send
+                        </Button>
+                      )}
+                      {wb.status === 'outstanding' && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                          onClick={() => deleteWaybill(wb.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {wb.status === 'outstanding' && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                          onClick={() => setEditingWaybill(wb)}>
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {wb.status === 'outstanding' && (
+                        <Button 
+                          size="sm" 
+                          className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs ml-1"
+                          onClick={() => handleOpenProcessReturn(wb)}>
+                          <RotateCcw className="h-3.5 w-3.5" /> Process
+                        </Button>
+                      )}
+                      {wb.status === 'outstanding' && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                          onClick={() => deleteWaybill(wb.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </Card>
 

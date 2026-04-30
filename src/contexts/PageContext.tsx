@@ -47,7 +47,7 @@ export function usePage() {
  * Because it consumes the dispatch context, updating the title will NO LONGER
  * trigger a double-render inside the calling page component.
  */
-export function useSetPageTitle(title: string, subtitle: string = '', buttons: ReactNode | null = null, deps: any[] = []) {
+export function useSetPageTitle(title: string | null, subtitle: string = '', buttons: ReactNode | null = null, deps: any[] = []) {
   const dispatch = useContext(PageDispatchContext);
   if (!dispatch) {
     throw new Error('useSetPageTitle must be used within a PageProvider');
@@ -61,6 +61,8 @@ export function useSetPageTitle(title: string, subtitle: string = '', buttons: R
   buttonsRef.current = buttons;
 
   useEffect(() => {
+    if (title === null) return;
+    
     setTitle(title);
     setSubtitle(subtitle);
     // Read from ref so JSX buttons don't trigger an infinite re-render loop
@@ -68,6 +70,7 @@ export function useSetPageTitle(title: string, subtitle: string = '', buttons: R
 
     // Cleanup on unmount
     return () => {
+      if (title === null) return;
       setTitle('');
       setSubtitle('');
       setHeaderButtons(null);

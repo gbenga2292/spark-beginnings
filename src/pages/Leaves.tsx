@@ -822,7 +822,7 @@ export function Leaves() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-teal-700 border-b border-teal-800 dark:bg-teal-950/40 dark:border-teal-900/40 text-teal-50 dark:text-teal-100 uppercase text-[11px] tracking-wider font-bold">
@@ -831,13 +831,13 @@ export function Leaves() {
                 <th className="px-5 py-4 whitespace-nowrap">Start</th>
                 <th className="px-5 py-4 whitespace-nowrap">Days</th>
                 <th className="px-5 py-4 whitespace-nowrap">Expected End</th>
-                <th className="px-5 py-4 whitespace-nowrap">Returned</th>
-                <th className="px-5 py-4 min-w-[200px]">Reason</th>
-                <th className="px-5 py-4 whitespace-nowrap text-center">Contact</th>
-                <th className="px-5 py-4 whitespace-nowrap text-center">Approver</th>
-                <th className="px-5 py-4 whitespace-nowrap text-center">Approval</th>
+                <th className="px-5 py-4 whitespace-nowrap hidden md:table-cell">Returned</th>
+                <th className="px-5 py-4 min-w-[200px] hidden sm:table-cell">Reason</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center hidden md:table-cell">Contact</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center hidden lg:table-cell">Approver</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center hidden sm:table-cell">Approval</th>
                 <th className="px-5 py-4 whitespace-nowrap text-center">Status</th>
-                <th className="px-5 py-4 whitespace-nowrap text-center">File</th>
+                <th className="px-5 py-4 whitespace-nowrap text-center hidden sm:table-cell">File</th>
                 <th className="px-5 py-4 whitespace-nowrap text-center">Actions</th>
               </tr>
             </thead>
@@ -869,15 +869,15 @@ export function Leaves() {
                     <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
                       {leave.expectedEndDate ? format(parseISO(leave.expectedEndDate), 'dd-MMM-yy') : '—'}
                     </td>
-                    <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                    <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap hidden md:table-cell">
                       {leave.dateReturned ? format(parseISO(leave.dateReturned), 'dd-MMM-yy') : '—'}
                     </td>
-                    <td className="px-5 py-4 max-w-xs text-slate-700 dark:text-slate-300 text-xs">{leave.reason}</td>
-                    <td className="px-5 py-4 text-center">
+                    <td className="px-5 py-4 max-w-xs text-slate-700 dark:text-slate-300 text-xs hidden sm:table-cell">{leave.reason}</td>
+                    <td className="px-5 py-4 text-center hidden md:table-cell">
                       <span className={`text-xs font-bold ${leave.canBeContacted === 'Yes' ? 'text-teal-600 dark:text-teal-400' : 'text-slate-400 dark:text-slate-500'}`}>{leave.canBeContacted}</span>
                     </td>
                     {/* Approver column */}
-                    <td className="px-5 py-4 text-center whitespace-nowrap">
+                    <td className="px-5 py-4 text-center whitespace-nowrap hidden lg:table-cell">
                       {leave.approvedByName ? (
                         <div className="flex items-center justify-center gap-1 text-xs text-slate-600 dark:text-slate-300">
                           {leave.approvalStatus === 'Approved'
@@ -889,7 +889,7 @@ export function Leaves() {
                         </div>
                       ) : <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>}
                     </td>
-                    <td className="px-5 py-4 text-center whitespace-nowrap">
+                    <td className="px-5 py-4 text-center whitespace-nowrap hidden sm:table-cell">
                       {leave.approvalStatus === 'Approved' ? (
                         <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30" variant="outline">Approved</Badge>
                       ) : leave.approvalStatus === 'Rejected' ? (
@@ -917,7 +917,7 @@ export function Leaves() {
                         );
                       })()}
                     </td>
-                    <td className="px-5 py-4 text-center">
+                    <td className="px-5 py-4 text-center hidden sm:table-cell">
                       {leave.nasFilePath ? (
                         <button
                           className="text-indigo-600 hover:text-indigo-800 flex items-center justify-center gap-1 mx-auto text-xs font-semibold"
@@ -982,6 +982,104 @@ export function Leaves() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile View: Cards */}
+        <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+          {filteredLeaves.map(leave => (
+            <div key={`mobile-${leave.id}`} className={`p-4 flex flex-col gap-3 ${leave.status === 'Cancelled' ? 'opacity-60 bg-slate-50 dark:bg-slate-800/50' : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors'}`}>
+              <div className="flex items-start justify-between">
+                <div className="flex flex-col">
+                  <span className="font-bold text-slate-800 dark:text-slate-200 uppercase text-sm">{leave.employeeName}</span>
+                  <div className="mt-1">
+                    <span className="inline-block px-2 py-0.5 text-[10px] font-semibold bg-teal-50 text-teal-700 border border-teal-200 dark:bg-teal-500/20 dark:text-teal-400 dark:border-teal-500/30 rounded-full whitespace-nowrap">
+                      {leave.leaveType || '—'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const isUpcoming = leave.startDate && new Date(leave.startDate).setHours(0, 0, 0, 0) > new Date().setHours(0, 0, 0, 0);
+                    const statusLabel = leave.status === 'Cancelled' ? 'Cancelled' : leave.dateReturned ? 'Completed' : isUpcoming ? 'Upcoming' : 'On Leave';
+                    let badgeClass = '';
+                    if (statusLabel === 'Cancelled') badgeClass = 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:border-rose-500/30';
+                    else if (statusLabel === 'Completed') badgeClass = 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30';
+                    else if (statusLabel === 'Upcoming') badgeClass = 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30';
+                    else badgeClass = 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30';
+
+                    return (
+                      <Badge className={badgeClass} variant="outline">
+                        {statusLabel}
+                      </Badge>
+                    );
+                  })()}
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40 bg-white dark:bg-slate-900 dark:border-slate-700">
+                      <DropdownMenuItem className="text-slate-600 cursor-pointer gap-2" onClick={() => openPrintPreview(leave)}>
+                        <Printer className="h-4 w-4" /> Print Preview
+                      </DropdownMenuItem>
+                      {priv.canEdit && (
+                        <DropdownMenuItem className="text-indigo-600 focus:text-indigo-600 cursor-pointer gap-2" onClick={() => handleEdit(leave)}>
+                          <Edit className="h-4 w-4" /> Edit
+                        </DropdownMenuItem>
+                      )}
+                      {priv.canDelete && leave.status !== 'Cancelled' && (
+                        <DropdownMenuItem className="text-amber-600 focus:text-amber-600 cursor-pointer gap-2" onClick={() => handleCancel(leave)}>
+                          <Ban className="h-4 w-4" /> Cancel Leave
+                        </DropdownMenuItem>
+                      )}
+                      {priv.canEdit && leave.approvalStatus === 'Pending' && leave.status !== 'Cancelled' && leave.approvalTaskId && !mainTasks.find(t => t.id === leave.approvalTaskId) && (
+                        <DropdownMenuItem className="text-sky-600 focus:text-sky-600 cursor-pointer gap-2" onClick={() => handleRecreateApprovalTask(leave)}>
+                          <RefreshCw className="h-4 w-4" /> Recreate Approval Task
+                        </DropdownMenuItem>
+                      )}
+                      {priv.canDelete && (
+                        <DropdownMenuItem className="text-rose-600 focus:text-rose-600 cursor-pointer gap-2" onClick={() => handleDelete(leave)}>
+                          <Trash2 className="h-4 w-4" /> Delete (Admin)
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm mt-1">
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Duration</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">{leave.duration} Days</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Approval</span>
+                  <div className="mt-0.5">
+                    {leave.approvalStatus === 'Approved' ? (
+                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30 text-[10px] py-0" variant="outline">Approved</Badge>
+                    ) : leave.approvalStatus === 'Rejected' ? (
+                      <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30 text-[10px] py-0" variant="outline">Rejected</Badge>
+                    ) : leave.approvalStatus === 'Pending' ? (
+                      <Badge className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30 text-[10px] py-0" variant="outline">Pending</Badge>
+                    ) : (
+                      <span className="text-slate-300 text-xs">—</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Start Date</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">{leave.startDate ? format(parseISO(leave.startDate), 'dd-MMM-yy') : '—'}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Expected End</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">{leave.expectedEndDate ? format(parseISO(leave.expectedEndDate), 'dd-MMM-yy') : '—'}</span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </Card>
 
@@ -1069,23 +1167,23 @@ export function Leaves() {
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-slate-900 max-w-4xl w-full rounded-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
               {/* Modal header */}
-              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+              <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50 shrink-0">
+                <h2 className="text-base font-bold text-slate-800 flex flex-wrap items-center gap-2">
                   <Printer className="h-5 w-5 text-teal-600" /> Staff Leave Application Form
                   {isPreviewLocked && (
-                    <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-600">LOCKED — Leave Elapsed</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-600">LOCKED — Leave Elapsed</span>
                   )}
                   {wfRejected && (
-                    <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">REJECTED</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">REJECTED</span>
                   )}
                   {wfStep === 5 && (
-                    <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">FULLY APPROVED ✓</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">FULLY APPROVED ✓</span>
                   )}
                   {formId && wfStep > 0 && wfStep < 5 && !wfRejected && (
-                    <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Step {wfStep}/4 Pending</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Step {wfStep}/4 Pending</span>
                   )}
                 </h2>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto justify-start sm:justify-end">
                   <button type="button" onClick={handleCreateOrUpdate}
                     className="flex items-center gap-1.5 px-3 h-9 rounded-lg border border-teal-300 bg-teal-50 hover:bg-teal-100 text-teal-700 text-xs font-bold">
                     <CheckCircle2 className="h-3.5 w-3.5" /> {formId ? 'Update Leave' : 'Submit Application'}
@@ -1112,8 +1210,8 @@ export function Leaves() {
               </div>
 
               {/* Scrollable A4 area */}
-              <div className="overflow-y-auto flex-1 bg-gray-300 p-6 flex flex-col gap-6">
-                <div ref={printRef}>
+              <div className="overflow-y-auto overflow-x-auto flex-1 bg-gray-300 p-2 sm:p-6 flex flex-col gap-6">
+                <div ref={printRef} className="min-w-[794px]">
                   <div className="a4-page bg-white shadow-lg mx-auto" style={{ width: 794, padding: '12px 24px 16px', fontFamily: 'Arial, sans-serif', fontSize: 11, color: '#111' }}>
 
                     {/* Header */}

@@ -121,8 +121,8 @@ function PersonalSpaceDashboard() {
             <div className="absolute -top-8 -right-8 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
             <div className="absolute bottom-0 left-24 w-32 h-32 bg-white/5 rounded-full blur-xl" />
           </div>
-          <div className="relative flex items-start justify-between gap-4">
-            <div>
+          <div className="relative flex flex-col md:flex-row md:items-start justify-between gap-4">
+            <div className="flex-1">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center backdrop-blur-sm border border-white/20">
                   <Lock className="w-3.5 h-3.5 text-white" />
@@ -423,8 +423,8 @@ function AdminDashboard() {
             <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/8 rounded-full blur-3xl" />
             <div className="absolute bottom-0 left-32 w-40 h-40 bg-white/5 rounded-full blur-2xl" />
           </div>
-          <div className="relative flex items-start justify-between gap-4 flex-wrap">
-            <div>
+          <div className="relative flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            <div className="flex-1">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center border border-white/20">
                   <Users className="w-3.5 h-3.5 text-white" />
@@ -448,7 +448,7 @@ function AdminDashboard() {
             </button>
           </div>
           {/* Stats row */}
-          <div className="relative mt-5 grid grid-cols-4 gap-2">
+          <div className="relative mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
               { label: isExternalHr ? 'HR Tasks' : 'Tasks', value: activeWsTasks.length, icon: Layers },
               { label: 'Active', value: inProgress, icon: Activity },
@@ -660,8 +660,8 @@ function UserDashboard() {
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute -top-8 -right-8 w-40 h-40 bg-white/8 rounded-full blur-2xl" />
           </div>
-          <div className="relative flex items-start justify-between gap-4 flex-wrap">
-            <div>
+          <div className="relative flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            <div className="flex-1">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xs font-semibold text-white/80 bg-white/10 px-2.5 py-1 rounded-full border border-white/20">
                   Team Workspace · {wsMembers.length} members
@@ -687,7 +687,7 @@ function UserDashboard() {
               </button>
             </div>
           </div>
-          <div className="relative mt-5 grid grid-cols-4 gap-2">
+          <div className="relative mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
               { label: isExternalHr ? 'HR Tasks' : 'Assigned', value: mySubs.length },
               { label: 'Active', value: myProgress },

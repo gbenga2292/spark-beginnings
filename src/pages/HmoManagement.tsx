@@ -268,7 +268,7 @@ export function HmoManagement() {
       {/* Table card */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
         <div className="p-4 border-b border-slate-200 dark:border-slate-800">
-          <div className="relative w-72">
+          <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             <input
               type="text"
@@ -280,16 +280,16 @@ export function HmoManagement() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
             <thead className="text-xs text-slate-700 dark:text-slate-300 uppercase bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
               <tr>
                 <th className="px-5 py-3">Employee</th>
                 <th className="px-5 py-3">Policy Number</th>
-                <th className="px-5 py-3">Start Date</th>
-                <th className="px-5 py-3">Duration</th>
+                <th className="px-5 py-3 hidden md:table-cell">Start Date</th>
+                <th className="px-5 py-3 hidden md:table-cell">Duration</th>
                 <th className="px-5 py-3">End Date</th>
-                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3 hidden sm:table-cell">Status</th>
                 <th className="px-5 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -313,12 +313,12 @@ export function HmoManagement() {
                       <td className="px-5 py-3">
                         {emp.lashmaPolicyNumber || <span className="text-slate-300 italic">Not set</span>}
                       </td>
-                      <td className="px-5 py-3">
+                      <td className="px-5 py-3 hidden md:table-cell">
                         {formatDate(start) || <span className="text-slate-300 italic">Not set</span>}
                       </td>
-                      <td className="px-5 py-3">{dur ? `${dur} months` : '-'}</td>
+                      <td className="px-5 py-3 hidden md:table-cell">{dur ? `${dur} months` : '-'}</td>
                       <td className="px-5 py-3">{formatDate(end) || '-'}</td>
-                      <td className="px-5 py-3">
+                      <td className="px-5 py-3 hidden sm:table-cell">
                         <StatusBadge status={expiryStatus} />
                       </td>
                       <td className="px-5 py-3 text-right">
@@ -335,6 +335,52 @@ export function HmoManagement() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile View: Cards */}
+        <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+          {visibleRows.map(emp => {
+            const { start, end, dur } = getHmoDetails(emp);
+            const expiryStatus        = getExpiryStatus(end);
+
+            return (
+              <div key={`mobile-${emp.id}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                <div className="flex items-start justify-between">
+                  <div className="flex flex-col">
+                    <span className="font-bold text-slate-900 dark:text-white">{emp.firstname} {emp.surname}</span>
+                    <span className="text-xs text-slate-500 font-mono tracking-tight mt-0.5">{emp.lashmaPolicyNumber || 'No Policy Set'}</span>
+                  </div>
+                  <button
+                    onClick={() => setViewHistoryEmp(emp)}
+                    className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium text-xs px-2 py-1.5 inline-flex items-center gap-1 rounded transition-colors"
+                  >
+                    <History className="h-3.5 w-3.5" /> History
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm mt-1">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Start Date</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-300">{formatDate(start) || '—'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">End Date</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-300">{formatDate(end) || '—'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Duration</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-300">{dur ? `${dur} months` : '—'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Status</span>
+                    <div className="mt-0.5">
+                      <StatusBadge status={expiryStatus} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

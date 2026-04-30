@@ -2139,7 +2139,7 @@ export function Employees() {
             </button>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input
@@ -2157,7 +2157,7 @@ export function Employees() {
             </select>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -2262,6 +2262,90 @@ export function Employees() {
             ))}
           </TableBody>
         </Table>
+        </div>
+
+        {/* Mobile View: Cards */}
+        <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+          {filteredEmployees.map((employee) => (
+            <div key={`mobile-${employee.id}`} className={`p-4 flex flex-col gap-3 ${selectedIds.includes(employee.id) ? 'bg-indigo-50/50 dark:bg-indigo-900/20' : ''}`}>
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <Checkbox 
+                    checked={selectedIds.includes(employee.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) setSelectedIds([...selectedIds, employee.id]);
+                      else setSelectedIds(selectedIds.filter(id => id !== employee.id));
+                    }}
+                  />
+                  <Avatar className="h-10 w-10 border border-slate-200">
+                    <AvatarFallback className="bg-indigo-50 text-indigo-700 font-bold text-xs">
+                      {employee.firstname.charAt(0)}{employee.surname.charAt(0)}
+                    </AvatarFallback>
+                    {employee.avatar && <AvatarImage src={employee.avatar} alt="Avatar" className="object-cover" />}
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <span className="font-bold text-slate-900 dark:text-slate-100 transition-colors">{employee.surname} {employee.firstname}</span>
+                    <span className="text-xs text-slate-500 font-mono tracking-tight">{employee.employeeCode || `EMP-${employee.id.substring(0, 4).toUpperCase()}`}</span>
+                  </div>
+                </div>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 data-[state=open]:bg-slate-100 data-[state=open]:text-indigo-600">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40 fade-in-80 zoom-in-95 data-[state=closed]:fade-out-80 data-[state=closed]:zoom-out-95">
+                    <DropdownMenuItem className="cursor-pointer gap-2" onClick={() => handleView(employee)}>
+                      <Eye className="h-4 w-4 text-slate-400" /> View Details
+                    </DropdownMenuItem>
+                    {priv.canEdit && (
+                      <DropdownMenuItem className="cursor-pointer gap-2" onClick={() => handleEdit(employee)}>
+                        <Pencil className="h-4 w-4 text-slate-400" /> Edit Record
+                      </DropdownMenuItem>
+                    )}
+                    {priv.canDelete && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-red-600 cursor-pointer focus:text-red-700 focus:bg-red-50 gap-2 font-medium"
+                          onClick={async () => {
+                            const ok = await showConfirm(`Are you sure you want to delete ${employee.surname} ${employee.firstname}?`, { variant: 'danger', confirmLabel: 'Delete' });
+                            if (ok) { deleteEmployee(employee.id); toast.success('Employee record deleted'); }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" /> Delete
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm mt-1 pl-[3.25rem]">
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Position</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">{employee.position || '—'}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Department</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">{employee.department || '—'}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Staff Type</span>
+                  <div className="mt-0.5">
+                    <Badge variant={employee.staffType === 'OFFICE' ? 'default' : employee.staffType === 'FIELD' ? 'secondary' : 'outline'} className="text-[10px] py-0 px-2 h-5">
+                      {employee.staffType}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Bank Info</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300 truncate">{employee.bankName || 'N/A'} • {employee.accountNo || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
       {renderBulkEditModal()}

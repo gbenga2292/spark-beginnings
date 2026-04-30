@@ -42,22 +42,22 @@ export function QuickCheckout() {
     view === 'checkout' 
       ? 'Fast checkout for individual employees and short-term loans' 
       : 'Full checkout history and status tracking',
-    <div className="hidden sm:flex items-center gap-2">
+    <div className="flex items-center gap-2">
       {view === 'checkout' ? (
         <>
           <Button variant="outline" size="sm" className="gap-2 h-9" onClick={() => setView('activity')}>
-            <History className="h-4 w-4" /> Activity
+            <History className="h-4 w-4" /> <span className="hidden sm:inline">Activity</span>
           </Button>
-          <Button variant="outline" size="sm" className="gap-2 h-9" onClick={() => navigate('/operations/analytics')}>
+          <Button variant="outline" size="sm" className="gap-2 h-9 hidden sm:flex" onClick={() => navigate('/operations/analytics')}>
             <Users className="h-4 w-4" /> Employees
           </Button>
         </>
       ) : (
         <Button variant="outline" size="sm" className="gap-2 h-9" onClick={() => setView('checkout')}>
-          <ArrowLeft className="h-4 w-4" /> New Checkout
+          <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">New Checkout</span>
         </Button>
       )}
-      <Button variant="outline" size="sm" className="gap-2 h-9">
+      <Button variant="outline" size="sm" className="gap-2 h-9 hidden sm:flex">
         <FileText className="h-4 w-4" /> Export
       </Button>
     </div>

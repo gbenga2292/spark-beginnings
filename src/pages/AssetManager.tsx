@@ -339,7 +339,7 @@ export function AssetManager() {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-blue-700 border-b border-blue-800 text-blue-50 uppercase text-[11px] tracking-wider font-bold">
@@ -442,6 +442,81 @@ export function AssetManager() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile View: Cards */}
+        <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+          {filtered.length === 0 ? (
+            <div className="px-5 py-12 text-center text-slate-500">
+              <div className="flex flex-col items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center border dark:border-slate-700">
+                  <Package className="h-5 w-5 text-slate-400" />
+                </div>
+                <p>No assets found.</p>
+              </div>
+            </div>
+          ) : (
+            filtered.map(asset => (
+              <div key={`mobile-${asset.id}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                <div className="flex items-start justify-between">
+                  <div className="flex flex-col">
+                    <span className="font-bold text-slate-800 dark:text-slate-200 text-sm uppercase">{asset.name}</span>
+                    <div className="flex gap-2 mt-1">
+                      <span className="inline-block px-2 py-0.5 text-[10px] font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-full capitalize">{asset.category}</span>
+                      <span className="inline-block px-2 py-0.5 text-[10px] font-semibold bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-full capitalize">{asset.type}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        'rounded-full px-2 py-0 text-[10px] border font-semibold whitespace-nowrap',
+                        asset.availableQuantity > 100
+                          ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200'
+                          : asset.availableQuantity > 0
+                          ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200'
+                          : 'bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200'
+                      )}
+                    >
+                      {asset.availableQuantity > 100 ? 'In Stock' : asset.availableQuantity > 0 ? 'Critical' : 'Out of Stock'}
+                    </Badge>
+                    <AssetActionsMenu
+                      asset={asset}
+                      onAction={modal => openModal(asset, modal)}
+                      onDelete={() => deleteAsset(asset.id)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-sm mt-1">
+                  <div className="flex flex-col items-center bg-slate-50 dark:bg-slate-800/50 p-2 rounded border border-slate-100 dark:border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 text-center">Total Stock</span>
+                    <span className="font-bold text-blue-600 dark:text-blue-400 mt-1">{asset.quantity}</span>
+                  </div>
+                  <div className="flex flex-col items-center bg-slate-50 dark:bg-slate-800/50 p-2 rounded border border-slate-100 dark:border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 text-center">Reserved</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 mt-1">{asset.reservedQuantity || 0}</span>
+                  </div>
+                  <div className="flex flex-col items-center bg-slate-50 dark:bg-slate-800/50 p-2 rounded border border-slate-100 dark:border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 text-center">Available</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 mt-1">{asset.availableQuantity || 0}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between mt-1 text-xs px-1">
+                  <div className="flex gap-3">
+                    <span className="flex items-center gap-1 text-slate-500"><span className="text-[10px] font-bold text-slate-400 uppercase">M:</span> <span className={asset.missingQuantity && asset.missingQuantity > 0 ? 'text-red-500 font-bold' : ''}>{asset.missingQuantity || 0}</span></span>
+                    <span className="flex items-center gap-1 text-slate-500"><span className="text-[10px] font-bold text-slate-400 uppercase">D:</span> <span className={asset.damagedQuantity && asset.damagedQuantity > 0 ? 'text-amber-500 font-bold' : ''}>{asset.damagedQuantity || 0}</span></span>
+                    <span className="flex items-center gap-1 text-slate-500"><span className="text-[10px] font-bold text-slate-400 uppercase">U:</span> <span className={asset.usedQuantity && asset.usedQuantity > 0 ? 'text-blue-500 font-bold' : ''}>{asset.usedQuantity || 0}</span></span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Loc:</span>
+                    <span className="font-semibold text-slate-600 dark:text-slate-400 truncate max-w-[80px]">{asset.location || 'store'}</span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </Card>
     </div>

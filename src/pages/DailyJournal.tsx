@@ -290,25 +290,33 @@ export function DailyJournal() {
           const entries = siteJournalEntries.filter(e => group.journals.some(j => j.id === e.journalId));
           return (
             <button key={group.date} onClick={() => setDiaryDate(group.date)}
-              className="w-full text-left bg-card border border-border rounded-lg px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-900/50 hover:shadow-sm transition-all flex items-center gap-4">
-              <Calendar className="h-4 w-4 text-slate-400 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-foreground">{format(new Date(group.date + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}</p>
-                  {isSameDay(new Date(group.date + 'T00:00:00'), new Date()) && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">TODAY</span>}
+              className="w-full text-left bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 sm:p-4 hover:shadow-md transition-all flex flex-col gap-3 group">
+              <div className="flex items-start justify-between gap-2 w-full">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex-shrink-0 h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50">
+                    <Calendar className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-x-2 gap-y-1">
+                      <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{format(new Date(group.date + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}</p>
+                      {isSameDay(new Date(group.date + 'T00:00:00'), new Date()) && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 flex-shrink-0">Today</span>}
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                      {entries.length} log points • {group.journals.length} session{group.journals.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <span className="text-xs text-muted-foreground">{entries.length} log points · {group.journals.length} session{group.journals.length !== 1 ? 's' : ''}</span>
-                  {[...new Set(entries.map(e => e.siteName))].map(s => (
-                    <span key={s} className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                      <MapPin className="h-3 w-3" />{s} ({entries.find(e => e.siteName === s)?.clientName || 'Unknown'})
-                    </span>
-                  ))}
+                <div className="flex-shrink-0 flex items-center justify-center h-10 w-8 text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all">
+                  <ChevronRight className="h-5 w-5" />
                 </div>
               </div>
-              <span className="text-xs font-medium px-2 py-1 text-slate-500 flex-shrink-0">
-                {entries.length} entries
-              </span>
+              
+              <div className="flex items-start gap-2 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 w-full overflow-hidden">
+                <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-snug truncate sm:whitespace-normal">
+                  {[...new Set(entries.map(e => `${e.siteName} (${entries.find(x => x.siteName === e.siteName)?.clientName || 'Unknown'})`))].join(' • ')}
+                </p>
+              </div>
             </button>
           );
         })}
@@ -318,60 +326,70 @@ export function DailyJournal() {
 
   function renderModal() {
     return (
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden p-0">
-          <DialogHeader className="px-6 py-5 border-b border-border">
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen} fullScreenMobile>
+        <DialogContent className="max-w-none w-full h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-w-2xl sm:max-h-[90vh] flex flex-col overflow-hidden p-0 !rounded-none sm:!rounded-xl border-0 sm:border !m-0 sm:!m-auto">
+          <DialogHeader className="px-4 sm:px-6 py-4 sm:py-5 border-b border-border bg-slate-50 dark:bg-slate-900 flex-shrink-0">
             <DialogTitle className="text-lg font-bold">{editingId ? 'Edit Log Session' : 'New Log Session'}</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-6 bg-white dark:bg-slate-950">
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Date</label>
-              <Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} className="h-10 max-w-xs" />
+              <Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} className="h-11 w-full sm:max-w-xs text-base sm:text-sm" />
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Add Site Activity</label>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <select value={selectedSiteId} onChange={e => setSelectedSiteId(e.target.value)}
-                  className="flex-1 h-10 rounded-md border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-slate-900 dark:border-slate-700">
+                  className="flex-1 h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-slate-900 dark:border-slate-700">
                   <option value="">Select site...</option>
                   {activeSites.map(s => <option key={s.id} value={s.id}>{s.name} ({s.client})</option>)}
                 </select>
                 <Button onClick={() => {
                   const s = sites.find(x => x.id === selectedSiteId);
                   if (s) { setFormEntries(p => [...p, { siteId: s.id, siteName: s.name, clientName: s.client, narration: '', loggedBy: currentUser?.name || 'System', createdAt: new Date().toISOString() }]); setSelectedSiteId(''); }
-                }} disabled={!selectedSiteId} className="h-10 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold shrink-0">
-                  <Plus className="h-4 w-4" /> Add
+                }} disabled={!selectedSiteId} className="h-11 w-full sm:w-auto px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold shrink-0 shadow-sm">
+                  <Plus className="h-4 w-4 sm:mr-1" /> Add
                 </Button>
               </div>
             </div>
             {formEntries.length === 0 ? (
-              <div className="border-2 border-dashed border-slate-200 rounded-lg py-10 text-center">
-                <MapPin className="h-8 w-8 text-slate-200 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">No sites added yet</p>
+              <div className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl py-12 text-center bg-slate-50/50 dark:bg-slate-900/50">
+                <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3">
+                  <MapPin className="h-6 w-6 text-slate-400" />
+                </div>
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400">No site activity added yet</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Select a site above to begin logging</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block">Logged Activities ({formEntries.length})</label>
                 {formEntries.map((entry, idx) => (
-                  <div key={idx} className="bg-card border border-border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold">{entry.siteName}({entry.clientName})</span>
+                  <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500" />
+                    <div className="flex items-start sm:items-center justify-between mb-3 pl-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 pr-6">
+                        <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{entry.siteName}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 font-medium w-fit">
+                          {entry.clientName}
+                        </span>
                       </div>
-                      <button onClick={() => setFormEntries(p => p.filter((_, i) => i !== idx))} className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors">
+                      <button onClick={() => setFormEntries(p => p.filter((_, i) => i !== idx))} className="absolute top-3 right-3 h-8 w-8 rounded-full flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
                         <X className="h-4 w-4" />
                       </button>
                     </div>
-                    <textarea value={entry.narration || ''} onChange={e => { const n = [...formEntries]; n[idx].narration = e.target.value; setFormEntries(n); }}
-                      rows={3} placeholder={`Field notes for ${entry.siteName}...`}
-                      className="w-full text-sm border border-slate-200 rounded-md p-3 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500 bg-background" />
+                    <div className="pl-2">
+                      <textarea value={entry.narration || ''} onChange={e => { const n = [...formEntries]; n[idx].narration = e.target.value; setFormEntries(n); }}
+                        rows={4} placeholder="Type your field notes here..."
+                        className="w-full text-base sm:text-sm border border-slate-200 dark:border-slate-700 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 dark:bg-slate-950 transition-all placeholder:text-slate-400" />
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-          <DialogFooter className="px-6 py-4 border-t border-border bg-muted/30">
-            <Button variant="outline" onClick={() => setIsModalOpen(false)} className="h-9">Cancel</Button>
-            <Button onClick={handleSave} className="h-9 px-6 bg-blue-600 hover:bg-blue-700 text-white">Publish Log</Button>
+          <DialogFooter className="px-4 sm:px-6 py-4 border-t border-border bg-slate-50 dark:bg-slate-900 shrink-0 flex-col sm:flex-row gap-3 sm:justify-end pb-safe">
+            <Button variant="outline" onClick={() => setIsModalOpen(false)} className="h-11 sm:h-10 w-full sm:w-auto font-semibold">Cancel</Button>
+            <Button onClick={handleSave} className="h-11 sm:h-10 w-full sm:w-auto px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md">Publish Log</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
