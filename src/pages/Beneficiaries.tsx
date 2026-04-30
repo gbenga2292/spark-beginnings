@@ -1447,7 +1447,7 @@ export function Beneficiaries() {
       : 'Manage directors, contractors, and welfare staff',
     (!isAdding && !isEditing)
       ? <div className="hidden sm:flex items-center gap-2">
-          {selectedIds.length > 0 && priv.canBulkEdit && (
+          {selectedIds.length > 0 && priv.canEdit && (
             <Button
               variant="outline"
               size="sm"

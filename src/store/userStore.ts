@@ -18,7 +18,7 @@ export interface TasksPriv {
 }
 
 // ─── HR ──────────────────────────────────────────────────────
-export interface EmployeesPriv   { canView: boolean; canAdd: boolean; canEdit: boolean; canBulkEdit: boolean; canDelete: boolean; canViewSalary: boolean; canViewAnalytics: boolean; canViewOrganogram: boolean; canImport: boolean; canExport: boolean; }
+export interface EmployeesPriv   { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canViewSalary: boolean; canViewAnalytics: boolean; canViewOrganogram: boolean; canImport: boolean; canExport: boolean; }
 export interface DisciplinaryPriv{ canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; }
 export interface EvaluationsPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; }
 export interface OnboardingPriv  { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; }
@@ -84,7 +84,7 @@ export interface ActivityLogPriv { canView: boolean; canExport: boolean; }
 
 // ─── Missing Bundled Pages ───────────────────────────────────
 export interface CommLogPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean; }
-export interface BeneficiariesPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canBulkEdit: boolean; canDelete: boolean; canImport: boolean; canExport: boolean; }
+export interface BeneficiariesPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canImport: boolean; canExport: boolean; }
 export interface DailyJournalPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean; }
 
 // ─── Weekly Report ───────────────────────────────────────────
@@ -155,7 +155,7 @@ export interface PrivilegePreset {
 // ─── FULL ACCESS ─────────────────────────────────────────────
 export const FULL_ACCESS: UserPrivileges = {
   dashboard:        { canView: true },
-  employees:        { canView: true, canAdd: true, canEdit: true, canBulkEdit: true, canDelete: true, canViewSalary: true, canViewAnalytics: true, canViewOrganogram: true, canImport: true, canExport: true },
+  employees:        { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewSalary: true, canViewAnalytics: true, canViewOrganogram: true, canImport: true, canExport: true },
   disciplinary:     { canView: true, canAdd: true, canEdit: true, canDelete: true },
   evaluations:      { canView: true, canAdd: true, canEdit: true, canDelete: true },
   onboarding:       { canView: true, canAdd: true, canEdit: true, canDelete: true },
@@ -190,7 +190,7 @@ export const FULL_ACCESS: UserPrivileges = {
   opsSites:         { canView: true },
   activityLog:      { canView: true, canExport: true },
   commLog:          { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
-  beneficiaries:    { canView: true, canAdd: true, canEdit: true, canBulkEdit: true, canDelete: true, canImport: true, canExport: true },
+  beneficiaries:    { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
   dailyJournal:     { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
   weeklyReport:     { canView: true, canViewHr: true, canViewOps: true, canViewComm: true, canViewFinance: true },
 };
@@ -198,7 +198,7 @@ export const FULL_ACCESS: UserPrivileges = {
 // ─── NO ACCESS ───────────────────────────────────────────────
 export const NO_ACCESS: UserPrivileges = {
   dashboard:        { canView: false },
-  employees:        { canView: false, canAdd: false, canEdit: false, canBulkEdit: false, canDelete: false, canViewSalary: false, canViewAnalytics: false, canViewOrganogram: false, canImport: false, canExport: false },
+  employees:        { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewSalary: false, canViewAnalytics: false, canViewOrganogram: false, canImport: false, canExport: false },
   disciplinary:     { canView: false, canAdd: false, canEdit: false, canDelete: false },
   evaluations:      { canView: false, canAdd: false, canEdit: false, canDelete: false },
   onboarding:       { canView: false, canAdd: false, canEdit: false, canDelete: false },
@@ -233,7 +233,7 @@ export const NO_ACCESS: UserPrivileges = {
   opsSites:         { canView: false },
   activityLog:      { canView: false, canExport: false },
   commLog:          { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
-  beneficiaries:    { canView: false, canAdd: false, canEdit: false, canBulkEdit: false, canDelete: false, canImport: false, canExport: false },
+  beneficiaries:    { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
   dailyJournal:     { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
   weeklyReport:     { canView: false, canViewHr: false, canViewOps: false, canViewComm: false, canViewFinance: false },
 };
@@ -246,7 +246,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
     privileges: {
       ...NO_ACCESS,
       dashboard:   { canView: true },
-      employees:   { canView: true, canAdd: true, canEdit: true, canBulkEdit: true, canDelete: false, canViewSalary: true, canViewAnalytics: true, canViewOrganogram: true, canImport: true, canExport: true },
+      employees:   { canView: true, canAdd: true, canEdit: true, canDelete: false, canViewSalary: true, canViewAnalytics: true, canViewOrganogram: true, canImport: true, canExport: true },
       disciplinary:{ canView: true, canAdd: true, canEdit: true, canDelete: false },
       evaluations: { canView: true, canAdd: true, canEdit: true, canDelete: false },
       onboarding:  { canView: true, canAdd: true, canEdit: true, canDelete: false },
@@ -257,7 +257,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       reports:     { canView: true, canExport: true },
       payroll:     { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true, canViewWithholdingSchedule: true },
       tasks:       { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: false },
-      beneficiaries:{ canView: true, canAdd: true, canEdit: true, canBulkEdit: true, canDelete: false, canImport: true, canExport: true },
+      beneficiaries:{ canView: true, canAdd: true, canEdit: true, canDelete: false, canImport: true, canExport: true },
       weeklyReport: { canView: true, canViewHr: true, canViewOps: true, canViewComm: true, canViewFinance: true },
     },
   },
@@ -281,7 +281,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
     privileges: {
       ...NO_ACCESS,
       dashboard:        { canView: true },
-      employees:        { canView: true, canAdd: false, canEdit: false, canBulkEdit: false, canDelete: false, canViewSalary: false, canViewAnalytics: false, canViewOrganogram: false, canImport: false, canExport: false },
+      employees:        { canView: true, canAdd: false, canEdit: false, canDelete: false, canViewSalary: false, canViewAnalytics: false, canViewOrganogram: false, canImport: false, canExport: false },
       onboarding:       { canView: true, canAdd: false, canEdit: false, canDelete: false },
       attendance:       { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
       leaves:           { canView: true, canAdd: false, canEdit: false, canDelete: false, canViewSummary: true },
@@ -303,7 +303,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       opsSites:         { canView: true },
       activityLog:      { canView: true, canExport: false },
       commLog:          { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
-      beneficiaries:    { canView: true, canAdd: false, canEdit: false, canBulkEdit: false, canDelete: false, canImport: false, canExport: false },
+      beneficiaries:    { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
     },
   },
 ];

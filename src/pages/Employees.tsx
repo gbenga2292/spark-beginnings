@@ -909,6 +909,7 @@ export function Employees() {
                   >
                     <option value="OFFICE">OFFICE</option>
                     <option value="FIELD">FIELD</option>
+                    <option value="NON-EMPLOYEE">NON EMPLOYEE</option>
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -1768,6 +1769,7 @@ export function Employees() {
                   <option value="">No Change</option>
                   <option value="OFFICE">OFFICE</option>
                   <option value="FIELD">FIELD</option>
+                  <option value="NON-EMPLOYEE">NON EMPLOYEE</option>
                 </select>
               </div>
 
@@ -2011,7 +2013,7 @@ export function Employees() {
       </div>
     ) : viewingEmployee ? null : (
       <div className="hidden sm:flex items-center gap-2">
-        {selectedIds.length > 0 && (
+        {selectedIds.length > 0 && priv.canEdit && (
           <Button 
             variant="outline" 
             size="sm"
@@ -2110,7 +2112,7 @@ export function Employees() {
             </label>
           )}
         </div>
-        {selectedIds.length > 0 && priv.canBulkEdit && (
+        {selectedIds.length > 0 && priv.canEdit && (
           <Button 
             className="w-full gap-2 bg-amber-500 hover:bg-amber-600 text-white"
             onClick={() => { setBulkFormData({}); setIsBulkEditing(true); }}
