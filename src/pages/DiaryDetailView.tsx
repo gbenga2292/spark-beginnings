@@ -47,143 +47,144 @@ export function DiaryDetailView({
         isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
       )}>
         {/* Header */}
-        <div className={cn('px-6 pt-6 pb-4 border-b', isDark ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50')}>
-          <div className="flex items-start justify-between gap-4">
+        <div className={cn('px-4 sm:px-6 py-5 border-b', isDark ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50')}>
+          <div className="flex flex-col gap-3">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 mb-1">
-                Site Diary
-              </p>
-              <h1 className={cn('text-2xl font-bold', isDark ? 'text-white' : 'text-slate-800')}>
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
+                  Site Diary
+                </p>
+                {isToday && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300">Today</span>}
+              </div>
+              <h1 className={cn('text-xl sm:text-2xl font-black tracking-tight leading-tight', isDark ? 'text-white' : 'text-slate-800')}>
                 {format(diaryDate, 'EEEE, MMMM d, yyyy')}
               </h1>
             </div>
-            <div className="flex flex-col items-center gap-2">
-              <div className={cn(
-                'w-12 h-12 rounded-lg flex items-center justify-center text-xl font-bold border-2',
-                isDark ? 'bg-teal-900/40 border-teal-700 text-teal-300' : 'bg-teal-50 border-teal-200 text-teal-700'
-              )}>
-                {format(diaryDate, 'd')}
-              </div>
-              {isToday && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-600 text-white uppercase tracking-wider">Today</span>}
+            
+            <div className="flex flex-col gap-1.5 mt-1">
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                {journals.length} session{journals.length !== 1 ? 's' : ''} • {allEntries.length} log point{allEntries.length !== 1 ? 's' : ''}
+              </p>
+              {uniqueSites.length > 0 && (
+                <div className="flex items-start gap-1.5 mt-1 bg-teal-50/50 dark:bg-teal-900/10 p-2.5 rounded-lg border border-teal-100 dark:border-teal-800/30">
+                  <MapPin className="h-4 w-4 text-teal-500 shrink-0 mt-0.5" />
+                  <p className="text-sm font-medium text-teal-800 dark:text-teal-300 leading-snug">
+                    {uniqueSites.map(s => `${s.site} (${s.client})`).join(' • ')}
+                  </p>
+                </div>
+              )}
             </div>
-          </div>
-
-          {/* Stats */}
-          <div className="flex flex-wrap gap-2 mt-4">
-            {[
-              `${journals.length} session${journals.length !== 1 ? 's' : ''}`,
-              `${allEntries.length} log point${allEntries.length !== 1 ? 's' : ''}`,
-            ].map(t => (
-              <span key={t} className={cn('text-xs font-medium px-3 py-1 rounded-md border', isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600')}>
-                {t}
-              </span>
-            ))}
-            {uniqueSites.map(item => (
-              <span key={`${item.site}-${item.client}`} className="flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-md bg-teal-50 text-teal-700 border border-teal-100 dark:bg-teal-900/20 dark:text-teal-400 dark:border-teal-800/30">
-                <MapPin className="h-3.5 w-3.5" />{item.site}({item.client})
-              </span>
-            ))}
           </div>
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-8">
+        <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
           {journals.length === 0 ? (
             <div className="text-center py-12">
               <BookOpen className="h-10 w-10 mx-auto mb-3 text-slate-300" />
               <p className={cn('font-medium text-sm', isDark ? 'text-slate-400' : 'text-slate-500')}>No entries for this day yet.</p>
               {currentUser?.privileges?.dailyJournal?.canAdd && (
-                <button onClick={() => onAddSession(date)} className="mt-4 px-4 py-2 rounded-md bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors">
+                <button onClick={() => onAddSession(date)} className="mt-4 px-4 py-2 rounded-md bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors shadow-sm">
                   + Add First Entry
                 </button>
               )}
             </div>
           ) : (
-            journals.map((journal, ji) => {
-              const jEntries = allEntries.filter(e => e.journalId === journal.id);
-              const isAuthor = journal.loggedBy === currentUser?.name;
-              const canEdit = isAuthor;
-              return (
-                <div key={journal.id}>
-                  {/* Session header */}
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center text-xs font-bold text-teal-700 dark:text-teal-400 flex-shrink-0">
-                      S{ji + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className={cn('text-sm font-semibold', isDark ? 'text-slate-200' : 'text-slate-800')}>
-                        Session {ji + 1}
-                      </span>
-                      <span className={cn('text-xs ml-2', isDark ? 'text-slate-400' : 'text-slate-500')}>
-                        by <span className="font-semibold text-teal-600 dark:text-teal-400">{journal.loggedBy}</span>
-                        {journal.createdAt && ` · ${format(new Date(journal.createdAt), 'HH:mm')}`}
-                      </span>
-                    </div>
-                    {canEdit && (
-                      <div className="flex gap-1">
-                        <button onClick={() => onEditJournal(journal)} className="h-8 w-8 rounded-md flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors">
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button onClick={() => onDeleteJournal(journal.id)} className="h-8 w-8 rounded-md flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+            <div className="space-y-6">
+              {journals.map((journal, ji) => {
+                const jEntries = allEntries.filter(e => e.journalId === journal.id);
+                const isAuthor = journal.loggedBy === currentUser?.name;
+                const canEdit = isAuthor;
+                return (
+                  <div key={journal.id} className="relative">
+                    {/* Session header */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-9 h-9 rounded-xl bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center text-sm font-bold text-teal-700 dark:text-teal-400 flex-shrink-0 border border-teal-200 dark:border-teal-800/50 shadow-sm">
+                        S{ji + 1}
                       </div>
-                    )}
-                  </div>
-
-                  {/* Site entries */}
-                  <div className="ml-11 space-y-3">
-                    {jEntries.map(entry => {
-                      const isEntryAuthor = (entry.loggedBy || journal.loggedBy) === currentUser?.name;
-                      const canDel = isEntryAuthor;
-                      return (
-                        <div key={entry.id} className={cn(
-                          'rounded-md p-4 border-l-[3px] border-l-teal-500 group',
-                          isDark ? 'bg-slate-800/50 border border-slate-800' : 'bg-slate-50 border border-slate-100 shadow-sm'
-                        )}>
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap mb-2">
-                                <span className={cn('font-semibold text-sm', isDark ? 'text-white' : 'text-slate-800')}>
-                                  {entry.siteName}({entry.clientName})
-                                </span>
-                              </div>
-                              {entry.narration ? (
-                                <p className={cn('text-sm', isDark ? 'text-slate-300' : 'text-slate-600')}>
-                                  {entry.narration}
-                                </p>
-                              ) : (
-                                <p className="text-xs text-slate-400 italic">No narration recorded.</p>
-                              )}
-                              <p className="text-[10px] text-slate-400 mt-2">Logged by {entry.loggedBy || journal.loggedBy}</p>
-                            </div>
-                            {canDel && (
-                              <button onClick={() => onDeleteEntry(entry.id)}
-                                className="opacity-0 group-hover:opacity-100 h-8 w-8 rounded-md flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all flex-shrink-0">
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            )}
-                          </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
+                          <span className={cn('text-sm font-bold', isDark ? 'text-slate-200' : 'text-slate-800')}>
+                            Session {ji + 1}
+                          </span>
+                          <span className={cn('text-xs font-medium', isDark ? 'text-slate-400' : 'text-slate-500')}>
+                            by <span className="font-bold text-teal-600 dark:text-teal-400">{journal.loggedBy}</span>
+                            {journal.createdAt && ` • ${format(new Date(journal.createdAt), 'HH:mm')}`}
+                          </span>
                         </div>
-                      );
-                    })}
+                      </div>
+                      {canEdit && (
+                        <div className="flex gap-1.5 flex-shrink-0">
+                          <button onClick={() => onEditJournal(journal)} className="h-8 w-8 rounded-lg flex items-center justify-center bg-slate-100 text-slate-500 hover:text-teal-600 hover:bg-teal-50 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-teal-900/30 transition-colors shadow-sm">
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button onClick={() => onDeleteJournal(journal.id)} className="h-8 w-8 rounded-lg flex items-center justify-center bg-slate-100 text-slate-500 hover:text-red-600 hover:bg-red-50 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-red-900/30 transition-colors shadow-sm">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Site entries */}
+                    <div className="ml-3 sm:ml-12 pl-6 sm:pl-0 border-l-2 border-slate-100 dark:border-slate-800 sm:border-0 space-y-3">
+                      {jEntries.map(entry => {
+                        const isEntryAuthor = (entry.loggedBy || journal.loggedBy) === currentUser?.name;
+                        const canDel = isEntryAuthor;
+                        return (
+                          <div key={entry.id} className={cn(
+                            'rounded-xl p-4 group relative overflow-hidden',
+                            isDark ? 'bg-slate-800/40' : 'bg-slate-50 shadow-sm border border-slate-100'
+                          )}>
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-teal-500 rounded-l-xl" />
+                            <div className="flex items-start justify-between gap-3 pl-1">
+                              <div className="flex-1 min-w-0">
+                                <div className="mb-2">
+                                  <span className={cn('font-bold text-sm block leading-tight', isDark ? 'text-slate-200' : 'text-slate-800')}>
+                                    {entry.siteName}
+                                  </span>
+                                  <span className="text-xs font-medium text-slate-500">
+                                    {entry.clientName}
+                                  </span>
+                                </div>
+                                {entry.narration ? (
+                                  <p className={cn('text-sm mt-2 leading-relaxed', isDark ? 'text-slate-300' : 'text-slate-600')}>
+                                    {entry.narration}
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-slate-400 italic mt-2">No narration recorded.</p>
+                                )}
+                                {entry.loggedBy && entry.loggedBy !== journal.loggedBy && (
+                                  <p className="text-[10px] text-slate-400 mt-3 font-medium">Logged by {entry.loggedBy}</p>
+                                )}
+                              </div>
+                              {canDel && (
+                                <button onClick={() => onDeleteEntry(entry.id)}
+                                  className="sm:opacity-0 sm:group-hover:opacity-100 h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all flex-shrink-0 bg-white dark:bg-slate-800 shadow-sm">
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </div>
           )}
 
           {/* Add session button */}
           {journals.length > 0 && (
             <button onClick={() => onAddSession(date)}
-              className="flex items-center gap-2 text-xs font-semibold text-teal-600 hover:text-teal-700 transition-colors ml-11">
-              <Plus className="h-3.5 w-3.5" /> Add another session for this day
+              className="w-full sm:w-auto sm:ml-12 mt-6 flex items-center justify-center gap-2 h-11 px-6 rounded-xl border-2 border-dashed border-teal-200 dark:border-teal-800/50 text-sm font-bold text-teal-600 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-teal-900/20 transition-all bg-white dark:bg-slate-900/50 shadow-sm">
+              <Plus className="h-4 w-4" /> Add Another Session
             </button>
           )}
         </div>
 
         {/* Footer */}
-        <div className={cn('px-6 py-4 border-t text-xs font-medium', isDark ? 'border-slate-800 text-slate-500 bg-slate-900/50' : 'border-slate-100 text-slate-400 bg-slate-50/50')}>
+        <div className={cn('px-6 py-4 border-t text-xs font-medium hidden sm:block', isDark ? 'border-slate-800 text-slate-500 bg-slate-900/50' : 'border-slate-100 text-slate-400 bg-slate-50/50')}>
           Dewatering Construction Etc Limited · Site Diary
         </div>
       </div>

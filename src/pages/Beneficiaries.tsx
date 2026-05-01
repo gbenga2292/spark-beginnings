@@ -1530,7 +1530,94 @@ export function Beneficiaries() {
             </select>
           </div>
         </div>
-        <div className="overflow-x-auto">
+
+        {/* Mobile-only action strip */}
+        {priv.canAdd && (
+          <div className="md:hidden flex justify-end px-4 py-2 border-b border-slate-100 bg-slate-50/50">
+            <Button
+              size="sm"
+              className="h-8 px-3 gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm"
+              onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'NON-EMPLOYEE', status: 'Active', payeTax: false, withholdingTax: false, payeeType: '', typeOfPay: 'Monthly', monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Record
+            </Button>
+          </div>
+        )}
+        {/* ── Mobile Card List (< md) ─────────────────────────────────── */}
+        <div className="md:hidden divide-y divide-slate-100">
+          {filteredBeneficiaries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+              <Users className="h-10 w-10 text-slate-300 mb-3" />
+              <p className="text-sm font-medium text-slate-500">No records found</p>
+              <p className="text-xs text-slate-400 mt-1">Try adjusting your search or filters.</p>
+            </div>
+          ) : (
+            filteredBeneficiaries.map((employee) => (
+              <div key={employee.id} className="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                <Avatar className="h-10 w-10 border border-slate-200 shrink-0">
+                  <AvatarFallback className="bg-indigo-50 text-indigo-700 font-bold text-xs">
+                    {employee.firstname.charAt(0)}{employee.surname.charAt(0)}
+                  </AvatarFallback>
+                  {employee.avatar && <AvatarImage src={employee.avatar} alt="Avatar" className="object-cover" />}
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900 text-sm truncate">{employee.surname} {employee.firstname}</span>
+                    <Badge variant={employee.status === 'Active' ? 'success' : 'outline'} className="text-[10px] px-1.5 py-0 shrink-0">
+                      {employee.status}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-[11px] text-slate-500 font-mono">{employee.employeeCode || `NE-${employee.id.substring(0, 4).toUpperCase()}`}</span>
+                    {employee.payeeType && (
+                      <span className="text-[11px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-medium">{employee.payeeType}</span>
+                    )}
+                    {employee.department && (
+                      <span className="text-[11px] text-slate-400">{employee.department}</span>
+                    )}
+                  </div>
+                  {employee.bankName && (
+                    <p className="text-[11px] text-slate-400 font-mono mt-0.5 truncate">{employee.bankName} · {employee.accountNo}</p>
+                  )}
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 shrink-0">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuItem className="cursor-pointer gap-2" onClick={() => handleView(employee)}>
+                      <Eye className="h-4 w-4 text-slate-400" /> View Details
+                    </DropdownMenuItem>
+                    {priv.canEdit && (
+                      <DropdownMenuItem className="cursor-pointer gap-2" onClick={() => handleEdit(employee)}>
+                        <Pencil className="h-4 w-4 text-slate-400" /> Edit Record
+                      </DropdownMenuItem>
+                    )}
+                    {priv.canDelete && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-red-600 cursor-pointer focus:text-red-700 focus:bg-red-50 gap-2 font-medium"
+                          onClick={async () => {
+                            const ok = await showConfirm(`Are you sure you want to delete ${employee.surname} ${employee.firstname}?`, { variant: 'danger', confirmLabel: 'Delete' });
+                            if (ok) { deleteEmployee(employee.id); toast.success('Record deleted'); }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" /> Delete
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* ── Desktop Table (≥ md) ────────────────────────────────────── */}
+        <div className="hidden md:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>

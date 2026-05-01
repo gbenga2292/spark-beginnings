@@ -478,7 +478,76 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                 background-color: #4f46e5;
                             }
                         `}</style>
-                        <Table className="whitespace-nowrap min-w-full text-sm">
+                        
+                        {/* MOBILE CARDS */}
+                        <div className="md:hidden flex flex-col p-4 bg-slate-50 border-b border-slate-100">
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">Total Sums</h4>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase">Amount</p>
+                                    <p className="text-sm font-mono font-black text-indigo-700">₦{formatSum(tableSums.amount)}</p>
+                                </div>
+                                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase">VAT</p>
+                                    <p className="text-sm font-mono font-black text-indigo-600">₦{formatSum(tableSums.vat)}</p>
+                                </div>
+                                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase">Amt For VAT</p>
+                                    <p className="text-sm font-mono font-black text-emerald-600">₦{formatSum(tableSums.amtForVat)}</p>
+                                </div>
+                                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase">WHT</p>
+                                    <p className="text-sm font-mono font-black text-slate-600">₦{formatSum(tableSums.wht)}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="md:hidden divide-y divide-slate-100 px-4">
+                            {sortedPayments.map((p: Payment) => {
+                                const { vat, amountForVat } = getVatDetails(p.amount || 0, p.payVat, vatRate);
+                                return (
+                                <div key={p.id} className="py-4 bg-white hover:bg-slate-50 transition-colors">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="min-w-0">
+                                            <h3 className="font-bold text-slate-900 truncate">{p.client}</h3>
+                                            <p className="text-xs text-slate-500">{p.site} | {formatDisplayDate(p.date)}</p>
+                                        </div>
+                                        <div className="text-right ml-4 shrink-0">
+                                            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Amount</p>
+                                            <p className="font-bold text-slate-900 text-sm">₦{priv?.canViewAmounts === false ? '***' : (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 flex-wrap mb-2">
+                                        <Badge variant={p.payVat === 'Yes' ? 'default' : p.payVat === 'Add' ? 'outline' : 'secondary'} className={`text-[10px] ${p.payVat === 'Yes' ? 'bg-indigo-100 text-indigo-800' : ''}`}>
+                                            VAT: {p.payVat || 'No'}
+                                        </Badge>
+                                        <span className="text-[10px] bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 text-indigo-700 font-mono">VAT Amt: ₦{priv?.canViewAmounts === false ? '***' : vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="text-[10px] bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5 text-emerald-700 font-mono">Amt For VAT: ₦{priv?.canViewAmounts === false ? '***' : amountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                    {showActions && (
+                                        <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-slate-50">
+                                            {priv.canEdit && (
+                                              <Button variant="outline" size="sm" onClick={() => handleEdit(p)} className="h-7 text-indigo-600 px-2 text-xs">
+                                                  <Edit className="w-3 h-3 mr-1" /> Edit
+                                              </Button>
+                                            )}
+                                            {priv.canDelete && (
+                                              <Button variant="outline" size="sm" onClick={() => handleDelete(p.id)} className="h-7 text-rose-600 px-2 text-xs">
+                                                  <Trash2 className="w-3 h-3 mr-1" /> Delete
+                                              </Button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )})}
+                            {sortedPayments.length === 0 && (
+                                <div className="py-8 text-center text-slate-500 text-sm">
+                                    No payment records found.
+                                </div>
+                            )}
+                        </div>
+
+                        <Table className="hidden md:table whitespace-nowrap min-w-full text-sm">
                             <TableHeader className="bg-slate-50 sticky top-0 z-20">
                                 <TableRow className="bg-slate-100/80 border-b border-slate-200">
                                     <TableHead colSpan={3} className="px-6 py-2.5">
@@ -487,7 +556,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                             <span className="text-[10px] font-black uppercase tracking-widest text-indigo-900">Total Sums</span>
                                         </div>
                                     </TableHead>
-                                    <TableHead className="px-4 py-2.5" /> {/* TIN col — no sum */}
+                                    <TableHead className="px-4 py-2.5" />
                                     <TableHead className="px-4 py-2.5 text-right">
                                         <div className="text-[12px] font-mono font-black text-indigo-700 bg-white px-2 py-1 rounded border border-indigo-100 shadow-sm inline-block">
                                             ₦{formatSum(tableSums.amount)}

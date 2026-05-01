@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   format, parseISO, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval,
   startOfWeek, endOfWeek, addMonths, subMonths, isToday, isSameMonth,
@@ -12,6 +12,7 @@ import { useAppData } from '@/src/contexts/AppDataContext';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
 import { Button } from '@/src/components/ui/button';
+import { useAppStore } from '@/src/store/appStore';
 
 const WEEKDAYS_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -40,6 +41,11 @@ const STATUS_STYLES: Record<string, { bg: string, label: string, icon: any }> = 
   reminder: {
     bg: 'bg-purple-600',
     label: 'Reminders',
+    icon: Bell,
+  },
+  holiday: {
+    bg: 'bg-pink-600',
+    label: 'Public Holiday',
     icon: Bell,
   },
 };
@@ -87,6 +93,7 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [showCompleted, setShowCompleted] = useState(externalShowCompleted ?? true);
+  const holidays = useAppStore(state => state.publicHolidays);
   
   // Update local state if external prop changes
   useMemo(() => {
@@ -182,8 +189,16 @@ export default function CalendarPage({ onNavigate, showCompleted: externalShowCo
       });
     });
 
+    // Public Holidays
+    holidays.forEach(h => {
+      events.push({
+        id: `hol-${h.date}`, title: h.name, time: parseISO(h.date),
+        type: 'reminder', body: 'Public Holiday', colorClass: STATUS_STYLES.holiday.bg,
+      });
+    });
+
     return events;
-  }, [reminders, subtasks, mainTasks, currentUser, filterMode, showCompleted]);
+  }, [reminders, subtasks, mainTasks, currentUser, filterMode, showCompleted, holidays]);
 
 
   const calDays = useMemo(() => {

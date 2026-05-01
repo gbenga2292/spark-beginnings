@@ -261,22 +261,26 @@ function PersonalSpaceDashboard() {
               const isOverdue = sub.deadline && isPast(new Date(sub.deadline));
               return (
                 <div key={sub.id ?? i} onClick={() => setOpenSubtaskId(sub.id ?? null)}
-                  className="flex items-center gap-3 px-5 py-3.5 hover:bg-violet-50/50 dark:hover:bg-violet-950/20 cursor-pointer transition-colors group">
-                  <span className="text-[11px] font-bold text-muted-foreground/40 w-4 text-center tabular-nums">{i + 1}</span>
-                  <div className={`w-1 h-10 rounded-full flex-shrink-0 ${isOverdue ? 'bg-red-500' : sub.status === 'in_progress' ? 'bg-violet-500' : 'bg-muted-foreground/20'}`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground truncate group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors font-medium">{sub.title}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{mt?.title}</p>
+                  className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 sm:px-5 py-3.5 hover:bg-violet-50/50 dark:hover:bg-violet-950/20 cursor-pointer transition-colors group">
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <span className="text-[11px] font-bold text-muted-foreground/40 w-4 text-center tabular-nums hidden sm:block">{i + 1}</span>
+                    <div className={`w-1 h-10 rounded-full flex-shrink-0 hidden sm:block ${isOverdue ? 'bg-red-500' : sub.status === 'in_progress' ? 'bg-violet-500' : 'bg-muted-foreground/20'}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-foreground truncate group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors font-medium">{sub.title}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{mt?.title}</p>
+                    </div>
                   </div>
-                  {mt?.priority && <PriorityPill priority={mt.priority} />}
-                  <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 flex-shrink-0 ${sc.pillClass}`}>
-                    <StatusIcon className="w-3 h-3" />{sc.label}
-                  </span>
-                  {sub.deadline && (
-                    <span className={`text-[11px] flex-shrink-0 hidden sm:flex items-center gap-1 ${isOverdue ? 'text-red-500 font-semibold' : 'text-muted-foreground'}`}>
-                      <Clock className="w-3 h-3" />{safeFmt(sub.deadline)}
+                  <div className="flex flex-wrap items-center gap-2 pl-0 sm:pl-0 mt-1 sm:mt-0 ml-0 sm:ml-auto">
+                    {mt?.priority && <PriorityPill priority={mt.priority} />}
+                    <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 flex-shrink-0 ${sc.pillClass}`}>
+                      <StatusIcon className="w-3 h-3" />{sc.label}
                     </span>
-                  )}
+                    {sub.deadline && (
+                      <span className={`text-[11px] flex-shrink-0 flex items-center gap-1 ${isOverdue ? 'text-red-500 font-semibold' : 'text-muted-foreground'}`}>
+                        <Clock className="w-3 h-3" />{safeFmt(sub.deadline)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -509,28 +513,33 @@ function AdminDashboard() {
                 const isOverdue = sub.deadline && isPast(new Date(sub.deadline));
                 return (
                   <div key={sub.id ?? i} onClick={() => setOpenSubtaskId(sub.id ?? null)}
-                    className="flex items-center gap-3 px-5 py-3 hover:bg-muted/40 cursor-pointer transition-colors group">
-                    <span className="text-[11px] font-bold text-muted-foreground/40 w-4 text-center tabular-nums">{i + 1}</span>
-                    <div className={`w-1 h-10 rounded-full flex-shrink-0 ${isOverdue ? 'bg-red-500' : sub.status === 'in_progress' ? 'bg-primary' : 'bg-muted-foreground/20'}`} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-sm text-foreground truncate group-hover:text-primary transition-colors font-medium">{sub.title}</p>
-                        {mt?.priority && <PriorityPill priority={mt.priority} />}
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1"><Users className="w-3 h-3" />{assignee?.name ?? "Unassigned"}{sub.assignedTo?.includes(',') && ' +'}</span>
-                        <span>·</span>
-                        <span className="truncate">{mt?.title ?? ""}</span>
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 sm:px-5 py-3 hover:bg-muted/40 cursor-pointer transition-colors group">
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                      <span className="text-[11px] font-bold text-muted-foreground/40 w-4 text-center tabular-nums hidden sm:block">{i + 1}</span>
+                      <div className={`w-1 h-10 rounded-full flex-shrink-0 hidden sm:block ${isOverdue ? 'bg-red-500' : sub.status === 'in_progress' ? 'bg-primary' : 'bg-muted-foreground/20'}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm text-foreground truncate group-hover:text-primary transition-colors font-medium">{sub.title}</p>
+                          <div className="hidden sm:block">{mt?.priority && <PriorityPill priority={mt.priority} />}</div>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1"><Users className="w-3 h-3" />{assignee?.name ?? "Unassigned"}{sub.assignedTo?.includes(',') && ' +'}</span>
+                          <span className="hidden sm:inline">·</span>
+                          <span className="truncate hidden sm:inline">{mt?.title ?? ""}</span>
+                        </div>
                       </div>
                     </div>
-                    <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 flex-shrink-0 ${sc.pillClass}`}>
-                      <StatusIcon className="w-3 h-3" />{sc.label}
-                    </span>
-                    {sub.deadline && (
-                      <span className={`text-[11px] flex-shrink-0 hidden sm:flex items-center gap-1 ${isOverdue ? 'text-red-500 font-semibold' : 'text-muted-foreground'}`}>
-                        <Clock className="w-3 h-3" />{safeFmt(sub.deadline)}
+                    <div className="flex flex-wrap items-center gap-2 mt-1 sm:mt-0 ml-0 sm:ml-auto">
+                      <div className="sm:hidden">{mt?.priority && <PriorityPill priority={mt.priority} />}</div>
+                      <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 flex-shrink-0 ${sc.pillClass}`}>
+                        <StatusIcon className="w-3 h-3" />{sc.label}
                       </span>
-                    )}
+                      {sub.deadline && (
+                        <span className={`text-[11px] flex-shrink-0 flex items-center gap-1 ${isOverdue ? 'text-red-500 font-semibold' : 'text-muted-foreground'}`}>
+                          <Clock className="w-3 h-3" />{safeFmt(sub.deadline)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -790,28 +799,30 @@ function UserDashboard() {
                 const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== 'completed';
                 return (
                   <div key={sub.id ?? i} onClick={() => setOpenSubtaskId(sub.id ?? null)}
-                    className="flex items-center gap-3 px-5 py-3 hover:bg-muted/40 transition-colors group cursor-pointer">
-                    <span className="text-[11px] font-bold text-muted-foreground/40 w-4 text-center tabular-nums">{i + 1}</span>
-                    <div className={`w-1 h-10 rounded-full flex-shrink-0 ${isOverdue ? 'bg-red-500' : sub.status === 'in_progress' ? 'bg-primary' : sub.status === 'pending_approval' ? 'bg-amber-400' : 'bg-muted-foreground/20'}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium truncate group-hover:text-primary transition-colors ${sub.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{sub.title}</p>
-                      <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                        <span className="truncate">{mt?.title ?? ''}</span>
-                        {sub.deadline && <>
-                          <span>·</span>
-                          <span className={`flex items-center gap-0.5 ${isOverdue ? 'text-red-500 font-medium' : ''}`}>
-                            <Clock className="w-3 h-3" />{safeFmt(sub.deadline)}
-                          </span>
-                        </>}
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 sm:px-5 py-3 hover:bg-muted/40 transition-colors group cursor-pointer">
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                      <span className="text-[11px] font-bold text-muted-foreground/40 w-4 text-center tabular-nums hidden sm:block">{i + 1}</span>
+                      <div className={`w-1 h-10 rounded-full flex-shrink-0 hidden sm:block ${isOverdue ? 'bg-red-500' : sub.status === 'in_progress' ? 'bg-primary' : sub.status === 'pending_approval' ? 'bg-amber-400' : 'bg-muted-foreground/20'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium truncate group-hover:text-primary transition-colors ${sub.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{sub.title}</p>
+                        <div className="flex items-center gap-2 mt-0.5 text-[11px] sm:text-xs text-muted-foreground">
+                          <span className="truncate">{mt?.title ?? ''}</span>
+                          {sub.deadline && <>
+                            <span className="hidden sm:inline">·</span>
+                            <span className={`flex items-center gap-0.5 ${isOverdue ? 'text-red-500 font-medium' : ''}`}>
+                              <Clock className="w-3 h-3" />{safeFmt(sub.deadline)}
+                            </span>
+                          </>}
+                        </div>
                       </div>
                     </div>
-                    <>
+                    <div className="flex flex-wrap items-center gap-2 mt-1 sm:mt-0 ml-0 sm:ml-auto">
                       {mt?.priority && <PriorityPill priority={mt.priority} />}
                       <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 flex-shrink-0 ${sc.pillClass}`}>
                         <StatusIcon className="w-3 h-3" />{sc.label}
                       </span>
-                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-primary transition-colors" />
-                    </>
+                      <ChevronRight className="hidden sm:block w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-primary transition-colors" />
+                    </div>
                   </div>
                 );
               })}

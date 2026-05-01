@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Input } from '@/src/components/ui/input';
-import { Download, Upload, CreditCard, ChevronDown, X, Printer } from 'lucide-react';
+import { Download, Upload, CreditCard, ChevronDown, X, Printer, MoreVertical } from 'lucide-react';
 import { useAppStore, Employee } from '@/src/store/appStore';
 import { computeWorkDays, computeWorkDaysInRange, MONTH_INDEX } from '@/src/lib/workdays';
 import logoSrc from '../../logo/logo-2.png';
@@ -80,6 +80,7 @@ export function Payroll() {
   const [activeTab, setActiveTab] = useState('processing');
   const [isProcessing, setIsProcessing] = useState(false);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [printSidebarOpen, setPrintSidebarOpen] = useState(false);
   const [printType, setPrintType] = useState<'PAYSLIPS' | 'PAYE' | 'PENSION' | 'NSITF' | 'WITHHOLDING'>('PAYSLIPS');
   const [printSelectedYear, setPrintSelectedYear] = useState(currentYear);
   const [printSelectedMonths, setPrintSelectedMonths] = useState<string[]>([]);
@@ -132,6 +133,7 @@ export function Payroll() {
     { id: 'account_number',   label: 'Account No',        summable: false, types: ['all'] },
     { id: 'paye_id',          label: 'PAYE ID',           summable: false, types: ['PAYE', 'PAYSLIPS'] },
     { id: 'pension_pin',      label: 'Pension Number',    summable: false, types: ['PENSION', 'PAYSLIPS'] },
+    { id: 'main_salary',      label: 'Main Salary',       summable: true,  types: ['PAYSLIPS'] },
     { id: 'basic',            label: 'Basic Salary',      summable: true,  types: ['PAYE', 'PAYSLIPS'] },
     { id: 'housing',          label: 'Housing',           summable: true,  types: ['PAYE', 'PAYSLIPS'] },
     { id: 'transport',        label: 'Transport',         summable: true,  types: ['PAYE', 'PAYSLIPS'] },
@@ -153,7 +155,7 @@ export function Payroll() {
   ];
 
   const DEFAULT_COLUMNS: Record<string, string[]> = {
-    PAYSLIPS: ['employee_name', 'month', 'bank_name', 'account_number', 'basic', 'housing', 'transport', 'other', 'overtime', 'gross', 'paye', 'loan', 'employee_pension', 'net_pay'],
+    PAYSLIPS: ['employee_name', 'month', 'bank_name', 'account_number', 'main_salary', 'basic', 'housing', 'transport', 'other', 'overtime', 'gross', 'paye', 'loan', 'employee_pension', 'net_pay'],
     PAYE:    ['sn', 'employee_name', 'paye_id', 'month', 'bank_name', 'account_number', 'basic', 'housing', 'transport', 'other', 'gross', 'paye'],
     PENSION: ['sn', 'employee_name', 'pension_pin', 'month', 'bank_name', 'account_number', 'pensionable', 'employee_pension', 'employer_pension', 'total_pension'],
     NSITF:   ['sn', 'employee_name', 'month', 'bank_name', 'account_number', 'gross', 'nsitf_rate', 'nsitf_amount'],
@@ -584,6 +586,7 @@ export function Payroll() {
         <table class="breakdown-table">
           <thead><tr><th>Earnings</th><th class="text-right">Amount (₦)</th></tr></thead>
           <tbody>
+            <tr><td>Main Salary</td><td class="text-right">${currency(slip.record.salary)}</td></tr>
             <tr><td>Basic Salary</td><td class="text-right">${currency(slip.record.basicSalary)}</td></tr>
             ${slip.record.housing > 0 ? `<tr><td>Housing Allowance</td><td class="text-right">${currency(slip.record.housing)}</td></tr>` : ''}
             ${slip.record.transport > 0 ? `<tr><td>Transport Allowance</td><td class="text-right">${currency(slip.record.transport)}</td></tr>` : ''}
@@ -742,61 +745,126 @@ export function Payroll() {
     useSetPageTitle(
       activeTabTitle,
       'Manage salaries, taxes, generate payslips, and handle staff advances and loans',
-      <div className="hidden sm:flex items-center gap-2">
-        <select
-          className="h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20"
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-        >
-          {months.map(month => (
-            <option key={month.key} value={month.key}>{month.label}</option>
-          ))}
-        </select>
+      <>
+        {/* Desktop Controls */}
+        <div className="hidden md:flex items-center gap-2">
+          <select
+            className="h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+          >
+            {months.map(month => (
+              <option key={month.key} value={month.key}>{month.label}</option>
+            ))}
+          </select>
 
-        <select
-          className="h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20 mr-2"
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(Number(e.target.value))}
-        >
-          {Array.from({ length: currentYear - YEAR_RANGE_START + 2 }, (_, i) => YEAR_RANGE_START + i).map(yr => (
-            <option key={yr} value={yr}>{yr}</option>
-          ))}
-        </select>
-        
-        {priv.canGenerate && (
-          <Button variant="outline" size="sm" className="h-9 w-9 border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm" onClick={() => handleOpenPrintDialog(activeTab === 'processing' ? 'PAYSLIPS' : activeTab.toUpperCase() as any)} title={`Print ${activeTab === 'processing' ? 'Payslips' : 'Schedule'}`}>
-            <Printer className="h-5 w-5" />
-          </Button>
-        )}
-        {finRepPriv?.canExport && activeTab === 'processing' && (
+          <select
+            className="h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20 mr-2"
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+          >
+            {Array.from({ length: currentYear - YEAR_RANGE_START + 2 }, (_, i) => YEAR_RANGE_START + i).map(yr => (
+              <option key={yr} value={yr}>{yr}</option>
+            ))}
+          </select>
+          
+          {priv.canGenerate && (
+            <Button variant="outline" size="sm" className="h-9 w-9 border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm" onClick={() => handleOpenPrintDialog(activeTab === 'processing' ? 'PAYSLIPS' : activeTab.toUpperCase() as any)} title={`Print ${activeTab === 'processing' ? 'Payslips' : 'Schedule'}`}>
+              <Printer className="h-5 w-5" />
+            </Button>
+          )}
+          {finRepPriv?.canExport && activeTab === 'processing' && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 w-9 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700" title="Export CSV">
+                  <Upload className="h-5 w-5 text-emerald-500" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleExportScheduleCSV('PAYSLIPS')} className="cursor-pointer font-medium text-sm">
+                  Entire Payroll Table
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExportScheduleCSV('PAYE')} className="cursor-pointer text-sm">
+                  PAYE Schedule
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExportScheduleCSV('PENSION')} className="cursor-pointer text-sm">
+                  Pension Schedule
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExportScheduleCSV('NSITF')} className="cursor-pointer text-sm">
+                  NSITF Schedule
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExportScheduleCSV('WITHHOLDING')} className="cursor-pointer text-sm">
+                  Withholding Schedule
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+
+        {/* Mobile Controls */}
+        <div className="md:hidden">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 w-9 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700" title="Export CSV">
-                <Upload className="h-5 w-5 text-emerald-500" />
+              <Button variant="outline" size="sm" className="h-9 w-9 p-0 bg-white shadow-sm border-slate-200">
+                <MoreVertical className="h-5 w-5 text-slate-600" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleExportScheduleCSV('PAYSLIPS')} className="cursor-pointer font-medium text-sm">
-                Entire Payroll Table
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportScheduleCSV('PAYE')} className="cursor-pointer text-sm">
-                PAYE Schedule
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportScheduleCSV('PENSION')} className="cursor-pointer text-sm">
-                Pension Schedule
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportScheduleCSV('NSITF')} className="cursor-pointer text-sm">
-                NSITF Schedule
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportScheduleCSV('WITHHOLDING')} className="cursor-pointer text-sm">
-                Withholding Schedule
-              </DropdownMenuItem>
+            <DropdownMenuContent align="end" className="w-56 p-2">
+              <div className="flex flex-col gap-2 pb-2 mb-2 border-b border-slate-100">
+                <label className="text-xs font-semibold text-slate-500 px-2">Filter Period</label>
+                <select
+                  className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 py-1 text-sm outline-none w-full"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                >
+                  {months.map(month => (
+                    <option key={month.key} value={month.key}>{month.label}</option>
+                  ))}
+                </select>
+                <select
+                  className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 py-1 text-sm outline-none w-full"
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                >
+                  {Array.from({ length: currentYear - YEAR_RANGE_START + 2 }, (_, i) => YEAR_RANGE_START + i).map(yr => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
+                </select>
+              </div>
+              
+              {priv.canGenerate && (
+                <DropdownMenuItem onClick={() => handleOpenPrintDialog(activeTab === 'processing' ? 'PAYSLIPS' : activeTab.toUpperCase() as any)} className="cursor-pointer">
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print {activeTab === 'processing' ? 'Payslips' : 'Schedule'}
+                </DropdownMenuItem>
+              )}
+              {finRepPriv?.canExport && activeTab === 'processing' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="px-2 pt-2 pb-1 text-xs text-slate-500">Export CSV</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => handleExportScheduleCSV('PAYSLIPS')} className="cursor-pointer">
+                    Entire Payroll Table
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportScheduleCSV('PAYE')} className="cursor-pointer">
+                    PAYE Schedule
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportScheduleCSV('PENSION')} className="cursor-pointer">
+                    Pension Schedule
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportScheduleCSV('NSITF')} className="cursor-pointer">
+                    NSITF Schedule
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportScheduleCSV('WITHHOLDING')} className="cursor-pointer">
+                    Withholding Schedule
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
-        )}
-      </div>,
+        </div>
+      </>,
       [selectedMonth, selectedYear, activeTab]
     );
 
@@ -903,14 +971,55 @@ export function Payroll() {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent
-                ref={tableContainerRef}
-                onMouseDown={handleMouseDown}
-                onMouseLeave={handleMouseLeave}
-                onMouseUp={handleMouseUp}
-                onMouseMove={handleMouseMove}
-                className={`overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-              >
+              <CardContent className="p-0 border-t border-slate-100">
+
+                {/* ── Mobile Card List (< md) ───────────────────────────────── */}
+                <div className="md:hidden divide-y divide-slate-100">
+                  {payrollData.filter(r => !filterDept || r.department === filterDept).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <CreditCard className="h-8 w-8 text-slate-300 mb-2" />
+                      <p className="text-sm font-medium text-slate-500">No payroll records for this period.</p>
+                    </div>
+                  ) : (
+                    payrollData.filter(r => !filterDept || r.department === filterDept).map((record) => (
+                      <div key={record.id} className="px-4 py-3 space-y-2">
+                        {/* Name & position row */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 text-sm truncate">{record.surname} {record.firstname}</p>
+                            <p className="text-[11px] text-slate-400 truncate">{record.position} · {record.department}</p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-[10px] text-slate-400 uppercase tracking-wider">Net Pay</p>
+                            <p className="text-sm font-bold text-emerald-600 font-mono">
+                              {priv?.canViewAmounts === false ? '***' : `₦${record.takeHomePay.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+                            </p>
+                          </div>
+                        </div>
+                        {/* Summary chips */}
+                        {priv?.canViewAmounts !== false && (
+                          <div className="flex flex-wrap gap-1.5 text-[10px]">
+                            <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-medium">Gross ₦{record.grossPay.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                            {record.paye > 0 && <span className="bg-red-50 text-red-600 px-2 py-0.5 rounded font-medium">PAYE ₦{record.paye.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>}
+                            {record.pension > 0 && <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-medium">Pension ₦{record.pension.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>}
+                            {record.loanRepayment > 0 && <span className="bg-rose-50 text-rose-600 px-2 py-0.5 rounded font-medium">Loan ₦{record.loanRepayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>}
+                            {record.overtime > 0 && <span className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded font-medium">OT ₦{record.overtime.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* ── Desktop Table (≥ md) ───────────────────────────────────── */}
+                <div
+                  ref={tableContainerRef}
+                  onMouseDown={handleMouseDown}
+                  onMouseLeave={handleMouseLeave}
+                  onMouseUp={handleMouseUp}
+                  onMouseMove={handleMouseMove}
+                  className={`hidden md:block overflow-x-auto overflow-y-auto max-h-[70vh] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                >
                 {/* Table mimicking Excel specific columns precisely */}
                 <Table className="whitespace-nowrap w-full text-xs">
                   <TableHeader className="sticky top-0 z-40 bg-slate-50 dark:bg-slate-900">
@@ -959,7 +1068,8 @@ export function Payroll() {
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -974,8 +1084,35 @@ export function Payroll() {
                     <span className="text-xs text-slate-500 font-medium">Total PAYE: <span className="text-red-600 font-bold">₦{fmT(totals.totalPAYE)}</span></span>
                   </div>
                 </CardHeader>
-                <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 cursor-grab">
-                  <Table className="whitespace-nowrap w-full text-xs">
+                <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 p-0 sm:p-6 sm:pt-0">
+                  {/* MOBILE CARDS */}
+                  <div className="md:hidden divide-y divide-slate-100">
+                    {payrollData.filter(r => (r.staffType === 'OFFICE' || r.staffType === 'FIELD') && !r.department.trim().toLowerCase().includes('adhoc')).map((r, i) => (
+                      <div key={r.id} className="p-4 bg-white hover:bg-slate-50 transition-colors">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-slate-900 truncate">{r.surname} {r.firstname}</h3>
+                            <p className="text-xs text-slate-500">{r.department}</p>
+                          </div>
+                          <div className="text-right ml-4 shrink-0">
+                            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">PAYE</p>
+                            <p className="font-bold text-red-600 text-base">₦{fm(r.paye)}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                          <span className="text-[10px] bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5 text-slate-600 font-mono">Gross: ₦{fm(r.grossPay)}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {(() => { const pd = payrollData.filter(r => (r.staffType === 'OFFICE' || r.staffType === 'FIELD') && !r.department.trim().toLowerCase().includes('adhoc')); return (
+                      <div className="p-4 bg-red-50 border-t border-red-100 flex justify-between items-center">
+                        <span className="font-bold text-red-900 text-sm">TOTAL PAYE</span>
+                        <span className="font-bold text-red-600 text-lg">₦{fmT(pd.reduce((s, r) => s + r.paye, 0))}</span>
+                      </div>
+                    ); })()}
+                  </div>
+
+                  <Table className="hidden md:table whitespace-nowrap w-full text-xs cursor-grab">
                     <TableHeader>
                       <TableRow className="bg-red-50 dark:bg-slate-900">
                         <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-red-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">S/N</TableHead>
@@ -1032,8 +1169,36 @@ export function Payroll() {
                     <span className="text-xs text-slate-500 font-medium">Total Pension: <span className="text-amber-600 font-bold">₦{fmT(totals.totalPension)}</span></span>
                   </div>
                 </CardHeader>
-                <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 cursor-grab">
-                  <Table className="whitespace-nowrap w-full text-xs">
+                <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 p-0 sm:p-6 sm:pt-0">
+                  {/* MOBILE CARDS */}
+                  <div className="md:hidden divide-y divide-slate-100">
+                    {payrollData.filter(r => (r.staffType === 'OFFICE' || r.staffType === 'FIELD') && !r.department.trim().toLowerCase().includes('adhoc')).map((r, i) => (
+                      <div key={r.id} className="p-4 bg-white hover:bg-slate-50 transition-colors">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-slate-900 truncate">{r.surname} {r.firstname}</h3>
+                            <p className="text-xs text-slate-500">{r.department}</p>
+                          </div>
+                          <div className="text-right ml-4 shrink-0">
+                            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Pension</p>
+                            <p className="font-bold text-emerald-700 text-base">₦{fm(r.pension + r.employerPension)}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                          <span className="text-[10px] bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5 text-amber-700 font-mono">Emp: ₦{fm(r.pension)}</span>
+                          <span className="text-[10px] bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5 text-indigo-700 font-mono">Empr: ₦{fm(r.employerPension)}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {(() => { const pp = payrollData.filter(r => (r.staffType === 'OFFICE' || r.staffType === 'FIELD') && !r.department.trim().toLowerCase().includes('adhoc')); return (
+                      <div className="p-4 bg-emerald-50 border-t border-emerald-100 flex justify-between items-center">
+                        <span className="font-bold text-emerald-900 text-sm">TOTAL PENSION</span>
+                        <span className="font-bold text-emerald-700 text-lg">₦{fmT(pp.reduce((s, r) => s + r.pension + r.employerPension, 0))}</span>
+                      </div>
+                    ); })()}
+                  </div>
+
+                  <Table className="hidden md:table whitespace-nowrap w-full text-xs cursor-grab">
                     <TableHeader>
                       <TableRow className="bg-amber-50 dark:bg-slate-900">
                         <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-amber-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">S/N</TableHead>
@@ -1087,8 +1252,34 @@ export function Payroll() {
                     <span className="text-xs text-slate-500 font-medium">Total NSITF: <span className="text-blue-600 font-bold">₦{fmT(payrollData.reduce((s, r) => s + r.nsitf, 0))}</span></span>
                   </div>
                 </CardHeader>
-                <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 cursor-grab">
-                  <Table className="whitespace-nowrap w-full text-xs">
+                <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 p-0 sm:p-6 sm:pt-0">
+                  {/* MOBILE CARDS */}
+                  <div className="md:hidden divide-y divide-slate-100">
+                    {payrollData.filter(r => isNsitfEligible(r)).map((r, i) => (
+                      <div key={r.id} className="p-4 bg-white hover:bg-slate-50 transition-colors">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-slate-900 truncate">{r.surname} {r.firstname}</h3>
+                            <p className="text-xs text-slate-500">{r.department}</p>
+                          </div>
+                          <div className="text-right ml-4 shrink-0">
+                            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">NSITF</p>
+                            <p className="font-bold text-blue-600 text-base">₦{fm(r.nsitf)}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                          <span className="text-[10px] bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5 text-slate-600 font-mono">Gross: ₦{fm(r.grossPay)}</span>
+                          <span className="text-[10px] bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5 text-slate-600 font-mono">Rate: {payrollVariables.nsitfRate}%</span>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="p-4 bg-blue-50 border-t border-blue-100 flex justify-between items-center">
+                      <span className="font-bold text-blue-900 text-sm">TOTAL NSITF</span>
+                      <span className="font-bold text-blue-600 text-lg">₦{fmT(payrollData.reduce((s, r) => s + r.nsitf, 0))}</span>
+                    </div>
+                  </div>
+
+                  <Table className="hidden md:table whitespace-nowrap w-full text-xs cursor-grab">
                     <TableHeader>
                       <TableRow className="bg-blue-50 dark:bg-slate-900">
                         <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-blue-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">S/N</TableHead>
@@ -1134,8 +1325,34 @@ export function Payroll() {
                   <span className="text-xs text-slate-500 font-medium">Total Withholding: <span className="text-indigo-600 font-bold">₦{fmT(totals.totalWithholding)}</span></span>
                 </div>
               </CardHeader>
-              <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 cursor-grab">
-                <Table className="whitespace-nowrap w-full text-xs">
+              <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 p-0 sm:p-6 sm:pt-0">
+                {/* MOBILE CARDS */}
+                <div className="md:hidden divide-y divide-slate-100">
+                  {payrollData.filter(r => r.staffType === 'NON-EMPLOYEE' && r.withholdingTax).map((r, i) => (
+                    <div key={r.id} className="p-4 bg-white hover:bg-slate-50 transition-colors">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-slate-900 truncate">{r.surname} {r.firstname}</h3>
+                          <p className="text-xs text-slate-500">TIN: {r.taxId || 'N/A'}</p>
+                        </div>
+                        <div className="text-right ml-4 shrink-0">
+                          <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Withholding</p>
+                          <p className="font-bold text-indigo-600 text-base">₦{fm(r.paye)}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 flex-wrap">
+                        <span className="text-[10px] bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5 text-slate-600 font-mono">Gross: ₦{fm(r.grossPay)}</span>
+                        <span className="text-[10px] bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5 text-slate-600 font-mono">Net: ₦{fm(r.takeHomePay)}</span>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="p-4 bg-indigo-50 border-t border-indigo-100 flex justify-between items-center">
+                    <span className="font-bold text-indigo-900 text-sm">TOTAL WHT</span>
+                    <span className="font-bold text-indigo-600 text-lg">₦{fmT(totals.totalWithholding)}</span>
+                  </div>
+                </div>
+
+                <Table className="hidden md:table whitespace-nowrap w-full text-xs cursor-grab">
                   <TableHeader>
                     <TableRow className="bg-indigo-50 dark:bg-slate-900">
                       <TableHead className="font-bold dark:text-slate-100 sticky top-0 z-20 bg-indigo-50 dark:bg-slate-900 ring-1 ring-slate-200 dark:ring-slate-700">S/N</TableHead>
@@ -1182,32 +1399,46 @@ export function Payroll() {
           <div className="fixed inset-0 bg-black/50 flex flex-col z-50 overflow-hidden items-center justify-center">
             <div className="bg-slate-100 shadow-xl flex flex-col w-screen h-screen relative rounded-none">
 
-              <div className="flex bg-indigo-600 p-4 justify-between items-center rounded-none shrink-0 z-10">
-                <h3 className="text-white font-bold text-lg">
+              <div className="flex flex-col md:flex-row bg-indigo-600 p-4 justify-between md:items-center gap-4 md:gap-0 rounded-none shrink-0 z-10">
+                <h3 className="text-white font-bold text-lg leading-tight">
                   {printType === 'PAYSLIPS' && "Print Bulk Payslips"}
                   {printType === 'PAYE' && "Generate PAYE Schedule"}
                   {printType === 'PENSION' && "Generate Pension Schedule"}
                   {printType === 'NSITF' && "Generate NSITF Schedule"}
                   {printType === 'WITHHOLDING' && "Generate Withholding Schedule"}
                 </h3>
-                <div className="flex gap-2">
-                  {printType !== 'PAYSLIPS' && (
-                    <Button variant="secondary" size="sm" className="gap-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800" onClick={() => handleExportScheduleCSV()} disabled={payslipsToPrint.length === 0}>
-                      <Upload className="h-4 w-4" /> Export CSV
+                <div className="flex items-center justify-between w-full md:w-auto gap-2">
+                  <div className="flex gap-2">
+                    {printType !== 'PAYSLIPS' && (
+                      <Button variant="secondary" size="sm" className="gap-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800" onClick={() => handleExportScheduleCSV()} disabled={payslipsToPrint.length === 0}>
+                        <Upload className="h-4 w-4 shrink-0" /> <span className="hidden sm:inline">Export CSV</span>
+                      </Button>
+                    )}
+                    <Button variant="secondary" size="sm" className="gap-1" onClick={handlePrint} disabled={payslipsToPrint.length === 0}>
+                      <Printer className="h-4 w-4 shrink-0" /> <span className="hidden sm:inline">Print Document</span>
                     </Button>
-                  )}
-                  <Button variant="secondary" size="sm" className="gap-1" onClick={handlePrint} disabled={payslipsToPrint.length === 0}>
-                    <Printer className="h-4 w-4" /> Print Document
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={() => setPrintDialogOpen(false)}>
+                  </div>
+                  <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700 p-2 shrink-0" onClick={() => setPrintDialogOpen(false)}>
                     <X className="h-5 w-5" />
                   </Button>
                 </div>
               </div>
 
-              <div className="flex flex-1 overflow-hidden print-hide">
+              <div className="flex flex-col md:flex-row flex-1 overflow-hidden print-hide">
+                {/* Mobile Toggle Button */}
+                <div className="md:hidden p-4 pb-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shrink-0">
+                  <Button 
+                    variant="outline" 
+                    className="w-full flex justify-between items-center" 
+                    onClick={() => setPrintSidebarOpen(!printSidebarOpen)}
+                  >
+                    <span className="font-semibold text-slate-700">Filter Options</span>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${printSidebarOpen ? 'rotate-180' : ''}`} />
+                  </Button>
+                </div>
+
                 {/* Filter Sidebar */}
-                <div className="w-1/3 max-w-[300px] border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 overflow-y-auto flex flex-col gap-6 hide-on-print shadow-sm z-10">
+                <div className={`w-full md:w-1/3 md:max-w-[300px] border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 md:overflow-y-auto flex-col gap-6 hide-on-print shadow-sm z-10 shrink-0 ${printSidebarOpen ? 'flex max-h-[50vh] overflow-y-auto' : 'hidden md:flex md:max-h-full'}`}>
                   {/* Schedule type selector */}
                   <div>
                     <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1">Schedule Type</h4>
@@ -1470,6 +1701,7 @@ export function Payroll() {
                               <tr className="text-left"><th className="py-2 text-slate-600">Description</th><th className="py-2 text-right text-slate-600">Amount (₦)</th></tr>
                             </thead>
                             <tbody>
+                              {printSelectedColumns.includes('main_salary') && <tr><td className="py-2">Main Salary</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.salary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
                               {printSelectedColumns.includes('basic') && <tr><td className="py-2">Basic Salary</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.basicSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
                               {printSelectedColumns.includes('housing') && slip.record.housing > 0 && <tr><td className="py-2">Housing Allowance</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.housing.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
                               {printSelectedColumns.includes('transport') && slip.record.transport > 0 && <tr><td className="py-2">Transport Allowance</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.transport.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}

@@ -1141,84 +1141,119 @@ export function Ledger() {
                 </table>
               ) : (
                 /* ── GROUPED VOUCHER VIEW (default when no search) ── */
-                <Table>
-                  <TableHeader className="bg-slate-50">
-                    <TableRow>
-                      <TableHead className="w-44">Voucher No.</TableHead>
-                      <TableHead className="w-32">Date</TableHead>
-                      <TableHead>Bank</TableHead>
-                      <TableHead className="text-right w-40">Amount</TableHead>
-                      <TableHead className="w-16 text-center">Lines</TableHead>
-                      <TableHead className="w-36">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {voucherSummaries.map((v, i) => (
-                      <TableRow
-                        key={v.voucherNo || `v-${i}`}
-                        className="hover:bg-indigo-50/30 cursor-pointer transition-colors"
-                        onClick={() => setDialogVoucher(v.voucherNo)}
-                      >
-                        <TableCell className="font-mono font-bold text-indigo-600">
-                          {v.voucherNo || '—'}
-                        </TableCell>
-                        <TableCell className="text-slate-600 text-sm whitespace-nowrap">
-                          {v.date ? formatDisplayDate(v.date) : '—'}
-                        </TableCell>
-                        <TableCell className="text-slate-600">{v.bank || '—'}</TableCell>
-                        <TableCell className="font-bold text-slate-900 text-right tabular-nums">
-                          ₦{(isNaN(v.total) ? 0 : v.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
-                            {v.count}
-                          </span>
-                        </TableCell>
-                        <TableCell onClick={e => e.stopPropagation()}>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 gap-1 h-8 px-2"
-                              onClick={() => setDialogVoucher(v.voucherNo)}
-                            >
-                              <Eye className="h-3.5 w-3.5" /> View
-                            </Button>
-                            {priv?.canDelete && (
+                <>
+                  {/* Mobile card list */}
+                  <div className="md:hidden divide-y divide-slate-100">
+                    {voucherSummaries.length === 0 ? (
+                      <div className="py-12 text-center text-slate-400 text-sm">No vouchers found.</div>
+                    ) : (
+                      voucherSummaries.map((v, i) => (
+                        <div
+                          key={v.voucherNo || `v-${i}`}
+                          className="flex items-center gap-3 px-4 py-3.5 hover:bg-indigo-50/30 active:bg-indigo-100/40 cursor-pointer transition-colors"
+                          onClick={() => setDialogVoucher(v.voucherNo)}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="font-mono font-bold text-indigo-600 text-sm">{v.voucherNo || '—'}</span>
+                              <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 text-[9px] font-bold">{v.count}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                              {v.date && <span>{formatDisplayDate(v.date)}</span>}
+                              {v.bank && <><span>·</span><span>{v.bank}</span></>}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-bold text-slate-900 text-sm tabular-nums">
+                              ₦{(isNaN(v.total) ? 0 : v.total).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                            </p>
+                            <p className="text-[10px] text-indigo-500">Tap to view</p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Desktop table */}
+                  <Table className="hidden md:table">
+                    <TableHeader className="bg-slate-50">
+                      <TableRow>
+                        <TableHead className="w-44">Voucher No.</TableHead>
+                        <TableHead className="w-32">Date</TableHead>
+                        <TableHead>Bank</TableHead>
+                        <TableHead className="text-right w-40">Amount</TableHead>
+                        <TableHead className="w-16 text-center">Lines</TableHead>
+                        <TableHead className="w-36">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {voucherSummaries.map((v, i) => (
+                        <TableRow
+                          key={v.voucherNo || `v-${i}`}
+                          className="hover:bg-indigo-50/30 cursor-pointer transition-colors"
+                          onClick={() => setDialogVoucher(v.voucherNo)}
+                        >
+                          <TableCell className="font-mono font-bold text-indigo-600">
+                            {v.voucherNo || '—'}
+                          </TableCell>
+                          <TableCell className="text-slate-600 text-sm whitespace-nowrap">
+                            {v.date ? formatDisplayDate(v.date) : '—'}
+                          </TableCell>
+                          <TableCell className="text-slate-600">{v.bank || '—'}</TableCell>
+                          <TableCell className="font-bold text-slate-900 text-right tabular-nums">
+                            ₦{(isNaN(v.total) ? 0 : v.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
+                              {v.count}
+                            </span>
+                          </TableCell>
+                          <TableCell onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center gap-1">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 h-8 w-8 p-0"
-                                title="Delete Voucher"
-                                onClick={async () => {
-                                  const vno = v.voucherNo;
-                                  const count = ledgerEntries.filter(e => e.voucherNo === vno).length;
-                                  const ok = await showConfirm(
-                                    `Delete voucher ${vno}?\n\nThis will permanently remove all ${count} transaction(s) in this voucher.`,
-                                    { variant: 'danger', confirmLabel: 'Yes, Delete' }
-                                  );
-                                  if (ok) {
-                                    ledgerEntries.filter(e => e.voucherNo === vno).forEach(r => deleteLedgerEntry(r.id));
-                                    toast.success(`Deleted voucher ${vno}.`);
-                                  }
-                                }}
+                                className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 gap-1 h-8 px-2"
+                                onClick={() => setDialogVoucher(v.voucherNo)}
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <Eye className="h-3.5 w-3.5" /> View
                               </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {voucherSummaries.length === 0 && (
-                      <TableRow key="no-results">
-                        <TableCell colSpan={6} className="text-center py-12 text-slate-500 bg-slate-50/30">
-                          No vouchers found.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                              {priv?.canDelete && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 h-8 w-8 p-0"
+                                  title="Delete Voucher"
+                                  onClick={async () => {
+                                    const vno = v.voucherNo;
+                                    const count = ledgerEntries.filter(e => e.voucherNo === vno).length;
+                                    const ok = await showConfirm(
+                                      `Delete voucher ${vno}?\n\nThis will permanently remove all ${count} transaction(s) in this voucher.`,
+                                      { variant: 'danger', confirmLabel: 'Yes, Delete' }
+                                    );
+                                    if (ok) {
+                                      ledgerEntries.filter(e => e.voucherNo === vno).forEach(r => deleteLedgerEntry(r.id));
+                                      toast.success(`Deleted voucher ${vno}.`);
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {voucherSummaries.length === 0 && (
+                        <TableRow key="no-results">
+                          <TableCell colSpan={6} className="text-center py-12 text-slate-500 bg-slate-50/30">
+                            No vouchers found.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </>
               )}
             </div>
           </CardContent>

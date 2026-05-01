@@ -152,15 +152,16 @@ export function Users() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
-          <div className="overflow-auto flex-1">
-            <table className="w-full text-sm text-left">
+          {/* ── Desktop Table View ── */}
+          <div className="hidden md:block overflow-auto flex-1 custom-scrollbar">
+            <table className="w-full min-w-[900px] text-sm text-left">
               <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase font-semibold sticky top-0 z-10">
                 <tr>
-                  <th className="px-6 py-4 w-[30%]">User</th>
-                  <th className="px-4 py-4 w-[10%]">Status</th>
-                  <th className="px-4 py-4 w-[35%]">Module Access</th>
-                  <th className="px-4 py-4 w-[10%]">Permissions</th>
-                  <th className="px-6 py-4 w-[15%] text-right">Actions</th>
+                  <th className="px-6 py-4 w-[30%] whitespace-nowrap">User</th>
+                  <th className="px-4 py-4 w-[10%] whitespace-nowrap">Status</th>
+                  <th className="px-4 py-4 w-[35%] whitespace-nowrap">Module Access</th>
+                  <th className="px-4 py-4 w-[10%] whitespace-nowrap">Permissions</th>
+                  <th className="px-6 py-4 w-[15%] text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -228,6 +229,75 @@ export function Users() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* ── Mobile Card View ── */}
+          <div className="md:hidden overflow-auto flex-1 p-3 flex flex-col gap-3 bg-slate-50/50">
+            {filtered.map((u) => {
+              const modules = getActiveModules(u.privileges);
+              const permCount = countPermissions(u.privileges);
+              return (
+                <div key={u.id} onClick={() => navigate(`/users/${u.id}/edit`)} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm active:scale-[0.98] transition-transform cursor-pointer">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-sm">
+                        {u.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 truncate">{u.name}</p>
+                        <p className="text-slate-500 text-xs truncate">{u.email}</p>
+                      </div>
+                    </div>
+                    {u.isActive ? (
+                       <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0 ml-2">Active</Badge>
+                    ) : (
+                       <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 shrink-0 ml-2">Disabled</Badge>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center justify-between mb-3 bg-slate-50 rounded-lg p-2.5 border border-slate-100">
+                     <div className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Permissions</div>
+                     <div className="flex items-center gap-1.5 text-slate-700">
+                       <Shield className="h-3.5 w-3.5 text-indigo-400" />
+                       <span className="text-sm font-bold">{permCount}</span>
+                     </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <div className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-2">Module Access</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {modules.length > 0 ? modules.map((m) => {
+                        const Icon = MODULE_ICONS[m];
+                        return (
+                          <span key={m} className={`text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5 shrink-0 ${MODULE_COLORS[m]}`}>
+                            <Icon className="h-3 w-3" /> {m}
+                          </span>
+                        );
+                      }) : (
+                        <span className="text-xs text-slate-400 italic">No access</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                    <button onClick={(e) => { e.stopPropagation(); navigate(`/users/${u.id}/edit`); }}
+                      className="px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors">
+                      Edit User
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={(e) => { e.stopPropagation(); updateUser(u.id, { isActive: !u.isActive }); }}
+                        className="p-2 rounded-md text-slate-400 hover:bg-slate-100 hover:text-amber-600 transition-colors" title={u.isActive ? 'Disable' : 'Enable'}>
+                        {u.isActive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                      <button onClick={(e) => handleDeleteUser(u, e)} disabled={isDeleting === u.id}
+                        className="p-2 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50" title="Delete">
+                        {isDeleting === u.id ? <div className="h-4 w-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

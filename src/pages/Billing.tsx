@@ -12,7 +12,7 @@ import { usePriv } from '@/src/hooks/usePriv';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
-import { generateId } from '@/src/lib/utils';
+import { generateId, cn } from '@/src/lib/utils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/src/components/ui/dropdown-menu';
 import { NumericFormat } from 'react-number-format';
 import { supabase } from '@/src/integrations/supabase/client';
@@ -1042,38 +1042,38 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
 
         {/* Tab switcher + mobile actions */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex bg-slate-200/50 p-1 rounded-lg">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 overflow-x-auto no-scrollbar w-full pb-1">
+          <div className="flex bg-slate-200/50 p-1 rounded-lg shrink-0">
             <button
-              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTab === 'all' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'all' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               onClick={() => setActiveTab('all')}
             >
               All Invoices
               <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'all' ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{invoices.length}</Badge>
             </button>
             <button
-              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTab === 'quotations' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'quotations' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               onClick={() => setActiveTab('quotations')}
             >
               Quotations
               <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'quotations' ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{pendingInvoices.length}</Badge>
             </button>
             <button
-              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTab === 'active' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'active' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               onClick={() => setActiveTab('active')}
             >
               Active Invoices
               <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'active' ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{invoices.filter(i => { const s = sites.find(site => site.name === i.siteName && site.client === i.client); return s && s.status !== 'Ended'; }).length}</Badge>
             </button>
             <button
-              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTab === 'unpaid' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'unpaid' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               onClick={() => setActiveTab('unpaid')}
             >
               Unpaid Invoices
               <Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 font-mono border-slate-300 ${activeTab === 'unpaid' ? 'bg-indigo-100/50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{unpaidSites.length}</Badge>
             </button>
             <button
-              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTab === 'completed' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center px-4 py-1.5 text-sm font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'completed' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               onClick={() => setActiveTab('completed')}
             >
               Completed Invoice
@@ -1081,24 +1081,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
             </button>
           </div>
 
-          {/* Mobile-only action buttons */}
-          <div className="flex sm:hidden items-center gap-2">
-            {priv.canImport && (
-              <label className="flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 shadow-sm border border-indigo-200 rounded-md h-9 px-3 text-sm font-medium cursor-pointer transition-colors">
-                <Upload className="h-4 w-4" /> Import
-                <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
-              </label>
-            )}
-            {priv.canExport && (
-              <div className="flex flex-col gap-1">
-                <Button variant="outline" size="sm" className="gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-[30px] text-[11px]" onClick={() => handleExportCSV('basic')}>
-                  <Download className="h-3 w-3" /> Basic CSV
-                </Button>
-                <Button variant="outline" size="sm" className="gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-[30px] text-[11px]" onClick={() => handleExportCSV('detailed')}>
-                  <Download className="h-3 w-3" /> Detailed CSV
-                </Button>
-              </div>
-            )}
+          <div className="hidden sm:flex items-center gap-2">
             {priv.canCreate && (activeTab === 'all' || activeTab === 'quotations') && (
               <Button
                 size="sm"
@@ -1189,7 +1172,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                     background-color: #4f46e5;
                 }
             `}</style>
-            <Table className="whitespace-nowrap min-w-full text-xs sm:text-sm">
+            <Table className="whitespace-nowrap min-w-full text-xs sm:text-sm hidden md:table">
               <TableHeader className="bg-slate-50 sticky top-0 z-20">
                 <TableRow className="bg-slate-100/80 border-b border-slate-200">
                   <TableHead colSpan={2} className="px-6 py-2.5">
@@ -1496,6 +1479,139 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                 )}
               </TableBody>
             </Table>
+
+            {/* Mobile Summary Cards */}
+            <div className="md:hidden flex flex-col gap-3 p-4 bg-slate-50 min-h-[400px]">
+              {(activeTab === 'completed' || activeTab === 'unpaid') ? (
+                (activeTab === 'completed' ? completedSites : unpaidSites).map((site) => {
+                  const siteKey = `${site.client}_${site.id || site.name}_${activeTab}`;
+                  return (
+                    <div key={siteKey} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                      <div className="p-3 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
+                        <div>
+                          <div className="font-bold text-slate-800 text-sm leading-tight">{site.client}</div>
+                          <div className="text-slate-500 text-xs mt-0.5">{site.name}</div>
+                        </div>
+                        <Badge variant="outline" className={cn(
+                          "text-[10px] uppercase font-bold shrink-0 ml-2",
+                          activeTab === 'completed' ? "border-emerald-200 text-emerald-700 bg-emerald-50" : "border-amber-200 text-amber-700 bg-amber-50"
+                        )}>
+                          {activeTab === 'completed' ? 'Fully Paid' : 'Outstanding'}
+                        </Badge>
+                      </div>
+                      <div className="p-3 grid grid-cols-2 gap-y-3 gap-x-2 text-xs">
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Status</p>
+                          <p className="font-medium text-slate-700 truncate">{site.status === 'Ended' ? 'Ended' : site.status}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Total Charge</p>
+                          <p className="font-mono font-semibold text-slate-700">₦{formatSum(site.totalInvoiceAmount)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Invoices</p>
+                          <p className="font-medium text-slate-700">{site.invoices.length}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Amount Paid</p>
+                          <p className="font-mono font-bold text-indigo-700">₦{formatSum(site.totalPaymentAmount)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                currentList.map((inv: any) => (
+                  <div key={inv.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative" onDoubleClick={() => { if (activeTab === 'quotations') handleMakeActive(inv) }}>
+                    {/* Status accent bar */}
+                    <div className={cn(
+                      "absolute left-0 top-0 bottom-0 w-1",
+                      activeTab === 'quotations' ? "bg-amber-400" : "bg-indigo-500"
+                    )} />
+                    
+                    <div className="p-3 pl-4 border-b border-slate-100 flex justify-between items-start">
+                      <div className="pr-2">
+                        <div className="font-bold text-slate-800 text-sm leading-tight line-clamp-1">{inv.client}</div>
+                        <div className="text-slate-500 text-xs mt-0.5 line-clamp-1">{inv.site || inv.siteName}</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-mono font-bold text-indigo-700 text-[13px]">₦{formatSum(inv.totalCharge || inv.amount || 0)}</div>
+                        <Badge variant="outline" className="mt-1 text-[9px] px-1.5 py-0 font-mono text-slate-500 bg-slate-50">
+                          {inv.invoiceNo || inv.invoiceNumber || 'DRAFT'}
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    <div className="p-3 pl-4 grid grid-cols-2 gap-y-2 text-xs">
+                      <div>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Dates</p>
+                        <p className="font-medium text-slate-600 truncate">{formatDisplayDate(inv.startDate || inv.date)} - {formatDisplayDate(inv.endDate || inv.dueDate)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Duration</p>
+                        <p className="font-medium text-slate-600">{inv.duration || 0} Days</p>
+                      </div>
+                      
+                      {/* Cost Breakdown */}
+                      <div className="col-span-2 mt-2 pt-2 border-t border-slate-50 flex flex-wrap gap-x-4 gap-y-1">
+                        <span className="text-[10px] text-slate-500"><b className="text-slate-400 font-normal">Rent:</b> ₦{formatSum(inv.rentalCost || 0)}</span>
+                        <span className="text-[10px] text-slate-500"><b className="text-slate-400 font-normal">Fuel:</b> ₦{formatSum(inv.dieselCost || 0)}</span>
+                        <span className="text-[10px] text-slate-500"><b className="text-slate-400 font-normal">Other:</b> ₦{formatSum((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0))}</span>
+                        <span className="text-[10px] text-slate-500"><b className="text-slate-400 font-normal">VAT:</b> ₦{formatSum(inv.vat || 0)}</span>
+                      </div>
+                    </div>
+                    
+                    {/* Actions */}
+                    {showActions && (priv.canEdit || priv.canDelete) && (
+                      <div className="px-2 py-1.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-1">
+                        {activeTab === 'quotations' && priv.canEdit && (
+                          <Button variant="ghost" size="sm" onClick={() => handleMakeActive(inv)} className="h-8 px-3 text-[11px] text-emerald-600 hover:bg-emerald-100 font-semibold rounded-md">
+                            <ArrowRightCircle className="w-3.5 h-3.5 mr-1.5" /> Make Active
+                          </Button>
+                        )}
+                        {priv.canEdit && (
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(inv)} className="h-8 w-8 p-0 text-indigo-600 hover:bg-indigo-100 rounded-md">
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {priv.canEdit && (
+                          <Button variant="ghost" size="sm" onClick={() => setPrintInvoiceTarget(inv)} className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-100 rounded-md">
+                            <Printer className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {priv.canDelete && (
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(inv.id)} className="h-8 w-8 p-0 text-rose-600 hover:bg-rose-100 rounded-md">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+              
+              {/* Empty states for mobile */}
+              {activeTab === 'quotations' && currentList.length > 0 && (
+                <div className="text-center text-amber-700 text-[10px] font-medium italic mt-2">
+                  Double-tap a quotation to transition it to Active.
+                </div>
+              )}
+              {activeTab !== 'completed' && activeTab !== 'unpaid' && currentList.length === 0 && (
+                <div className="py-12 text-center text-slate-500 text-sm font-medium">
+                  No {activeTab} records found.
+                </div>
+              )}
+              {activeTab === 'completed' && completedSites.length === 0 && (
+                <div className="py-12 text-center text-slate-500 text-sm font-medium">
+                  No completely paid sites (Ended status) found.
+                </div>
+              )}
+              {activeTab === 'unpaid' && unpaidSites.length === 0 && (
+                <div className="py-12 text-center text-slate-500 text-sm font-medium">
+                  No sites with outstanding balances found.
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

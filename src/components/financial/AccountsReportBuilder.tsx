@@ -187,6 +187,9 @@ const SUM_COLUMNS: ColumnDef[] = [
   // Requires BOTH invoice and payment sources
   { id: 's_bfwd',          label: 'Balance B/F (Prev. Years)',summable: true,  sources: ['INVOICE','PAYMENT'] },
   { id: 's_balance',       label: 'Balance Due (All-Time)',   summable: true,  sources: ['INVOICE','PAYMENT'] },
+  // Requires BOTH payment and vat sources
+  { id: 's_vat_owed',      label: 'VAT Meant to Pay (From Payments)', summable: true,  sources: ['PAYMENT','VAT'] },
+  { id: 's_vat_bal',       label: 'VAT Balance to Remit',             summable: true,  sources: ['PAYMENT','VAT'] },
 ];
 
 // ── Built-in presets ──────────────────────────────────────────────────────────
@@ -273,6 +276,8 @@ interface AggRow {
   payDiscount: number;
   vatCount: number;
   vatRemitted: number;
+  vatOwedFromPayments: number;
+  vatBal: number;
   ledgerTotal: number;
   siteCount: number;
   // All-time (ignore date filter — driven from rawInvoices/rawPayments directly)
@@ -359,6 +364,7 @@ export function AccountsReportBuilder({
   const [userPresets,     setUserPresets]     = useState<ReportPreset[]>([]);
   const [showPresetInput, setShowPresetInput] = useState(false);
   const [newPresetName,   setNewPresetName]   = useState('');
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
   const isMultiSource = selectedSources.length > 1;
   const prevMulti = useRef(false);
@@ -658,7 +664,7 @@ export function AccountsReportBuilder({
           client: cLabel, tin: getTin(cLabel),
           invCount: 0, periodCharged: 0, invVat: 0,
           payCount: 0, periodCleared: 0, totalPaidCash: 0, payWht: 0, payDiscount: 0,
-          vatCount: 0, vatRemitted: 0,
+          vatCount: 0, vatRemitted: 0, vatOwedFromPayments: 0, vatBal: 0,
           ledgerTotal: 0, siteCount: 0,
           allTimeCharged: 0, allTimeCleared: 0,
           bfwdCharged: 0, bfwdCleared: 0, bfwd: 0,
@@ -683,6 +689,10 @@ export function AccountsReportBuilder({
         row.payWht += r.withholdingTax || 0;
         row.payDiscount += r.discount || 0;
         row.periodCleared += (r.amount || 0) + (r.withholdingTax || 0) + (r.discount || 0);
+        
+        const pvVal = r.payVat || (sites.find(s => s.name === r.site && s.client === r.client)?.vat as any) || 'No';
+        const { vat } = getVatDetails(r.amount || 0, pvVal, vatRate);
+        row.vatOwedFromPayments += vat;
       } else if (rec._source === 'VAT') {
         row.vatCount++;
         row.vatRemitted += r.amount || 0;
@@ -731,10 +741,11 @@ export function AccountsReportBuilder({
     map.forEach(row => {
       row.bfwd    = row.bfwdCharged - row.bfwdCleared;         // opening balance
       row.balance = row.allTimeCharged - row.allTimeCleared;   // true closing balance
+      row.vatBal  = Math.max(0, row.vatOwedFromPayments - row.vatRemitted); // VAT balance
     });
 
     return Array.from(map.values()).sort((a, b) => a.client.localeCompare(b.client));
-  }, [recordsToPrint, isMultiSource, selectedClients, selectedYears, rawInvoices, rawPayments]); // eslint-disable-line
+  }, [recordsToPrint, isMultiSource, selectedClients, selectedYears, rawInvoices, rawPayments, sites, getVatDetails, vatRate]); // eslint-disable-line
 
   // ── Column sets ──────────────────────────────────────────────────────────────
   const relevantCols = useMemo(() => {
@@ -743,6 +754,10 @@ export function AccountsReportBuilder({
         // Balance/B/F require BOTH invoice and payment sources
         if (['s_bfwd','s_balance'].includes(col.id)) {
           return selectedSources.includes('INVOICE') && selectedSources.includes('PAYMENT');
+        }
+        // VAT Cross columns require BOTH payment and vat sources
+        if (['s_vat_owed','s_vat_bal'].includes(col.id)) {
+          return selectedSources.includes('PAYMENT') && selectedSources.includes('VAT');
         }
         if (['s_sn','s_client','s_tin'].includes(col.id)) return true;
         return col.sources.some(s => selectedSources.includes(s));
@@ -957,6 +972,8 @@ export function AccountsReportBuilder({
       case 's_allcleared':   return row.allTimeCleared;
       case 's_vat_count':    return row.vatCount;
       case 's_vat_remitted': return row.vatRemitted;
+      case 's_vat_owed':     return row.vatOwedFromPayments;
+      case 's_vat_bal':      return row.vatBal;
       case 's_ledger_total': return row.ledgerTotal;
       case 's_site_count':   return row.siteCount;
       case 's_bfwd':         return row.bfwd;
@@ -1096,53 +1113,63 @@ export function AccountsReportBuilder({
             </button>
 
             {/* ── Breadcrumb + title ── */}
-            <DialogTitle className="flex items-center gap-2 px-3 min-w-0 flex-1">
-              <span className="text-slate-500 text-[11px] font-medium uppercase tracking-widest shrink-0 select-none">
+            <DialogTitle className="flex items-center gap-1.5 md:gap-2 px-1 md:px-3 min-w-0 flex-1">
+              <span className="hidden md:inline-block text-slate-500 text-[11px] font-medium uppercase tracking-widest shrink-0 select-none">
                 Report Builder
               </span>
-              <span className="text-slate-600 text-[11px] shrink-0">/</span>
-              <span className="text-white text-sm font-semibold truncate">{reportTitle}</span>
+              <span className="hidden md:inline-block text-slate-600 text-[11px] shrink-0">/</span>
+              <span className="text-white text-xs md:text-sm font-semibold truncate">{reportTitle}</span>
               {isMultiSource && (
-                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold px-2 py-0.5 rounded shrink-0">
-                  Multi-source
+                <span className="hidden sm:inline-block text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold px-2 py-0.5 rounded shrink-0">
+                  Multi
                 </span>
               )}
             </DialogTitle>
 
             {/* ── Meta + actions ── */}
-            <div className="flex items-center gap-2 px-2 shrink-0 border-l border-slate-700/50">
+            <div className="flex items-center gap-1.5 md:gap-2 px-2 shrink-0 border-l border-slate-700/50">
               {rowCount > 0 && (
                 <span className="text-slate-500 text-[11px] font-mono hidden md:block">
                   {rowCount} {isMultiSource ? 'clients' : 'records'}
                 </span>
               )}
+              {/* Mobile Filter Toggle */}
+              <button
+                onClick={() => setShowMobileSidebar(!showMobileSidebar)}
+                className={`md:hidden inline-flex items-center justify-center h-7 w-7 rounded border transition-colors ${showMobileSidebar ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-600 text-slate-300 hover:bg-slate-800'}`}
+                aria-label="Toggle Filters"
+              >
+                <Filter className="h-3.5 w-3.5" />
+              </button>
               {/* Primary action */}
               <button
                 onClick={handleExportCSV}
                 disabled={rowCount === 0}
-                className="inline-flex items-center gap-1.5 h-7 px-3 text-xs font-semibold rounded bg-indigo-600 hover:bg-indigo-500 text-white transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                className="inline-flex items-center justify-center gap-1.5 h-7 px-2 md:px-3 text-xs font-semibold rounded bg-indigo-600 hover:bg-indigo-500 text-white transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                title="Export CSV"
               >
                 <Upload className="h-3.5 w-3.5" />
-                Export CSV
+                <span className="hidden sm:inline-block">Export</span>
               </button>
               {/* Secondary action */}
               <button
                 onClick={() => window.print()}
                 disabled={rowCount === 0}
-                className="inline-flex items-center gap-1.5 h-7 px-3 text-xs font-semibold rounded border border-slate-600 text-slate-300 hover:border-slate-400 hover:text-white transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                className="inline-flex items-center justify-center gap-1.5 h-7 px-2 md:px-3 text-xs font-semibold rounded border border-slate-600 text-slate-300 hover:border-slate-400 hover:text-white transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                title="Print"
               >
                 <Printer className="h-3.5 w-3.5" />
-                Print
+                <span className="hidden sm:inline-block">Print</span>
               </button>
             </div>
 
           </div>
         </DialogHeader>
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
 
           {/* ── Sidebar ── */}
-          <div className="w-[288px] shrink-0 border-r border-slate-200 bg-white shadow-sm z-10 flex flex-col h-full print:hidden">
+          <div className={`${showMobileSidebar ? 'flex' : 'hidden'} md:flex w-full md:w-[288px] shrink-0 border-b md:border-b-0 md:border-r border-slate-200 bg-white shadow-sm z-10 flex-col h-[50%] md:h-full print:hidden`}>
             <div className="flex-1 overflow-y-auto p-4 pb-10 flex flex-col gap-5 custom-scrollbar">
 
               {/* Presets */}

@@ -212,14 +212,14 @@ export function ActivityLog() {
                  type="date" 
                  value={fromDate}
                  onChange={e => { setFromDate(e.target.value); setPage(0); }}
-                 className="h-9 px-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-700" 
+                 className="h-9 w-[120px] sm:w-[140px] px-2 rounded-lg border border-slate-200 bg-white text-xs sm:text-sm text-slate-700" 
                />
                <span className="text-slate-400 text-xs">to</span>
                <input 
                  type="date" 
                  value={toDate}
                  onChange={e => { setToDate(e.target.value); setPage(0); }}
-                 className="h-9 px-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-700" 
+                 className="h-9 w-[120px] sm:w-[140px] px-2 rounded-lg border border-slate-200 bg-white text-xs sm:text-sm text-slate-700" 
                />
             </div>
             
@@ -267,16 +267,16 @@ export function ActivityLog() {
                     {isUpdate && <Edit2 className="w-4 h-4" />}
                     {isDelete && <Trash2 className="w-4 h-4" />}
                   </div>
-                  <div className="flex-1 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md transition-shadow p-4 relative top-1">
-                     <p className="text-[14px] text-slate-800 leading-snug">
+                  <div className="flex-1 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md transition-shadow p-3 sm:p-4 relative top-1 min-w-0">
+                     <p className="text-[13px] sm:text-[14px] text-slate-800 leading-snug break-words">
                        <span className="font-bold text-slate-900">{uName}</span>{' '}
                        {isInsert ? 'created a new' : isUpdate ? 'updated the' : 'deleted the'}{' '}
                        <span className="font-semibold">{tName.toLowerCase()}</span>{' '}
-                       record for <span className="font-mono text-xs bg-slate-100 px-1 py-0.5 rounded text-indigo-700">{rId}</span>.
+                       record for <span className="font-mono text-[11px] sm:text-xs bg-slate-100 px-1 py-0.5 rounded text-indigo-700">{rId}</span>.
                      </p>
-                     <p className="text-xs text-slate-400 mt-1 mb-3 md:hidden">{time}</p>
+                     <p className="text-[11px] sm:text-xs text-slate-400 mt-1.5 mb-2.5 md:hidden">{time}</p>
                      
-                     <div className="bg-slate-50/80 border border-slate-100 rounded-lg p-3">
+                     <div className="bg-slate-50/80 border border-slate-100 rounded-lg p-2.5 sm:p-3 overflow-x-auto custom-scrollbar">
                        {renderChanges(log)}
                      </div>
                   </div>

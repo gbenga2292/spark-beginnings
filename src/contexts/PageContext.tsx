@@ -49,33 +49,25 @@ export function usePage() {
  */
 export function useSetPageTitle(title: string | null, subtitle: string = '', buttons: ReactNode | null = null, deps: any[] = []) {
   const dispatch = useContext(PageDispatchContext);
-  if (!dispatch) {
-    throw new Error('useSetPageTitle must be used within a PageProvider');
-  }
-  
-  const { setTitle, setSubtitle, setHeaderButtons } = dispatch;
-  
-  // Use a ref to hold the latest buttons value so we never include it
-  // in the dep array — JSX creates a new object reference on every render.
+
+  // Keep hook call order unconditional (Rules of Hooks)
   const buttonsRef = useRef(buttons);
   buttonsRef.current = buttons;
 
   useEffect(() => {
-    if (title === null) return;
-    
+    if (!dispatch || title === null) return;
+
+    const { setTitle, setSubtitle, setHeaderButtons } = dispatch;
     setTitle(title);
     setSubtitle(subtitle);
-    // Read from ref so JSX buttons don't trigger an infinite re-render loop
     setHeaderButtons(buttonsRef.current);
 
-    // Cleanup on unmount
     return () => {
-      if (title === null) return;
       setTitle('');
       setSubtitle('');
       setHeaderButtons(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, subtitle, setTitle, setSubtitle, setHeaderButtons, deps]);
+  }, [dispatch, title, subtitle, ...deps]);
 }
 

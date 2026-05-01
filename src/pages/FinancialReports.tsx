@@ -84,6 +84,7 @@ export function FinancialReports() {
   const [reportBuilderOpen, setReportBuilderOpen] = useState(false);
   const sitesPriv = usePriv('sites');
   const [ledgerSummaryView, setLedgerSummaryView] = useState<'category' | 'bank' | 'client' | 'site'>('category');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Dynamic titles and subtitles for the header
   const tabInfo = {
@@ -506,7 +507,10 @@ export function FinancialReports() {
         else siteMap[inv.siteName].pending += inv.amount;
       }
     });
-    return Object.entries(siteMap).map(([name, data]) => ({ name, ...data })).sort((a, b) => (b.paid + b.pending) - (a.paid + a.pending));
+    return Object.entries(siteMap)
+      .map(([name, data]) => ({ name, ...data }))
+      .filter(item => item.paid > 0 || item.pending > 0)
+      .sort((a, b) => (b.paid + b.pending) - (a.paid + a.pending));
   }, [sites, invoices]);
 
   const formatCurrCompact = (val: number) => {
@@ -1205,47 +1209,97 @@ export function FinancialReports() {
       <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
 
         {/* ── GLOBAL FILTERS BAR ────────────────────────────────────── */}
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-white rounded-xl shadow-sm border border-slate-100 px-4 py-3">
-          <div className="flex items-center gap-2 text-slate-700">
-            <Filter className="w-4 h-4 text-indigo-500" />
-            <span className="text-xs font-bold uppercase tracking-wide">Report Filters</span>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-slate-700">
+              <Filter className="w-4 h-4 text-indigo-500" />
+              <span className="text-xs font-bold uppercase tracking-wide">Report Filters</span>
+            </div>
+            {/* Mobile Toggle */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="md:hidden flex items-center gap-2 text-slate-500"
+              onClick={() => setFiltersOpen(!filtersOpen)}
+            >
+              <Filter className="w-4 h-4" />
+              {filtersOpen ? 'Hide' : 'Options'}
+            </Button>
+            {/* Desktop Reset - Hidden on mobile */}
+            <div className="hidden md:flex flex-wrap items-center gap-3">
+              {/* Year */}
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase">Year</span>
+                <select value={filterYear} onChange={e => startTransition(() => setFilterYear(e.target.value))}
+                  className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[110px]">
+                  <option value="All">All Years</option>
+                  {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              {/* Month */}
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase">Month</span>
+                <select value={filterMonth} onChange={e => startTransition(() => setFilterMonth(e.target.value))}
+                  className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[130px]">
+                  <option value="All">All Months</option>
+                  {MONTHS_LIST.map(m => <option key={m.value} value={String(m.value)}>{m.label}</option>)}
+                </select>
+              </div>
+              {/* Client */}
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase">Client</span>
+                <select value={filterClient} onChange={e => startTransition(() => setFilterClient(e.target.value))}
+                  className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[140px]">
+                  <option value="All">All Clients</option>
+                  {availableClients.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              {/* Reset */}
+              {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All') && (
+                <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); }); }}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-rose-500 hover:text-rose-700 px-2 py-1 rounded-md hover:bg-rose-50 transition-colors">
+                  <X className="w-3.5 h-3.5" /> Reset
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Year */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase">Year</span>
-              <select value={filterYear} onChange={e => startTransition(() => setFilterYear(e.target.value))}
-                className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[110px]">
-                <option value="All">All Years</option>
-                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
+          
+          {/* Mobile Filter Panel */}
+          {filtersOpen && (
+            <div className="md:hidden mt-4 pt-4 border-t border-slate-100 flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase">Year</span>
+                <select value={filterYear} onChange={e => startTransition(() => setFilterYear(e.target.value))}
+                  className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none w-full">
+                  <option value="All">All Years</option>
+                  {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase">Month</span>
+                <select value={filterMonth} onChange={e => startTransition(() => setFilterMonth(e.target.value))}
+                  className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none w-full">
+                  <option value="All">All Months</option>
+                  {MONTHS_LIST.map(m => <option key={m.value} value={String(m.value)}>{m.label}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase">Client</span>
+                <select value={filterClient} onChange={e => startTransition(() => setFilterClient(e.target.value))}
+                  className="h-9 px-3 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none w-full">
+                  <option value="All">All Clients</option>
+                  {availableClients.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              {/* Reset Mobile */}
+              {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All') && (
+                <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); setFiltersOpen(false); }); }}
+                  className="flex items-center justify-center gap-1.5 text-sm font-semibold text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-md py-2 transition-colors mt-2">
+                  <X className="w-4 h-4" /> Reset Filters
+                </button>
+              )}
             </div>
-            {/* Month */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase">Month</span>
-              <select value={filterMonth} onChange={e => startTransition(() => setFilterMonth(e.target.value))}
-                className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[130px]">
-                <option value="All">All Months</option>
-                {MONTHS_LIST.map(m => <option key={m.value} value={String(m.value)}>{m.label}</option>)}
-              </select>
-            </div>
-            {/* Client */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase">Client</span>
-              <select value={filterClient} onChange={e => startTransition(() => setFilterClient(e.target.value))}
-                className="h-8 px-2.5 text-sm font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400/30 min-w-[140px]">
-                <option value="All">All Clients</option>
-                {availableClients.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            {/* Reset */}
-            {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All') && (
-              <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); }); }}
-                className="flex items-center gap-1.5 text-xs font-semibold text-rose-500 hover:text-rose-700 px-2 py-1 rounded-md hover:bg-rose-50 transition-colors">
-                <X className="w-3.5 h-3.5" /> Reset
-              </button>
-            )}
-          </div>
+          )}
         </div>
 
         {/* Tab switcher - compact implementation */}
@@ -1709,25 +1763,29 @@ export function FinancialReports() {
           </CardHeader>
           <CardContent className="p-5 flex-1 min-h-[300px]">
             {trendData.length > 0 ? (
-              <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
-                <AreaChart data={trendData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorBilledR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#818cf8" stopOpacity={0.8} /><stop offset="95%" stopColor="#818cf8" stopOpacity={0} /></linearGradient>
-                    <linearGradient id="colorCollectedR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#34d399" stopOpacity={0.8} /><stop offset="95%" stopColor="#34d399" stopOpacity={0} /></linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `₦${val / 1000000}M`} />
-                  <RechartsTooltip formatter={(value: number | undefined) => formatCurr(value ?? 0)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                  <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '13px' }} />
-                  <Area type="monotone" dataKey="Billed" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorBilledR)">
-                    <LabelList dataKey="Billed" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#6366f1' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
-                  </Area>
-                  <Area type="monotone" dataKey="Collected" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorCollectedR)">
-                    <LabelList dataKey="Collected" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
-                  </Area>
-                </AreaChart>
-              </ResponsiveContainer>
+              <div className="w-full h-[300px] overflow-x-auto">
+                <div className="min-w-[600px] h-full">
+                  <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
+                    <AreaChart data={trendData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorBilledR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#818cf8" stopOpacity={0.8} /><stop offset="95%" stopColor="#818cf8" stopOpacity={0} /></linearGradient>
+                        <linearGradient id="colorCollectedR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#34d399" stopOpacity={0.8} /><stop offset="95%" stopColor="#34d399" stopOpacity={0} /></linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `₦${val / 1000000}M`} />
+                      <RechartsTooltip formatter={(value: number | undefined) => formatCurr(value ?? 0)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                      <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '13px' }} />
+                      <Area type="monotone" dataKey="Billed" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorBilledR)">
+                        <LabelList dataKey="Billed" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#6366f1' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
+                      </Area>
+                      <Area type="monotone" dataKey="Collected" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorCollectedR)">
+                        <LabelList dataKey="Collected" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
+                      </Area>
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-slate-400">
                 <BarChart3 className="w-10 h-10 mb-2 opacity-20" /><p className="text-sm">Not enough data to map trends.</p>
@@ -1828,22 +1886,24 @@ export function FinancialReports() {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
-              <BarChart data={siteFinancialData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
-                <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
-                <Legend verticalAlign="bottom" height={36} />
-                <Bar dataKey="paid" stackId="a" fill="#10b981" name="Paid Invoice">
-                  <LabelList dataKey="paid" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
-                </Bar>
-                <Bar dataKey="pending" stackId="a" fill="#f59e0b" name="Pending Invoice" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="pending" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="w-full h-[300px] overflow-x-auto">
+            <div className="min-w-[600px] h-full">
+              <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
+                <BarChart data={siteFinancialData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
+                  <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+                  <Legend verticalAlign="bottom" height={36} />
+                  <Bar dataKey="paid" stackId="a" fill="#10b981" name="Paid Invoice">
+                    <LabelList dataKey="paid" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                  </Bar>
+                  <Bar dataKey="pending" stackId="a" fill="#f59e0b" name="Pending Invoice" radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="pending" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -1910,26 +1970,28 @@ export function FinancialReports() {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
-              <LineChart data={payrollChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis yAxisId="left" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false}
-                  tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
-                <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false}
-                  tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
-                <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
-                <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
-                  <LabelList dataKey="Payroll" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
-                </Line>
-                <Line yAxisId="right" type="monotone" name="Overtime Burn" dataKey="Overtime" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
-                  <LabelList dataKey="Overtime" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#f59e0b' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
-                </Line>
-              </LineChart>
-            </ResponsiveContainer>
+          <div className="w-full h-[300px] overflow-x-auto">
+            <div className="min-w-[600px] h-full">
+              <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
+                <LineChart data={payrollChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis yAxisId="left" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false}
+                    tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
+                  <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false}
+                    tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
+                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                  <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
+                    <LabelList dataKey="Payroll" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#4f46e5' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                  </Line>
+                  <Line yAxisId="right" type="monotone" name="Overtime Burn" dataKey="Overtime" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
+                    <LabelList dataKey="Overtime" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#f59e0b' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
+                  </Line>
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -2045,128 +2107,131 @@ export function FinancialReports() {
                 <>
                   <div className="flex items-center justify-end mb-4 flex-wrap gap-3">
                     {priv.canExport && (
-                      <div className="flex gap-2">
+                      <div className="flex justify-end gap-2">
                         <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportPayrollSummaryCsv}>
                           <FileSpreadsheet className="h-4 w-4" /> CSV
                         </Button>
-                        <Button size="sm" className="gap-2 bg-[#2c7793] hover:bg-[#1a556b] text-white" onClick={exportPayrollSummaryPdf}>
+                        <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700 text-white" onClick={exportPayrollSummaryPdf}>
                           <FileText className="h-4 w-4" /> PDF
                         </Button>
                       </div>
                     )}
                   </div>
-                  <div className="rounded-2xl border border-slate-200 shadow-lg overflow-hidden" style={{ background: 'linear-gradient(to bottom, #f8fafc, #ffffff)' }}>
-                    {/* column legend bar */}
-                    <div className="grid grid-cols-8 text-[10px] font-bold tracking-widest uppercase px-0 bg-gradient-to-r from-[#1a4a5c] via-[#1f6075] to-[#1a4a5c] border-b border-[#0d3344]">
-                      {[
-                        { label: 'MONTH',        align: 'left',  accent: false, wide: true },
-                        { label: 'SALARY',       align: 'right', accent: false },
-                        { label: 'OVERTIME',     align: 'right', accent: false },
-                        { label: 'GROSS PAY',    align: 'right', accent: true  },
-                        { label: 'EMP. PENSION', align: 'right', accent: false },
-                        { label: 'LOANS',        align: 'right', accent: false },
-                        { label: 'PAYE',         align: 'right', accent: false },
-                        { label: 'TOTAL PAYOUT', align: 'right', accent: true  },
-                      ].map(col => (
-                        <div
-                          key={col.label}
-                          className={`py-3.5 px-4 text-${col.align} ${
-                            col.accent
-                              ? 'text-amber-300 bg-[#0d3344]/40 border-l border-r border-[#0d3344]/60'
-                              : 'text-[#9ecfe8]'
-                          } ${col.label === 'MONTH' ? 'col-span-1' : ''}`}
-                        >
-                          {col.label}
-                        </div>
-                      ))}
-                    </div>
 
-                    {/* rows */}
-                    <div className="divide-y divide-slate-100">
-                      {payrollSummaryData.map((row, idx) => {
-                        const maxPayout = Math.max(...payrollSummaryData.map(r => r.totalPayout), 1);
-                        const pct = Math.round((row.totalPayout / maxPayout) * 100);
-                        const isEven = idx % 2 === 0;
-                        return (
+                  <div className="rounded-2xl border border-slate-200 shadow-lg overflow-x-auto" style={{ background: 'linear-gradient(to bottom, #f8fafc, #ffffff)' }}>
+                    <div className="min-w-[1100px]">
+                      {/* column legend bar */}
+                      <div className="grid grid-cols-8 text-[10px] font-bold tracking-widest uppercase px-0 bg-gradient-to-r from-[#1a4a5c] via-[#1f6075] to-[#1a4a5c] border-b border-[#0d3344]">
+                        {[
+                          { label: 'MONTH',        align: 'left',  accent: false, wide: true },
+                          { label: 'SALARY',       align: 'right', accent: false },
+                          { label: 'OVERTIME',     align: 'right', accent: false },
+                          { label: 'GROSS PAY',    align: 'right', accent: true  },
+                          { label: 'EMP. PENSION', align: 'right', accent: false },
+                          { label: 'LOANS',        align: 'right', accent: false },
+                          { label: 'PAYE',         align: 'right', accent: false },
+                          { label: 'TOTAL PAYOUT', align: 'right', accent: true  },
+                        ].map(col => (
                           <div
-                            key={row.monthLabel}
-                            className={`grid grid-cols-8 items-center group transition-all duration-150 hover:shadow-md hover:z-10 relative ${
-                              isEven ? 'bg-white' : 'bg-slate-50/70'
-                            } hover:bg-teal-50/60`}
+                            key={col.label}
+                            className={`py-3.5 px-4 text-${col.align} ${
+                              col.accent
+                                ? 'text-amber-300 bg-[#0d3344]/40 border-l border-r border-[#0d3344]/60'
+                                : 'text-[#9ecfe8]'
+                            } ${col.label === 'MONTH' ? 'col-span-1' : ''}`}
                           >
-                            <div className="py-3 px-4 flex items-center gap-2.5">
-                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-[10px] font-black bg-gradient-to-br from-[#1f6075] to-[#1a4a5c] text-white shadow-sm shrink-0">
-                                {row.monthLabel.slice(0, 3).toUpperCase()}
-                              </span>
-                              <span className="text-sm font-semibold text-slate-800">{row.monthLabel}</span>
-                            </div>
-                            <div className="py-3 px-4 text-right">
-                              <span className="text-sm font-mono text-slate-700">₦{fm(row.salary)}</span>
-                            </div>
-                            <div className="py-3 px-4 text-right">
-                              {row.overtime > 0 ? (
-                                <span className="inline-flex items-center gap-1 text-sm font-mono text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5">
-                                  ₦{fm(row.overtime)}
+                            {col.label}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* rows */}
+                      <div className="divide-y divide-slate-100">
+                        {payrollSummaryData.map((row, idx) => {
+                          const maxPayout = Math.max(...payrollSummaryData.map(r => r.totalPayout), 1);
+                          const pct = Math.round((row.totalPayout / maxPayout) * 100);
+                          const isEven = idx % 2 === 0;
+                          return (
+                            <div
+                              key={row.monthLabel}
+                              className={`grid grid-cols-8 items-center group transition-all duration-150 hover:shadow-md hover:z-10 relative ${
+                                isEven ? 'bg-white' : 'bg-slate-50/70'
+                              } hover:bg-teal-50/60`}
+                            >
+                              <div className="py-3 px-4 flex items-center gap-2.5">
+                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-[10px] font-black bg-gradient-to-br from-[#1f6075] to-[#1a4a5c] text-white shadow-sm shrink-0">
+                                  {row.monthLabel.slice(0, 3).toUpperCase()}
                                 </span>
-                              ) : (
-                                <span className="text-sm font-mono text-slate-400">—</span>
-                              )}
-                            </div>
-                            <div className="py-3 px-4 text-right bg-teal-50/50 border-l border-r border-teal-100 group-hover:bg-teal-100/40">
-                              <span className="text-sm font-mono font-bold text-teal-800">₦{fm(row.grossPay)}</span>
-                            </div>
-                            <div className="py-3 px-4 text-right">
-                              <span className="text-sm font-mono text-slate-600">₦{fm(row.employeePension)}</span>
-                            </div>
-                            <div className="py-3 px-4 text-right">
-                              <span className="text-sm font-mono text-slate-600">₦{fm(row.loans)}</span>
-                            </div>
-                            <div className="py-3 px-4 text-right">
-                              <span className="inline-flex items-center gap-1 text-xs font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-0.5">
-                                ₦{fm(row.paye)}
-                              </span>
-                            </div>
-                            <div className="py-3 px-4 bg-slate-800/[0.03] border-l border-slate-200 group-hover:bg-slate-800/[0.06]">
-                              <div className="flex flex-col items-end gap-1">
-                                <span className="text-sm font-mono font-extrabold text-slate-900">₦{fm(row.totalPayout)}</span>
-                                <div className="w-full max-w-[80px] h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full bg-gradient-to-r from-[#1f6075] to-[#2aa0c8]"
-                                    style={{ width: `${pct}%` }}
-                                  />
+                                <span className="text-sm font-semibold text-slate-800">{row.monthLabel}</span>
+                              </div>
+                              <div className="py-3 px-4 text-right">
+                                <span className="text-sm font-mono text-slate-700">₦{fm(row.salary)}</span>
+                              </div>
+                              <div className="py-3 px-4 text-right">
+                                {row.overtime > 0 ? (
+                                  <span className="inline-flex items-center gap-1 text-sm font-mono text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5">
+                                    ₦{fm(row.overtime)}
+                                  </span>
+                                ) : (
+                                  <span className="text-sm font-mono text-slate-400">—</span>
+                                )}
+                              </div>
+                              <div className="py-3 px-4 text-right bg-teal-50/50 border-l border-r border-teal-100 group-hover:bg-teal-100/40">
+                                <span className="text-sm font-mono font-bold text-teal-800">₦{fm(row.grossPay)}</span>
+                              </div>
+                              <div className="py-3 px-4 text-right">
+                                <span className="text-sm font-mono text-slate-600">₦{fm(row.employeePension)}</span>
+                              </div>
+                              <div className="py-3 px-4 text-right">
+                                <span className="text-sm font-mono text-slate-600">₦{fm(row.loans)}</span>
+                              </div>
+                              <div className="py-3 px-4 text-right">
+                                <span className="inline-flex items-center gap-1 text-xs font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-0.5">
+                                  ₦{fm(row.paye)}
+                                </span>
+                              </div>
+                              <div className="py-3 px-4 bg-slate-800/[0.03] border-l border-slate-200 group-hover:bg-slate-800/[0.06]">
+                                <div className="flex flex-col items-end gap-1">
+                                  <span className="text-sm font-mono font-extrabold text-slate-900">₦{fm(row.totalPayout)}</span>
+                                  <div className="w-full max-w-[80px] h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full rounded-full bg-gradient-to-r from-[#1f6075] to-[#2aa0c8]"
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Grand Total footer */}
-                    <div className="grid grid-cols-8 items-center bg-gradient-to-r from-[#1a4a5c] via-[#1f6075] to-[#1a4a5c] border-t-2 border-[#0d3344] shadow-inner">
-                      <div className="py-4 px-4 flex items-center gap-2">
-                        <span className="text-xs font-black uppercase tracking-widest text-white/90 bg-white/10 border border-white/20 rounded-lg px-2.5 py-1">
-                          GRAND TOTAL
-                        </span>
+                          );
+                        })}
                       </div>
-                      {[gSalary, gOvertime, gGrossPay, gEmployeePension, gLoans, gPaye, gTotalPayout].map((val, i) => {
-                        const isAccent = i === 2 || i === 6;
-                        const isPaye   = i === 5;
-                        return (
-                          <div
-                            key={i}
-                            className={`py-4 px-4 text-right ${
-                              isAccent ? 'bg-white/10' : ''
-                            } ${isPaye ? '' : ''}`}
-                          >
-                            <span className={`text-sm font-mono font-extrabold tracking-wide ${
-                              isAccent ? 'text-amber-300' : isPaye ? 'text-rose-300' : 'text-white'
-                            }`}>
-                              ₦{fmT(val)}
-                            </span>
-                          </div>
-                        );
-                      })}
+
+                      {/* Grand Total footer */}
+                      <div className="grid grid-cols-8 items-center bg-gradient-to-r from-[#1a4a5c] via-[#1f6075] to-[#1a4a5c] border-t-2 border-[#0d3344] shadow-inner">
+                        <div className="py-4 px-4 flex items-center gap-2">
+                          <span className="text-xs font-black uppercase tracking-widest text-white/90 bg-white/10 border border-white/20 rounded-lg px-2.5 py-1">
+                            GRAND TOTAL
+                          </span>
+                        </div>
+                        {[gSalary, gOvertime, gGrossPay, gEmployeePension, gLoans, gPaye, gTotalPayout].map((val, i) => {
+                          const isAccent = i === 2 || i === 6;
+                          const isPaye   = i === 5;
+                          return (
+                            <div
+                              key={i}
+                              className={`py-4 px-4 text-right ${
+                                isAccent ? 'bg-white/10' : ''
+                              } ${isPaye ? '' : ''}`}
+                            >
+                              <span className={`text-sm font-mono font-extrabold tracking-wide ${
+                                isAccent ? 'text-amber-300' : isPaye ? 'text-rose-300' : 'text-white'
+                              }`}>
+                                ₦{fmT(val)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </>

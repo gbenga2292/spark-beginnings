@@ -592,7 +592,47 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                                         background-color: #4f46e5;
                                     }
                                 `}</style>
-                                <Table className="whitespace-nowrap min-w-full text-sm">
+
+                                {/* MOBILE CARDS */}
+                                <div className="md:hidden flex flex-col p-4 bg-slate-50 border-b border-slate-100">
+                                    <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Total Remitted</h4>
+                                    <div className="bg-white p-2 rounded border border-emerald-100 shadow-sm inline-block w-max">
+                                        <p className="text-sm font-mono font-black text-emerald-600">₦{formatSum(vatPaymentsSum)}</p>
+                                    </div>
+                                </div>
+                                <div className="md:hidden divide-y divide-slate-100 px-4">
+                                    {sortedVatPayments.map((p: VatPayment) => (
+                                        <div key={p.id} className="py-4 bg-white hover:bg-slate-50 transition-colors">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="min-w-0">
+                                                    <h3 className="font-bold text-slate-900 truncate">{p.client}</h3>
+                                                    <p className="text-xs text-slate-500">VAT Period: {p.month} {p.year} | Paid: {formatDisplayDate(p.date)}</p>
+                                                </div>
+                                                <div className="text-right ml-4 shrink-0">
+                                                    <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Amount</p>
+                                                    <p className="font-bold text-emerald-600 font-mono text-sm">₦{priv?.canViewAmounts === false ? '***' : (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                                </div>
+                                            </div>
+                                            {showActions && priv.canManageVat && (
+                                                <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-slate-50">
+                                                    <Button variant="outline" size="sm" onClick={() => handleEdit(p)} className="h-7 text-indigo-600 px-2 text-xs">
+                                                        <Edit className="w-3 h-3 mr-1" /> Edit
+                                                    </Button>
+                                                    <Button variant="outline" size="sm" onClick={() => handleDelete(p.id)} className="h-7 text-rose-600 px-2 text-xs">
+                                                        <Trash2 className="w-3 h-3 mr-1" /> Delete
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {sortedVatPayments.length === 0 && (
+                                        <div className="py-8 text-center text-slate-500 text-sm">
+                                            No VAT payment records.
+                                        </div>
+                                    )}
+                                </div>
+
+                                <Table className="hidden md:table whitespace-nowrap min-w-full text-sm">
                                     <TableHeader className="bg-slate-50 sticky top-0 z-20">
                                         <TableRow className="bg-slate-100/80 border-b border-slate-200">
                                             <TableHead colSpan={4} className="px-6 py-2.5">
@@ -691,7 +731,67 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
                             </div>
 
                             <div className="flex-1 overflow-x-auto [scrollbar-gutter:stable] min-h-[250px] max-h-[350px]">
-                                <Table className="whitespace-nowrap min-w-full text-sm">
+                                {/* MOBILE CARDS */}
+                                <div className="md:hidden flex flex-col p-4 bg-slate-50 border-b border-slate-100">
+                                    <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">Aggregate Balances</h4>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">Total Paid</p>
+                                            <p className="text-sm font-mono font-bold text-slate-600">₦{formatSum(overallTotals.totalPaid)}</p>
+                                        </div>
+                                        <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">VAT Value</p>
+                                            <p className="text-sm font-mono font-bold text-slate-600">₦{formatSum(overallTotals.vat)}</p>
+                                        </div>
+                                        <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">VAT Remitted</p>
+                                            <p className="text-sm font-mono font-bold text-emerald-600">₦{formatSum(overallTotals.vatPaid)}</p>
+                                        </div>
+                                        <div className="bg-white p-2 rounded border border-rose-100 shadow-sm">
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">Balance to Pay</p>
+                                            <p className="text-sm font-mono font-black text-rose-600">₦{formatSum(overallTotals.vatBalanceToPay)}</p>
+                                        </div>
+                                        <div className="bg-white p-2 rounded border border-indigo-50 shadow-sm col-span-2">
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">Principle on VAT Due</p>
+                                            <p className="text-sm font-mono font-bold text-indigo-600">₦{formatSum(overallTotals.principleOnVatDue)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="md:hidden divide-y divide-slate-100 px-4">
+                                    {totalsData.map((t, i) => (
+                                        <div key={i} className="py-4 bg-white hover:bg-slate-50 transition-colors">
+                                            <h3 className="font-bold text-slate-900 mb-2">{t.client}</h3>
+                                            <div className="grid grid-cols-2 gap-y-2 gap-x-4">
+                                                <div className="flex justify-between">
+                                                    <span className="text-[10px] text-slate-500 uppercase">Paid</span>
+                                                    <span className="text-xs font-mono text-slate-600">{t.totalPaid ? t.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-[10px] text-slate-500 uppercase">VAT</span>
+                                                    <span className="text-xs font-mono text-slate-600">{t.vat ? t.vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-[10px] text-slate-500 uppercase">Remitted</span>
+                                                    <span className="text-xs font-mono text-emerald-600">{t.vatPaid ? t.vatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-[10px] text-slate-500 uppercase">Balance</span>
+                                                    <span className="text-xs font-mono font-bold text-rose-600">{t.vatBalanceToPay ? t.vatBalanceToPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
+                                                </div>
+                                                <div className="flex justify-between col-span-2 border-t border-slate-50 pt-1 mt-1">
+                                                    <span className="text-[10px] text-slate-500 uppercase">Principle on VAT Due</span>
+                                                    <span className="text-xs font-mono font-medium text-indigo-600">{t.principleOnVatDue ? t.principleOnVatDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {totalsData.length === 0 && (
+                                        <div className="py-8 text-center text-slate-500 text-sm">
+                                            No summarized data.
+                                        </div>
+                                    )}
+                                </div>
+                                <Table className="hidden md:table whitespace-nowrap min-w-full text-sm">
                                     <TableHeader className="bg-slate-50 sticky top-0 z-20">
                                         <TableRow className="bg-slate-100/80 border-b border-slate-200">
                                             <TableHead className="px-6 py-2.5">
