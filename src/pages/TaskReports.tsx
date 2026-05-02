@@ -287,7 +287,7 @@ function AnalyticsDashboard() {
     useSetPageTitle(
         'Performance Analytics',
         `Analyzing ${periodLabel} · ${currentSiteName}`,
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1 -mb-1 w-full max-w-[calc(100vw-6rem)] md:max-w-none">
             {/* Site Selector */}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
