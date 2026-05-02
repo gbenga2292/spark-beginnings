@@ -181,30 +181,39 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         ]);
 
         if (dbAssets) {
-          setAssets(dbAssets.map((a: any) => ({
-            id: a.id,
-            name: a.name,
-            category: a.category,
-            type: a.type || 'equipment',
-            quantity: a.quantity,
-            availableQuantity: a.available_quantity,
-            reservedQuantity: a.reserved_quantity,
-            usedQuantity: a.used_quantity || 0,
-            missingQuantity: a.missing_quantity || 0,
-            damagedQuantity: a.damaged_quantity || 0,
-            unitOfMeasurement: a.unit,
-            status: a.status,
-            location: a.location,
-            condition: a.condition,
-            description: a.description,
-            requiresLogging: a.requires_logging,
-            serialNumber: a.serial_number,
-            serviceIntervalMonths: a.service_interval_months || 2,
-            powerSource: a.power_source,
-            cost: a.cost,
-            lowStockLevel: a.low_stock_level,
-            criticalStockLevel: a.critical_stock_level
-          })));
+          setAssets(dbAssets.map((a: any) => {
+            const quantity = a.quantity || 0;
+            const reservedQuantity = a.reserved_quantity || 0;
+            const usedQuantity = a.used_quantity || 0;
+            const missingQuantity = a.missing_quantity || 0;
+            const damagedQuantity = a.damaged_quantity || 0;
+            const availableQuantity = Math.max(0, quantity - (reservedQuantity + usedQuantity + missingQuantity + damagedQuantity));
+
+            return {
+              id: a.id,
+              name: a.name,
+              category: a.category,
+              type: a.type || 'equipment',
+              quantity,
+              availableQuantity,
+              reservedQuantity,
+              usedQuantity,
+              missingQuantity,
+              damagedQuantity,
+              unitOfMeasurement: a.unit,
+              status: a.status,
+              location: a.location,
+              condition: a.condition,
+              description: a.description,
+              requiresLogging: a.requires_logging,
+              serialNumber: a.serial_number,
+              serviceIntervalMonths: a.service_interval_months || 2,
+              powerSource: a.power_source,
+              cost: a.cost,
+              lowStockLevel: a.low_stock_level,
+              criticalStockLevel: a.critical_stock_level
+            };
+          }));
         }
 
         if (dbWaybills) {
@@ -421,7 +430,14 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     let targetAsset: Asset | undefined;
 
     setAssets(prev => {
-      const updated = prev.map(a => a.id === id ? { ...a, ...updates } : a);
+      const updated = prev.map(a => {
+        if (a.id === id) {
+          const newAsset = { ...a, ...updates };
+          newAsset.availableQuantity = Math.max(0, newAsset.quantity - ((newAsset.reservedQuantity || 0) + (newAsset.missingQuantity || 0) + (newAsset.damagedQuantity || 0) + (newAsset.usedQuantity || 0)));
+          return newAsset;
+        }
+        return a;
+      });
       targetAsset = updated.find(a => a.id === id);
       return updated;
     });

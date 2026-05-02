@@ -6,7 +6,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
 import { toast } from '@/src/components/ui/toast';
-import { Search, Plus, Calendar, MapPin, X, ChevronLeft, ChevronRight, FileText, Download, Filter, Wrench, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Calendar, MapPin, X, ChevronLeft, ChevronRight, FileText, Download, Filter, Wrench, CheckCircle2, AlertTriangle, Package } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay } from 'date-fns';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { DiaryDetailView } from './DiaryDetailView';
@@ -14,6 +14,9 @@ import { useOperations } from '../contexts/OperationsContext';
 import { DailyLogManager } from './DailyLogManager';
 import { jsPDF } from 'jspdf';
 import logoSrc from '@/logo/logo-2.png';
+
+import { BulkConsumableLogModal } from './BulkConsumableLogModal';
+import { BulkMachineLogModal } from './BulkMachineLogModal';
 
 function SiteLogCard({ 
   entry, 
@@ -31,12 +34,41 @@ function SiteLogCard({
   onOpenMachineLog: (machine: {id: string, name: string}, siteId: string, siteName: string) => void;
 }) {
   const { waybills, assets, dailyMachineLogs } = useOperations();
-  const [activeTab, setActiveTab] = useState<'general' | 'machines'>('general');
+  const { consumableLogs } = useAppStore();
+  const [activeTab, setActiveTab] = useState<'general' | 'machines' | 'consumables'>('general');
+  const [isBulkConsumableOpen, setIsBulkConsumableOpen] = useState(false);
+  const [isBulkMachineOpen, setIsBulkMachineOpen] = useState(false);
 
   const machineItems = useMemo(() => {
     if (!entry.siteId) return [];
     const siteWaybills = waybills.filter(w => w.siteId === entry.siteId && w.type === 'waybill' && w.status !== 'outstanding');
     return assets.filter(a => a.type === 'equipment' && a.requiresLogging && siteWaybills.some(w => w.items.some(i => i.assetId === a.id)));
+  }, [waybills, assets, entry.siteId]);
+
+  const consumableItems = useMemo(() => {
+    if (!entry.siteId) return [];
+    const siteWaybills = waybills.filter(w => w.siteId === entry.siteId && w.type === 'waybill' && w.status !== 'outstanding');
+    
+    const itemsMap = new Map();
+    siteWaybills.forEach(w => {
+      w.items.forEach(i => {
+        const asset = assets.find(a => a.id === i.assetId);
+        if (asset && asset.type === 'consumable') {
+          if (itemsMap.has(i.assetId)) {
+            itemsMap.get(i.assetId).quantity += i.quantity;
+          } else {
+            itemsMap.set(i.assetId, {
+              assetId: i.assetId,
+              assetName: asset.name,
+              quantity: i.quantity,
+              unit: asset.unitOfMeasurement || 'pcs'
+            });
+          }
+        }
+      });
+    });
+    
+    return Array.from(itemsMap.values());
   }, [waybills, assets, entry.siteId]);
 
   return (
@@ -54,19 +86,34 @@ function SiteLogCard({
         </button>
       </div>
 
-      <div className="pl-2 mb-3 flex gap-2 border-b border-slate-100 dark:border-slate-800">
-        <button 
-          className={cn("px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors border-b-2", activeTab === 'general' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300')}
+      <div className={cn("mb-3 border-b border-slate-100 dark:border-slate-800", machineItems.length === 0 && consumableItems.length === 0 ? "hidden" : `grid grid-cols-${machineItems.length > 0 && consumableItems.length > 0 ? 3 : 2}`)}>
+        <button
+          className={cn("flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold uppercase tracking-wide transition-colors border-b-2", activeTab === 'general' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300')}
           onClick={() => setActiveTab('general')}
         >
-          General Notes
+          <FileText className="h-3.5 w-3.5 shrink-0" />
+          Notes
         </button>
-        <button 
-          className={cn("px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 flex items-center gap-1.5", activeTab === 'machines' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300')}
-          onClick={() => setActiveTab('machines')}
-        >
-          <Wrench className="h-3.5 w-3.5" /> Machine Logs ({machineItems.length})
-        </button>
+        {machineItems.length > 0 && (
+          <button
+            className={cn("flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold uppercase tracking-wide transition-colors border-b-2", activeTab === 'machines' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300')}
+            onClick={() => setActiveTab('machines')}
+          >
+            <Wrench className="h-3.5 w-3.5 shrink-0" />
+            Machines
+            <span className={cn("text-[9px] font-black px-1 rounded-full", activeTab === 'machines' ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40' : 'bg-slate-100 text-slate-500 dark:bg-slate-800')}>{machineItems.length}</span>
+          </button>
+        )}
+        {consumableItems.length > 0 && (
+          <button
+            className={cn("flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold uppercase tracking-wide transition-colors border-b-2", activeTab === 'consumables' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300')}
+            onClick={() => setActiveTab('consumables')}
+          >
+            <Package className="h-3.5 w-3.5 shrink-0" />
+            Stock
+            <span className={cn("text-[9px] font-black px-1 rounded-full", activeTab === 'consumables' ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40' : 'bg-slate-100 text-slate-500 dark:bg-slate-800')}>{consumableItems.length}</span>
+          </button>
+        )}
       </div>
 
       <div className="pl-2">
@@ -74,13 +121,21 @@ function SiteLogCard({
           <textarea value={entry.narration || ''} onChange={e => onChangeNarration(e.target.value)}
             rows={4} placeholder="Type your field notes here..."
             className="w-full text-base sm:text-sm border border-slate-200 dark:border-slate-700 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 dark:bg-slate-950 transition-all placeholder:text-slate-400" />
-        ) : (
+        ) : activeTab === 'machines' ? (
           <div className="space-y-2">
             {machineItems.length === 0 ? (
               <p className="text-xs text-slate-500 py-4 text-center">No machines currently logged at this site.</p>
             ) : (
-              machineItems.map(m => {
-                const hasLog = dailyMachineLogs.some(l => l.assetId === m.id && l.date === formDate);
+              <>
+                {machineItems.length > 1 && (
+                  <div className="flex justify-end mb-3">
+                    <Button onClick={() => setIsBulkMachineOpen(true)} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-8 text-xs">
+                      Bulk Log Machines
+                    </Button>
+                  </div>
+                )}
+                {machineItems.map(m => {
+                  const hasLog = dailyMachineLogs.some(l => l.assetId === m.id && l.date === formDate);
                 return (
                   <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50">
                     <div className="flex items-center gap-3">
@@ -104,11 +159,67 @@ function SiteLogCard({
                     </Button>
                   </div>
                 );
-              })
+              })}
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {consumableItems.length === 0 ? (
+              <p className="text-xs text-slate-500 py-4 text-center">No consumables currently on this site.</p>
+            ) : (
+              <>
+                <div className="flex justify-end mb-3">
+                  <Button onClick={() => setIsBulkConsumableOpen(true)} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-8 text-xs">
+                    Bulk Log Consumables Usage
+                  </Button>
+                </div>
+                {consumableItems.map(c => {
+                  const hasLog = consumableLogs.some(l => l.assetId === c.assetId && l.siteId === entry.siteId && l.date === formDate);
+                  return (
+                    <div key={c.assetId} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                          <Package className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{c.assetName}</p>
+                          <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                            {hasLog ? <><CheckCircle2 className="h-3 w-3 text-emerald-500"/> Logged for {formatDateDisplay(formDate)}</> : <><AlertTriangle className="h-3 w-3 text-amber-500"/> Available: {c.quantity} {c.unit}</>}
+                          </p>
+                        </div>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        variant={hasLog ? "outline" : "default"}
+                        className={cn("h-8 text-xs font-bold px-4", hasLog ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/50 dark:text-emerald-400 dark:hover:bg-emerald-900/30" : "bg-emerald-600 hover:bg-emerald-700 text-white")}
+                        onClick={() => setIsBulkConsumableOpen(true)}
+                      >
+                        {hasLog ? 'Edit Usage' : 'Log Usage'}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </>
             )}
           </div>
         )}
       </div>
+
+      <BulkConsumableLogModal
+        isOpen={isBulkConsumableOpen}
+        onClose={() => setIsBulkConsumableOpen(false)}
+        site={{ id: entry.siteId!, name: entry.siteName!, client: entry.clientName! } as any}
+        consumables={consumableItems}
+      />
+      <BulkMachineLogModal
+        isOpen={isBulkMachineOpen}
+        onClose={() => setIsBulkMachineOpen(false)}
+        siteId={entry.siteId!}
+        siteName={entry.siteName!}
+        machines={machineItems.map(m => ({ id: m.id, name: m.name }))}
+        date={formDate}
+      />
     </div>
   );
 }
@@ -193,6 +304,16 @@ export function DailyJournal() {
   const handleSave = () => {
     if (!formDate.trim()) return toast.error('Date is required');
     if (formEntries.length === 0) return toast.error('Add at least one site log');
+
+    // Check that at least one entry has content (notes or machine/consumable logs)
+    const hasAnyContent = formEntries.some(e => {
+      const hasNarration = e.narration && e.narration.trim().length > 0;
+      const hasMachines = e.siteId && dailyMachineLogs.some(l => l.siteId === e.siteId && l.date === formDate);
+      return hasNarration || hasMachines;
+    });
+    if (!hasAnyContent) {
+      return toast.error('Please fill in notes or log machine activity for at least one site before publishing.');
+    }
     if (editingId) {
       updateDailyJournal(editingId, { date: formDate, generalNotes: '' }, formEntries.map(e => ({ id: e.id || generateId(), journalId: editingId, siteId: e.siteId!, siteName: e.siteName!, clientName: e.clientName!, narration: e.narration!, createdAt: e.createdAt || new Date().toISOString(), loggedBy: e.loggedBy || currentUser?.name || 'System' })));
       toast.success('Log updated');
@@ -308,8 +429,8 @@ export function DailyJournal() {
   useSetPageTitle('Site Diary', 'Daily field activity register', (
     <div className="flex items-center gap-3">
       {currentUser?.privileges?.dailyJournal?.canExport && (
-        <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(true)} className="h-9 px-4 gap-2 border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight">
-          <FileText className="w-4 h-4" /> Export Report
+        <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(true)} className="h-9 px-3 sm:px-4 gap-2 border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight">
+          <FileText className="w-4 h-4 shrink-0" /> <span className="hidden sm:inline">Export Report</span>
         </Button>
       )}
       {!diaryDate && (
@@ -442,6 +563,11 @@ export function DailyJournal() {
   }
 
   function renderModal() {
+    const hasMachineActivity = formEntries.some(e =>
+      e.siteId && dailyMachineLogs.some(l => l.siteId === e.siteId && l.date === formDate)
+    );
+    const hasTypedNotes = formEntries.some(e => e.narration && e.narration.trim().length > 0);
+    const showPublishReminder = formEntries.length > 0 && (hasMachineActivity || hasTypedNotes);
     return (
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen} fullScreenMobile>
         <DialogContent className="max-w-none w-full h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-w-2xl sm:max-h-[90vh] flex flex-col overflow-hidden p-0 !rounded-none sm:!rounded-xl border-0 sm:border !m-0 sm:!m-auto">
@@ -498,7 +624,9 @@ export function DailyJournal() {
           </div>
           <DialogFooter className="px-4 sm:px-6 py-4 border-t border-border bg-slate-50 dark:bg-slate-900 shrink-0 flex-col sm:flex-row gap-3 sm:justify-end pb-safe">
             <Button variant="outline" onClick={() => setIsModalOpen(false)} className="h-11 sm:h-10 w-full sm:w-auto font-semibold">Cancel</Button>
-            <Button onClick={handleSave} className="h-11 sm:h-10 w-full sm:w-auto px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md">Publish Log</Button>
+            <Button onClick={handleSave} className={cn("h-11 sm:h-10 w-full sm:w-auto px-8 text-white font-bold shadow-md", showPublishReminder ? "bg-amber-500 hover:bg-amber-600 animate-pulse" : "bg-blue-600 hover:bg-blue-700")}>
+              {showPublishReminder ? '⚠️ Publish Log' : 'Publish Log'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -93,16 +93,16 @@ export function BulkConsumableLogModal({ isOpen, onClose, site, consumables }: B
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl bg-white dark:bg-slate-950 p-0 border-0 shadow-2xl rounded-2xl overflow-hidden">
-        <DialogHeader className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+    <Dialog open={isOpen} onOpenChange={onClose} fullScreenMobile={true}>
+      <DialogContent className="w-full h-[100dvh] max-h-[100dvh] max-w-full sm:max-w-2xl sm:h-auto sm:max-h-[90vh] p-0 border-0 shadow-2xl rounded-none sm:rounded-2xl overflow-hidden flex flex-col bg-white dark:bg-slate-950">
+        <DialogHeader className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
           <DialogTitle className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
             <PackageCheck className="h-5 w-5 text-emerald-500" />
             Bulk Log Consumables
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col max-h-[80vh]">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             
             {/* Common Details */}

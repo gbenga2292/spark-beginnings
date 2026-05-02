@@ -55,6 +55,7 @@ export function WeeklyReport() {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // ── Permissions ───────────────────────────────────────
   const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId) || null);
@@ -274,86 +275,113 @@ export function WeeklyReport() {
 
   const reportLabel = reportMode === 'monthly' ? format(start, 'MMMM yyyy') : `${format(start, 'dd MMM yyyy')} – ${format(end, 'dd MMM yyyy')}`;
 
+
   // ── Page Header ───────────────────────────────────────
   useSetPageTitle(
     pdfPreviewUrl ? 'Report Document Preview' : (reportMode === 'monthly' ? 'Monthly Operations Report' : 'Weekly Operations Report'),
     pdfPreviewUrl ? 'Professional Site Operations Ledger' : 'Aggregated enterprise activity and financial summaries',
-    <div className="flex items-center gap-2">
+    <div className="relative flex items-center gap-2">
       {pdfPreviewUrl ? (
         <>
           <Button size="sm" variant="outline" onClick={() => { setPdfPreviewUrl(null); setIsPreviewOpen(false); }} className="h-9 w-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm" title="Close Preview">
-             <X className="h-5 w-5 text-slate-400" />
+            <X className="h-5 w-5 text-slate-400" />
           </Button>
           <Button size="sm" onClick={() => generateProfessionalPDF('download')} className="h-9 w-9 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200" title="Save PDF">
-             <Printer className="h-5 w-5" />
+            <Printer className="h-5 w-5" />
           </Button>
         </>
       ) : (
         <>
-          {/* Mode switcher — segmented pill */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 border border-slate-200 dark:border-slate-700">
-            {(['weekly', 'monthly'] as const).map(mode => (
-              <button
-                key={mode}
-                onClick={() => setReportMode(mode)}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all duration-150",
-                  reportMode === mode
-                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                )}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-
-          {/* Period navigator */}
-          <div className="flex items-center gap-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-            <button
-              onClick={() => setAnchor(a => reportMode === 'monthly' ? subMonths(a, 1) : subWeeks(a, 1))}
-              className="h-9 w-9 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 active:scale-90 transition-all duration-100 border-r border-slate-100 dark:border-slate-800"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-
-            <div className="flex items-center gap-2 px-3 min-w-[170px] justify-center">
-              <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
-              <span className="text-[12px] font-bold text-slate-800 dark:text-slate-100 tracking-tight text-center whitespace-nowrap">
-                {reportLabel}
-              </span>
+          {/* Desktop controls — hidden on mobile */}
+          <div className="hidden sm:flex items-center gap-2">
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 border border-slate-200 dark:border-slate-700">
+              {(['weekly', 'monthly'] as const).map(mode => (
+                <button key={mode} onClick={() => setReportMode(mode)}
+                  className={cn("px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all duration-150",
+                    reportMode === mode ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200")}>
+                  {mode}
+                </button>
+              ))}
             </div>
-
-            <button
-              onClick={() => setAnchor(a => reportMode === 'monthly' ? addMonths(a, 1) : addWeeks(a, 1))}
-              className="h-9 w-9 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 active:scale-90 transition-all duration-100 border-l border-slate-100 dark:border-slate-800"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+              <button onClick={() => setAnchor(a => reportMode === 'monthly' ? subMonths(a, 1) : subWeeks(a, 1))} className="h-9 w-9 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 active:scale-90 transition-all duration-100 border-r border-slate-100 dark:border-slate-800">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div className="flex items-center gap-2 px-3 min-w-[170px] justify-center">
+                <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
+                <span className="text-[12px] font-bold text-slate-800 dark:text-slate-100 tracking-tight text-center whitespace-nowrap">{reportLabel}</span>
+              </div>
+              <button onClick={() => setAnchor(a => reportMode === 'monthly' ? addMonths(a, 1) : addWeeks(a, 1))} className="h-9 w-9 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 active:scale-90 transition-all duration-100 border-l border-slate-100 dark:border-slate-800">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+            <button onClick={() => setAnchor(new Date())} className="h-9 px-3 text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm whitespace-nowrap">Today</button>
+            <Button variant="outline" size="sm" onClick={handleExportXLSX} className="h-9 w-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm" title="Export Excel"><Download className="h-5 w-5 text-indigo-500" /></Button>
+            <Button size="sm" onClick={() => generateProfessionalPDF('preview')} className="h-9 w-9 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200" title="View PDF Report"><FileText className="h-5 w-5" /></Button>
           </div>
 
-          {/* Jump to today */}
+          {/* Mobile: 3-dot menu trigger */}
           <button
-            onClick={() => setAnchor(new Date())}
-            className="h-9 px-3 text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm whitespace-nowrap"
-            title="Jump to current period"
+            className="sm:hidden h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white dark:bg-slate-900 dark:border-slate-700 text-slate-600 dark:text-slate-300 shadow-sm"
+            onClick={() => setMobileMenuOpen(o => !o)}
           >
-            Today
+            <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
           </button>
 
-          <Button variant="outline" size="sm" onClick={handleExportXLSX} className="h-9 w-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm" title="Export Excel">
-            <Download className="h-5 w-5 text-indigo-500" />
-          </Button>
-          <Button size="sm" onClick={() => generateProfessionalPDF('preview')} className="h-9 w-9 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200" title="View PDF Report">
-            <FileText className="h-5 w-5" />
-          </Button>
+          {/* Mobile dropdown panel — fixed to escape header clipping */}
+          {mobileMenuOpen && (
+            <>
+              {/* Backdrop */}
+              <div className="sm:hidden fixed inset-0 z-40" onClick={() => setMobileMenuOpen(false)} />
+              {/* Panel */}
+              <div className="sm:hidden fixed top-16 right-3 z-50 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              {/* Mode switcher */}
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Report Mode</p>
+                <div className="flex gap-2">
+                  {(['weekly', 'monthly'] as const).map(mode => (
+                    <button key={mode} onClick={() => { setReportMode(mode); }}
+                      className={cn("flex-1 py-2 rounded-xl text-xs font-bold uppercase tracking-wide transition-all",
+                        reportMode === mode ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900" : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400")}>
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Period navigator */}
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Period</p>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setAnchor(a => reportMode === 'monthly' ? subMonths(a, 1) : subWeeks(a, 1))} className="h-9 w-9 shrink-0 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="flex-1 text-center text-xs font-bold text-slate-800 dark:text-slate-100">{reportLabel}</span>
+                  <button onClick={() => setAnchor(a => reportMode === 'monthly' ? addMonths(a, 1) : addWeeks(a, 1))} className="h-9 w-9 shrink-0 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                <button onClick={() => { setAnchor(new Date()); setMobileMenuOpen(false); }} className="flex-1 h-9 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">Today</button>
+                <button onClick={() => { handleExportXLSX(); setMobileMenuOpen(false); }} className="flex-1 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold flex items-center justify-center gap-1.5">
+                  <Download className="h-4 w-4" /> Excel
+                </button>
+                <button onClick={() => { generateProfessionalPDF('preview'); setMobileMenuOpen(false); }} className="flex-1 h-9 rounded-xl bg-slate-900 text-white text-xs font-bold flex items-center justify-center gap-1.5">
+                  <FileText className="h-4 w-4" /> PDF
+                </button>
+              </div>
+            </div>
+            </>
+          )}
         </>
       )}
     </div>,
-    [reportLabel, reportMode, pdfPreviewUrl]
+    [reportLabel, reportMode, pdfPreviewUrl, mobileMenuOpen]
   );
 
-  // ── Professional PDF Generation ───────────────────────
   async function generateProfessionalPDF(mode: 'preview' | 'download') {
     setIsGenerating(true);
     const doc = new jsPDF();
