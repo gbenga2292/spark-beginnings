@@ -43,6 +43,7 @@ interface PayrollRecord {
   nsitf: number;
   withholdingTaxRate?: number;
   withholdingTax: boolean;
+  hasPension?: boolean;
   taxId: string;
   status: 'Pending' | 'Processed';
 }
@@ -53,7 +54,7 @@ import { getPositionIndex } from '@/src/lib/hierarchy';
 
 
 const isPayeEligible = (r: PayrollRecord) => r.paye > 0 && r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
-const isPensionEligible = (r: PayrollRecord) => r.pension > 0 && r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
+const isPensionEligible = (r: PayrollRecord) => r.hasPension && r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
 const isNsitfEligible = (r: PayrollRecord) => r.nsitf > 0 && !r.department.trim().toLowerCase().includes('adhoc');
 
 const currentYear = new Date().getFullYear();
@@ -360,8 +361,13 @@ export function Payroll() {
           // GROSS PAY: SALARY + OVERTIME
           const grossPay = salary + overtime;
 
-          // PENSION deduction (on pensionSum, not totalAllowances) — OFFICE/FIELD staff only
-          const pension = (emp.payeTax && emp.staffType !== 'NON-EMPLOYEE') ? pensionSum * (payrollVariables.employeePensionRate / 100) : 0;
+          // Determine pension eligibility: use subjectToPension if explicitly set, else fall back to payeTax
+          const hasPension = (emp.subjectToPension !== undefined && emp.subjectToPension !== null)
+            ? (emp.subjectToPension && emp.staffType !== 'NON-EMPLOYEE')
+            : (emp.payeTax && emp.staffType !== 'NON-EMPLOYEE');
+
+          // PENSION deduction (on pensionSum, not totalAllowances)
+          const pension = hasPension ? pensionSum * (payrollVariables.employeePensionRate / 100) : 0;
 
           // Ã¢â€â‚¬Ã¢â€â‚¬ PAYE calculation matching Excel formula exactly: Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
           // Ã¢â€ â‚¬Ã¢â€ â‚¬ PAYE calculation matching Excel formula exactly: Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬Ã¢â€ â‚¬
@@ -371,7 +377,7 @@ export function Payroll() {
           if (emp.payeTax) {
             const tv = payeTaxVariables;
             const annualGross = (salary * 12) + overtime;
-            const pensionAmt = (pensionSum * 12) * (payrollVariables.employeePensionRate / 100);
+            const pensionAmt = hasPension ? (pensionSum * 12) * (payrollVariables.employeePensionRate / 100) : 0;
             const extraCRA = tv.extraConditions.filter(c => c.enabled).reduce((s, c) => s + c.amount, 0);
             const rentRelief = Math.min((emp.rent || 0) * (tv.rentReliefRate ?? 0.20), 500000);
             const cra = tv.craBase + rentRelief + pensionAmt + extraCRA;
@@ -454,7 +460,7 @@ export function Payroll() {
           // TAKE HOME PAY: GROSS PAY - (PAYE + LOAN REPAYMENT + PENSION)
           const takeHomePay = grossPay - (paye + loanRepayment + pension);
 
-          const employerPension = (emp.payeTax && emp.staffType !== 'NON-EMPLOYEE') ? pensionSum * (payrollVariables.employerPensionRate / 100) : 0;
+          const employerPension = hasPension ? pensionSum * (payrollVariables.employerPensionRate / 100) : 0;
           const nsitf = emp.payeTax ? grossPay * (payrollVariables.nsitfRate / 100) : 0;
 
           return {
@@ -481,6 +487,7 @@ export function Payroll() {
             pension,
             employerPension,
             nsitf,
+            hasPension,
             takeHomePay,
             withholdingTaxRate: whtRateToStore,
             withholdingTax: !!emp.withholdingTax,
@@ -594,7 +601,7 @@ export function Payroll() {
         return `
         <div class="payslip${isLast ? ' last' : ''}">
           <div class="classic-header">
-            <div class="classic-logo-area"><img src="${logoSrc}" alt="Logo" style="height:56px;width:auto;" /></div>
+            <div class="classic-logo-area"><img src="${logoSrc}" alt="Logo" style="height:64px;width:auto;" /></div>
             <div class="classic-company-info">
               <h1 class="classic-company-name">${companyInfo.name}</h1>
               <p class="classic-company-sub">${companyInfo.address}</p>
@@ -622,9 +629,10 @@ export function Payroll() {
               <tbody>${deductionRows}${deductionsTotalRow}</tbody>
             </table>
           </div>
+          <div class="classic-spacer"></div>
           ${netPayBlock}
           <div class="classic-footer">
-            <p>This is a computer-generated payslip and requires no signature.</p>
+            <p>This is a computer-generated payslip. Please retain for your records.</p>
             <p>Generated: ${formatDisplayDate(Date.now())}</p>
           </div>
         </div>`;
@@ -635,10 +643,11 @@ export function Payroll() {
         return `
         <div class="payslip${isLast ? ' last' : ''}">
           <div class="formal-header">
-            <img src="${logoSrc}" alt="Logo" style="height:44px;width:auto;" />
+            <img src="${logoSrc}" alt="Logo" style="height:52px;width:auto;" />
             <div class="formal-header-text">
               <div class="formal-company">${companyInfo.name}</div>
               <div class="formal-subtitle">PAYROLL ADVICE — ${period}</div>
+              ${companyInfo.address ? `<div class="formal-address">${companyInfo.address}</div>` : ''}
             </div>
           </div>
           <table class="formal-info-table">
@@ -671,10 +680,11 @@ export function Payroll() {
               </table>
             </div>
           </div>
+          <div class="formal-spacer"></div>
           ${col('net_pay') ? `<div class="formal-net"><span class="formal-net-label">NET PAY</span><span class="formal-net-amount">${currency(slip.record.takeHomePay)}</span></div>` : ''}
           <div class="formal-footer">
-            <span>Authorised Signatory ________________________</span>
-            <span>Computer-generated. Generated on ${formatDisplayDate(Date.now())}</span>
+            <span>Computer-generated payslip. Please retain for your records.</span>
+            <span>Generated on ${formatDisplayDate(Date.now())}</span>
           </div>
         </div>`;
       }
@@ -713,51 +723,62 @@ export function Payroll() {
 
     // ── Theme-specific CSS ───────────────────────────────────────────────
     const themeStyles = payslipTheme === 'CLASSIC' ? `
-      body, .preview-payslips-wrapper { font-family: sans-serif; color: #1a1a1a; }
-      .payslip { page-break-after: always; max-width: 820px; margin: 0 auto; padding: 30px 40px; border: 1px solid #bbb; }
+      @page { size: A4 portrait; margin: 14mm 16mm; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body, .preview-payslips-wrapper { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a1a; }
+      .payslip { page-break-after: always; width: 100%; min-height: 269mm; display: flex; flex-direction: column; padding: 22px 28px; border: 1px solid #ccc; }
       .payslip.last { page-break-after: auto; }
-      .classic-header { display: flex; align-items: center; gap: 20px; padding-bottom: 14px; border-bottom: 3px double #1a1a1a; margin-bottom: 14px; }
-      .classic-company-name { margin: 0 0 4px; font-size: 17px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
-      .classic-company-sub { margin: 0; font-size: 11px; color: #555; }
-      .classic-title-bar { background: #1a1a1a; color: #fff; display: flex; justify-content: space-between; padding: 6px 12px; font-size: 12px; font-weight: bold; letter-spacing: 1px; margin-bottom: 14px; text-transform: uppercase; }
-      .classic-info-grid { display: flex; gap: 32px; margin-bottom: 18px; }
-      .info-table { flex: 1; font-size: 12px; border-collapse: collapse; }
-      .info-table td { padding: 4px 6px; border: 1px solid #ddd; }
-      .info-table td:first-child { font-weight: bold; background: #f5f5f5; width: 40%; }
-      .classic-body { display: flex; gap: 20px; margin-bottom: 14px; }
-      .classic-section-table { flex: 1; border-collapse: collapse; font-size: 13px; }
-      .classic-section-table thead th { background: #333; color: #fff; padding: 6px 8px; text-align: left; font-size: 11px; letter-spacing: 0.5px; }
-      .classic-section-table td { padding: 5px 8px; border-bottom: 1px solid #eee; }
-      .classic-section-table tr.sum td { font-weight: bold; border-top: 2px solid #333; background: #f9f9f9; }
+      .classic-header { display: flex; align-items: center; gap: 24px; padding-bottom: 16px; border-bottom: 3px double #1a1a1a; margin-bottom: 16px; }
+      .classic-company-name { margin: 0 0 5px; font-size: 18px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+      .classic-company-sub { margin: 2px 0 0; font-size: 11.5px; color: #555; }
+      .classic-title-bar { background: #1a1a1a; color: #fff; display: flex; justify-content: space-between; padding: 9px 14px; font-size: 12.5px; font-weight: bold; letter-spacing: 1px; margin-bottom: 18px; text-transform: uppercase; }
+      .classic-info-grid { display: flex; gap: 32px; margin-bottom: 20px; }
+      .info-table { flex: 1; font-size: 12.5px; border-collapse: collapse; }
+      .info-table td { padding: 7px 8px; border: 1px solid #ddd; }
+      .info-table td:first-child { font-weight: bold; background: #f5f5f5; width: 42%; }
+      .classic-body { display: flex; gap: 24px; margin-bottom: 0; }
+      .classic-section-table { flex: 1; border-collapse: collapse; font-size: 13px; height: fit-content; }
+      .classic-section-table thead th { background: #2c2c2c; color: #fff; padding: 9px 10px; text-align: left; font-size: 11.5px; letter-spacing: 0.5px; }
+      .classic-section-table td { padding: 8px 10px; border-bottom: 1px solid #eee; }
+      .classic-section-table tr.sum td { font-weight: bold; border-top: 2px solid #333; background: #f4f4f4; padding: 10px; }
       .text-right { text-align: right !important; }
-      .net-pay { border: 2px solid #1a1a1a; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
-      .net-pay span:first-child { font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
-      .net-pay span:last-child { font-size: 20px; font-weight: bold; font-family: 'Courier New', monospace; }
-      .classic-footer { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #888; font-style: italic; }
+      .classic-spacer { flex: 1; }
+      .net-pay { border: 2.5px solid #1a1a1a; padding: 16px 18px; display: flex; justify-content: space-between; align-items: center; margin: 18px 0 16px; }
+      .net-pay span:first-child { font-size: 14px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+      .net-pay span:last-child { font-size: 22px; font-weight: bold; font-family: 'Courier New', monospace; }
+      .classic-footer { border-top: 1px solid #ccc; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #888; font-style: italic; }
     ` : payslipTheme === 'FORMAL' ? `
+      @page { size: A4 portrait; margin: 0; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
       body, .preview-payslips-wrapper { font-family: Arial, Helvetica, sans-serif; color: #1a1a2e; }
-      .payslip { page-break-after: always; max-width: 820px; margin: 0 auto; padding: 0 0 28px 0; }
+      .payslip { page-break-after: always; width: 100%; min-height: 297mm; display: flex; flex-direction: column; padding: 0; }
       .payslip.last { page-break-after: auto; }
-      .formal-header { display: flex; align-items: center; gap: 16px; background: #0f172a; color: #fff; padding: 16px 22px; margin-bottom: 0; }
+      .formal-header { display: flex; align-items: center; gap: 18px; background: #0f172a; color: #fff; padding: 22px 28px; }
       .formal-header-text { flex: 1; }
-      .formal-company { font-size: 15px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
-      .formal-subtitle { font-size: 11px; color: #9bb8d8; margin-top: 3px; letter-spacing: 1px; }
-      .formal-info-table { width: 100%; border-collapse: collapse; margin: 0 0 16px; border: 1px solid #c8d8e8; }
-      .formal-info-table td { padding: 9px 14px; border: 1px solid #c8d8e8; font-size: 13px; vertical-align: top; }
-      .formal-info-table label { display: block; font-size: 10px; color: #7a98b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
-      .formal-info-table span { font-weight: 600; font-size: 13px; color: #1a1a2e; }
-      .formal-columns { display: flex; gap: 16px; margin-bottom: 0; }
-      .formal-col { flex: 1; }
-      .formal-col-header { background: #0f172a; color: #fff; padding: 7px 12px; font-size: 11px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
+      .formal-company { font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+      .formal-subtitle { font-size: 11.5px; color: #9bb8d8; margin-top: 4px; letter-spacing: 1px; }
+      .formal-address { font-size: 10.5px; color: #7a98b8; margin-top: 3px; }
+      .formal-info-table { width: 100%; border-collapse: collapse; border-bottom: 1px solid #c8d8e8; }
+      .formal-info-table td { padding: 13px 28px; border-right: 1px solid #e2e8f0; font-size: 13px; vertical-align: top; width: 33.3%; }
+      .formal-info-table td:last-child { border-right: none; }
+      .formal-info-table label { display: block; font-size: 10px; color: #7a98b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+      .formal-info-table span { font-weight: 600; font-size: 13.5px; color: #1a1a2e; }
+      .formal-columns { display: flex; border-top: 3px solid #0f172a; }
+      .formal-col { flex: 1; padding: 18px 28px 22px; }
+      .formal-col:first-child { border-right: 1px solid #e2e8f0; }
+      .formal-col-header { font-size: 11px; font-weight: bold; letter-spacing: 1.2px; text-transform: uppercase; color: #0f172a; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 10px; }
       .formal-breakdown { width: 100%; border-collapse: collapse; font-size: 13px; }
-      .formal-breakdown tbody td { padding: 6px 12px; border-bottom: 1px solid #eaeff5; }
-      .formal-breakdown tfoot td { padding: 7px 12px; font-weight: bold; border-top: 2px solid #0f172a; background: #f8fafc; }
+      .formal-breakdown tbody td { padding: 8px 0; border-bottom: 1px solid #eaeff5; }
+      .formal-breakdown tfoot td { padding: 10px 0; font-weight: bold; border-top: 2px solid #0f172a; font-size: 13.5px; }
       .formal-breakdown tr.sum td { font-weight: bold; }
       .text-right { text-align: right !important; }
-      .formal-net { background: #0f172a; color: #fff; padding: 16px 22px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+      .formal-spacer { flex: 1; }
+      .formal-net { background: #0f172a; color: #fff; padding: 20px 28px; display: flex; justify-content: space-between; align-items: center; }
       .formal-net-label { font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1.5px; }
-      .formal-net-amount { font-size: 22px; font-weight: bold; font-family: 'Courier New', monospace; }
-      .formal-footer { display: flex; justify-content: space-between; font-size: 10px; color: #999; border-top: 1px solid #ddd; padding: 8px 4px 0; }
+      .formal-net-amount { font-size: 26px; font-weight: bold; font-family: 'Courier New', monospace; }
+      .formal-footer { display: flex; justify-content: space-between; font-size: 10px; color: #888; padding: 10px 28px; background: #f8fafc; }
     ` : `
       body, .preview-payslips-wrapper { font-family: sans-serif; color: #333; }
       .payslip { page-break-after: always; max-width: 800px; margin: 0 auto; padding: 20px; }
@@ -850,7 +871,7 @@ export function Payroll() {
 
       // Helpers for CSV eligibility
       const csvPayeOk  = (r: PayrollRecord) => r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
-      const csvPenOk   = (r: PayrollRecord) => r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
+      const csvPenOk   = (r: PayrollRecord) => r.hasPension && r.staffType !== 'NON-EMPLOYEE' && !r.department.trim().toLowerCase().includes('adhoc');
       const csvNsitfOk = (r: PayrollRecord) => r.nsitf > 0 && !r.department.trim().toLowerCase().includes('adhoc');
 
       if (typeToExport === 'PAYE') {
@@ -1353,7 +1374,7 @@ export function Payroll() {
                 <CardContent className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-slate-100 p-0 sm:p-6 sm:pt-0">
                   {/* MOBILE CARDS */}
                   <div className="md:hidden divide-y divide-slate-100">
-                    {payrollData.filter(r => (r.staffType === 'OFFICE' || r.staffType === 'FIELD') && !r.department.trim().toLowerCase().includes('adhoc')).map((r, i) => (
+                    {payrollData.filter(isPensionEligible).map((r, i) => (
                       <div key={r.id} className="p-4 bg-white hover:bg-slate-50 transition-colors">
                         <div className="flex justify-between items-start mb-2">
                           <div className="min-w-0">
@@ -1371,7 +1392,7 @@ export function Payroll() {
                         </div>
                       </div>
                     ))}
-                    {(() => { const pp = payrollData.filter(r => (r.staffType === 'OFFICE' || r.staffType === 'FIELD') && !r.department.trim().toLowerCase().includes('adhoc')); return (
+                    {(() => { const pp = payrollData.filter(isPensionEligible); return (
                       <div className="p-4 bg-emerald-50 border-t border-emerald-100 flex justify-between items-center">
                         <span className="font-bold text-emerald-900 text-sm">TOTAL PENSION</span>
                         <span className="font-bold text-emerald-700 text-lg">₦{fmT(pp.reduce((s, r) => s + r.pension + r.employerPension, 0))}</span>
@@ -1393,7 +1414,7 @@ export function Payroll() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {payrollData.filter(r => (r.staffType === 'OFFICE' || r.staffType === 'FIELD') && !r.department.trim().toLowerCase().includes('adhoc')).map((r, i) => {
+                      {payrollData.filter(isPensionEligible).map((r, i) => {
                         const penSum = r.basicSalary + r.housing + r.transport;
                         return (
                           <TableRow key={r.id} className="hover:bg-amber-50/30">
@@ -1408,7 +1429,7 @@ export function Payroll() {
                           </TableRow>
                         );
                       })}
-                      {(() => { const pp = payrollData.filter(r => (r.staffType === 'OFFICE' || r.staffType === 'FIELD') && !r.department.trim().toLowerCase().includes('adhoc')); return (
+                      {(() => { const pp = payrollData.filter(isPensionEligible); return (
                       <TableRow className="border-t-2 bg-amber-50 font-bold">
                         <TableCell colSpan={4} className="text-right font-bold">TOTALS</TableCell>
                         <TableCell className="text-right font-mono">{fmT(pp.reduce((s, r) => s + (r.basicSalary + r.housing + r.transport), 0))}</TableCell>

@@ -5,7 +5,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar';
-import { Search, Plus, MoreHorizontal, Download, Upload, ArrowLeft, Save, Pencil, Trash2, Eye, X, Network, CheckSquare, Square, Settings2, Users, ChevronDown } from 'lucide-react';
+import { Search, Plus, MoreHorizontal, Download, Upload, ArrowLeft, Save, Pencil, Trash2, Eye, X, Network, CheckSquare, Square, Settings2, Users, ChevronDown, Calendar as CalendarIcon } from 'lucide-react';
 import { useAppStore, Employee, MonthlySalary, DisciplinaryRecord } from '@/src/store/appStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -1404,57 +1404,185 @@ export function Employees() {
             })()}
 
             {detailTab === 'Attendance' && (() => {
+              if (activeTabMonth === 'All' || activeTabYear === 'All') {
+                return (
+                  <div className="text-center py-12 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 border-dashed">
+                    <CalendarIcon className="w-8 h-8 text-slate-400 mx-auto mb-3" />
+                    <p className="text-slate-600 font-medium">Please select a specific month and year to view the attendance calendar.</p>
+                  </div>
+                );
+              }
+
+              const year = parseInt(activeTabYear);
+              const month = parseInt(activeTabMonth);
+              const daysInMonth = new Date(year, month, 0).getDate();
+              
               const empAtt = attendanceRecords
                 .filter(r => r.staffId === emp.id)
-                .filter(r => activeTabYear === 'All' ? true : r.date?.startsWith(activeTabYear))
-                .filter(r => activeTabMonth === 'All' ? true : new Date(r.date || '').getMonth() + 1 === parseInt(activeTabMonth))
-                .sort((a,b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+                .filter(r => {
+                  const dateParts = r.date?.split('-');
+                  if (!dateParts || dateParts.length !== 3) return false;
+                  return parseInt(dateParts[0]) === year && parseInt(dateParts[1]) === month;
+                });
               
-              const actualWorkdays = empAtt.reduce((sum, r) => sum + ((Number(r.dayWk) || 0) + (Number(r.nightWk) || 0)), 0);
-              const absentDays = empAtt.filter(r => r.isPresent === 'No').length;
-              const overtimeHours = empAtt.reduce((sum, r) => sum + (Number(r.ot) || 0), 0);
+              const recordsByDay = new Map(empAtt.map(r => {
+                const day = parseInt(r.date.split('-')[2]);
+                return [day, r];
+              }));
+
+              let workdays = 0;
+              let absentDays = 0;
+              let leaveCount = 0;
+              let permitCount = 0;
+              let overtimeCount = 0;
+
+              for (let d = 1; d <= daysInMonth; d++) {
+                const r = recordsByDay.get(d);
+                if (!r) continue;
+                if (r.isPresent === 'Yes') workdays++;
+                if (r.isPresent === 'No') {
+                  const status = (r.absentStatus || '').toLowerCase();
+                  if (status.includes('permit')) permitCount++;
+                  else if (status.includes('leave')) leaveCount++;
+                  else absentDays++;
+                }
+                if (r.overtimeDetails || (Number(r.ot) > 0)) overtimeCount++;
+              }
+
+              // Build calendar grid cells
+              const gridCells = [];
+              // Add empty cells for the first day of the month offset
+              const firstDayOfWeek = new Date(year, month - 1, 1).getDay(); // 0 = Sunday
+              for (let i = 0; i < firstDayOfWeek; i++) {
+                gridCells.push(<div key={`empty-${i}`} className="h-14 border border-transparent"></div>);
+              }
+
+              for (let day = 1; day <= daysInMonth; day++) {
+                const r = recordsByDay.get(day);
+                let bgColor = 'bg-slate-50 dark:bg-slate-800/50';
+                let textColor = 'text-slate-400';
+                let dotColor = 'bg-transparent';
+                let hoverTitle = 'No Record';
+                let siteInfo = null;
+
+                if (r) {
+                  const status = (r.absentStatus || '').toLowerCase();
+                  const isLeave = status.includes('leave');
+                  const isPermit = status.includes('permit');
+                  const isAbsent = r.isPresent === 'No' && !isLeave && !isPermit;
+                  const isOvertime = r.overtimeDetails || (Number(r.ot) > 0);
+                  const isPresent = r.isPresent === 'Yes';
+
+                  if (isLeave) {
+                    bgColor = 'bg-amber-50 dark:bg-amber-900/20';
+                    textColor = 'text-amber-700 dark:text-amber-400';
+                    dotColor = 'bg-amber-500';
+                    hoverTitle = 'On Leave';
+                  } else if (isPermit) {
+                    // Avoiding purple as per rules, using orange for "Absent with Permit"
+                    bgColor = 'bg-orange-50 dark:bg-orange-900/20';
+                    textColor = 'text-orange-700 dark:text-orange-400';
+                    dotColor = 'bg-orange-500';
+                    hoverTitle = 'Absent with Permit';
+                  } else if (isAbsent) {
+                    bgColor = 'bg-rose-50 dark:bg-rose-900/20';
+                    textColor = 'text-rose-700 dark:text-rose-400';
+                    dotColor = 'bg-rose-500';
+                    hoverTitle = 'Absent';
+                  } else if (isOvertime) {
+                    bgColor = 'bg-blue-50 dark:bg-blue-900/20';
+                    textColor = 'text-blue-700 dark:text-blue-400';
+                    dotColor = 'bg-blue-500';
+                    hoverTitle = 'Overtime';
+                  } else if (isPresent) {
+                    bgColor = 'bg-emerald-50 dark:bg-emerald-900/20';
+                    textColor = 'text-emerald-700 dark:text-emerald-400';
+                    dotColor = 'bg-emerald-500';
+                    hoverTitle = 'Present';
+                  }
+
+                  if (isPresent || isOvertime) {
+                    const locations = [];
+                    if (r.daySite) locations.push(`Day: ${r.dayClient ? r.dayClient + ' - ' : ''}${r.daySite}`);
+                    if (r.nightSite) locations.push(`Night: ${r.nightClient ? r.nightClient + ' - ' : ''}${r.nightSite}`);
+                    siteInfo = locations.join(' | ');
+                  }
+                }
+
+                gridCells.push(
+                  <div key={`day-${day}`} className={`relative h-14 rounded-md border border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center group transition-all duration-200 cursor-default ${bgColor}`}>
+                    <span className={`text-sm font-semibold ${textColor}`}>{day}</span>
+                    {r && (
+                      <span className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${dotColor}`} />
+                    )}
+                    
+                    {/* Floating Hover UI */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-3 bg-slate-900 text-white rounded-lg shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-10 text-xs text-left">
+                      <div className="font-bold border-b border-slate-700 pb-1 mb-1">
+                        {new Date(year, month - 1, day).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </div>
+                      <div className="text-slate-300 mb-1">{hoverTitle}</div>
+                      {siteInfo && <div className="text-emerald-300 truncate">{siteInfo}</div>}
+                      {r?.overtimeDetails && <div className="text-blue-300 mt-1 truncate">OT: {r.overtimeDetails}</div>}
+                    </div>
+                  </div>
+                );
+              }
 
               return (
-                <div className="space-y-4">
-                  <div className="text-sm font-bold text-slate-700">
-                     <span>Actual Workdays: {actualWorkdays}</span>
-                     <span className="mx-2 text-slate-300">|</span>
-                     <span>Absent: {absentDays}</span>
-                     <span className="mx-2 text-slate-300">|</span>
-                     <span>Overtime: {overtimeHours} hrs</span>
+                <div className="space-y-6">
+                  {/* Executive Summary Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700 flex flex-col">
+                      <span className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Workdays</span>
+                      <span className="text-2xl font-bold text-slate-900 dark:text-white">{workdays}</span>
+                    </div>
+                    <div className="bg-rose-50 dark:bg-rose-900/10 rounded-lg p-3 border border-rose-100 dark:border-rose-900/50 flex flex-col">
+                      <span className="text-xs text-rose-500 font-medium uppercase tracking-wider mb-1">Absent</span>
+                      <span className="text-2xl font-bold text-rose-700 dark:text-rose-400">{absentDays}</span>
+                    </div>
+                    <div className="bg-orange-50 dark:bg-orange-900/10 rounded-lg p-3 border border-orange-100 dark:border-orange-900/50 flex flex-col">
+                      <span className="text-xs text-orange-600 font-medium uppercase tracking-wider mb-1">W/ Permit</span>
+                      <span className="text-2xl font-bold text-orange-700 dark:text-orange-400">{permitCount}</span>
+                    </div>
+                    <div className="bg-amber-50 dark:bg-amber-900/10 rounded-lg p-3 border border-amber-100 dark:border-amber-900/50 flex flex-col">
+                      <span className="text-xs text-amber-600 font-medium uppercase tracking-wider mb-1">Leave</span>
+                      <span className="text-2xl font-bold text-amber-700 dark:text-amber-400">{leaveCount}</span>
+                    </div>
+                    <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-3 border border-blue-100 dark:border-blue-900/50 flex flex-col">
+                      <span className="text-xs text-blue-600 font-medium uppercase tracking-wider mb-1">Overtime</span>
+                      <span className="text-2xl font-bold text-blue-700 dark:text-blue-400">{overtimeCount}</span>
+                    </div>
                   </div>
-                  {empAtt.length === 0 ? (
-                    <div className="text-center py-8 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 shadow-inner">
-                      <p className="text-slate-500 font-medium">No attendance records found for selected period.</p>
+
+                  {/* Calendar Grid */}
+                  <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                    <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
+                      <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                        <CalendarIcon className="w-4 h-4 text-slate-500" />
+                        Attendance Calendar
+                      </h4>
+                      <div className="flex gap-4 text-xs font-medium">
+                        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div> Present</div>
+                        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div> Overtime</div>
+                        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div> Leave</div>
+                        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div> Permit</div>
+                        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div> Absent</div>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-slate-50/50">
-                            <TableHead className="w-24">Date</TableHead>
-                            <TableHead>Client/Site</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {empAtt.map(r => (
-                            <TableRow key={r.id}>
-                              <TableCell className="font-mono text-[11px] text-slate-500">{formatDisplayDate(r.date)}</TableCell>
-                              <TableCell className="text-xs text-slate-600">
-                                {r.dayClient && r.dayClient !== 'N/A' ? `${r.dayClient} - ${r.daySite}` : 'N/A'}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className={r.isPresent === 'Yes' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-rose-50 text-rose-600 border-rose-200'}>
-                                  {r.isPresent === 'Yes' ? 'Present' : 'Absent'}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                    <div className="p-5">
+                      <div className="grid grid-cols-7 gap-2 mb-2">
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                          <div key={day} className="text-center text-xs font-semibold text-slate-400 uppercase tracking-wider py-1">
+                            {day}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-7 gap-2">
+                        {gridCells}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               );
             })()}
