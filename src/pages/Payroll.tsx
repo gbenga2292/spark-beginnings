@@ -1,5 +1,5 @@
 import { formatDisplayDate, getPayrollPeriodDates } from '@/src/lib/dateUtils';
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -14,6 +14,7 @@ import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
 import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
+import { supabase } from '@/src/integrations/supabase/client';
 
 interface PayrollRecord {
   id: string;
@@ -90,6 +91,26 @@ export function Payroll() {
   const [printViewMode, setPrintViewMode] = useState<'LIST' | 'MATRIX'>('LIST');
   const [filterDept, setFilterDept] = useState<string>('');
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+
+  const [companyInfo, setCompanyInfo] = useState({ name: 'DEWATERING CONSTRUCTION ETC LIMITED', address: '', phone: '', email: '' });
+  const [payslipTheme, setPayslipTheme] = useState<'MODERN' | 'CLASSIC' | 'FORMAL'>('MODERN');
+
+  useEffect(() => {
+    const fetchCompanyInfo = async () => {
+      const { data } = await supabase.from('app_settings').select('*');
+      if (data) {
+        const info = { name: '', address: '', phone: '', email: '' };
+        data.forEach(setting => {
+          if (setting.key === 'company_name') info.name = setting.value;
+          if (setting.key === 'company_address') info.address = setting.value;
+          if (setting.key === 'company_phone') info.phone = setting.value;
+          if (setting.key === 'company_email') info.email = setting.value;
+        });
+        if (info.name) setCompanyInfo(prev => ({ ...prev, ...info }));
+      }
+    };
+    fetchCompanyInfo();
+  }, []);
 
   // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Permissions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const priv = usePriv('payroll');
@@ -528,6 +549,238 @@ export function Payroll() {
       setPrintSelectedColumns(DEFAULT_COLUMNS[type] || []);
     };
 
+    // Build self-contained HTML for every payslip so all appear in one print job
+    const currency = (n: number) => '₦' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // Column visibility helper – gates each field against the user's checkbox selections
+    const col = (id: string) => printSelectedColumns.includes(id);
+
+    // Per-slip HTML builder — branches on payslipTheme for 3 distinct layouts
+    const buildSlipHtml = (slip: typeof payslipsToPrint[0], i: number) => {
+      const isLast = i === payslipsToPrint.length - 1;
+      const name = `${slip.record.firstname} ${slip.record.surname}`;
+      const period = `${slip.monthLabel} ${printSelectedYear}`;
+      const totalDeductions = slip.record.paye + slip.record.loanRepayment + slip.record.pension;
+
+      // ── Shared row builders (respect column filter) ──────────────────
+      const earningsRows = [
+        col('main_salary') ? `<tr><td>Main Salary</td><td class="text-right">${currency(slip.record.salary)}</td></tr>` : '',
+        col('basic') ? `<tr><td>Basic Salary</td><td class="text-right">${currency(slip.record.basicSalary)}</td></tr>` : '',
+        col('housing') && slip.record.housing > 0 ? `<tr><td>Housing Allowance</td><td class="text-right">${currency(slip.record.housing)}</td></tr>` : '',
+        col('transport') && slip.record.transport > 0 ? `<tr><td>Transport Allowance</td><td class="text-right">${currency(slip.record.transport)}</td></tr>` : '',
+        col('other') && slip.record.otherAllowances > 0 ? `<tr><td>Other Allowances</td><td class="text-right">${currency(slip.record.otherAllowances)}</td></tr>` : '',
+        col('overtime') && slip.record.overtime > 0 ? `<tr><td>Overtime Pay</td><td class="text-right">${currency(slip.record.overtime)}</td></tr>` : '',
+      ].filter(Boolean).join('');
+
+      const grossRow = col('gross') ? `<tr class="sum"><td>GROSS PAY</td><td class="text-right">${currency(slip.record.grossPay)}</td></tr>` : '';
+
+      const deductionRows = [
+        col('paye') && slip.record.paye > 0 ? `<tr><td>PAYE Tax</td><td class="text-right">-${currency(slip.record.paye)}</td></tr>` : '',
+        col('loan') && slip.record.loanRepayment > 0 ? `<tr><td>Loan &amp; Advance</td><td class="text-right">-${currency(slip.record.loanRepayment)}</td></tr>` : '',
+        col('employee_pension') && slip.record.pension > 0 ? `<tr><td>Pension</td><td class="text-right">-${currency(slip.record.pension)}</td></tr>` : '',
+        col('withholding') && slip.record.withholdingTax && slip.record.paye > 0 ? `<tr><td>Withholding Tax</td><td class="text-right">-${currency(slip.record.paye)}</td></tr>` : '',
+      ].filter(Boolean).join('');
+
+      const deductionsTotalRow = `<tr class="sum"><td>TOTAL DEDUCTIONS</td><td class="text-right">-${currency(totalDeductions)}</td></tr>`;
+      const netPayBlock = col('net_pay') ? `<div class="net-pay"><span>TAKE HOME PAY</span><span>${currency(slip.record.takeHomePay)}</span></div>` : '';
+
+      const bankInfoRows = [
+        col('bank_name') ? `<tr><td>Bank:</td><td>${slip.record.bankName}</td></tr>` : '',
+        col('account_number') ? `<tr><td>Account:</td><td>${slip.record.accountNo}</td></tr>` : '',
+        col('paye_id') && slip.record.taxId ? `<tr><td>Tax ID (TIN):</td><td>${slip.record.taxId}</td></tr>` : '',
+      ].filter(Boolean).join('');
+
+      // ── CLASSIC theme ─────────────────────────────────────────────────
+      if (payslipTheme === 'CLASSIC') {
+        return `
+        <div class="payslip${isLast ? ' last' : ''}">
+          <div class="classic-header">
+            <div class="classic-logo-area"><img src="${logoSrc}" alt="Logo" style="height:56px;width:auto;" /></div>
+            <div class="classic-company-info">
+              <h1 class="classic-company-name">${companyInfo.name}</h1>
+              <p class="classic-company-sub">${companyInfo.address}</p>
+              ${companyInfo.phone ? `<p class="classic-company-sub">Tel: ${companyInfo.phone}</p>` : ''}
+              ${companyInfo.email ? `<p class="classic-company-sub">Email: ${companyInfo.email}</p>` : ''}
+            </div>
+          </div>
+          <div class="classic-title-bar"><span>EMPLOYEE PAY STATEMENT</span><span>${period}</span></div>
+          <div class="classic-info-grid">
+            <table class="info-table">
+              <tr><td>Employee Name:</td><td><strong>${name}</strong></td></tr>
+              <tr><td>Employee ID:</td><td>${slip.record.employeeCode || slip.record.id}</td></tr>
+              <tr><td>Position:</td><td>${slip.record.position}</td></tr>
+              <tr><td>Department:</td><td>${slip.record.department}</td></tr>
+            </table>
+            <table class="info-table">${bankInfoRows}</table>
+          </div>
+          <div class="classic-body">
+            <table class="classic-section-table">
+              <thead><tr><th>EARNINGS</th><th class="text-right">AMOUNT (₦)</th></tr></thead>
+              <tbody>${earningsRows}${grossRow}</tbody>
+            </table>
+            <table class="classic-section-table">
+              <thead><tr><th>DEDUCTIONS</th><th class="text-right">AMOUNT (₦)</th></tr></thead>
+              <tbody>${deductionRows}${deductionsTotalRow}</tbody>
+            </table>
+          </div>
+          ${netPayBlock}
+          <div class="classic-footer">
+            <p>This is a computer-generated payslip and requires no signature.</p>
+            <p>Generated: ${formatDisplayDate(Date.now())}</p>
+          </div>
+        </div>`;
+      }
+
+      // ── FORMAL theme ──────────────────────────────────────────────────
+      if (payslipTheme === 'FORMAL') {
+        return `
+        <div class="payslip${isLast ? ' last' : ''}">
+          <div class="formal-header">
+            <img src="${logoSrc}" alt="Logo" style="height:44px;width:auto;" />
+            <div class="formal-header-text">
+              <div class="formal-company">${companyInfo.name}</div>
+              <div class="formal-subtitle">PAYROLL ADVICE — ${period}</div>
+            </div>
+          </div>
+          <table class="formal-info-table">
+            <tbody>
+              <tr>
+                <td><label>Name</label><span>${name}</span></td>
+                <td><label>Employee ID</label><span>${slip.record.employeeCode || slip.record.id}</span></td>
+                <td><label>Position</label><span>${slip.record.position}</span></td>
+              </tr>
+              <tr>
+                ${col('bank_name') ? `<td><label>Bank</label><span>${slip.record.bankName}</span></td>` : '<td></td>'}
+                ${col('account_number') ? `<td><label>Account No.</label><span>${slip.record.accountNo}</span></td>` : '<td></td>'}
+                ${col('paye_id') && slip.record.taxId ? `<td><label>Tax ID (TIN)</label><span>${slip.record.taxId}</span></td>` : '<td></td>'}
+              </tr>
+            </tbody>
+          </table>
+          <div class="formal-columns">
+            <div class="formal-col">
+              <div class="formal-col-header">EARNINGS</div>
+              <table class="formal-breakdown">
+                <tbody>${earningsRows}</tbody>
+                <tfoot><tr class="sum"><td>Gross Pay</td><td class="text-right">${col('gross') ? currency(slip.record.grossPay) : '—'}</td></tr></tfoot>
+              </table>
+            </div>
+            <div class="formal-col">
+              <div class="formal-col-header">DEDUCTIONS</div>
+              <table class="formal-breakdown">
+                <tbody>${deductionRows}</tbody>
+                <tfoot><tr class="sum"><td>Total Deductions</td><td class="text-right">-${currency(totalDeductions)}</td></tr></tfoot>
+              </table>
+            </div>
+          </div>
+          ${col('net_pay') ? `<div class="formal-net"><span class="formal-net-label">NET PAY</span><span class="formal-net-amount">${currency(slip.record.takeHomePay)}</span></div>` : ''}
+          <div class="formal-footer">
+            <span>Authorised Signatory ________________________</span>
+            <span>Computer-generated. Generated on ${formatDisplayDate(Date.now())}</span>
+          </div>
+        </div>`;
+      }
+
+      // ── MODERN theme (default) ────────────────────────────────────────
+      return `
+      <div class="payslip${isLast ? ' last' : ''}">
+        <div class="header">
+          <img src="${logoSrc}" alt="Company Logo" style="height: 48px; width: auto; margin-bottom: 8px;" />
+          <h2>${companyInfo.name}</h2>
+          <p>Employee Payslip &ndash; ${period}</p>
+          ${companyInfo.address ? `<p style="font-size:12px;color:#94a3b8;margin:2px 0 0;">${companyInfo.address}</p>` : ''}
+        </div>
+        <div class="two-col">
+          <table class="info-table">
+            <tr><td>Name:</td><td><strong>${name}</strong></td></tr>
+            <tr><td>ID:</td><td>${slip.record.employeeCode || slip.record.id}</td></tr>
+            <tr><td>Position:</td><td>${slip.record.position}</td></tr>
+          </table>
+          <table class="info-table">${bankInfoRows}</table>
+        </div>
+        <table class="breakdown-table">
+          <thead><tr><th>Earnings</th><th class="text-right">Amount (₦)</th></tr></thead>
+          <tbody>${earningsRows}${grossRow}</tbody>
+        </table>
+        <table class="breakdown-table">
+          <thead><tr><th>Deductions</th><th class="text-right">Amount (₦)</th></tr></thead>
+          <tbody>${deductionRows}${deductionsTotalRow}</tbody>
+        </table>
+        ${netPayBlock}
+        <div class="footer">This is a system generated payslip. No signature is required. Generated on ${formatDisplayDate(Date.now())}</div>
+      </div>`;
+    };
+
+    const slipsHtml = payslipsToPrint.map((slip, i) => buildSlipHtml(slip, i)).join('');
+
+    // ── Theme-specific CSS ───────────────────────────────────────────────
+    const themeStyles = payslipTheme === 'CLASSIC' ? `
+      body, .preview-payslips-wrapper { font-family: sans-serif; color: #1a1a1a; }
+      .payslip { page-break-after: always; max-width: 820px; margin: 0 auto; padding: 30px 40px; border: 1px solid #bbb; }
+      .payslip.last { page-break-after: auto; }
+      .classic-header { display: flex; align-items: center; gap: 20px; padding-bottom: 14px; border-bottom: 3px double #1a1a1a; margin-bottom: 14px; }
+      .classic-company-name { margin: 0 0 4px; font-size: 17px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+      .classic-company-sub { margin: 0; font-size: 11px; color: #555; }
+      .classic-title-bar { background: #1a1a1a; color: #fff; display: flex; justify-content: space-between; padding: 6px 12px; font-size: 12px; font-weight: bold; letter-spacing: 1px; margin-bottom: 14px; text-transform: uppercase; }
+      .classic-info-grid { display: flex; gap: 32px; margin-bottom: 18px; }
+      .info-table { flex: 1; font-size: 12px; border-collapse: collapse; }
+      .info-table td { padding: 4px 6px; border: 1px solid #ddd; }
+      .info-table td:first-child { font-weight: bold; background: #f5f5f5; width: 40%; }
+      .classic-body { display: flex; gap: 20px; margin-bottom: 14px; }
+      .classic-section-table { flex: 1; border-collapse: collapse; font-size: 13px; }
+      .classic-section-table thead th { background: #333; color: #fff; padding: 6px 8px; text-align: left; font-size: 11px; letter-spacing: 0.5px; }
+      .classic-section-table td { padding: 5px 8px; border-bottom: 1px solid #eee; }
+      .classic-section-table tr.sum td { font-weight: bold; border-top: 2px solid #333; background: #f9f9f9; }
+      .text-right { text-align: right !important; }
+      .net-pay { border: 2px solid #1a1a1a; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+      .net-pay span:first-child { font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+      .net-pay span:last-child { font-size: 20px; font-weight: bold; font-family: 'Courier New', monospace; }
+      .classic-footer { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #888; font-style: italic; }
+    ` : payslipTheme === 'FORMAL' ? `
+      body, .preview-payslips-wrapper { font-family: Arial, Helvetica, sans-serif; color: #1a1a2e; }
+      .payslip { page-break-after: always; max-width: 820px; margin: 0 auto; padding: 0 0 28px 0; }
+      .payslip.last { page-break-after: auto; }
+      .formal-header { display: flex; align-items: center; gap: 16px; background: #0f172a; color: #fff; padding: 16px 22px; margin-bottom: 0; }
+      .formal-header-text { flex: 1; }
+      .formal-company { font-size: 15px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+      .formal-subtitle { font-size: 11px; color: #9bb8d8; margin-top: 3px; letter-spacing: 1px; }
+      .formal-info-table { width: 100%; border-collapse: collapse; margin: 0 0 16px; border: 1px solid #c8d8e8; }
+      .formal-info-table td { padding: 9px 14px; border: 1px solid #c8d8e8; font-size: 13px; vertical-align: top; }
+      .formal-info-table label { display: block; font-size: 10px; color: #7a98b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+      .formal-info-table span { font-weight: 600; font-size: 13px; color: #1a1a2e; }
+      .formal-columns { display: flex; gap: 16px; margin-bottom: 0; }
+      .formal-col { flex: 1; }
+      .formal-col-header { background: #0f172a; color: #fff; padding: 7px 12px; font-size: 11px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
+      .formal-breakdown { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .formal-breakdown tbody td { padding: 6px 12px; border-bottom: 1px solid #eaeff5; }
+      .formal-breakdown tfoot td { padding: 7px 12px; font-weight: bold; border-top: 2px solid #0f172a; background: #f8fafc; }
+      .formal-breakdown tr.sum td { font-weight: bold; }
+      .text-right { text-align: right !important; }
+      .formal-net { background: #0f172a; color: #fff; padding: 16px 22px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+      .formal-net-label { font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1.5px; }
+      .formal-net-amount { font-size: 22px; font-weight: bold; font-family: 'Courier New', monospace; }
+      .formal-footer { display: flex; justify-content: space-between; font-size: 10px; color: #999; border-top: 1px solid #ddd; padding: 8px 4px 0; }
+    ` : `
+      body, .preview-payslips-wrapper { font-family: sans-serif; color: #333; }
+      .payslip { page-break-after: always; max-width: 800px; margin: 0 auto; padding: 20px; }
+      .payslip.last { page-break-after: auto; }
+      .header { text-align: center; border-bottom: 2px solid #4f46e5; padding-bottom: 16px; margin-bottom: 24px; }
+      .header h2 { margin: 0 0 4px; color: #1e293b; font-size: 18px; }
+      .header p { margin: 4px 0 0; color: #64748b; font-size: 14px; }
+      .two-col { display: flex; justify-content: space-between; margin-bottom: 24px; gap: 40px; }
+      .info-table { flex: 1; font-size: 14px; border-collapse: collapse; }
+      .info-table td { padding: 4px 0; border: none; }
+      .info-table td:first-child { color: #64748b; width: 90px; }
+      .breakdown-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px; }
+      .breakdown-table th { background: #f8fafc; text-align: left; padding: 8px; border-bottom: 1px solid #cbd5e1; }
+      .breakdown-table td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
+      .breakdown-table .sum { font-weight: bold; font-size: 15px; }
+      .breakdown-table .sum td { border-top: 1px solid #94a3b8; border-bottom: none; }
+      .text-right { text-align: right !important; }
+      .net-pay { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-top: 24px; }
+      .net-pay span:first-child { font-size: 16px; font-weight: bold; color: #1e293b; }
+      .net-pay span:last-child { font-size: 22px; font-weight: bold; color: #15803d; font-family: monospace; }
+      .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 10px; text-align: center; font-size: 11px; color: #94a3b8; }
+    `;
+
     const handlePrint = () => {
       if (!payslipsToPrint || payslipsToPrint.length === 0) return;
 
@@ -563,84 +816,12 @@ export function Payroll() {
         return;
       }
 
-      // Build self-contained HTML for every payslip so all appear in one print job
-      const currency = (n: number) => '₦' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const slipsHtml = payslipsToPrint.map((slip, i) => `
-      <div class="payslip${i === payslipsToPrint.length - 1 ? ' last' : ''}">
-        <div class="header">
-          <img src="${logoSrc}" alt="Company Logo" style="height: 48px; width: auto; margin-bottom: 8px;" />
-          <p>Employee Payslip &ndash; ${slip.monthLabel} ${printSelectedYear}</p>
-        </div>
-        <div class="two-col">
-          <table class="info-table">
-            <tr><td>Name:</td><td><strong>${slip.record.firstname} ${slip.record.surname}</strong></td></tr>
-            <tr><td>ID:</td><td>${slip.record.employeeCode || slip.record.id}</td></tr>
-            <tr><td>Position:</td><td>${slip.record.position}</td></tr>
-          </table>
-          <table class="info-table">
-            <tr><td>Bank:</td><td>${slip.record.bankName}</td></tr>
-            <tr><td>Account:</td><td>${slip.record.accountNo}</td></tr>
-          </table>
-        </div>
-        
-        <table class="breakdown-table">
-          <thead><tr><th>Earnings</th><th class="text-right">Amount (₦)</th></tr></thead>
-          <tbody>
-            <tr><td>Main Salary</td><td class="text-right">${currency(slip.record.salary)}</td></tr>
-            <tr><td>Basic Salary</td><td class="text-right">${currency(slip.record.basicSalary)}</td></tr>
-            ${slip.record.housing > 0 ? `<tr><td>Housing Allowance</td><td class="text-right">${currency(slip.record.housing)}</td></tr>` : ''}
-            ${slip.record.transport > 0 ? `<tr><td>Transport Allowance</td><td class="text-right">${currency(slip.record.transport)}</td></tr>` : ''}
-            ${slip.record.otherAllowances > 0 ? `<tr><td>Other Allowances</td><td class="text-right">${currency(slip.record.otherAllowances)}</td></tr>` : ''}
-            ${slip.record.overtime > 0 ? `<tr><td>Overtime Pay</td><td class="text-right">${currency(slip.record.overtime)}</td></tr>` : ''}
-            <tr class="sum"><td>GROSS PAY</td><td class="text-right">${currency(slip.record.grossPay)}</td></tr>
-          </tbody>
-        </table>
-
-        <table class="breakdown-table">
-          <thead><tr><th>Deductions</th><th class="text-right">Amount (₦)</th></tr></thead>
-          <tbody>
-            ${slip.record.paye > 0 ? `<tr><td>PAYE Tax</td><td class="text-right">-${currency(slip.record.paye)}</td></tr>` : ''}
-            ${slip.record.loanRepayment > 0 ? `<tr><td>Loan & Advance</td><td class="text-right">-${currency(slip.record.loanRepayment)}</td></tr>` : ''}
-            ${slip.record.pension > 0 ? `<tr><td>Pension</td><td class="text-right">-${currency(slip.record.pension)}</td></tr>` : ''}
-            <tr class="sum"><td>TOTAL DEDUCTIONS</td><td class="text-right">-${currency(slip.record.paye + slip.record.loanRepayment + slip.record.pension)}</td></tr>
-          </tbody>
-        </table>
-
-        <div class="net-pay">
-            <span>TAKE HOME PAY</span>
-            <span>${currency(slip.record.takeHomePay)}</span>
-        </div>
-        
-        <div class="footer">This is a system generated payslip. No signature is required. Generated on ${formatDisplayDate(Date.now())}</div>
-      </div>
-    `).join('');
-
+      const slipsHtml = payslipsToPrint.map((slip, i) => buildSlipHtml(slip, i)).join('');
       const html = `
     <!DOCTYPE html>
     <html><head>
       <title>Print Bulk Payslips</title>
-      <style>
-        body { font-family: sans-serif; color: #333; }
-        .payslip { page-break-after: always; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .payslip.last { page-break-after: auto; }
-        .header { text-align: center; border-bottom: 2px solid #4f46e5; padding-bottom: 16px; margin-bottom: 24px; }
-        .header h2 { margin: 0; color: #1e293b; }
-        .header p { margin: 4px 0 0 0; color: #64748b; font-size: 14px; }
-        .two-col { display: flex; justify-content: space-between; margin-bottom: 24px; gap: 40px; }
-        .info-table { flex: 1; font-size: 14px; }
-        .info-table td { padding: 4px 0; border: none; }
-        .info-table td:first-child { color: #64748b; width: 80px; }
-        .breakdown-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px; }
-        .breakdown-table th { background: #f8fafc; text-align: left; padding: 8px; border-bottom: 1px solid #cbd5e1; }
-        .breakdown-table td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
-        .breakdown-table .sum { font-weight: bold; font-size: 15px; }
-        .breakdown-table .sum td { border-top: 1px solid #94a3b8; border-bottom: none; }
-        .text-right { text-align: right !important; }
-        .net-pay { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-top: 24px;}
-        .net-pay span:first-child { font-size: 16px; font-weight: bold; color: #1e293b; }
-        .net-pay span:last-child  { font-size: 22px; font-weight: bold; color: #15803d; font-family: monospace; }
-        .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 10px; text-align: center; font-size: 11px; color: #94a3b8; }
-      </style>
+      <style>${themeStyles}</style>
     </head><body>${slipsHtml}</body></html>`;
 
       const iframe = document.createElement('iframe');
@@ -1440,6 +1621,32 @@ export function Payroll() {
                 {/* Filter Sidebar */}
                 <div className={`w-full md:w-1/3 md:max-w-[300px] border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 md:overflow-y-auto flex-col gap-6 hide-on-print shadow-sm z-10 shrink-0 ${printSidebarOpen ? 'flex max-h-[50vh] overflow-y-auto' : 'hidden md:flex md:max-h-full'}`}>
                   {/* Schedule type selector */}
+                  {printType === 'PAYSLIPS' && (
+                    <div className="mb-4">
+                      <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1">Payslip Theme</h4>
+                      <div className="flex gap-2">
+                        <button 
+                          className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border ${payslipTheme === 'MODERN' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                          onClick={() => setPayslipTheme('MODERN')}
+                        >
+                          Modern
+                        </button>
+                        <button 
+                          className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border ${payslipTheme === 'CLASSIC' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                          onClick={() => setPayslipTheme('CLASSIC')}
+                        >
+                          Classic
+                        </button>
+                        <button 
+                          className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border ${payslipTheme === 'FORMAL' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                          onClick={() => setPayslipTheme('FORMAL')}
+                        >
+                          Formal
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <h4 className="font-bold text-sm text-slate-900 mb-2 border-b pb-1">Schedule Type</h4>
                     <select
@@ -1658,104 +1865,10 @@ export function Payroll() {
                       No records match your selection.
                     </div>
                   ) : printType === 'PAYSLIPS' ? (
-                    payslipsToPrint.map((slip, i) => (
-                      <div key={`${slip.monthKey}-${slip.record.id}`} className="bg-white dark:bg-slate-900 p-10 mb-8 mx-auto shadow-sm max-w-3xl rounded-sm print-break">
-                        {/* Company Header */}
-                        <div className="border-b-2 border-indigo-600 pb-4 mb-6">
-                          <img src={logoSrc} alt="Company Logo" className="h-12 w-auto mb-2" />
-                          <p className="text-sm text-slate-500">Employee Payslip - {slip.monthLabel} {printSelectedYear}</p>
-                        </div>
-
-                        {/* Employee Info */}
-                        <div className="grid grid-cols-2 gap-8 mb-6">
-                          <div>
-                            <h3 className="text-sm font-semibold text-slate-500 uppercase mb-2">Employee Details</h3>
-                            <table className="w-full text-sm">
-                              <tbody>
-                                {printSelectedColumns.includes('employee_name') && <tr><td className="py-1 text-slate-600">Name:</td><td className="py-1 font-medium">{slip.record.firstname} {slip.record.surname}</td></tr>}
-                                <tr><td className="py-1 text-slate-600">Employee ID:</td><td className="py-1 font-mono">{slip.record.employeeCode || slip.record.id}</td></tr>
-                                {printSelectedColumns.includes('paye_id') && <tr><td className="py-1 text-slate-600">PAYE ID:</td><td className="py-1 font-mono">{(() => { const emp = employees.find(e => e.id === slip.record.id); return emp?.payeNumber || emp?.taxId || 'N/A'; })()}</td></tr>}
-                                {printSelectedColumns.includes('pension_pin') && <tr><td className="py-1 text-slate-600">Pension No:</td><td className="py-1 font-mono">{(() => { const emp = employees.find(e => e.id === slip.record.id); return emp?.pensionNumber || 'N/A'; })()}</td></tr>}
-                                <tr><td className="py-1 text-slate-600">Position:</td><td className="py-1">{slip.record.position}</td></tr>
-                                <tr><td className="py-1 text-slate-600">Department:</td><td className="py-1">{slip.record.department}</td></tr>
-                              </tbody>
-                            </table>
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-semibold text-slate-500 uppercase mb-2">Payment Details</h3>
-                            <table className="w-full text-sm">
-                              <tbody>
-                                {printSelectedColumns.includes('month') && <tr><td className="py-1 text-slate-600">Pay Period:</td><td className="py-1 font-medium">{slip.monthLabel}</td></tr>}
-                                {printSelectedColumns.includes('bank_name') && <tr><td className="py-1 text-slate-600">Bank:</td><td className="py-1">{slip.record.bankName}</td></tr>}
-                                {printSelectedColumns.includes('account_number') && <tr><td className="py-1 text-slate-600">Account No:</td><td className="py-1 font-mono">{slip.record.accountNo}</td></tr>}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-
-                        {/* Earnings Section */}
-                        <div className="mb-6">
-                          <h3 className="text-sm font-semibold text-slate-500 uppercase mb-2 border-b pb-1">Earnings</h3>
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="text-left"><th className="py-2 text-slate-600">Description</th><th className="py-2 text-right text-slate-600">Amount (₦)</th></tr>
-                            </thead>
-                            <tbody>
-                              {printSelectedColumns.includes('main_salary') && <tr><td className="py-2">Main Salary</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.salary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
-                              {printSelectedColumns.includes('basic') && <tr><td className="py-2">Basic Salary</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.basicSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
-                              {printSelectedColumns.includes('housing') && slip.record.housing > 0 && <tr><td className="py-2">Housing Allowance</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.housing.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
-                              {printSelectedColumns.includes('transport') && slip.record.transport > 0 && <tr><td className="py-2">Transport Allowance</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.transport.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
-                              {printSelectedColumns.includes('other') && slip.record.otherAllowances > 0 && <tr><td className="py-2">Other Allowances</td><td className="py-2 text-right font-mono">{priv?.canViewAmounts === false ? '***' : slip.record.otherAllowances.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
-                              {printSelectedColumns.includes('overtime') && slip.record.overtime > 0 && <tr><td className="py-2">Overtime Pay</td><td className="py-2 text-right font-mono text-emerald-600">+{priv?.canViewAmounts === false ? '***' : slip.record.overtime.toLocaleString()}</td></tr>}
-                              {printSelectedColumns.includes('gross') && <tr className="border-t font-semibold"><td className="py-2">GROSS PAY</td><td className="py-2 text-right font-mono text-lg">{priv?.canViewAmounts === false ? '***' : slip.record.grossPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
-                            </tbody>
-                          </table>
-                        </div>
-
-                        {/* Deductions Section */}
-                        <div className="mb-6">
-                          <h3 className="text-sm font-semibold text-slate-500 uppercase mb-2 border-b pb-1">Deductions</h3>
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="text-left"><th className="py-2 text-slate-600">Description</th><th className="py-2 text-right text-slate-600">Amount (₦)</th></tr>
-                            </thead>
-                            <tbody>
-                              {printSelectedColumns.includes('paye') && slip.record.paye > 0 && <tr><td className="py-2">PAYE Tax</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.paye.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
-                              {printSelectedColumns.includes('loan') && slip.record.loanRepayment > 0 && <tr><td className="py-2">Loan & Advance Repayment</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.loanRepayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
-                              {printSelectedColumns.includes('employee_pension') && slip.record.pension > 0 && <tr><td className="py-2">Pension Contribution</td><td className="py-2 text-right font-mono text-red-600">-{priv?.canViewAmounts === false ? '***' : slip.record.pension.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>}
-                              
-                              <tr className="border-t font-semibold">
-                                <td className="py-2">TOTAL DEDUCTIONS</td>
-                                <td className="py-2 text-right font-mono text-red-600 text-lg">
-                                  -{priv?.canViewAmounts === false ? '***' : (
-                                    (printSelectedColumns.includes('paye') ? slip.record.paye : 0) + 
-                                    (printSelectedColumns.includes('loan') ? slip.record.loanRepayment : 0) + 
-                                    (printSelectedColumns.includes('employee_pension') ? slip.record.pension : 0)
-                                  ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-
-                        {/* Net Pay */}
-                        {printSelectedColumns.includes('net_pay') && (
-                          <div className="bg-emerald-50 p-6 rounded-lg border border-emerald-100">
-                            <div className="flex justify-between items-center">
-                              <span className="text-lg font-bold text-slate-900">TAKE HOME PAY</span>
-                              <span className="text-3xl font-bold text-emerald-700">₦{priv?.canViewAmounts === false ? '***' : slip.record.takeHomePay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Footer */}
-                        <div className="mt-8 pt-4 border-t text-center text-xs text-slate-400">
-                          <p>This is a computer-generated document. No signature required.</p>
-                          <p>Generated on {formatDisplayDate(Date.now())}</p>
-                        </div>
-
-                      </div>
-                    ))
+                    <div className="bg-white mx-auto print-break shadow-sm" style={{ maxWidth: 820 }}>
+                      <style>{`.preview-payslips-wrapper { text-align: left; } .preview-payslips-wrapper * { box-sizing: border-box; } ` + themeStyles}</style>
+                      <div className="preview-payslips-wrapper" dangerouslySetInnerHTML={{ __html: payslipsToPrint.map((slip, i) => buildSlipHtml(slip, i)).join('') }} />
+                    </div>
                   ) : printType === 'PAYE' || printType === 'PENSION' || printType === 'NSITF' || printType === 'WITHHOLDING' ? (() => {
                     // ── Ordered selected columns for this schedule type ──────────────
                     const relevantCols = AVAILABLE_COLUMNS.filter(c => c.types.includes('all') || c.types.includes(printType));

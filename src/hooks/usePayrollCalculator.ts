@@ -145,23 +145,26 @@ export function usePayrollCalculator() {
           overtime = totalOTInstances * (dailyRate * (1 + otRate));
         }
 
-        const basicSalary = emp.payeTax ? salary * (payrollVariables.basic / 100) : 0;
-        const housing = emp.payeTax ? salary * (payrollVariables.housing / 100) : 0;
-        const transport = emp.payeTax ? salary * (payrollVariables.transport / 100) : 0;
-        const otherAllowances = emp.payeTax ? salary * (payrollVariables.otherAllowances / 100) : 0;
+        const hasPension = emp.subjectToPension !== undefined ? emp.subjectToPension : emp.payeTax;
+        const breakDownSalary = emp.payeTax || hasPension;
+
+        const basicSalary = breakDownSalary ? salary * (payrollVariables.basic / 100) : 0;
+        const housing = breakDownSalary ? salary * (payrollVariables.housing / 100) : 0;
+        const transport = breakDownSalary ? salary * (payrollVariables.transport / 100) : 0;
+        const otherAllowances = breakDownSalary ? salary * (payrollVariables.otherAllowances / 100) : 0;
 
         const totalAllowances = basicSalary + housing + transport + otherAllowances;
         const pensionSum = basicSalary + housing + transport;
 
         const grossPay = salary + overtime;
 
-        const pension = emp.payeTax ? pensionSum * (payrollVariables.employeePensionRate / 100) : 0;
+        const pension = hasPension ? pensionSum * (payrollVariables.employeePensionRate / 100) : 0;
 
         let paye = 0;
         if (emp.payeTax) {
           const tv = payeTaxVariables;
           const annualGross = (salary * 12) + overtime;
-          const pensionAmt = (pensionSum * 12) * (payrollVariables.employeePensionRate / 100);
+          const pensionAmt = hasPension ? (pensionSum * 12) * (payrollVariables.employeePensionRate / 100) : 0;
           const extraCRA = tv.extraConditions.filter(c => c.enabled).reduce((s, c) => s + c.amount, 0);
           const rentRelief = Math.min((emp.rent || 0) * (tv.rentReliefRate ?? 0.20), 500000);
           const cra = tv.craBase + rentRelief + pensionAmt + extraCRA;
@@ -215,7 +218,7 @@ export function usePayrollCalculator() {
 
         const takeHomePay = grossPay - (paye + loanRepayment + pension);
 
-        const employerPension = emp.payeTax ? pensionSum * (payrollVariables.employerPensionRate / 100) : 0;
+        const employerPension = hasPension ? pensionSum * (payrollVariables.employerPensionRate / 100) : 0;
         const nsitf = emp.payeTax ? grossPay * (payrollVariables.nsitfRate / 100) : 0;
 
         return {

@@ -114,6 +114,7 @@ export function Employees() {
     level: 10,
     status: 'Active',
     payeTax: false,
+    subjectToPension: false,
     withholdingTax: false,
     monthlySalaries: {
       jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0,
@@ -301,6 +302,7 @@ export function Employees() {
       level: 10,
       status: 'Active',
       payeTax: false,
+      subjectToPension: false,
       withholdingTax: false,
       monthlySalaries: {
         jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0,
@@ -446,6 +448,7 @@ export function Employees() {
       level: 10,
       status: 'Active',
       payeTax: false,
+      subjectToPension: false,
       withholdingTax: false,
       monthlySalaries: {
         jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0,
@@ -486,7 +489,7 @@ export function Employees() {
         headers = [
           'id', 'employeeCode', 'surname', 'firstname', 'department', 'staffType', 'level', 'position', 'status',
           'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'taxId', 'pensionNumber', 'lashmaPolicyNumber',
-          'lashmaRegistrationDate', 'lashmaExpiryDate', 'payeTax', 'withholdingTax', 'excludeFromOnboarding', 'rent',
+          'lashmaRegistrationDate', 'lashmaExpiryDate', 'payeTax', 'subjectToPension', 'withholdingTax', 'excludeFromOnboarding', 'rent',
           'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
         ];
       }
@@ -529,6 +532,7 @@ export function Employees() {
             extractCSV(formatDisplayDate(emp.lashmaRegistrationDate) || ''),
             extractCSV(formatDisplayDate(emp.lashmaExpiryDate) || ''),
             extractCSV(emp.payeTax),
+            extractCSV(emp.subjectToPension !== undefined ? emp.subjectToPension : emp.payeTax),
             extractCSV(emp.withholdingTax),
             extractCSV(emp.excludeFromOnboarding || false),
             extractCSV(emp.rent || 0),
@@ -668,6 +672,7 @@ export function Employees() {
           lashmaRegistrationDate: getIdx(['lashmaRegistrationDate', 'lashma_reg_date']),
           lashmaExpiryDate: getIdx(['lashmaExpiryDate', 'lashma_expiry']),
           payeTax: getIdx(['payeTax', 'paye_tax', 'paye']),
+          subjectToPension: getIdx(['subjectToPension', 'subject_to_pension', 'pension_tax']),
           withholdingTax: getIdx(['withholdingTax', 'with_tax', 'wht']),
           excludeFromOnboarding: getIdx(['excludeFromOnboarding', 'exclude_from_onboarding']),
           rent: getIdx(['rent']),
@@ -733,6 +738,7 @@ export function Employees() {
             lashmaRegistrationDate: normalizeDate(val(idxMap.lashmaRegistrationDate)),
             lashmaExpiryDate: normalizeDate(val(idxMap.lashmaExpiryDate)),
             payeTax: bool(idxMap.payeTax),
+            subjectToPension: idxMap.subjectToPension !== -1 ? bool(idxMap.subjectToPension) : bool(idxMap.payeTax),
             withholdingTax: bool(idxMap.withholdingTax),
             excludeFromOnboarding: bool(idxMap.excludeFromOnboarding),
             rent: num(idxMap.rent),
@@ -1191,6 +1197,10 @@ export function Employees() {
                   Subject to PAYE Tax
                 </label>
                 <label className="flex items-center gap-3 text-sm font-medium cursor-pointer p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                  <input type="checkbox" checked={formData.subjectToPension !== undefined ? formData.subjectToPension : formData.payeTax} onChange={e => setFormData({ ...formData, subjectToPension: e.target.checked })} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4" />
+                  Subject to Pension
+                </label>
+                <label className="flex items-center gap-3 text-sm font-medium cursor-pointer p-2 rounded-lg hover:bg-slate-50 transition-colors">
                   <input type="checkbox" checked={formData.withholdingTax} onChange={e => setFormData({ ...formData, withholdingTax: e.target.checked })} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4" />
                   Subject to Withholding Tax
                 </label>
@@ -1324,6 +1334,7 @@ export function Employees() {
                       {emp.lashmaRegistrationDate && <div className="flex justify-between text-xs"><span className="text-slate-500">Reg. Date:</span><span>{formatDisplayDate(emp.lashmaRegistrationDate)}</span></div>}
                       {emp.lashmaExpiryDate && <div className="flex justify-between text-xs text-rose-500 font-semibold"><span className="text-slate-500">Expiry Date:</span><span>{formatDisplayDate(emp.lashmaExpiryDate)}</span></div>}
                       <div className="flex justify-between"><span className="text-slate-500">PAYE Tax:</span><span>{emp.payeTax ? 'Yes' : 'No'}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Subject to Pension:</span><span>{emp.subjectToPension !== false && (emp.subjectToPension !== undefined || emp.payeTax) ? 'Yes' : 'No'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">WHT Tax:</span><span>{emp.withholdingTax ? 'Yes' : 'No'}</span></div>
                     </div>
                   </div>
@@ -1855,6 +1866,14 @@ export function Employees() {
                 </label>
                 <label className="flex items-center gap-3 text-sm font-medium cursor-pointer p-2 rounded-lg hover:bg-slate-50 transition-colors">
                   <Checkbox
+                    checked={bulkFormData.subjectToPension}
+                    onCheckedChange={(checked) => setBulkFormData({ ...bulkFormData, subjectToPension: checked as boolean })}
+                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4"
+                  />
+                  Subject to Pension
+                </label>
+                <label className="flex items-center gap-3 text-sm font-medium cursor-pointer p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                  <Checkbox
                     checked={bulkFormData.withholdingTax}
                     onCheckedChange={(checked) => setBulkFormData({ ...bulkFormData, withholdingTax: checked as boolean })}
                     className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 h-4 w-4"
@@ -2063,7 +2082,7 @@ export function Employees() {
           </Button>
         )}
         {priv.canAdd && (
-          <Button size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'OFFICE', level: 10, status: 'Active', payeTax: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
+          <Button size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'OFFICE', level: 10, status: 'Active', payeTax: false, subjectToPension: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
             <Plus className="h-4 w-4" /> Add Employee
           </Button>
         )}
@@ -2089,7 +2108,7 @@ export function Employees() {
       <div className="flex sm:hidden flex-col gap-3 px-1">
         <div className="flex flex-wrap gap-2">
           {priv.canAdd && (
-            <Button className="flex-1 gap-2 bg-indigo-600 text-white" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'OFFICE', level: 10, status: 'Active', payeTax: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
+            <Button className="flex-1 gap-2 bg-indigo-600 text-white" onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'OFFICE', level: 10, status: 'Active', payeTax: false, subjectToPension: false, withholdingTax: false, monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}>
               <Plus className="h-4 w-4" /> Add Employee
             </Button>
           )}

@@ -359,6 +359,7 @@ export interface Employee {
   payeTax: boolean;
   withholdingTax: boolean;
   withholdingTaxRate?: number; // per-consultant rate (e.g. 0.05 or 0.10)
+  subjectToPension?: boolean;
   taxId: string;
   pensionNumber: string;
   payeNumber?: string;
