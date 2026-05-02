@@ -4,6 +4,7 @@ import { useTheme } from '@/src/hooks/useTheme';
 import { cn } from '@/src/lib/utils';
 import { ArrowLeft, MapPin, Edit, Trash2, BookOpen, Plus, FileText } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
+import { useOperations } from '../contexts/OperationsContext';
 
 interface DiaryDetailViewProps {
   date: string;
@@ -21,6 +22,7 @@ export function DiaryDetailView({
   const { isDark } = useTheme();
   const currentUser = useUserStore(s => s.getCurrentUser());
   const { dailyJournals, siteJournalEntries } = useAppStore();
+  const { dailyMachineLogs } = useOperations();
 
   const diaryDate = new Date(date + 'T00:00:00');
   const journals = dailyJournals.filter(j => j.date === date)
@@ -151,8 +153,28 @@ export function DiaryDetailView({
                                     {entry.narration}
                                   </p>
                                 ) : (
-                                  <p className="text-xs text-slate-400 italic mt-2">No narration recorded.</p>
+                                  <p className="text-xs text-slate-400 italic mt-2">No general note recorded.</p>
                                 )}
+                                {(() => {
+                                  const machineLogs = dailyMachineLogs.filter(l => l.siteId === entry.siteId && l.date === date);
+                                  if (machineLogs.length === 0) return null;
+                                  return (
+                                    <div className="mt-3 bg-slate-100/50 dark:bg-slate-900/50 rounded-lg p-3 border border-slate-200/50 dark:border-slate-700/50">
+                                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Machine Log Narrative</p>
+                                      <ul className="space-y-1.5 list-none">
+                                        {machineLogs.map(ml => (
+                                          <li key={ml.id} className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed relative pl-4">
+                                            <div className={cn("absolute left-0 top-2 h-1.5 w-1.5 rounded-full", ml.isActive ? "bg-emerald-500" : "bg-rose-500")} />
+                                            <span className="font-semibold text-slate-800 dark:text-slate-200">{ml.assetName}</span> is {ml.isActive ? 'operational' : 'inactive'}
+                                            {ml.isActive && ml.dieselUsage > 0 ? ` and ${ml.dieselUsage}L of diesel was filled on it` : ''}.
+                                            {ml.issuesOnSite ? ` Note: ${ml.issuesOnSite}` : ''}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  );
+                                })()}
+                                
                                 {entry.loggedBy && entry.loggedBy !== journal.loggedBy && (
                                   <p className="text-[10px] text-slate-400 mt-3 font-medium">Logged by {entry.loggedBy}</p>
                                 )}

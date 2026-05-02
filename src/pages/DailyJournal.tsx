@@ -6,16 +6,125 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
 import { toast } from '@/src/components/ui/toast';
-import { Search, Plus, Calendar, MapPin, X, ChevronLeft, ChevronRight, FileText, Download, Filter } from 'lucide-react';
+import { Search, Plus, Calendar, MapPin, X, ChevronLeft, ChevronRight, FileText, Download, Filter, Wrench, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay } from 'date-fns';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { DiaryDetailView } from './DiaryDetailView';
+import { useOperations } from '../contexts/OperationsContext';
+import { DailyLogManager } from './DailyLogManager';
 import { jsPDF } from 'jspdf';
 import logoSrc from '@/logo/logo-2.png';
+
+function SiteLogCard({ 
+  entry, 
+  idx, 
+  onRemove, 
+  onChangeNarration, 
+  formDate,
+  onOpenMachineLog
+}: { 
+  entry: Partial<SiteJournalEntry>; 
+  idx: number; 
+  onRemove: () => void; 
+  onChangeNarration: (val: string) => void;
+  formDate: string;
+  onOpenMachineLog: (machine: {id: string, name: string}, siteId: string, siteName: string) => void;
+}) {
+  const { waybills, assets, dailyMachineLogs } = useOperations();
+  const [activeTab, setActiveTab] = useState<'general' | 'machines'>('general');
+
+  const machineItems = useMemo(() => {
+    if (!entry.siteId) return [];
+    const siteWaybills = waybills.filter(w => w.siteId === entry.siteId && w.type === 'waybill' && w.status !== 'outstanding');
+    return assets.filter(a => a.type === 'equipment' && a.requiresLogging && siteWaybills.some(w => w.items.some(i => i.assetId === a.id)));
+  }, [waybills, assets, entry.siteId]);
+
+  return (
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500" />
+      <div className="flex items-start sm:items-center justify-between mb-3 pl-2">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 pr-6">
+          <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{entry.siteName}</span>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 font-medium w-fit">
+            {entry.clientName}
+          </span>
+        </div>
+        <button onClick={onRemove} className="absolute top-3 right-3 h-8 w-8 rounded-full flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="pl-2 mb-3 flex gap-2 border-b border-slate-100 dark:border-slate-800">
+        <button 
+          className={cn("px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors border-b-2", activeTab === 'general' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300')}
+          onClick={() => setActiveTab('general')}
+        >
+          General Notes
+        </button>
+        <button 
+          className={cn("px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 flex items-center gap-1.5", activeTab === 'machines' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300')}
+          onClick={() => setActiveTab('machines')}
+        >
+          <Wrench className="h-3.5 w-3.5" /> Machine Logs ({machineItems.length})
+        </button>
+      </div>
+
+      <div className="pl-2">
+        {activeTab === 'general' ? (
+          <textarea value={entry.narration || ''} onChange={e => onChangeNarration(e.target.value)}
+            rows={4} placeholder="Type your field notes here..."
+            className="w-full text-base sm:text-sm border border-slate-200 dark:border-slate-700 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 dark:bg-slate-950 transition-all placeholder:text-slate-400" />
+        ) : (
+          <div className="space-y-2">
+            {machineItems.length === 0 ? (
+              <p className="text-xs text-slate-500 py-4 text-center">No machines currently logged at this site.</p>
+            ) : (
+              machineItems.map(m => {
+                const hasLog = dailyMachineLogs.some(l => l.assetId === m.id && l.date === formDate);
+                return (
+                  <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                        <Wrench className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{m.name}</p>
+                        <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                          {hasLog ? <><CheckCircle2 className="h-3 w-3 text-emerald-500"/> Logged for {formatDateDisplay(formDate)}</> : <><AlertTriangle className="h-3 w-3 text-amber-500"/> Not logged yet</>}
+                        </p>
+                      </div>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant={hasLog ? "outline" : "default"}
+                      className={cn("h-8 text-xs font-bold px-4", hasLog ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/50 dark:text-emerald-400 dark:hover:bg-emerald-900/30" : "bg-indigo-600 hover:bg-indigo-700 text-white")}
+                      onClick={() => onOpenMachineLog({ id: m.id, name: m.name }, entry.siteId!, entry.siteName!)}
+                    >
+                      {hasLog ? 'Edit Log' : 'Start Log'}
+                    </Button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function formatDateDisplay(d: string) {
+  try {
+    return format(new Date(d + 'T00:00:00'), 'MMM d, yyyy');
+  } catch {
+    return d;
+  }
+}
 
 export function DailyJournal() {
   const currentUser = useUserStore(s => s.getCurrentUser());
   const { dailyJournals, siteJournalEntries, sites, addDailyJournal, updateDailyJournal, deleteDailyJournal, deleteSiteJournalEntry } = useAppStore();
+  const { dailyMachineLogs } = useOperations();
 
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -30,6 +139,7 @@ export function DailyJournal() {
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [pdfDataUri, setPdfDataUri] = useState('');
   const [pdfExportDate, setPdfExportDate] = useState('');
+  const [machineLogContext, setMachineLogContext] = useState<{ assetId: string, assetName: string, siteId: string, siteName: string } | null>(null);
 
   // Export Filter States
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -159,9 +269,16 @@ export function DailyJournal() {
           doc.text(`Client: ${entry.clientName}`, 22, y + 4.5); 
           y += 10;
 
-          if (entry.narration) {
+          const siteLogs = dailyMachineLogs.filter(l => l.siteId === entry.siteId && l.date === journal.date);
+          const machineNarrative = siteLogs.map(ml => 
+            `[${ml.assetName}]: ${ml.isActive ? 'Operational' : 'Inactive'}${ml.isActive && ml.dieselUsage > 0 ? `. ${ml.dieselUsage}L of diesel filled` : ''}.${ml.issuesOnSite ? ` Note: ${ml.issuesOnSite}` : ''}`
+          ).join('\n');
+          
+          const combinedNarration = [entry.narration, machineNarrative].filter(Boolean).join('\n\n');
+
+          if (combinedNarration) {
             doc.setFont('times', 'italic'); doc.setFontSize(9); doc.setTextColor(60, 60, 80);
-            const lines = doc.splitTextToSize(entry.narration, W - 40);
+            const lines = doc.splitTextToSize(combinedNarration, W - 40);
             lines.forEach((line: string) => {
               if (y > H - 25) { doc.addPage(); y = 30; }
               doc.text(line, 22, y); y += 5;
@@ -235,7 +352,7 @@ export function DailyJournal() {
             setShowPdfPreview(true);
           }}
         />
-        {renderModal()} {renderDeleteConfirm()} {renderPdfPreview()} {renderExportModal()}
+        {renderModal()} {renderDeleteConfirm()} {renderPdfPreview()} {renderExportModal()} {renderMachineLogModal()}
       </>
     );
   }
@@ -364,25 +481,17 @@ export function DailyJournal() {
               <div className="space-y-4">
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block">Logged Activities ({formEntries.length})</label>
                 {formEntries.map((entry, idx) => (
-                  <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500" />
-                    <div className="flex items-start sm:items-center justify-between mb-3 pl-2">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 pr-6">
-                        <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{entry.siteName}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 font-medium w-fit">
-                          {entry.clientName}
-                        </span>
-                      </div>
-                      <button onClick={() => setFormEntries(p => p.filter((_, i) => i !== idx))} className="absolute top-3 right-3 h-8 w-8 rounded-full flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div className="pl-2">
-                      <textarea value={entry.narration || ''} onChange={e => { const n = [...formEntries]; n[idx].narration = e.target.value; setFormEntries(n); }}
-                        rows={4} placeholder="Type your field notes here..."
-                        className="w-full text-base sm:text-sm border border-slate-200 dark:border-slate-700 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 dark:bg-slate-950 transition-all placeholder:text-slate-400" />
-                    </div>
-                  </div>
+                  <SiteLogCard 
+                    key={entry.siteId || idx}
+                    entry={entry}
+                    idx={idx}
+                    onRemove={() => setFormEntries(p => p.filter((_, i) => i !== idx))}
+                    onChangeNarration={(val) => { const n = [...formEntries]; n[idx].narration = val; setFormEntries(n); }}
+                    formDate={formDate}
+                    onOpenMachineLog={(machine, siteId, siteName) => {
+                      setMachineLogContext({ assetId: machine.id, assetName: machine.name, siteId, siteName });
+                    }}
+                  />
                 ))}
               </div>
             )}
@@ -408,6 +517,26 @@ export function DailyJournal() {
             <Button variant="outline" onClick={() => setDeleteConfirm(null)} className="h-9">Cancel</Button>
             <Button onClick={confirmDelete} className="h-9 bg-red-600 hover:bg-red-700 text-white font-bold">Delete</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  function renderMachineLogModal() {
+    return (
+      <Dialog open={!!machineLogContext} onOpenChange={(o) => !o && setMachineLogContext(null)} fullScreenMobile>
+        <DialogContent className="max-w-none w-full h-[100dvh] max-h-[100dvh] sm:h-[90vh] sm:max-w-5xl sm:max-h-[90vh] p-0 !rounded-none sm:!rounded-xl border-0 sm:border !m-0 sm:!m-auto overflow-hidden flex flex-col bg-slate-50 dark:bg-slate-950">
+          {machineLogContext && (
+            <DailyLogManager
+              assetId={machineLogContext.assetId}
+              assetName={machineLogContext.assetName}
+              siteId={machineLogContext.siteId}
+              siteName={machineLogContext.siteName}
+              initialDate={formDate}
+              isEmbedded={true}
+              onBack={() => setMachineLogContext(null)}
+            />
+          )}
         </DialogContent>
       </Dialog>
     );
@@ -565,6 +694,7 @@ export function DailyJournal() {
       {renderDeleteConfirm()}
       {renderPdfPreview()}
       {renderExportModal()}
+      {renderMachineLogModal()}
     </div>
   );
 }

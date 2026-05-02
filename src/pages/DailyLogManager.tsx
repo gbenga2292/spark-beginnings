@@ -27,16 +27,23 @@ interface DailyLogManagerProps {
   assetName: string;
   siteId: string;
   siteName: string;
+  initialDate?: string;
+  isEmbedded?: boolean;
   onBack: () => void;
 }
 
-export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }: DailyLogManagerProps) {
+export function DailyLogManager({ assetId, assetName, siteId, siteName, initialDate, isEmbedded, onBack }: DailyLogManagerProps) {
   const { dailyMachineLogs, logDailyActivity, waybills } = useOperations();
   const { employees } = useAppStore();
   const currentUser = useUserStore(s => s.getCurrentUser());
-  const [view, setView] = useState<'history' | 'form' | 'analytics' | 'calendar' | 'detail'>('history');
-  const [selectedLog, setSelectedLog] = useState<DailyMachineLog | null>(null);
+  
+  const [view, setView] = useState<'history' | 'form' | 'analytics' | 'calendar' | 'detail'>(initialDate ? 'form' : 'history');
   const [viewingLog, setViewingLog] = useState<DailyMachineLog | null>(null);
+  
+  const [selectedLog, setSelectedLog] = useState<DailyMachineLog | null>(() => {
+    if (!initialDate) return null;
+    return dailyMachineLogs.find(l => l.assetId === assetId && l.siteId === siteId && l.date === initialDate) || null;
+  });
   
   // Dewatering field staff for supervisor dropdown
   const dewateringStaff = employees.filter(e => 
@@ -48,14 +55,14 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
   // Form State
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [isActive, setIsActive] = useState(true);
-  const [dieselUsage, setDieselUsage] = useState<string>('0');
-  const [supervisorOnSite, setSupervisorOnSite] = useState('');
-  const [clientFeedback, setClientFeedback] = useState('');
-  const [maintenanceDetails, setMaintenanceDetails] = useState('');
-  const [issuesOnSite, setIssuesOnSite] = useState('');
-  const [downtimeEntries, setDowntimeEntries] = useState<DowntimeEntry[]>([]);
+  const [date, setDate] = useState(() => selectedLog?.date || initialDate || new Date().toISOString().split('T')[0]);
+  const [isActive, setIsActive] = useState(selectedLog ? selectedLog.isActive : true);
+  const [dieselUsage, setDieselUsage] = useState<string>(selectedLog ? selectedLog.dieselUsage.toString() : '0');
+  const [supervisorOnSite, setSupervisorOnSite] = useState(selectedLog?.supervisorOnSite || '');
+  const [clientFeedback, setClientFeedback] = useState(selectedLog?.clientFeedback || '');
+  const [maintenanceDetails, setMaintenanceDetails] = useState(selectedLog?.maintenanceDetails || '');
+  const [issuesOnSite, setIssuesOnSite] = useState(selectedLog?.issuesOnSite || '');
+  const [downtimeEntries, setDowntimeEntries] = useState<DowntimeEntry[]>(selectedLog?.downtimeEntries || []);
   const [showDowntimeDialog, setShowDowntimeDialog] = useState(false);
   
   // Downtime Form State
@@ -101,15 +108,19 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
         downtimeEntries,
         loggedBy: currentUser?.name || 'Unknown'
       });
-      setView('history');
-      resetForm();
+      if (isEmbedded) {
+        onBack();
+      } else {
+        setView('history');
+        resetForm();
+      }
     } catch (err) {
       // Error handled in context
     }
   };
 
   const resetForm = () => {
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(initialDate || new Date().toISOString().split('T')[0]);
     setIsActive(true);
     setDieselUsage('0');
     setSupervisorOnSite('');
@@ -141,57 +152,59 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800/60 p-4 sm:p-5 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800/60 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
           <button 
             onClick={onBack}
-            className="h-8 w-8 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all shadow-sm"
+            className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all shadow-sm"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
-          <div>
-            <h2 className="text-base font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-              {assetName}
-              <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300 px-2 py-0">Daily Logs</Badge>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2 truncate">
+              <span className="truncate">{assetName}</span>
+              <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300 px-2 py-0 hidden sm:inline-flex shrink-0">Daily Logs</Badge>
             </h2>
-            <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
-              <Calendar className="h-3 w-3" /> Site: {siteName}
+            <p className="text-xs text-slate-400 font-medium flex items-center gap-1 truncate">
+              <Calendar className="h-3 w-3 shrink-0" /> <span className="truncate">Site: {siteName}</span>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-lg">
-            <button 
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${view === 'history' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-              onClick={() => setView('history')}
+        {!isEmbedded && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-hide w-full sm:w-auto">
+            <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-lg shrink-0">
+              <button 
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${view === 'history' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                onClick={() => setView('history')}
+              >
+                History
+              </button>
+              <button 
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${view === 'analytics' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                onClick={() => setView('analytics')}
+              >
+                Analytics
+              </button>
+              <button 
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${view === 'calendar' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                onClick={() => setView('calendar')}
+              >
+                Calendar
+              </button>
+            </div>
+            <Button 
+              size="sm"
+              className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 ml-2 shrink-0"
+              onClick={() => {
+                resetForm();
+                setView('form');
+              }}
             >
-              History
-            </button>
-            <button 
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${view === 'analytics' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-              onClick={() => setView('analytics')}
-            >
-              Analytics
-            </button>
-            <button 
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${view === 'calendar' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-              onClick={() => setView('calendar')}
-            >
-              Calendar
-            </button>
+              <Plus className="h-4 w-4" /> File Log
+            </Button>
           </div>
-          <Button 
-            size="sm"
-            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 ml-2"
-            onClick={() => {
-              resetForm();
-              setView('form');
-            }}
-          >
-            <Plus className="h-4 w-4" /> File Log
-          </Button>
-        </div>
+        )}
       </div>
 
       {/* Content */}
@@ -228,7 +241,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
                             "text-[10px] font-bold px-2 py-0 rounded-full",
                             log.isActive ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-700 border-rose-100"
                           )}>
-                            {log.isActive ? 'OPERATIONAL' : 'DOWN'}
+                            {log.isActive ? 'OPERATIONAL' : 'INACTIVE'}
                           </Badge>
                           {log.downtimeEntries.length > 0 && (
                             <Badge variant="outline" className="text-[10px] font-bold px-2 py-0 rounded-full bg-amber-50 text-amber-700 border-amber-100">
@@ -331,81 +344,90 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
                           !isActive ? "bg-white dark:bg-slate-700 text-rose-600 shadow-sm border border-slate-200/50 dark:border-slate-600" : "text-slate-500 hover:text-slate-700"
                         )}
                       >
-                        <AlertTriangle className="h-3.5 w-3.5" /> DOWN
+                        <AlertTriangle className="h-3.5 w-3.5" /> INACTIVE
                       </button>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Diesel Usage (L)</label>
-                    <div className="relative">
-                      <Fuel className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                      <Input 
-                        type="number" 
-                        value={dieselUsage} 
-                        onChange={e => setDieselUsage(e.target.value)}
-                        className="pl-9 h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500"
-                        placeholder="0.00"
-                      />
+                  {isActive && (
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Diesel Usage (L)</label>
+                      <div className="relative">
+                        <Fuel className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                        <Input 
+                          type="number" 
+                          value={dieselUsage} 
+                          onChange={e => setDieselUsage(e.target.value)}
+                          className="pl-9 h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500"
+                          placeholder="0.00"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Supervisor Field */}
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Supervisor on Site</label>
-                  <div className="relative group">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                    <select
-                      value={supervisorOnSite}
-                      onChange={(e) => setSupervisorOnSite(e.target.value)}
-                      className="w-full h-10 pl-9 pr-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="">Select Supervisor</option>
-                      {dewateringStaff.map(staff => (
-                        <option key={staff.id} value={`${staff.firstname} ${staff.surname}`}>
-                          {staff.firstname} {staff.surname}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                      <ChevronDown className="h-4 w-4" />
+                {isActive && (
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Supervisor on Site</label>
+                    <div className="relative group">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                      <select
+                        value={supervisorOnSite}
+                        onChange={(e) => setSupervisorOnSite(e.target.value)}
+                        className="w-full h-10 pl-9 pr-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer"
+                      >
+                        <option value="">Select Supervisor</option>
+                        {dewateringStaff.map(staff => (
+                          <option key={staff.id} value={`${staff.firstname} ${staff.surname}`}>
+                            {staff.firstname} {staff.surname}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                        <ChevronDown className="h-4 w-4" />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className={cn("grid gap-6", isActive ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1")}>
                   <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Issues on Site</label>
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Issues on Site / General Note</label>
                     <Textarea 
                       value={issuesOnSite} 
                       onChange={e => setIssuesOnSite(e.target.value)}
                       className="min-h-[100px] border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500 p-3"
-                      placeholder="Describe any environmental or site-specific issues..."
+                      placeholder="Describe any general notes, environmental, or site-specific issues..."
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Maintenance Performed</label>
-                    <Textarea 
-                      value={maintenanceDetails} 
-                      onChange={e => setMaintenanceDetails(e.target.value)}
-                      className="min-h-[100px] border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500 p-3"
-                      placeholder="Any onsite repairs or maintenance done today?"
-                    />
-                  </div>
+                  {isActive && (
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Maintenance Performed</label>
+                      <Textarea 
+                        value={maintenanceDetails} 
+                        onChange={e => setMaintenanceDetails(e.target.value)}
+                        className="min-h-[100px] border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500 p-3"
+                        placeholder="Any onsite repairs or maintenance done today?"
+                      />
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Client Feedback</label>
-                  <Textarea 
-                    value={clientFeedback} 
-                    onChange={e => setClientFeedback(e.target.value)}
-                    className="min-h-[80px] border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500 p-3"
-                    placeholder="What did the client say about the machine performance?"
-                  />
-                </div>
+                {isActive && (
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Client Feedback</label>
+                    <Textarea 
+                      value={clientFeedback} 
+                      onChange={e => setClientFeedback(e.target.value)}
+                      className="min-h-[80px] border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500 p-3"
+                      placeholder="What did the client say about the machine performance?"
+                    />
+                  </div>
+                )}
 
                 {/* Downtime Section */}
-                <div className="space-y-4 pt-6 border-t border-slate-100 dark:border-slate-800">
+                {isActive && (
+                  <div className="space-y-4 pt-6 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-rose-500" />
@@ -458,18 +480,19 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, onBack }
                     </div>
                   )}
                 </div>
+                )}
               </div>
 
-              <div className="bg-slate-50/50 dark:bg-slate-800/50 p-4 sm:p-5 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800 rounded-b-lg">
+              <div className="bg-slate-50/50 dark:bg-slate-800/50 p-4 sm:p-5 flex flex-col sm:flex-row justify-end gap-3 border-t border-slate-100 dark:border-slate-800 rounded-b-lg">
                 <Button 
                   variant="outline" 
-                  className="rounded-md border-slate-200"
-                  onClick={() => setView('history')}
+                  className="rounded-md border-slate-200 w-full sm:w-auto"
+                  onClick={() => isEmbedded ? onBack() : setView('history')}
                 >
                   Cancel
                 </Button>
                 <Button 
-                  className="rounded-md bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                  className="rounded-md bg-blue-600 hover:bg-blue-700 text-white gap-2 w-full sm:w-auto"
                   onClick={handleSaveLog}
                 >
                   <Save className="h-4 w-4" /> {selectedLog ? 'Update Log' : 'Save Daily Log'}
