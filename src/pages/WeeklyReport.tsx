@@ -691,7 +691,10 @@ export function WeeklyReport() {
                   <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider text-right leading-tight min-w-0">{stat.label}</p>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-base sm:text-lg font-black text-foreground tracking-tight truncate">
+                  <p className={cn(
+                    "font-black text-foreground tracking-tight leading-none",
+                    String(stat.value).length > 8 ? "text-sm sm:text-sm lg:text-xs xl:text-sm break-words" : "text-base sm:text-lg truncate"
+                  )}>
                     {stat.isCurrency ? '₦' : ''}{stat.value}
                   </p>
                   {(stat as any).sub && <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{(stat as any).sub}</p>}
@@ -982,6 +985,43 @@ export function WeeklyReport() {
                   </table>
                 </div>
               </Card>
+
+              {/* Daily Journals / Diary Table */}
+              <Card className="border border-border/50 shadow-sm rounded-2xl bg-card overflow-hidden mt-6">
+                <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+                   <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2"><BookOpen className="h-4 w-4 text-emerald-600" /> Operations Diary (Daily Journals)</CardTitle>
+                </div>
+                <div className="divide-y divide-border/50 max-h-[500px] overflow-y-auto custom-scrollbar">
+                   {weekJournals.length === 0 || weekJournalEntries.length === 0 ? (
+                     <div className="px-6 py-8 text-center text-slate-400 italic text-xs">No diary entries for this period</div>
+                   ) : (
+                     weekJournals.sort((a,b) => b.date.localeCompare(a.date)).map(j => {
+                       const entries = weekJournalEntries.filter(e => e.journalId === j.id);
+                       if (entries.length === 0) return null;
+                       return (
+                         <div key={j.id} className="p-5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                            <h3 className="font-bold text-sm text-foreground flex items-center gap-2 mb-3">
+                              <Calendar className="h-4 w-4 text-slate-400" />
+                              {formatDisplayDate(j.date)}
+                            </h3>
+                            <div className="space-y-4">
+                              {entries.map(e => (
+                                <div key={e.id} className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-border/50">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-none font-bold text-[10px] uppercase">{e.siteName}</Badge>
+                                    <span className="text-[10px] text-muted-foreground font-semibold">Logged by: {e.loggedBy}</span>
+                                  </div>
+                                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{e.narration}</p>
+                                </div>
+                              ))}
+                            </div>
+                         </div>
+                       );
+                     })
+                   )}
+                </div>
+              </Card>
+
             </section>
             )}
 

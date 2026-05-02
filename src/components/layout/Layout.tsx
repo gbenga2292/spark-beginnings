@@ -17,6 +17,7 @@ export function Layout() {
   const { isDark, showFloatingCalendar } = useTheme();
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const [privBannerVisible, setPrivBannerVisible] = useState(false);
+  const [reloadCountdown, setReloadCountdown] = useState<number | null>(null);
 
   // Start network monitoring
   useEffect(() => {
@@ -26,10 +27,26 @@ export function Layout() {
 
   // Listen for privilege updates pushed via realtime
   useEffect(() => {
-    const handler = () => setPrivBannerVisible(true);
+    const handler = () => {
+      setPrivBannerVisible(true);
+      setReloadCountdown(10); // 10 second auto-reload
+    };
     window.addEventListener('privileges-updated', handler);
     return () => window.removeEventListener('privileges-updated', handler);
   }, []);
+
+  // Auto-reload countdown effect
+  useEffect(() => {
+    if (!privBannerVisible || reloadCountdown === null) return;
+    if (reloadCountdown === 0) {
+      window.location.reload();
+      return;
+    }
+    const timer = setTimeout(() => {
+      setReloadCountdown(prev => (prev !== null ? prev - 1 : null));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [reloadCountdown, privBannerVisible]);
 
   // Still loading the Supabase session — don't redirect yet
   if (loading) return null;
@@ -58,12 +75,16 @@ export function Layout() {
             </span>
             <button
               onClick={() => window.location.reload()}
-              className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 rounded px-3 py-1 text-xs font-semibold transition-colors"
+              className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 rounded px-3 py-1 text-xs font-semibold transition-colors whitespace-nowrap"
             >
-              <RefreshCw className="h-3.5 w-3.5" /> Reload Now
+              <RefreshCw className="h-3.5 w-3.5" /> 
+              {reloadCountdown !== null ? `Reloading in ${reloadCountdown}s...` : 'Reload Now'}
             </button>
             <button
-              onClick={() => setPrivBannerVisible(false)}
+              onClick={() => {
+                setPrivBannerVisible(false);
+                setReloadCountdown(null);
+              }}
               className="hover:bg-white/20 rounded p-1 transition-colors"
               aria-label="Dismiss"
             >

@@ -485,7 +485,8 @@ export function Dashboard() {
                 value={filterYear} onChange={e => setFilterYear(Number(e.target.value))}>
                 {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
-        </div>
+        </div>,
+        [filterMonth, filterYear]
     );
 
     return (

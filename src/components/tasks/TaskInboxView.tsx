@@ -806,16 +806,16 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
           </div>
 
           {/* RIGHT: Updates Panel */}
-          <div className="w-full xl:w-[400px] 2xl:w-[520px] flex-shrink-0 bg-white border-t xl:border-t-0 xl:border-l border-border flex flex-col xl:overflow-hidden min-h-[600px] xl:min-h-0">
-            <div className="flex bg-slate-50 border-b border-border" style={{ flexShrink: 0 }}>
+          <div className="w-full xl:w-[400px] 2xl:w-[520px] flex-shrink-0 bg-white dark:bg-slate-900 border-t xl:border-t-0 xl:border-l border-border dark:border-slate-800 flex flex-col xl:overflow-hidden min-h-[600px] xl:min-h-0">
+            <div className="flex bg-slate-50 dark:bg-[#111827] border-b border-border dark:border-slate-800" style={{ flexShrink: 0 }}>
               {(['updates', 'workflow', 'files'] as const).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setRightTab(tab)}
                   className={`flex-1 w-full flex items-center justify-center py-4 text-sm font-bold capitalize tracking-wide transition-all border-b-2 cursor-pointer ${
                     rightTab === tab
-                      ? 'bg-white text-primary border-primary shadow-sm'
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100 border-transparent'
+                      ? 'bg-white dark:bg-slate-800 text-primary border-primary shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/50 border-transparent'
                   }`}
                 >
                   {tab === 'updates' ? '💬 Updates' : tab === 'workflow' ? '⚡ Workflow' : '📎 Files'}
@@ -1155,19 +1155,18 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
 
       {/* Messages - WhatsApp background */}
       <div
-        className="flex-1 overflow-y-auto px-3 py-4 space-y-1"
+        className="flex-1 overflow-y-auto px-3 py-4 space-y-1 bg-[#efeae2] dark:bg-[#0b141a]"
         style={{
-          background: '#efeae2',
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23c8bfb0' fill-opacity='0.18'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
         }}
       >
         {comments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-14 gap-2">
-            <div className="w-14 h-14 rounded-full bg-white/60 flex items-center justify-center shadow-sm">
-              <MessageSquare className="w-6 h-6 text-slate-400" />
+            <div className="w-14 h-14 rounded-full bg-white/60 dark:bg-slate-800/60 flex items-center justify-center shadow-sm">
+              <MessageSquare className="w-6 h-6 text-slate-400 dark:text-slate-500" />
             </div>
-            <p className="text-sm font-medium text-slate-500">No updates yet</p>
-            <p className="text-xs text-slate-400">Be the first to post an update!</p>
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No updates yet</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">Be the first to post an update!</p>
           </div>
         ) : (() => {
           let lastDateLabel = '';
@@ -1208,7 +1207,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
                 {/* Date separator */}
                 {showDateSep && (
                   <div className="flex justify-center my-3">
-                    <span className="px-3 py-1 bg-[#d1f2e0]/90 text-[#555] text-[11px] font-semibold rounded-full shadow-sm border border-white/60">{dateLabel}</span>
+                    <span className="px-3 py-1 bg-[#d1f2e0]/90 dark:bg-[#182229]/90 text-[#555] dark:text-[#8696a0] text-[11px] font-semibold rounded-full shadow-sm border border-white/60 dark:border-white/5">{dateLabel}</span>
                   </div>
                 )}
 
@@ -1231,11 +1230,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
 
                   {/* Bubble */}
                   <div
-                    className={`relative max-w-[75%] rounded-2xl px-3 py-2 ${ isOwn ? 'rounded-br-sm' : 'rounded-bl-sm' }`}
-                    style={{
-                      background: isOwn ? '#dcf8c6' : '#ffffff',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.13)',
-                    }}
+                    className={`relative max-w-[75%] rounded-2xl px-3 py-2 shadow-sm ${ isOwn ? 'rounded-br-sm bg-[#dcf8c6] dark:bg-[#005c4b]' : 'rounded-bl-sm bg-white dark:bg-[#202c33]' }`}
                   >
                     {/* Sender name — only for others */}
                     {!isOwn && (
@@ -1300,7 +1295,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
                         })()}
 
                         {/* Message body */}
-                        <p className="text-[13px] text-slate-800 leading-snug whitespace-pre-wrap break-words">
+                        <p className="text-[13px] text-slate-800 dark:text-[#e9edef] leading-snug whitespace-pre-wrap break-words">
                           {renderText((c.text || '').replace(/^\[reply_to:[^\]]+\]\n/, ''))}
                         </p>
 
@@ -1369,10 +1364,10 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
       </div>
 
       {/* WhatsApp-style Compose Bar */}
-      <div className="flex-shrink-0 relative z-20" style={{ background: '#f0f2f5', borderTop: '1px solid #d9dbde' }}>
+      <div className="flex-shrink-0 relative z-20 bg-[#f0f2f5] dark:bg-[#202c33] border-t border-[#d9dbde] dark:border-[#313d45]">
         {/* Reply preview */}
         {replyingTo && (
-          <div className="mx-3 mt-2 px-3 py-2 bg-white rounded-xl border-l-4 flex items-start justify-between" style={{ borderLeftColor: getAuthorColor(replyingTo.author_id || replyingTo.authorId || 'x') }}>
+          <div className="mx-3 mt-2 px-3 py-2 bg-white dark:bg-[#2a3942] rounded-xl border-l-4 flex items-start justify-between" style={{ borderLeftColor: getAuthorColor(replyingTo.author_id || replyingTo.authorId || 'x') }}>
             <div className="min-w-0 pr-3">
               <p className="text-[11px] font-bold mb-0.5 flex items-center gap-1" style={{ color: getAuthorColor(replyingTo.author_id || replyingTo.authorId || 'x') }}>
                 <Reply className="w-3 h-3" /> Replying to {users.find((u: any) => u.id === (replyingTo.author_id || replyingTo.authorId))?.name}
@@ -1456,7 +1451,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
             )}
 
             <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" multiple />
-            <div className="flex items-end bg-white rounded-full px-4 py-2 shadow-sm" style={{ border: '1px solid #ced4d8' }}>
+            <div className="flex items-end bg-white dark:bg-[#2a3942] rounded-full px-4 py-2 shadow-sm border border-[#ced4d8] dark:border-[#2a3942]">
               <textarea
                 id={`updates-textarea-${subtask.id}`}
                 value={text}
@@ -1497,7 +1492,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
                 placeholder="Type a message"
                 rows={1}
                 style={{ maxHeight: 120, overflowY: 'auto' }}
-                className="flex-1 w-full text-[14px] text-slate-800 bg-transparent resize-none focus:outline-none placeholder:text-slate-400 leading-snug"
+                className="flex-1 w-full text-[14px] text-slate-800 dark:text-[#e9edef] bg-transparent resize-none focus:outline-none placeholder:text-slate-400 dark:placeholder:text-[#8696a0] leading-snug"
               />
               <div className="flex items-center gap-1 ml-1 flex-shrink-0 pb-px">
                 <button
