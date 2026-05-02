@@ -39,6 +39,7 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
   const [approverId, setApproverId] = useState('');
   const [viewMode, setViewMode] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const employees = useAppStore((state) => state.employees).filter(e => e.status === 'Active' || e.status === 'On Leave');
   const departments = useAppStore((state) => state.departments);
@@ -435,54 +436,66 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
   useSetPageTitle(
     viewMode ? 'Financial Entries Database' : 'Financial Request',
     viewMode ? 'View all recorded salary advances and loans' : 'Submit salary advances or loans for approval',
-    <div className="flex items-center gap-2">
-      {priv.canAdd && (
-        <label className="flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 shadow-sm border border-indigo-200 rounded-md h-9 px-3 text-xs font-medium cursor-pointer transition-colors whitespace-nowrap">
-          <Upload className="h-4 w-4" /> Import
-          <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
-        </label>
-      )}
-      {priv.canAdd && (
-        <div className="relative group">
-          <button className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 border border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-9 px-3 text-xs gap-2">
-            <Download className="h-4 w-4" /> Export
-          </button>
-          
-          <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-md shadow-lg border border-slate-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden translate-y-1 group-hover:translate-y-0">
-            <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/50">
-              <span className="font-semibold text-xs text-slate-700">Choose Export Type</span>
-            </div>
-            
-            <button 
-              onClick={() => handleExportCSV('bare')} 
-              className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors flex flex-col border-b border-slate-50"
-            >
-              <span className="font-medium text-sm text-slate-900">Bare Minimum</span>
-              <span className="text-[10px] text-slate-500">Essential fields for reporting</span>
-            </button>
-            
-            <button 
-              onClick={() => handleExportCSV('detailed')} 
-              className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors flex flex-col"
-            >
-              <span className="font-medium text-sm text-slate-900">Detailed Version</span>
-              <span className="text-[10px] text-slate-500">Full database records</span>
-            </button>
-          </div>
-        </div>
-      )}
-      <Button
-        variant={viewMode ? "default" : "outline"}
-        size="sm"
-        className={viewMode ? "bg-indigo-600 hover:bg-indigo-700 h-9 text-xs" : "border-slate-200 h-9 text-xs"}
-        onClick={() => setViewMode(!viewMode)}
-      >
-        {viewMode ? (
-          <><ArrowLeft className="h-4 w-4 mr-2" /> Back to Form</>
-        ) : (
-          <><List className="h-4 w-4 mr-2" /> View Database</>
+    <div className="relative flex items-center gap-2">
+      {/* ── Desktop controls ── */}
+      <div className="hidden sm:flex items-center gap-2">
+        {priv.canAdd && (
+          <label className="flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 shadow-sm border border-indigo-200 rounded-md h-9 px-3 text-xs font-medium cursor-pointer transition-colors whitespace-nowrap">
+            <Upload className="h-4 w-4" /> Import
+            <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
+          </label>
         )}
-      </Button>
+        {priv.canAdd && (
+          <div className="relative group">
+            <button className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 border border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-9 px-3 text-xs gap-2">
+              <Download className="h-4 w-4" /> Export
+            </button>
+            <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-md shadow-lg border border-slate-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden translate-y-1 group-hover:translate-y-0">
+              <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/50">
+                <span className="font-semibold text-xs text-slate-700">Choose Export Type</span>
+              </div>
+              <button onClick={() => handleExportCSV('bare')} className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors flex flex-col border-b border-slate-50">
+                <span className="font-medium text-sm text-slate-900">Bare Minimum</span>
+                <span className="text-[10px] text-slate-500">Essential fields for reporting</span>
+              </button>
+              <button onClick={() => handleExportCSV('detailed')} className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors flex flex-col">
+                <span className="font-medium text-sm text-slate-900">Detailed Version</span>
+                <span className="text-[10px] text-slate-500">Full database records</span>
+              </button>
+            </div>
+          </div>
+        )}
+        <Button
+          variant={viewMode ? 'default' : 'outline'}
+          size="sm"
+          className={viewMode ? 'bg-indigo-600 hover:bg-indigo-700 h-9 text-xs' : 'border-slate-200 h-9 text-xs'}
+          onClick={() => setViewMode(!viewMode)}
+        >
+          {viewMode ? <><ArrowLeft className="h-4 w-4 mr-2" /> Back to Form</> : <><List className="h-4 w-4 mr-2" /> View Database</>}
+        </Button>
+      </div>
+
+      {/* ── Mobile: icon buttons + 3-dot menu ── */}
+      <div className="flex sm:hidden items-center gap-2">
+        <Button
+          variant={viewMode ? 'default' : 'outline'}
+          size="sm"
+          className={`h-9 w-9 ${viewMode ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'border-slate-200'}`}
+          onClick={() => setViewMode(!viewMode)}
+          title={viewMode ? 'Back to Form' : 'View Database'}
+        >
+          {viewMode ? <ArrowLeft className="h-4 w-4" /> : <List className="h-4 w-4" />}
+        </Button>
+        {viewMode && (
+          <button
+            className={`h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 shadow-sm transition-colors ${mobileMenuOpen ? 'bg-slate-100 text-indigo-600' : 'bg-white text-slate-600'}`}
+            onClick={(e) => { e.stopPropagation(); setMobileMenuOpen(o => !o); }}
+            title="More options"
+          >
+            <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 
@@ -506,6 +519,31 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
   if (viewMode) {
     return (
       <>
+        {/* ── Mobile dropdown panel ── */}
+        {mobileMenuOpen && (
+          <div className="sm:hidden relative z-[100]">
+            <div className="fixed inset-0 bg-transparent cursor-default touch-none" onPointerDown={(e) => { e.stopPropagation(); setMobileMenuOpen(false); }} />
+            <div className="fixed top-16 right-3 w-48 bg-white border border-slate-200 rounded-md shadow-md p-1 animate-in fade-in zoom-in-95 duration-100">
+              {priv.canAdd && (
+                <label className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer rounded-sm active:bg-slate-100 transition-colors">
+                  <Upload className="h-4 w-4 text-indigo-500" /> Import CSV
+                  <input type="file" accept=".csv" className="hidden" onClick={(e) => e.stopPropagation()} onChange={(e) => { handleImportCSVSelected(e); setMobileMenuOpen(false); }} />
+                </label>
+              )}
+              {priv.canAdd && (
+                <>
+                  <button onPointerDown={(e) => { e.stopPropagation(); handleExportCSV('bare'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 rounded-sm active:bg-slate-100 transition-colors text-left">
+                    <Download className="h-4 w-4 text-emerald-500" /> Export Bare
+                  </button>
+                  <button onPointerDown={(e) => { e.stopPropagation(); handleExportCSV('detailed'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 rounded-sm active:bg-slate-100 transition-colors text-left">
+                    <Download className="h-4 w-4 text-indigo-500" /> Export Detailed
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      
         <div className="flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Salary Advances Table */}

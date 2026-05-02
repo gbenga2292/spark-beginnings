@@ -112,6 +112,38 @@ const Page = ({ children, label }: { children: React.ReactNode; label?: string }
   </PageErrorBoundary>
 );
 
+import { useUserStore } from './store/userStore';
+
+function RootRedirect() {
+  const { user } = useAuth();
+  const currentUser = useUserStore((s) => s.getCurrentUser());
+
+  if (user && !currentUser) {
+    return <PageLoader />;
+  }
+
+  if (currentUser) {
+    const p = currentUser.privileges;
+    
+    // Waterfall redirect based on highest-priority modules
+    if (p.tasks?.canViewDashboard) return <Navigate to="/tasks/dashboard" replace />;
+    if (p.tasks?.canView) return <Navigate to="/tasks" replace />;
+    if (p.dashboard?.canView) return <Navigate to="/hr-dashboard" replace />;
+    if (p.operations?.canView) return <Navigate to="/operations" replace />;
+    if (p.dailyJournal?.canView) return <Navigate to="/daily-journal" replace />;
+    if (p.employees?.canView) return <Navigate to="/employees" replace />;
+    if (p.sites?.canView) return <Navigate to="/sites" replace />;
+    if (p.ledger?.canView) return <Navigate to="/ledger" replace />;
+    if (p.weeklyReport?.canView) return <Navigate to="/weekly-report" replace />;
+    if (p.leaves?.canView) return <Navigate to="/leaves" replace />;
+    
+    // Fallback: If they have minimal permissions, at least let them see their profile
+    return <Navigate to="/profile" replace />;
+  }
+
+  return <Navigate to="/login" replace />;
+}
+
 function AppContent() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -140,7 +172,7 @@ function AppContent() {
       <Route path="/login" element={<Login />} />
       <Route path="/setup" element={<SuperAdminSetup />} />
       <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
-        <Route index element={<Page label="Task Dashboard"><ProtectedRoute requiredModule="tasks"><TaskDashboard /></ProtectedRoute></Page>} />
+        <Route index element={<RootRedirect />} />
         
         {/* ── Restricted Modules (Hidden in Web Build) ────────────────────────── */}
         {!IS_LIMITED_WEB_WEB && (
@@ -208,7 +240,7 @@ function AppContent() {
         <Route path="company-expenses" element={<Page label="Company Expenses"><ProtectedRoute requiredModule="ledger"><CompanyExpenses /></ProtectedRoute></Page>} />
         
         <Route path="tasks" element={<Page label="Task Register"><ProtectedRoute requiredModule="tasks"><Tasks /></ProtectedRoute></Page>} />
-        <Route path="tasks/dashboard" element={<Navigate to="/" replace />} />
+        <Route path="tasks/dashboard" element={<Page label="Task Dashboard"><ProtectedRoute requiredModule="tasks"><TaskDashboard /></ProtectedRoute></Page>} />
         <Route path="tasks/reminders" element={<Page label="Task Reminders"><ProtectedRoute requiredModule="tasks"><TaskReminders /></ProtectedRoute></Page>} />
         <Route path="tasks/reports" element={<Page label="Task Reports"><ProtectedRoute requiredModule="tasks"><TaskReports /></ProtectedRoute></Page>} />
         <Route path="tasks/archive" element={<Page label="Task Archive"><ProtectedRoute requiredModule="tasks"><TaskArchive /></ProtectedRoute></Page>} />

@@ -78,9 +78,9 @@ const navigation: NavCategory[] = [
     name: 'Dashboard',
     icon: LayoutDashboard,
     standalone: true,
-    standaloneHref: '/',
+    standaloneHref: '/tasks/dashboard',
     items: [
-      { name: 'Dashboard', href: '/', icon: LayoutDashboard, privKey: 'tasks', privField: 'canViewDashboard' },
+      { name: 'Dashboard', href: '/tasks/dashboard', icon: LayoutDashboard, privKey: 'tasks', privField: 'canViewDashboard' },
     ],
   },
   // ── Tasks ────────────────────────────────────────────────────────

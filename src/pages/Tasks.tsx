@@ -15,7 +15,7 @@ import { AddSubtaskInline } from './Tasks/AddSubtaskInline';
 import { AssignUserDialog } from './Tasks/AssignUserDialog';
 import type { AppUser } from "@/src/store/userStore";
 import type { TaskPriority } from "@/src/types/tasks";
-import { RotateCcw, Reply, Trash2, Archive, LayoutGrid, BarChart2, CheckCircle2, History, Plus, Search, Circle, Loader2, Calendar, X, Users, Clock, ChevronDown, ChevronRight, UserCheck, ArrowUpDown, Flag, MessageSquare, Send, Pencil, Lock, User, FolderOpen, List, Bell, RefreshCw, Link as LinkIcon, FileText, Paperclip, AtSign } from 'lucide-react';
+import { KanbanSquare, LayoutList, RotateCcw, Reply, Trash2, Archive, LayoutGrid, BarChart2, CheckCircle2, History, Plus, Search, Circle, Loader2, Calendar, X, Users, Clock, ChevronDown, ChevronRight, UserCheck, ArrowUpDown, Flag, MessageSquare, Send, Pencil, Lock, User, FolderOpen, List, Bell, RefreshCw, Link as LinkIcon, FileText, Paperclip, AtSign } from 'lucide-react';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useTaskReadTracker } from '@/src/hooks/useTaskReadTracker';
 import { Button } from '@/src/components/ui/button';
@@ -123,6 +123,7 @@ function PersonalTasksView() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { hrVariables } = useAppStore();
   
   const [viewMode, setViewModeState] = useState<TaskViewMode>(() => (localStorage.getItem('tf_default_view') as TaskViewMode) || loadDefaultView());
@@ -199,46 +200,79 @@ function PersonalTasksView() {
   useSetPageTitle(
     'My Tasks',
     'Manage your private tasks and to-do list across different view modes',
-    <div className="flex items-center gap-3">
-      <ViewToggle value={viewMode} onChange={setViewMode} />
-      
-      <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
-
-      {/* Sort */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-9 gap-2 text-slate-600 font-bold text-[11px] uppercase tracking-tight border border-slate-200 bg-white hover:bg-slate-50">
-            <ArrowUpDown className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{SORT_OPTIONS.find(o => o.value === sortBy)?.label}</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
-          {SORT_OPTIONS.map(opt => (
-            <DropdownMenuItem key={opt.value} onClick={() => setSortBy(opt.value)} className={sortBy === opt.value ? 'bg-indigo-50 text-indigo-700 font-bold' : ''}>
-              {opt.label}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <Button 
-        size="sm" 
-        variant="outline"
-        onClick={() => navigate('/tasks/archive')}
-        className="h-9 px-4 gap-2 border-slate-200 text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50"
-      >
-        <Archive className="w-4 h-4 text-slate-400" /> <span className="hidden sm:inline">Archive</span>
-      </Button>
-
-      <Button 
-        size="sm" 
-        onClick={() => setShowCreate(true)}
-        className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
-      >
-        <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Task</span>
-      </Button>
+    <div className="relative flex items-center gap-2">
+      {/* Desktop */}
+      <div className="hidden sm:flex items-center gap-3">
+        <ViewToggle value={viewMode} onChange={setViewMode} />
+        <div className="h-8 w-[1px] bg-slate-200 mx-1" />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-9 gap-2 text-slate-600 font-bold text-[11px] uppercase tracking-tight border border-slate-200 bg-white hover:bg-slate-50">
+              <ArrowUpDown className="w-3.5 h-3.5" />
+              {SORT_OPTIONS.find(o => o.value === sortBy)?.label}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            {SORT_OPTIONS.map(opt => (
+              <DropdownMenuItem key={opt.value} onClick={() => setSortBy(opt.value)} className={sortBy === opt.value ? 'bg-indigo-50 text-indigo-700 font-bold' : ''}>
+                {opt.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Button size="sm" variant="outline" onClick={() => navigate('/tasks/archive')} className="h-9 px-4 gap-2 border-slate-200 text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50">
+          <Archive className="w-4 h-4 text-slate-400" /> Archive
+        </Button>
+        <Button size="sm" onClick={() => setShowCreate(true)} className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95">
+          <Plus className="w-4 h-4" /> New Task
+        </Button>
+      </div>
+      {/* Mobile */}
+      <div className="flex sm:hidden items-center gap-2">
+        <Button size="sm" onClick={() => setShowCreate(true)} className="h-9 w-9 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md" title="New Task">
+          <Plus className="w-4 h-4" />
+        </Button>
+        <button className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm" onClick={() => setMobileMenuOpen(o => !o)} title="More options">
+          <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
+        </button>
+      </div>
+      {mobileMenuOpen && (
+        <>
+          <div className="sm:hidden fixed inset-0 z-40" onClick={() => setMobileMenuOpen(false)} />
+          <div className="sm:hidden fixed top-16 right-3 z-50 w-48 bg-white border border-slate-200 rounded-md shadow-md p-2 space-y-2">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-2">View & Sort</p>
+              <div className="flex gap-1 px-1">
+                {(['board', 'list'] as const).map(mode => (
+                  <button key={mode} onClick={() => { setViewMode(mode); setMobileMenuOpen(false); }}
+                    className={`flex-1 py-1.5 rounded text-xs font-bold uppercase transition-colors flex items-center justify-center gap-1 ${
+                      viewMode === mode ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                    {mode === 'board' ? <KanbanSquare className="w-3.5 h-3.5" /> : <LayoutList className="w-3.5 h-3.5" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-2 pt-1 border-t border-slate-100">Sort By</p>
+              <div className="flex flex-col gap-1 px-1">
+                {SORT_OPTIONS.map(opt => (
+                  <button key={opt.value} onClick={() => { setSortBy(opt.value); setMobileMenuOpen(false); }} className={`w-full text-left px-2 py-2 rounded text-sm transition-colors ${sortBy === opt.value ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="pt-1 border-t border-slate-100 px-1">
+              <button onClick={() => { navigate('/tasks/archive'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-2 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded">
+                <Archive className="w-4 h-4" /> Archive
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>,
-    [viewMode, sortBy, search]
+    [viewMode, sortBy, search, mobileMenuOpen]
   );
 
   const toggle = (id: string) =>
@@ -621,6 +655,7 @@ function AdminTasksView() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const [teamMobileMenuOpen, setTeamMobileMenuOpen] = useState(false);
   const { hrVariables } = useAppStore();
   const { wsTasks: rawTeamTasks, wsMembers, workspace: teamWs } = useWorkspace();
   const teamTasks = React.useMemo(() => {
@@ -797,59 +832,92 @@ function AdminTasksView() {
   useSetPageTitle(
     'Team Tasks',
     'Coordinate with your team, track projects, and manage subtasks in real-time',
-    <div className="flex items-center gap-3">
-      <ViewToggle value={viewMode} onChange={setViewMode} />
-      
-      <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
+    <div className="relative flex items-center gap-2">
+      {/* ── Desktop ── */}
+      <div className="hidden sm:flex items-center gap-2">
+        <ViewToggle value={viewMode} onChange={setViewMode} />
+        <div className="h-8 w-[1px] bg-slate-200 mx-1" />
+        <ScopePicker scope={scope} setScope={setScope} myCount={mySubs.length} pendingCount={pendingApprovalSubs.length} />
+        <div className="h-8 w-[1px] bg-slate-200 mx-1" />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-9 gap-2 text-slate-600 font-bold text-[11px] uppercase tracking-tight border border-slate-200 bg-white hover:bg-slate-50">
+              <ArrowUpDown className="w-3.5 h-3.5 text-indigo-500" />
+              {SORT_OPTIONS.find(o => o.value === sortBy)?.label}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            {SORT_OPTIONS.map(opt => (
+              <DropdownMenuItem key={opt.value} onClick={() => setSortBy(opt.value)} className={sortBy === opt.value ? 'bg-indigo-50 text-indigo-700 font-bold' : ''}>
+                {opt.label}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleSetDefault} className="text-[10px] text-indigo-600 font-bold">SET AS DEFAULT SORT</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Button size="sm" variant="outline" onClick={() => navigate('/tasks/archive')} className="h-9 px-4 gap-2 border-slate-200 text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50">
+          <Archive className="w-4 h-4 text-slate-400" /> Archive
+        </Button>
+        <Button size="sm" onClick={() => scope === 'projects' ? setShowCreateProject(true) : setShowCreate(true)} className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95">
+          {scope === 'projects' ? <FolderOpen className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+          {scope === 'projects' ? 'New Project' : 'New Task'}
+        </Button>
+      </div>
 
-      <ScopePicker
-        scope={scope}
-        setScope={setScope}
-        myCount={mySubs.length}
-        pendingCount={pendingApprovalSubs.length}
-      />
+      {/* ── Mobile ── */}
+      <div className="flex sm:hidden items-center gap-2">
+        <Button size="sm" onClick={() => scope === 'projects' ? setShowCreateProject(true) : setShowCreate(true)} className="h-9 w-9 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md" title={scope === 'projects' ? 'New Project' : 'New Task'}>
+          {scope === 'projects' ? <FolderOpen className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+        </Button>
+        <button className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm" onClick={() => setTeamMobileMenuOpen(o => !o)} title="More options">
+          <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
+        </button>
+      </div>
 
-      <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-9 gap-2 text-slate-600 font-bold text-[11px] uppercase tracking-tight border border-slate-200 bg-white hover:bg-slate-50">
-            <ArrowUpDown className="w-3.5 h-3.5 text-indigo-500" />
-            <span className="hidden sm:inline">{SORT_OPTIONS.find(o => o.value === sortBy)?.label}</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
-          {SORT_OPTIONS.map(opt => (
-            <DropdownMenuItem key={opt.value} onClick={() => setSortBy(opt.value)} className={sortBy === opt.value ? 'bg-indigo-50 text-indigo-700 font-bold' : ''}>
-              {opt.label}
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleSetDefault} className="text-[10px] text-indigo-600 font-bold">
-            SET AS DEFAULT SORT
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <Button 
-        size="sm" 
-        variant="outline"
-        onClick={() => navigate('/tasks/archive')}
-        className="h-9 px-4 gap-2 border-slate-200 text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50"
-      >
-        <Archive className="w-4 h-4 text-slate-400" /> <span className="hidden lg:inline">Archive</span>
-      </Button>
-
-      <Button 
-        size="sm" 
-        onClick={() => scope === 'projects' ? setShowCreateProject(true) : setShowCreate(true)}
-        className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
-      >
-        {scope === 'projects' ? <FolderOpen className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-        <span className="hidden lg:inline">{scope === 'projects' ? 'New Project' : 'New Task'}</span>
-      </Button>
+      {teamMobileMenuOpen && (
+        <>
+          <div className="sm:hidden fixed inset-0 z-40" onClick={() => setTeamMobileMenuOpen(false)} />
+          <div className="sm:hidden fixed top-16 right-3 z-50 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-md p-2 space-y-2">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-2">View</p>
+              <div className="flex gap-1 px-1">
+                {(['board', 'list'] as const).map(mode => (
+                  <button key={mode} onClick={() => { setViewMode(mode); setTeamMobileMenuOpen(false); }}
+                    className={`flex-1 py-1.5 rounded text-xs font-bold uppercase transition-colors flex items-center justify-center gap-1 ${
+                      viewMode === mode ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                    {mode === 'board' ? <KanbanSquare className="w-3.5 h-3.5" /> : <LayoutList className="w-3.5 h-3.5" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-2 pt-1 border-t border-slate-100">Scope</p>
+              <div className="px-1">
+                <ScopePicker scope={scope} setScope={(s) => { setScope(s); setTeamMobileMenuOpen(false); }} myCount={mySubs.length} pendingCount={pendingApprovalSubs.length} />
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-2 pt-1 border-t border-slate-100">Sort By</p>
+              <div className="flex flex-col gap-1 px-1">
+                {SORT_OPTIONS.map(opt => (
+                  <button key={opt.value} onClick={() => { setSortBy(opt.value); setTeamMobileMenuOpen(false); }} className={`w-full text-left px-2 py-2 rounded text-sm transition-colors ${sortBy === opt.value ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="pt-1 border-t border-slate-100 px-1">
+              <button onClick={() => { navigate('/tasks/archive'); setTeamMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-2 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded">
+                <Archive className="w-4 h-4" /> Archive
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>,
-    [viewMode, scope, sortBy, mySubs.length, pendingApprovalSubs.length]
+    [viewMode, scope, sortBy, mySubs.length, pendingApprovalSubs.length, teamMobileMenuOpen]
   );
 
   const toggle = (id: string) => {

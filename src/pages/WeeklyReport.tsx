@@ -333,16 +333,16 @@ export function WeeklyReport() {
             <>
               {/* Backdrop */}
               <div className="sm:hidden fixed inset-0 z-40" onClick={() => setMobileMenuOpen(false)} />
-              {/* Panel */}
-              <div className="sm:hidden fixed top-16 right-3 z-50 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="sm:hidden fixed top-16 right-3 z-50 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-md p-2 space-y-2">
               {/* Mode switcher */}
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Report Mode</p>
-                <div className="flex gap-2">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-2">Mode</p>
+                <div className="flex gap-1 px-1">
                   {(['weekly', 'monthly'] as const).map(mode => (
                     <button key={mode} onClick={() => { setReportMode(mode); }}
-                      className={cn("flex-1 py-2 rounded-xl text-xs font-bold uppercase tracking-wide transition-all",
-                        reportMode === mode ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900" : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400")}>
+                      className={`flex-1 py-1.5 rounded text-xs font-bold uppercase tracking-wide transition-colors ${
+                        reportMode === mode ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                      }`}>
                       {mode}
                     </button>
                   ))}
@@ -351,26 +351,26 @@ export function WeeklyReport() {
 
               {/* Period navigator */}
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Period</p>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setAnchor(a => reportMode === 'monthly' ? subMonths(a, 1) : subWeeks(a, 1))} className="h-9 w-9 shrink-0 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-2">Period</p>
+                <div className="flex items-center gap-1 px-1">
+                  <button onClick={() => setAnchor(a => reportMode === 'monthly' ? subMonths(a, 1) : subWeeks(a, 1))} className="h-8 w-8 shrink-0 rounded border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100">
                     <ChevronLeft className="h-4 w-4" />
                   </button>
-                  <span className="flex-1 text-center text-xs font-bold text-slate-800 dark:text-slate-100">{reportLabel}</span>
-                  <button onClick={() => setAnchor(a => reportMode === 'monthly' ? addMonths(a, 1) : addWeeks(a, 1))} className="h-9 w-9 shrink-0 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+                  <span className="flex-1 text-center text-xs font-bold text-slate-800 dark:text-slate-100 truncate px-1">{reportLabel}</span>
+                  <button onClick={() => setAnchor(a => reportMode === 'monthly' ? addMonths(a, 1) : addWeeks(a, 1))} className="h-8 w-8 shrink-0 rounded border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100">
                     <ChevronRight className="h-4 w-4" />
                   </button>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="flex gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
-                <button onClick={() => { setAnchor(new Date()); setMobileMenuOpen(false); }} className="flex-1 h-9 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">Today</button>
-                <button onClick={() => { handleExportXLSX(); setMobileMenuOpen(false); }} className="flex-1 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold flex items-center justify-center gap-1.5">
-                  <Download className="h-4 w-4" /> Excel
+              <div className="flex flex-col gap-1 pt-1 border-t border-slate-100 dark:border-slate-800 px-1">
+                <button onClick={() => { setAnchor(new Date()); setMobileMenuOpen(false); }} className="w-full text-left px-2 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded">Today</button>
+                <button onClick={() => { handleExportXLSX(); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full text-left px-2 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded">
+                  <Download className="h-4 w-4 text-emerald-500" /> Excel Export
                 </button>
-                <button onClick={() => { generateProfessionalPDF('preview'); setMobileMenuOpen(false); }} className="flex-1 h-9 rounded-xl bg-slate-900 text-white text-xs font-bold flex items-center justify-center gap-1.5">
-                  <FileText className="h-4 w-4" /> PDF
+                <button onClick={() => { generateProfessionalPDF('preview'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full text-left px-2 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded">
+                  <FileText className="h-4 w-4 text-indigo-500" /> PDF Report
                 </button>
               </div>
             </div>

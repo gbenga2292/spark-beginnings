@@ -74,6 +74,7 @@ export function Attendance() {
   const [staffTypeFilter, setStaffTypeFilter] = useState<'OFFICE' | 'FIELD' | 'NON-EMPLOYEE'>('FIELD');
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   type SortConfig = { key: keyof AttendanceRecord; direction: 'asc' | 'desc' };
   const [sortConfig, setSortConfig] = useState<SortConfig[]>([]);
@@ -1045,67 +1046,112 @@ export function Attendance() {
   useSetPageTitle(
     'Daily Register',
     'Attendance & site allocation',
-    <div className="flex items-center gap-2">
-      {activeTab === 'database' && (
+    <div className="relative flex items-center gap-2">
+      {/* ── Desktop controls ── */}
+      <div className="hidden sm:flex items-center gap-2">
+        {activeTab === 'database' && (
+          <>
+            {priv.canImport && (
+              <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm mb-0">
+                <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
+                <Input type="file" accept=".xlsx" className="hidden" onChange={handleImportExcel} />
+              </label>
+            )}
+            {priv.canDelete && dbSelectedIds.size > 0 && (
+              <Button onClick={handleBulkDelete} size="sm" variant="destructive" className="h-9 px-3 text-[11px] font-bold uppercase tracking-tight gap-2 shadow-sm">
+                <Trash2 className="h-3.5 w-3.5" /> Delete ({dbSelectedIds.size})
+              </Button>
+            )}
+            {priv.canExport && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50">
+                    <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleExportExcel('bare')} className="cursor-pointer">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Bare Minimum</span>
+                      <span className="text-[10px] text-slate-500">Essential fields for re-import</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportExcel('detailed')} className="cursor-pointer">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Detailed Version</span>
+                      <span className="text-[10px] text-slate-500">Full database records with estimates</span>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            <div className="w-px h-5 bg-slate-200 mx-1" />
+          </>
+        )}
+        <TabsList className="bg-slate-100/80 p-1 h-10 border border-slate-200/50 shadow-sm">
+          <TabsTrigger active={activeTab === 'entry'} onClick={() => setActiveTab('entry')} className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-4 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all">
+            <CalendarIcon className="h-3.5 w-3.5 text-indigo-500" /> Entry
+          </TabsTrigger>
+          <TabsTrigger active={activeTab === 'database'} onClick={() => setActiveTab('database')} className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-4 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all">
+            <Database className="h-3.5 w-3.5 text-emerald-500" /> Database
+          </TabsTrigger>
+        </TabsList>
+      </div>
+
+      {/* ── Mobile: tab icons + 3-dot ── */}
+      <div className="flex sm:hidden items-center gap-2">
+        <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/50 shadow-sm">
+          <button onClick={() => setActiveTab('entry')} className={`h-8 w-8 flex items-center justify-center rounded-md transition-all ${activeTab === 'entry' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`} title="Entry">
+            <CalendarIcon className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={() => setActiveTab('database')} className={`h-8 w-8 flex items-center justify-center rounded-md transition-all ${activeTab === 'database' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500'}`} title="Database">
+            <Database className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        {activeTab === 'database' && (
+          <button
+            className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm"
+            onClick={() => setMobileMenuOpen(o => !o)}
+            title="More options"
+          >
+            <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
+          </button>
+        )}
+      </div>
+
+      {/* ── Mobile dropdown panel ── */}
+      {mobileMenuOpen && (
         <>
-          {priv.canImport && (
-            <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm mb-0">
-              <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
-              <Input type="file" accept=".xlsx" className="hidden" onChange={handleImportExcel} />
-            </label>
-          )}
-          {priv.canDelete && dbSelectedIds.size > 0 && (
-            <Button onClick={handleBulkDelete} size="sm" variant="destructive" className="h-9 px-3 text-[11px] font-bold uppercase tracking-tight gap-2 shadow-sm">
-              <Trash2 className="h-3.5 w-3.5" /> Delete ({dbSelectedIds.size})
-            </Button>
-          )}
-          {priv.canExport && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50">
-                  <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleExportExcel('bare')} className="cursor-pointer">
-                  <div className="flex flex-col">
-                    <span className="font-medium">Bare Minimum</span>
-                    <span className="text-[10px] text-slate-500">Essential fields for re-import</span>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExportExcel('detailed')} className="cursor-pointer">
-                  <div className="flex flex-col">
-                    <span className="font-medium">Detailed Version</span>
-                    <span className="text-[10px] text-slate-500">Full database records with estimates</span>
-                  </div>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          <div className="w-px h-5 bg-slate-200 mx-1" />
+          <div className="sm:hidden fixed inset-0 z-40" onClick={() => setMobileMenuOpen(false)} />
+          <div className="sm:hidden fixed top-16 right-3 z-50 w-48 bg-white border border-slate-200 rounded-md shadow-md p-1">
+            {priv.canImport && (
+              <label className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 cursor-pointer">
+                <Download className="h-4 w-4 text-indigo-500" /> Import Excel
+                <Input type="file" accept=".xlsx" className="hidden" onChange={(e) => { handleImportExcel(e); setMobileMenuOpen(false); }} />
+              </label>
+            )}
+            {priv.canDelete && dbSelectedIds.size > 0 && (
+              <button onClick={() => { handleBulkDelete(); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-rose-600 hover:bg-rose-50">
+                <Trash2 className="h-4 w-4" /> Delete ({dbSelectedIds.size})
+              </button>
+            )}
+            {priv.canExport && (
+              <>
+                <button onClick={() => { handleExportExcel('bare'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                  <Upload className="h-4 w-4 text-emerald-500" /> Export Bare
+                </button>
+                <button onClick={() => { handleExportExcel('detailed'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                  <Upload className="h-4 w-4 text-indigo-500" /> Export Detailed
+                </button>
+              </>
+            )}
+          </div>
         </>
       )}
-
-      <TabsList className="bg-slate-100/80 p-1 h-10 border border-slate-200/50 shadow-sm">
-        <TabsTrigger
-          active={activeTab === 'entry'}
-          onClick={() => setActiveTab('entry')}
-          className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-4 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all"
-        >
-          <CalendarIcon className="h-3.5 w-3.5 text-indigo-500" /> Entry
-        </TabsTrigger>
-        <TabsTrigger
-          active={activeTab === 'database'}
-          onClick={() => setActiveTab('database')}
-          className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-4 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all"
-        >
-          <Database className="h-3.5 w-3.5 text-emerald-500" /> Database
-        </TabsTrigger>
-      </TabsList>
     </div>,
-    [activeTab, priv.canImport, priv.canDelete, priv.canExport, dbSelectedIds.size, handleImportExcel, handleExportExcel, handleBulkDelete]
+    [activeTab, priv.canImport, priv.canDelete, priv.canExport, dbSelectedIds.size, handleImportExcel, handleExportExcel, handleBulkDelete, mobileMenuOpen]
   );
 
   return (

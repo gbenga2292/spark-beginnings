@@ -254,6 +254,7 @@ export function DailyJournal() {
 
   // Export Filter States
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [exportFilters, setExportFilters] = useState({
     startDate: format(subMonths(new Date(), 1), 'yyyy-MM-dd'),
     endDate: format(new Date(), 'yyyy-MM-dd'),
@@ -427,37 +428,88 @@ export function DailyJournal() {
   };
 
   useSetPageTitle('Site Diary', 'Daily field activity register', (
-    <div className="flex items-center gap-3">
-      {currentUser?.privileges?.dailyJournal?.canExport && (
-        <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(true)} className="h-9 px-3 sm:px-4 gap-2 border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight">
-          <FileText className="w-4 h-4 shrink-0" /> <span className="hidden sm:inline">Export Report</span>
-        </Button>
-      )}
-      {!diaryDate && (
-        <>
-          <div className="flex items-center rounded border border-slate-200 bg-white p-0.5 shadow-sm">
-            {(['list', 'calendar'] as const).map(v => (
-              <button key={v} onClick={() => { setViewMode(v); setDiaryDate(null); }}
-                className={cn('px-3 py-1.5 text-xs font-medium rounded transition-all', viewMode === v && !diaryDate ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
-                {v === 'list' ? 'List' : 'Calendar'}
-              </button>
-            ))}
-          </div>
-          {currentUser?.privileges?.dailyJournal?.canAdd && (
-            <Button size="sm" onClick={() => openModal(undefined, diaryDate || undefined)}
-              className="h-9 px-4 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs tracking-tight shadow-sm active:scale-95">
-              <Plus className="w-4 h-4" /><span className="hidden sm:inline">New Log</span>
+    <div className="relative flex items-center gap-2">
+      {/* ── Desktop Controls ── */}
+      <div className="hidden sm:flex items-center gap-3">
+        {currentUser?.privileges?.dailyJournal?.canExport && (
+          <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(true)} className="h-9 px-3 sm:px-4 gap-2 border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight">
+            <FileText className="w-4 h-4 shrink-0" /> <span>Export Report</span>
+          </Button>
+        )}
+        {!diaryDate && (
+          <>
+            <div className="flex items-center rounded border border-slate-200 bg-white p-0.5 shadow-sm">
+              {(['list', 'calendar'] as const).map(v => (
+                <button key={v} onClick={() => { setViewMode(v); setDiaryDate(null); }}
+                  className={cn('px-3 py-1.5 text-xs font-medium rounded transition-all', viewMode === v && !diaryDate ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
+                  {v === 'list' ? 'List' : 'Calendar'}
+                </button>
+              ))}
+            </div>
+            {currentUser?.privileges?.dailyJournal?.canAdd && (
+              <Button size="sm" onClick={() => openModal(undefined, diaryDate || undefined)}
+                className="h-9 px-4 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs tracking-tight shadow-sm active:scale-95">
+                <Plus className="w-4 h-4" /><span>New Log</span>
+              </Button>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Mobile Controls ── */}
+      <div className="flex sm:hidden items-center gap-2">
+        {!diaryDate && (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setViewMode(viewMode === 'list' ? 'calendar' : 'list'); setDiaryDate(null); }}
+              className="h-9 w-9 border-slate-200 text-slate-600 p-0"
+              title={viewMode === 'list' ? 'Switch to Calendar' : 'Switch to List'}
+            >
+              {viewMode === 'list' ? <Calendar className="h-4 w-4" /> : <div className="font-bold text-[10px]">List</div>}
             </Button>
-          )}
-        </>
-      )}
+            {currentUser?.privileges?.dailyJournal?.canAdd && (
+              <Button size="sm" onClick={() => openModal(undefined, diaryDate || undefined)}
+                className="h-9 w-9 bg-blue-600 hover:bg-blue-700 text-white p-0"
+                title="New Log"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            )}
+          </>
+        )}
+        {currentUser?.privileges?.dailyJournal?.canExport && (
+          <button
+            className={`h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 shadow-sm transition-colors ${mobileMenuOpen ? 'bg-slate-100 text-blue-600' : 'bg-white text-slate-600'}`}
+            onClick={(e) => { e.stopPropagation(); setMobileMenuOpen(o => !o); }}
+          >
+            <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
+          </button>
+        )}
+      </div>
+
     </div>
   ), [viewMode, diaryDate, dailyJournals, currentUser]);
+
+  const mobileDropdownPanel = mobileMenuOpen && (
+    <div className="sm:hidden relative z-[100]">
+      <div className="fixed inset-0 bg-transparent cursor-default touch-none" onPointerDown={(e) => { e.stopPropagation(); setMobileMenuOpen(false); }} />
+      <div className="fixed top-16 right-3 w-48 bg-white border border-slate-200 rounded-md shadow-md p-1 animate-in fade-in zoom-in-95 duration-100">
+        {currentUser?.privileges?.dailyJournal?.canExport && (
+          <button onPointerDown={(e) => { e.stopPropagation(); setIsExportModalOpen(true); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 rounded-sm text-left transition-colors active:bg-slate-100">
+            <FileText className="h-4 w-4 text-blue-600" /> Export Report
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
   // Diary detail page
   if (diaryDate) {
     return (
       <>
+        {mobileDropdownPanel}
         <DiaryDetailView
           date={diaryDate}
           onBack={() => setDiaryDate(null)}
@@ -784,6 +836,7 @@ export function DailyJournal() {
 
   return (
     <div className="space-y-5">
+      {mobileDropdownPanel}
       {/* Search (list view only) */}
       {viewMode === 'list' && (
         <div className="relative w-full max-w-md">

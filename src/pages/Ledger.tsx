@@ -73,6 +73,7 @@ export function Ledger() {
   const setLedgerDirty = useAppStore((state) => state.setLedgerDirty);
 
   const [hasUnsavedPending, setHasUnsavedPending] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isLedgerDirty = useMemo(() => {
     return JSON.stringify(items) !== originalItemsJSON || hasUnsavedPending;
@@ -640,104 +641,120 @@ export function Ledger() {
     tab === 'entry'
       ? 'Record vouchers, manage expenses, and track financial outflows across banks and sites'
       : `Click any voucher to view its transactions. Showing ${voucherSummaries.length} voucher${voucherSummaries.length !== 1 ? 's' : ''}.`,
-    <div className="flex items-center gap-2">
-      {/* Tab Toggle */}
-      <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60 shadow-sm backdrop-blur-sm">
-         <button 
-           onClick={() => setTab('entry')} 
-           className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${
-             tab === 'entry' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'
-           }`}
-         >
-           <FileText className="h-3 w-3" /> Entry
-         </button>
-         <button 
-           onClick={() => setTab('records')} 
-           className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${
-             tab === 'records' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'
-           }`}
-         >
-           <History className="h-3 w-3" /> History
-         </button>
+    <div className="relative flex items-center gap-2">
+      {/* ── Desktop controls ── */}
+      <div className="hidden sm:flex items-center gap-2">
+        <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60 shadow-sm backdrop-blur-sm">
+          <button onClick={() => setTab('entry')} className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${tab === 'entry' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}>
+            <FileText className="h-3 w-3" /> Entry
+          </button>
+          <button onClick={() => setTab('records')} className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${tab === 'records' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}>
+            <History className="h-3 w-3" /> History
+          </button>
+        </div>
+        <div className="h-8 w-[1px] bg-slate-200 mx-1" />
+        {tab === 'entry' ? (
+          <div className="flex items-center gap-2">
+            {activeVoucherNo && priv.canDelete && (
+              <Button size="sm" variant="ghost" className="h-9 w-9 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-600 border border-rose-100" onClick={handleDeleteVoucher} title="Delete Voucher">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" className="h-9 w-9 p-0 text-slate-500 hover:bg-slate-100 border border-slate-200" onClick={handleReload} title="Reload Voucher">
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Button size="sm" variant="outline" className={`h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight ${hasUnsavedPending ? 'opacity-40 pointer-events-none' : 'hover:bg-slate-50'}`} onClick={handleClear}>
+              <X className="h-3.5 w-3.5" /> Clear
+            </Button>
+            <Button size="sm" className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95" onClick={handleSubmit} disabled={!priv.canAdd}>
+              <CheckCircle2 className="h-3.5 w-3.5" /> Submit Voucher
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            {priv.canAdd && (
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm">
+                <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
+              </Button>
+            )}
+            {priv.canExport && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm">
+                    <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleExport('bare')} className="cursor-pointer">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Basic</span>
+                      <span className="text-[10px] text-slate-500">Voucher, date, description, category &amp; amount</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport('detailed')} className="cursor-pointer">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Detailed</span>
+                      <span className="text-[10px] text-slate-500">Full records with client, site, vendor &amp; bank</span>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        )}
       </div>
 
-      <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
+      {/* ── Mobile: icon tab toggle + context action icons + 3-dot ── */}
+      <div className="flex sm:hidden items-center gap-2">
+        {/* Tab toggle */}
+        <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60 shadow-sm">
+          <button onClick={() => setTab('entry')} className={`h-8 px-2 flex items-center gap-1 rounded-md text-[10px] font-extrabold uppercase tracking-wide transition-all ${tab === 'entry' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'}`} title="Entry">
+            <FileText className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={() => setTab('records')} className={`h-8 px-2 flex items-center gap-1 rounded-md text-[10px] font-extrabold uppercase tracking-wide transition-all ${tab === 'records' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'}`} title="History">
+            <History className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        {/* Entry quick actions (moved to page content) */}
+        {/* Records: 3-dot for import/export */}
+        {tab === 'records' && (
+          <button
+            className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm"
+            onClick={() => setMobileMenuOpen(o => !o)}
+            title="More options"
+          >
+            <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
+          </button>
+        )}
+      </div>
 
-      {tab === 'entry' ? (
-        <div className="flex items-center gap-2">
-          {activeVoucherNo && priv.canDelete && (
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              className="h-9 w-9 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-600 border border-rose-100" 
-              onClick={handleDeleteVoucher}
-              title="Delete Voucher"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-          <Button 
-            size="sm" 
-            variant="ghost" 
-            className="h-9 w-9 p-0 text-slate-500 hover:bg-slate-100 border border-slate-200" 
-            onClick={handleReload}
-            title="Reload Voucher"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-          <Button 
-            size="sm" 
-            variant="outline" 
-            className={`h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight ${hasUnsavedPending ? 'opacity-40 pointer-events-none' : 'hover:bg-slate-50'}`} 
-            onClick={handleClear}
-          >
-            <X className="h-3.5 w-3.5" /> Clear
-          </Button>
-          <Button 
-            size="sm" 
-            className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95" 
-            onClick={handleSubmit} 
-            disabled={!priv.canAdd}
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" /> Submit Voucher
-          </Button>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-           {priv.canAdd && (
-             <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm">
-               <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
-             </Button>
-           )}
-           {priv.canExport && (
-             <DropdownMenu>
-               <DropdownMenuTrigger asChild>
-                 <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm">
-                   <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
-                 </Button>
-               </DropdownMenuTrigger>
-               <DropdownMenuContent align="end" className="w-52">
-                 <DropdownMenuLabel>Choose Export Type</DropdownMenuLabel>
-                 <DropdownMenuSeparator />
-                 <DropdownMenuItem onClick={() => handleExport('bare')} className="cursor-pointer">
-                   <div className="flex flex-col">
-                     <span className="font-medium">Basic</span>
-                     <span className="text-[10px] text-slate-500">Voucher, date, description, category &amp; amount</span>
-                   </div>
-                 </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => handleExport('detailed')} className="cursor-pointer">
-                   <div className="flex flex-col">
-                     <span className="font-medium">Detailed</span>
-                     <span className="text-[10px] text-slate-500">Full records with client, site, vendor &amp; bank</span>
-                   </div>
-                 </DropdownMenuItem>
-               </DropdownMenuContent>
-             </DropdownMenu>
-           )}
-        </div>
+      {/* ── Mobile dropdown panel ── */}
+      {mobileMenuOpen && (
+        <>
+          <div className="sm:hidden fixed inset-0 z-40" onClick={() => setMobileMenuOpen(false)} />
+          <div className="sm:hidden fixed top-16 right-3 z-50 w-48 bg-white border border-slate-200 rounded-md shadow-md p-1">
+            {priv.canAdd && (
+              <button onClick={() => { fileInputRef.current?.click(); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                <Download className="h-4 w-4 text-indigo-500" /> Import
+              </button>
+            )}
+            {priv.canExport && (
+              <>
+                <button onClick={() => { handleExport('bare'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                  <Upload className="h-4 w-4 text-emerald-500" /> Export Basic
+                </button>
+                <button onClick={() => { handleExport('detailed'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                  <Upload className="h-4 w-4 text-indigo-500" /> Export Detailed
+                </button>
+              </>
+            )}
+          </div>
+        </>
       )}
     </div>,
-    [tab, priv, hasUnsavedPending, activeVoucherNo, ledgerEntries, voucherDate, paidFrom, items, currentUser, voucherSummaries.length]
+    [tab, priv, hasUnsavedPending, activeVoucherNo, ledgerEntries, voucherDate, paidFrom, items, currentUser, voucherSummaries.length, mobileMenuOpen]
   );
 
   if (!priv?.canView) {
@@ -792,6 +809,23 @@ export function Ledger() {
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Entered By</label>
               <Input readOnly value={currentUser?.name || ''} className="bg-slate-100/50 h-9 text-xs font-bold text-slate-400 border-slate-200 pointer-events-none shadow-sm" />
             </div>
+          </div>
+
+          {/* Mobile Actions (Only visible on small screens) */}
+          <div className="sm:hidden p-3 bg-white border-b border-slate-200/60 flex items-center justify-between gap-2 shadow-sm">
+            <div className="flex gap-2">
+              {activeVoucherNo && priv.canDelete && (
+                <Button size="sm" variant="outline" className="h-9 px-3 text-rose-500 hover:bg-rose-50 border-rose-100 font-bold gap-1.5" onClick={handleDeleteVoucher}>
+                  <Trash2 className="h-3.5 w-3.5" /> <span className="text-[10px] uppercase tracking-wider">Delete</span>
+                </Button>
+              )}
+              <Button size="sm" variant="outline" className="h-9 px-3 text-slate-500 hover:bg-slate-100 border-slate-200 font-bold gap-1.5" onClick={handleReload}>
+                <RotateCcw className="h-3.5 w-3.5" /> <span className="text-[10px] uppercase tracking-wider">Reload</span>
+              </Button>
+            </div>
+            <Button size="sm" className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-md active:scale-95 transition-all" onClick={handleSubmit} disabled={!priv.canAdd}>
+              <CheckCircle2 className="h-3.5 w-3.5" /> <span className="text-[10px] uppercase tracking-wider">Submit</span>
+            </Button>
           </div>
 
           {/* Grid Table */}

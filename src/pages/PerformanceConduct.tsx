@@ -4,7 +4,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog } from '@/src/components/ui/dialog';
-import { Search, Plus, ArrowLeft, Save, Pencil, Trash2, AlertTriangle, Eye, ShieldAlert, CheckCircle2, CheckSquare, BellRing, PanelLeftClose, PanelLeftOpen, Users } from 'lucide-react';
+import { Search, Plus, ArrowLeft, Save, Pencil, Trash2, AlertTriangle, Eye, ShieldAlert, CheckCircle2, CheckSquare, BellRing, PanelLeftClose, PanelLeftOpen, Users, X } from 'lucide-react';
 import { useAppStore, DisciplinaryRecord, Employee } from '@/src/store/appStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -28,6 +28,7 @@ export function PerformanceConduct() {
   const [showNotices, setShowNotices] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileListOpen, setIsMobileListOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const employees = useAppStore(s => s.employees);
   const records = useAppStore(s => s.disciplinaryRecords);
@@ -409,26 +410,52 @@ export function PerformanceConduct() {
   useSetPageTitle(
     'Performance & Conduct',
     'Staff Merits & Demerits • Due Process • Active Evaluation',
-    <div className="flex items-center gap-2">
-      <Button 
-        variant="outline" 
-        size="sm"
-        className={`relative h-9 ${showNotices ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white dark:bg-slate-900 dark:bg-slate-900'}`} 
-        onClick={() => { setShowNotices(!showNotices); setSelectedEmployeeId(null); setIsAdding(false); setIsEditing(false); setSidebarCollapsed(false); }}
-      >
-        <BellRing className="h-4 w-4 mr-2" />
-        Notices
-        {noticeRecords.length > 0 && <span className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-rose-500 text-white text-[9px] flex items-center justify-center rounded-full font-bold shadow-sm">{noticeRecords.length}</span>}
-      </Button>
-      <Button 
-        variant="outline" 
-        size="sm"
-        onClick={() => setSidebarCollapsed(!sidebarCollapsed)} 
-        className="bg-white px-3 h-9"
-      >
-        {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4 mr-2 text-slate-500" /> : <PanelLeftClose className="h-4 w-4 mr-2 text-slate-500" />}
-        {sidebarCollapsed ? 'Expand' : 'Collapse'}
-      </Button>
+    <div className="relative flex items-center gap-2">
+      {/* ── Desktop controls ── */}
+      <div className="hidden sm:flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className={`relative h-9 ${showNotices ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white dark:bg-slate-900'}`}
+          onClick={() => { setShowNotices(!showNotices); setSelectedEmployeeId(null); setIsAdding(false); setIsEditing(false); setSidebarCollapsed(false); }}
+        >
+          {showNotices ? <X className="h-4 w-4 mr-2" /> : <BellRing className="h-4 w-4 mr-2" />}
+          {showNotices ? 'Close Notices' : 'Notices'}
+          {!showNotices && noticeRecords.length > 0 && <span className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-rose-500 text-white text-[9px] flex items-center justify-center rounded-full font-bold shadow-sm">{noticeRecords.length}</span>}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          className="bg-white px-3 h-9"
+        >
+          {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4 mr-2 text-slate-500" /> : <PanelLeftClose className="h-4 w-4 mr-2 text-slate-500" />}
+          {sidebarCollapsed ? 'Expand' : 'Collapse'}
+        </Button>
+      </div>
+
+      {/* ── Mobile: icon-only buttons ── */}
+      <div className="flex sm:hidden items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className={`relative h-9 w-9 ${showNotices ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white dark:bg-slate-900'}`}
+          onClick={() => { setShowNotices(!showNotices); setSelectedEmployeeId(null); setIsAdding(false); setIsEditing(false); setSidebarCollapsed(false); }}
+          title={showNotices ? "Close Notices" : "Notices"}
+        >
+          {showNotices ? <X className="h-4 w-4" /> : <BellRing className="h-4 w-4" />}
+          {!showNotices && noticeRecords.length > 0 && <span className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-rose-500 text-white text-[9px] flex items-center justify-center rounded-full font-bold shadow-sm">{noticeRecords.length}</span>}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          className="h-9 w-9 bg-white"
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4 text-slate-500" /> : <PanelLeftClose className="h-4 w-4 text-slate-500" />}
+        </Button>
+      </div>
     </div>
   );
 
@@ -746,13 +773,13 @@ export function PerformanceConduct() {
       </div>
 
       {/* Mobile FAB */}
-      {!selectedEmployeeId && !isMobileListOpen && !showNotices && (
+      {!selectedEmployeeId && !isMobileListOpen && (
         <button
           onClick={() => setIsMobileListOpen(true)}
-          className="fixed bottom-6 right-6 z-40 md:hidden flex items-center gap-2 bg-rose-600 text-white px-4 py-3 rounded-full shadow-lg hover:bg-rose-700 transition-colors"
+          className={`fixed bottom-6 right-6 z-40 md:hidden flex items-center gap-2 text-white px-4 py-3 rounded-full shadow-lg transition-colors ${showNotices ? 'bg-amber-600 hover:bg-amber-700' : 'bg-rose-600 hover:bg-rose-700'}`}
         >
-          <Users className="h-5 w-5" />
-          <span className="text-sm font-semibold">Employees</span>
+          {showNotices ? <BellRing className="h-5 w-5" /> : <Users className="h-5 w-5" />}
+          <span className="font-bold text-sm tracking-wide">{showNotices ? 'View Notices' : 'Employees'}</span>
         </button>
       )}
     </div>

@@ -168,6 +168,9 @@ export function TaskReminders() {
     }
   }, []);
 
+  /* Mobile menu */
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   /* Form state */
   const [showForm, setShowForm]     = useState(false);
   const [editingId, setEditingId]   = useState<string | null>(null);
@@ -252,47 +255,107 @@ export function TaskReminders() {
   useSetPageTitle(
     'Task Reminders',
     `${activeCount} active${overdueCount > 0 ? ` · ${overdueCount} overdue` : ''} · ${pool.length} total reminders tracked`,
-    <div className="flex items-center gap-3">
-      {/* View Mode Toggle */}
-      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
-        <Button 
-          variant={viewMode === 'calendar' ? 'secondary' : 'ghost'} 
-          size="sm" 
-          onClick={() => setViewMode('calendar')}
-          className={`h-8 px-3 gap-2 font-bold text-[10px] uppercase tracking-tight ${viewMode === 'calendar' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+    <div className="relative flex items-center gap-2">
+      {/* ── Desktop controls ── */}
+      <div className="hidden sm:flex items-center gap-2">
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+          <Button
+            variant={viewMode === 'calendar' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('calendar')}
+            className={`h-8 px-3 gap-2 font-bold text-[10px] uppercase tracking-tight ${viewMode === 'calendar' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+          >
+            <Calendar className="w-3.5 h-3.5" /> Calendar
+          </Button>
+          <Button
+            variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('list')}
+            className={`h-8 px-3 gap-2 font-bold text-[10px] uppercase tracking-tight ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+          >
+            <LayoutList className="w-3.5 h-3.5" /> List
+          </Button>
+        </div>
+
+        <div className="h-8 w-[1px] bg-slate-200 mx-1" />
+
+        {/* Tab Filter */}
+        <TabsList className="h-9 bg-slate-100 border border-slate-200 p-0.5">
+          <TabsTrigger active={tab === 'all'} onClick={() => setTab('all')} className="h-8 px-3 text-[10px] font-bold uppercase tracking-tight">All</TabsTrigger>
+          <TabsTrigger active={tab === 'mine'} onClick={() => setTab('mine')} className="h-8 px-3 text-[10px] font-bold uppercase tracking-tight">Mine</TabsTrigger>
+          <TabsTrigger active={tab === 'shared'} onClick={() => setTab('shared')} className="h-8 px-3 text-[10px] font-bold uppercase tracking-tight">Shared</TabsTrigger>
+        </TabsList>
+
+        <div className="h-8 w-[1px] bg-slate-200 mx-1" />
+
+        <Button
+          size="sm"
+          onClick={openCreate}
+          className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
         >
-          <Calendar className="w-3.5 h-3.5" /> Calendar
-        </Button>
-        <Button 
-          variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
-          size="sm" 
-          onClick={() => setViewMode('list')}
-          className={`h-8 px-3 gap-2 font-bold text-[10px] uppercase tracking-tight ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
-        >
-          <LayoutList className="w-3.5 h-3.5" /> List
+          <Plus className="w-4 h-4" /> New Reminder
         </Button>
       </div>
 
-      <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
+      {/* ── Mobile: New Reminder icon + 3-dot menu ── */}
+      <div className="flex sm:hidden items-center gap-2">
+        <Button
+          size="sm"
+          onClick={openCreate}
+          className="h-9 w-9 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition-all active:scale-95"
+          title="New Reminder"
+        >
+          <Plus className="w-4 h-4" />
+        </Button>
 
-      {/* Tab Filter */}
-      <TabsList className="h-9 bg-slate-100 border border-slate-200 p-0.5 hidden md:flex">
-        <TabsTrigger active={tab === 'all'} onClick={() => setTab('all')} className="h-8 px-3 text-[10px] font-bold uppercase tracking-tight">All</TabsTrigger>
-        <TabsTrigger active={tab === 'mine'} onClick={() => setTab('mine')} className="h-8 px-3 text-[10px] font-bold uppercase tracking-tight">Mine</TabsTrigger>
-        <TabsTrigger active={tab === 'shared'} onClick={() => setTab('shared')} className="h-8 px-3 text-[10px] font-bold uppercase tracking-tight">Shared</TabsTrigger>
-      </TabsList>
+        <button
+          className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white dark:bg-slate-900 dark:border-slate-700 text-slate-600 dark:text-slate-300 shadow-sm"
+          onClick={() => setMobileMenuOpen(o => !o)}
+          title="More options"
+        >
+          <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
+        </button>
+      </div>
 
-      <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
-
-      <Button 
-        size="sm" 
-        onClick={openCreate}
-        className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
-      >
-        <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Reminder</span>
-      </Button>
+      {/* ── Mobile dropdown panel ── */}
+      {mobileMenuOpen && (
+        <>
+          {/* Backdrop */}
+          <div className="sm:hidden fixed inset-0 z-40" onClick={() => setMobileMenuOpen(false)} />
+          {/* Panel */}
+          <div className="sm:hidden fixed top-16 right-3 z-50 w-48 bg-white border border-slate-200 rounded-md shadow-md p-2 space-y-2">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-2">View</p>
+              <div className="flex gap-1 px-1">
+                {(['calendar', 'list'] as const).map(mode => (
+                  <button key={mode} onClick={() => { setViewMode(mode); setMobileMenuOpen(false); }}
+                    className={`flex-1 py-1.5 rounded text-xs font-bold uppercase transition-colors flex items-center justify-center gap-1 ${
+                      viewMode === mode ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                    {mode === 'calendar' ? <Calendar className="w-3.5 h-3.5" /> : <LayoutList className="w-3.5 h-3.5" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-2 pt-1 border-t border-slate-100">Filter</p>
+              <div className="flex flex-col gap-1 px-1">
+                {(['all', 'mine', 'shared'] as const).map(t => (
+                  <button key={t} onClick={() => { setTab(t); setMobileMenuOpen(false); }}
+                    className={`w-full text-left px-2 py-2 rounded text-sm transition-colors ${
+                      tab === t ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                    }`}>
+                    <span className="capitalize">{t}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>,
-    [viewMode, tab, activeCount, overdueCount, pool.length]
+    [viewMode, tab, activeCount, overdueCount, pool.length, mobileMenuOpen]
   );
 
   const handleSubmit = (e: React.FormEvent) => {
