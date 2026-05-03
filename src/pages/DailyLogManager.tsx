@@ -11,6 +11,7 @@ import { useUserStore } from '../store/userStore';
 import { DailyMachineLog, DowntimeEntry } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { cn } from '@/src/lib/utils';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { Card } from '@/src/components/ui/card';
@@ -149,63 +150,56 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     setView('detail');
   };
 
+  // inside component, right before return:
+  useSetPageTitle(
+    assetName,
+    `Site: ${siteName}`,
+    <div className="flex items-center gap-1 sm:gap-2">
+      <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 sm:gap-2" onClick={onBack}>
+        <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back</span>
+      </Button>
+      {!isEmbedded && (
+        <Button 
+          size="sm"
+          className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-8 sm:h-9 px-3"
+          onClick={() => {
+            resetForm();
+            setView('form');
+          }}
+        >
+          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">File Log</span>
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300">
-      {/* Header */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800/60 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={onBack}
-            className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all shadow-sm"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2 truncate">
-              <span className="truncate">{assetName}</span>
-              <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300 px-2 py-0 hidden sm:inline-flex shrink-0">Daily Logs</Badge>
-            </h2>
-            <p className="text-xs text-slate-400 font-medium flex items-center gap-1 truncate">
-              <Calendar className="h-3 w-3 shrink-0" /> <span className="truncate">Site: {siteName}</span>
-            </p>
+      {/* Tabs */}
+      {!isEmbedded && (
+        <div className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800/60 p-3 sm:p-4 flex items-center justify-center sm:justify-start overflow-x-auto scrollbar-hide shadow-sm z-10 sticky top-0">
+          <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg w-full sm:w-auto">
+            <button 
+              className={cn("flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-md transition-all", view === 'history' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
+              onClick={() => setView('history')}
+            >
+              History
+            </button>
+            <button 
+              className={cn("flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-md transition-all", view === 'analytics' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
+              onClick={() => setView('analytics')}
+            >
+              Analytics
+            </button>
+            <button 
+              className={cn("flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-md transition-all", view === 'calendar' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
+              onClick={() => setView('calendar')}
+            >
+              Calendar
+            </button>
           </div>
         </div>
-
-        {!isEmbedded && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-hide w-full sm:w-auto">
-            <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-lg shrink-0">
-              <button 
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${view === 'history' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-                onClick={() => setView('history')}
-              >
-                History
-              </button>
-              <button 
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${view === 'analytics' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-                onClick={() => setView('analytics')}
-              >
-                Analytics
-              </button>
-              <button 
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${view === 'calendar' ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-                onClick={() => setView('calendar')}
-              >
-                Calendar
-              </button>
-            </div>
-            <Button 
-              size="sm"
-              className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 ml-2 shrink-0"
-              onClick={() => {
-                resetForm();
-                setView('form');
-              }}
-            >
-              <Plus className="h-4 w-4" /> File Log
-            </Button>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6">

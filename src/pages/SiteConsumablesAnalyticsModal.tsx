@@ -51,16 +51,16 @@ export function SiteConsumablesAnalyticsModal({ isOpen, onClose, site, consumabl
   const totalDistinctItems = consumables.length;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl bg-white dark:bg-slate-950 p-0 border-0 shadow-2xl rounded-2xl overflow-hidden">
-        <DialogHeader className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+    <Dialog open={isOpen} onOpenChange={onClose} fullScreenMobile={true}>
+      <DialogContent className="w-full h-[100dvh] max-h-[100dvh] max-w-full sm:max-w-4xl sm:h-auto sm:max-h-[90vh] bg-white dark:bg-slate-950 p-0 border-0 shadow-2xl rounded-none sm:rounded-2xl overflow-hidden flex flex-col">
+        <DialogHeader className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
           <DialogTitle className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
             <Activity className="h-5 w-5 text-blue-500" />
             Consumables Analytics - {site.name}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="p-6 max-h-[80vh] overflow-y-auto bg-slate-50/30 dark:bg-slate-950/30 space-y-6">
+        <div className="p-6 flex-1 overflow-y-auto bg-slate-50/30 dark:bg-slate-950/30 space-y-6">
           
           {/* Top KPIs */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

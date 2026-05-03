@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { 
   ArrowLeft, Calendar, FileText, 
   Wrench, Activity, Clock, Shield, AlertCircle, 
@@ -48,7 +49,7 @@ export function MaintenanceAssetDetailView({ asset, onBack }: MaintenanceAssetDe
 
   // Analytics Calculation
   const stats = useMemo(() => {
-    const totalCost = logs.reduce((acc, log) => acc + (log.cost || 0), 0);
+    const totalCost = logs.reduce((acc, log) => acc + (Number(log.cost) || 0), 0);
     const avgCost = logs.length > 0 ? totalCost / logs.length : 0;
     const partsCount = logs.reduce((acc, log) => acc + (log.parts?.length || 0), 0);
     const shutdowns = logs.filter(log => log.shutdown).length;
@@ -74,7 +75,7 @@ export function MaintenanceAssetDetailView({ asset, onBack }: MaintenanceAssetDe
       const d = new Date(log.date!);
       const key = `${months[d.getMonth()]} ${d.getFullYear().toString().substring(2)}`;
       if (dataMap[key] !== undefined) {
-        dataMap[key] += (log.cost || 0);
+        dataMap[key] += (Number(log.cost) || 0);
       }
     });
 
@@ -90,35 +91,27 @@ export function MaintenanceAssetDetailView({ asset, onBack }: MaintenanceAssetDe
     }
   };
 
+  useSetPageTitle(
+    asset.name,
+    `S/N: ${asset.serialNumber || 'N/A'} • ${asset.site}`,
+    <div className="flex items-center gap-1 sm:gap-2">
+      <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 sm:gap-2" onClick={onBack}>
+        <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back</span>
+      </Button>
+      <Badge variant="outline" className={cn("hidden sm:flex rounded-full px-3 py-0.5 font-bold uppercase text-[10px]", getStatusColor(asset.status))}>
+        {asset.status.replace('_', ' ')}
+      </Badge>
+      <Button variant="outline" size="sm" className="h-8 sm:h-9 gap-1 sm:gap-2 px-2 sm:px-3 font-bold text-[10px] sm:text-xs uppercase tracking-wider text-slate-600 bg-white">
+        <Download className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Export</span>
+      </Button>
+      <Button size="sm" className="h-8 sm:h-9 gap-1 sm:gap-2 px-2 sm:px-3 font-bold text-[10px] sm:text-xs uppercase tracking-wider bg-blue-600 hover:bg-blue-700 text-white">
+        <Activity className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Diagnosis</span>
+      </Button>
+    </div>
+  );
+
   return (
-    <div className="flex flex-col gap-6 max-w-6xl mx-auto pb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={onBack} className="h-10 w-10 rounded-xl bg-white shadow-sm border border-slate-200">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-slate-800 uppercase tracking-tight">{asset.name}</h1>
-              <Badge variant="outline" className={cn("rounded-full px-3 py-0.5 font-bold uppercase text-[10px]", getStatusColor(asset.status))}>
-                {asset.status.replace('_', ' ')}
-              </Badge>
-            </div>
-            <p className="text-sm text-slate-500 font-medium flex items-center gap-2 mt-1">
-              <Tag className="h-3.5 w-3.5" /> S/N: {asset.serialNumber || 'N/A'} • <MapPin className="h-3.5 w-3.5" /> {asset.site}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-10 rounded-xl gap-2 font-bold text-xs uppercase tracking-wider text-slate-600 bg-white shadow-sm">
-            <Download className="h-4 w-4" /> Export Report
-          </Button>
-          <Button className="h-10 rounded-xl gap-2 font-bold text-xs uppercase tracking-wider bg-blue-600 hover:bg-blue-700 text-white shadow-md">
-            <Activity className="h-4 w-4" /> Run Diagnosis
-          </Button>
-        </div>
-      </div>
+    <div className="flex flex-col gap-6 max-w-6xl mx-auto pb-10 animate-in fade-in slide-in-from-bottom-4 duration-500 mt-4">
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

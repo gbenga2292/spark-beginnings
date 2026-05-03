@@ -5,7 +5,7 @@ import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import {
   ArrowLeft, Package, Wrench, Layers, Truck, Activity,
   MapPin, Building2, User, Phone, Calendar, Info, X,
-  FileText, ArrowRightLeft, RotateCcw, ChevronRight
+  FileText, ArrowRightLeft, RotateCcw, ChevronRight, BarChart2, ClipboardList
 } from 'lucide-react';
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
@@ -21,6 +21,8 @@ import { DailyLogManager } from './DailyLogManager';
 import { ConsumableDetailView } from './ConsumableDetailView';
 import { BulkConsumableLogModal } from './BulkConsumableLogModal';
 import { SiteConsumablesAnalyticsModal } from './SiteConsumablesAnalyticsModal';
+import { BulkMachineLogModal } from './BulkMachineLogModal';
+import { SiteMachineAnalyticsModal } from './SiteMachineAnalyticsModal';
 
 interface SiteInventoryViewProps {
   site: Site;
@@ -40,7 +42,7 @@ interface SiteItem {
 }
 
 export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventoryViewProps) {
-  const { waybills, assets, maintenanceAssets } = useOperations();
+  const { waybills, assets, maintenanceAssets, dailyMachineLogs } = useOperations();
   const [activeTab, setActiveTab] = useState<TabId>('materials');
   const [showReturnWaybill, setShowReturnWaybill] = useState(false);
   const [showTransactions, setShowTransactions] = useState(false);
@@ -49,6 +51,8 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
   const [selectedConsumable, setSelectedConsumable] = useState<SiteItem | null>(null);
   const [showBulkLog, setShowBulkLog] = useState(false);
   const [showConsumablesAnalytics, setShowConsumablesAnalytics] = useState(false);
+  const [showMachineBulkLog, setShowMachineBulkLog] = useState(false);
+  const [showMachineAnalytics, setShowMachineAnalytics] = useState(false);
 
   const { consumableLogs, addConsumableLogs } = useAppStore();
 
@@ -167,20 +171,28 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
     setShowReportDialog(false);
   };
 
+  const currentMachines = machineItems;
+  const historyMachines = assets.filter(a => 
+    a.type === 'equipment' && 
+    a.requiresLogging && 
+    siteWaybills.some(w => w.type === 'waybill' && w.items.some(i => i.assetId === a.id)) &&
+    !currentMachines.find(c => c.id === a.id)
+  );
+
   useSetPageTitle(
     site.name,
     questionnaire?.contactPersonPhone ? `Contact: ${questionnaire.contactPersonPhone}` : 'Site Overview',
-    <div className="hidden sm:flex items-center gap-2">
-      <Button variant="outline" size="sm" className="gap-2 h-9" onClick={onBack}>
+    <div className="flex items-center gap-1 sm:gap-2">
+      <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 sm:gap-2" onClick={onBack}>
         <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back</span>
       </Button>
-      <Button variant="outline" size="sm" className="gap-2 h-9 hidden sm:flex" onClick={() => setShowReturnWaybill(true)}>
-        <RotateCcw className="h-4 w-4" /> Return Waybill
+      <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 sm:gap-2" onClick={() => setShowReturnWaybill(true)} title="Return Waybill">
+        <RotateCcw className="h-4 w-4" /> <span className="hidden sm:inline">Return</span>
       </Button>
-      <Button variant="outline" size="sm" className="gap-2 h-9" onClick={() => setShowTransactions(true)}>
+      <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 sm:gap-2" onClick={() => setShowTransactions(true)} title="Transactions">
         <Activity className="h-4 w-4" /> <span className="hidden sm:inline">Transactions</span>
       </Button>
-      <Button variant="outline" size="icon" className="h-9 w-9 hidden sm:flex" onClick={() => setShowReportDialog(true)}>
+      <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={() => setShowReportDialog(true)} title="Generate Report">
         <FileText className="h-4 w-4" />
       </Button>
     </div>
@@ -228,20 +240,51 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
     );
   }
 
+  const renderMachineItem = (machine: any, isHistory = false) => {
+    const mAsset = maintenanceAssets.find(ma => ma.id === machine.id);
+    return (
+      <div
+        key={machine.id}
+        onClick={() => setSelectedMachine({ id: machine.id, name: machine.name })}
+        className={cn(
+          "flex items-center justify-between px-6 py-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors cursor-pointer group",
+          isHistory && "opacity-60 hover:opacity-100"
+        )}
+      >
+        <div className="flex items-center gap-4">
+          <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-500 shrink-0 group-hover:scale-110 transition-transform">
+            <Wrench className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-800 dark:text-white group-hover:text-blue-600 transition-colors">{machine.name}</p>
+            <p className="text-xs text-slate-400">
+              S/N: {machine.serialNumber || 'N/A'} {isHistory ? '· Previously on site' : (mAsset ? `· Next service: ${new Date(mAsset.nextServiceDate).toLocaleDateString()}` : '')}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {mAsset && !isHistory && (
+            <Badge
+              variant="outline"
+              className={cn(
+                "text-[10px] font-bold px-2 py-0.5",
+                mAsset.status === 'ok' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                mAsset.status === 'due_soon' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                "bg-rose-50 text-rose-700 border-rose-200"
+              )}
+            >
+              {mAsset.status.replace('_', ' ')}
+            </Badge>
+          )}
+          <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      
-      {/* Mobile action buttons (shown only on small screens) */}
-      <div className="flex sm:hidden items-center gap-2 mb-2">
-        <Button variant="outline" size="sm" className="flex-1 gap-2 h-9" onClick={() => setShowReturnWaybill(true)}>
-          <RotateCcw className="h-4 w-4" /> Return Waybill
-        </Button>
-        <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setShowReportDialog(true)}>
-          <FileText className="h-4 w-4" />
-        </Button>
-      </div>
-
-      <div className="bg-card rounded-xl shadow-sm border border-border flex flex-col overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border border-border flex flex-col overflow-hidden mt-2">
         {/* Tabs */}
         <div className="flex overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
             {tabs.map(tab => (
@@ -311,52 +354,158 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
             )}
 
             {activeTab === 'machines' && (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                {machineItems.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-slate-300">
+              <div className="p-6">
+                {/* Action bar — identical style to consumables */}
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Site Machines</h3>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 border-slate-200 hover:bg-slate-50 text-slate-700"
+                      onClick={() => setShowMachineBulkLog(true)}
+                      title="Bulk Log"
+                    >
+                      <ClipboardList className="h-4 w-4" /> <span className="hidden sm:inline">Bulk Log</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 border-slate-200 hover:bg-slate-50 text-slate-700"
+                      onClick={() => setShowMachineAnalytics(true)}
+                      title="Site Analytics"
+                    >
+                      <BarChart2 className="h-4 w-4" /> <span className="hidden sm:inline">Site Analytics</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {currentMachines.length === 0 && historyMachines.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-slate-300 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
                     <Wrench className="h-12 w-12 mb-3" />
                     <p className="text-sm font-medium text-slate-400">No machines assigned to this site</p>
                   </div>
-                ) : machineItems.map(machine => {
-                  const mAsset = maintenanceAssets.find(ma => ma.id === machine.id);
-                  return (
-                    <div
-                      key={machine.id}
-                      onClick={() => setSelectedMachine({ id: machine.id, name: machine.name })}
-                      className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-500 shrink-0 group-hover:scale-110 transition-transform">
-                          <Wrench className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-slate-800 dark:text-white group-hover:text-blue-600 transition-colors">{machine.name}</p>
-                          <p className="text-xs text-slate-400">
-                            S/N: {machine.serialNumber || 'N/A'} · {mAsset ? `Next service: ${new Date(mAsset.nextServiceDate).toLocaleDateString()}` : 'No service info'}
-                          </p>
+                ) : (
+                  <div className="space-y-8">
+                    {/* Current on Site */}
+                    {currentMachines.length > 0 && (
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Current on Site</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {currentMachines.map(machine => {
+                            const mAsset = maintenanceAssets.find(ma => ma.id === machine.id);
+                            const machineLogCount = dailyMachineLogs.filter(l => l.assetId === machine.id && l.siteId === site.id).length;
+                            return (
+                              <div
+                                key={machine.id}
+                                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                              >
+                                {/* Card Header */}
+                                <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                                  <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 shrink-0">
+                                    <Wrench className="h-5 w-5" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{machine.name}</h4>
+                                    <p className="text-[11px] font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider">S/N: {machine.serialNumber || 'N/A'}</p>
+                                  </div>
+                                  {mAsset && (
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "text-[10px] font-bold px-2 py-0.5 shrink-0",
+                                        mAsset.status === 'ok' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                        mAsset.status === 'due_soon' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                                        "bg-rose-50 text-rose-700 border-rose-200"
+                                      )}
+                                    >
+                                      {mAsset.status.replace('_', ' ')}
+                                    </Badge>
+                                  )}
+                                </div>
+
+                                {/* Stats row */}
+                                <div className="p-4 grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                                  <div className="flex flex-col items-center justify-center px-2">
+                                    <p className="text-xs text-slate-500 mb-1">Next Service</p>
+                                    <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 text-center">
+                                      {mAsset ? new Date(mAsset.nextServiceDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}
+                                    </p>
+                                  </div>
+                                  <div className="flex flex-col items-center justify-center px-2">
+                                    <p className="text-xs text-slate-500 mb-1">Interval</p>
+                                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                                      {mAsset ? `${mAsset.serviceIntervalMonths}mo` : '—'}
+                                    </p>
+                                  </div>
+                                  <div className="flex flex-col items-center justify-center px-2">
+                                    <p className="text-xs text-slate-500 mb-1">Log Days</p>
+                                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{machineLogCount}</p>
+                                  </div>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="p-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
+                                  <Button
+                                    size="sm"
+                                    className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5 h-8 px-3 rounded-lg font-medium shadow-sm"
+                                    onClick={() => setSelectedMachine({ id: machine.id, name: machine.name })}
+                                  >
+                                    View Logs
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        {mAsset && (
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "text-[10px] font-bold px-2 py-0.5",
-                              mAsset.status === 'ok' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                              mAsset.status === 'due_soon' ? "bg-amber-50 text-amber-700 border-amber-200" :
-                              "bg-rose-50 text-rose-700 border-rose-200"
-                            )}
-                          >
-                            {mAsset.status.replace('_', ' ')}
-                          </Badge>
-                        )}
-                        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
+                    )}
+
+                    {/* History */}
+                    {historyMachines.length > 0 && (
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">History — Previously on Site</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {historyMachines.map(machine => (
+                            <div
+                              key={machine.id}
+                              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm opacity-60 hover:opacity-90 transition-opacity"
+                            >
+                              <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 shrink-0">
+                                  <Wrench className="h-5 w-5" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{machine.name}</h4>
+                                  <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">S/N: {machine.serialNumber || 'N/A'}</p>
+                                </div>
+                                <Badge variant="outline" className="text-[10px] font-bold px-2 py-0.5 shrink-0 text-slate-500 border-slate-300">
+                                  Past
+                                </Badge>
+                              </div>
+                              <div className="px-4 py-3 bg-slate-50/50 dark:bg-slate-900/50">
+                                <p className="text-xs text-slate-400 text-center">Previously deployed to this site</p>
+                              </div>
+                              <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 px-3 text-slate-600 border-slate-200 w-full"
+                                  onClick={() => setSelectedMachine({ id: machine.id, name: machine.name })}
+                                >
+                                  View History
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    )}
+                  </div>
+                )}
               </div>
             )}
+
 
             {/* Consumables Tab */}
             {activeTab === 'consumables' && (
@@ -369,16 +518,18 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
                       size="sm" 
                       className="gap-2 border-slate-200 hover:bg-slate-50 text-slate-700"
                       onClick={() => setShowBulkLog(true)}
+                      title="Bulk Log"
                     >
-                      <Layers className="h-4 w-4" /> Bulk Log
+                      <ClipboardList className="h-4 w-4" /> <span className="hidden sm:inline">Bulk Log</span>
                     </Button>
                     <Button 
                       variant="outline" 
                       size="sm" 
                       className="gap-2 border-slate-200 hover:bg-slate-50 text-slate-700"
                       onClick={() => setShowConsumablesAnalytics(true)}
+                      title="Site Analytics"
                     >
-                      <Activity className="h-4 w-4" /> Site Analytics
+                      <BarChart2 className="h-4 w-4" /> <span className="hidden sm:inline">Site Analytics</span>
                     </Button>
                   </div>
                 </div>
@@ -552,6 +703,22 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
         site={site}
         consumables={consumableItems}
         logs={siteConsumableLogs}
+      />
+
+      <BulkMachineLogModal
+        isOpen={showMachineBulkLog}
+        onClose={() => setShowMachineBulkLog(false)}
+        siteId={site.id}
+        siteName={site.name}
+        machines={currentMachines.map(m => ({ id: m.id, name: m.name }))}
+        date={new Date().toISOString().split('T')[0]}
+      />
+
+      <SiteMachineAnalyticsModal
+        isOpen={showMachineAnalytics}
+        onClose={() => setShowMachineAnalytics(false)}
+        site={site}
+        machines={[...currentMachines, ...historyMachines].map(m => ({ id: m.id, name: m.name }))}
       />
     </div>
   );

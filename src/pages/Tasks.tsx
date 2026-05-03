@@ -1851,6 +1851,7 @@ function AdminTasksView() {
           getComments={getMainTaskComments}
           onPost={(text) => postComment(chatTaskId, chatTaskId, currentUser?.id ?? "", text)}
           onClose={() => setChatTaskId(null)}
+          onOpenSubtask={(id) => { setChatTaskId(null); setOpenSubtaskId(id); }}
         />
       )}
 
@@ -2265,13 +2266,14 @@ function EditTaskReminderSection({ taskId, assignedTo, users }: { taskId: string
 }
 
 /* ─── Main Task Chat Sheet ──────────────────────────────────────────────────── */
-function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPost, onClose }: {
+function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPost, onClose, onOpenSubtask }: {
   mainTaskId: string;
   users: AppUser[];
   currentUserId: string;
   getComments: (id: string) => import('@/src/types/tasks').TaskComment[];
   onPost: (text: string) => void;
   onClose: () => void;
+  onOpenSubtask?: (subtaskId: string) => void;
 }) {
   const { mainTasks, subtasks } = useAppData();
   const task = mainTasks.find(t => t.id === mainTaskId);
@@ -2371,7 +2373,12 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
     const parts = raw.split(/(#\[[^\]]+\]|@\w+)/g);
     return parts.map((part, i) => {
       const subMatch = part.match(/^#\[(.+)\]$/);
-      if (subMatch) return <span key={i} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[12px] font-semibold bg-primary/15 text-primary" title={`Subtask: ${subMatch[1]}`}>#{subMatch[1]}</span>;
+      if (subMatch) {
+        const matchedSub = taskSubtasks.find(s => s.title === subMatch[1]);
+        return matchedSub && onOpenSubtask
+          ? <button key={i} onClick={() => onOpenSubtask(matchedSub.id!)} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[12px] font-semibold bg-primary/15 text-primary hover:bg-primary/25 transition-colors cursor-pointer underline underline-offset-2" title={`Open subtask: ${subMatch[1]}`}>#{subMatch[1]}</button>
+          : <span key={i} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[12px] font-semibold bg-primary/15 text-primary" title={`Subtask: ${subMatch[1]}`}>#{subMatch[1]}</span>;
+      }
       const mentionMatch = part.match(/^@(\w+)$/);
       if (mentionMatch) return <span key={i} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[12px] font-semibold bg-primary/15 text-primary">@{mentionMatch[1]}</span>;
       return <span key={i}>{part}</span>;
@@ -2416,10 +2423,16 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
             <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Subtasks</p>
             <div className="flex flex-wrap gap-1.5">
               {taskSubtasks.map(s => (
-                <span key={s.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-card border border-border text-muted-foreground">
+                <button
+                  key={s.id}
+                  onClick={() => onOpenSubtask && s.id && onOpenSubtask(s.id)}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-card border border-border text-muted-foreground hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer group"
+                  title={`Open: ${s.title}`}
+                >
                   <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.status === 'completed' ? 'bg-green-500' : s.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-300'}`} />
                   {s.title}
-                </span>
+                  <span className="opacity-0 group-hover:opacity-60 transition-opacity text-[9px]">↗</span>
+                </button>
               ))}
             </div>
           </div>
@@ -2465,7 +2478,13 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
                     <span className="text-[11px] font-semibold text-foreground">{isMe ? 'You' : (author?.name?.split(' ')[0] || 'Unknown')}</span>
                     {isMain
                       ? <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold border border-primary/20 uppercase tracking-wide">Main</span>
-                      : parentSub && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700 font-semibold">#{parentSub.title}</span>
+                      : parentSub && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onOpenSubtask && parentSub.id && onOpenSubtask(parentSub.id); }}
+                          className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700 font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors cursor-pointer underline underline-offset-1"
+                          title={`Open subtask: ${parentSub.title}`}
+                        >#{parentSub.title}</button>
+                      )
                     }
                   </div>
                   <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${isMe ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-muted text-foreground rounded-tl-sm'}`}>
