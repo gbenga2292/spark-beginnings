@@ -105,9 +105,12 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       .filter(a => a.type === 'equipment' && a.requiresLogging)
       .map(a => {
         const sessions = maintenanceSessions.filter(s => s.assets.some(sa => sa.assetId === a.id));
-        const lastSession = sessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
+        const routineSessions = sessions.filter(s => s.type === 'routine' || s.type === 'scheduled');
         
-        const nextDate = lastSession ? new Date(lastSession.date) : new Date();
+        const lastSession = sessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
+        const lastRoutineSession = routineSessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
+        
+        const nextDate = lastRoutineSession ? new Date(lastRoutineSession.date) : (a.created_at ? new Date(a.created_at) : new Date());
         nextDate.setMonth(nextDate.getMonth() + (a.serviceIntervalMonths || 2));
         
         const now = new Date();
@@ -134,9 +137,12 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     // 2. Vehicles: All vehicles from the vehicle page
     const mappedVehicles = vehicles.map(v => {
       const sessions = maintenanceSessions.filter(s => s.assets.some(sa => sa.assetId === v.id));
-      const lastSession = sessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
+      const routineSessions = sessions.filter(s => s.type === 'routine' || s.type === 'scheduled');
       
-      const nextDate = lastSession ? new Date(lastSession.date) : new Date();
+      const lastSession = sessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
+      const lastRoutineSession = routineSessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
+      
+      const nextDate = lastRoutineSession ? new Date(lastRoutineSession.date) : (v.created_at ? new Date(v.created_at) : new Date());
       nextDate.setMonth(nextDate.getMonth() + 3); // Default 3 months
       
       const now = new Date();
@@ -211,7 +217,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
               powerSource: a.power_source,
               cost: a.cost,
               lowStockLevel: a.low_stock_level,
-              criticalStockLevel: a.critical_stock_level
+              criticalStockLevel: a.critical_stock_level,
+              created_at: a.created_at
             };
           }));
         }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -14,6 +14,7 @@ import {
     getYear, getMonth,
 } from 'date-fns';
 import { Download, AlertCircle, Clock, CheckCircle2, Activity, Filter, FileText, ChevronDown, CalendarDays, FolderOpen, FileSpreadsheet, TrendingUp, GanttChartSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { Button } from '@/src/components/ui/button';
@@ -33,13 +34,14 @@ const MONTHS = [
 ];
 
 /* ── Build year list from subtask timestamps ──────────────────────────────── */
-function buildYearList(subtasks: { createdAt?: string }[]): number[] {
+function buildYearList(subtasks: { createdAt?: string; created_at?: string }[]): number[] {
     const set = new Set<number>();
     const curr = new Date().getFullYear();
     set.add(curr);
     subtasks.forEach(s => {
-        if (s.createdAt) {
-            try { set.add(getYear(parseISO(s.createdAt))); } catch {}
+        const createdAt = s.createdAt || s.created_at;
+        if (createdAt) {
+            try { set.add(getYear(parseISO(createdAt))); } catch {}
         }
     });
     return Array.from(set).sort((a, b) => b - a); // newest first
@@ -55,6 +57,10 @@ function AnalyticsDashboard() {
     const { user: currentUser } = useAuth();
     const { subtasks: allSubtasks, users } = useAppData();
     const { wsTasks: allMainTasks, wsMembers: teamUsers, workspace } = useWorkspace();
+    const navigate = useNavigate();
+    const handleAnalyzeProject = useCallback((taskId: string) => {
+        navigate(`/tasks?openTask=${taskId}`);
+    }, [navigate]);
 
     const appUser = users.find(u => u.id === currentUser?.id);
     const isExternalHr = appUser?.privileges?.tasks?.isExternalHr;
@@ -125,16 +131,18 @@ function AnalyticsDashboard() {
     // ── Subtasks within the resolved interval ────────────────────────────────
     const validSubs = useMemo(() =>
         subtasks.filter(s => {
-            if (!s.createdAt) return false;
+            const createdAt = s.createdAt || s.created_at;
+            if (!createdAt) return false;
             
             // Site Filter Logic: Try to match main task title with a site name
             if (filterSite !== 'all') {
-                const mt = mainTasks.find(m => m.id === s.mainTaskId);
+                const mtId = s.mainTaskId || s.main_task_id;
+                const mt = mainTasks.find(m => m.id === mtId);
                 if (!mt || !mt.title.toLowerCase().includes(filterSite.toLowerCase())) return false;
             }
 
             try {
-                return isWithinInterval(parseISO(s.createdAt), { start: intervalStart, end: intervalEnd });
+                return isWithinInterval(parseISO(createdAt), { start: intervalStart, end: intervalEnd });
             } catch { return false; }
         }),
     [subtasks, mainTasks, intervalStart, intervalEnd, filterSite]);
@@ -148,11 +156,11 @@ function AnalyticsDashboard() {
     // ── Avg closure time (days) ─────────────────────────────────────────────
     const avgClosureDays = useMemo(() => {
         const pairs = completedSubs
-            .filter(s => s.createdAt && s.updatedAt)
+            .filter(s => (s.createdAt || s.created_at) && (s.updatedAt || s.updated_at))
             .map(s => {
                 try {
-                    const created = parseISO(s.createdAt!);
-                    const closed  = parseISO(s.updatedAt!);
+                    const created = parseISO((s.createdAt || s.created_at)!);
+                    const closed  = parseISO((s.updatedAt || s.updated_at)!);
                     return Math.max(0, (closed.getTime() - created.getTime()) / 86_400_000);
                 } catch { return null; }
             })
@@ -165,10 +173,11 @@ function AnalyticsDashboard() {
     const bottleneckData = useMemo(() =>
         teamUsers.map(user => {
             const userSubs    = allStatusSubs.filter(s => {
-                if (!s.assignedTo) return false;
-                const assignees = typeof s.assignedTo === 'string' 
-                    ? s.assignedTo.split(',').map(id => id.trim()) 
-                    : Array.isArray(s.assignedTo) ? s.assignedTo : [];
+                const assignedTo = s.assignedTo || s.assigned_to;
+                if (!assignedTo) return false;
+                const assignees = typeof assignedTo === 'string' 
+                    ? assignedTo.split(',').map(id => id.trim()) 
+                    : Array.isArray(assignedTo) ? assignedTo : [];
                 return assignees.includes(user.id);
             });
             const overdue     = userSubs.filter(s => s.deadline && isPast(parseISO(s.deadline)) && s.status !== 'completed').length;
@@ -202,13 +211,15 @@ function AnalyticsDashboard() {
                 const end   = endOfMonth(ref);
 
                 const created = subtasks.filter(s => {
-                    if (!s.createdAt) return false;
-                    try { return isWithinInterval(parseISO(s.createdAt), { start, end }); } catch { return false; }
+                    const createdAt = s.createdAt || s.created_at;
+                    if (!createdAt) return false;
+                    try { return isWithinInterval(parseISO(createdAt), { start, end }); } catch { return false; }
                 }).length;
 
                 const closed = subtasks.filter(s => {
-                    if (s.status !== 'completed' || !s.updatedAt) return false;
-                    try { return isWithinInterval(parseISO(s.updatedAt), { start, end }); } catch { return false; }
+                    const updatedAt = s.updatedAt || s.updated_at;
+                    if (s.status !== 'completed' || !updatedAt) return false;
+                    try { return isWithinInterval(parseISO(updatedAt), { start, end }); } catch { return false; }
                 }).length;
 
                 return { date: label.slice(0, 3), created, closed };
@@ -223,13 +234,15 @@ function AnalyticsDashboard() {
             const dayLabel = format(day, 'MMM d');
 
             const created = subtasks.filter(s => {
-                if (!s.createdAt) return false;
-                try { return isSameDay(parseISO(s.createdAt), day); } catch { return false; }
+                const createdAt = s.createdAt || s.created_at;
+                if (!createdAt) return false;
+                try { return isSameDay(parseISO(createdAt), day); } catch { return false; }
             }).length;
 
             const closed = subtasks.filter(s => {
-                if (s.status !== 'completed' || !s.updatedAt) return false;
-                try { return isSameDay(parseISO(s.updatedAt), day); } catch { return false; }
+                const updatedAt = s.updatedAt || s.updated_at;
+                if (s.status !== 'completed' || !updatedAt) return false;
+                try { return isSameDay(parseISO(updatedAt), day); } catch { return false; }
             }).length;
 
             days.push({ date: dayLabel, created, closed });
@@ -241,9 +254,10 @@ function AnalyticsDashboard() {
     // ── 3. Project health (within interval) ──────────────────────────────────
     const projectHealthData = useMemo(() =>
         mainTasks.map(mt => {
-            const mSubs = validSubs.filter(s => s.mainTaskId === mt.id);
+            const mSubs = validSubs.filter(s => (s.mainTaskId || s.main_task_id) === mt.id);
             const comp  = mSubs.filter(s => s.status === 'completed').length;
             return {
+                id:        mt.id,
                 name:      mt.title.length > 18 ? mt.title.slice(0, 18) + '…' : mt.title,
                 completed: comp,
                 remaining: mSubs.length - comp,
@@ -254,15 +268,18 @@ function AnalyticsDashboard() {
 
     // ── Excel export ─────────────────────────────────────────────────────────
     const handleExport = () => {
-        const rows = validSubs.map(s => ({
-            'Project':  mainTasks.find(m => m.id === s.mainTaskId)?.title ?? 'Unknown',
-            'Task ID':  s.id ?? '',
-            'Title':    s.title,
-            'Status':   s.status,
-            'Assignee': teamUsers.find(u => u.id === s.assignedTo?.split(',')[0])?.name + (s.assignedTo?.includes(',') ? ' + others' : '') || 'Unassigned',
-            'Deadline': s.deadline ? format(parseISO(s.deadline), 'yyyy-MM-dd') : 'No Deadline',
-            'Overdue':  s.deadline && isPast(parseISO(s.deadline)) && s.status !== 'completed' ? 'YES' : 'NO',
-        }));
+        const rows = validSubs.map(s => {
+            const assignedTo = s.assignedTo || s.assigned_to;
+            return ({
+                'Project':  mainTasks.find(m => m.id === (s.mainTaskId || s.main_task_id))?.title ?? 'Unknown',
+                'Task ID':  s.id ?? '',
+                'Title':    s.title,
+                'Status':   s.status,
+                'Assignee': teamUsers.find(u => u.id === assignedTo?.split(',')[0])?.name + (assignedTo?.includes(',') ? ' + others' : '') || 'Unassigned',
+                'Deadline': s.deadline ? format(parseISO(s.deadline), 'yyyy-MM-dd') : 'No Deadline',
+                'Overdue':  s.deadline && isPast(parseISO(s.deadline)) && s.status !== 'completed' ? 'YES' : 'NO',
+            });
+        });
         const ws = XLSX.utils.json_to_sheet(rows);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Task Report');
@@ -612,7 +629,7 @@ function AnalyticsDashboard() {
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="opacity-[0.08]" />
                                 <XAxis dataKey="date" axisLine={false} tickLine={false}
                                     tick={{ fontSize: 10, fill: 'currentColor' }} className="text-muted-foreground"
-                                    interval={velocityData.length > 30 ? Math.ceil(velocityData.length / 15) : 0} />
+                                    minTickGap={20} />
                                 <YAxis axisLine={false} tickLine={false}
                                     tick={{ fontSize: 10, fill: 'currentColor' }} className="text-muted-foreground"
                                     allowDecimals={false} />
@@ -676,7 +693,11 @@ function AnalyticsDashboard() {
                                 <p className="text-center text-xs font-medium text-slate-400">No projects found in this period</p>
                             </div>
                         ) : projectHealthData.map(p => (
-                            <div key={p.name} className="space-y-2 group">
+                            <div 
+                                key={p.id} 
+                                className="space-y-2 group cursor-pointer"
+                                onClick={() => handleAnalyzeProject(p.id)}
+                            >
                                 <div className="flex justify-between items-center px-1">
                                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate tracking-tight">{p.name}</span>
                                     <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded uppercase">{Math.round((p.completed / (p.completed + (p.remaining || 0))) * 100) || 0}%</span>
@@ -694,7 +715,7 @@ function AnalyticsDashboard() {
                                 </div>
                                 <div className="flex justify-between items-center px-1">
                                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{p.completed} / {p.completed + (p.remaining || 0)} Units Done</span>
-                                    <span className="text-[9px] font-bold text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">Analyze Project →</span>
+                                    <span className="text-[9px] font-bold text-indigo-500 sm:text-slate-400 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">Analyze Project →</span>
                                 </div>
                             </div>
                         ))}

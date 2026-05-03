@@ -98,14 +98,14 @@ export function MaintenanceManager() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id as MaintenanceTab)}
               className={cn(
-                "flex items-center justify-center gap-2 flex-1 min-w-[120px] py-4 text-sm font-semibold border-b-2 transition-all whitespace-nowrap",
+                "flex items-center justify-center gap-2 flex-1 min-w-[64px] sm:min-w-[120px] py-4 text-sm font-semibold border-b-2 transition-all whitespace-nowrap",
                 activeTab === tab.id 
                   ? 'border-blue-600 text-blue-600 bg-blue-50/50 dark:bg-blue-900/10' 
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-slate-50 dark:hover:bg-slate-800/50'
               )}
             >
-              <tab.icon className="h-4 w-4" />
-              {tab.label}
+              <tab.icon className="h-5 w-5 sm:h-4 sm:w-4 shrink-0" />
+              <span className="hidden sm:inline">{tab.label}</span>
               {tab.count !== undefined && (
                 <span className={cn(
                   "ml-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter",

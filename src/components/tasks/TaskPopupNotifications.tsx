@@ -24,7 +24,8 @@ import { useAppData } from '@/src/contexts/AppDataContext';
 import { useUserStore } from '@/src/store/userStore';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useTheme } from '@/src/hooks/useTheme';
-import { addDays, isBefore } from 'date-fns';
+import { addHours, addDays, addMonths, isBefore } from 'date-fns';
+import type { Reminder, ReminderFrequency } from '@/src/types/tasks';
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 export interface TaskPopup {
@@ -35,6 +36,7 @@ export interface TaskPopup {
   taskUrl?: string;
   subtaskUrl?: string;
   timestamp: number;
+  reminderId?: string;
 }
 
 const POPUP_TTL_MS = 15000; // auto-dismiss after 15 s
@@ -67,14 +69,23 @@ function PopupCard({
   popup,
   onDismiss,
   onNavigate,
+  onMarkAsDone,
   isDark,
 }: {
   popup: TaskPopup;
   onDismiss: (id: string) => void;
   onNavigate: (popup: TaskPopup) => void;
+  onMarkAsDone?: (popup: TaskPopup) => void;
   isDark: boolean;
 }) {
   const url = popup.taskUrl;  // Always open the main task detail page
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onDismiss(popup.id);
+    }, POPUP_TTL_MS);
+    return () => clearTimeout(timer);
+  }, [popup.id, onDismiss]);
 
   return (
     <motion.div
@@ -115,15 +126,29 @@ function PopupCard({
           )}
         </div>
 
-        {/* Close */}
-        <button
-          onClick={() => onDismiss(popup.id)}
-          className={`flex-shrink-0 p-1 rounded-lg transition-colors ${
-            isDark ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
+        {/* Actions */}
+        <div className="flex flex-col gap-1 flex-shrink-0 ml-1">
+          <button
+            onClick={(e) => { e.stopPropagation(); onDismiss(popup.id); }}
+            className={`p-1 rounded-lg transition-colors flex items-center justify-center ${
+              isDark ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <X className="w-4 h-4" />
+          </button>
+          
+          {popup.reminderId && onMarkAsDone && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onMarkAsDone(popup); }}
+              title="Mark as Done"
+              className={`p-1 rounded-lg transition-colors flex items-center justify-center mt-1 ${
+                isDark ? 'text-emerald-500 hover:bg-emerald-900/30' : 'text-emerald-600 hover:bg-emerald-50'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
     </motion.div>
   );
@@ -140,8 +165,6 @@ export function TaskPopupNotifications() {
   const [popups, setPopups] = useState<TaskPopup[]>([]);
   // Track reminder IDs we've already shown to prevent duplicates on re-render
   const shownIds = useRef<Set<string>>(new Set());
-  // Track reminder updates to prevent multiple hits within the same window
-  const updatedReminders = useRef<Set<string>>(new Set());
   // Track comment IDs processed by real-time so we don't re-process on initial load
   const processedCommentIds = useRef<Set<string>>(new Set());
   const initialised = useRef(false);
@@ -170,6 +193,37 @@ export function TaskPopupNotifications() {
     if (url) navigate(url);
     dismiss(popup.id);
   }, [navigate, dismiss]);
+
+  const handleMarkAsDone = useCallback((popup: TaskPopup) => {
+    if (!popup.reminderId) return;
+    const rem = reminders.find(r => r.id === popup.reminderId);
+    if (!rem) {
+      dismiss(popup.id);
+      return;
+    }
+
+    if (!rem.frequency || rem.frequency === 'once') {
+      updateReminder(rem.id, { isActive: false });
+    } else {
+      const current = new Date(rem.remindAt);
+      let nextDate = current;
+      switch (rem.frequency) {
+        case 'hourly': nextDate = addHours(current, 1); break;
+        case 'every_6_hours': nextDate = addHours(current, 6); break;
+        case 'daily': nextDate = addDays(current, 1); break;
+        case 'weekly': nextDate = addDays(current, 7); break;
+        case 'monthly': nextDate = addMonths(current, 1); break;
+      }
+      
+      if (rem.endAt && isBefore(new Date(rem.endAt), nextDate)) {
+        updateReminder(rem.id, { isActive: false });
+      } else {
+        updateReminder(rem.id, { remindAt: nextDate.toISOString() });
+      }
+    }
+    
+    dismiss(popup.id);
+  }, [reminders, updateReminder, dismiss]);
 
   /* ── Mark all existing comments as already 'seen' on mount ───────────── */
   useEffect(() => {
@@ -201,8 +255,9 @@ export function TaskPopupNotifications() {
         const remindAt = new Date(rem.remindAt).getTime();
         const diff = now - remindAt;
 
-        // Only fire if within the 2-minute window after the scheduled time
-        if (diff < 0 || diff > WINDOW_MS) return;
+        // Fire for any unacknowledged past reminder.
+        // It won't spam because `shownIds.current` tracks it for the session.
+        if (diff < 0) return;
 
         // HR visibility filter: align with Tasks.tsx / TaskDashboard.tsx hasHrAccess pattern
         const isExternalHr = currentUser?.privileges?.tasks?.isExternalHr;
@@ -235,23 +290,8 @@ export function TaskPopupNotifications() {
           body:  rem.body || rem.title || 'You have a reminder',
           taskUrl:   rem.mainTaskId ? `/tasks?openTask=${rem.mainTaskId}` : undefined,
           dedupeKey: `rem-popup-${rem.id}`,
+          reminderId: rem.id,
         });
-
-        // ── Handle Recurrence / Deactivation ──
-        if (!updatedReminders.current.has(rem.id)) {
-            updatedReminders.current.add(rem.id);
-            
-            if (rem.frequency === 'weekly') {
-                const nextDate = addDays(new Date(rem.remindAt), 7);
-                if (!rem.endAt || isBefore(nextDate, new Date(rem.endAt))) {
-                    updateReminder(rem.id, { remindAt: nextDate.toISOString() });
-                } else {
-                    updateReminder(rem.id, { isActive: false });
-                }
-            } else if (rem.frequency === 'once' || !rem.frequency) {
-                updateReminder(rem.id, { isActive: false });
-            }
-        }
       });
     };
 
@@ -396,6 +436,7 @@ export function TaskPopupNotifications() {
             popup={p}
             onDismiss={dismiss}
             onNavigate={handleNavigate}
+            onMarkAsDone={handleMarkAsDone}
             isDark={isDark}
           />
         ))}

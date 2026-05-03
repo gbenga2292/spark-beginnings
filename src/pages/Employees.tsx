@@ -798,38 +798,6 @@ export function Employees() {
   // Render Employee Form (Add or Edit)
   const renderEmployeeForm = (isEdit: boolean) => (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 gap-4">
-        <div className="flex items-center gap-4 w-full sm:w-auto">
-          <Button variant="ghost" size="icon" onClick={async () => {
-            const { isEmployeeFormDirty } = useAppStore.getState();
-            if (isEmployeeFormDirty) {
-              const ok = await showConfirm('You have unsaved changes. Are you sure you want to leave without saving?', {
-                title: 'Unsaved Changes',
-                confirmLabel: 'Discard & Leave',
-                cancelLabel: 'Stay Here',
-                variant: 'danger'
-              });
-              if (!ok) return;
-            }
-            setEmployeeFormDirty(false);
-            setIsAdding(false);
-            setIsEditing(false);
-          }} className="hover:bg-slate-100 rounded-full h-10 w-10 shrink-0">
-            <ArrowLeft className="h-5 w-5 text-slate-600" />
-          </Button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-400">
-              {isEdit ? 'Edit Employee Record' : 'Add New Employee'}
-            </h1>
-            <p className="text-sm font-medium text-slate-500 mt-1">Configure profile details, compensation, and system access.</p>
-          </div>
-        </div>
-        <Button onClick={isEdit ? handleUpdate : handleSave} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition-all font-semibold w-full sm:w-auto">
-          <Save className="h-4 w-4" /> {isEdit ? 'Save Changes' : 'Create Employee'}
-        </Button>
-      </div>
-
-
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
         {/* --- LEFT COLUMN: Primary Details --- */}
         <div className="xl:col-span-2 flex flex-col gap-6">

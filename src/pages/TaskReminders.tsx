@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   format, parseISO, isPast, isToday, isTomorrow, differenceInHours,
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
-  isSameMonth, isSameDay, addMonths, subMonths, getHours
+  isSameMonth, isSameDay, addMonths, subMonths, getHours,
+  addHours, addDays, isBefore
 } from 'date-fns';
 import {
   Bell, Plus, Trash2, Edit3, Clock, Mail, Users, X, Check,
@@ -167,6 +168,29 @@ export function TaskReminders() {
       setPurging(false);
     }
   }, []);
+
+  const handleMarkAsDone = useCallback((rem: Reminder) => {
+    if (!rem.frequency || rem.frequency === 'once') {
+      updateReminder(rem.id, { isActive: false });
+    } else {
+      const current = new Date(rem.remindAt);
+      let nextDate = current;
+      switch (rem.frequency) {
+        case 'hourly': nextDate = addHours(current, 1); break;
+        case 'every_6_hours': nextDate = addHours(current, 6); break;
+        case 'daily': nextDate = addDays(current, 1); break;
+        case 'weekly': nextDate = addDays(current, 7); break;
+        case 'monthly': nextDate = addMonths(current, 1); break;
+      }
+      
+      if (rem.endAt && isBefore(new Date(rem.endAt), nextDate)) {
+        updateReminder(rem.id, { isActive: false });
+      } else {
+        updateReminder(rem.id, { remindAt: nextDate.toISOString() });
+      }
+    }
+    toast.success('Reminder marked as done');
+  }, [updateReminder]);
 
   /* Mobile menu */
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -402,6 +426,11 @@ export function TaskReminders() {
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => openEdit(rem)} title={isAdminCal && !isOwnerCal ? 'Edit (Admin Override)' : 'Edit'} className="p-1 hover:bg-muted rounded text-muted-foreground"><Edit3 className="w-3.5 h-3.5" /></button>
                       <button onClick={() => deleteReminder(rem.id)} title={isAdminCal && !isOwnerCal ? 'Delete (Admin Override)' : 'Delete'} className="p-1 hover:bg-red-50 rounded text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                      {rem.isActive && (
+                        <button onClick={() => handleMarkAsDone(rem)} title="Mark as Done" className="p-1 hover:bg-emerald-50 rounded text-emerald-500">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -666,6 +695,12 @@ export function TaskReminders() {
                                 className={`p-1.5 rounded-lg transition-colors ${rem.isActive ? 'text-indigo-500 hover:bg-indigo-50' : 'text-muted-foreground hover:bg-muted'}`}>
                                 {rem.isActive ? <ToggleRight className="w-3.5 h-3.5" /> : <ToggleLeft className="w-3.5 h-3.5" />}
                               </button>
+                              {rem.isActive && (
+                                <button onClick={() => handleMarkAsDone(rem)} title="Mark as Done"
+                                  className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                               <button onClick={() => openEdit(rem)} title={isAdmin && !isOwner ? 'Edit (Admin Override)' : 'Edit'}
                                 className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors">
                                 <Edit3 className="w-3.5 h-3.5" />

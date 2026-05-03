@@ -463,10 +463,17 @@ export function PerformanceConduct() {
     <div className={`flex flex-col h-full transition-colors ${showNotices ? 'bg-amber-50/30' : 'bg-slate-50/50'}`}>
       <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 space-y-3">
         <div className="flex justify-between items-center">
-          <h2 className={`font-bold flex items-center gap-2 ${showNotices ? 'text-amber-700' : 'text-slate-800'}`}>
-            {showNotices ? <BellRing className="h-5 w-5" /> : <ShieldAlert className="h-5 w-5 text-rose-600" />}
-            {showNotices ? 'Notices Queue' : 'Active Directory'}
-          </h2>
+          <div className="flex items-center gap-2">
+            {showNotices && (
+              <Button variant="ghost" size="icon" className="h-6 w-6 -ml-2 text-amber-700 hover:bg-amber-100" onClick={() => setShowNotices(false)} title="Back to Directory">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+            <h2 className={`font-bold flex items-center gap-2 ${showNotices ? 'text-amber-700' : 'text-slate-800'}`}>
+              {!showNotices && <ShieldAlert className="h-5 w-5 text-rose-600" />}
+              {showNotices ? 'Notices Queue' : 'Active Directory'}
+            </h2>
+          </div>
           {!showNotices && activeCount > 0 && <Badge variant="destructive" className="px-1.5 py-0 min-w-[20px] justify-center">{activeCount}</Badge>}
         </div>
         {!showNotices && (
@@ -591,6 +598,9 @@ export function PerformanceConduct() {
               <div className="text-center max-w-sm">
                 <h3 className="font-bold text-xl text-amber-800">Notice Queue</h3>
                 <p className="text-sm mt-2 text-amber-700/80 leading-relaxed">Select a pending notice ticket from the left sidebar. This will instantly open the due process form so you can track the reply and escalate if necessary.</p>
+                <Button variant="outline" className="mt-6 border-amber-200 text-amber-700 hover:bg-amber-50" onClick={() => setShowNotices(false)}>
+                  <ArrowLeft className="h-4 w-4 mr-2" /> Back to Directory
+                </Button>
               </div>
             </div>
           ) : !selectedEmployeeId && !showNotices ? (

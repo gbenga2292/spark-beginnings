@@ -2,10 +2,11 @@ import React, { useState, useEffect, useContext, useMemo, useCallback } from 're
 import { useAppStore } from '../store/appStore';
 import { TaskContext } from '../contexts/AppDataContext';
 import { useAuth } from '../hooks/useAuth';
-import { Search, ShieldAlert, FileText, CheckCircle2, AlertCircle, Clock, X, Download, History } from 'lucide-react';
+import { Search, ShieldAlert, FileText, CheckCircle2, AlertCircle, Clock, X, Download, Upload, History } from 'lucide-react';
 import { toast } from '../components/ui/toast';
 import { differenceInDays, format, parseISO } from 'date-fns';
 import { Button } from '../components/ui/button';
+import { useSetPageTitle } from '../contexts/PageContext';
 
 // ---------------------------------------------------------------------------
 // Helpers (pure — defined outside component to prevent recreation on render)
@@ -215,25 +216,21 @@ export function HmoManagement() {
     document.body.removeChild(a);
   }, [activeTab, filteredDirectory, pendingRenewals]);
 
+  // Set global page header
+  useSetPageTitle(
+    'LASHMA / HMO Management',
+    'Track employee health insurance policies and manage renewals',
+    <Button onClick={handleExportCSV} variant="outline" className="flex items-center gap-2 shadow-sm border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight h-9">
+      <Upload className="h-3.5 w-3.5 text-emerald-500" />
+      Export CSV
+    </Button>
+  );
+
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
   return (
     <div className="p-6">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">LASHMA / HMO Management</h1>
-          <p className="text-sm text-slate-500 mt-1">Track employee health insurance policies and manage renewals</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={handleExportCSV} variant="outline" className="flex items-center gap-2 bg-white shadow-sm text-slate-700">
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
-        </div>
-      </div>
-
       {/* Tabs */}
       <div className="flex space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg w-fit mb-6">
         <button
