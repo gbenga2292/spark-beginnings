@@ -286,45 +286,47 @@ export function Profile() {
   useSetPageTitle('My Profile', 'Account settings, appearance, and security');
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-8 pb-20 sm:pb-10">
 
       {/* Success/Error Messages */}
       {successMessage && (
-        <div className="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 mb-6">
-          <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
-          {successMessage}
+        <div className="flex items-center gap-3 text-sm text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl px-4 py-4 mb-6 animate-in fade-in slide-in-from-top-2">
+          <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-emerald-500" />
+          <p className="font-bold">{successMessage}</p>
         </div>
       )}
 
       {errorMessage && (
-        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-6">
-          <AlertCircle className="h-4 w-4 flex-shrink-0" />
-          {errorMessage}
+        <div className="flex items-center gap-3 text-sm text-red-600 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-xl px-4 py-4 mb-6 animate-in fade-in slide-in-from-top-2">
+          <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500" />
+          <p className="font-bold">{errorMessage}</p>
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
         {/* Profile Card */}
-        <Card className="lg:col-span-1">
-          <CardHeader className="text-center pb-4">
-            <CardTitle className="text-lg">Profile Photo</CardTitle>
+        <Card className="lg:col-span-1 h-fit overflow-hidden border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl">
+          <CardHeader className="text-center pb-3 border-b border-slate-100 dark:border-slate-800 mb-6 bg-slate-50/50 dark:bg-slate-900/50">
+            <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-200">Profile Photo</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col items-center">
-            <div className="relative mb-4">
-              <Avatar className="w-32 h-32 border-4 border-white shadow-lg">
-                <AvatarImage src={avatarPreview || currentUser?.avatar} alt={currentUser?.name || user?.name} referrerPolicy="no-referrer" />
-                <AvatarFallback className="text-3xl bg-indigo-100 text-indigo-700 font-bold uppercase">
-                  {(currentUser?.name || user?.name || '?').charAt(0)}
-                </AvatarFallback>
-              </Avatar>
+          <CardContent className="flex flex-col items-center pt-2 pb-8">
+            <div className="relative mb-6">
+              <div className="relative p-1.5 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 shadow-xl">
+                <Avatar className="w-28 h-28 sm:w-32 sm:h-32 border-4 border-white dark:border-slate-900 shadow-inner">
+                  <AvatarImage src={avatarPreview || currentUser?.avatar} alt={currentUser?.name || user?.name} referrerPolicy="no-referrer" />
+                  <AvatarFallback className="text-3xl bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-bold uppercase">
+                    {(currentUser?.name || user?.name || '?').charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
               <button
                 onClick={handleAvatarClick}
                 disabled={isUploadingAvatar}
-                className="absolute bottom-0 right-0 h-10 w-10 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-indigo-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                className="absolute bottom-1 right-1 h-10 w-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-lg hover:scale-110 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {isUploadingAvatar
-                  ? <Loader2 className="h-4 w-4 animate-spin" />
-                  : <Camera className="h-4 w-4" />
+                  ? <Loader2 className="h-5 w-5 animate-spin" />
+                  : <Camera className="h-5 w-5" />
                 }
               </button>
               <input
@@ -335,10 +337,10 @@ export function Profile() {
                 className="hidden"
               />
             </div>
-            <h2 className="text-xl font-bold text-slate-900">{currentUser?.name || user?.name}</h2>
-            <p className="text-slate-500 text-sm">{currentUser?.email || user?.email}</p>
-            <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-full">
-              <Building2 className="h-3 w-3" />
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white text-center px-2">{currentUser?.name || user?.name}</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">{currentUser?.email || user?.email}</p>
+            <div className="flex items-center gap-2 text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 px-4 py-1.5 rounded-full border border-indigo-100 dark:border-indigo-800 shadow-sm">
+              <Building2 className="h-3.5 w-3.5" />
               {user?.role || 'Employee'}
             </div>
           </CardContent>
@@ -347,57 +349,61 @@ export function Profile() {
         {/* Settings Cards */}
         <div className="lg:col-span-2 space-y-6">
           {/* Personal Information */}
-          <Card>
-            <CardHeader>
+          <Card className="border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden rounded-2xl">
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <User className="h-5 w-5 text-indigo-600" />
-                    Personal Information
-                  </CardTitle>
-                  <CardDescription>Update your personal details</CardDescription>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center shadow-sm">
+                    <User className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-200">Personal Details</CardTitle>
+                    <CardDescription className="text-xs text-slate-500">Identity & Contact</CardDescription>
+                  </div>
                 </div>
                 {!isEditing && (
                   <Button 
                     variant="outline" 
                     size="sm"
                     onClick={() => setIsEditing(true)}
+                    className="h-8 px-4 rounded-lg font-bold text-[10px] uppercase tracking-wider border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
                     Edit
                   </Button>
                 )}
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="pt-6 space-y-5">
               {isEditing ? (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Full Name</label>
+                <div className="space-y-5 animate-in fade-in duration-300">
+                  <div className="space-y-2 px-1">
+                    <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 ml-1">Full Name</label>
                     <Input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Enter your full name"
+                      className="h-11 rounded-lg bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 font-bold"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Email Address</label>
+                  <div className="space-y-2 px-1">
+                    <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 ml-1">Email Address</label>
                     <Input
                       value={email}
                       disabled
-                      className="bg-slate-50"
+                      className="h-11 rounded-lg bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-60 text-slate-500 font-bold"
                     />
-                    <p className="text-xs text-slate-400">Email cannot be changed</p>
+                    <p className="text-[10px] text-slate-400 italic px-2 font-medium">Registered email cannot be changed</p>
                   </div>
-                  <div className="flex gap-3 pt-2">
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <Button 
                       onClick={handleSaveProfile}
-                      className="bg-indigo-600 hover:bg-indigo-700"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-11 rounded-xl shadow-lg active:scale-95 transition-all"
                     >
                       <Save className="h-4 w-4 mr-2" />
                       Save Changes
                     </Button>
                     <Button 
-                      variant="outline"
+                      variant="ghost"
                       onClick={() => {
                         setIsEditing(false);
                         setName(currentUser?.name || user?.name || '');
@@ -405,33 +411,30 @@ export function Profile() {
                         setCurrentPassword('');
                         setErrorMessage('');
                       }}
+                      className="h-11 rounded-xl font-bold text-slate-500 dark:text-slate-400"
                     >
                       Cancel
                     </Button>
                   </div>
-                </>
+                </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between py-3 border-b border-slate-100">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center">
-                        <User className="h-5 w-5 text-indigo-600" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500">Full Name</p>
-                        <p className="text-sm font-medium text-slate-900">{currentUser?.name || user?.name}</p>
-                      </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-4 p-3 rounded-xl bg-white dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800/50">
+                    <div className="h-10 w-10 rounded-lg bg-indigo-50 dark:bg-slate-800 flex items-center justify-center border border-slate-100 dark:border-slate-700">
+                      <User className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-slate-500">Full Name</p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{currentUser?.name || user?.name}</p>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center">
-                        <Mail className="h-5 w-5 text-indigo-600" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500">Email Address</p>
-                        <p className="text-sm font-medium text-slate-900">{currentUser?.email || user?.email}</p>
-                      </div>
+                  <div className="flex items-center gap-4 p-3 rounded-xl bg-white dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800/50">
+                    <div className="h-10 w-10 rounded-lg bg-indigo-50 dark:bg-slate-800 flex items-center justify-center border border-slate-100 dark:border-slate-700">
+                      <Mail className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-slate-500">Email Address</p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{currentUser?.email || user?.email}</p>
                     </div>
                   </div>
                 </div>
@@ -440,166 +443,182 @@ export function Profile() {
           </Card>
 
           {/* Security Settings */}
-          <Card>
-            <CardHeader>
+          <Card className="border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden rounded-2xl">
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Shield className="h-5 w-5 text-indigo-600" />
-                    Security
-                  </CardTitle>
-                  <CardDescription>Manage your password and account security</CardDescription>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center shadow-sm">
+                    <Shield className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-200">Security & Access</CardTitle>
+                    <CardDescription className="text-xs text-slate-500">Credentials & MFA</CardDescription>
+                  </div>
                 </div>
                 {!isChangingPassword && (
                   <Button 
                     variant="outline" 
                     size="sm"
                     onClick={() => setIsChangingPassword(true)}
+                    className="h-8 px-4 rounded-lg font-bold text-[10px] uppercase tracking-wider border-slate-200 dark:border-slate-700"
                   >
-                    Change Password
+                    Update
                   </Button>
                 )}
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               {isChangingPassword ? (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700">New Password</label>
+                  <div className="space-y-4 animate-in fade-in duration-300">
+                    <div className="space-y-2 px-1">
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 ml-1">New Password</label>
                       <Input
                         type="password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Enter new password (min. 6 chars)"
+                        placeholder="Min. 6 characters"
+                        className="h-11 rounded-lg bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 font-bold"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700">Confirm New Password</label>
+                    <div className="space-y-2 px-1">
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 ml-1">Confirm Password</label>
                       <Input
                         type="password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Confirm new password"
+                        placeholder="Confirm your new password"
+                        className="h-11 rounded-lg bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 font-bold"
                       />
                     </div>
-                    <div className="flex gap-3 pt-2 items-center">
-                      <Button onClick={handleChangePassword} className="bg-indigo-600 hover:bg-indigo-700">
-                        <Lock className="h-4 w-4 mr-2" /> Update Password
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                      <Button onClick={handleChangePassword} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-11 rounded-xl shadow-lg active:scale-95 transition-all">
+                        <Lock className="h-4 w-4 mr-2" /> Change Password
                       </Button>
-                      <Button variant="outline" onClick={() => {
+                      <Button variant="ghost" onClick={() => {
                         setIsChangingPassword(false);
                         setNewPassword('');
                         setConfirmPassword('');
                         setErrorMessage('');
-                      }}>Cancel</Button>
+                      }} className="h-11 rounded-xl font-bold text-slate-500 dark:text-slate-400">Cancel</Button>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-4 py-4">
-                    <div className="h-10 w-10 shrink-0 rounded-xl bg-orange-50 flex items-center justify-center">
-                      <Lock className="h-5 w-5 text-orange-600" />
+                  <div className="flex items-center gap-4 py-2">
+                    <div className="h-10 w-10 shrink-0 rounded-xl bg-orange-50 dark:bg-orange-950/20 flex items-center justify-center border border-orange-100 dark:border-orange-900/30">
+                      <Lock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900">Password</p>
-                      <p className="text-xs text-slate-500 truncate">Change your login password</p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">Account Password</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">Last changed recently</p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => setIsChangingPassword(true)}>
+                    <Button variant="outline" size="sm" onClick={() => setIsChangingPassword(true)} className="rounded-lg h-8 text-xs font-medium border-slate-200 dark:border-slate-700 shadow-sm">
                       Change
                     </Button>
                   </div>
                 )}
                 
                 {/* MFA / Two-Factor Authentication Divider */}
-                <div className="h-px bg-slate-100 my-4" />
+                <div className="h-px bg-slate-100 dark:bg-slate-800 my-6" />
                 
                 {isEnrollingMfa ? (
-                  <div className="space-y-4 bg-slate-50 border border-slate-200 p-4 rounded-xl">
-                    <p className="text-sm font-semibold text-slate-800">Set Up Two-Factor Authentication</p>
-                    <p className="text-xs text-slate-600">Scan this QR code with your authenticator app (Authy, Google Authenticator, etc).</p>
+                  <div className="space-y-5 bg-slate-50 dark:bg-slate-800/50 border border-indigo-100 dark:border-indigo-900/30 p-5 rounded-xl animate-in zoom-in-95 duration-300">
+                    <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
+                        <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">MFA Setup Wizard</p>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Scan this code with an Authenticator app (Authy, Google Authenticator, etc).</p>
                     
-                    <div className="flex flex-col items-center">
-                      <div className="bg-white p-2 rounded-xl shadow-sm inline-block" dangerouslySetInnerHTML={{ __html: mfaQr }} />
-                      <p className="text-[10px] text-slate-500 mt-2 tracking-widest font-mono text-center max-w-[250px] break-all">{mfaSecret}</p>
+                    <div className="flex flex-col items-center py-2">
+                      <div className="bg-white p-3 rounded-xl shadow-xl inline-block border-4 border-white" dangerouslySetInnerHTML={{ __html: mfaQr }} />
+                      <div className="mt-4 p-2 bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 w-full max-w-[280px]">
+                        <p className="text-[9px] font-bold text-slate-500 dark:text-slate-500 uppercase text-center mb-1">Manual Entry Secret</p>
+                        <p className="text-[10px] text-slate-600 dark:text-slate-300 tracking-widest font-mono text-center break-all select-all">{mfaSecret}</p>
+                      </div>
                     </div>
                     
                     <div className="space-y-2 pt-2">
-                       <label className="text-xs font-semibold text-slate-700">Enter Verification Code</label>
+                       <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 text-center block">6-Digit Verification Code</label>
                        <Input 
                          type="text" 
                          value={mfaCode} 
                          onChange={(e) => setMfaCode(e.target.value)}
-                         placeholder="000000"
-                         className="font-mono text-center tracking-widest text-lg h-12"
+                         placeholder="000 000"
+                         className="font-mono text-center tracking-[0.5em] text-2xl h-14 rounded-xl border-indigo-200 dark:border-indigo-900 bg-white dark:bg-slate-900 shadow-inner"
                          maxLength={6}
                        />
                     </div>
                     
-                    <div className="flex gap-3 pt-2">
-                      <Button onClick={handleVerifyMfa} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                      <Button onClick={handleVerifyMfa} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 rounded-xl shadow-lg active:scale-95 transition-all">
                         Verify & Enable
                       </Button>
-                      <Button variant="outline" className="w-full" onClick={() => setIsEnrollingMfa(false)}>
+                      <Button variant="ghost" className="w-full font-bold text-slate-500" onClick={() => setIsEnrollingMfa(false)}>
                         Cancel
                       </Button>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-4 py-4">
-                    <div className="h-10 w-10 shrink-0 rounded-xl bg-emerald-50 flex items-center justify-center">
-                       <Shield className="h-5 w-5 text-emerald-600" />
+                  <div className="flex items-center gap-4 py-2">
+                    <div className="h-10 w-10 shrink-0 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/30">
+                       <Shield className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                       <p className="text-sm font-medium text-slate-900 flex items-center gap-2">
-                          Two-Factor Authentication
-                          {mfaStatus === 'verified' && <span className="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded-full font-bold">ACTIVE</span>}
+                       <p className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                          Two-Factor Auth
+                          {mfaStatus === 'verified' && <span className="bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 text-[10px] px-2 py-0.5 rounded-full font-bold border border-emerald-200 dark:border-emerald-800 shadow-sm animate-pulse">ACTIVE</span>}
                        </p>
-                       <p className="text-xs text-slate-500 truncate">Adds an extra layer of security to your account.</p>
+                       <p className="text-xs text-slate-500 dark:text-slate-400 truncate">Login verification via 6-digit codes</p>
                     </div>
                     {mfaStatus === 'loading' ? (
                        <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
                     ) : mfaStatus === 'verified' ? (
-                       <Button variant="outline" size="sm" onClick={handleUnenrollMfa} className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200">
+                       <Button variant="outline" size="sm" onClick={handleUnenrollMfa} className="rounded-lg h-8 text-xs font-medium border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 shadow-sm">
                          Disable
                        </Button>
                     ) : (
-                       <Button variant="outline" size="sm" onClick={handleEnrollMfa}>
+                       <Button variant="outline" size="sm" onClick={handleEnrollMfa} className="rounded-lg h-8 text-xs font-medium border-slate-200 dark:border-slate-700 shadow-sm">
                          Enable
                        </Button>
                     )}
                   </div>
                 )}
               </CardContent>
-            </Card>
+          </Card>
+
           {/* Appearance / Theme */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Palette className="h-5 w-5 text-indigo-600" />
-                Appearance
-              </CardTitle>
-              <CardDescription>Choose your preferred color theme and mode</CardDescription>
+          <Card className="border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden rounded-2xl">
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center shadow-sm">
+                  <Palette className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-200">Appearance</CardTitle>
+                  <CardDescription className="text-xs text-slate-500">Workspace Themes</CardDescription>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="pt-6 space-y-6">
               {/* Theme Settings Dropdowns */}
-              <div className="space-y-5">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700 block">Mode</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2 px-1">
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 ml-1">Color Mode</label>
                   <select 
                     value={isDark ? 'dark' : 'light'} 
                     onChange={() => toggle()}
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="flex h-11 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 px-4 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer font-bold"
                   >
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
+                    <option value="light">☀️ Light Mode</option>
+                    <option value="dark">🌙 Dark Mode</option>
                   </select>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700 block">Color Theme</label>
+                <div className="space-y-2 px-1">
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 ml-1">Accent Color</label>
                   <select
                     value={colorTheme}
                     onChange={(e) => setColorTheme(e.target.value as ColorTheme)}
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="flex h-11 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 px-4 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer font-bold"
                   >
                     {THEME_OPTIONS.map(opt => (
                       <option key={opt.id} value={opt.id}>{opt.label}</option>
@@ -607,12 +626,12 @@ export function Profile() {
                   </select>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700 block">App Layout Theme</label>
+                <div className="sm:col-span-2 space-y-2 px-1">
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 ml-1">UI Interaction Style</label>
                   <select
                     value={uiTheme}
                     onChange={(e) => setUITheme(e.target.value as UITheme)}
-                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="flex h-11 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 px-4 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer font-bold"
                   >
                     {UI_THEME_OPTIONS.map(opt => (
                       <option key={opt.id} value={opt.id}>{opt.label} - {opt.description}</option>
@@ -622,24 +641,24 @@ export function Profile() {
               </div>
 
               {/* Floating Calendar Toggle */}
-              <div className="h-px bg-slate-100 dark:bg-slate-800" />
-              <div className="flex items-center justify-between py-1">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center">
+              <div className="h-px bg-slate-100 dark:bg-slate-800 my-2" />
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800/50">
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-lg bg-indigo-50 dark:bg-slate-800 flex items-center justify-center border border-slate-100 dark:border-slate-700">
                     <CalendarDays className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-slate-900 dark:text-white">Floating Calendar</p>
-                    <p className="text-xs text-slate-500">Quick-access calendar tab on the right edge</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">Floating Calendar</p>
+                    <p className="text-xs font-medium text-slate-500">Sidebar quick-access</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowFloatingCalendar(!showFloatingCalendar)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    showFloatingCalendar ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 shadow-inner ${
+                    showFloatingCalendar ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
                   }`}
                 >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-xl transition-transform duration-300 ${
                     showFloatingCalendar ? 'translate-x-6' : 'translate-x-1'
                   }`} />
                 </button>

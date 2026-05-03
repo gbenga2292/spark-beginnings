@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
@@ -8,6 +8,7 @@ import { useUserStore } from '@/src/store/userStore';
 import { DesktopFloatingCalendar } from '../tasks/DesktopFloatingCalendar';
 import { TaskPopupNotifications } from '../tasks/TaskPopupNotifications';
 import { ConnectionBanner } from '@/src/components/offline/ConnectionBanner';
+import { PullToRefresh } from '../ui/PullToRefresh';
 import { startNetworkMonitor } from '@/src/store/networkStore';
 import { ShieldAlert, RefreshCw, X } from 'lucide-react';
 
@@ -18,6 +19,7 @@ export function Layout() {
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const [privBannerVisible, setPrivBannerVisible] = useState(false);
   const [reloadCountdown, setReloadCountdown] = useState<number | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
 
   // Start network monitoring
   useEffect(() => {
@@ -62,7 +64,7 @@ export function Layout() {
     <div className={`flex h-full w-full overflow-hidden font-sans transition-colors duration-200 ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
       }`}>
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
-      <div className="flex flex-1 flex-col overflow-hidden w-full">
+      <div className="flex flex-1 flex-col overflow-hidden w-full relative">
         <ConnectionBanner />
 
         {/* ── Privilege-update banner ─────────────────────────────── */}
@@ -94,9 +96,15 @@ export function Layout() {
         )}
 
         <Header onMenuClick={() => setIsSidebarOpen(true)} />
-        <main className={`flex-1 overflow-y-auto pt-4 px-2 pb-4 md:pt-4 md:px-6 md:pb-6 w-full ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
-          <Outlet />
-        </main>
+        <div className="flex-1 relative overflow-hidden">
+          <PullToRefresh scrollRef={mainRef} />
+          <main 
+            ref={mainRef}
+            className={`h-full overflow-y-auto pt-4 px-2 pb-4 md:pt-4 md:px-6 md:pb-6 w-full ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}
+          >
+            <Outlet />
+          </main>
+        </div>
       </div>
 
       {/* Global Features */}

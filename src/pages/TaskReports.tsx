@@ -279,6 +279,9 @@ function AnalyticsDashboard() {
         return 'All time';
     }, [filterYear, filterMonth, rolling]);
 
+    // Mobile menu state
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
     const currentSiteName = useMemo(() => {
         if (filterSite === 'all') return 'All Sites';
         return sites.find(s => s.name === filterSite)?.name || filterSite;
@@ -287,105 +290,224 @@ function AnalyticsDashboard() {
     useSetPageTitle(
         'Performance Analytics',
         `Analyzing ${periodLabel} · ${currentSiteName}`,
-        <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1 -mb-1 w-full max-w-[calc(100vw-6rem)] md:max-w-none">
-            {/* Site Selector */}
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-9 min-w-[140px] justify-between gap-2 px-3 text-[10px] font-bold uppercase tracking-tight border-slate-200 bg-white hover:border-indigo-300 transition-colors">
-                        {currentSiteName}
-                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[180px] max-h-[300px] overflow-y-auto">
-                    <DropdownMenuItem className="text-xs" onClick={() => setFilterSite('all')}>
-                        All Sites
-                    </DropdownMenuItem>
-                    {sites.map(s => (
-                        <DropdownMenuItem key={s.id} className="text-xs" onClick={() => setFilterSite(s.name)}>
-                            {s.name}
+        <div className="relative flex items-center gap-2">
+            {/* ── Desktop View (Hidden on Mobile) ── */}
+            <div className="hidden sm:flex items-center gap-2 overflow-x-auto hide-scrollbar">
+                {/* Site Selector */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-9 min-w-[140px] justify-between gap-2 px-3 text-[10px] font-bold uppercase tracking-tight border-slate-200 bg-white hover:border-indigo-300 transition-colors">
+                            {currentSiteName}
+                            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[180px] max-h-[300px] overflow-y-auto">
+                        <DropdownMenuItem className="text-xs" onClick={() => setFilterSite('all')}>
+                            All Sites
                         </DropdownMenuItem>
-                    ))}
-                </DropdownMenuContent>
-            </DropdownMenu>
+                        {sites.map(s => (
+                            <DropdownMenuItem key={s.id} className="text-xs" onClick={() => setFilterSite(s.name)}>
+                                {s.name}
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
 
-            <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
+                <div className="h-8 w-[1px] bg-slate-200 mx-1" />
 
-            {/* Year Selector */}
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-9 min-w-[110px] justify-between gap-2 px-3 text-[10px] font-bold uppercase tracking-tight border-slate-200 bg-white">
-                        {filterYear === '' ? 'All Years' : filterYear}
-                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[110px]">
-                    <DropdownMenuItem className="text-xs" onClick={() => {
-                        setFilterYear('');
-                        setFilterMonth('');
-                    }}>
-                        All Years
-                    </DropdownMenuItem>
-                    {yearList.map(y => (
-                        <DropdownMenuItem key={y} className="text-xs" onClick={() => {
-                            setFilterYear(y);
+                {/* Year Selector */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-9 min-w-[110px] justify-between gap-2 px-3 text-[10px] font-bold uppercase tracking-tight border-slate-200 bg-white">
+                            {filterYear === '' ? 'All Years' : filterYear}
+                            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[110px]">
+                        <DropdownMenuItem className="text-xs" onClick={() => {
+                            setFilterYear('');
                             setFilterMonth('');
-                            setRolling(null);
                         }}>
-                            {y}
+                            All Years
                         </DropdownMenuItem>
-                    ))}
-                </DropdownMenuContent>
-            </DropdownMenu>
+                        {yearList.map(y => (
+                            <DropdownMenuItem key={y} className="text-xs" onClick={() => {
+                                setFilterYear(y);
+                                setFilterMonth('');
+                                setRolling(null);
+                            }}>
+                                {y}
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
 
-            {/* Month Selector */}
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild disabled={filterYear === ''}>
-                    <Button variant="outline" size="sm" className="h-9 min-w-[130px] justify-between gap-2 px-3 text-[10px] font-bold uppercase tracking-tight border-slate-200 bg-white disabled:opacity-50">
-                        {filterMonth === '' ? 'All Months' : MONTHS[filterMonth as number]}
-                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[130px]">
-                    <DropdownMenuItem className="text-xs" onClick={() => setFilterMonth('')}>
-                        All Months
-                    </DropdownMenuItem>
-                    {MONTHS.map((m, i) => (
-                        <DropdownMenuItem key={i} className="text-xs" onClick={() => setFilterMonth(i)}>
-                            {m}
+                {/* Month Selector */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild disabled={filterYear === ''}>
+                        <Button variant="outline" size="sm" className="h-9 min-w-[130px] justify-between gap-2 px-3 text-[10px] font-bold uppercase tracking-tight border-slate-200 bg-white disabled:opacity-50">
+                            {filterMonth === '' ? 'All Months' : MONTHS[filterMonth as number]}
+                            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[130px]">
+                        <DropdownMenuItem className="text-xs" onClick={() => setFilterMonth('')}>
+                            All Months
                         </DropdownMenuItem>
-                    ))}
-                </DropdownMenuContent>
-            </DropdownMenu>
+                        {MONTHS.map((m, i) => (
+                            <DropdownMenuItem key={i} className="text-xs" onClick={() => setFilterMonth(i)}>
+                                {m}
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
 
-            <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
+                <div className="h-8 w-[1px] bg-slate-200 mx-1" />
 
-            {/* Rolling Window */}
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild disabled={filterYear !== ''}>
-                    <Button variant="outline" size="sm" className="h-9 min-w-[140px] justify-between gap-2 px-3 text-[10px] font-bold uppercase tracking-tight border-slate-200 bg-white disabled:opacity-50">
-                        {rolling === null ? 'All Time' : `Last ${rolling} days`}
-                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[140px]">
-                    <DropdownMenuItem className="text-xs" onClick={() => setRolling(null)}>All Time</DropdownMenuItem>
-                    {[7, 14, 30, 90].map(days => (
-                        <DropdownMenuItem key={days} className="text-xs" onClick={() => setRolling(days)}>
-                            Last {days} days
-                        </DropdownMenuItem>
-                    ))}
-                </DropdownMenuContent>
-            </DropdownMenu>
+                {/* Rolling Window */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild disabled={filterYear !== ''}>
+                        <Button variant="outline" size="sm" className="h-9 min-w-[140px] justify-between gap-2 px-3 text-[10px] font-bold uppercase tracking-tight border-slate-200 bg-white disabled:opacity-50">
+                            {rolling === null ? 'All Time' : `Last ${rolling} days`}
+                            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[140px]">
+                        <DropdownMenuItem className="text-xs" onClick={() => setRolling(null)}>All Time</DropdownMenuItem>
+                        {[7, 14, 30, 90].map(days => (
+                            <DropdownMenuItem key={days} className="text-xs" onClick={() => setRolling(days)}>
+                                Last {days} days
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
 
-            <Button 
-                size="sm" 
-                onClick={handleExport}
-                className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
-            >
-                <FileSpreadsheet className="h-4 w-4" /> <span className="hidden sm:inline">Export Analysis</span>
-            </Button>
+                <Button 
+                    size="sm" 
+                    onClick={handleExport}
+                    className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
+                >
+                    <FileSpreadsheet className="h-4 w-4" /> <span>Export Analysis</span>
+                </Button>
+            </div>
+
+            {/* ── Mobile View (Action Buttons) ── */}
+            <div className="flex sm:hidden items-center gap-2">
+                <Button 
+                    size="sm" 
+                    onClick={handleExport}
+                    className="h-9 w-9 p-0 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md active:scale-95"
+                    title="Export Analysis"
+                >
+                    <FileSpreadsheet className="h-4 w-4" />
+                </Button>
+
+                <button
+                    className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white dark:bg-slate-900 dark:border-slate-700 text-slate-600 dark:text-slate-300 shadow-sm"
+                    onClick={() => setMobileMenuOpen(o => !o)}
+                    title="More options"
+                >
+                    <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
+                </button>
+            </div>
+
+            {/* ── Mobile Dropdown Panel ── */}
+            {mobileMenuOpen && (
+                <>
+                    <div className="sm:hidden fixed inset-0 z-40 bg-slate-900/10 backdrop-blur-[2px]" onClick={() => setMobileMenuOpen(false)} />
+                    <div className="sm:hidden fixed top-16 right-3 z-50 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-4 space-y-5 animate-in slide-in-from-top-2 duration-200">
+                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 -mt-1">
+                            <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">Report Filters</h4>
+                            <button onClick={() => setMobileMenuOpen(false)} className="text-[10px] font-bold text-indigo-600 uppercase tracking-tight">Done</button>
+                        </div>
+
+                        {/* Site Filter */}
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 px-1">Filter by Site</p>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" className="w-full h-10 justify-between px-3 text-xs border-slate-200 dark:border-slate-800">
+                                        <span className="truncate">{currentSiteName}</span>
+                                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="w-56 max-h-[300px] overflow-y-auto">
+                                    <DropdownMenuItem onClick={() => setFilterSite('all')}>All Sites</DropdownMenuItem>
+                                    {sites.map(s => (
+                                        <DropdownMenuItem key={s.id} onClick={() => setFilterSite(s.name)}>{s.name}</DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+
+                        {/* Date Filters */}
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 px-1">Year</p>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="w-full h-10 justify-between px-3 text-xs border-slate-200 dark:border-slate-800">
+                                            {filterYear === '' ? 'All' : filterYear}
+                                            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent>
+                                        <DropdownMenuItem onClick={() => { setFilterYear(''); setFilterMonth(''); }}>All Years</DropdownMenuItem>
+                                        {yearList.map(y => (
+                                            <DropdownMenuItem key={y} onClick={() => { setFilterYear(y); setFilterMonth(''); setRolling(null); }}>{y}</DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 px-1">Month</p>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild disabled={filterYear === ''}>
+                                        <Button variant="outline" className="w-full h-10 justify-between px-3 text-xs border-slate-200 dark:border-slate-800">
+                                            {filterMonth === '' ? 'All' : MONTHS[filterMonth as number].slice(0,3)}
+                                            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent>
+                                        <DropdownMenuItem onClick={() => setFilterMonth('')}>All Months</DropdownMenuItem>
+                                        {MONTHS.map((m, i) => (
+                                            <DropdownMenuItem key={i} onClick={() => setFilterMonth(i)}>{m}</DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                        </div>
+
+                        {/* Rolling Window */}
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 px-1">Rolling Period</p>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild disabled={filterYear !== ''}>
+                                    <Button variant="outline" className="w-full h-10 justify-between px-3 text-xs border-slate-200 dark:border-slate-800">
+                                        {rolling === null ? 'All Time' : `Last ${rolling} days`}
+                                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    <DropdownMenuItem onClick={() => setRolling(null)}>All Time</DropdownMenuItem>
+                                    {[7, 14, 30, 90].map(days => (
+                                        <DropdownMenuItem key={days} onClick={() => setRolling(days)}>Last {days} days</DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+
+                        <Button 
+                            onClick={() => setMobileMenuOpen(false)}
+                            className="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-tight rounded-xl shadow-md"
+                        >
+                            Apply Filters
+                        </Button>
+                    </div>
+                </>
+            )}
         </div>,
-        [filterYear, filterMonth, rolling, periodLabel, filterSite, sites, currentSiteName]
+        [filterYear, filterMonth, rolling, periodLabel, filterSite, sites, currentSiteName, mobileMenuOpen, yearList]
     );
 
     function startOfDay(d: Date) { const c = new Date(d); c.setHours(0,0,0,0); return c; }

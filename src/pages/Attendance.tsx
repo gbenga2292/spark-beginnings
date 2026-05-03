@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, memo, useCallback } from 'react';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -33,6 +33,167 @@ import {
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
 import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
+import type { Employee } from '@/src/store/appStore';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AttendanceRow — React.memo isolates re-renders to only the changed employee.
+// When attendanceData[employee.id] changes for Employee A, React.memo prevents
+// all 299 other rows from re-rendering. Shallow prop comparison is the key.
+// ─────────────────────────────────────────────────────────────────────────────
+type RowData = { day: string; night: string; overtime: boolean; overtimeDetails: string } | undefined;
+
+interface AttendanceRowProps {
+  employee: Employee;
+  idx: number;
+  rowData: RowData;
+  onLeave: boolean;
+  registerDate: string;
+  isFieldStaff: boolean;
+  isHoliday: boolean;
+  deptMap: Map<string, { workDaysPerWeek?: number; [key: string]: any }>;
+  siteOptionNodes: React.ReactNode[];
+  statusOptionNodes: React.ReactNode[];
+  renderHistoricalOption: (val: string) => React.ReactNode;
+  isAbsentStatus: (txt: string) => boolean;
+  onSelectChange: (empId: string, shift: 'day' | 'night' | 'overtimeDetails', value: string | boolean) => void;
+  onOvertimeToggle: (empId: string, checked: boolean) => void;
+  getDOW: (dateStr: string) => number;
+}
+
+const AttendanceRow = memo(function AttendanceRow({
+  employee, idx, rowData, onLeave, registerDate, isFieldStaff, isHoliday,
+  deptMap, siteOptionNodes, statusOptionNodes, renderHistoricalOption,
+  isAbsentStatus, onSelectChange, onOvertimeToggle, getDOW,
+}: AttendanceRowProps) {
+  const dow = getDOW(registerDate);
+  const deptObj = deptMap.get(employee.department); // O(1) map lookup — no .find()
+  const defaultDays = employee.staffType === 'FIELD' ? 6 : 5;
+  const wd = deptObj?.workDaysPerWeek ?? defaultDays;
+  const isWorkday = (dow <= wd) && !isHoliday;
+
+  const dayVal = (onLeave && isWorkday) ? 'On Leave' : (!onLeave ? (rowData?.day || '') : '');
+  const isAbsent = !!(dayVal && isAbsentStatus(dayVal));
+  const nightVal = (!onLeave && !isAbsent) ? (rowData?.night || '') : '';
+  const hasEntry = dayVal || nightVal;
+  const disabledOt = isWorkday || onLeave;
+
+  // Shared CSS helpers
+  const statusDot = isAbsent ? 'bg-red-400' : hasEntry ? 'bg-emerald-400' : 'bg-slate-300';
+  const cardBorder = isAbsent ? 'border-red-200 bg-red-50/60' : hasEntry ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200 bg-white';
+
+  const daySelectClass = `w-full h-8 rounded-md border text-xs px-2 outline-none transition-all ${
+    onLeave ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
+  } ${dayVal && !isAbsentStatus(dayVal)
+    ? 'border-emerald-300 bg-emerald-50 text-emerald-800 font-medium'
+    : dayVal && isAbsentStatus(dayVal)
+      ? 'border-red-300 bg-red-50 text-red-700 font-medium'
+      : 'border-slate-200 bg-white text-slate-700'
+  } focus:ring-1 focus:ring-slate-400`;
+
+  const nightSelectClass = `w-full h-8 rounded-md border text-xs px-2 outline-none transition-all ${
+    (onLeave || isAbsent) ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
+  } ${nightVal && !isAbsentStatus(nightVal)
+    ? 'border-blue-300 bg-blue-50 text-blue-800 font-medium'
+    : nightVal && isAbsentStatus(nightVal)
+      ? 'border-red-300 bg-red-50 text-red-700 font-medium'
+      : 'border-slate-200 bg-white text-slate-700'
+  } focus:ring-1 focus:ring-slate-400`;
+
+  // ── Shared select markup (reused in both desktop + mobile) ──────────────
+  const DaySiteSelect = (
+    <select className={daySelectClass} value={dayVal}
+      onChange={(e) => onSelectChange(employee.id, 'day', e.target.value)} disabled={onLeave}>
+      <option value="">— Select —</option>
+      <optgroup label="Sites">{siteOptionNodes}{renderHistoricalOption(dayVal)}</optgroup>
+      <optgroup label="Status">{statusOptionNodes}</optgroup>
+    </select>
+  );
+
+  const NightSiteSelect = isFieldStaff ? (
+    <select className={nightSelectClass} value={nightVal}
+      onChange={(e) => onSelectChange(employee.id, 'night', e.target.value)} disabled={onLeave || isAbsent}>
+      <option value="">— Select —</option>
+      <optgroup label="Sites">{siteOptionNodes}{renderHistoricalOption(nightVal)}</optgroup>
+      <optgroup label="Status">{statusOptionNodes}</optgroup>
+    </select>
+  ) : (
+    <div className="flex items-center gap-2">
+      <label className={`flex items-center gap-1.5 ${disabledOt ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+        title={isWorkday ? 'Overtime disabled on regular workdays' : (onLeave ? 'On leave' : '')}>
+        <input type="checkbox"
+          className="rounded border-slate-300 text-slate-800 focus:ring-slate-500 disabled:opacity-50"
+          checked={!disabledOt && (rowData?.overtime || false)}
+          onChange={(e) => onOvertimeToggle(employee.id, e.target.checked)}
+          disabled={disabledOt} />
+        <span className="text-xs text-slate-600 font-medium">Overtime</span>
+      </label>
+      {rowData?.overtime && !isWorkday && (
+        <input type="text" placeholder="Remarks..."
+          className="h-7 text-xs flex-1 border border-slate-200 rounded px-2 outline-none focus:ring-1 focus:ring-slate-400"
+          value={rowData?.overtimeDetails || ''}
+          onChange={(e) => onSelectChange(employee.id, 'overtimeDetails', e.target.value)} />
+      )}
+    </div>
+  );
+
+  // ── Desktop table row (hidden on mobile) ────────────────────────────────
+  const tableRow = (
+    <tr className={`hidden sm:table-row transition-colors ${
+      isAbsent ? 'bg-red-50/50' : hasEntry ? 'bg-emerald-50/40' :
+        idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
+    } hover:bg-slate-100/60`}>
+      <td className="py-1 px-3">
+        <div className="flex items-center gap-2">
+          <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDot}`} />
+          <span className="font-medium text-slate-800 text-xs truncate">{employee.surname} {employee.firstname}</span>
+          <span className="text-[10px] text-slate-400 bg-slate-100 rounded px-1 py-0.5 flex-shrink-0">{employee.department}</span>
+        </div>
+      </td>
+      <td className="py-1 px-2 border-l border-slate-100">{DaySiteSelect}</td>
+      <td className="py-1 px-2 border-l border-slate-100">{NightSiteSelect}</td>
+    </tr>
+  );
+
+  // ── Mobile card (hidden on desktop) ────────────────────────────────────
+  const mobileCard = (
+    <div className={`sm:hidden rounded-xl border p-3 transition-all ${cardBorder}`}>
+      {/* Card header */}
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot}`} />
+          <span className="font-semibold text-slate-800 text-sm truncate">{employee.surname} {employee.firstname}</span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {onLeave && <span className="text-[9px] font-bold bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 uppercase tracking-wide">On Leave</span>}
+          <span className="text-[9px] font-medium text-slate-400 bg-slate-100 rounded-full px-2 py-0.5 truncate max-w-[80px]">{employee.department}</span>
+        </div>
+      </div>
+
+      {/* Selects grid */}
+      <div className={`grid gap-2 ${isFieldStaff ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+            {isFieldStaff ? '☀ Day' : 'Day Site'}
+          </label>
+          {DaySiteSelect}
+        </div>
+        {isFieldStaff && (
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">🌙 Night</label>
+            {NightSiteSelect}
+          </div>
+        )}
+        {!isFieldStaff && (
+          <div className="mt-1">{NightSiteSelect}</div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Render both — CSS visibility determines which shows.
+  // React only renders one branch worth of real DOM per breakpoint.
+  return <>{tableRow}{mobileCard}</>;
+});
 
 
 export function Attendance() {
@@ -301,30 +462,37 @@ export function Attendance() {
     });
   }, [sites, registerDate]);
 
-  const renderSiteOptions = (prefix: string, currentVal: string) => {
-    const opts = activeSitesForDate.map(site => (
-      <option key={`${prefix}-${site.id}`} value={site.name}>{site.name} ({site.client})</option>
+  // ─── O(1) dept lookup map — built once, avoids .find() inside render loops ───
+  const deptMap = useMemo(
+    () => new Map(departments.map(d => [d.name, d])),
+    [departments]
+  );
+
+  // ─── Pre-built site <option> nodes — computed once, reused across all rows ───
+  // This prevents React from destroying/rebuilding thousands of DOM nodes per keystroke.
+  const siteOptionNodes = useMemo(() => {
+    return activeSitesForDate.map(site => (
+      <option key={site.id} value={site.name}>
+        {site.name} ({site.client})
+      </option>
     ));
-    
-    // Prevent data loss natively by maintaining the previously selected site as visual history
-    if (currentVal && !statuses.includes(currentVal) && !activeSitesForDate.find(s => s.name === currentVal)) {
-      const histSite = sites.find(s => s.name === currentVal);
-      if (histSite) {
-        opts.push(
-          <option key={`${prefix}-hist-${histSite.id}`} value={histSite.name}>
-            {histSite.name} ({histSite.client}) (Historical)
-          </option>
-        );
-      } else {
-        opts.push(
-          <option key={`${prefix}-hist-del`} value={currentVal}>
-            {currentVal} (Deleted)
-          </option>
-        );
-      }
+  }, [activeSitesForDate]);
+
+  const statusOptionNodes = useMemo(() => {
+    return statuses.map(status => (
+      <option key={status} value={status}>{status}</option>
+    ));
+  }, [statuses]);
+
+  // renderSiteOptions kept for historical-value fallback only; standard options come from siteOptionNodes
+  const renderHistoricalOption = useCallback((currentVal: string) => {
+    if (!currentVal || statuses.includes(currentVal) || activeSitesForDate.find(s => s.name === currentVal)) return null;
+    const histSite = sites.find(s => s.name === currentVal);
+    if (histSite) {
+      return <option key={`hist-${histSite.id}`} value={histSite.name}>{histSite.name} ({histSite.client}) (Historical)</option>;
     }
-    return opts;
-  };
+    return <option key="hist-del" value={currentVal}>{currentVal} (Deleted)</option>;
+  }, [statuses, activeSitesForDate, sites]);
 
   // Auto-load existing records when date changes — O(1) via recordsByDate index
   useEffect(() => {
@@ -776,7 +944,7 @@ export function Attendance() {
     });
   };
 
-  const handleSelectChange = (empId: string, shift: 'day' | 'night' | 'overtimeDetails', value: string | boolean) => {
+  const handleSelectChange = useCallback((empId: string, shift: 'day' | 'night' | 'overtimeDetails', value: string | boolean) => {
     setAttendanceData(prev => ({
       ...prev,
       [empId]: {
@@ -784,9 +952,9 @@ export function Attendance() {
         [shift]: value
       }
     }));
-  };
+  }, []);
 
-  const handleOvertimeToggle = (empId: string, checked: boolean) => {
+  const handleOvertimeToggle = useCallback((empId: string, checked: boolean) => {
     const emp = employees.find(e => e.id === empId);
     const isOps = emp ? isOpsOrEngDept(emp.department) : false;
     setAttendanceData(prev => ({
@@ -795,12 +963,11 @@ export function Attendance() {
         ...prev[empId],
         overtime: checked,
         overtimeDetails: checked ? prev[empId]?.overtimeDetails || '' : '',
-        // For non-Operations: auto-set day to 'Office' (DCEL) when overtime is ticked
         ...((!isOps && checked) ? { day: 'Office' } : {}),
         ...((!isOps && !checked && prev[empId]?.day === 'Office') ? { day: '' } : {}),
       }
     }));
-  };
+  }, [employees, isOpsOrEngDept]);
 
   const handleClear = async () => {
     const ok = await showConfirm('Are you sure you want to clear the current form?', { variant: 'danger', confirmLabel: 'Clear' });
@@ -1043,6 +1210,16 @@ export function Attendance() {
 
   const filledCount = Object.keys(attendanceData).filter(k => attendanceData[k]?.day || attendanceData[k]?.night).length;
 
+  // ─── Pre-compute DB view metrics — avoids calling calculateAttendanceMetrics
+  // inside the render loop where it scans 10k records per visible row. ───────
+  const dbRecordMetrics = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof calculateAttendanceMetrics>>();
+    filteredDbRecords.forEach(r => {
+      map.set(r.id, calculateAttendanceMetrics(r, publicHolidays, payrollVariables, monthValues, []));
+    });
+    return map;
+  }, [filteredDbRecords, publicHolidays, payrollVariables, monthValues]);
+
   useSetPageTitle(
     'Daily Register',
     'Attendance & site allocation',
@@ -1110,48 +1287,142 @@ export function Attendance() {
             <Database className="h-3.5 w-3.5" />
           </button>
         </div>
-        {activeTab === 'database' && (
-          <button
-            className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm"
-            onClick={() => setMobileMenuOpen(o => !o)}
-            title="More options"
-          >
-            <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
-          </button>
-        )}
+        <button
+          className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm"
+          onClick={() => setMobileMenuOpen(o => !o)}
+          title="More options"
+        >
+          <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
+        </button>
       </div>
 
       {/* ── Mobile dropdown panel ── */}
       {mobileMenuOpen && (
         <>
-          <div className="sm:hidden fixed inset-0 z-40" onClick={() => setMobileMenuOpen(false)} />
-          <div className="sm:hidden fixed top-16 right-3 z-50 w-48 bg-white border border-slate-200 rounded-md shadow-md p-1">
-            {priv.canImport && (
-              <label className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 cursor-pointer">
-                <Download className="h-4 w-4 text-indigo-500" /> Import Excel
-                <Input type="file" accept=".xlsx" className="hidden" onChange={(e) => { handleImportExcel(e); setMobileMenuOpen(false); }} />
-              </label>
-            )}
-            {priv.canDelete && dbSelectedIds.size > 0 && (
-              <button onClick={() => { handleBulkDelete(); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-rose-600 hover:bg-rose-50">
-                <Trash2 className="h-4 w-4" /> Delete ({dbSelectedIds.size})
-              </button>
-            )}
-            {priv.canExport && (
-              <>
-                <button onClick={() => { handleExportExcel('bare'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">
-                  <Upload className="h-4 w-4 text-emerald-500" /> Export Bare
-                </button>
-                <button onClick={() => { handleExportExcel('detailed'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">
-                  <Upload className="h-4 w-4 text-indigo-500" /> Export Detailed
-                </button>
-              </>
+          <div className="sm:hidden fixed inset-0 z-40 bg-slate-900/10 backdrop-blur-[2px]" onClick={() => setMobileMenuOpen(false)} />
+          <div className="sm:hidden fixed top-16 right-3 z-50 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-4 space-y-5 animate-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 -mt-1">
+                <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                    {activeTab === 'database' ? 'Database Actions' : 'Entry Filters'}
+                </h4>
+                <button onClick={() => setMobileMenuOpen(false)} className="text-[10px] font-bold text-indigo-600 uppercase tracking-tight">Done</button>
+            </div>
+
+            {activeTab === 'database' ? (
+              <div className="space-y-2">
+                {priv.canImport && (
+                  <label className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 cursor-pointer rounded-lg">
+                    <Download className="h-4 w-4 text-indigo-500" /> Import Excel
+                    <Input type="file" accept=".xlsx" className="hidden" onChange={(e) => { handleImportExcel(e); setMobileMenuOpen(false); }} />
+                  </label>
+                )}
+                {priv.canDelete && dbSelectedIds.size > 0 && (
+                  <button onClick={() => { handleBulkDelete(); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg">
+                    <Trash2 className="h-4 w-4" /> Delete ({dbSelectedIds.size})
+                  </button>
+                )}
+                {priv.canExport && (
+                  <>
+                    <button onClick={() => { handleExportExcel('bare'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-lg">
+                      <Upload className="h-4 w-4 text-emerald-500" /> Export Bare
+                    </button>
+                    <button onClick={() => { handleExportExcel('detailed'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-lg">
+                      <Upload className="h-4 w-4 text-indigo-500" /> Export Detailed
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Date Controls */}
+                <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center justify-between mb-2 px-1">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date / Latest</span>
+                    <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                      {lastAttendanceDate ? formatDisplayDate(lastAttendanceDate) : 'None'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setRegisterDate(getNextDayStr(registerDate, -1))}
+                      className="h-10 w-10 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex-shrink-0 shadow-sm"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="relative flex-1">
+                      <Input
+                        type="date"
+                        value={registerDate}
+                        max={maxSelectableDate}
+                        onChange={(e) => setRegisterDate(e.target.value)}
+                        className="h-10 pl-9 pr-2 text-xs bg-white dark:bg-slate-800 shadow-sm border-slate-200 dark:border-slate-700 w-full"
+                      />
+                      <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        const nextDate = getNextDayStr(registerDate, 1);
+                        if (nextDate <= maxSelectableDate) {
+                          setRegisterDate(nextDate);
+                        }
+                      }}
+                      disabled={registerDate >= maxSelectableDate}
+                      className="h-10 w-10 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex-shrink-0 shadow-sm disabled:opacity-50"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Staff Type filter */}
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 px-1">Staff Type</p>
+                  <div className="relative">
+                    <select
+                      value={staffTypeFilter}
+                      onChange={(e) => setStaffTypeFilter(e.target.value as any)}
+                      className="h-10 w-full pl-9 pr-8 text-xs font-bold uppercase tracking-tight rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-sm appearance-none cursor-pointer outline-none"
+                    >
+                      <option value="OFFICE">OFFICE STAFF</option>
+                      <option value="FIELD">FIELD STAFF</option>
+                      <option value="NON-EMPLOYEE">NON-EMPLOYEE</option>
+                    </select>
+                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+                
+                {/* Search */}
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 px-1">Search Staff</p>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <Input
+                      placeholder="Search..."
+                      className="h-10 pl-9 text-xs bg-white dark:bg-slate-800 shadow-sm border-slate-200 dark:border-slate-700 rounded-xl"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <Button 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-tight rounded-xl shadow-md mt-2"
+                >
+                    Apply Filters
+                </Button>
+              </div>
             )}
           </div>
         </>
       )}
     </div>,
-    [activeTab, priv.canImport, priv.canDelete, priv.canExport, dbSelectedIds.size, handleImportExcel, handleExportExcel, handleBulkDelete, mobileMenuOpen]
+    [activeTab, priv.canImport, priv.canDelete, priv.canExport, dbSelectedIds.size, handleImportExcel, handleExportExcel, handleBulkDelete, mobileMenuOpen, staffTypeFilter, searchTerm, registerDate, lastAttendanceDate, maxSelectableDate]
   );
 
   return (
@@ -1161,7 +1432,7 @@ export function Attendance() {
           {/* Toolbar: date, filters, search, actions — all in one row */}
           <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-end justify-between gap-2 py-2 px-1">
             {/* Date controls */}
-            <div className="flex flex-col gap-1.5 w-full sm:w-auto shrink-0">
+            <div className="hidden sm:flex flex-col gap-1.5 w-full sm:w-auto shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest px-0.5">
@@ -1263,7 +1534,7 @@ export function Attendance() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 flex-1 w-full sm:w-auto min-w-[300px]">
+            <div className="hidden sm:flex flex-wrap items-center gap-2 flex-1 w-full sm:w-auto min-w-[300px]">
               {/* Staff Type filter */}
               <div className="relative shrink-0">
               <select
@@ -1323,161 +1594,77 @@ export function Attendance() {
           </div>
         </div>
 
-        {/* Compact entry table */}
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0 mt-2">
+        {/* ── DESKTOP: Compact entry table (hidden on mobile) ── */}
+          <div className="hidden sm:flex rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 flex-col min-h-0 mt-2">
             <div className="overflow-x-auto overflow-y-auto flex-1">
-              <table className="w-full text-sm min-w-[800px]">
+              <table className="w-full text-sm">
                 <thead className="bg-slate-900 text-white sticky top-0 z-10">
                   <tr>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 w-[30%]">Staff Name</th>
                     <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">Day Site / Status</th>
-                    {isFieldStaff ? (
-                      <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">
-                        Night Site / Status
-                      </th>
-                    ) : (
-                      <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">
-                        Overtime
-                      </th>
-                    )}
+                    <th className="text-left text-[11px] font-semibold uppercase tracking-wider py-2 px-3 border-l border-white/10 w-[35%]">
+                      {isFieldStaff ? 'Night Site / Status' : 'Overtime'}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                   {filteredEmployees.length === 0 ? (
                     <tr>
-                      <td colSpan={isFieldStaff ? 3 : 2} className="text-center py-8 text-slate-400 text-sm">No employees match your filters.</td>
+                      <td colSpan={3} className="text-center py-8 text-slate-400 text-sm">No employees match your filters.</td>
                     </tr>
                   ) : (
-                    filteredEmployees.map((employee, idx) => {
-                      const onLeave = employeesOnLeaveForRegisterDate.has(employee.id);
-                      
-                      const dow = getDOW(registerDate);
-                      const deptObj = departments.find(d => d.name === employee.department);
-                      const defaultDays = employee.staffType === 'FIELD' ? 6 : 5;
-                      const wd = deptObj?.workDaysPerWeek ?? defaultDays;
-                      const isWorkday = (dow <= wd) && !isHoliday(registerDate);
-
-                      const dayVal = (onLeave && isWorkday) ? 'On Leave' : (!onLeave ? (attendanceData[employee.id]?.day || '') : '');
-                      const isAbsent = dayVal && isAbsentStatus(dayVal);
-                      const nightVal = (!onLeave && !isAbsent) ? (attendanceData[employee.id]?.night || '') : '';
-                      const hasEntry = dayVal || nightVal;
-
-                      return (
-                        <tr
-                          key={employee.id}
-                          className={`transition-colors ${isAbsent ? 'bg-red-50/50 dark:bg-red-900/10' :
-                            hasEntry ? 'bg-emerald-50/40 dark:bg-emerald-900/10' :
-                              idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-800/50'
-                            } hover:bg-slate-100/60 dark:hover:bg-slate-700/40`}
-                        >
-                          <td className="py-1 px-3">
-                            <div className="flex items-center gap-2">
-                              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isAbsent ? 'bg-red-400' : hasEntry ? 'bg-emerald-400' : 'bg-slate-300'
-                                }`} />
-                              <span className="font-medium text-slate-800 dark:text-slate-200 text-xs truncate">
-                                {employee.surname} {employee.firstname}
-                              </span>
-                              <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 rounded px-1 py-0.5 flex-shrink-0 hidden sm:inline">
-                                {employee.department}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="py-1 px-2 border-l border-slate-100 dark:border-slate-700">
-                            <select
-                              className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all ${
-                                onLeave ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
-                              } ${dayVal && !isAbsentStatus(dayVal)
-                                ? 'border-emerald-300 bg-emerald-50 text-emerald-800 font-medium'
-                                : dayVal && isAbsentStatus(dayVal)
-                                  ? 'border-red-300 bg-red-50 text-red-700 font-medium'
-                                  : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'
-                                } focus:ring-1 focus:ring-slate-400`}
-                              value={dayVal}
-                              onChange={(e) => handleSelectChange(employee.id, 'day', e.target.value)}
-                              disabled={onLeave}
-                            >
-                              <option value="">&mdash; Select &mdash;</option>
-                              <optgroup label="Sites">
-                                {renderSiteOptions('d', dayVal)}
-                              </optgroup>
-                              <optgroup label="Status">
-                                {statuses.map(status => (
-                                  <option key={`d-${status}`} value={status}>{status}</option>
-                                ))}
-                              </optgroup>
-                            </select>
-                          </td>
-                          {isFieldStaff ? (
-                            <td className="py-1 px-2 border-l border-slate-100 dark:border-slate-700">
-                              <select
-                                className={`w-full h-7 rounded border text-xs px-2 outline-none transition-all ${
-                                  (onLeave || isAbsent) ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
-                                } ${nightVal && !isAbsentStatus(nightVal)
-                                  ? 'border-indigo-300 bg-indigo-50 text-indigo-800 font-medium'
-                                  : nightVal && isAbsentStatus(nightVal)
-                                    ? 'border-red-300 bg-red-50 text-red-700 font-medium'
-                                    : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200'
-                                  } focus:ring-1 focus:ring-slate-400`}
-                                value={nightVal}
-                                onChange={(e) => handleSelectChange(employee.id, 'night', e.target.value)}
-                                disabled={onLeave || isAbsent}
-                              >
-                                <option value="">&mdash; Select &mdash;</option>
-                                <optgroup label="Sites">
-                                  {renderSiteOptions('n', nightVal)}
-                                </optgroup>
-                                <optgroup label="Status">
-                                  {statuses.map(status => (
-                                    <option key={`n-${status}`} value={status}>{status}</option>
-                                  ))}
-                                </optgroup>
-                              </select>
-                            </td>
-                          ) : (
-                            <td className="py-1 px-2 border-l border-slate-100">
-                              <div className="flex items-center gap-2">
-                                {(() => {
-                                  const dow = getDOW(registerDate);
-                                  const deptObj = departments.find(d => d.name === employee.department);
-                                  const defaultDays = employee.staffType === 'FIELD' ? 6 : 5;
-                                  const wd = deptObj?.workDaysPerWeek ?? defaultDays;
-                                  const isWorkday = (dow <= wd) && !isHoliday(registerDate);
-
-                                  const disabledOt = isWorkday || onLeave;
-                                  return (
-                                    <>
-                                      <label className={`flex items-center gap-1 ${disabledOt ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} title={isWorkday ? "Overtime disabled on regular workdays" : (onLeave ? "On leave" : "")}>
-                                        <input
-                                          type="checkbox"
-                                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                                          checked={!disabledOt && (attendanceData[employee.id]?.overtime || false)}
-                                          onChange={(e) => handleOvertimeToggle(employee.id, e.target.checked)}
-                                          disabled={disabledOt}
-                                        />
-                                        <span className="text-xs text-slate-600 font-medium">Overtime</span>
-                                      </label>
-                                      {attendanceData[employee.id]?.overtime && !isWorkday && (
-                                        <Input
-                                          type="text"
-                                          placeholder="Remarks..."
-                                          className="h-7 text-xs flex-1"
-                                          value={attendanceData[employee.id]?.overtimeDetails || ''}
-                                          onChange={(e) => handleSelectChange(employee.id, 'overtimeDetails', e.target.value)}
-                                        />
-                                      )}
-                                    </>
-                                  );
-                                })()}
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      );
-                    })
+                    filteredEmployees.map((employee, idx) => (
+                      <AttendanceRow
+                        key={employee.id}
+                        employee={employee}
+                        idx={idx}
+                        rowData={attendanceData[employee.id]}
+                        onLeave={employeesOnLeaveForRegisterDate.has(employee.id)}
+                        registerDate={registerDate}
+                        isFieldStaff={isFieldStaff}
+                        isHoliday={isHoliday(registerDate)}
+                        deptMap={deptMap}
+                        siteOptionNodes={siteOptionNodes}
+                        statusOptionNodes={statusOptionNodes}
+                        renderHistoricalOption={renderHistoricalOption}
+                        isAbsentStatus={isAbsentStatus}
+                        onSelectChange={handleSelectChange}
+                        onOvertimeToggle={handleOvertimeToggle}
+                        getDOW={getDOW}
+                      />
+                    ))
                   )}
                 </tbody>
               </table>
             </div>
+          </div>
+
+        {/* ── MOBILE: Card list (hidden on desktop) ── */}
+          <div className="sm:hidden flex-1 overflow-y-auto mt-2 space-y-2 px-0.5 pb-4">
+            {filteredEmployees.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 text-sm">No employees match your filters.</div>
+            ) : (
+              filteredEmployees.map((employee, idx) => (
+                <AttendanceRow
+                  key={employee.id}
+                  employee={employee}
+                  idx={idx}
+                  rowData={attendanceData[employee.id]}
+                  onLeave={employeesOnLeaveForRegisterDate.has(employee.id)}
+                  registerDate={registerDate}
+                  isFieldStaff={isFieldStaff}
+                  isHoliday={isHoliday(registerDate)}
+                  deptMap={deptMap}
+                  siteOptionNodes={siteOptionNodes}
+                  statusOptionNodes={statusOptionNodes}
+                  renderHistoricalOption={renderHistoricalOption}
+                  isAbsentStatus={isAbsentStatus}
+                  onSelectChange={handleSelectChange}
+                  onOvertimeToggle={handleOvertimeToggle}
+                  getDOW={getDOW}
+                />
+              ))
+            )}
           </div>
         </TabsContent>
 
@@ -1640,7 +1827,7 @@ export function Attendance() {
                     </tr>
                   ) : (
                     filteredDbRecords.map((r) => {
-                      const met = calculateAttendanceMetrics(r, publicHolidays, payrollVariables, monthValues, attendanceRecords);
+                      const met = dbRecordMetrics.get(r.id)!;
                       return (
                         <tr key={r.id} className="hover:bg-slate-50">
                           <td className="py-1.5 px-2">
