@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { generateId } from '@/src/lib/utils';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
@@ -194,10 +194,30 @@ const toDisplayDate = (iso: string | null | undefined): string => {
 };
 
 export function Sites() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'clients' | 'active' | 'pending'>('clients');
+  const [activeTab, setActiveTab] = useState<'clients' | 'active' | 'pending'>(
+    (searchParams.get('tab') as any) || 'clients'
+  );
+
+  // Sync tab state to URL so back navigation restores the exact tab
+  useEffect(() => {
+    const currentTab = searchParams.get('tab');
+    if (currentTab !== activeTab) {
+      setSearchParams(prev => {
+        prev.set('tab', activeTab);
+        return prev;
+      }, { replace: true });
+    }
+  }, [activeTab, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const currentTab = searchParams.get('tab') as 'clients' | 'active' | 'pending';
+    if (currentTab && currentTab !== activeTab) {
+      setActiveTab(currentTab);
+    }
+  }, [searchParams]);
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [selectedLogsSiteId, setSelectedLogsSiteId] = useState<string | 'all'>('all');
   const [isAddingSite, setIsAddingSite] = useState(searchParams.get('action') === 'add');
@@ -928,7 +948,7 @@ export function Sites() {
                 />
               </div>
             )}
-            {(activeTab === 'active' || selectedClient) && (
+            {(activeTab === 'active' || activeTab === 'pending' || selectedClient) && (
               <>
                 <select 
                   className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
@@ -1378,64 +1398,122 @@ export function Sites() {
           </div>
         ) : (
           <div className="flex-1 flex flex-col min-h-0">
-            <div className="overflow-auto style-scroll flex-1">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Client</TableHead>
-                  <TableHead>Proposed Site</TableHead>
-                  <TableHead className="text-center">Phase 1</TableHead>
-                  <TableHead className="text-center">Phase 2</TableHead>
-                  <TableHead className="text-center">Phase 3</TableHead>
-                  <TableHead className="text-center">Phase 4</TableHead>
-                  <TableHead className="text-center">Phase 5</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            {viewMode === 'table' ? (
+              <div className="overflow-auto style-scroll flex-1">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Client</TableHead>
+                    <TableHead>Proposed Site</TableHead>
+                    <TableHead className="text-center">Phase 1</TableHead>
+                    <TableHead className="text-center">Phase 2</TableHead>
+                    <TableHead className="text-center">Phase 3</TableHead>
+                    <TableHead className="text-center">Phase 4</TableHead>
+                    <TableHead className="text-center">Phase 5</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredPendingSites.map(site => (
+                    <TableRow 
+                      key={site.id} 
+                      className="hover:bg-slate-50/50 transition-colors cursor-pointer"
+                      onClick={() => {
+                        if (!selectedClientName) {
+                          navigate(`/sites?client=${encodeURIComponent(site.clientName)}`);
+                        }
+                      }}
+                    >
+                      <TableCell className="font-bold text-slate-900">{site.clientName}</TableCell>
+                      <TableCell className="font-medium text-slate-600">{site.siteName}</TableCell>
+                      <TableCell className="text-center">{site.phase1.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
+                      <TableCell className="text-center">{site.phase2.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
+                      <TableCell className="text-center">{site.phase3.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
+                      <TableCell className="text-center">{site.phase4.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
+                      <TableCell className="text-center">{site.phase5.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={site.status === 'Pending' ? 'outline' : 'success'}
+                          className={`text-[10px] font-bold ${site.status === 'Pending' ? 'bg-slate-50 text-slate-500 border-slate-200' : ''}`}
+                        >
+                          {site.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-indigo-600 hover:bg-slate-50" onClick={() => navigate(`/sites/onboarding/${site.id}`)}>
+                          <Eye className="h-4 w-4 mr-2" /> View Form
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {filteredPendingSites.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-12 text-slate-400 italic">
+                        No pending onboarding records found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 sm:p-5 bg-slate-50/30 overflow-y-auto style-scroll flex-1 min-h-0 items-start">
                 {filteredPendingSites.map(site => (
-                  <TableRow 
+                  <Card 
                     key={site.id} 
-                    className="hover:bg-slate-50/50 transition-colors cursor-pointer"
+                    className="border-slate-200 shadow-sm hover:shadow-md transition-all bg-white group overflow-hidden cursor-pointer"
                     onClick={() => {
                       if (!selectedClientName) {
                         navigate(`/sites?client=${encodeURIComponent(site.clientName)}`);
                       }
                     }}
                   >
-                    <TableCell className="font-bold text-slate-900">{site.clientName}</TableCell>
-                    <TableCell className="font-medium text-slate-600">{site.siteName}</TableCell>
-                    <TableCell className="text-center">{site.phase1.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
-                    <TableCell className="text-center">{site.phase2.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
-                    <TableCell className="text-center">{site.phase3.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
-                    <TableCell className="text-center">{site.phase4.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
-                    <TableCell className="text-center">{site.phase5.completed ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}</TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant={site.status === 'Pending' ? 'outline' : 'success'}
-                        className={`text-[10px] font-bold ${site.status === 'Pending' ? 'bg-slate-50 text-slate-500 border-slate-200' : ''}`}
-                      >
-                        {site.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right" onClick={e => e.stopPropagation()}>
-                      <Button variant="ghost" size="sm" className="text-slate-400 hover:text-indigo-600 hover:bg-slate-50" onClick={() => navigate(`/sites/onboarding/${site.id}`)}>
-                        <Eye className="h-4 w-4 mr-2" /> View Form
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                    <CardContent className="p-4 pb-3">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex gap-3">
+                          <div className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                            <Clock className="h-4 w-4 text-slate-400" />
+                          </div>
+                          <div className="overflow-hidden">
+                            <h3 className="text-sm font-bold text-slate-800 uppercase truncate leading-tight" title={site.siteName}>{site.siteName}</h3>
+                            <div className="flex items-center gap-1.5 mt-0.5 font-semibold text-slate-500 text-xs">
+                              <Building2 className="h-3 w-3" /> <span className="truncate" title={site.clientName}>{site.clientName}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <Badge variant={site.status === 'Pending' ? 'outline' : 'success'} className={`text-[10px] font-bold shrink-0 ml-2 ${site.status === 'Pending' ? 'bg-slate-50 text-slate-500 border-slate-200' : ''}`}>
+                          {site.status}
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-5 gap-1 mb-3 bg-slate-50 rounded-md p-2">
+                        {[1, 2, 3, 4, 5].map(phase => {
+                          const isCompleted = (site as any)[`phase${phase}`].completed;
+                          return (
+                            <div key={phase} className="flex flex-col items-center gap-1">
+                              <span className="text-[9px] font-bold text-slate-400">P{phase}</span>
+                              {isCompleted ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <Circle className="h-3.5 w-3.5 text-slate-200" />}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="pt-2 flex justify-end">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-semibold" onClick={(e) => { e.stopPropagation(); navigate(`/sites/onboarding/${site.id}`); }}>
+                          <Eye className="h-3 w-3 mr-1.5" /> View Form
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
                 {filteredPendingSites.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12 text-slate-400 italic">
-                      No pending onboarding records found.
-                    </TableCell>
-                  </TableRow>
+                  <div className="col-span-full text-center py-12 text-slate-400 italic">
+                    No pending onboarding records found.
+                  </div>
                 )}
-              </TableBody>
-            </Table>
-            </div>
+              </div>
+            )}
           </div>
         )}
       </div>

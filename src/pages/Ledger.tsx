@@ -5,7 +5,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { TabsContent } from '@/src/components/ui/tabs';
-import { Search, Download, Upload, FileText, ChevronLeft, ChevronRight, X, Eye, BookOpen, RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, ChevronDown } from 'lucide-react';
+import { Search, Download, Upload, FileText, ChevronLeft, ChevronRight, X, Eye, BookOpen, RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, ChevronDown, Filter } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/src/components/ui/dropdown-menu';
 import { useAppStore, LedgerEntry } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
@@ -74,6 +74,7 @@ export function Ledger() {
 
   const [hasUnsavedPending, setHasUnsavedPending] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   const isLedgerDirty = useMemo(() => {
     return JSON.stringify(items) !== originalItemsJSON || hasUnsavedPending;
@@ -720,13 +721,22 @@ export function Ledger() {
         {/* Entry quick actions (moved to page content) */}
         {/* Records: 3-dot for import/export */}
         {tab === 'records' && (
-          <button
-            className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm"
-            onClick={() => setMobileMenuOpen(o => !o)}
-            title="More options"
-          >
-            <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
-          </button>
+          <>
+            <button
+              className={`h-9 w-9 flex items-center justify-center rounded-xl border ${showMobileFilters ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600'} shadow-sm`}
+              onClick={() => setShowMobileFilters(o => !o)}
+              title="Toggle filters"
+            >
+              <Filter className="h-4 w-4" />
+            </button>
+            <button
+              className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm"
+              onClick={() => setMobileMenuOpen(o => !o)}
+              title="More options"
+            >
+              <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
+            </button>
+          </>
         )}
       </div>
 
@@ -754,7 +764,7 @@ export function Ledger() {
         </>
       )}
     </div>,
-    [tab, priv, hasUnsavedPending, activeVoucherNo, ledgerEntries, voucherDate, paidFrom, items, currentUser, voucherSummaries.length, mobileMenuOpen]
+    [tab, priv, hasUnsavedPending, activeVoucherNo, ledgerEntries, voucherDate, paidFrom, items, currentUser, voucherSummaries.length, mobileMenuOpen, showMobileFilters]
   );
 
   if (!priv?.canView) {
@@ -776,11 +786,42 @@ export function Ledger() {
       <TabsContent active={tab === 'entry'} className="m-0 focus-visible:outline-none">
         <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
           {/* Form Header */}
-          <div className="bg-slate-50/80 p-4 grid grid-cols-2 lg:grid-cols-4 gap-4 border-b border-slate-200/60 backdrop-blur-sm">
+          <div className="bg-slate-50/80 p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 border-b border-slate-200/60 backdrop-blur-sm">
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Voucher No.</label>
               <div className="flex rounded-md shadow-sm">
-                <Input readOnly value={activeVoucherNo || generatedVoucherNo} className="bg-white h-9 font-mono text-indigo-700 font-bold tracking-wide border-r-0 rounded-r-none border-slate-300 pointer-events-none" />
+                <select
+                  value={activeVoucherNo || generatedVoucherNo}
+                  onChange={async e => {
+                    const vno = e.target.value;
+                    if (vno === (activeVoucherNo || generatedVoucherNo)) return;
+                    
+                    if (isLedgerDirty) {
+                      const ok = await showConfirm("You have unsaved changes. Discard them?", { variant: 'danger' });
+                      if (!ok) return;
+                    }
+                    
+                    if (vno === generatedVoucherNo) {
+                      handleClear();
+                    } else {
+                      loadVoucher(vno);
+                    }
+                  }}
+                  className="bg-white flex-1 min-w-0 h-9 font-mono text-indigo-700 font-bold tracking-wide border border-r-0 rounded-l-md border-slate-300 outline-none px-3 cursor-pointer truncate"
+                >
+                  <option value={generatedVoucherNo} className="font-sans italic text-slate-500">
+                    New: {generatedVoucherNo}
+                  </option>
+                  {voucherSummaries.length > 0 && (
+                    <optgroup label="Saved Vouchers">
+                      {voucherSummaries.map(v => (
+                        <option key={v.voucherNo} value={v.voucherNo} className="font-mono text-slate-700">
+                          {v.voucherNo}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
                 <button onClick={handlePrevVoucher} className="h-9 w-9 shrink-0 bg-slate-50 border border-slate-300 border-l-0 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors">
                   <ChevronLeft className="h-4 w-4" />
                 </button>
@@ -829,8 +870,95 @@ export function Ledger() {
           </div>
 
           {/* Grid Table */}
+          {/* Grid Table */}
           <div className="overflow-x-auto select-none">
-            <table className="w-full text-left text-sm whitespace-nowrap">
+            {/* Mobile View */}
+            <div className="md:hidden divide-y divide-slate-100 border-b border-slate-200">
+              {items.map((item, idx) => (
+                <div key={idx} className={`p-4 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-bold text-slate-500 text-xs tracking-wider uppercase">Line {idx + 1}</span>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                         <label className="text-[10px] font-bold text-slate-500 uppercase">Date</label>
+                         <input type="date" className="w-full h-9 px-2 rounded-md border border-slate-200 text-xs bg-white" value={item.transactionDate} onChange={e => setItemField(idx, 'transactionDate', e.target.value)} />
+                      </div>
+                      <div className="space-y-1.5">
+                         <label className="text-[10px] font-bold text-slate-500 uppercase">Amount</label>
+                         <div className="relative">
+                           <span className="absolute left-2.5 top-2.5 text-slate-400 text-xs font-semibold">₦</span>
+                           <input type="text" className="w-full h-9 pl-6 pr-2 rounded-md border border-slate-200 text-xs font-bold bg-white" value={
+                             item.amount 
+                               ? item.amount.split('.').length > 1
+                                 ? Number(item.amount.split('.')[0]).toLocaleString() + '.' + item.amount.split('.')[1]
+                                 : Number(item.amount).toLocaleString()
+                               : ''
+                           } onChange={e => {
+                             const v = e.target.value.replace(/,/g, '').replace(/[^0-9.]/g, '');
+                             const parts = v.split('.');
+                             const cleanV = parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
+                             setItemField(idx, 'amount', cleanV);
+                           }} />
+                         </div>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Description</label>
+                      <input type="text" className="w-full h-9 px-3 rounded-md border border-slate-200 text-xs bg-white" value={item.description} onChange={e => setItemField(idx, 'description', e.target.value)} placeholder="Enter details..." />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Category</label>
+                        <select className="w-full h-9 px-2 rounded-md border border-slate-200 text-xs bg-white truncate" value={item.category} onChange={e => setItemField(idx, 'category', e.target.value)}>
+                          <option value="" disabled>Select...</option>
+                          {sortedCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Vendor</label>
+                        <select className="w-full h-9 px-2 rounded-md border border-slate-200 text-xs bg-white truncate" value={item.vendor} onChange={e => setItemField(idx, 'vendor', e.target.value)}>
+                          <option value="none">None</option>
+                          {sortedVendors.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Client</label>
+                        <select className="w-full h-9 px-2 rounded-md border border-slate-200 text-xs bg-white truncate" value={item.client} onChange={e => {
+                          const newItems = [...items];
+                          newItems[idx] = { ...newItems[idx], client: e.target.value, site: 'none' };
+                          setItems(newItems);
+                        }}>
+                          <option value="none">None</option>
+                          {clients.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Site</label>
+                        <select className="w-full h-9 px-2 rounded-md border border-slate-200 text-xs bg-white truncate" value={item.site} onChange={e => setItemField(idx, 'site', e.target.value)}>
+                          <option value="none">None</option>
+                          {sites
+                            .filter(s => !item.client || item.client === 'none' || s.client === item.client)
+                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .map(s => <option key={s.id} value={s.name}>{s.name}</option>)
+                          }
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div className="p-4 bg-indigo-50 flex justify-between items-center">
+                <span className="font-bold text-slate-700 text-sm uppercase tracking-wider">Total Amount</span>
+                <span className="font-bold text-indigo-700 text-lg tabular-nums">₦{formTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+
+            {/* Desktop View */}
+            <table className="hidden md:table w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-slate-900 text-white font-semibold">
                 <tr>
                   <th className="py-2.5 px-3 text-center border-r border-slate-800 w-10 text-[10px] uppercase tracking-widest opacity-70">NÂº</th>
@@ -1016,7 +1144,7 @@ export function Ledger() {
       <TabsContent active={tab === 'records'} className="m-0 space-y-4">
         <Card>
           <CardHeader className="pb-4 border-b border-slate-100">
-            <div className="flex flex-wrap items-center justify-end gap-3 w-full">
+            <div className={`flex-wrap items-center justify-end gap-3 w-full ${!showMobileFilters ? 'hidden sm:flex' : 'flex'}`}>
                 <div className="flex flex-wrap items-center gap-2">
                   <select 
                     className="h-9 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-600 font-medium" 
@@ -1183,9 +1311,17 @@ export function Ledger() {
                     ) : (
                       voucherSummaries.map((v, i) => (
                         <div
+                          role="button"
+                          tabIndex={0}
                           key={v.voucherNo || `v-${i}`}
                           className="flex items-center gap-3 px-4 py-3.5 hover:bg-indigo-50/30 active:bg-indigo-100/40 cursor-pointer transition-colors"
                           onClick={() => setDialogVoucher(v.voucherNo)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setDialogVoucher(v.voucherNo);
+                            }
+                          }}
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
@@ -1297,11 +1433,11 @@ export function Ledger() {
       {/* Voucher Dialog Popup */}
       {dialogVoucher && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4"
           onClick={() => setDialogVoucher(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden"
+            className="bg-white sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto sm:max-h-[85vh] max-w-4xl flex flex-col overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             {/* Dialog Header */}
@@ -1328,19 +1464,78 @@ export function Ledger() {
 
             {/* Bank / Date meta row */}
             {dialogTransactions.length > 0 && (
-              <div className="flex items-center gap-6 px-6 py-3 bg-slate-50 border-b border-slate-100 text-sm shrink-0">
-                <span className="text-slate-500">Bank: <strong className="text-slate-700">{dialogTransactions[0].bank}</strong></span>
-                <span className="text-slate-500">Entered by: <strong className="text-slate-700">{dialogTransactions[0].enteredBy}</strong></span>
-                <span className="text-slate-500">{dialogTransactions.length} transaction{dialogTransactions.length !== 1 ? 's' : ''}</span>
-                <Button size="sm" variant="outline" className="ml-auto" onClick={() => { setDialogVoucher(null); loadVoucher(dialogVoucher); setTab('entry'); }}>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 px-6 py-4 bg-slate-50 border-b border-slate-100 text-sm shrink-0">
+                <div className="flex justify-between sm:block">
+                  <span className="text-slate-500">Bank: </span>
+                  <strong className="text-slate-700">{dialogTransactions[0].bank}</strong>
+                </div>
+                <div className="flex justify-between sm:block">
+                  <span className="text-slate-500">Entered by: </span>
+                  <strong className="text-slate-700 truncate max-w-[150px] sm:max-w-none text-right">{dialogTransactions[0].enteredBy}</strong>
+                </div>
+                <div className="text-center sm:text-left text-slate-500 py-1 sm:py-0 border-y sm:border-0 border-slate-200/60">
+                  {dialogTransactions.length} transaction{dialogTransactions.length !== 1 ? 's' : ''}
+                </div>
+                <Button size="sm" variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0 sm:ml-auto" onClick={() => { setDialogVoucher(null); loadVoucher(dialogVoucher); setTab('entry'); }}>
                   <Eye className="h-4 w-4 mr-1.5" /> Edit in Form
                 </Button>
               </div>
             )}
 
             {/* Transactions Table */}
-            <div className="overflow-y-auto flex-1">
-              <table className="w-full text-sm">
+            <div className="overflow-y-auto flex-1 bg-slate-50 sm:bg-white">
+              {/* Mobile View */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {dialogTransactions.map((t, idx) => (
+                  <div key={t.id || `t-${idx}`} className="p-4 bg-white">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Line {idx + 1}</span>
+                      <span className="text-xs font-mono text-slate-500">{t.date ? formatDisplayDate(t.date) : '—'}</span>
+                    </div>
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-slate-800 break-words">{t.description || <span className="text-slate-300 italic">No description</span>}</p>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">{t.category}</span>
+                        {t.client && <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{t.client}</span>}
+                        {t.site && <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{t.site}</span>}
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+                      <span className="text-xs text-slate-500 truncate max-w-[120px]">{t.vendor || '—'}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-slate-900 tabular-nums">₦{t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        {priv?.canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-600 shrink-0"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const isLast = dialogTransactions.length === 1;
+                              const ok = await showConfirm(
+                                isLast
+                                  ? `This is the only transaction in voucher ${dialogVoucher}. Deleting it will remove the entire voucher. Continue?`
+                                  : 'Delete this transaction line from the voucher?',
+                                { variant: 'danger', confirmLabel: 'Delete Line' }
+                              );
+                              if (ok) {
+                                deleteLedgerEntry(t.id);
+                                toast.success('Transaction line removed.');
+                                if (isLast) setDialogVoucher(null);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop View */}
+              <table className="hidden md:table w-full text-sm">
                 <thead className="bg-slate-100 sticky top-0">
                   <tr>
                     <th className="py-2.5 px-4 text-left font-semibold text-slate-600 w-8">#</th>
@@ -1401,12 +1596,11 @@ export function Ledger() {
                   ))}
                   {/* Grand total row */}
                   <tr key="voucher-total-row" className="bg-indigo-50 border-t-2 border-indigo-200">
-                    <td colSpan={6} className="py-3 px-4 text-right font-bold text-slate-700">Total</td>
+                    <td colSpan={priv?.canDelete ? 6 : 5} className="py-3 px-4 text-right font-bold text-slate-700">Total</td>
                     <td className="py-3 px-3 text-right font-extrabold text-indigo-700 tabular-nums">
                       ₦{dialogTransactions.reduce((s, e) => s + e.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
-                    {priv?.canDelete && <td />}
-                    <td />
+                    <td colSpan={2}></td>
                   </tr>
                 </tbody>
               </table>

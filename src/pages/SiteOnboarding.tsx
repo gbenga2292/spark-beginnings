@@ -348,12 +348,20 @@ export function SiteOnboarding() {
       setShowUnsavedModal(true);
       return;
     }
-    navigate('/sites');
+    if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      navigate('/sites');
+    }
   };
 
   const forceLeave = () => {
     setShowUnsavedModal(false);
-    navigate('/sites');
+    if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      navigate('/sites');
+    }
   };
 
   const headerActions = (
@@ -498,7 +506,7 @@ export function SiteOnboarding() {
       {isNew && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Site Details</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-sm font-medium text-slate-700">
                 Client Name <span className="text-red-500">*</span>
@@ -595,7 +603,7 @@ export function SiteOnboarding() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 min-h-0 overflow-hidden flex flex-col">
 
           {/* Tabs */}
-          <div className="flex border-b border-slate-200 overflow-x-auto flex-shrink-0">
+          <div className="flex border-b border-slate-200 overflow-x-auto style-scroll flex-shrink-0">
             {[1, 2, 3, 4, 5].map(phase => {
               const done = (form as any)[`phase${phase}`].completed;
               return (
@@ -603,7 +611,7 @@ export function SiteOnboarding() {
                   key={phase}
                   onClick={() => setActivePhase(phase as any)}
                   className={`flex-1 py-3 px-3 text-xs font-medium border-b-2 whitespace-nowrap
-                    transition-colors flex flex-col items-center gap-0.5 min-w-[90px]
+                    transition-colors flex flex-col items-center gap-0.5 min-w-[100px] sm:min-w-[120px]
                     ${activePhase === phase
                       ? 'border-indigo-600 text-indigo-700 bg-indigo-50/40'
                       : done
@@ -637,7 +645,7 @@ export function SiteOnboarding() {
                   {form.phase1.completed && <Badge variant="success">Complete</Badge>}
                 </div>
 
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="space-y-1">
                     <label className="text-sm font-medium text-slate-700">Project Service</label>
                     <select
@@ -687,7 +695,7 @@ export function SiteOnboarding() {
                     type="date"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   <PhaseCheck
                     label="Geotechnical Report Available"
                     checked={form.phase1.geotechnicalReportAvailable}
@@ -719,7 +727,7 @@ export function SiteOnboarding() {
                   </div>
                   {form.phase2.completed && <Badge variant="success">Complete</Badge>}
                 </div>
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="flex flex-col gap-3">
                     <PhaseCheck label="Site Visited" checked={form.phase2.siteVisited} onChange={v => updPhase('phase2', { siteVisited: v })} />
                     <PhaseCheck label="Walkthrough Completed" checked={form.phase2.walkthroughCompleted} onChange={v => updPhase('phase2', { walkthroughCompleted: v })} />
@@ -774,7 +782,7 @@ export function SiteOnboarding() {
                   {form.phase3.completed && <Badge variant="success">Complete</Badge>}
                 </div>
                 {form.phase1.whatIsBeingBuilt?.toLowerCase().includes('dewatering') ? (
-                  <div className="grid grid-cols-2 gap-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-slate-700">Dewatering Method(s)</label>
                       <div className="flex flex-col gap-2">
@@ -795,7 +803,7 @@ export function SiteOnboarding() {
                     </div>
 
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <PhaseTextField
                           label="Total Headers Required" type="number"
                           value={form.phase3.totalHeadersRequired}
@@ -814,7 +822,7 @@ export function SiteOnboarding() {
                           placeholder="Auto-calculated"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <PhaseTextField
                           label="Total Pumps Required" type="number"
                           value={form.phase3.totalPumpsRequired}
@@ -858,7 +866,7 @@ export function SiteOnboarding() {
                   {form.phase4.completed && <Badge variant="success">Complete</Badge>}
                 </div>
 
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="space-y-3">
                     <PhaseCheck label="Quotation Sent to Client" checked={form.phase4.quotationSent} onChange={v => updPhase('phase4', { quotationSent: v })} />
                     <PhaseCheck label="Client Feedback Received" checked={form.phase4.clientFeedbackReceived} onChange={v => updPhase('phase4', { clientFeedbackReceived: v })} />
@@ -972,7 +980,7 @@ export function SiteOnboarding() {
                   </div>
                   {form.phase5.completed && <Badge variant="success">Complete</Badge>}
                 </div>
-                <div className="grid grid-cols-2 gap-y-4 gap-x-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-6">
                   <PhaseCheck label="Pre-requisite: Site-Specific Safety Plan Integrated" checked={form.phase5.safetyPlanIntegrated} onChange={v => updPhase('phase5', { safetyPlanIntegrated: v })} />
                   <div />
 

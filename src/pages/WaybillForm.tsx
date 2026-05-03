@@ -48,6 +48,10 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
   const driverOptions = employees
     .filter(e => e.status === 'Active' || e.status === 'On Leave')
     .sort((a, b) => {
+      const aIsDriver = (a.position || '').toLowerCase().includes('driver') ? 1 : 0;
+      const bIsDriver = (b.position || '').toLowerCase().includes('driver') ? 1 : 0;
+      if (aIsDriver !== bIsDriver) return bIsDriver - aIsDriver;
+
       const rankA = getPositionIndex(a.position);
       const rankB = getPositionIndex(b.position);
       if (rankA !== rankB) return rankA - rankB;

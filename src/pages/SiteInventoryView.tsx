@@ -179,8 +179,10 @@ export function SiteInventoryView({ site, questionnaire, onBack }: SiteInventory
     !currentMachines.find(c => c.id === a.id)
   );
 
+  const isSubViewActive = showReturnWaybill || selectedMachine || selectedConsumable || showTransactions;
+
   useSetPageTitle(
-    site.name,
+    isSubViewActive ? null : site.name,
     questionnaire?.contactPersonPhone ? `Contact: ${questionnaire.contactPersonPhone}` : 'Site Overview',
     <div className="flex items-center gap-1 sm:gap-2">
       <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 sm:gap-2" onClick={onBack}>

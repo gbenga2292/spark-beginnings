@@ -68,28 +68,33 @@ export function Layout() {
 
         {/* ── Privilege-update banner ─────────────────────────────── */}
         {privBannerVisible && (
-          <div className="relative flex items-center gap-3 bg-amber-500 text-white px-4 py-2.5 text-sm font-medium shadow-md z-50">
+          <div className="relative flex items-center gap-2 sm:gap-3 bg-amber-500 text-white px-3 sm:px-4 py-2 sm:py-2.5 shadow-md z-50">
             <ShieldAlert className="h-4 w-4 shrink-0" />
-            <span className="flex-1">
-              Your permissions have been updated by an administrator.
-              Reload the page to apply the changes.
-            </span>
+            <div className="flex-1 text-xs sm:text-sm font-medium leading-tight">
+              <span className="hidden sm:inline">
+                Your permissions have been updated by an administrator. Reload the page to apply the changes.
+              </span>
+              <span className="sm:hidden">
+                Permissions updated. Reload to apply.
+              </span>
+            </div>
             <button
               onClick={() => window.location.reload()}
-              className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 rounded px-3 py-1 text-xs font-semibold transition-colors whitespace-nowrap"
+              className="flex items-center gap-1 sm:gap-1.5 bg-white/20 hover:bg-white/30 rounded px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-semibold transition-colors whitespace-nowrap"
             >
-              <RefreshCw className="h-3.5 w-3.5" /> 
-              {reloadCountdown !== null ? `Reloading in ${reloadCountdown}s...` : 'Reload Now'}
+              <RefreshCw className="h-3 sm:h-3.5 w-3 sm:w-3.5 shrink-0" /> 
+              <span className="hidden sm:inline">{reloadCountdown !== null ? `Reloading in ${reloadCountdown}s...` : 'Reload Now'}</span>
+              <span className="sm:hidden">{reloadCountdown !== null ? `in ${reloadCountdown}s` : 'Reload'}</span>
             </button>
             <button
               onClick={() => {
                 setPrivBannerVisible(false);
                 setReloadCountdown(null);
               }}
-              className="hover:bg-white/20 rounded p-1 transition-colors"
+              className="hover:bg-white/20 rounded p-1 transition-colors shrink-0"
               aria-label="Dismiss"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 sm:h-4 w-3.5 sm:w-4" />
             </button>
           </div>
         )}

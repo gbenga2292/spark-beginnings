@@ -8,6 +8,7 @@ import { Label } from '@/src/components/ui/label';
 import { toast } from '@/src/components/ui/toast';
 import { Circle, CheckCircle2, ChevronDown, Package } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
+import { getPositionIndex } from '@/src/lib/hierarchy';
 
 export interface SiteItem {
   assetId: string;
@@ -41,10 +42,20 @@ export function CreateReturnWaybill({ site, inventoryItems, onBack }: CreateRetu
   // Key: assetId, Value: quantity to return
   const [selectedItems, setSelectedItems] = useState<Record<string, number>>({});
 
-  const driverOptions = [
-    ...employees.filter(e => ['Driver', 'Foreman', 'Site Supervisor', 'Assistant Supervisor'].includes(e.position || ''))
-      .map(e => `${e.firstname} ${e.surname}`),
-  ];
+  const driverOptions = employees
+    .filter(e => e.status === 'Active' || e.status === 'On Leave')
+    .sort((a, b) => {
+      const aIsDriver = (a.position || '').toLowerCase().includes('driver') ? 1 : 0;
+      const bIsDriver = (b.position || '').toLowerCase().includes('driver') ? 1 : 0;
+      if (aIsDriver !== bIsDriver) return bIsDriver - aIsDriver;
+
+      const rankA = getPositionIndex(a.position);
+      const rankB = getPositionIndex(b.position);
+      if (rankA !== rankB) return rankA - rankB;
+      return `${a.firstname} ${a.surname}`.localeCompare(`${b.firstname} ${b.surname}`);
+    })
+    .map(e => `${e.firstname} ${e.surname}`);
+
   const uniqueDrivers = Array.from(new Set(driverOptions));
   const vehicleOptions = vehicles.map(v => v.name);
 
