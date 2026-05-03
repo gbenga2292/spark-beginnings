@@ -8,7 +8,6 @@ import { useUserStore } from '@/src/store/userStore';
 import { DesktopFloatingCalendar } from '../tasks/DesktopFloatingCalendar';
 import { TaskPopupNotifications } from '../tasks/TaskPopupNotifications';
 import { ConnectionBanner } from '@/src/components/offline/ConnectionBanner';
-import { PullToRefresh } from '../ui/PullToRefresh';
 import { startNetworkMonitor } from '@/src/store/networkStore';
 import { ShieldAlert, RefreshCw, X } from 'lucide-react';
 
@@ -97,7 +96,6 @@ export function Layout() {
 
         <Header onMenuClick={() => setIsSidebarOpen(true)} />
         <div className="flex-1 relative overflow-hidden">
-          <PullToRefresh scrollRef={mainRef} />
           <main 
             ref={mainRef}
             className={`h-full overflow-y-auto pt-4 px-2 pb-4 md:pt-4 md:px-6 md:pb-6 w-full ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}

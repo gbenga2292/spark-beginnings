@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, memo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, memo, useCallback, startTransition } from 'react';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -35,6 +35,24 @@ import "react-day-picker/style.css";
 import { calculateAttendanceMetrics } from '@/src/lib/attendanceLogic';
 import type { Employee } from '@/src/store/appStore';
 
+// ─── useIsMobile: zero-re-render breakpoint detection via matchMedia ────────────────
+// Returns true when viewport < 640px (Tailwind `sm` breakpoint).
+// Uses a ref so the listener never re-creates; only triggers 1 re-render on cross.
+function useIsMobile() {
+  const mq = useRef<MediaQueryList | null>(null);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return !window.matchMedia('(min-width: 640px)').matches;
+  });
+  useEffect(() => {
+    mq.current = window.matchMedia('(min-width: 640px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobile(!e.matches);
+    mq.current.addEventListener('change', handler);
+    return () => mq.current?.removeEventListener('change', handler);
+  }, []);
+  return isMobile;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // AttendanceRow — React.memo isolates re-renders to only the changed employee.
 // When attendanceData[employee.id] changes for Employee A, React.memo prevents
@@ -58,12 +76,13 @@ interface AttendanceRowProps {
   onSelectChange: (empId: string, shift: 'day' | 'night' | 'overtimeDetails', value: string | boolean) => void;
   onOvertimeToggle: (empId: string, checked: boolean) => void;
   getDOW: (dateStr: string) => number;
+  mode: 'desktop' | 'mobile';
 }
 
 const AttendanceRow = memo(function AttendanceRow({
   employee, idx, rowData, onLeave, registerDate, isFieldStaff, isHoliday,
   deptMap, siteOptionNodes, statusOptionNodes, renderHistoricalOption,
-  isAbsentStatus, onSelectChange, onOvertimeToggle, getDOW,
+  isAbsentStatus, onSelectChange, onOvertimeToggle, getDOW, mode
 }: AttendanceRowProps) {
   const dow = getDOW(registerDate);
   const deptObj = deptMap.get(employee.department); // O(1) map lookup — no .find()
@@ -190,15 +209,31 @@ const AttendanceRow = memo(function AttendanceRow({
     </div>
   );
 
-  // Render both — CSS visibility determines which shows.
-  // React only renders one branch worth of real DOM per breakpoint.
-  return <>{tableRow}{mobileCard}</>;
+  // Render based on mode to prevent DOM nesting validation warnings
+  if (mode === 'desktop') return tableRow;
+  return mobileCard;
 });
 
 
+const statuses = [
+  "Absent",
+  "Absent with Permit",
+  "On Leave"
+];
+
 export function Attendance() {
   const allEmployees = useAppStore((state) => state.employees);
-  const employees = allEmployees.filter(e => e.status === 'Active' || e.status === 'On Leave');
+  // Memoized: avoids re-creating the filtered array on every parent render
+  const employees = useMemo(
+    () => allEmployees.filter(e => e.status === 'Active' || e.status === 'On Leave'),
+    [allEmployees]
+  );
+  // O(1) employee lookup — used by filteredDbRecords to avoid O(N) .find() per record
+  const employeeMap = useMemo(
+    () => new Map(employees.map(e => [e.id, e])),
+    [employees]
+  );
+  const isMobile = useIsMobile();
   const sites = useAppStore((state) => state.sites);
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const payrollVariables = useAppStore((state) => state.payrollVariables);
@@ -211,31 +246,36 @@ export function Attendance() {
   const publicHolidaysStore = useAppStore((state) => state.publicHolidays);
   const monthValues = useAppStore((state) => state.monthValues);
 
-  // ─── Department Ancestry Helper ────────────────────────────
-  // Returns true if a department (by name) is Operations or Engineering,
-  // OR is a sub-department of one of those (walks parentDepartmentId chain).
-  const isOpsOrEngDept = (deptName: string): boolean => {
+  // \u2500\u2500\u2500 Department Ancestry Helper \u2014 useCallback for stable reference \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // CRITICAL: Without useCallback, this recreates every render \u2192 handleOvertimeToggle
+  // gets a new ref \u2192 React.memo sees changed prop \u2192 all 300 rows re-render per keystroke.
+  const isOpsOrEngDept = useCallback((deptName: string): boolean => {
     const OPS_ROOTS = ['OPERATIONS', 'ENGINEERING'];
     let current = departments.find(d => d.name.toUpperCase() === deptName.toUpperCase());
     const visited = new Set<string>();
     while (current) {
-      if (visited.has(current.id)) break; // guard against circular refs
+      if (visited.has(current.id)) break;
       visited.add(current.id);
       if (OPS_ROOTS.includes(current.name.toUpperCase())) return true;
       if (!current.parentDepartmentId) break;
       current = departments.find(d => d.id === current!.parentDepartmentId);
     }
     return false;
-  };
+  }, [departments]);
 
   const [registerDate, setRegisterDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [lastEntryDate, setLastEntryDate] = useState(format(new Date(Date.now() - 86400000), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('entry');
-  const [staffTypeFilter, setStaffTypeFilter] = useState<'OFFICE' | 'FIELD' | 'NON-EMPLOYEE'>('FIELD');
+  const [staffTypeFilter, setStaffTypeFilter] = useState<'OFFICE' | 'FIELD'>('FIELD');
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false);
+  const [desktopCalendarOpen, setDesktopCalendarOpen] = useState(false);
+
+  const [dbPage, setDbPage] = useState(1);
+  const dbPageSize = 100;
 
   type SortConfig = { key: keyof AttendanceRecord; direction: 'asc' | 'desc' };
   const [sortConfig, setSortConfig] = useState<SortConfig[]>([]);
@@ -384,6 +424,48 @@ export function Attendance() {
     return map;
   }, [attendanceRecords, employees, publicHolidaysStore]);
 
+  // ─── Pre-computed DayPicker modifier arrays — built once from the status map ──────────
+  // DayPicker accepts Date[] directly and does O(1) per-cell comparison.
+  // This replaces per-cell inline arrow functions which fire on every render.
+  const calendarModifiers = useMemo(() => {
+    const fullyDates: Date[] = [];
+    const specialDates: Date[] = [];
+    const missingDates: Date[] = [];
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const maxDate = parseISO(maxSelectableDate);
+
+    // Build a date range from the earliest record to today
+    const allDateStrs = new Set([
+      ...Object.keys(attendanceStatusMap),
+    ]);
+
+    // Check all dates from 60 days ago up to today for missing
+    const startCheck = new Date(now); startCheck.setDate(startCheck.getDate() - 60);
+    let cursor = new Date(startCheck);
+    while (cursor <= now && cursor <= maxDate) {
+      const dStr = format(cursor, 'yyyy-MM-dd');
+      if (!allDateStrs.has(dStr)) allDateStrs.add(dStr);
+      cursor = new Date(cursor); cursor.setDate(cursor.getDate() + 1);
+    }
+
+    allDateStrs.forEach(dStr => {
+      const status = attendanceStatusMap[dStr];
+      const d = parseISO(dStr);
+      const dMid = new Date(d); dMid.setHours(0, 0, 0, 0);
+
+      if (status === 'fully') { fullyDates.push(d); return; }
+      if (status === 'special') { specialDates.push(d); return; }
+
+      // missing: past date, no/none status, not holiday, not Sunday
+      if (dMid <= now && (!status || status === 'none')) {
+        const isHol = publicHolidaysStore.some(h => h.date === dStr);
+        if (!isHol && !isSunday(d)) missingDates.push(d);
+      }
+    });
+
+    return { fullyDates, specialDates, missingDates };
+  }, [attendanceStatusMap, publicHolidaysStore, maxSelectableDate]);
+
 
   const lastAttendanceDate = useMemo(() => {
     if (!attendanceRecords || attendanceRecords.length === 0) return null;
@@ -425,12 +507,35 @@ export function Attendance() {
 
   // State for the current form
   const [attendanceData, setAttendanceData] = useState<Record<string, { day: string, night: string, overtime: boolean, overtimeDetails: string }>>({});
+  const [prevRegisterDate, setPrevRegisterDate] = useState(registerDate);
+  const [prevRecordsByDate, setPrevRecordsByDate] = useState(recordsByDate);
 
-  const statuses = [
-    "Absent",
-    "Absent with Permit",
-    "On Leave"
-  ];
+  // Synchronously update attendanceData when registerDate or recordsByDate changes
+  // This prevents a double-render of all 300 rows when switching dates.
+  if (registerDate !== prevRegisterDate || recordsByDate !== prevRecordsByDate) {
+    setPrevRegisterDate(registerDate);
+    setPrevRecordsByDate(recordsByDate);
+
+    const normDate = normalizeDate(registerDate);
+    const existingRecords = normDate ? (recordsByDate.get(normDate) ?? []) : [];
+
+    if (existingRecords.length > 0) {
+      const loadedData: Record<string, { day: string, night: string, overtime: boolean, overtimeDetails: string }> = {};
+      existingRecords.forEach(r => {
+        loadedData[r.staffId] = {
+          day: r.daySite || r.absentStatus || '',
+          night: r.nightSite || '',
+          overtime: !!r.overtimeDetails,
+          overtimeDetails: r.overtimeDetails || ''
+        };
+      });
+      setAttendanceData(loadedData);
+    } else {
+      setAttendanceData({});
+    }
+  }
+
+
 
   const employeesOnLeaveForRegisterDate = useMemo(() => {
     const regDateObj = parseISO(registerDate);
@@ -494,35 +599,18 @@ export function Attendance() {
     return <option key="hist-del" value={currentVal}>{currentVal} (Deleted)</option>;
   }, [statuses, activeSitesForDate, sites]);
 
-  // Auto-load existing records when date changes — O(1) via recordsByDate index
-  useEffect(() => {
-    const normDate = normalizeDate(registerDate);
-    const existingRecords = normDate ? (recordsByDate.get(normDate) ?? []) : [];
 
-    if (existingRecords.length > 0) {
-      const loadedData: Record<string, { day: string, night: string, overtime: boolean, overtimeDetails: string }> = {};
-      existingRecords.forEach(r => {
-        loadedData[r.staffId] = {
-          day: r.daySite || r.absentStatus || '',
-          night: r.nightSite || '',
-          overtime: r.overtimeDetails ? true : false,
-          overtimeDetails: r.overtimeDetails || ''
-        };
-      });
-      setAttendanceData(loadedData);
-    } else {
-      setAttendanceData({});
-    }
-  }, [registerDate, recordsByDate]);
+
+  const debouncedDbSearch = useDebounce(dbSearchTerm, 300);
+  // Debounced: prevents row-list rebuild + header portal rebuild on every keystroke
+  const debouncedSearchTerm = useDebounce(searchTerm, 200);
 
   const filteredEmployees = useMemo(() => {
-    const searchLow = searchTerm.toLowerCase();
+    const searchLow = debouncedSearchTerm.toLowerCase();
     return employees.filter(emp => {
       const matchesSearch = emp.surname.toLowerCase().includes(searchLow) ||
         emp.firstname.toLowerCase().includes(searchLow);
-      const matchesType = staffTypeFilter === 'NON-EMPLOYEE' 
-        ? emp.staffType === 'NON-EMPLOYEE' 
-        : emp.staffType === staffTypeFilter;
+      const matchesType = emp.staffType === staffTypeFilter;
       const isNotCEO = emp.position !== 'CEO';
       
       // Only show employees who have started by this date and haven't left yet
@@ -536,13 +624,12 @@ export function Attendance() {
       if (idxA !== idxB) return idxA - idxB;
       return (a.position || '').localeCompare(b.position || '');
     });
-  }, [employees, searchTerm, staffTypeFilter]);
+  }, [employees, debouncedSearchTerm, staffTypeFilter, registerDate]);
 
-  const debouncedDbSearch = useDebounce(dbSearchTerm, 300);
 
   const filteredDbRecords = useMemo(() => {
     return attendanceRecords.filter(r => {
-      const emp = employees.find(e => e.id === r.staffId);
+      const emp = employeeMap.get(r.staffId); // O(1) — was O(N) .find()
       if (dbStaffTypeFilter !== 'All') {
         if (emp?.staffType !== dbStaffTypeFilter) return false;
       } else {
@@ -585,7 +672,17 @@ export function Attendance() {
         return (a.position || '').localeCompare(b.position || '');
       }
     });
-  }, [attendanceRecords, employees, debouncedDbSearch, dbStaffTypeFilter, dbSiteFilter, dbShiftFilter, sortConfig]);
+  }, [attendanceRecords, employeeMap, debouncedDbSearch, dbStaffTypeFilter, dbSiteFilter, dbShiftFilter, sortConfig, dbDateFilter]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setDbPage(1);
+  }, [debouncedDbSearch, dbStaffTypeFilter, dbSiteFilter, dbShiftFilter, sortConfig, dbDateFilter]);
+
+  const paginatedDbRecords = useMemo(() => {
+    const start = (dbPage - 1) * dbPageSize;
+    return filteredDbRecords.slice(start, start + dbPageSize);
+  }, [filteredDbRecords, dbPage]);
 
   // DB Actions
   const handleBulkDelete = async () => {
@@ -945,28 +1042,34 @@ export function Attendance() {
   };
 
   const handleSelectChange = useCallback((empId: string, shift: 'day' | 'night' | 'overtimeDetails', value: string | boolean) => {
-    setAttendanceData(prev => ({
-      ...prev,
-      [empId]: {
-        ...prev[empId],
-        [shift]: value
-      }
-    }));
+    // startTransition: marks this update as non-urgent so React yields to user input first.
+    // The dropdown feels instant; the 300-row reconciliation runs in the background.
+    startTransition(() => {
+      setAttendanceData(prev => ({
+        ...prev,
+        [empId]: {
+          ...prev[empId],
+          [shift]: value
+        }
+      }));
+    });
   }, []);
 
   const handleOvertimeToggle = useCallback((empId: string, checked: boolean) => {
     const emp = employees.find(e => e.id === empId);
     const isOps = emp ? isOpsOrEngDept(emp.department) : false;
-    setAttendanceData(prev => ({
-      ...prev,
-      [empId]: {
-        ...prev[empId],
-        overtime: checked,
-        overtimeDetails: checked ? prev[empId]?.overtimeDetails || '' : '',
-        ...((!isOps && checked) ? { day: 'Office' } : {}),
-        ...((!isOps && !checked && prev[empId]?.day === 'Office') ? { day: '' } : {}),
-      }
-    }));
+    startTransition(() => {
+      setAttendanceData(prev => ({
+        ...prev,
+        [empId]: {
+          ...prev[empId],
+          overtime: checked,
+          overtimeDetails: checked ? prev[empId]?.overtimeDetails || '' : '',
+          ...((!isOps && checked) ? { day: 'Office' } : {}),
+          ...((!isOps && !checked && prev[empId]?.day === 'Office') ? { day: '' } : {}),
+        }
+      }));
+    });
   }, [employees, isOpsOrEngDept]);
 
   const handleClear = async () => {
@@ -974,10 +1077,10 @@ export function Attendance() {
     if (ok) setAttendanceData({});
   };
 
-  const isAbsentStatus = (txt: string) => {
+  const isAbsentStatus = useCallback((txt: string) => {
     const upper = txt.toUpperCase();
     return ["ABSENT", "ABSENT WITH PERMIT", "ABSENT WITHOUT PERMIT", "ON LEAVE", "NO WORK", "SICK LEAVE", "MATERNITY LEAVE", "ANNUAL LEAVE", "SUSPENSION", "PUBLIC HOLIDAY", "OFF DUTY"].includes(upper);
-  };
+  }, []);
 
   const applyOverride = (src: string, currentSite: string, currentShift: string, currentReason: string, isNight: boolean = false) => {
     if (!src) return { site: currentSite, shift: currentShift, reason: currentReason };
@@ -999,9 +1102,19 @@ export function Attendance() {
     return { site: src, shift: "Yes", reason: currentReason };
   };
 
-  const publicHolidays = publicHolidaysStore ? publicHolidaysStore.map(h => h.date) : [];
+  // Memoized: publicHolidaysStore is an array of objects — map to a date-string Set once
+  // Using a Set instead of an array makes isHoliday() an O(1) lookup vs O(N) Array.includes()
+  const publicHolidays = useMemo(
+    () => (publicHolidaysStore ? publicHolidaysStore.map(h => h.date) : []),
+    [publicHolidaysStore]
+  );
+  const publicHolidaySet = useMemo(
+    () => new Set(publicHolidays),
+    [publicHolidays]
+  );
 
-  const isHoliday = (dateStr: string) => publicHolidays.includes(dateStr);
+  // O(1) lookup — called once per employee row on every render; must be fast
+  const isHoliday = useCallback((dateStr: string) => publicHolidaySet.has(dateStr), [publicHolidaySet]);
 
   const getNextDayStr = (dateStr: string, offset: number = 1) => {
     // Add T00:00:00 to prevent timezone-shift-backward bugs in some environments
@@ -1021,12 +1134,12 @@ export function Attendance() {
   };
 
   // Excel DOW: WEEKDAY(date, 2) → 1=Monday, 7=Sunday
-  const getDOW = (dateStr: string) => {
+  const getDOW = useCallback((dateStr: string) => {
     const d = new Date(dateStr + 'T00:00:00');
     if (isNaN(d.getTime())) return 1;
     const jsDay = d.getDay(); // 0=Sun, 1=Mon...6=Sat
     return jsDay === 0 ? 7 : jsDay; // Convert to 1=Mon...7=Sun
-  };
+  }, []);
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
@@ -1214,11 +1327,11 @@ export function Attendance() {
   // inside the render loop where it scans 10k records per visible row. ───────
   const dbRecordMetrics = useMemo(() => {
     const map = new Map<string, ReturnType<typeof calculateAttendanceMetrics>>();
-    filteredDbRecords.forEach(r => {
+    paginatedDbRecords.forEach(r => {
       map.set(r.id, calculateAttendanceMetrics(r, publicHolidays, payrollVariables, monthValues, []));
     });
     return map;
-  }, [filteredDbRecords, publicHolidays, payrollVariables, monthValues]);
+  }, [paginatedDbRecords, publicHolidays, payrollVariables, monthValues]);
 
   useSetPageTitle(
     'Daily Register',
@@ -1279,6 +1392,44 @@ export function Attendance() {
 
       {/* ── Mobile: tab icons + 3-dot ── */}
       <div className="flex sm:hidden items-center gap-2">
+        {activeTab === 'entry' && (
+          <Popover open={mobileCalendarOpen} onOpenChange={setMobileCalendarOpen}>
+            <PopoverTrigger asChild>
+              <button className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-indigo-600 shadow-sm" title="Attendance Calendar Overview">
+                <CalendarIcon className="h-4 w-4" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 z-[130]" align="end">
+              <DayPicker
+                mode="single"
+                selected={parseISO(registerDate)}
+                onDayClick={(date) => { setRegisterDate(format(date, 'yyyy-MM-dd')); setMobileCalendarOpen(false); }}
+                disabled={{ after: parseISO(maxSelectableDate) }}
+                modifiers={{
+                  fully: calendarModifiers.fullyDates,
+                  special: calendarModifiers.specialDates,
+                  viewing: [parseISO(registerDate)],
+                  missing: calendarModifiers.missingDates,
+                }}
+                modifiersStyles={{
+                  today: { color: 'inherit', fontWeight: 'bold' },
+                  viewing: { backgroundColor: '#f8fafc', border: '2px solid #cbd5e1', borderRadius: '4px' },
+                  fully: { backgroundColor: '#d1fae5', color: '#065f46', fontWeight: 'bold', borderRadius: '4px' },
+                  special: { backgroundColor: '#e0e7ff', color: '#3730a3', fontWeight: 'bold', borderRadius: '4px' },
+                  missing: { border: '2px solid #ef4444', borderRadius: '50%' },
+                }}
+                className="bg-white dark:bg-slate-900"
+              />
+              <div className="mt-3 text-[10px] flex flex-col gap-1.5 p-3 pt-0">
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#d1fae5]"></div> Attendance Entered</div>
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#e0e7ff]"></div> Attendance Entered (Holiday/Sun)</div>
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full border-2 border-red-500"></div> Missing/Due Attendance</div>
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#f8fafc] border-2 border-[#cbd5e1]"></div> Date Currently Viewing</div>
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-transparent border border-slate-200"></div> No Entry</div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
         <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/50 shadow-sm">
           <button onClick={() => setActiveTab('entry')} className={`h-8 w-8 flex items-center justify-center rounded-md transition-all ${activeTab === 'entry' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`} title="Entry">
             <CalendarIcon className="h-3.5 w-3.5" />
@@ -1299,7 +1450,7 @@ export function Attendance() {
       {/* ── Mobile dropdown panel ── */}
       {mobileMenuOpen && (
         <>
-          <div className="sm:hidden fixed inset-0 z-40 bg-slate-900/10 backdrop-blur-[2px]" onClick={() => setMobileMenuOpen(false)} />
+          <div className="sm:hidden fixed inset-0 z-40 bg-slate-900/40 transition-opacity" onClick={() => setMobileMenuOpen(false)} />
           <div className="sm:hidden fixed top-16 right-3 z-50 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-4 space-y-5 animate-in slide-in-from-top-2 duration-200">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 -mt-1">
                 <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">
@@ -1337,7 +1488,10 @@ export function Attendance() {
                 {/* Date Controls */}
                 <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
                   <div className="flex items-center justify-between mb-2 px-1">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date / Latest</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date / Latest</span>
+
+                    </div>
                     <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
                       {lastAttendanceDate ? formatDisplayDate(lastAttendanceDate) : 'None'}
                     </span>
@@ -1389,7 +1543,6 @@ export function Attendance() {
                     >
                       <option value="OFFICE">OFFICE STAFF</option>
                       <option value="FIELD">FIELD STAFF</option>
-                      <option value="NON-EMPLOYEE">NON-EMPLOYEE</option>
                     </select>
                     <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
@@ -1422,7 +1575,10 @@ export function Attendance() {
         </>
       )}
     </div>,
-    [activeTab, priv.canImport, priv.canDelete, priv.canExport, dbSelectedIds.size, handleImportExcel, handleExportExcel, handleBulkDelete, mobileMenuOpen, staffTypeFilter, searchTerm, registerDate, lastAttendanceDate, maxSelectableDate]
+    // mobileMenuOpen intentionally excluded — it only controls an overlay rendered *outside*
+    // this memo. Including it caused the entire expensive header to re-compute on every tap.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeTab, priv.canImport, priv.canDelete, priv.canExport, dbSelectedIds.size, handleImportExcel, handleExportExcel, handleBulkDelete, mobileCalendarOpen, desktopCalendarOpen, staffTypeFilter, debouncedSearchTerm, registerDate, lastAttendanceDate, maxSelectableDate, calendarModifiers]
   );
 
   return (
@@ -1487,7 +1643,7 @@ export function Attendance() {
                 >
                   <ChevronRight className="h-4 w-4 text-slate-500" />
                 </Button>
-                <Popover>
+                <Popover open={desktopCalendarOpen} onOpenChange={setDesktopCalendarOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex-shrink-0 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors" title="Attendance Calendar Overview">
                       <CalendarIcon className="h-4 w-4 text-indigo-500" />
@@ -1497,21 +1653,13 @@ export function Attendance() {
                      <div className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-300">Attendance Overview</div>
                      <DayPicker
                         defaultMonth={parseISO(registerDate)}
-                        onDayClick={(date) => { setRegisterDate(format(date, 'yyyy-MM-dd')) }}
+                        onDayClick={(date) => { setRegisterDate(format(date, 'yyyy-MM-dd')); setDesktopCalendarOpen(false); }}
                         disabled={{ after: parseISO(maxSelectableDate) }}
                         modifiers={{
-                          fully: (date) => attendanceStatusMap[format(date, 'yyyy-MM-dd')] === 'fully',
-                          special: (date) => attendanceStatusMap[format(date, 'yyyy-MM-dd')] === 'special',
-                          viewing: (date) => format(date, 'yyyy-MM-dd') === registerDate,
-                          missing: (date) => {
-                            const dStr = format(date, 'yyyy-MM-dd');
-                            const status = attendanceStatusMap[dStr];
-                            const d = new Date(date); d.setHours(0,0,0,0);
-                            const now = new Date(); now.setHours(0,0,0,0);
-                            const isHolidayDay = isHoliday(dStr);
-                            const isSun = isSunday(d);
-                            return d <= now && (!status || status === 'none') && !isHolidayDay && !isSun;
-                          }
+                          fully: calendarModifiers.fullyDates,
+                          special: calendarModifiers.specialDates,
+                          viewing: [parseISO(registerDate)],
+                          missing: calendarModifiers.missingDates,
                         }}
                         modifiersStyles={{
                           today: { color: 'inherit', fontWeight: 'bold' },
@@ -1544,7 +1692,6 @@ export function Attendance() {
               >
                 <option value="OFFICE">OFFICE STAFF</option>
                 <option value="FIELD">FIELD STAFF</option>
-                <option value="NON-EMPLOYEE">NON-EMPLOYEE</option>
               </select>
               <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
               <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300 pointer-events-none" />
@@ -1594,8 +1741,9 @@ export function Attendance() {
           </div>
         </div>
 
-        {/* ── DESKTOP: Compact entry table (hidden on mobile) ── */}
-          <div className="hidden sm:flex rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 flex-col min-h-0 mt-2">
+        {/* ── DESKTOP table: rendered only when NOT on mobile ── */}
+        {!isMobile ? (
+          <div className="flex rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 flex-col min-h-0 mt-2">
             <div className="overflow-x-auto overflow-y-auto flex-1">
               <table className="w-full text-sm">
                 <thead className="bg-slate-900 text-white sticky top-0 z-10">
@@ -1609,28 +1757,19 @@ export function Attendance() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                   {filteredEmployees.length === 0 ? (
-                    <tr>
-                      <td colSpan={3} className="text-center py-8 text-slate-400 text-sm">No employees match your filters.</td>
-                    </tr>
+                    <tr><td colSpan={3} className="text-center py-8 text-slate-400 text-sm">No employees match your filters.</td></tr>
                   ) : (
                     filteredEmployees.map((employee, idx) => (
-                      <AttendanceRow
-                        key={employee.id}
-                        employee={employee}
-                        idx={idx}
+                      <AttendanceRow key={employee.id} employee={employee} idx={idx}
                         rowData={attendanceData[employee.id]}
                         onLeave={employeesOnLeaveForRegisterDate.has(employee.id)}
-                        registerDate={registerDate}
-                        isFieldStaff={isFieldStaff}
-                        isHoliday={isHoliday(registerDate)}
-                        deptMap={deptMap}
-                        siteOptionNodes={siteOptionNodes}
-                        statusOptionNodes={statusOptionNodes}
+                        registerDate={registerDate} isFieldStaff={isFieldStaff}
+                        isHoliday={isHoliday(registerDate)} deptMap={deptMap}
+                        siteOptionNodes={siteOptionNodes} statusOptionNodes={statusOptionNodes}
                         renderHistoricalOption={renderHistoricalOption}
-                        isAbsentStatus={isAbsentStatus}
-                        onSelectChange={handleSelectChange}
-                        onOvertimeToggle={handleOvertimeToggle}
-                        getDOW={getDOW}
+                        isAbsentStatus={isAbsentStatus} onSelectChange={handleSelectChange}
+                        onOvertimeToggle={handleOvertimeToggle} getDOW={getDOW}
+                        mode="desktop"
                       />
                     ))
                   )}
@@ -1638,34 +1777,28 @@ export function Attendance() {
               </table>
             </div>
           </div>
-
-        {/* ── MOBILE: Card list (hidden on desktop) ── */}
-          <div className="sm:hidden flex-1 overflow-y-auto mt-2 space-y-2 px-0.5 pb-4">
+        ) : (
+          /* ── MOBILE card list: rendered only when on mobile ── */
+          <div className="flex-1 overflow-y-auto mt-2 space-y-2 px-0.5 pb-4">
             {filteredEmployees.length === 0 ? (
               <div className="text-center py-12 text-slate-400 text-sm">No employees match your filters.</div>
             ) : (
               filteredEmployees.map((employee, idx) => (
-                <AttendanceRow
-                  key={employee.id}
-                  employee={employee}
-                  idx={idx}
+                <AttendanceRow key={employee.id} employee={employee} idx={idx}
                   rowData={attendanceData[employee.id]}
                   onLeave={employeesOnLeaveForRegisterDate.has(employee.id)}
-                  registerDate={registerDate}
-                  isFieldStaff={isFieldStaff}
-                  isHoliday={isHoliday(registerDate)}
-                  deptMap={deptMap}
-                  siteOptionNodes={siteOptionNodes}
-                  statusOptionNodes={statusOptionNodes}
+                  registerDate={registerDate} isFieldStaff={isFieldStaff}
+                  isHoliday={isHoliday(registerDate)} deptMap={deptMap}
+                  siteOptionNodes={siteOptionNodes} statusOptionNodes={statusOptionNodes}
                   renderHistoricalOption={renderHistoricalOption}
-                  isAbsentStatus={isAbsentStatus}
-                  onSelectChange={handleSelectChange}
-                  onOvertimeToggle={handleOvertimeToggle}
-                  getDOW={getDOW}
+                  isAbsentStatus={isAbsentStatus} onSelectChange={handleSelectChange}
+                  onOvertimeToggle={handleOvertimeToggle} getDOW={getDOW}
+                  mode="mobile"
                 />
               ))
             )}
           </div>
+        )}
         </TabsContent>
 
         <TabsContent active={activeTab === 'database'} className="flex-1 flex flex-col min-h-0 mt-0">
@@ -1761,6 +1894,85 @@ export function Attendance() {
           </div>
 
           <div className="rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
+            {isMobile ? (
+              <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-900">
+                {paginatedDbRecords.length > 0 && (
+                  <div className="flex items-center justify-between p-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+                    <label className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+                      <input
+                        type="checkbox"
+                        className="rounded border-slate-300 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                        checked={filteredDbRecords.length > 0 && dbSelectedIds.size === filteredDbRecords.length}
+                        onChange={(e) => {
+                          if (e.target.checked) setDbSelectedIds(new Set(filteredDbRecords.map(r => r.id)));
+                          else setDbSelectedIds(new Set());
+                        }}
+                      />
+                      Select All ({filteredDbRecords.length})
+                    </label>
+                  </div>
+                )}
+                <div className="flex-1 overflow-auto p-2 space-y-2">
+                  {paginatedDbRecords.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 text-sm">
+                      No records match filters.
+                    </div>
+                  ) : (
+                    paginatedDbRecords.map((r) => {
+                      const met = dbRecordMetrics.get(r.id)!;
+                      return (
+                        <div key={r.id} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-3 shadow-sm flex flex-col gap-2">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                className="rounded border-slate-300 w-4 h-4 text-indigo-600 focus:ring-indigo-500 mt-0.5"
+                                checked={dbSelectedIds.has(r.id)}
+                                onChange={(e) => {
+                                  const s = new Set(dbSelectedIds);
+                                  if (e.target.checked) s.add(r.id);
+                                  else s.delete(r.id);
+                                  setDbSelectedIds(s);
+                                }}
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-bold text-slate-800 dark:text-slate-200 text-xs leading-tight">{r.staffName}</span>
+                                <span className="text-[10px] text-slate-500 truncate max-w-[150px] mt-0.5">{r.position}</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end shrink-0">
+                              <span className="text-[10px] font-mono text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600">{formatDisplayDate(r.date)}</span>
+                              <span className={`text-[9px] font-black uppercase tracking-wider mt-1.5 px-1.5 py-0.5 rounded-sm ${met.isPresent === 'Yes' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
+                                {met.isPresent === 'Yes' ? 'PRESENT' : 'ABSENT'}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2 text-[10px] mt-1 bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-slate-400 font-bold uppercase tracking-wider text-[8px]">Day Shift</span>
+                              <span className="font-semibold text-slate-700 dark:text-slate-300 truncate">{r.daySite || r.absentStatus || '—'}</span>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-slate-400 font-bold uppercase tracking-wider text-[8px]">Night Shift</span>
+                              <span className="font-semibold text-slate-700 dark:text-slate-300 truncate">{r.nightSite || '—'}</span>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-slate-400 font-bold uppercase tracking-wider text-[8px]">Overtime</span>
+                              <span className="font-bold text-indigo-600">{met.ot > 0 ? `${met.ot} ${met.otSite ? `(${met.otSite})` : ''}` : '—'}</span>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-slate-400 font-bold uppercase tracking-wider text-[8px]">Metrics</span>
+                              <span className="font-semibold text-slate-600 dark:text-slate-400">D:{met.dayWk} N:{met.nightWk} DoW:{met.dow}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            ) : (
             <div className="overflow-auto flex-1 h-full max-h-[calc(100vh-250px)]">
               <table className="w-full text-[11px] whitespace-nowrap">
                 <thead className="bg-slate-100 dark:bg-slate-800 sticky top-0 shadow-sm z-10">
@@ -1819,14 +2031,14 @@ export function Attendance() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                  {filteredDbRecords.length === 0 ? (
+                  {paginatedDbRecords.length === 0 ? (
                     <tr>
                       <td colSpan={19} className="text-center py-8 text-slate-400 text-sm">
                         No records match filters.
                       </td>
                     </tr>
                   ) : (
-                    filteredDbRecords.map((r) => {
+                    paginatedDbRecords.map((r) => {
                       const met = dbRecordMetrics.get(r.id)!;
                       return (
                         <tr key={r.id} className="hover:bg-slate-50">
@@ -1871,6 +2083,39 @@ export function Attendance() {
                 </tbody>
               </table>
             </div>
+            )}
+            
+            {/* Pagination Controls */}
+            {filteredDbRecords.length > dbPageSize && (
+              <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 shrink-0">
+                <div className="text-xs text-slate-500 font-medium">
+                  Showing <span className="text-slate-900 dark:text-white font-bold">{(dbPage - 1) * dbPageSize + 1}</span> to <span className="text-slate-900 dark:text-white font-bold">{Math.min(dbPage * dbPageSize, filteredDbRecords.length)}</span> of <span className="text-slate-900 dark:text-white font-bold">{filteredDbRecords.length}</span> records
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDbPage(p => Math.max(1, p - 1))}
+                    disabled={dbPage === 1}
+                    className="h-8 px-3 text-xs border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5 mr-1" /> Prev
+                  </Button>
+                  <div className="text-xs font-bold text-slate-600 dark:text-slate-300 px-2">
+                    Page {dbPage} of {Math.ceil(filteredDbRecords.length / dbPageSize)}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDbPage(p => Math.min(Math.ceil(filteredDbRecords.length / dbPageSize), p + 1))}
+                    disabled={dbPage >= Math.ceil(filteredDbRecords.length / dbPageSize)}
+                    className="h-8 px-3 text-xs border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                  >
+                    Next <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>

@@ -967,11 +967,12 @@ export function Beneficiaries() {
                 {canSeeSalary && (
                   <div className="mt-6">
                     <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Stipend Information</h4>
-                    <div className="bg-slate-50 rounded-lg p-4">
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-6 gap-y-2 text-sm mb-3">
+                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 text-sm mb-4">
                         {MONTH_KEYS.map((key, idx) => {
                           const amount = emp.monthlySalaries[key as keyof MonthlySalary] || 0;
-                          const startIdx = MONTHS_LIST.indexOf(emp.startMonthOfPay || 'January');
+                          const startMonth = emp.startMonthOfPay || 'January';
+                          const startIdx = MONTHS_LIST.indexOf(startMonth);
                           const diff = idx - startIdx;
                           let isPayMonth = true;
                           if (startIdx !== -1) {
@@ -985,18 +986,20 @@ export function Beneficiaries() {
                           }
 
                           return (
-                            <div key={key} className={`flex justify-between items-center border-b border-slate-100 pb-1 ${!isPayMonth ? 'opacity-20 grayscale' : ''}`}>
-                              <span className="text-slate-400 uppercase text-[10px] font-bold">{key}</span>
-                              <span className={`font-mono text-xs ${amount > 0 ? 'text-slate-700 font-bold' : 'text-slate-300'}`}>
+                            <div key={key} className={`flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-slate-700 sm:border-0 last:border-0 ${!isPayMonth ? 'opacity-25 grayscale' : ''}`}>
+                              <span className="text-slate-500 dark:text-slate-400 uppercase text-[10px] font-bold tracking-wider">{key}:</span>
+                              <span className={`font-mono font-medium ${amount > 0 ? 'text-slate-900 dark:text-slate-200' : 'text-slate-300 dark:text-slate-600'}`}>
                                 ₦{amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </span>
                             </div>
                           );
                         })}
                       </div>
-                      <div className="border-t border-slate-200 pt-3 flex justify-between items-center">
-                        <span className="font-semibold">Annual Total:</span>
-                        <span className="text-xl font-bold text-indigo-600">₦{totalSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <div className="border-t border-slate-200 dark:border-slate-700 pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <span className="font-bold text-slate-600 dark:text-slate-400 uppercase text-xs tracking-widest">Annual Total</span>
+                        <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                          ₦{totalSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
                       </div>
                     </div>
                   </div>

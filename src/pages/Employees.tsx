@@ -1344,18 +1344,25 @@ export function Employees() {
                 {canSeeSalary && (
                   <div className="mt-6">
                     <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Salary Information</h4>
-                    <div className="bg-slate-50 rounded-lg p-4">
-                      <div className="grid grid-cols-4 gap-2 text-sm mb-3">
-                        {Object.entries(emp.monthlySalaries).map(([month, amount]) => (
-                          <div key={month} className="flex justify-between">
-                            <span className="text-slate-500 uppercase text-xs">{month}:</span>
-                            <span className="font-mono">₦{amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                          </div>
-                        ))}
+                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 text-sm mb-4">
+                        {['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].map((month) => {
+                          const amount = (emp.monthlySalaries as any)[month] || 0;
+                          return (
+                            <div key={month} className="flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-slate-700 sm:border-0 last:border-0">
+                              <span className="text-slate-500 dark:text-slate-400 uppercase text-[10px] font-bold tracking-wider">{month}:</span>
+                              <span className="font-mono font-medium text-slate-900 dark:text-slate-200">
+                                ₦{amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
-                      <div className="border-t border-slate-200 pt-3 flex justify-between items-center">
-                        <span className="font-semibold">Annual Total:</span>
-                        <span className="text-xl font-bold text-indigo-600">₦{totalSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <div className="border-t border-slate-200 dark:border-slate-700 pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <span className="font-bold text-slate-600 dark:text-slate-400 uppercase text-xs tracking-widest">Annual Total</span>
+                        <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                          ₦{totalSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
                       </div>
                     </div>
                   </div>
