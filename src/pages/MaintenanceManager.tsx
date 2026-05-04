@@ -31,7 +31,14 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 export function MaintenanceManager() {
   const [activeTab, setActiveTab] = useState<MaintenanceTab>('dashboard');
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [logAssetId, setLogAssetId] = useState<string | null>(null);
   const { maintenanceAssets } = useOperations();
+  
+  const handleLogAsset = (id: string) => {
+    setLogAssetId(id);
+    setActiveTab('log');
+    setSelectedAssetId(null);
+  };
   
   const machinesCount = maintenanceAssets.filter(a => a.category === 'machine').length;
   const vehiclesCount = maintenanceAssets.filter(a => a.category === 'vehicle').length;
@@ -127,6 +134,7 @@ export function MaintenanceManager() {
             category="machine" 
             selectedAssetId={selectedAssetId}
             onSelectAsset={setSelectedAssetId}
+            onLogAsset={handleLogAsset}
           />
         )}
         {activeTab === 'vehicles' && (
@@ -134,9 +142,10 @@ export function MaintenanceManager() {
             category="vehicle" 
             selectedAssetId={selectedAssetId}
             onSelectAsset={setSelectedAssetId}
+            onLogAsset={handleLogAsset}
           />
         )}
-        {activeTab === 'log' && <LogMaintenanceForm />}
+        {activeTab === 'log' && <LogMaintenanceForm initialAssetId={logAssetId} />}
       </div>
     </div>
   );

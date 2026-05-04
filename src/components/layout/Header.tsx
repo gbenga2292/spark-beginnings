@@ -218,7 +218,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const notifications = useNotifications();
   const { isDark } = useTheme();
-  const { title, subtitle, headerButtons } = usePage();
+  const { title, subtitle, headerButtons, showBackButton } = usePage();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -299,7 +299,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         <div className="flex flex-col min-w-0 transition-all duration-300">
           <div className="flex items-center gap-2">
-            {usePage().showBackButton && (
+            {showBackButton && (
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -320,7 +320,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           {subtitle && (
             <p className={`text-[10px] truncate font-medium mt-0.5 ${
               isDark ? 'text-slate-400' : 'text-slate-500'
-            } ${usePage().showBackButton ? 'ml-8' : ''}`}>
+            } ${showBackButton ? 'ml-8' : ''}`}>
               {subtitle}
             </p>
           )}

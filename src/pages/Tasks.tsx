@@ -89,8 +89,8 @@ function applySortToMainTasks(tasks: MainTask[], sortBy: SortOption, allSubtasks
       case 'alpha': return (a.title || '').localeCompare(b.title || '');
       case 'date_asc': return (a.deadline ?? '9999').localeCompare(b.deadline ?? '9999');
       case 'date_desc': return (b.deadline ?? '').localeCompare(a.deadline ?? '');
-      case 'created_asc': return (a.createdAt || (a as any).created_at || '9999').localeCompare(b.createdAt || (b as any).created_at || '9999');
-      case 'created_desc': return (b.createdAt || (b as any).created_at || '').localeCompare(a.createdAt || (a as any).created_at || '');
+      case 'created_asc': return (a.createdAt ?? '9999').localeCompare(b.createdAt ?? '9999');
+      case 'created_desc': return (b.createdAt ?? '').localeCompare(a.createdAt ?? '');
       case 'urgency': {
         const score = (d?: string) => d ? new Date(d).getTime() : 9999999999999;
         return score(a.deadline) - score(b.deadline);
@@ -111,7 +111,7 @@ function PersonalTasksView() {
   const me = React.useMemo(() => users.find(u => u.id === currentUser?.id), [users, currentUser?.id]);
   const isHrConsultant = me?.privileges?.tasks?.isExternalHr;
   const { wsTasks: rawWsTasks, workspace } = useWorkspace();
-  const wsTasks = React.useMemo(() => rawWsTasks.filter(mt => mt.is_project || subtasks.some(s => s.mainTaskId === mt.id || (s as any).main_task_id === mt.id)), [rawWsTasks, subtasks]);
+  const wsTasks = React.useMemo(() => rawWsTasks.filter(mt => mt.isProject || subtasks.some(s => s.mainTaskId === mt.id)), [rawWsTasks, subtasks]);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -661,21 +661,20 @@ function AdminTasksView() {
   const teamTasks = React.useMemo(() => {
     return rawTeamTasks.filter(mt => {
       // Primary visibility: projects, HR tasks, or tasks with subtasks
-      const isVisible = mt.is_project || mt.is_hr_task || mt.created_by === myId || (mt as any).createdBy === myId || subtasks.some(s => s.mainTaskId === mt.id || (s as any).main_task_id === mt.id);
+      const isVisible = mt.isProject || mt.isHrTask || mt.createdBy === myId || subtasks.some(s => s.mainTaskId === mt.id);
       if (!isVisible) return false;
 
       // Access control for HR tasks
-      if (mt.is_hr_task) {
-        const isAssigned = (mt.assignedTo || (mt as any).assigned_to || '').includes(myId);
-        const isCreator = mt.created_by === myId || (mt as any).createdBy === myId;
+      if (mt.isHrTask) {
+        const isAssigned = (mt.assignedTo || '').includes(myId);
+        const isCreator = mt.createdBy === myId;
         // Authorized HR personnel can see all HR tasks; others only see them if assigned or they created them
         return hasHrAccess || isCreator || isAssigned;
       }
 
       if (isExternalHr) {
-        const isAssigned = (mt.assignedTo || (mt as any).assigned_to || '').includes(myId);
-        // External HR (without full admin) restricted to HR tasks, their own, or assigned
-        return mt.created_by === myId || (mt as any).createdBy === myId || isAssigned;
+        const isAssigned = (mt.assignedTo || '').includes(myId);
+        return mt.createdBy === myId || isAssigned;
       }
 
       return true;
@@ -716,7 +715,7 @@ function AdminTasksView() {
     if (openProjectName && projects.length > 0) {
       const proj = projects.find(p => p.name === openProjectName);
       if (proj) {
-        const mt = mainTasks.find(m => m.id === proj.mainTaskId || (m.is_project && m.title === proj.name));
+        const mt = mainTasks.find(m => m.id === proj.mainTaskId || (m.isProject && m.title === proj.name));
         if (mt) {
            setExpanded(prev => new Set([...prev, mt.id]));
         }
@@ -761,7 +760,7 @@ function AdminTasksView() {
     if (!currentUser?.id) return false;
     
     const mt = teamTasks.find(m => m.id === s.mainTaskId);
-    const isHr = !!mt?.is_hr_task;
+    const isHr = !!mt?.isHrTask;
     const isCreator = s.createdBy === currentUser.id || mt?.createdBy === currentUser.id;
     
     let isAssigned = false;
@@ -980,7 +979,7 @@ function AdminTasksView() {
       {viewMode === 'board' && scope === 'mine' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <SubtaskKanbanView
-            subtasks={filteredMySubs as SubTask[]}
+            subtasks={applySortToSubs(filteredMySubs, sortBy) as SubTask[]}
             mainTasks={mainTasks}
             users={activeUsers}
             onClickSubtask={id => setOpenSubtaskId(id)}
@@ -1038,8 +1037,8 @@ function AdminTasksView() {
       {viewMode === 'compact' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           {(() => {
-            const compactPool = scope === 'mine' ? filteredMySubs : scope === 'pending_review' ? pendingApprovalSubs : (() => {
-              const allSubs = scope === 'projects' ? tabFiltered.filter(m => m.is_project).flatMap(mt => teamSubtasks.filter(s => s.mainTaskId === mt.id)) : tabFiltered.flatMap(mt => teamSubtasks.filter(s => s.mainTaskId === mt.id));
+            const compactPool = scope === 'mine' ? applySortToSubs(filteredMySubs, sortBy) : scope === 'pending_review' ? pendingApprovalSubs : (() => {
+              const allSubs = scope === 'projects' ? tabFiltered.filter(m => m.isProject).flatMap(mt => teamSubtasks.filter(s => s.mainTaskId === mt.id)) : tabFiltered.flatMap(mt => teamSubtasks.filter(s => s.mainTaskId === mt.id));
               return applySortToSubs(allSubs, sortBy);
             })();
             if (compactPool.length === 0) return (
@@ -1325,25 +1324,23 @@ function AdminTasksView() {
               </div>
             ) : (
               <div className="space-y-2">
-                {filteredMySubs.map((sub, i) => {
+                {applySortToSubs(filteredMySubs, sortBy).map((sub, i) => {
                   const sc = statusConfig[sub.status as SubTaskStatus];
                   const mt = mainTasks.find(m => m.id === sub.mainTaskId);
                   const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
 
-                  const parentId = sub.mainTaskId ?? (sub as any).main_task_id;
+                  const parentId = sub.mainTaskId;
                   const subCmts = comments.filter(c => {
-                    const cMainId = c.main_task_id ?? c.mainTaskId;
-                    const cSubId  = c.subtask_id  ?? c.subtaskId;
-                    return cMainId === parentId || cSubId === sub.id;
+                    return c.mainTaskId === parentId || c.subtaskId === sub.id;
                   });
                   const subReadAt = readMap[sub.id] || readMap[parentId] || '';
                   const subMentioned = myFirstName && subCmts.some(c =>
                     (c.content || c.text || '').toLowerCase().includes(`@${myFirstName}`) &&
-                    (c.created_at || '') > subReadAt
+                    c.createdAt > subReadAt
                   );
                   const subUnseenCount = subCmts.filter(c =>
-                    (c.author_id ?? c.authorId) !== myId &&
-                    (c.created_at || '') > subReadAt
+                    c.authorId !== myId &&
+                    c.createdAt > subReadAt
                   ).length;
 
                   return (
@@ -1495,19 +1492,17 @@ function AdminTasksView() {
                 const mtId = mt.id;
                 const subIds = new Set(subs.map(s => s.id));
                 const taskComments = comments.filter(c => {
-                  const cMainId = c.main_task_id ?? c.mainTaskId;
-                  const cSubId  = c.subtask_id  ?? c.subtaskId;
-                  return cMainId === mtId || (cSubId && subIds.has(cSubId));
+                  return c.mainTaskId === mtId || (c.subtaskId && subIds.has(c.subtaskId));
                 });
                 const readAt = readMap[mtId] || '';
                 const isMentioned = myFirstName && taskComments.some(c =>
                   (c.content || c.text || '').toLowerCase().includes(`@${myFirstName}`) &&
-                  (c.created_at || '') > readAt
+                  c.createdAt > readAt
                 );
                 // Only count comments from others, after the last time the task was viewed
                 const isInvolved = myId && (
                   subs.some(s => {
-                    const a = s.assignedTo || s.assigned_to || '';
+                    const a = s.assignedTo || '';
                     return String(a).includes(myId);
                   }) ||
                   (mt.createdBy === myId) ||
@@ -1515,8 +1510,8 @@ function AdminTasksView() {
                 );
                 const unseenCount = isInvolved
                   ? taskComments.filter(c =>
-                      (c.author_id ?? c.authorId) !== myId &&
-                      (c.created_at || '') > readAt
+                      c.authorId !== myId &&
+                      c.createdAt > readAt
                     ).length
                   : 0;
 
@@ -1626,9 +1621,7 @@ function AdminTasksView() {
                                 const assignee = users.find(u => u.id === sub.assignedTo?.split(',')[0]);
                                 const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
 
-                                // Per-subtask badges — covers full parent thread so main-task-level
-                                // comments appear on subtask rows too.
-                                const parentId = sub.mainTaskId ?? sub.main_task_id;
+                                const parentId = sub.mainTaskId;
                                 const subCmts = comments.filter(c => {
                                   const cMainId = c.main_task_id ?? c.mainTaskId;
                                   const cSubId  = c.subtask_id  ?? c.subtaskId;
@@ -1926,7 +1919,13 @@ function UserTasksView() {
   const teamSubtaskIds = new Set(teamTasks.map(mt => mt.id));
   const teamSubtasks = subtasks.filter(s => teamSubtaskIds.has(s.mainTaskId));
   const allSubs = teamSubtasks;
-  const mySubs = teamSubtasks.filter(s => s.assignedTo?.split(',').includes(currentUser?.id || ''));
+  const mySubs = teamSubtasks.filter(s => {
+    if (!s.assignedTo) return false;
+    const assignees = typeof s.assignedTo === 'string' 
+      ? s.assignedTo.split(',').map((id: string) => id.trim()) 
+      : Array.isArray(s.assignedTo) ? s.assignedTo : [];
+    return assignees.includes(currentUser?.id || '');
+  });
 
   const [scope, setScope] = useState<'mine' | 'all'>('mine');
   const pool = scope === 'mine' ? mySubs : allSubs;

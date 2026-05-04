@@ -13,14 +13,18 @@ import { MaintenanceLogType } from '@/src/types/operations';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 
-export function LogMaintenanceForm() {
+interface LogMaintenanceFormProps {
+  initialAssetId?: string | null;
+}
+
+export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) {
   const { logMaintenance, maintenanceAssets, assets } = useOperations();
   const { isDark } = useTheme();
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [type, setType] = useState<MaintenanceLogType>('scheduled');
   const [technician, setTechnician] = useState('');
   const [generalRemark, setGeneralRemark] = useState('');
-  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
+  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>(initialAssetId ? [initialAssetId] : []);
   
   // Advanced State for individual machines
   const [assetData, setAssetData] = useState<Record<string, any>>({});

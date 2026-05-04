@@ -80,24 +80,73 @@ export function mapReminderToCamel(r: any) {
     if (!r) return r;
     return {
         ...r,
-        remindAt: r.remind_at,
-        endAt: r.end_at,
-        recipientIds: r.recipient_ids || [],
-        sendEmail: r.send_email,
-        isActive: r.is_active,
-        createdBy: r.created_by,
-        mainTaskId: r.main_task_id,
-        subtaskId: r.subtask_id,
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-        lastSentAt: r.last_sent_at,
-        snoozedUntil: r.snoozed_until,
-        sourceRef: r.source_ref,
+        remindAt: r.remindAt || r.remind_at,
+        endAt: r.endAt || r.end_at,
+        recipientIds: r.recipientIds || r.recipient_ids || [],
+        sendEmail: r.send_email ?? r.sendEmail,
+        isActive: r.is_active ?? r.isActive,
+        createdBy: r.createdBy || r.created_by,
+        mainTaskId: r.mainTaskId || r.main_task_id,
+        subtaskId: r.subtaskId || r.subtask_id,
+        createdAt: r.createdAt || r.created_at,
+        updatedAt: r.updatedAt || r.updated_at,
+        lastSentAt: r.lastSentAt || r.last_sent_at,
+        snoozedUntil: r.snoozedUntil || r.snoozed_until,
+        sourceRef: r.sourceRef || r.source_ref,
+    };
+}
+
+export function mapMainTaskToCamel(m: any) {
+    if (!m) return m;
+    return {
+        ...m,
+        teamId: m.teamId || m.team_id,
+        workspaceId: m.workspaceId || m.workspace_id,
+        createdBy: m.createdBy || m.created_by,
+        assignedTo: m.assignedTo || m.assigned_to,
+        isDeleted: m.is_deleted ?? m.isDeleted,
+        isProject: m.is_project ?? m.isProject,
+        isHrTask: m.is_hr_task ?? m.isHrTask,
+        requiresApproval: m.requires_approval ?? m.requiresApproval,
+        completedAt: m.completed_at || m.completedAt,
+        deletedAt: m.deleted_at || m.deletedAt,
+        createdAt: m.created_at || m.createdAt,
+        updatedAt: m.updated_at || m.updatedAt,
+    };
+}
+
+export function mapSubtaskToCamel(s: any) {
+    if (!s) return s;
+    return {
+        ...s,
+        mainTaskId: s.mainTaskId || s.main_task_id,
+        workspaceId: s.workspaceId || s.workspace_id,
+        assignedTo: s.assignedTo || s.assigned_to,
+        requiresApproval: s.requires_approval ?? s.requiresApproval,
+        pendingApprovalSince: s.pending_approval_since || s.pendingApprovalSince,
+        approvedBy: s.approvedBy || s.approved_by,
+        rejectedAt: s.rejectedAt || s.rejected_at,
+        completedAt: s.completed_at || s.completedAt,
+        isDeleted: s.is_deleted ?? s.isDeleted,
+        deletedAt: s.deleted_at || s.deletedAt,
+        createdAt: s.created_at || s.createdAt,
+        updatedAt: s.updated_at || s.updatedAt,
+    };
+}
+
+export function mapTaskUpdateToCamel(c: any) {
+    if (!c) return c;
+    return {
+        ...c,
+        mainTaskId: c.mainTaskId || c.main_task_id,
+        subtaskId: c.subtaskId || c.subtask_id,
+        authorId: c.authorId || c.author_id,
+        createdAt: c.createdAt || c.created_at,
     };
 }
 
 export function getMainTaskProgress(mainTaskId: string, subtasks: any[]) {
-    const subs = subtasks.filter(s => s.main_task_id === mainTaskId || s.mainTaskId === mainTaskId);
+    const subs = subtasks.filter(s => s.mainTaskId === mainTaskId);
     return { total: subs.length, completed: subs.filter(s => s.status === 'completed').length };
 }
 
@@ -137,8 +186,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 if (commRes.error && !commRes.error.message?.includes('AbortError')) console.error('Failed to load task_updates:', commRes.error);
                 if (remRes.error && !remRes.error.message?.includes('AbortError')) console.error('Failed to load reminders:', remRes.error);
 
-                if (mtRes.data) setMainTasks(mtRes.data);
-                if (stRes.data) setSubtasks(stRes.data);
+                if (mtRes.data) {
+                    const mapped = mtRes.data.map(mapMainTaskToCamel);
+                    setMainTasks(mapped);
+                }
+                if (stRes.data) {
+                    const mapped = stRes.data.map(mapSubtaskToCamel);
+                    setSubtasks(mapped);
+                }
                 if (pRes.data) setUsers(pRes.data);
                 let loadedProjects: any[] = [];
                 if (mtRes.data) {
@@ -158,7 +213,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     loadedProjects = [...loadedProjects, ...genericProjects];
                 }
                 setProjects(loadedProjects);
-                if (commRes.data) setComments(commRes.data);
+                if (commRes.data) {
+                    const mapped = commRes.data.map(mapTaskUpdateToCamel);
+                    setComments(mapped);
+                }
                 if (remRes.data) {
                     const mappedRems = remRes.data.map(mapReminderToCamel);
                     setReminders(mappedRems);
@@ -238,14 +296,16 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
             // task_updates (chat messages)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'task_updates' }, (payload) => {
+                const camel = mapTaskUpdateToCamel(payload.new);
                 setComments(prev => {
                     // avoid duplicates (our own optimistic insert may already exist)
-                    if (prev.some(c => c.id === payload.new.id)) return prev;
-                    return [...prev, payload.new];
+                    if (prev.some(c => c.id === camel.id)) return prev;
+                    return [...prev, camel];
                 });
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'task_updates' }, (payload) => {
-                setComments(prev => prev.map(c => c.id === payload.new.id ? payload.new : c));
+                const camel = mapTaskUpdateToCamel(payload.new);
+                setComments(prev => prev.map(c => c.id === camel.id ? camel : c));
             })
             .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'task_updates' }, (payload) => {
                 setComments(prev => prev.filter(c => c.id !== payload.old.id));
@@ -253,17 +313,18 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
             // subtasks
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'subtasks' }, (payload) => {
+                const camel = mapSubtaskToCamel(payload.new);
                 setSubtasks(prev => {
-
-                    if (prev.some(s => s.id === payload.new.id)) return prev;
-                    return [...prev, payload.new];
+                    if (prev.some(s => s.id === camel.id)) return prev;
+                    return [...prev, camel];
                 });
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'subtasks' }, (payload) => {
-                if (payload.new.is_deleted) {
-                    setSubtasks(prev => prev.filter(s => s.id !== payload.new.id));
+                const camel = mapSubtaskToCamel(payload.new);
+                if (camel.isDeleted) {
+                    setSubtasks(prev => prev.filter(s => s.id !== camel.id));
                 } else {
-                    setSubtasks(prev => prev.map(s => s.id === payload.new.id ? payload.new : s));
+                    setSubtasks(prev => prev.map(s => s.id === camel.id ? camel : s));
                 }
             })
             .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'subtasks' }, (payload) => {
@@ -272,17 +333,19 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
             // main_tasks
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'main_tasks' }, (payload) => {
-                if (payload.new.is_deleted) return;
+                const camel = mapMainTaskToCamel(payload.new);
+                if (camel.isDeleted) return;
                 setMainTasks(prev => {
-                    if (prev.some(t => t.id === payload.new.id)) return prev;
-                    return [...prev, payload.new];
+                    if (prev.some(t => t.id === camel.id)) return prev;
+                    return [...prev, camel];
                 });
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'main_tasks' }, (payload) => {
-                if (payload.new.is_deleted) {
-                    setMainTasks(prev => prev.filter(t => t.id !== payload.new.id));
+                const camel = mapMainTaskToCamel(payload.new);
+                if (camel.isDeleted) {
+                    setMainTasks(prev => prev.filter(t => t.id !== camel.id));
                 } else {
-                    setMainTasks(prev => prev.map(t => t.id === payload.new.id ? payload.new : t));
+                    setMainTasks(prev => prev.map(t => t.id === camel.id ? camel : t));
                 }
             })
             // reminders
@@ -342,7 +405,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             return null;
         }
         if (data) {
-            setMainTasks(prev => [...prev, data]);
+            setMainTasks(prev => [...prev, mapMainTaskToCamel(data)]);
             toast.success('Task created successfully');
             let targetSubs = subs;
             
@@ -376,7 +439,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     toast.error('Task created but subtasks failed to save.');
                 }
                 if (insertedSubs) {
-                    setSubtasks(prev => [...prev, ...insertedSubs]);
+                    const mapped = insertedSubs.map(mapSubtaskToCamel);
+                    setSubtasks(prev => [...prev, ...mapped]);
                 }
             }
 
@@ -412,7 +476,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             toast.error('Failed to update task.');
             return;
         }
-        if (data) setMainTasks(prev => prev.map(t => t.id === id ? data : t));
+        if (data) {
+            const camel = mapMainTaskToCamel(data);
+            setMainTasks(prev => prev.map(t => t.id === id ? camel : t));
+        }
     }, []);
 
     const deleteMainTask = useCallback(async (id: string) => {
@@ -433,7 +500,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             toast.error('Failed to restore task.');
             return;
         }
-        if (data) setMainTasks(prev => [...prev, data]);
+        if (data) setMainTasks(prev => [...prev, mapMainTaskToCamel(data)]);
         toast.success('Task restored');
     }, []);
 
@@ -464,7 +531,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             toast.error('Failed to add subtask.');
             return;
         }
-        if (data) setSubtasks(prev => [...prev, data]);
+        if (data) {
+            const camel = mapSubtaskToCamel(data);
+            setSubtasks(prev => [...prev, camel]);
+        }
     }, []);
 
     const updateSubtask = useCallback(async (id: string, p: any) => {
@@ -481,7 +551,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             toast.error('Failed to update subtask.');
             return;
         }
-        if (data) setSubtasks(prev => prev.map(s => s.id === id ? data : s));
+        if (data) {
+            const camel = mapSubtaskToCamel(data);
+            setSubtasks(prev => prev.map(s => s.id === id ? camel : s));
+        }
     }, []);
 
     const deleteSubtask = useCallback(async (id: string) => {
@@ -583,8 +656,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             return;
         }
         if (data) {
-             setSubtasks(prev => prev.map(s => s.id === id ? data : s));
-             supabase.functions.invoke('send-email-reminder', { body: data }).catch(console.error);
+             const camel = mapSubtaskToCamel(data);
+             setSubtasks(prev => prev.map(s => s.id === id ? camel : s));
+             supabase.functions.invoke('send-email-reminder', { body: camel }).catch(console.error);
         }
     }, []);
 
@@ -612,7 +686,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             return;
         }
         if (data) {
-            setSubtasks(prev => prev.map(s => s.id === id ? data : s));
+            const camel = mapSubtaskToCamel(data);
+            setSubtasks(prev => prev.map(s => s.id === id ? camel : s));
 
             // Notify the main task creator
             if (finalStatus === 'pending_approval') {

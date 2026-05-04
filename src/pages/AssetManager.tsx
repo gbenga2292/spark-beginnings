@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { useOperations } from '../contexts/OperationsContext';
 import {
   Plus, Search, Package, Upload, ListFilter,
   Edit2, Trash2, BarChart2, Clock, FileText, MoreHorizontal,
+  ChevronsUpDown, ChevronUp, ChevronDown as ChevronDownIcon,
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { Asset, AssetCategory } from '../types/operations';
@@ -214,6 +215,20 @@ export function AssetManager() {
   const [activeAsset, setActiveAsset]       = useState<Asset | null>(null);
   const [activeModal, setActiveModal]       = useState<ActionModal>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [sortKey, setSortKey]               = useState<string | null>(null);
+  const [sortDir, setSortDir]               = useState<'asc' | 'desc'>('asc');
+
+  const toggleSort = (key: string) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 ml-1 opacity-50 inline-block" />;
+    return sortDir === 'asc'
+      ? <ChevronUp className="h-3 w-3 ml-1 inline-block" />
+      : <ChevronDownIcon className="h-3 w-3 ml-1 inline-block" />;
+  };
 
   useSetPageTitle(
     'Inventory Management',
@@ -270,11 +285,27 @@ export function AssetManager() {
 
   const closeModal = () => { setActiveAsset(null); setActiveModal(null); };
 
-  const filtered = assets.filter(a => {
-    const matchSearch = a.name.toLowerCase().includes(search.toLowerCase());
-    const matchFilter = filter === 'all' || a.category === filter;
-    return matchSearch && matchFilter;
-  });
+  const filtered = useMemo(() => {
+    const base = assets.filter(a => {
+      const matchSearch = a.name.toLowerCase().includes(search.toLowerCase());
+      const matchFilter = filter === 'all' || a.category === filter;
+      return matchSearch && matchFilter;
+    });
+    if (!sortKey) return base;
+    return [...base].sort((a, b) => {
+      let aVal: any, bVal: any;
+      if (sortKey === 'name')      { aVal = a.name; bVal = b.name; }
+      else if (sortKey === 'quantity')  { aVal = a.quantity; bVal = b.quantity; }
+      else if (sortKey === 'reserved')  { aVal = a.reservedQuantity || 0; bVal = b.reservedQuantity || 0; }
+      else if (sortKey === 'available') { aVal = a.availableQuantity || 0; bVal = b.availableQuantity || 0; }
+      else if (sortKey === 'status')    { aVal = a.availableQuantity || 0; bVal = b.availableQuantity || 0; }
+      else if (sortKey === 'location')  { aVal = a.location || ''; bVal = b.location || ''; }
+      else return 0;
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [assets, search, filter, sortKey, sortDir]);
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
@@ -343,14 +374,26 @@ export function AssetManager() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-blue-700 border-b border-blue-800 text-blue-50 uppercase text-[11px] tracking-wider font-bold">
-                <th className="px-5 py-4 whitespace-nowrap">Asset Name</th>
-                <th className="px-5 py-4 whitespace-nowrap text-center">Total Stock</th>
-                <th className="px-5 py-4 whitespace-nowrap text-center">Reserved</th>
-                <th className="px-5 py-4 whitespace-nowrap text-center">Available</th>
+                <th className="px-5 py-4 whitespace-nowrap cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('name')}>
+                  Asset Name <SortIcon col="name" />
+                </th>
+                <th className="px-5 py-4 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('quantity')}>
+                  Total Stock <SortIcon col="quantity" />
+                </th>
+                <th className="px-5 py-4 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('reserved')}>
+                  Reserved <SortIcon col="reserved" />
+                </th>
+                <th className="px-5 py-4 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('available')}>
+                  Available <SortIcon col="available" />
+                </th>
                 <th className="px-5 py-4 whitespace-nowrap">Stats (M | D | U)</th>
                 <th className="px-5 py-4 whitespace-nowrap">Category | Type</th>
-                <th className="px-5 py-4 whitespace-nowrap">Location</th>
-                <th className="px-5 py-4 whitespace-nowrap text-center">Status</th>
+                <th className="px-5 py-4 whitespace-nowrap cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('location')}>
+                  Location <SortIcon col="location" />
+                </th>
+                <th className="px-5 py-4 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('status')}>
+                  Status <SortIcon col="status" />
+                </th>
                 <th className="px-5 py-4 whitespace-nowrap text-center">Actions</th>
               </tr>
             </thead>
