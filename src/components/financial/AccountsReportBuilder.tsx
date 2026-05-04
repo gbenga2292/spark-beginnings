@@ -1521,24 +1521,23 @@ export function AccountsReportBuilder({
             }
           `}</style>
 
-          <div className="flex-1 overflow-auto bg-slate-200/60 p-6 md:p-8 print:p-0 print:bg-white" id="arb-print-area">
-            <div className="bg-white mx-auto shadow-2xl max-w-7xl rounded-lg min-h-full print:shadow-none print:max-w-none mb-[100px] print:mb-0"
+          <div className="flex-1 overflow-auto bg-slate-200/60 p-2 sm:p-4 md:p-8 print:p-0 print:bg-white" id="arb-print-area">
+            <div className="bg-white mx-auto shadow-2xl max-w-7xl rounded-none sm:rounded-lg min-h-full print:shadow-none print:max-w-none mb-[100px] print:mb-0"
               style={{ fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
 
               {/* Document header */}
-              <div className="flex justify-between items-start px-8 py-6 border-b border-slate-200">
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4 px-4 sm:px-8 py-4 sm:py-6 border-b border-slate-200">
                 <div>
-                  <img src={logoSrc} alt="Logo" className="h-8 w-auto mb-2" />
-                  <h1 className="text-xl font-bold text-slate-900">{reportTitle}</h1>
-                  <p className="text-sm text-slate-500 mt-0.5">
+                  <img src={logoSrc} alt="Logo" className="h-6 sm:h-8 w-auto mb-2" />
+                  <h1 className="text-lg sm:text-xl font-bold text-slate-900">{reportTitle}</h1>
+                  <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                     {selectedSources.length > 1 && `${selectedSources.map(s => SOURCE_LABELS[s]).join(' + ')} · `}
                     {selectedYears.length === 1 ? selectedYears[0] : `${Math.min(...selectedYears)}–${Math.max(...selectedYears)}`} · {selectedMonths.length === 12 ? 'All Months' : `${selectedMonths.length} month(s)`}
                     {selectedClients.length !== availableClients.length ? ` · ${selectedClients.length} client(s)` : ''}
                     {isMultiSource ? ` · ${aggregatedRows.length} unique client(s)` : ` · ${recordsToPrint.length} record(s)`}
                   </p>
-
                 </div>
-                <div className="text-right text-xs text-slate-400 print:hidden">
+                <div className="text-left sm:text-right text-xs text-slate-400 print:hidden w-full sm:w-auto border-t sm:border-t-0 border-slate-100 pt-2 sm:pt-0 mt-2 sm:mt-0">
                   <p>Generated: {new Date().toLocaleDateString()}</p>
                   {orderedCols.length > 0 && <p className="mt-0.5">{orderedCols.length} column(s)</p>}
                 </div>

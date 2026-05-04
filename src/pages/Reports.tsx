@@ -4,7 +4,7 @@ import { computeWorkDays } from '@/src/lib/workdays';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
-import { Download, FileSpreadsheet, FileText, PieChart as PieChartIcon, Users, Building2, Activity, CheckCircle2, CalendarClock, LayoutGrid, BarChart2, Flame, Eye, Save, AlertCircle, XCircle } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, PieChart as PieChartIcon, Users, Building2, Activity, CheckCircle2, CalendarClock, LayoutGrid, BarChart2, Flame, Eye, Save, AlertCircle, XCircle, Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore, DisciplinaryRecord } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LabelList } from 'recharts';
@@ -75,6 +75,28 @@ export function Reports() {
   const [otStaffTypeFilter, setOtStaffTypeFilter] = useState<'All' | 'OFFICE' | 'FIELD'>('All');
   const [otYear, setOtYear] = useState<number>(currentYear);
   const [otChartView, setOtChartView] = useState<'table' | 'heatmap' | 'bar'>('table');
+  const [fullScreenTable, setFullScreenTable] = useState<'site-work' | 'monthly-summary' | 'overtime-detail' | null>(null);
+
+  const toggleFullScreen = async (tableName: 'site-work' | 'monthly-summary' | 'overtime-detail') => {
+    if (fullScreenTable === tableName) {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen().catch(console.error);
+      }
+      if ('orientation' in screen && 'unlock' in screen.orientation) {
+        try { (screen.orientation as any).unlock(); } catch (e) { console.log(e); }
+      }
+      setFullScreenTable(null);
+    } else {
+      setFullScreenTable(tableName);
+      const el = document.documentElement;
+      if (el.requestFullscreen) {
+        await el.requestFullscreen().catch(console.error);
+        if ('orientation' in screen && 'lock' in screen.orientation) {
+          try { await (screen.orientation as any).lock('landscape'); } catch (e) { console.log(e); }
+        }
+      }
+    }
+  };
 
   const [meritFilter, setMeritFilter] = useState<'All Time' | 'Year' | 'Month'>('All Time');
   const [meritFilterYear, setMeritFilterYear] = useState<number>(currentYear);
@@ -1288,41 +1310,60 @@ export function Reports() {
       </div>
 
       {/* Staff Site Work Report */}
-      <Card className="bg-white border-slate-200">
-        <CardHeader className="border-b border-slate-100 pb-4">
+      <Card className={`bg-white ${fullScreenTable === 'site-work' ? 'fixed z-[100] m-0 rounded-none border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : 'border-slate-200'}`}>
+        <CardHeader className={`border-b border-slate-100 pb-4 shrink-0 ${fullScreenTable === 'site-work' ? 'hidden' : ''}`}>
           <div className="flex items-center justify-between">
             <CardTitle className="text-slate-900 flex items-center gap-2">
               <Building2 className="h-5 w-5 text-indigo-600" />
               Staff Site Work Report
             </CardTitle>
-            {/* View toggle */}
-            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-              <button
-                onClick={() => setSiteChartView('table')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                  siteChartView === 'table'
-                    ? 'bg-white text-indigo-700 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <LayoutGrid className="h-3.5 w-3.5" /> Table
-              </button>
-              <button
-                onClick={() => setSiteChartView('gantt')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                  siteChartView === 'gantt'
-                    ? 'bg-white text-indigo-700 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <BarChart2 className="h-3.5 w-3.5" /> Schedule Chart
-              </button>
+            <div className="flex items-center gap-2">
+              {/* View toggle */}
+              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                <button
+                  onClick={() => setSiteChartView('table')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    siteChartView === 'table'
+                      ? 'bg-white text-indigo-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" /> Table
+                </button>
+                <button
+                  onClick={() => setSiteChartView('gantt')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    siteChartView === 'gantt'
+                      ? 'bg-white text-indigo-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <BarChart2 className="h-3.5 w-3.5" /> Schedule Chart
+                </button>
+              </div>
+              <Button variant="outline" size="sm" className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-100 h-[32px]" onClick={() => toggleFullScreen('site-work')}>
+                <Maximize2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Full Screen</span>
+              </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-6">
+
+        {fullScreenTable === 'site-work' && (
+          <Button
+            variant="default"
+            size="icon"
+            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-indigo-600 hover:bg-indigo-700 text-white w-12 h-12"
+            onClick={() => toggleFullScreen('site-work')}
+            title="Exit Full Screen"
+          >
+            <Minimize2 className="h-5 w-5" />
+          </Button>
+        )}
+
+        <CardContent className={`pt-6 ${fullScreenTable === 'site-work' ? 'flex-1 flex flex-col min-h-0 overflow-hidden' : ''}`}>
           {/* Filters */}
-          <div className="flex flex-wrap items-center gap-4 mb-6">
+          <div className={`flex flex-wrap items-center gap-4 mb-6 ${fullScreenTable === 'site-work' ? 'hidden' : ''}`}>
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-slate-700">Month:</label>
               <select
@@ -1374,8 +1415,8 @@ export function Reports() {
                 ? [...activeSitesForMonth, officeSite]
                 : activeSitesForMonth;
               return (
-            <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                  <Table className="max-h-[420px]">
+            <div className={`rounded-xl border border-slate-200 shadow-sm overflow-hidden ${fullScreenTable === 'site-work' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
+                  <Table className={fullScreenTable === 'site-work' ? 'flex-1' : "max-h-[420px]"}>
                     <TableHeader>
                       <TableRow className="bg-gradient-to-r from-slate-800 to-slate-700 sticky top-0 z-10">
                         <TableHead className="text-left font-semibold text-white py-2 px-3 whitespace-nowrap">Employee</TableHead>
@@ -1448,7 +1489,7 @@ export function Reports() {
             })()
           ) : (
             /* ── GANTT / SCHEDULE CHART VIEW ── */
-            <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className={`rounded-xl border border-slate-200 shadow-sm overflow-hidden ${fullScreenTable === 'site-work' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
               {/* Legend */}
               <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide mr-1">Legend:</span>
@@ -1479,8 +1520,8 @@ export function Reports() {
               </div>
 
               {/* Chart grid */}
-              <div className="overflow-x-auto">
-                <div className="overflow-y-auto" style={{ maxHeight: '450px' }}>
+              <div className={`overflow-x-auto ${fullScreenTable === 'site-work' ? 'flex-1' : ''}`}>
+                <div className="overflow-y-auto" style={{ maxHeight: fullScreenTable === 'site-work' ? 'none' : '450px' }}>
                   <div style={{ minWidth: `${Math.max(700, 160 + ganttData.days.length * 34)}px` }}>
                     {/* Header row: day numbers */}
                     <div className="flex sticky top-0 z-20 bg-slate-800">
@@ -1594,45 +1635,64 @@ export function Reports() {
       </Card>
 
       {/* Staff Monthly Work Summary */}
-      <Card className="bg-white border-slate-200">
-        <CardHeader className="border-b border-slate-100 pb-4">
+      <Card className={`bg-white ${fullScreenTable === 'monthly-summary' ? 'fixed z-[100] m-0 rounded-none border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : 'border-slate-200'}`}>
+        <CardHeader className={`border-b border-slate-100 pb-4 shrink-0 ${fullScreenTable === 'monthly-summary' ? 'hidden' : ''}`}>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <CardTitle className="text-slate-900 flex items-center gap-2">
               <CalendarClock className="h-5 w-5 text-indigo-600" />
               Staff Monthly Work Summary
             </CardTitle>
-            {/* View toggle */}
-            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-              <button
-                onClick={() => setSummaryChartView('table')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                  summaryChartView === 'table' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <LayoutGrid className="h-3.5 w-3.5" /> Table
-              </button>
-              <button
-                onClick={() => setSummaryChartView('heatmap')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                  summaryChartView === 'heatmap' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <Flame className="h-3.5 w-3.5" /> Heat Map
-              </button>
-              <button
-                onClick={() => setSummaryChartView('bar')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                  summaryChartView === 'bar' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <BarChart2 className="h-3.5 w-3.5" /> Bar Chart
-              </button>
+            <div className="flex items-center gap-2">
+              {/* View toggle */}
+              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                <button
+                  onClick={() => setSummaryChartView('table')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    summaryChartView === 'table' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" /> Table
+                </button>
+                <button
+                  onClick={() => setSummaryChartView('heatmap')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    summaryChartView === 'heatmap' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Flame className="h-3.5 w-3.5" /> Heat Map
+                </button>
+                <button
+                  onClick={() => setSummaryChartView('bar')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    summaryChartView === 'bar' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <BarChart2 className="h-3.5 w-3.5" /> Bar Chart
+                </button>
+              </div>
+              <Button variant="outline" size="sm" className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-100 h-[32px]" onClick={() => toggleFullScreen('monthly-summary')}>
+                <Maximize2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Full Screen</span>
+              </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-6">
+
+        {fullScreenTable === 'monthly-summary' && (
+          <Button
+            variant="default"
+            size="icon"
+            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-indigo-600 hover:bg-indigo-700 text-white w-12 h-12"
+            onClick={() => toggleFullScreen('monthly-summary')}
+            title="Exit Full Screen"
+          >
+            <Minimize2 className="h-5 w-5" />
+          </Button>
+        )}
+
+        <CardContent className={`pt-6 ${fullScreenTable === 'monthly-summary' ? 'flex-1 flex flex-col min-h-0 overflow-hidden' : ''}`}>
           {/* Filters */}
-          <div className="flex flex-wrap items-center gap-4 mb-6">
+          <div className={`flex flex-wrap items-center gap-4 mb-6 ${fullScreenTable === 'monthly-summary' ? 'hidden' : ''}`}>
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-slate-700">Year:</label>
               <select
@@ -1669,8 +1729,8 @@ export function Reports() {
 
           {summaryChartView === 'table' ? (
             /* ── TABLE VIEW ── */
-            <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                  <Table className="max-h-[420px]">
+            <div className={`rounded-xl border border-slate-200 shadow-sm overflow-hidden ${fullScreenTable === 'monthly-summary' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
+                  <Table className={fullScreenTable === 'monthly-summary' ? 'flex-1' : "max-h-[420px]"}>
                     <TableHeader className="sticky top-0 z-10">
                       <TableRow className="bg-gradient-to-r from-slate-800 to-slate-700">
                         <TableHead rowSpan={2} className="text-left font-semibold text-white align-middle py-2 px-3 whitespace-nowrap sticky left-0 bg-slate-800 z-20">Full Name</TableHead>
@@ -1801,7 +1861,7 @@ export function Reports() {
               };
 
               return (
-                <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className={`rounded-xl border border-slate-200 shadow-sm overflow-hidden ${fullScreenTable === 'monthly-summary' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
                   {/* Legend */}
                   <div className="flex flex-wrap items-center gap-4 px-4 py-3 bg-slate-50 border-b border-slate-200">
                     <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Legend:</span>
@@ -1814,7 +1874,7 @@ export function Reports() {
                       Days Worked (light → dark)
                     </span>
                     <span className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
-                      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-600 text-[9px] font-bold">â— </span>
+                      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-600 text-[9px] font-bold">●</span>
                       OT days present
                     </span>
                     <span className="flex items-center gap-1.5 text-xs text-red-600 font-medium">
@@ -1827,8 +1887,8 @@ export function Reports() {
                     </span>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <div className="overflow-y-auto" style={{ maxHeight: '480px' }}>
+                  <div className={`overflow-x-auto ${fullScreenTable === 'monthly-summary' ? 'flex-1' : ''}`}>
+                    <div className="overflow-y-auto" style={{ maxHeight: fullScreenTable === 'monthly-summary' ? 'none' : '480px' }}>
                       <div style={{ minWidth: '720px' }}>
                         {/* Header */}
                         <div className="flex sticky top-0 z-20 bg-slate-800">
@@ -1974,8 +2034,8 @@ export function Reports() {
                       <span className="inline-block w-3 h-3 rounded-sm bg-red-400"></span> Absent
                     </span>
                   </div>
-                  <div className="p-4">
-                    <div className="h-[340px]">
+                  <div className="p-4 flex-1 flex flex-col min-h-0 overflow-hidden">
+                    <div className={fullScreenTable === 'monthly-summary' ? "flex-1 min-h-[300px]" : "h-[340px]"}>
                       <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
                         <BarChart data={barData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }} barSize={18} barGap={2}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -1993,9 +2053,9 @@ export function Reports() {
                     </div>
 
                     {/* Per-employee annual bar breakdown */}
-                    <div className="mt-6 border-t border-slate-100 pt-5">
+                    <div className={`mt-6 border-t border-slate-100 pt-5 ${fullScreenTable === 'monthly-summary' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
                       <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Annual Breakdown Per Employee</div>
-                      <div className="space-y-2 overflow-y-auto" style={{ maxHeight: '280px' }}>
+                      <div className="space-y-2 overflow-y-auto" style={{ maxHeight: fullScreenTable === 'monthly-summary' ? 'none' : '280px' }}>
                         {operationsInternalStaff.map(emp => {
                           const totals = staffTotals[emp.id];
                           const data   = monthlyWorkSummary[emp.id];
@@ -2164,44 +2224,63 @@ export function Reports() {
       </Card>
 
       {/* Monthly Overtime Detail Report */}
-      <Card className="bg-white border-slate-200">
-        <CardHeader className="border-b border-slate-100 pb-4">
+      <Card className={`bg-white ${fullScreenTable === 'overtime-detail' ? 'fixed z-[100] m-0 rounded-none border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : 'border-slate-200'}`}>
+        <CardHeader className={`border-b border-slate-100 pb-4 shrink-0 ${fullScreenTable === 'overtime-detail' ? 'hidden' : ''}`}>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <CardTitle className="text-slate-900 flex items-center gap-2">
               <CalendarClock className="h-5 w-5 text-amber-600" />
               Monthly Overtime Detail
             </CardTitle>
-            {/* View toggle */}
-            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-              <button
-                onClick={() => setOtChartView('table')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                  otChartView === 'table' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <LayoutGrid className="h-3.5 w-3.5" /> Table
-              </button>
-              <button
-                onClick={() => setOtChartView('heatmap')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                  otChartView === 'heatmap' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <Flame className="h-3.5 w-3.5" /> Heat Map
-              </button>
-              <button
-                onClick={() => setOtChartView('bar')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                  otChartView === 'bar' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <BarChart2 className="h-3.5 w-3.5" /> Bar Chart
-              </button>
+            <div className="flex items-center gap-2">
+              {/* View toggle */}
+              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                <button
+                  onClick={() => setOtChartView('table')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    otChartView === 'table' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" /> Table
+                </button>
+                <button
+                  onClick={() => setOtChartView('heatmap')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    otChartView === 'heatmap' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Flame className="h-3.5 w-3.5" /> Heat Map
+                </button>
+                <button
+                  onClick={() => setOtChartView('bar')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    otChartView === 'bar' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <BarChart2 className="h-3.5 w-3.5" /> Bar Chart
+                </button>
+              </div>
+              <Button variant="outline" size="sm" className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-100 h-[32px]" onClick={() => toggleFullScreen('overtime-detail')}>
+                <Maximize2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Full Screen</span>
+              </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap items-center gap-4 mb-6">
+
+        {fullScreenTable === 'overtime-detail' && (
+          <Button
+            variant="default"
+            size="icon"
+            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-indigo-600 hover:bg-indigo-700 text-white w-12 h-12"
+            onClick={() => toggleFullScreen('overtime-detail')}
+            title="Exit Full Screen"
+          >
+            <Minimize2 className="h-5 w-5" />
+          </Button>
+        )}
+
+        <CardContent className={`pt-6 ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0 overflow-hidden' : ''}`}>
+          <div className={`flex flex-wrap items-center gap-4 mb-6 ${fullScreenTable === 'overtime-detail' ? 'hidden' : ''}`}>
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-slate-700">Year:</label>
               <select
@@ -2234,8 +2313,8 @@ export function Reports() {
           </div>
 
           {otChartView === 'table' ? (
-            <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <Table className="max-h-[420px]">
+            <div className={`rounded-xl border border-slate-200 shadow-sm overflow-hidden ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
+              <Table className={fullScreenTable === 'overtime-detail' ? 'flex-1' : "max-h-[420px]"}>
                 <TableHeader className="sticky top-0 z-10">
                   <TableRow className="bg-gradient-to-r from-slate-800 to-slate-700">
                     <TableHead className="text-left font-semibold text-white py-2 px-3 whitespace-nowrap sticky left-0 bg-slate-800 z-20">Full Name</TableHead>
@@ -2308,9 +2387,9 @@ export function Reports() {
                 });
 
                 return (
-                  <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <div className="overflow-y-auto" style={{ maxHeight: '480px' }}>
+                  <div className={`rounded-xl border border-slate-200 shadow-sm overflow-hidden ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
+                    <div className={`overflow-x-auto ${fullScreenTable === 'overtime-detail' ? 'flex-1' : ''}`}>
+                      <div className="overflow-y-auto" style={{ maxHeight: fullScreenTable === 'overtime-detail' ? 'none' : '480px' }}>
                         <div style={{ minWidth: '720px' }}>
                           <div className="flex sticky top-0 z-20 bg-slate-800">
                             <div className="flex-shrink-0 w-44 px-3 py-2.5 border-r border-slate-700">
@@ -2381,15 +2460,15 @@ export function Reports() {
               });
 
               return (
-                <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className={`rounded-xl border border-slate-200 shadow-sm overflow-hidden ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
                   <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-6">
                     <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Team Monthly Overtime</span>
                     <span className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
                       <span className="inline-block w-3 h-3 rounded-sm bg-amber-400"></span> Total Overtime
                     </span>
                   </div>
-                  <div className="p-4">
-                    <div className="h-[340px]">
+                  <div className="p-4 flex-1">
+                    <div className={fullScreenTable === 'overtime-detail' ? "h-full" : "h-[340px]"}>
                       <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
                         <BarChart data={barData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }} barSize={30}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />

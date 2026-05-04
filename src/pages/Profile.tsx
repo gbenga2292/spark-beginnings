@@ -288,6 +288,18 @@ export function Profile() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-8 pb-20 sm:pb-10">
 
+      {/* Back Button */}
+      <div className="mb-6">
+        <Button 
+          variant="ghost" 
+          onClick={() => navigate(-1)} 
+          className="rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold -ml-2 h-10 px-4"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+      </div>
+
       {/* Success/Error Messages */}
       {successMessage && (
         <div className="flex items-center gap-3 text-sm text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl px-4 py-4 mb-6 animate-in fade-in slide-in-from-top-2">

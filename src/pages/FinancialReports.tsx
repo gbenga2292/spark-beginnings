@@ -1,5 +1,6 @@
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { useState, useMemo, useRef, startTransition } from 'react';
+import { createPortal } from 'react-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -7,7 +8,7 @@ import { Badge } from '@/src/components/ui/badge';
 import {
   Download, Upload, ReceiptText, Wallet, TrendingUp, Landmark, Activity, AlertCircle,
   PieChart as PieChartIcon, BarChart3, Filter, X, CheckCircle2, FileSpreadsheet, FileText, Backpack, CreditCard,
-  Eye, Save, Trash2, XCircle
+  Eye, Save, Trash2, XCircle, Maximize2, Minimize2
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
 import { NairaSign } from '@/src/components/ui/naira-sign';
@@ -23,6 +24,7 @@ import * as XLSX from 'xlsx';
 import { usePayrollCalculator } from '@/src/hooks/usePayrollCalculator';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { useHeaderPortalTarget } from '@/src/hooks/useHeaderPortal';
 import { SiteSummary } from './SiteSummary';
 import { AccountsReportBuilder } from '@/src/components/financial/AccountsReportBuilder';
 
@@ -85,6 +87,28 @@ export function FinancialReports() {
   const sitesPriv = usePriv('sites');
   const [ledgerSummaryView, setLedgerSummaryView] = useState<'category' | 'bank' | 'client' | 'site'>('category');
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [fullScreenTable, setFullScreenTable] = useState<'ledger' | 'payroll' | null>(null);
+
+  const toggleFullScreen = async (tableName: 'ledger' | 'payroll') => {
+    if (fullScreenTable === tableName) {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen().catch(console.error);
+      }
+      if ('orientation' in screen && 'unlock' in screen.orientation) {
+        try { (screen.orientation as any).unlock(); } catch (e) { console.log(e); }
+      }
+      setFullScreenTable(null);
+    } else {
+      setFullScreenTable(tableName);
+      const el = document.documentElement;
+      if (el.requestFullscreen) {
+        await el.requestFullscreen().catch(console.error);
+        if ('orientation' in screen && 'lock' in screen.orientation) {
+          try { await (screen.orientation as any).lock('landscape'); } catch (e) { console.log(e); }
+        }
+      }
+    }
+  };
 
   // Dynamic titles and subtitles for the header
   const tabInfo = {
@@ -106,6 +130,20 @@ export function FinancialReports() {
     }
   };
 
+  const headerPortalTarget = useHeaderPortalTarget();
+
+  const headerActions = (
+    <Button 
+      size="sm" 
+      className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 font-bold whitespace-nowrap flex shrink-0 border border-indigo-500 shadow-sm px-2 sm:px-4" 
+      onClick={() => setReportBuilderOpen(true)}
+      title="Open Report Builder"
+    >
+      <div className="h-5 w-5 bg-white/20 rounded-full flex items-center justify-center shrink-0"><FileSpreadsheet className="h-3 w-3 text-white" /></div>
+      <span className="hidden sm:inline-block">Open Report Builder</span>
+    </Button>
+  );
+
   useSetPageTitle(
     tabInfo[mainTab].title,
     tabInfo[mainTab].subtitle
@@ -125,11 +163,21 @@ export function FinancialReports() {
 
   const { calculatePayrollForMonth, MONTHS } = usePayrollCalculator();
 
+  const headerPortalNode = headerPortalTarget ? createPortal(headerActions, headerPortalTarget) : null;
+
   const hideAmounts = priv.canViewAmounts === false;
   const fm = (n: number) => hideAmounts ? '***' : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmRaw = (n: number) => hideAmounts ? '***' : '₦' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  // Payroll Exposure calculations — delegates to the canonical payroll calculator
+  // Canonical pre-computation of all payroll data to prevent multiple O(N) calculations
+  const allMonthsPayroll = useMemo(() => {
+    return MONTHS.reduce((acc, m) => {
+      acc[m.key] = calculatePayrollForMonth(m.key);
+      return acc;
+    }, {} as Record<string, any[]>);
+  }, [calculatePayrollForMonth, MONTHS]);
+
+  // Payroll Exposure calculations
   const payrollStats = useMemo(() => {
     let totalGrossExposure = 0;
     let totalStatutory = 0;
@@ -139,7 +187,7 @@ export function FinancialReports() {
       : MONTHS.map(m => m.key);
 
     monthsToProcess.forEach(monthKey => {
-      const rows = calculatePayrollForMonth(monthKey);
+      const rows = allMonthsPayroll[monthKey] || [];
       rows.forEach(row => {
         totalGrossExposure += row.grossPay;
         totalOvertimeCost += row.overtime;
@@ -154,12 +202,12 @@ export function FinancialReports() {
     loans.forEach(l => { if (l.status === 'Active') outstandingLoans += l.remainingBalance; });
 
     return { totalGrossExposure, totalStatutory, totalOvertimeCost, outstandingLoans };
-  }, [calculatePayrollForMonth, MONTHS, (filterMonth === "All" ? null : parseInt(filterMonth, 10)), salaryAdvances, loans]);
+  }, [allMonthsPayroll, MONTHS, filterMonth, salaryAdvances, loans]);
 
-  // Annual Payroll & Overtime Trend — uses the same canonical calculator
+  // Annual Payroll & Overtime Trend
   const payrollChartData = useMemo(() => {
     return MONTHS.map((m) => {
-      const rows = calculatePayrollForMonth(m.key);
+      const rows = allMonthsPayroll[m.key] || [];
       let totalPayroll = 0, totalOvertime = 0;
       rows.forEach(row => {
         totalPayroll += row.grossPay;
@@ -167,11 +215,11 @@ export function FinancialReports() {
       });
       return { name: m.label.substring(0, 3), Payroll: totalPayroll, Overtime: totalOvertime };
     });
-  }, [calculatePayrollForMonth, MONTHS]);
+  }, [allMonthsPayroll, MONTHS]);
 
   const payrollSummaryData = useMemo(() => {
     return MONTHS.map(month => {
-      const results = calculatePayrollForMonth(month.key);
+      const results = allMonthsPayroll[month.key] || [];
       let salary = 0;
       let overtime = 0;
       let grossPay = 0;
@@ -200,7 +248,7 @@ export function FinancialReports() {
         totalPayout
       };
     });
-  }, [calculatePayrollForMonth, MONTHS]);
+  }, [allMonthsPayroll, MONTHS]);
 
   const [summaryTab, setSummaryTab] = useState<'client' | 'site'>('client');
   const [debtorView, setDebtorView] = useState<'client' | 'site'>('client');
@@ -1196,6 +1244,7 @@ export function FinancialReports() {
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
+      {headerPortalNode}
       <AccountsReportBuilder
         open={reportBuilderOpen}
         onOpenChange={setReportBuilderOpen}
@@ -1303,7 +1352,7 @@ export function FinancialReports() {
         </div>
 
         {/* Tab switcher - compact implementation */}
-        <div className="flex bg-white p-2 rounded-xl shadow-sm border border-slate-100 items-center justify-between overflow-x-auto no-scrollbar gap-2">
+        <div className="flex bg-white p-2 rounded-xl shadow-sm border border-slate-100 items-center overflow-x-auto no-scrollbar gap-2">
           <div className="flex gap-1">
             {[
               { id: 'client-account', label: 'Client Account', icon: Landmark },
@@ -1330,15 +1379,6 @@ export function FinancialReports() {
               );
             })}
           </div>
-          
-          <Button 
-            size="sm" 
-            className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 font-bold whitespace-nowrap hidden sm:flex shrink-0 border border-indigo-500 shadow-sm" 
-            onClick={() => setReportBuilderOpen(true)}
-          >
-            <div className="h-5 w-5 bg-white/20 rounded-full flex items-center justify-center shrink-0"><FileSpreadsheet className="h-3 w-3 text-white" /></div>
-            Open Report Builder
-          </Button>
         </div>
 
 
@@ -1623,26 +1663,45 @@ export function FinancialReports() {
         </Card>
       </div>
 
-      {/* FINANCIAL SUMMARY LEDGER - Featured at top */}
-      <Card className="shadow-sm border-slate-200 overflow-hidden">
-        <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-0 pt-4 px-0">
+      {/* FINANCIAL SUMMARY Ledger - Featured at top */}
+      <Card className={`shadow-sm border-slate-200 overflow-hidden ${fullScreenTable === 'ledger' ? 'fixed z-[100] m-0 rounded-none bg-slate-50 border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : ''}`}>
+        <CardHeader className={`bg-slate-50/50 border-b border-slate-100 pb-0 pt-4 px-0 shrink-0 ${fullScreenTable === 'ledger' ? 'hidden' : ''}`}>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-5 pb-3">
             <div className="flex items-center gap-2">
               <ReceiptText className="w-5 h-5 text-indigo-600" />
               <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">Financial Summary Ledger</CardTitle>
             </div>
-            {priv.canExport && (
-              <Button variant="outline" size="sm" className="gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportLedgerPdf}>
-                <FileText className="h-4 w-4" /> Export PDF
+            <div className="flex items-center gap-2 mt-2 sm:mt-0">
+              {priv.canExport && (
+                <Button variant="outline" size="sm" className="gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportLedgerPdf}>
+                  <FileText className="h-4 w-4" /> Export PDF
+                </Button>
+              )}
+              <Button variant="outline" size="sm" className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-100" onClick={() => toggleFullScreen('ledger')}>
+                <Maximize2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Full Screen</span>
               </Button>
-            )}
+            </div>
           </div>
           <div className="flex px-5 gap-6 border-b border-slate-200">
             <button className={`pb-3 text-sm font-semibold transition-all border-b-2 ${summaryTab === 'client' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('client')}>Client Summary</button>
             <button className={`pb-3 text-sm font-semibold transition-all border-b-2 ${summaryTab === 'site' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('site')}>Site Summary</button>
           </div>
         </CardHeader>
-        <div className="overflow-auto max-h-[70vh] relative no-scrollbar">
+        
+        {fullScreenTable === 'ledger' && (
+          <Button 
+            variant="default" 
+            size="icon" 
+            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-indigo-600 hover:bg-indigo-700 text-white w-12 h-12" 
+            onClick={() => toggleFullScreen('ledger')}
+            title="Exit Full Screen"
+          >
+            <Minimize2 className="h-5 w-5" />
+          </Button>
+        )}
+
+        <div className={`overflow-auto relative no-scrollbar ${fullScreenTable === 'ledger' ? 'flex-1 h-full min-h-0' : 'max-h-[70vh]'}`}>
           <Table className="whitespace-nowrap min-w-full text-[13px]">
             <TableHeader className="bg-slate-900 sticky top-0 z-20 shadow-md">
               <TableRow className="hover:bg-slate-900 border-b border-indigo-500/50">
@@ -1997,31 +2056,50 @@ export function FinancialReports() {
       </Card>
 
       {/* ───────────────── ACCOUNTS REPORTS ───────────────── */}
-      <Card className="bg-white border-slate-200 mb-6">
-        <CardHeader className="border-b border-slate-100 pb-4">
+      <Card className={`bg-white mb-6 ${fullScreenTable === 'payroll' ? 'fixed z-[100] m-0 rounded-none border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : 'border-slate-200'}`}>
+        <CardHeader className={`border-b border-slate-100 pb-4 shrink-0 ${fullScreenTable === 'payroll' ? 'hidden' : ''}`}>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <CardTitle className="text-slate-900 flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border text-amber-700 bg-amber-50 border-amber-200">Accounts</span>
               Financial Staff Reports
             </CardTitle>
             {/* Tab switcher */}
-            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-              <button onClick={() => setAccountsTab('payroll')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                  accountsTab === 'payroll' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}>
-                <FileText className="h-3.5 w-3.5" /> Payroll Summary
-              </button>
-              <button onClick={() => setAccountsTab('loans')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                  accountsTab === 'loans' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}>
-                <FileSpreadsheet className="h-3.5 w-3.5" /> Loans & Advances
-              </button>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                <button onClick={() => setAccountsTab('payroll')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    accountsTab === 'payroll' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}>
+                  <FileText className="h-3.5 w-3.5" /> Payroll Summary
+                </button>
+                <button onClick={() => setAccountsTab('loans')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    accountsTab === 'loans' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}>
+                  <FileSpreadsheet className="h-3.5 w-3.5" /> Loans & Advances
+                </button>
+              </div>
+              <Button variant="outline" size="sm" className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-100 h-[32px]" onClick={() => toggleFullScreen('payroll')}>
+                <Maximize2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Full Screen</span>
+              </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-6">
+
+        {fullScreenTable === 'payroll' && (
+          <Button 
+            variant="default" 
+            size="icon" 
+            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-indigo-600 hover:bg-indigo-700 text-white w-12 h-12" 
+            onClick={() => toggleFullScreen('payroll')}
+            title="Exit Full Screen"
+          >
+            <Minimize2 className="h-5 w-5" />
+          </Button>
+        )}
+
+        <CardContent className={`pt-6 ${fullScreenTable === 'payroll' ? 'flex-1 flex flex-col min-h-0 overflow-hidden' : ''}`}>
           {accountsTab === 'payroll' ? (
             /* ── PAYROLL SUMMARY ── */
             (() => {
@@ -2105,7 +2183,7 @@ export function FinancialReports() {
 
               return (
                 <>
-                  <div className="flex items-center justify-end mb-4 flex-wrap gap-3">
+                  <div className={`flex items-center justify-end flex-wrap gap-3 ${fullScreenTable === 'payroll' ? 'hidden' : 'mb-4'}`}>
                     {priv.canExport && (
                       <div className="flex justify-end gap-2">
                         <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportPayrollSummaryCsv}>
@@ -2118,7 +2196,7 @@ export function FinancialReports() {
                     )}
                   </div>
 
-                  <div className="rounded-2xl border border-slate-200 shadow-lg overflow-x-auto" style={{ background: 'linear-gradient(to bottom, #f8fafc, #ffffff)' }}>
+                  <div className={`rounded-2xl border border-slate-200 shadow-lg overflow-auto no-scrollbar ${fullScreenTable === 'payroll' ? 'flex-1 min-h-0' : ''}`} style={{ background: 'linear-gradient(to bottom, #f8fafc, #ffffff)' }}>
                     <div className="min-w-[1100px]">
                       {/* column legend bar */}
                       <div className="grid grid-cols-8 text-[10px] font-bold tracking-widest uppercase px-0 bg-gradient-to-r from-[#1a4a5c] via-[#1f6075] to-[#1a4a5c] border-b border-[#0d3344]">
@@ -2298,7 +2376,7 @@ export function FinancialReports() {
               return (
                 <>
                   {/* Summary tiles */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+                  <div className={`grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5 ${fullScreenTable === 'payroll' ? 'hidden' : ''}`}>
                     {[
                       { label: 'Active Loans', value: activeLoans.length, color: 'amber' },
                       { label: 'Total Loan Balance', value: fmRaw(activeLoans.reduce((s, l) => s + l.remainingBalance, 0)), color: 'amber' },
@@ -2316,7 +2394,7 @@ export function FinancialReports() {
                     ))}
                   </div>
                   {priv.canExport && (
-                    <div className="flex justify-end gap-2 mb-4">
+                    <div className={`flex justify-end gap-2 mb-4 ${fullScreenTable === 'payroll' ? 'hidden' : ''}`}>
                       <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportLoansCsv}>
                         <FileSpreadsheet className="h-4 w-4" /> CSV
                       </Button>
@@ -2327,8 +2405,9 @@ export function FinancialReports() {
                   )}
 
                   {/* Loans table */}
-                  <div className="mb-6">
-                    <div className="text-xs font-bold uppercase tracking-widest text-amber-700 mb-2 px-1">Staff Loans</div>
+                  <div className={`${fullScreenTable === 'payroll' ? 'flex-1 overflow-auto min-h-0 space-y-6 pr-2' : ''}`}>
+                    <div className="mb-6">
+                      <div className="text-xs font-bold uppercase tracking-widest text-amber-700 mb-2 px-1">Staff Loans</div>
                     <div className="rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                       <div className="overflow-x-auto">
                         <Table>
@@ -2408,6 +2487,7 @@ export function FinancialReports() {
                         </Table>
                       </div>
                     </div>
+                  </div>
                   </div>
                 </>
               );
