@@ -5,8 +5,9 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { TabsContent } from '@/src/components/ui/tabs';
-import { Search, Download, Upload, FileText, ChevronLeft, ChevronRight, X, Eye, BookOpen, RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, ChevronDown, Filter } from 'lucide-react';
+import { Search, Download, Upload, FileText, ChevronLeft, ChevronRight, X, Eye, BookOpen, RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, ChevronDown, Filter, Plus, Users, Edit2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/src/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/src/components/ui/dialog';
 import { useAppStore, LedgerEntry } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { usePriv } from '@/src/hooks/usePriv';
@@ -51,6 +52,8 @@ export function Ledger() {
   const addLedgerCategory = useAppStore((state) => state.addLedgerCategory);
   const addLedgerBank = useAppStore((state) => state.addLedgerBank);
   const addLedgerVendor = useAppStore((state) => state.addLedgerVendor);
+  const updateLedgerVendor = useAppStore((state) => state.updateLedgerVendor);
+  const removeLedgerVendor = useAppStore((state) => state.removeLedgerVendor);
 
   const [tab, setTab] = useState('entry');
 
@@ -75,6 +78,51 @@ export function Ledger() {
   const [hasUnsavedPending, setHasUnsavedPending] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+  const [quickVendor, setQuickVendor] = useState('');
+  const [quickTin, setQuickTin] = useState('');
+  const [showVendorDialog, setShowVendorDialog] = useState(false);
+  const [editingVendorId, setEditingVendorId] = useState<string | null>(null);
+  const [vendorRenameValue, setVendorRenameValue] = useState('');
+  const [tinRenameValue, setTinRenameValue] = useState('');
+
+  const handleAddVendor = () => {
+    if (!quickVendor.trim()) return;
+    const exists = ledgerVendors.some(v => v.name.toLowerCase() === quickVendor.trim().toLowerCase());
+    if (exists) {
+      toast.error('Vendor already exists');
+      return;
+    }
+    addLedgerVendor({ id: generateId(), name: quickVendor.trim(), tinNumber: quickTin.trim() });
+    setQuickVendor('');
+    setQuickTin('');
+    toast.success(`Vendor "${quickVendor.trim()}" added`);
+  };
+
+  const handleRenameVendor = (id: string) => {
+    if (!vendorRenameValue.trim()) return;
+    updateLedgerVendor(id, { 
+      name: vendorRenameValue.trim(),
+      tinNumber: tinRenameValue.trim()
+    });
+    setEditingVendorId(null);
+    setVendorRenameValue('');
+    setTinRenameValue('');
+    toast.success('Vendor updated');
+  };
+
+  const handleRemoveVendor = async (id: string, name: string) => {
+    const usage = ledgerEntries.filter(l => l.vendor === name).length;
+    if (usage > 0) {
+      toast.error(`Cannot delete: Vendor is used in ${usage} ledger entries.`);
+      return;
+    }
+    const ok = await showConfirm(`Delete vendor "${name}"?`);
+    if (ok) {
+      removeLedgerVendor(id);
+      toast.success('Vendor deleted');
+    }
+  };
 
   const isLedgerDirty = useMemo(() => {
     return JSON.stringify(items) !== originalItemsJSON || hasUnsavedPending;
@@ -654,24 +702,7 @@ export function Ledger() {
           </button>
         </div>
         <div className="h-8 w-[1px] bg-slate-200 mx-1" />
-        {tab === 'entry' ? (
-          <div className="flex items-center gap-2">
-            {activeVoucherNo && priv.canDelete && (
-              <Button size="sm" variant="ghost" className="h-9 w-9 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-600 border border-rose-100" onClick={handleDeleteVoucher} title="Delete Voucher">
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-            <Button size="sm" variant="ghost" className="h-9 w-9 p-0 text-slate-500 hover:bg-slate-100 border border-slate-200" onClick={handleReload} title="Reload Voucher">
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="outline" className={`h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight ${hasUnsavedPending ? 'opacity-40 pointer-events-none' : 'hover:bg-slate-50'}`} onClick={handleClear}>
-              <X className="h-3.5 w-3.5" /> Clear
-            </Button>
-            <Button size="sm" className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95" onClick={handleSubmit} disabled={!priv.canAdd}>
-              <CheckCircle2 className="h-3.5 w-3.5" /> Submit Voucher
-            </Button>
-          </div>
-        ) : (
+        {tab === 'records' && (
           <div className="flex items-center gap-2">
             {priv.canAdd && (
               <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm">
@@ -807,7 +838,7 @@ export function Ledger() {
                       loadVoucher(vno);
                     }
                   }}
-                  className="bg-white flex-1 min-w-0 h-9 font-mono text-indigo-700 font-bold tracking-wide border border-r-0 rounded-l-md border-slate-300 outline-none px-3 cursor-pointer truncate"
+                  className="bg-white flex-1 min-w-0 h-9 text-xs font-mono text-indigo-700 font-bold border border-r-0 rounded-l-md border-slate-300 outline-none px-2 cursor-pointer truncate"
                 >
                   <option value={generatedVoucherNo} className="font-sans italic text-slate-500">
                     New: {generatedVoucherNo}
@@ -822,11 +853,11 @@ export function Ledger() {
                     </optgroup>
                   )}
                 </select>
-                <button onClick={handlePrevVoucher} className="h-9 w-9 shrink-0 bg-slate-50 border border-slate-300 border-l-0 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors">
-                  <ChevronLeft className="h-4 w-4" />
+                <button onClick={handlePrevVoucher} className="h-9 w-8 shrink-0 bg-slate-50 border border-slate-300 border-l-0 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors">
+                  <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={handleNextVoucher} className="h-9 w-9 shrink-0 bg-slate-50 border border-slate-300 border-l-0 rounded-r-md text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors">
-                  <ChevronRight className="h-4 w-4" />
+                <button onClick={handleNextVoucher} className="h-9 w-8 shrink-0 bg-slate-50 border border-slate-300 border-l-0 rounded-r-md text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors">
+                  <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
@@ -849,6 +880,55 @@ export function Ledger() {
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Entered By</label>
               <Input readOnly value={currentUser?.name || ''} className="bg-slate-100/50 h-9 text-xs font-bold text-slate-400 border-slate-200 pointer-events-none shadow-sm" />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Directory</label>
+              <Button 
+                variant="outline" 
+                className="h-9 w-full sm:w-auto px-4 border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-indigo-600 font-bold text-[11px] uppercase tracking-wider gap-2 shadow-sm transition-all active:scale-95 bg-white justify-start" 
+                onClick={() => setShowVendorDialog(true)}
+              >
+                <Users className="h-3.5 w-3.5" /> Manage Vendors
+              </Button>
+            </div>
+
+            {/* Desktop Actions */}
+            <div className="hidden sm:flex flex-col justify-end items-end sm:col-span-1 lg:col-span-3 mt-4 sm:mt-0">
+              <div className="flex items-center gap-2">
+                {activeVoucherNo && priv.canDelete && (
+                  <Button 
+                    variant="ghost" 
+                    className="h-9 w-9 p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-600 border border-rose-100 bg-white" 
+                    onClick={handleDeleteVoucher} 
+                    title="Delete Voucher"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button 
+                  variant="ghost" 
+                  className="h-9 w-9 p-0 text-slate-500 hover:bg-slate-100 border border-slate-200 bg-white" 
+                  onClick={handleReload} 
+                  title="Reload Voucher"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className={`h-9 px-4 gap-2 border-slate-300 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight ${hasUnsavedPending ? 'opacity-40 pointer-events-none' : 'hover:bg-slate-50'}`} 
+                  onClick={handleClear}
+                >
+                  <X className="h-3.5 w-3.5" /> Clear
+                </Button>
+                <Button 
+                  className="h-9 px-6 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95" 
+                  onClick={handleSubmit} 
+                  disabled={!priv.canAdd}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Submit Voucher
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -1663,6 +1743,212 @@ export function Ledger() {
           </div>
         </div>
       )}
+
+      <TabsContent active={tab === 'records'} className="m-0 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-12">
+          {voucherSummaries.length === 0 ? (
+            <div className="col-span-full py-24 text-center bg-white rounded-2xl border border-dashed border-slate-200 shadow-sm">
+              <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <History className="h-8 w-8 text-slate-300" />
+              </div>
+              <p className="text-slate-600 font-bold text-lg">No Voucher Records</p>
+              <p className="text-sm text-slate-400 mt-1 max-w-xs mx-auto">Voucher records will appear here once you submit entries in the Entry tab.</p>
+            </div>
+          ) : (
+            voucherSummaries.map((v) => (
+              <Card 
+                key={v.voucherNo} 
+                className="group hover:border-indigo-400 transition-all cursor-pointer hover:shadow-lg overflow-hidden border-slate-200 relative bg-white"
+                onClick={() => setDialogVoucher(v.voucherNo)}
+              >
+                <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="p-5 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-0.5">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Voucher No</p>
+                      <h4 className="text-lg font-black text-slate-900 font-mono tracking-tight group-hover:text-indigo-600 transition-colors">{v.voucherNo}</h4>
+                    </div>
+                    <div className="bg-slate-100 px-2.5 py-1 rounded-lg text-slate-600 font-bold text-[10px] uppercase group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-sm">
+                      {v.count} Line{v.count !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Date</p>
+                      <p className="text-xs font-bold text-slate-700 bg-slate-50 px-2 py-1 rounded border border-slate-100">{normalizeDate(v.date)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Bank</p>
+                      <p className="text-xs font-bold text-slate-700 truncate">{v.bank || 'Unspecified'}</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-100 flex justify-between items-end">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total Amount</p>
+                      <p className="text-xl font-black text-indigo-700 font-mono">₦{v.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    </div>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-300 group-hover:text-indigo-500 group-hover:bg-indigo-50 transition-all">
+                      <ChevronRight className="h-5 w-5" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+      </TabsContent>
+
+      {/* ── Vendor Management Dialog ─────────────────────────────────────── */}
+      <Dialog open={showVendorDialog} onOpenChange={setShowVendorDialog}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0 border-none shadow-2xl">
+          <DialogHeader className="p-6 pb-5 border-b border-slate-100 bg-white shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-indigo-50 border border-indigo-100/50 rounded-xl">
+                <Users className="h-5 w-5 text-indigo-600" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-black tracking-tight text-slate-800">Vendor Directory</DialogTitle>
+                <p className="text-slate-500 text-xs mt-0.5 font-medium">Manage global vendors for ledger entries</p>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/30">
+            {/* Add New Vendor */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+              <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                <Plus className="h-3 w-3 text-indigo-500" /> Add New Vendor
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-[1.5fr_1.5fr_auto] gap-3 items-end">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-500">Vendor Name</label>
+                  <Input 
+                    placeholder="e.g. Amorsil..." 
+                    value={quickVendor}
+                    onChange={e => setQuickVendor(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAddVendor()}
+                    className="h-9 text-xs shadow-sm border-slate-200 focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-500">TIN Number <span className="text-slate-400 font-normal">(Optional)</span></label>
+                  <Input 
+                    placeholder="Enter TIN..." 
+                    value={quickTin}
+                    onChange={e => setQuickTin(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAddVendor()}
+                    className="h-9 text-xs shadow-sm border-slate-200 focus:border-indigo-500 font-mono transition-colors"
+                  />
+                </div>
+                <Button onClick={handleAddVendor} className="h-9 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm gap-2 px-6 w-full sm:w-auto">
+                  Add Vendor
+                </Button>
+              </div>
+            </div>
+
+            {/* Vendor List */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registered Vendors ({ledgerVendors.length})</h4>
+              </div>
+              <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                <Table>
+                  <TableHeader className="bg-slate-50">
+                    <TableRow>
+                      <TableHead className="text-[10px] uppercase font-bold text-slate-500 h-10 px-4">Vendor Name</TableHead>
+                      <TableHead className="text-[10px] uppercase font-bold text-slate-500 h-10 px-4">TIN Number</TableHead>
+                      <TableHead className="text-[10px] uppercase font-bold text-slate-500 h-10 text-right px-4">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedVendors.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="h-24 text-center text-slate-400 text-xs italic">No vendors registered yet.</TableCell>
+                      </TableRow>
+                    ) : (
+                      sortedVendors.map(v => (
+                        <TableRow key={v.id} className="hover:bg-slate-50/50 transition-colors group">
+                          <TableCell className="py-2 px-4">
+                            {editingVendorId === v.id ? (
+                              <Input 
+                                value={vendorRenameValue} 
+                                onChange={e => setVendorRenameValue(e.target.value)}
+                                className="h-8 text-xs font-semibold focus:ring-indigo-500/20"
+                                autoFocus
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleRenameVendor(v.id);
+                                  if (e.key === 'Escape') setEditingVendorId(null);
+                                }}
+                              />
+                            ) : (
+                              <span className="font-semibold text-slate-700 text-sm">{v.name}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-2 px-4">
+                            {editingVendorId === v.id ? (
+                              <Input 
+                                value={tinRenameValue} 
+                                onChange={e => setTinRenameValue(e.target.value)}
+                                className="h-8 text-xs font-mono focus:ring-indigo-500/20"
+                                placeholder="TIN..."
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleRenameVendor(v.id);
+                                  if (e.key === 'Escape') setEditingVendorId(null);
+                                }}
+                              />
+                            ) : (
+                              <span className="text-xs font-mono text-slate-500">{v.tinNumber || '—'}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-2 px-4 text-right">
+                            {editingVendorId === v.id ? (
+                              <div className="flex justify-end gap-1">
+                                <Button size="sm" onClick={() => handleRenameVendor(v.id)} className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white px-3">Save</Button>
+                                <Button size="sm" variant="ghost" onClick={() => setEditingVendorId(null)} className="h-8 text-slate-400 hover:text-slate-600">Cancel</Button>
+                              </div>
+                            ) : (
+                              <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                  onClick={() => {
+                                    setEditingVendorId(v.id);
+                                    setVendorRenameValue(v.name);
+                                    setTinRenameValue(v.tinNumber || '');
+                                  }}
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                  onClick={() => handleRemoveVendor(v.id, v.name)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="p-4 bg-slate-50 border-t border-slate-100 shrink-0 flex justify-end">
+            <DialogClose className="w-auto h-10 px-6 bg-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-200 font-semibold border-none rounded-lg transition-colors">
+              Close Directory
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Hidden Global File Input */}
       {priv?.canAdd && <input type="file" ref={fileInputRef} accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportSelected} />}
