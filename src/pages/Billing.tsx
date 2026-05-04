@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import InvoiceLogo from '../../logo/logo-2.png';
 import { useAppStore, PendingInvoice, Invoice } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
-import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight, Printer } from 'lucide-react';
+import { Trash2, Edit, CheckCircle, Plus, X, ArrowRightCircle, Upload, Download, Mail, ChevronUp, ChevronDown, ChevronRight, Printer, PlusCircle } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -54,6 +54,9 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
   const [filterFromMonth, setFilterFromMonth] = useState<string>('');
   const [filterToMonth, setFilterToMonth] = useState<string>('');
   const [showActions, setShowActions] = useState(false);
+  const [nextInvoiceDialog, setNextInvoiceDialog] = useState(false);
+  const [nextInvoiceSource, setNextInvoiceSource] = useState<Invoice | null>(null);
+  const [selectedNextMachines, setSelectedNextMachines] = useState<number[]>([]);
 
   // ── Master Site Registry ────────────────────────────────────
   const siteRegistry = useMemo(() => {
@@ -516,6 +519,87 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       setActiveTab('all');
     }
   };
+
+  const handleGenerateNext = (inv: Invoice) => {
+    const num = inv.noOfMachine || 0;
+    if (num > 1) {
+      setNextInvoiceSource(inv);
+      setSelectedNextMachines(Array.from({ length: num }, (_, i) => i));
+      setNextInvoiceDialog(true);
+    } else {
+      prepareNextInvoice(inv, [0]);
+    }
+  };
+
+  const prepareNextInvoice = (inv: Invoice, machineIndices: number[]) => {
+    handleClear();
+    
+    // Calculate start date: previous end date (dueDate) + 1 day
+    let nextStart = '';
+    const prevEnd = inv.dueDate || inv.date;
+    if (prevEnd) {
+      const d = new Date(prevEnd);
+      if (!isNaN(d.getTime())) {
+        d.setDate(d.getDate() + 1);
+        nextStart = d.toISOString().split('T')[0];
+      }
+    }
+
+    const client = (inv.client || '').trim();
+    const site = (inv.siteName || '').trim();
+    const siteObj = siteRegistry.find(s => s.name === site && s.client === client);
+
+    setForm({
+      ...initialForm,
+      destination: 'Active',
+      startDate: nextStart,
+      client,
+      site,
+      vatInc: siteObj ? siteObj.vat : (inv.vatInc || 'No'),
+      noOfMachine: String(machineIndices.length),
+      noOfTechnician: String(inv.noOfTechnician || 0),
+      techniciansDailyRate: String(inv.techniciansDailyRate || 0),
+      dieselCostPerLtr: String(inv.dieselCostPerLtr || 0),
+      dailyUsage: String(inv.dailyUsage || 0),
+      mobDemob: '0', // Usually mob/demob is one-time, but user can re-input
+      installation: '0',
+      damages: '0',
+      createReminder: true,
+      sendEmailNotification: true,
+    });
+
+    // Handle machine configs
+    if (inv.machineConfigs && inv.machineConfigs.length > 0) {
+      const firstRate = inv.machineConfigs[0].rate;
+      const firstDur = inv.machineConfigs[0].duration;
+      
+      const newConfigs = machineIndices.map((idx, i) => {
+        const source = inv.machineConfigs![idx];
+        return {
+          rate: String(source?.rate ?? firstRate ?? 0),
+          duration: String(source?.duration ?? firstDur ?? 0),
+          sameRateAsFirst: i > 0,
+          sameDurationAsFirst: i > 0
+        };
+      });
+      setMachineConfigs(newConfigs);
+    } else {
+      const rate = String(inv.dailyRentalCost || 0);
+      const dur = String(inv.duration || 0);
+      setMachineConfigs(
+        Array.from({ length: machineIndices.length }, (_, i) => ({
+          rate,
+          duration: dur,
+          sameRateAsFirst: i > 0,
+          sameDurationAsFirst: i > 0
+        }))
+      );
+    }
+
+    setIsModalOpen(true);
+    setNextInvoiceDialog(false);
+  };
+
 
   const parseCSVRow = (str: string) => {
     const vals: string[] = [];
@@ -1433,6 +1517,11 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                                 <Edit className="w-4 h-4" />
                               </Button>
                             )}
+                             {priv.canEdit && activeTab !== 'quotations' && (
+                               <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleGenerateNext(inv); }} className="h-8 w-8 text-orange-600 hover:bg-orange-50" title="Generate Next Invoice">
+                                 <PlusCircle className="w-4 h-4" />
+                               </Button>
+                             )}
                             {priv.canEdit && (
                               <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setPrintInvoiceTarget(inv); }} className="h-8 w-8 text-blue-600 hover:bg-blue-50" title="Print Invoice">
                                 <Printer className="w-4 h-4" />
@@ -1574,6 +1663,11 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                             <Edit className="w-4 h-4" />
                           </Button>
                         )}
+                         {priv.canEdit && activeTab !== 'quotations' && (
+                           <Button variant="ghost" size="sm" onClick={() => handleGenerateNext(inv)} className="h-8 w-8 p-0 text-orange-600 hover:bg-orange-100 rounded-md">
+                             <PlusCircle className="w-4 h-4" />
+                           </Button>
+                         )}
                         {priv.canEdit && (
                           <Button variant="ghost" size="sm" onClick={() => setPrintInvoiceTarget(inv)} className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-100 rounded-md">
                             <Printer className="w-4 h-4" />
@@ -1868,6 +1962,72 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
             </div>
           </div>
         )}
+
+        {/* Next Invoice Machine Selection Dialog */}
+         {nextInvoiceDialog && nextInvoiceSource && (
+           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+               <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                 <h3 className="font-bold text-slate-800 uppercase tracking-tight text-sm flex items-center gap-2">
+                   <PlusCircle className="w-4 h-4 text-orange-500" /> Select Machines
+                 </h3>
+                 <button onClick={() => setNextInvoiceDialog(false)} className="text-slate-400 hover:text-slate-600">
+                   <X className="w-5 h-5" />
+                 </button>
+               </div>
+               <div className="p-6 space-y-4">
+                 <p className="text-xs text-slate-500 leading-relaxed">
+                   Invoice <span className="font-bold text-slate-700">#{nextInvoiceSource.invoiceNumber}</span> contains multiple machines. Select which ones to include in the next billing cycle.
+                 </p>
+                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                   <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors group">
+                     <input 
+                       type="checkbox" 
+                       className="w-4 h-4 accent-orange-500"
+                       checked={selectedNextMachines.length === nextInvoiceSource.noOfMachine}
+                       onChange={(e) => {
+                         if (e.target.checked) {
+                           setSelectedNextMachines(Array.from({ length: nextInvoiceSource.noOfMachine || 0 }, (_, i) => i));
+                         } else {
+                           setSelectedNextMachines([]);
+                         }
+                       }}
+                     />
+                     <span className="text-sm font-bold text-slate-700 group-hover:text-orange-600">Select All Machines</span>
+                   </label>
+                   <div className="h-px bg-slate-100 my-1" />
+                   {Array.from({ length: nextInvoiceSource.noOfMachine || 0 }).map((_, idx) => (
+                     <label key={idx} className="flex items-center gap-3 p-3 rounded-lg border border-slate-50 hover:border-orange-100 hover:bg-orange-50/30 cursor-pointer transition-colors group">
+                       <input 
+                         type="checkbox" 
+                         className="w-4 h-4 accent-orange-500"
+                         checked={selectedNextMachines.includes(idx)}
+                         onChange={(e) => {
+                           if (e.target.checked) {
+                             setSelectedNextMachines([...selectedNextMachines, idx]);
+                           } else {
+                             setSelectedNextMachines(selectedNextMachines.filter(i => i !== idx));
+                           }
+                         }}
+                       />
+                       <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">Machine {idx + 1}</span>
+                     </label>
+                   ))}
+                 </div>
+               </div>
+               <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+                 <Button variant="outline" className="flex-1 h-10 text-xs font-bold uppercase tracking-tight" onClick={() => setNextInvoiceDialog(false)}>Cancel</Button>
+                 <Button 
+                   className="flex-1 h-10 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold uppercase tracking-tight shadow-md disabled:opacity-50"
+                   disabled={selectedNextMachines.length === 0}
+                   onClick={() => prepareNextInvoice(nextInvoiceSource, selectedNextMachines)}
+                 >
+                   Continue <ArrowRightCircle className="ml-2 w-4 h-4" />
+                 </Button>
+               </div>
+             </div>
+           </div>
+         )}
 
         {/* Import Modal Options */}
         {importFile && (
@@ -2549,4 +2709,3 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
     </div>
   );
 }
-
