@@ -544,13 +544,15 @@ export function Payroll() {
       // Seed with ALL active employee IDs so all checkboxes appear checked
       const isExcludeNonEmp = type === 'PAYSLIPS' || type === 'PAYE' || type === 'PENSION' || type === 'NSITF';
       const isOnlyNonEmp = type === 'WITHHOLDING';
-      setPrintSelectedEmployees(employees.filter(e => {
+      const initialStaff = employees.filter(e => {
         if (e.status !== 'Active' && e.status !== 'On Leave') return false;
         const isNonEmp = e.staffType === 'NON-EMPLOYEE' || e.department?.toUpperCase() === 'NON-EMPLOYEE' || e.department?.toUpperCase() === 'BENEFICIARY';
         if (isExcludeNonEmp && isNonEmp) return false;
         if (isOnlyNonEmp && !isNonEmp) return false;
         return true;
-      }).map(e => e.id));
+      });
+      setPrintSelectedEmployees(initialStaff.map(e => e.id));
+      setPrintSelectedDepts([...new Set(initialStaff.map(e => e.department).filter(Boolean))]);
       setPrintType(type);
       setPrintDialogOpen(true);
       setPrintSelectedColumns(DEFAULT_COLUMNS[type] || []);

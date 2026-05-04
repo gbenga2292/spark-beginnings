@@ -5,6 +5,7 @@ interface PageState {
   title: string;
   headerButtons: ReactNode | null;
   subtitle: string;
+  showBackButton: boolean;
 }
 
 // Dispatch definition
@@ -12,6 +13,7 @@ interface PageDispatch {
   setTitle: (title: string) => void;
   setHeaderButtons: (buttons: ReactNode | null) => void;
   setSubtitle: (subtitle: string) => void;
+  setShowBackButton: (show: boolean) => void;
 }
 
 const PageStateContext = createContext<PageState | undefined>(undefined);
@@ -21,9 +23,10 @@ export function PageProvider({ children }: { children: ReactNode }) {
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
   const [headerButtons, setHeaderButtons] = useState<ReactNode | null>(null);
+  const [showBackButton, setShowBackButton] = useState(false);
 
-  const stateValue = useMemo(() => ({ title, subtitle, headerButtons }), [title, subtitle, headerButtons]);
-  const dispatchValue = useMemo(() => ({ setTitle, setSubtitle, setHeaderButtons }), []);
+  const stateValue = useMemo(() => ({ title, subtitle, headerButtons, showBackButton }), [title, subtitle, headerButtons, showBackButton]);
+  const dispatchValue = useMemo(() => ({ setTitle, setSubtitle, setHeaderButtons, setShowBackButton }), []);
 
   return (
     <PageStateContext.Provider value={stateValue}>
@@ -57,7 +60,8 @@ export function useSetPageTitle(
   title: string | null,
   subtitle: string = '',
   buttons: ReactNode | null = null,
-  deps: any[] = []
+  deps: any[] = [],
+  showBackButton: boolean = false
 ) {
   const dispatch = useContext(PageDispatchContext);
 
@@ -80,10 +84,11 @@ export function useSetPageTitle(
     const myGen = _generation;
     generationRef.current = myGen;
 
-    const { setTitle, setSubtitle, setHeaderButtons } = dispatch;
+    const { setTitle, setSubtitle, setHeaderButtons, setShowBackButton } = dispatch;
     setTitle(title);
     setSubtitle(subtitle);
     setHeaderButtons(buttonsRef.current);
+    setShowBackButton(showBackButton);
 
     return () => {
       // Only clear if we are still the latest owner (i.e. no newer component mounted yet)
@@ -95,6 +100,7 @@ export function useSetPageTitle(
           setTitle('');
           setSubtitle('');
           setHeaderButtons(null);
+          setShowBackButton(false);
         }
         // else: a newer component already set the title — don't touch it
       }, 0);

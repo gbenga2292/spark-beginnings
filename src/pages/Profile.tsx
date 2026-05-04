@@ -283,22 +283,10 @@ export function Profile() {
     );
   }
 
-  useSetPageTitle('My Profile', 'Account settings, appearance, and security');
+  useSetPageTitle('My Profile', 'Account settings, appearance, and security', null, [], true);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-8 pb-20 sm:pb-10">
-
-      {/* Back Button */}
-      <div className="mb-6">
-        <Button 
-          variant="ghost" 
-          onClick={() => navigate(-1)} 
-          className="rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold -ml-2 h-10 px-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-      </div>
 
       {/* Success/Error Messages */}
       {successMessage && (

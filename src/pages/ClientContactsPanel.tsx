@@ -24,68 +24,32 @@ const EMPTY_CONTACT = (): Omit<ClientContact, 'id' | 'createdAt' | 'updatedAt'> 
   isActive: true,
 });
 
-export function ClientContactsPanel({ clientName, onClose }: Props) {
-  const { isDark } = useTheme();
-  const contacts = useAppStore(s => s.clientContacts);
-  const sites = useAppStore(s => s.sites);
-  const addClientContact = useAppStore(s => s.addClientContact);
-  const updateClientContact = useAppStore(s => s.updateClientContact);
-  const deleteClientContact = useAppStore(s => s.deleteClientContact);
+const CardRow = ({ icon, value }: { icon: React.ReactNode; value?: string }) =>
+  value ? (
+    <div className="flex items-center gap-1.5 text-xs text-slate-500 truncate">
+      {icon}
+      <span className="truncate">{value}</span>
+    </div>
+  ) : null;
 
-  const clientContacts = contacts.filter(c => c.clientName === clientName);
-  const clientSites = sites.filter(s => s.client === clientName);
+interface ContactFormProps {
+  draft: ReturnType<typeof EMPTY_CONTACT>;
+  setDraft: React.Dispatch<React.SetStateAction<ReturnType<typeof EMPTY_CONTACT>>>;
+  isDark: boolean;
+  clientSites: any[];
+  onSave: () => void;
+  onCancel: () => void;
+  toggleSite: (site: { id: string; name: string }, currentIds: string[], currentNames: string[]) => void;
+}
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [showAdd, setShowAdd] = useState(false);
-  const [draft, setDraft] = useState(EMPTY_CONTACT());
-
+const ContactForm = ({ draft, setDraft, isDark, clientSites, onSave, onCancel, toggleSite }: ContactFormProps) => {
   const inputCls = cn(
     'flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500',
     isDark ? 'bg-slate-800 border-slate-600 text-slate-100 placeholder:text-slate-500' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
   );
   const labelCls = cn('text-xs font-semibold mb-1', isDark ? 'text-slate-400' : 'text-slate-500');
 
-  const handleAdd = () => {
-    if (!draft.name.trim()) { toast.error('Name is required'); return; }
-    addClientContact({ ...draft, id: generateId(), clientName, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
-    setDraft(EMPTY_CONTACT());
-    setShowAdd(false);
-    toast.success('Contact added');
-  };
-
-  const startEdit = (c: ClientContact) => {
-    setEditingId(c.id);
-    setDraft({ name: c.name, phone: c.phone || '', email: c.email || '', position: c.position || '', note: c.note || '', clientName: c.clientName, siteIds: c.siteIds || [], siteNames: c.siteNames || [], isActive: c.isActive });
-    setShowAdd(false);
-  };
-
-  const saveEdit = () => {
-    if (!draft.name.trim()) { toast.error('Name is required'); return; }
-    updateClientContact(editingId!, draft);
-    setEditingId(null);
-    toast.success('Contact updated');
-  };
-
-  const toggleSite = (site: { id: string; name: string }, currentIds: string[], currentNames: string[]) => {
-    if (currentIds.includes(site.id)) {
-      setDraft(d => ({ ...d, siteIds: currentIds.filter(id => id !== site.id), siteNames: currentNames.filter(n => n !== site.name) }));
-    } else {
-      setDraft(d => ({ ...d, siteIds: [...currentIds, site.id], siteNames: [...currentNames, site.name] }));
-    }
-  };
-
-  const CardRow = ({ icon, value }: { icon: React.ReactNode; value?: string }) =>
-    value ? (
-      <div className="flex items-center gap-1.5 text-xs text-slate-500 truncate">
-        {icon}
-        <span className="truncate">{value}</span>
-      </div>
-    ) : null;
-
-  const overlayBg = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4';
-  const cardCls = cn('relative w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200');
-
-  const ContactForm = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+  return (
     <div className={cn('rounded-xl border p-4 space-y-3', isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200')}>
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -149,6 +113,55 @@ export function ClientContactsPanel({ clientName, onClose }: Props) {
       </div>
     </div>
   );
+};
+
+export function ClientContactsPanel({ clientName, onClose }: Props) {
+  const { isDark } = useTheme();
+  const contacts = useAppStore(s => s.clientContacts);
+  const sites = useAppStore(s => s.sites);
+  const addClientContact = useAppStore(s => s.addClientContact);
+  const updateClientContact = useAppStore(s => s.updateClientContact);
+  const deleteClientContact = useAppStore(s => s.deleteClientContact);
+
+  const clientContacts = contacts.filter(c => c.clientName === clientName);
+  const clientSites = sites.filter(s => s.client === clientName);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [draft, setDraft] = useState(EMPTY_CONTACT());
+
+  const handleAdd = () => {
+    if (!draft.name.trim()) { toast.error('Name is required'); return; }
+    addClientContact({ ...draft, id: generateId(), clientName, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    setDraft(EMPTY_CONTACT());
+    setShowAdd(false);
+    toast.success('Contact added');
+  };
+
+  const startEdit = (c: ClientContact) => {
+    setEditingId(c.id);
+    setDraft({ name: c.name, phone: c.phone || '', email: c.email || '', position: c.position || '', note: c.note || '', clientName: c.clientName, siteIds: c.siteIds || [], siteNames: c.siteNames || [], isActive: c.isActive });
+    setShowAdd(false);
+  };
+
+  const saveEdit = () => {
+    if (!draft.name.trim()) { toast.error('Name is required'); return; }
+    updateClientContact(editingId!, draft);
+    setEditingId(null);
+    toast.success('Contact updated');
+  };
+
+  const toggleSite = (site: { id: string; name: string }, currentIds: string[], currentNames: string[]) => {
+    if (currentIds.includes(site.id)) {
+      setDraft(d => ({ ...d, siteIds: currentIds.filter(id => id !== site.id), siteNames: currentNames.filter(n => n !== site.name) }));
+    } else {
+      setDraft(d => ({ ...d, siteIds: [...currentIds, site.id], siteNames: [...currentNames, site.name] }));
+    }
+  };
+
+  const overlayBg = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4';
+  const cardCls = cn('relative w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]', isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200');
+
 
   return (
     <div className={overlayBg} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -177,7 +190,7 @@ export function ClientContactsPanel({ clientName, onClose }: Props) {
               <Plus className="w-3.5 h-3.5" /> Add Contact
             </Button>
           )}
-          {showAdd && <ContactForm onSave={handleAdd} onCancel={() => setShowAdd(false)} />}
+          {showAdd && <ContactForm draft={draft} setDraft={setDraft} isDark={isDark} clientSites={clientSites} onSave={handleAdd} onCancel={() => setShowAdd(false)} toggleSite={toggleSite} />}
 
           {/* Contact list */}
           {clientContacts.length === 0 && !showAdd && (
@@ -191,7 +204,7 @@ export function ClientContactsPanel({ clientName, onClose }: Props) {
           {clientContacts.map(contact => (
             <div key={contact.id}>
               {editingId === contact.id ? (
-                <ContactForm onSave={saveEdit} onCancel={() => setEditingId(null)} />
+                <ContactForm draft={draft} setDraft={setDraft} isDark={isDark} clientSites={clientSites} onSave={saveEdit} onCancel={() => setEditingId(null)} toggleSite={toggleSite} />
               ) : (
                 <div className={cn('rounded-xl border p-4 transition-all', isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200', !contact.isActive && 'opacity-60')}>
                   <div className="flex items-start justify-between gap-3">

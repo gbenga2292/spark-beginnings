@@ -1,6 +1,6 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign } from 'lucide-react';
+import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft } from 'lucide-react';
 import { StatusIndicator } from '@/src/components/offline/StatusIndicator';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/src/store/auth';
@@ -298,15 +298,29 @@ export function Header({ onMenuClick }: HeaderProps) {
         )}
 
         <div className="flex flex-col min-w-0 transition-all duration-300">
-          <h1 className={`text-base md:text-lg font-bold tracking-tight truncate ${
-            isDark ? 'text-slate-100' : 'text-slate-900'
-          }`}>
-            {title || 'Dashboard'}
-          </h1>
+          <div className="flex items-center gap-2">
+            {usePage().showBackButton && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => navigate(-1)} 
+                className={`h-7 w-7 rounded-lg -ml-1 transition-all ${
+                  isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+            <h1 className={`text-base md:text-lg font-bold tracking-tight truncate ${
+              isDark ? 'text-slate-100' : 'text-slate-900'
+            }`}>
+              {title || 'Dashboard'}
+            </h1>
+          </div>
           {subtitle && (
             <p className={`text-[10px] truncate font-medium mt-0.5 ${
               isDark ? 'text-slate-400' : 'text-slate-500'
-            }`}>
+            } ${usePage().showBackButton ? 'ml-8' : ''}`}>
               {subtitle}
             </p>
           )}

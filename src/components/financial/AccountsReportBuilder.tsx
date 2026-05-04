@@ -136,6 +136,8 @@ const TXN_COLUMNS: ColumnDef[] = [
   { id: 'p_net',        label: 'Net Pay',          summable: true,  sources: ['PAYROLL'] },
   { id: 'p_month',      label: 'Month',            summable: false, sources: ['PAYROLL'] },
   { id: 'p_year',       label: 'Year',             summable: false, sources: ['PAYROLL'] },
+  { id: 'p_bank',       label: 'Bank Name',        summable: false, sources: ['PAYROLL'] },
+  { id: 'p_account',    label: 'Account Number',   summable: false, sources: ['PAYROLL'] },
   // Ledger
   { id: 'l_date',       label: 'Date',             summable: false, sources: ['LEDGER'] },
   { id: 'l_voucher',    label: 'Voucher No.',      summable: false, sources: ['LEDGER'] },
@@ -220,7 +222,7 @@ const BUILT_IN_PRESETS: ReportPreset[] = [
   {
     id: '__payroll', name: 'Payroll Report', builtIn: true,
     sources: ['PAYROLL'],
-    columns: ['sn','p_employee','p_department','p_position','p_staffType','p_basic','p_pension','p_paye','p_nsitf','p_net','p_month','p_year'],
+    columns: ['sn','p_employee','p_department','p_position','p_staffType','p_basic','p_pension','p_paye','p_nsitf','p_net','p_month','p_year', 'p_bank', 'p_account'],
   },
   {
     id: '__led', name: 'Ledger Report', builtIn: true,
@@ -249,7 +251,7 @@ const fm = (v: number | null | undefined) => {
 const NON_NUMERIC_COLS = new Set([
   'sn','client','site','tin','date','vatDate','dueDate','invoiceNo','billingCycle',
   'vatInc','status','remMonth','remYear','project',
-  'p_employee','p_department','p_position','p_staffType','p_month','p_year',
+  'p_employee','p_department','p_position','p_staffType','p_month','p_year', 'p_bank', 'p_account',
   'l_date','l_voucher','l_category','l_desc','l_vendor','l_bank','l_client','l_site','l_enteredBy',
   't_name','t_client','t_status','t_vat','t_start','t_end',
   's_sn','s_client','s_tin',
@@ -405,17 +407,30 @@ export function AccountsReportBuilder({
   // ── Available clients ────────────────────────────────────────────────────────
   const availableClients = useMemo(() => {
     const s = new Set<string>();
-    sites.forEach(x => { if (x.client) s.add(x.client.trim()); });
-    rawInvoices.forEach(x => { if (x.client) s.add(x.client.trim()); });
-    rawPayments.forEach(x => { if ((x as any).client) s.add(((x as any).client as string).trim()); });
-    rawVatPayments.forEach(x => { if (x.client) s.add(x.client.trim()); });
-    rawLedgerEntries.forEach(x => { if (x.client && x.client !== '—') s.add(x.client.trim()); });
+    if (selectedSources.includes('PAYROLL')) {
+      employees.forEach(e => s.add(`${e.surname} ${e.firstname}`.trim()));
+    } else {
+      sites.forEach(x => { if (x.client) s.add(x.client.trim()); });
+      rawInvoices.forEach(x => { if (x.client) s.add(x.client.trim()); });
+      rawPayments.forEach(x => { if ((x as any).client) s.add(((x as any).client as string).trim()); });
+      rawVatPayments.forEach(x => { if (x.client) s.add(x.client.trim()); });
+      rawLedgerEntries.forEach(x => { if (x.client && x.client !== '—') s.add(x.client.trim()); });
+    }
     return Array.from(s).sort();
-  }, [sites, rawInvoices, rawPayments, rawVatPayments, rawLedgerEntries]);
+  }, [selectedSources, employees, sites, rawInvoices, rawPayments, rawVatPayments, rawLedgerEntries]);
 
   const availableDepts = useMemo(() => Array.from(new Set(employees.map(e => String(e.department || '')).filter(Boolean))).sort(), [employees]);
   const availablePos   = useMemo(() => Array.from(new Set(employees.map(e => String(e.position || '')).filter(Boolean))).sort((a, b) => getPositionIndex(a) - getPositionIndex(b)), [employees]);
   const availableTypes = ['OFFICE', 'FIELD', 'NON-EMPLOYEE'];
+
+  const prevSourceMode = useRef(selectedSources.includes('PAYROLL') ? 'PAYROLL' : 'FINANCE');
+  useEffect(() => {
+    const currentMode = selectedSources.includes('PAYROLL') ? 'PAYROLL' : 'FINANCE';
+    if (currentMode !== prevSourceMode.current) {
+      setSelectedClients(availableClients);
+      prevSourceMode.current = currentMode;
+    }
+  }, [selectedSources, availableClients]);
 
   useEffect(() => {
     if (availableClients.length > 0 && selectedClients.length === 0) {
@@ -919,6 +934,8 @@ export function AccountsReportBuilder({
         case 'p_net':        return r.takeHomePay || 0;
         case 'p_month':      return MONTHS.find(m => m.key === r.month)?.label || r.month || '—';
         case 'p_year':       return r.year || '—';
+        case 'p_bank':       return r.bankName || '—';
+        case 'p_account':    return r.accountNo || '—';
         default: return '—';
       }
     }
@@ -1259,13 +1276,43 @@ export function AccountsReportBuilder({
               <div>
                 <p className="text-[10px] font-bold text-slate-500 mb-1">Department</p>
                 <div className="flex flex-wrap gap-1">
-                  {availableDepts.map(d => (
-                    <button key={d} onClick={() => setSelectedDepts((prev: string[]) => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])}
-                      className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-all ${selectedDepts.includes(d) ? 'bg-purple-600 border-purple-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:border-purple-300'}`}>
-                      {d}
+                  {availableDepts.map(d => {
+                    const active = selectedDepts.includes(d);
+                    return (
+                      <button 
+                        key={d} 
+                        onClick={() => {
+                          const next = active ? selectedDepts.filter(x => x !== d) : [...selectedDepts, d];
+                          setSelectedDepts(next);
+                          // Auto-mark employees
+                          const filtered = employees.filter(e => {
+                            const dMatch = next.length === 0 || next.includes(e.department);
+                            const tMatch = selectedTypes.length === 0 || selectedTypes.includes(e.staffType);
+                            return dMatch && tMatch;
+                          }).map(e => `${e.surname} ${e.firstname}`.trim());
+                          setSelectedClients(filtered);
+                        }}
+                        className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-all ${active ? 'bg-purple-600 border-purple-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:border-purple-300'}`}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                  {selectedDepts.length > 0 && (
+                    <button 
+                      onClick={() => {
+                        setSelectedDepts([]);
+                        const filtered = employees.filter(e => {
+                          const tMatch = selectedTypes.length === 0 || selectedTypes.includes(e.staffType);
+                          return tMatch;
+                        }).map(e => `${e.surname} ${e.firstname}`.trim());
+                        setSelectedClients(filtered);
+                      }} 
+                      className="text-[10px] text-purple-600 font-bold px-1 hover:underline"
+                    >
+                      Clear
                     </button>
-                  ))}
-                  {availableDepts.length > 0 && <button onClick={() => setSelectedDepts([])} className="text-[10px] text-purple-600 font-bold px-1 hover:underline">Clear</button>}
+                  )}
                 </div>
               </div>
 
@@ -1273,12 +1320,28 @@ export function AccountsReportBuilder({
               <div>
                 <p className="text-[10px] font-bold text-slate-500 mb-1">Staff Type</p>
                 <div className="flex gap-1">
-                  {availableTypes.map(t => (
-                    <button key={t} onClick={() => setSelectedTypes((prev: string[]) => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])}
-                      className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-all ${selectedTypes.includes(t) ? 'bg-purple-600 border-purple-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:border-purple-300'}`}>
-                      {t}
-                    </button>
-                  ))}
+                  {availableTypes.map(t => {
+                    const active = selectedTypes.includes(t);
+                    return (
+                      <button 
+                        key={t} 
+                        onClick={() => {
+                          const next = active ? selectedTypes.filter(x => x !== t) : [...selectedTypes, t];
+                          setSelectedTypes(next);
+                          // Auto-mark employees
+                          const filtered = employees.filter(e => {
+                            const dMatch = selectedDepts.length === 0 || selectedDepts.includes(e.department);
+                            const tMatch = next.length === 0 || next.includes(e.staffType);
+                            return dMatch && tMatch;
+                          }).map(e => `${e.surname} ${e.firstname}`.trim());
+                          setSelectedClients(filtered);
+                        }}
+                        className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-all ${active ? 'bg-purple-600 border-purple-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:border-purple-300'}`}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               
@@ -1290,7 +1353,7 @@ export function AccountsReportBuilder({
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px]">
-                    {selectedClients.filter(c => employees.some(e => `${e.surname} ${e.firstname}`.trim() === c)).length || 'All'}
+                    {selectedClients.length === availableClients.length ? 'All' : `${selectedClients.length} Selected`}
                   </span>
                   <ChevronRight className="h-3 w-3 opacity-40" />
                 </div>
@@ -1518,6 +1581,10 @@ export function AccountsReportBuilder({
               #arb-print-area, #arb-print-area * { visibility: visible; }
               #arb-print-area { position: absolute; left: 0; top: 0; width: 100%; }
               .print\\:hidden { display: none !important; }
+              table { border: 1px solid #cbd5e1 !important; border-collapse: collapse !important; width: 100% !important; }
+              th, td { border: 1px solid #cbd5e1 !important; }
+              thead tr { background-color: #1e293b !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .bg-slate-800 { background-color: #1e293b !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             }
           `}</style>
 
@@ -1532,9 +1599,9 @@ export function AccountsReportBuilder({
                   <h1 className="text-lg sm:text-xl font-bold text-slate-900">{reportTitle}</h1>
                   <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                     {selectedSources.length > 1 && `${selectedSources.map(s => SOURCE_LABELS[s]).join(' + ')} · `}
-                    {selectedYears.length === 1 ? selectedYears[0] : `${Math.min(...selectedYears)}–${Math.max(...selectedYears)}`} · {selectedMonths.length === 12 ? 'All Months' : `${selectedMonths.length} month(s)`}
-                    {selectedClients.length !== availableClients.length ? ` · ${selectedClients.length} client(s)` : ''}
-                    {isMultiSource ? ` · ${aggregatedRows.length} unique client(s)` : ` · ${recordsToPrint.length} record(s)`}
+                    {selectedYears.length === 1 ? selectedYears[0] : `${Math.min(...selectedYears)}–${Math.max(...selectedYears)}`} · {selectedMonths.length === 12 ? 'All Months' : (selectedMonths.length === 1 ? MONTHS.find(m => m.key === selectedMonths[0])?.label : `${selectedMonths.length} month(s)`)}
+                    {selectedClients.length !== availableClients.length ? ` · ${selectedClients.length} ${selectedSources.includes('PAYROLL') ? 'employee(s)' : 'client(s)'}` : ''}
+                    {!selectedSources.includes('PAYROLL') && (isMultiSource ? ` · ${aggregatedRows.length} unique client(s)` : ` · ${recordsToPrint.length} record(s)`)}
                   </p>
                 </div>
                 <div className="text-left sm:text-right text-xs text-slate-400 print:hidden w-full sm:w-auto border-t sm:border-t-0 border-slate-100 pt-2 sm:pt-0 mt-2 sm:mt-0">
