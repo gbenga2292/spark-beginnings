@@ -561,11 +561,22 @@ export function Payroll() {
     // Column visibility helper – gates each field against the user's checkbox selections
     const col = (id: string) => printSelectedColumns.includes(id);
 
+    // Simple HTML escaper to prevent XSS
+    const esc = (str: any) => {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+
     // Per-slip HTML builder — branches on payslipTheme for 3 distinct layouts
     const buildSlipHtml = (slip: typeof payslipsToPrint[0], i: number) => {
       const isLast = i === payslipsToPrint.length - 1;
-      const name = `${slip.record.firstname} ${slip.record.surname}`;
-      const period = `${slip.monthLabel} ${printSelectedYear}`;
+      const name = esc(`${slip.record.firstname} ${slip.record.surname}`);
+      const period = esc(`${slip.monthLabel} ${printSelectedYear}`);
       const totalDeductions = slip.record.paye + slip.record.loanRepayment + slip.record.pension;
 
       // ── Shared row builders (respect column filter) ──────────────────
@@ -591,9 +602,9 @@ export function Payroll() {
       const netPayBlock = col('net_pay') ? `<div class="net-pay"><span>TAKE HOME PAY</span><span>${currency(slip.record.takeHomePay)}</span></div>` : '';
 
       const bankInfoRows = [
-        col('bank_name') ? `<tr><td>Bank:</td><td>${slip.record.bankName}</td></tr>` : '',
-        col('account_number') ? `<tr><td>Account:</td><td>${slip.record.accountNo}</td></tr>` : '',
-        col('paye_id') && slip.record.taxId ? `<tr><td>Tax ID (TIN):</td><td>${slip.record.taxId}</td></tr>` : '',
+        col('bank_name') ? `<tr><td>Bank:</td><td>${esc(slip.record.bankName)}</td></tr>` : '',
+        col('account_number') ? `<tr><td>Account:</td><td>${esc(slip.record.accountNo)}</td></tr>` : '',
+        col('paye_id') && slip.record.taxId ? `<tr><td>Tax ID (TIN):</td><td>${esc(slip.record.taxId)}</td></tr>` : '',
       ].filter(Boolean).join('');
 
       // ── CLASSIC theme ─────────────────────────────────────────────────
@@ -603,19 +614,19 @@ export function Payroll() {
           <div class="classic-header">
             <div class="classic-logo-area"><img src="${logoSrc}" alt="Logo" style="height:64px;width:auto;" /></div>
             <div class="classic-company-info">
-              <h1 class="classic-company-name">${companyInfo.name}</h1>
-              <p class="classic-company-sub">${companyInfo.address}</p>
-              ${companyInfo.phone ? `<p class="classic-company-sub">Tel: ${companyInfo.phone}</p>` : ''}
-              ${companyInfo.email ? `<p class="classic-company-sub">Email: ${companyInfo.email}</p>` : ''}
+              <h1 class="classic-company-name">${esc(companyInfo.name)}</h1>
+              <p class="classic-company-sub">${esc(companyInfo.address)}</p>
+              ${companyInfo.phone ? `<p class="classic-company-sub">Tel: ${esc(companyInfo.phone)}</p>` : ''}
+              ${companyInfo.email ? `<p class="classic-company-sub">Email: ${esc(companyInfo.email)}</p>` : ''}
             </div>
           </div>
           <div class="classic-title-bar"><span>EMPLOYEE PAY STATEMENT</span><span>${period}</span></div>
           <div class="classic-info-grid">
             <table class="info-table">
               <tr><td>Employee Name:</td><td><strong>${name}</strong></td></tr>
-              <tr><td>Employee ID:</td><td>${slip.record.employeeCode || slip.record.id}</td></tr>
-              <tr><td>Position:</td><td>${slip.record.position}</td></tr>
-              <tr><td>Department:</td><td>${slip.record.department}</td></tr>
+              <tr><td>Employee ID:</td><td>${esc(slip.record.employeeCode || slip.record.id)}</td></tr>
+              <tr><td>Position:</td><td>${esc(slip.record.position)}</td></tr>
+              <tr><td>Department:</td><td>${esc(slip.record.department)}</td></tr>
             </table>
             <table class="info-table">${bankInfoRows}</table>
           </div>
@@ -645,22 +656,22 @@ export function Payroll() {
           <div class="formal-header">
             <img src="${logoSrc}" alt="Logo" style="height:52px;width:auto;" />
             <div class="formal-header-text">
-              <div class="formal-company">${companyInfo.name}</div>
+              <div class="formal-company">${esc(companyInfo.name)}</div>
               <div class="formal-subtitle">PAYROLL ADVICE — ${period}</div>
-              ${companyInfo.address ? `<div class="formal-address">${companyInfo.address}</div>` : ''}
+              ${companyInfo.address ? `<div class="formal-address">${esc(companyInfo.address)}</div>` : ''}
             </div>
           </div>
           <table class="formal-info-table">
             <tbody>
               <tr>
                 <td><label>Name</label><span>${name}</span></td>
-                <td><label>Employee ID</label><span>${slip.record.employeeCode || slip.record.id}</span></td>
-                <td><label>Position</label><span>${slip.record.position}</span></td>
+                <td><label>Employee ID</label><span>${esc(slip.record.employeeCode || slip.record.id)}</span></td>
+                <td><label>Position</label><span>${esc(slip.record.position)}</span></td>
               </tr>
               <tr>
-                ${col('bank_name') ? `<td><label>Bank</label><span>${slip.record.bankName}</span></td>` : '<td></td>'}
-                ${col('account_number') ? `<td><label>Account No.</label><span>${slip.record.accountNo}</span></td>` : '<td></td>'}
-                ${col('paye_id') && slip.record.taxId ? `<td><label>Tax ID (TIN)</label><span>${slip.record.taxId}</span></td>` : '<td></td>'}
+                ${col('bank_name') ? `<td><label>Bank</label><span>${esc(slip.record.bankName)}</span></td>` : '<td></td>'}
+                ${col('account_number') ? `<td><label>Account No.</label><span>${esc(slip.record.accountNo)}</span></td>` : '<td></td>'}
+                ${col('paye_id') && slip.record.taxId ? `<td><label>Tax ID (TIN)</label><span>${esc(slip.record.taxId)}</span></td>` : '<td></td>'}
               </tr>
             </tbody>
           </table>
@@ -694,15 +705,15 @@ export function Payroll() {
       <div class="payslip${isLast ? ' last' : ''}">
         <div class="header">
           <img src="${logoSrc}" alt="Company Logo" style="height: 48px; width: auto; margin-bottom: 8px;" />
-          <h2>${companyInfo.name}</h2>
+          <h2>${esc(companyInfo.name)}</h2>
           <p>Employee Payslip &ndash; ${period}</p>
-          ${companyInfo.address ? `<p style="font-size:12px;color:#94a3b8;margin:2px 0 0;">${companyInfo.address}</p>` : ''}
+          ${companyInfo.address ? `<p style="font-size:12px;color:#94a3b8;margin:2px 0 0;">${esc(companyInfo.address)}</p>` : ''}
         </div>
         <div class="two-col">
           <table class="info-table">
             <tr><td>Name:</td><td><strong>${name}</strong></td></tr>
-            <tr><td>ID:</td><td>${slip.record.employeeCode || slip.record.id}</td></tr>
-            <tr><td>Position:</td><td>${slip.record.position}</td></tr>
+            <tr><td>ID:</td><td>${esc(slip.record.employeeCode || slip.record.id)}</td></tr>
+            <tr><td>Position:</td><td>${esc(slip.record.position)}</td></tr>
           </table>
           <table class="info-table">${bankInfoRows}</table>
         </div>
