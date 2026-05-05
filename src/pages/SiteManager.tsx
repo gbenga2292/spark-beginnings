@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppStore, Site } from '@/src/store/appStore';
 import { useOperations } from '../contexts/OperationsContext';
 import { 
@@ -15,9 +15,11 @@ import { useTheme } from '@/src/hooks/useTheme';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { SiteInventoryView } from './SiteInventoryView';
+import { filterOperationalSites } from '@/src/lib/siteUtils';
 
 export function SiteManager() {
   const sites = useAppStore(s => s.sites);
+  const operationalSites = useMemo(() => filterOperationalSites(sites), [sites]);
   const pendingSites = useAppStore(s => s.pendingSites);
   const { waybills, getSiteAnalytics } = useOperations();
   const { isDark } = useTheme();
@@ -26,15 +28,15 @@ export function SiteManager() {
   const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('Active');
   const [inventorySite, setInventorySite] = useState<{ site: Site; q: SiteQuestionnaire | null } | null>(null);
 
-  const activeCount = sites.filter(s => s.status === 'Active').length;
-  const totalCount = sites.length;
+  const activeCount = operationalSites.filter(s => s.status === 'Active').length;
+  const totalCount = operationalSites.length;
 
   useSetPageTitle(
     inventorySite ? null : 'Site Management',
     inventorySite ? '' : `${activeCount} of ${totalCount} sites currently active`
   );
 
-  const filteredSites = sites.filter(s => {
+  const filteredSites = operationalSites.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           s.client.toLowerCase().includes(searchTerm.toLowerCase());
     

@@ -9,6 +9,7 @@ import { useAppStore } from '../store/appStore';
 import { useSetPageTitle } from './PageContext';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
+import { isInternalSite } from '@/src/lib/siteUtils';
 
 interface OperationsContextType {
   assets: Asset[];
@@ -102,7 +103,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const maintenanceAssets = React.useMemo(() => {
     // 1. Machines: Assets with type 'equipment' and requiresLogging = true
     const machines = assets
-      .filter(a => a.type === 'equipment' && a.requiresLogging)
+      .filter(a => a.type === 'equipment' && a.requiresLogging && (!a.location || !isInternalSite({ name: a.location })))
       .map(a => {
         const sessions = maintenanceSessions.filter(s => s.assets.some(sa => sa.assetId === a.id));
         const routineSessions = sessions.filter(s => s.type === 'routine' || s.type === 'scheduled');
@@ -135,36 +136,42 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       });
 
     // 2. Vehicles: All vehicles from the vehicle page
-    const mappedVehicles = vehicles.map(v => {
-      const sessions = maintenanceSessions.filter(s => s.assets.some(sa => sa.assetId === v.id));
-      const routineSessions = sessions.filter(s => s.type === 'routine' || s.type === 'scheduled');
-      
-      const lastSession = sessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
-      const lastRoutineSession = routineSessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
-      
-      const nextDate = lastRoutineSession ? new Date(lastRoutineSession.date) : (v.created_at ? new Date(v.created_at) : new Date());
-      nextDate.setMonth(nextDate.getMonth() + 3); // Default 3 months
-      
-      const now = new Date();
-      let status: ServiceStatus = 'ok';
-      if (now > nextDate) status = 'overdue';
-      else if (nextDate.getTime() - now.getTime() < 14 * 24 * 60 * 60 * 1000) status = 'due_soon';
+    // Note: Vehicles are currently hardcoded to 'Main Office'. 
+    // If the user wants to exclude 'Main Office' as well, we should filter them.
+    // However, usually vehicles belong to the office. 
+    // We'll keep them for now unless they match 'DCEL OFFICE' specifically.
+    const mappedVehicles = vehicles
+      .filter(v => !isInternalSite({ name: 'Main Office' })) // This would filter ALL vehicles if Main Office is internal
+      .map(v => {
+        const sessions = maintenanceSessions.filter(s => s.assets.some(sa => sa.assetId === v.id));
+        const routineSessions = sessions.filter(s => s.type === 'routine' || s.type === 'scheduled');
+        
+        const lastSession = sessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
+        const lastRoutineSession = routineSessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
+        
+        const nextDate = lastRoutineSession ? new Date(lastRoutineSession.date) : (v.created_at ? new Date(v.created_at) : new Date());
+        nextDate.setMonth(nextDate.getMonth() + 3); // Default 3 months
+        
+        const now = new Date();
+        let status: ServiceStatus = 'ok';
+        if (now > nextDate) status = 'overdue';
+        else if (nextDate.getTime() - now.getTime() < 14 * 24 * 60 * 60 * 1000) status = 'due_soon';
 
-      return {
-        id: v.id,
-        name: v.name,
-        serialNumber: v.registration_number,
-        category: 'vehicle' as const,
-        site: 'Main Office',
-        lastServiceDate: lastSession?.date || '',
-        nextServiceDate: nextDate.toISOString(),
-        serviceIntervalMonths: 3,
-        status,
-        pattern: 'Routine',
-        totalMaintenanceRecords: sessions.length,
-        isActive: v.status === 'active'
-      };
-    });
+        return {
+          id: v.id,
+          name: v.name,
+          serialNumber: v.registration_number,
+          category: 'vehicle' as const,
+          site: 'Main Office',
+          lastServiceDate: lastSession?.date || '',
+          nextServiceDate: nextDate.toISOString(),
+          serviceIntervalMonths: 3,
+          status,
+          pattern: 'Routine',
+          totalMaintenanceRecords: sessions.length,
+          isActive: v.status === 'active'
+        };
+      });
 
     return [...machines, ...mappedVehicles];
   }, [assets, vehicles, maintenanceSessions]);

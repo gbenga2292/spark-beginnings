@@ -15,6 +15,7 @@ import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
 import { Badge } from '@/src/components/ui/badge';
+import { filterOperationalSites } from '@/src/lib/siteUtils';
 
 const getBase64ImageFromUrl = async (imageUrl: string) => {
   const res = await fetch(imageUrl);
@@ -37,7 +38,7 @@ export function Reports() {
     e.staffType?.toUpperCase() !== 'NON-EMPLOYEE' && e.staffType?.toUpperCase() !== 'NON EMPLOYEE' &&
     (!e.department || !nonEmployeeDeptNames.has(e.department))
   );
-  const sites = useAppStore((state) => state.sites).filter(s => s.name?.toUpperCase() !== 'DCEL' && s.name?.toUpperCase() !== 'OFFICE');
+  const sites = filterOperationalSites(useAppStore((state) => state.sites));
   const attendanceRecords = useAppStore((state) => state.attendanceRecords);
   const leaves = useAppStore((state) => state.leaves);
   const publicHolidays = useAppStore((state) => state.publicHolidays);
@@ -190,11 +191,19 @@ export function Reports() {
         // Find the dept's workDaysPerWeek (default 6 = Mon-Sat)
         const dept = departments.find(d => d.name === emp.department);
         const wdpw = dept?.workDaysPerWeek ?? 6;
+        const empStart = emp.startDate ? new Date(emp.startDate) : null;
+        if (empStart) empStart.setHours(0, 0, 0, 0);
 
         days.forEach(d => {
           if (d > lastElapsedDay) return; // future day — skip
           if (grid[emp.id][d].site) return; // already has a record
+          
           const dateObj = new Date(selectedYear, selectedMonth - 1, d);
+          dateObj.setHours(0, 0, 0, 0);
+          
+          // Don't auto-populate if before start date
+          if (empStart && dateObj < empStart) return;
+
           const dow = dateObj.getDay(); // 0=Sun, 6=Sat
           if (dow === 0) return; // Sunday always off
           if (wdpw < 6 && dow === 6) return; // Saturday off
@@ -353,12 +362,19 @@ export function Reports() {
       if (emp.staffType?.toUpperCase() === 'OFFICE' && siteCounts[emp.id]) {
         const dept = departments.find(d => d.name === emp.department);
         const wdpw = dept?.workDaysPerWeek ?? 6;
+        const empStart = emp.startDate ? new Date(emp.startDate) : null;
+        if (empStart) empStart.setHours(0, 0, 0, 0);
 
         let validOfficeDays = 0;
         for (let d = 1; d <= lastElapsedDay; d++) {
           if (recordedDays[emp.id]?.has(d)) continue; // Day already has a record
 
           const dateObj = new Date(selectedYear, selectedMonth - 1, d);
+          dateObj.setHours(0, 0, 0, 0);
+          
+          // Don't auto-populate if before start date
+          if (empStart && dateObj < empStart) continue;
+
           const dow = dateObj.getDay();
           if (dow === 0) continue; // Sunday off
           if (wdpw < 6 && dow === 6) continue; // Saturday off
@@ -397,6 +413,9 @@ export function Reports() {
       months: Record<number, { daysWorked: number; otDays: number; daysAbsent: number }>;
     }> = {};
 
+    // Track recorded dates per employee to avoid double counting with auto-population
+    const recordedDatesByEmp = new Map<string, Set<string>>();
+
     // Initialize all staff
     operationsInternalStaff.forEach(emp => {
       summaryData[emp.id] = {
@@ -416,10 +435,16 @@ export function Reports() {
       return recDate.getFullYear() === summaryYear;
     });
 
-    // Process records
+    // Process actual records first
     yearRecords.forEach(rec => {
       const empId = rec.staffId;
       if (summaryData[empId]) {
+        const dateStr = rec.date;
+        if (!recordedDatesByEmp.has(empId)) {
+          recordedDatesByEmp.set(empId, new Set());
+        }
+        recordedDatesByEmp.get(empId)!.add(dateStr);
+
         const month = rec.mth || new Date(rec.date).getMonth() + 1;
         if (month >= 1 && month <= 12) {
           if (rec.day === 'Yes') {
@@ -436,8 +461,55 @@ export function Reports() {
       }
     });
 
+    // Auto-populate Office staff for unrecorded workdays (up to today if current year)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const publicHolidaySet = new Set(publicHolidays.map(h => h.date));
+
+    operationsInternalStaff.forEach(emp => {
+      if (emp.staffType?.toUpperCase() === 'OFFICE') {
+        const dept = departments.find(d => d.name === emp.department);
+        const wdpw = dept?.workDaysPerWeek ?? 6;
+        const empStart = emp.startDate ? new Date(emp.startDate) : null;
+        if (empStart) empStart.setHours(0, 0, 0, 0);
+
+        for (let m = 1; m <= 12; m++) {
+          // Only process months up to today if it's the current year
+          if (summaryYear > today.getFullYear()) continue;
+          if (summaryYear === today.getFullYear() && m > today.getMonth() + 1) continue;
+
+          const daysInMonth = new Date(summaryYear, m, 0).getDate();
+          const lastDayToProcess = (summaryYear === today.getFullYear() && m === today.getMonth() + 1)
+            ? today.getDate()
+            : daysInMonth;
+
+          for (let d = 1; d <= lastDayToProcess; d++) {
+            const dateObj = new Date(summaryYear, m - 1, d);
+            dateObj.setHours(0, 0, 0, 0);
+            
+            // Check start date
+            if (empStart && dateObj < empStart) continue;
+
+            const iso = `${summaryYear}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            
+            // Skip if already has an attendance record
+            if (recordedDatesByEmp.get(emp.id)?.has(iso)) continue;
+
+            // Check if it's a workday
+            const dow = dateObj.getDay();
+            if (dow === 0) continue; // Sunday off
+            if (wdpw < 6 && dow === 6) continue; // Saturday off if 5-day week
+            if (publicHolidaySet.has(iso)) continue; // Public holiday
+
+            // Auto-populate as worked
+            summaryData[emp.id].months[m].daysWorked += 1;
+          }
+        }
+      }
+    });
+
     return summaryData;
-  }, [attendanceRecords, summaryYear, operationsInternalStaff]);
+  }, [attendanceRecords, summaryYear, operationsInternalStaff, publicHolidays, departments]);
 
   // Calculate totals
   const staffTotals = useMemo(() => {

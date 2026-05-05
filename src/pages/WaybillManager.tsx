@@ -1,5 +1,5 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useOperations } from '../contexts/OperationsContext';
 import { 
   Plus, Search, Eye, Edit2, Trash2, Truck, ArrowRightLeft, ListFilter, Calendar, RotateCcw
@@ -18,6 +18,8 @@ import { Dialog, DialogContent } from '@/src/components/ui/dialog';
 import { Label } from '@/src/components/ui/label';
 
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { useAppStore } from '../store/appStore';
+import { isInternalSite } from '@/src/lib/siteUtils';
 
 function WaybillManagerHeader({ onCreate, activeTab }: { onCreate: () => void, activeTab: 'waybill' | 'return' }) {
   useSetPageTitle(
@@ -36,6 +38,15 @@ function WaybillManagerHeader({ onCreate, activeTab }: { onCreate: () => void, a
 
 export function WaybillManager() {
   const { waybills, updateWaybillStatus, deleteWaybill } = useOperations();
+  const sites = useAppStore(state => state.sites);
+
+  const activeWaybills = useMemo(() => {
+    return waybills.filter(wb => {
+      const site = sites.find(s => s.id === wb.siteId);
+      return !site || !isInternalSite(site);
+    });
+  }, [waybills, sites]);
+
   const { isDark } = useTheme();
   const [waybillSearch, setWaybillSearch] = useState('');
   const [returnSearch, setReturnSearch] = useState('');
@@ -48,8 +59,8 @@ export function WaybillManager() {
   const [waybillToProcess, setWaybillToProcess] = useState<Waybill | null>(null);
   const [returnConditions, setReturnConditions] = useState<Record<string, { good: number, damaged: number, missing: number }>>({});
 
-  const outgoingWaybills = waybills.filter(w => w.type === 'waybill');
-  const incomingReturns = waybills.filter(w => w.type === 'return');
+  const outgoingWaybills = activeWaybills.filter(w => w.type === 'waybill');
+  const incomingReturns = activeWaybills.filter(w => w.type === 'return');
 
 
   const filteredOutgoing = outgoingWaybills.filter(w => 

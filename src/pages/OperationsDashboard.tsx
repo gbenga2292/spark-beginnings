@@ -5,6 +5,7 @@ import { Badge } from '@/src/components/ui/badge';
 import { useTheme } from '@/src/hooks/useTheme';
 import { cn } from '@/src/lib/utils';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { isInternalSite } from '@/src/lib/siteUtils';
 import { AssetForm } from './AssetForm';
 import { useState } from 'react';
 import { usePriv } from '@/src/hooks/usePriv';
@@ -121,10 +122,13 @@ export function Dashboard() {
             )}
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800 flex-1">
-            {waybills.length === 0 ? (
+            {waybills.filter(wb => !isInternalSite({ name: wb.siteName })).length === 0 ? (
               <div className="p-8 text-center text-slate-500 text-sm">No recent logistics activity.</div>
             ) : (
-              waybills.slice(0, 6).map((wb) => (
+              waybills
+                .filter(wb => !isInternalSite({ name: wb.siteName }))
+                .slice(0, 6)
+                .map((wb) => (
                 <div key={wb.id} 
                   onClick={() => opsWaybills?.canView && navigate('/operations/waybills')}
                   className={cn(

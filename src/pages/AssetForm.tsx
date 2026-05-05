@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useOperations } from '../contexts/OperationsContext';
 import { X, Package, Save, ChevronDown, Lightbulb, Cpu } from 'lucide-react';
 import { Asset, AssetCategory, AssetType } from '../types/operations';
+import { isInternalSite } from '@/src/lib/siteUtils';
 
 interface AssetFormProps {
   onClose: () => void;
@@ -15,7 +16,7 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
   const existingLocations = useMemo(() => {
     const locs = assets
       .map(a => a.location)
-      .filter((loc): loc is string => !!loc && loc.trim() !== '');
+      .filter((loc): loc is string => !!loc && loc.trim() !== '' && !isInternalSite({ name: loc }));
     return Array.from(new Set(locs)).sort();
   }, [assets]);
 

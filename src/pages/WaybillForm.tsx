@@ -14,6 +14,7 @@ import { toast } from '@/src/components/ui/toast';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { ArrowLeft } from 'lucide-react';
 import { getPositionIndex } from '@/src/lib/hierarchy';
+import { filterOperationalSites } from '@/src/lib/siteUtils';
 
 interface WaybillFormProps {
   onClose: () => void;
@@ -251,7 +252,7 @@ export function WaybillForm({ onClose, initialType = 'waybill', prefillSiteName 
                     className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
                   >
                     <option value="">Select Site</option>
-                    {sites.map(s => <option key={s.id} value={s.name}>{s.name} ({s.client})</option>)}
+                    {filterOperationalSites(sites).map(s => <option key={s.id} value={s.name}>{s.name} ({s.client})</option>)}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 </div>
