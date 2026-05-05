@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useOperations } from '../contexts/OperationsContext';
 import { X, Package, Save, ChevronDown, Lightbulb, Cpu } from 'lucide-react';
@@ -10,7 +10,14 @@ interface AssetFormProps {
 }
 
 export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
-  const { addAsset, updateAsset } = useOperations();
+  const { assets, addAsset, updateAsset } = useOperations();
+  
+  const existingLocations = useMemo(() => {
+    const locs = assets
+      .map(a => a.location)
+      .filter((loc): loc is string => !!loc && loc.trim() !== '');
+    return Array.from(new Set(locs)).sort();
+  }, [assets]);
 
   const [name, setName]                     = useState(assetToEdit?.name || '');
   const [description, setDescription]       = useState(assetToEdit?.description || '');
@@ -19,8 +26,8 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
   const [cost, setCost]                     = useState(assetToEdit?.cost || 0);
   const [category, setCategory]             = useState<AssetCategory>(assetToEdit?.category || 'dewatering');
   const [assetType, setAssetType]           = useState<AssetType>(assetToEdit?.type || 'equipment');
-  const [lowStockLevel, setLowStock]        = useState(assetToEdit?.lowStockLevel || 10);
-  const [criticalStockLevel, setCritical]   = useState(assetToEdit?.criticalStockLevel || 5);
+  const [lowStockLevel, setLowStock]        = useState(assetToEdit?.lowStockLevel || 0);
+  const [criticalStockLevel, setCritical]   = useState(assetToEdit?.criticalStockLevel || 0);
   const [location, setLocation]             = useState(assetToEdit?.location || '');
   const [customLocation, setCustomLocation] = useState('');
   const [isCustomLoc, setIsCustomLoc]       = useState(false);
@@ -205,9 +212,9 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
                 className={selectCls}
               >
                 <option value="">Select asset location</option>
-                <option value="Store A">Store A</option>
-                <option value="Site B">Site B</option>
-                <option value="Main Store">Main Store</option>
+                {existingLocations.map(loc => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
                 <option value="custom">Custom Location...</option>
               </select>
               <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />

@@ -1,5 +1,5 @@
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -62,8 +62,31 @@ export function SalaryLoans({ setPreviewModal }: { setPreviewModal?: (val: any) 
   const deleteSalaryAdvance = useAppStore((state) => state.deleteSalaryAdvance);
   const deleteLoan = useAppStore((state) => state.deleteLoan);
 
-  // Approver options — all active system users except current user
-  const approverOptions = users.filter((u: any) => u.id !== currentUser?.id && !u.isDeleted);
+  // Approver options — all active system users, filtered by seniority and excluding the requesting staff member
+  const approverOptions = useMemo(() => {
+    const selectedEmployee = employees.find(e => e.id === staffId);
+    // If no staff is selected or level is missing, default to a high number (lowest seniority)
+    const selectedLevel = selectedEmployee?.level ?? 100; 
+
+    return users.filter((u: any) => {
+      if (u.isDeleted) return false;
+      
+      const uEmp = employees.find(e => {
+        const uName = u.name?.toLowerCase() || '';
+        const fName = e.firstname?.toLowerCase() || '';
+        const sName = e.surname?.toLowerCase() || '';
+        return uName.includes(fName) && uName.includes(sName);
+      });
+      
+      // Exclude the selected staff from being their own approver
+      if (uEmp && uEmp.id === staffId) return false;
+      
+      const uLevel = uEmp?.level ?? 100;
+      
+      // Approver must have a lower level number (higher seniority) than the requester
+      return uLevel < selectedLevel;
+    });
+  }, [users, employees, staffId]);
 
   const handleClear = () => {
     setRequestType('Salary Advance');

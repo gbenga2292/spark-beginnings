@@ -5,12 +5,16 @@ import {
   Plus, Search, Package, Upload, ListFilter,
   Edit2, Trash2, BarChart2, Clock, FileText, MoreHorizontal,
   ChevronsUpDown, ChevronUp, ChevronDown as ChevronDownIcon,
+  Download,
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { Asset, AssetCategory } from '../types/operations';
 import { AssetForm } from './AssetForm';
 import { RestockModal } from './RestockModal';
 import { AssetAnalyticsDialog } from './AssetAnalyticsDialog';
+import { BulkImportAssetsDialog } from './BulkImportAssetsDialog';
+import { ExportAssetsDialog } from './ExportAssetsDialog';
+import { usePriv } from '../hooks/usePriv';
 import { Card } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
@@ -207,9 +211,15 @@ function AssetActionsMenu({
 /* ─────────────────────────────────────────────────────────────── */
 export function AssetManager() {
   const { assets, deleteAsset, bulkAddAssets } = useOperations();
+  const priv = usePriv('opsInventory');
+  const canExport = priv?.canExport ?? false;
+  const canImport = priv?.canImport ?? false;
+
   const [showAddForm, setShowAddForm]       = useState(false);
   const [editingAsset, setEditingAsset]     = useState<Asset | null>(null);
   const [showRestockModal, setShowRestockModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [importFile, setImportFile]         = useState<File | null>(null);
   const [search, setSearch]                 = useState('');
   const [filter, setFilter]                 = useState<AssetCategory | 'all'>('all');
   const [activeAsset, setActiveAsset]       = useState<Asset | null>(null);
@@ -234,14 +244,18 @@ export function AssetManager() {
     'Inventory Management',
     'Track equipment, tools, and consumables across all sites',
     <div className="hidden sm:flex items-center gap-2">
-      <Button variant="outline" size="sm" className="gap-2 h-9" onClick={() => fileInputRef.current?.click()}>
-        <Upload className="h-4 w-4" /> Bulk Import
-      </Button>
-      <Button variant="outline" size="sm" className="gap-2 h-9" onClick={() => setShowRestockModal(true)}>
+      {canExport && (
+        <Button variant="outline" size="sm" className="gap-2 h-9 text-slate-700 hover:text-slate-900 border-slate-200" onClick={() => setShowExportModal(true)}>
+          <Download className="h-4 w-4" /> Export
+        </Button>
+      )}
+      {canImport && (
+        <Button variant="outline" size="sm" className="gap-2 h-9 text-slate-700 hover:text-slate-900 border-slate-200" onClick={() => fileInputRef.current?.click()}>
+          <Upload className="h-4 w-4" /> Bulk Import
+        </Button>
+      )}
+      <Button variant="outline" size="sm" className="gap-2 h-9 text-slate-700 hover:text-slate-900 border-slate-200" onClick={() => setShowRestockModal(true)}>
         <Package className="h-4 w-4" /> Restock
-      </Button>
-      <Button size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9" onClick={() => setShowAddForm(true)}>
-        <Plus className="h-4 w-4" /> Add Asset
       </Button>
     </div>
   );
@@ -249,32 +263,8 @@ export function AssetManager() {
   const handleBulkImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = event.target?.result;
-        const wb = XLSX.read(data, { type: 'binary' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws);
-        const toImport = rows.map((item: any) => ({
-          name: item['Asset Name'] || item['Name'] || item['Asset'] || 'Unnamed Asset',
-          description: item['Description'] || '',
-          category: (item['Category']?.toLowerCase() || 'dewatering') as AssetCategory,
-          type: (item['Type']?.toLowerCase() || 'equipment') as any,
-          quantity: Number(item['Quantity'] || 0),
-          unitOfMeasurement: item['Unit'] || 'pcs',
-          cost: Number(item['Cost'] || 0),
-          location: item['Location'] || 'store',
-          status: 'active',
-          condition: 'good',
-        }));
-        bulkAddAssets(toImport as any);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      } catch (err) {
-        console.error('Bulk import failed', err);
-      }
-    };
-    reader.readAsBinaryString(file);
+    setImportFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const openModal = (asset: Asset, modal: ActionModal) => {
@@ -317,6 +307,8 @@ export function AssetManager() {
         />
       )}
       {showRestockModal && <RestockModal onClose={() => setShowRestockModal(false)} />}
+      {showExportModal && <ExportAssetsDialog onClose={() => setShowExportModal(false)} />}
+      {importFile && <BulkImportAssetsDialog file={importFile} onClose={() => setImportFile(null)} />}
       {activeModal === 'description'    && activeAsset && <DescriptionDialog    asset={activeAsset} onClose={closeModal} />}
       {activeModal === 'analytics'      && activeAsset && <AssetAnalyticsDialog asset={activeAsset} onClose={closeModal} />}
       {activeModal === 'restock-history'&& activeAsset && <RestockHistoryDialog asset={activeAsset} onClose={closeModal} />}
@@ -326,9 +318,11 @@ export function AssetManager() {
 
       {/* Mobile Actions */}
       <div className="flex sm:hidden flex-wrap gap-2 px-1">
-        <Button className="flex-1 gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm" onClick={() => setShowAddForm(true)}>
-          <Plus className="h-4 w-4" /> Add Asset
-        </Button>
+        {canExport && (
+          <Button variant="outline" className="flex-1 gap-2 text-slate-700 hover:text-slate-900 border-slate-200" onClick={() => setShowExportModal(true)}>
+            <Download className="h-4 w-4" /> Export
+          </Button>
+        )}
       </div>
 
       {/* Table Card */}
@@ -344,27 +338,33 @@ export function AssetManager() {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1 rounded-lg">
-              {(['all', 'dewatering', 'waterproofing', 'tiling', 'ppe'] as const).map(tab => (
-                <button key={tab} onClick={() => setFilter(tab)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all capitalize ${
-                    filter === tab
-                      ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-400 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {tab === 'all' ? 'All' : tab}
-                </button>
-              ))}
+            <div className="relative">
+              <select
+                className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg h-9 pl-3 pr-8 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-medium capitalize cursor-pointer w-full sm:w-40"
+                value={filter}
+                onChange={e => setFilter(e.target.value as any)}
+              >
+                {(['all', 'dewatering', 'waterproofing', 'tiling', 'ppe', 'office'] as const).map(opt => (
+                  <option key={opt} value={opt} className="capitalize">{opt === 'all' ? 'All Categories' : opt}</option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                <ChevronDownIcon className="h-4 w-4" />
+              </div>
             </div>
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search assets..."
-                className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-9 text-sm focus-visible:ring-blue-500/50 rounded-lg shadow-sm"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Search assets..."
+                  className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-9 text-sm focus-visible:ring-blue-500/50 rounded-lg shadow-sm"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
+              <Button size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 shadow-sm whitespace-nowrap" onClick={() => setShowAddForm(true)}>
+                <Plus className="h-4 w-4" /> Add Asset
+              </Button>
             </div>
           </div>
         </div>
@@ -374,27 +374,27 @@ export function AssetManager() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-blue-700 border-b border-blue-800 text-blue-50 uppercase text-[11px] tracking-wider font-bold">
-                <th className="px-5 py-4 whitespace-nowrap cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('name')}>
+                <th className="px-3 py-3 whitespace-nowrap cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('name')}>
                   Asset Name <SortIcon col="name" />
                 </th>
-                <th className="px-5 py-4 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('quantity')}>
-                  Total Stock <SortIcon col="quantity" />
+                <th className="px-2 py-3 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('quantity')}>
+                  Total <SortIcon col="quantity" />
                 </th>
-                <th className="px-5 py-4 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('reserved')}>
-                  Reserved <SortIcon col="reserved" />
+                <th className="px-2 py-3 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('reserved')}>
+                  Rsvd <SortIcon col="reserved" />
                 </th>
-                <th className="px-5 py-4 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('available')}>
-                  Available <SortIcon col="available" />
+                <th className="px-2 py-3 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('available')}>
+                  Avail <SortIcon col="available" />
                 </th>
-                <th className="px-5 py-4 whitespace-nowrap">Stats (M | D | U)</th>
-                <th className="px-5 py-4 whitespace-nowrap">Category | Type</th>
-                <th className="px-5 py-4 whitespace-nowrap cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('location')}>
+                <th className="px-2 py-3 whitespace-nowrap text-center">Stats (M|D|U)</th>
+                <th className="px-2 py-3 whitespace-nowrap">Category/Type</th>
+                <th className="px-2 py-3 whitespace-nowrap cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('location')}>
                   Location <SortIcon col="location" />
                 </th>
-                <th className="px-5 py-4 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('status')}>
+                <th className="px-2 py-3 whitespace-nowrap text-center cursor-pointer select-none hover:bg-blue-600 transition-colors" onClick={() => toggleSort('status')}>
                   Status <SortIcon col="status" />
                 </th>
-                <th className="px-5 py-4 whitespace-nowrap text-center">Actions</th>
+                <th className="px-2 py-3 whitespace-nowrap text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
@@ -413,67 +413,62 @@ export function AssetManager() {
                 filtered.map(asset => (
                   <tr key={asset.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group">
                     {/* Name */}
-                    <td className="px-5 py-4 font-bold text-slate-800 dark:text-slate-200 text-xs uppercase">{asset.name}</td>
+                    <td className="px-3 py-3 font-bold text-slate-800 dark:text-slate-200 text-xs uppercase max-w-[150px] truncate" title={asset.name}>{asset.name}</td>
 
                     {/* Total Stock */}
-                    <td className="px-5 py-4 text-center">
-                      <span className="font-bold text-blue-600 dark:text-blue-400 text-sm">{asset.quantity} {asset.unitOfMeasurement}</span>
+                    <td className="px-2 py-3 text-center">
+                      <span className="font-bold text-blue-600 dark:text-blue-400 text-sm">{asset.quantity}</span><span className="text-[10px] text-slate-400 ml-1">{asset.unitOfMeasurement}</span>
                     </td>
 
                     {/* Reserved */}
-                    <td className="px-5 py-4 text-center font-semibold text-slate-700 dark:text-slate-300">{asset.reservedQuantity || 0}</td>
+                    <td className="px-2 py-3 text-center font-semibold text-slate-700 dark:text-slate-300">{asset.reservedQuantity || 0}</td>
 
                     {/* Available */}
-                    <td className="px-5 py-4 text-center font-semibold text-slate-700 dark:text-slate-300">{asset.availableQuantity || 0}</td>
+                    <td className="px-2 py-3 text-center font-semibold text-slate-700 dark:text-slate-300">{asset.availableQuantity || 0}</td>
 
                     {/* Stats M|D|U */}
-                    <td className="px-5 py-4">
-                      <div className="flex flex-col text-xs leading-relaxed">
-                        {[
-                          { label: 'Missing:', val: asset.missingQuantity || 0, cls: (v: number) => v > 0 ? 'text-red-500'   : 'text-slate-400' },
-                          { label: 'Damaged:', val: asset.damagedQuantity || 0, cls: (v: number) => v > 0 ? 'text-amber-500' : 'text-slate-400' },
-                          { label: 'Used:',    val: asset.usedQuantity    || 0, cls: (v: number) => v > 0 ? 'text-blue-500'  : 'text-slate-400' },
-                        ].map(row => (
-                          <div key={row.label} className="flex items-center justify-between gap-4">
-                            <span className="text-slate-400 font-semibold">{row.label}</span>
-                            <span className={cn('font-bold', row.cls(row.val))}>{row.val}</span>
-                          </div>
-                        ))}
+                    <td className="px-2 py-3 text-center">
+                      <div className="flex flex-col items-center justify-center gap-1 text-xs font-semibold">
+                        <span title="Missing" className={asset.missingQuantity && asset.missingQuantity > 0 ? 'text-red-500' : 'text-slate-400'}>M: {asset.missingQuantity || 0}</span>
+                        <span title="Damaged" className={asset.damagedQuantity && asset.damagedQuantity > 0 ? 'text-amber-500' : 'text-slate-400'}>D: {asset.damagedQuantity || 0}</span>
+                        <span title="Used" className={asset.usedQuantity && asset.usedQuantity > 0 ? 'text-blue-500' : 'text-slate-400'}>U: {asset.usedQuantity || 0}</span>
                       </div>
                     </td>
 
                     {/* Category | Type */}
-                    <td className="px-5 py-4">
-                      <div className="flex flex-col gap-1">
-                        <span className="inline-block px-2 py-1 text-[11px] font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-full capitalize w-fit">{asset.category}</span>
-                        <span className="inline-block px-2 py-1 text-[11px] font-semibold bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-full capitalize w-fit">{asset.type}</span>
+                    <td className="px-2 py-3">
+                      <div className="flex flex-col gap-1 w-fit">
+                        <span className="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded capitalize text-center">{asset.category}</span>
+                        <span className="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded capitalize text-center">{asset.type}</span>
                       </div>
                     </td>
 
                     {/* Location */}
-                    <td className="px-5 py-4">
-                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 truncate block max-w-[100px]">{asset.location || 'store'}</span>
+                    <td className="px-2 py-3">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 truncate block max-w-[80px]" title={asset.location || 'store'}>{asset.location || 'store'}</span>
                     </td>
 
                     {/* Status */}
-                    <td className="px-5 py-4 text-center">
+                    <td className="px-2 py-3 text-center">
                       <Badge
                         variant="outline"
                         className={cn(
-                          'rounded-full px-3 py-0.5 font-semibold text-[11px] border',
-                          asset.availableQuantity > 100
-                            ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200'
-                            : asset.availableQuantity > 0
+                          'rounded-full px-2 py-0.5 font-semibold text-[10px] border whitespace-nowrap',
+                          asset.availableQuantity <= 0
+                            ? 'bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200'
+                            : (asset.criticalStockLevel && asset.criticalStockLevel > 0 && asset.availableQuantity <= asset.criticalStockLevel)
+                            ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-200'
+                            : (asset.lowStockLevel && asset.lowStockLevel > 0 && asset.availableQuantity <= asset.lowStockLevel)
                             ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200'
-                            : 'bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200'
+                            : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200'
                         )}
                       >
-                        {asset.availableQuantity > 100 ? 'In Stock' : asset.availableQuantity > 0 ? 'Critical' : 'Out of Stock'}
+                        {asset.availableQuantity <= 0 ? 'Out' : (asset.criticalStockLevel && asset.criticalStockLevel > 0 && asset.availableQuantity <= asset.criticalStockLevel) ? 'Critical' : (asset.lowStockLevel && asset.lowStockLevel > 0 && asset.availableQuantity <= asset.lowStockLevel) ? 'Low Stock' : 'In Stock'}
                       </Badge>
                     </td>
 
                     {/* Actions — sleek ... dropdown */}
-                    <td className="px-5 py-4 text-center">
+                    <td className="px-2 py-3 text-center">
                       <AssetActionsMenu
                         asset={asset}
                         onAction={modal => openModal(asset, modal)}
