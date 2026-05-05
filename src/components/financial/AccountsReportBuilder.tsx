@@ -2,7 +2,7 @@ import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { Button } from '@/src/components/ui/button';
-import { Upload, Printer, Trash2, Save, X, Info, Search, Filter, Users, ChevronRight, Check } from 'lucide-react';
+import { Upload, Printer, Trash2, Save, X, Info, Search, Filter, Users, ChevronRight, ChevronDown, Check, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAppStore, Employee } from '@/src/store/appStore';
 import { getPositionIndex } from '@/src/lib/hierarchy';
 import { toast } from '@/src/components/ui/toast';
@@ -367,6 +367,15 @@ export function AccountsReportBuilder({
   const [showPresetInput, setShowPresetInput] = useState(false);
   const [newPresetName,   setNewPresetName]   = useState('');
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Tracks sections collapsed in the sidebar
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const toggleSection = (key: string) =>
+    setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
+
+  // Tracks when user intentionally cleared all clients (so auto-fill effect is suppressed)
+  const userClearedClients = useRef(false);
 
   const isMultiSource = selectedSources.length > 1;
   const prevMulti = useRef(false);
@@ -433,9 +442,12 @@ export function AccountsReportBuilder({
   }, [selectedSources, availableClients]);
 
   useEffect(() => {
-    if (availableClients.length > 0 && selectedClients.length === 0) {
+    // Only auto-fill when the list has items AND the user didn't explicitly clear it
+    if (availableClients.length > 0 && selectedClients.length === 0 && !userClearedClients.current) {
       setSelectedClients(availableClients);
     }
+    // Reset the flag after the effect runs so future source changes still auto-fill
+    userClearedClients.current = false;
   }, [availableClients]); // eslint-disable-line
 
   // ── Pre-cache payroll rows per year×month to avoid re-invoking heavy calculator on every sidebar interaction ──
@@ -1186,7 +1198,32 @@ export function AccountsReportBuilder({
         <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
 
           {/* ── Sidebar ── */}
-          <div className={`${showMobileSidebar ? 'flex' : 'hidden'} md:flex w-full md:w-[288px] shrink-0 border-b md:border-b-0 md:border-r border-slate-200 bg-white shadow-sm z-10 flex-col h-[50%] md:h-full print:hidden`}>
+          {/* Collapsed rail — visible only on desktop when sidebar is collapsed */}
+          {sidebarCollapsed && (
+            <div className="hidden md:flex flex-col items-center py-2 w-8 shrink-0 border-r border-slate-200 bg-white z-10 print:hidden">
+              <button
+                onClick={() => setSidebarCollapsed(false)}
+                title="Expand sidebar"
+                className="h-7 w-7 flex items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+          <div className={`${
+            sidebarCollapsed ? 'hidden' : (showMobileSidebar ? 'flex' : 'hidden')
+          } md:${sidebarCollapsed ? 'hidden' : 'flex'} w-full md:w-[288px] shrink-0 border-b md:border-b-0 md:border-r border-slate-200 bg-white shadow-sm z-10 flex-col h-[50%] md:h-full print:hidden`}>
+            {/* Sidebar top bar with collapse button */}
+            <div className="hidden md:flex items-center justify-between px-3 py-1.5 border-b border-slate-100 shrink-0 bg-slate-50/80">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Filters</span>
+              <button
+                onClick={() => setSidebarCollapsed(true)}
+                title="Collapse sidebar"
+                className="h-6 w-6 flex items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors"
+              >
+                <PanelLeftClose className="h-3.5 w-3.5" />
+              </button>
+            </div>
             <div className="flex-1 overflow-y-auto p-4 pb-10 flex flex-col gap-5 custom-scrollbar">
 
               {/* Presets */}
@@ -1227,43 +1264,50 @@ export function AccountsReportBuilder({
 
               {/* Data Sources */}
               <div>
-                <h4 className="font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-2">Data Sources</h4>
-                <div className="flex flex-col gap-1.5">
-                  {(['INVOICE','PAYMENT','VAT','PAYROLL','LEDGER','SITE'] as DataSource[]).map((src, idx) => {
-                    const active = selectedSources.includes(src);
-                    const isDivider = idx === 3;
-                    // Use pre-computed blockedSources for performance
-                    const wouldBlock = !active && blockedSources.has(src);
-                    return (
-                      <div key={src}>
-                        {isDivider && <div className="my-1 border-t border-slate-200" />}
-                        <button
-                          onClick={() => toggleSource(src)}
-                          title={wouldBlock ? `Cannot combine with current selection` : undefined}
-                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-sm font-semibold transition-all
-                            ${active
-                              ? SOURCE_TOGGLE_ON[src]
-                              : wouldBlock
-                              ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed opacity-50'
-                              : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-500'
-                            }`}
-                        >
-                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${active ? 'border-current' : 'border-slate-300'}`}>
-                            {active && <div className="w-2 h-2 rounded-sm bg-current" />}
-                          </div>
-                          <span className="flex-1 text-left">{SOURCE_LABELS[src]}</span>
-                          {wouldBlock
-                            ? <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border bg-slate-100 text-slate-400 border-slate-200">N/A</span>
-                            : <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${SOURCE_PILL[src]}`}>
-                                {['INVOICE','PAYMENT','VAT'].includes(src) ? 'Finance' : src === 'PAYROLL' ? 'HR' : src === 'LEDGER' ? 'Expense' : 'Ops'}
-                        </span>
-                      }
-                    </button>
+                <button
+                  onClick={() => toggleSection('sources')}
+                  className="w-full font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1 hover:text-slate-600 transition-colors"
+                >
+                  {collapsedSections['sources'] ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  Data Sources
+                </button>
+                {!collapsedSections['sources'] && (
+                  <div className="flex flex-col gap-1.5">
+                    {(['INVOICE','PAYMENT','VAT','PAYROLL','LEDGER','SITE'] as DataSource[]).map((src, idx) => {
+                      const active = selectedSources.includes(src);
+                      const isDivider = idx === 3;
+                      const wouldBlock = !active && blockedSources.has(src);
+                      return (
+                        <div key={src}>
+                          {isDivider && <div className="my-1 border-t border-slate-200" />}
+                          <button
+                            onClick={() => toggleSource(src)}
+                            title={wouldBlock ? `Cannot combine with current selection` : undefined}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-sm font-semibold transition-all
+                              ${active
+                                ? SOURCE_TOGGLE_ON[src]
+                                : wouldBlock
+                                ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed opacity-50'
+                                : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-500'
+                              }`}
+                          >
+                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${active ? 'border-current' : 'border-slate-300'}`}>
+                              {active && <div className="w-2 h-2 rounded-sm bg-current" />}
+                            </div>
+                            <span className="flex-1 text-left">{SOURCE_LABELS[src]}</span>
+                            {wouldBlock
+                              ? <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border bg-slate-100 text-slate-400 border-slate-200">N/A</span>
+                              : <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${SOURCE_PILL[src]}`}>
+                                  {['INVOICE','PAYMENT','VAT'].includes(src) ? 'Finance' : src === 'PAYROLL' ? 'HR' : src === 'LEDGER' ? 'Expense' : 'Ops'}
+                                </span>
+                            }
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
-          </div>
+                )}
+              </div>
 
           {/* Payroll Filters (Dynamic) */}
           {selectedSources.includes('PAYROLL') && (
@@ -1363,37 +1407,47 @@ export function AccountsReportBuilder({
 
               {/* Years */}
               <div>
-                <h4 className="font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-2 flex items-center justify-between">
-                  Year(s)
-                  <div className="flex gap-2">
-                    <button className="text-[10px] text-indigo-600 font-bold hover:underline"
-                      onClick={() => setSelectedYears(Array.from({ length: currentYear - YEAR_RANGE_START + 2 }, (_, i) => YEAR_RANGE_START + i))}>All</button>
-                    <span className="text-slate-300">|</span>
-                    <button className="text-[10px] text-indigo-600 font-bold hover:underline"
-                      onClick={() => setSelectedYears([currentYear])}>Reset</button>
+                <button
+                  onClick={() => toggleSection('years')}
+                  className="w-full font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-2 flex items-center justify-between hover:text-slate-600 transition-colors"
+                >
+                  <span className="flex items-center gap-1">
+                    {collapsedSections['years'] ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    Year(s)
+                  </span>
+                  {!collapsedSections['years'] && (
+                    <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                      <button className="text-[10px] text-indigo-600 font-bold hover:underline"
+                        onClick={() => setSelectedYears(Array.from({ length: currentYear - YEAR_RANGE_START + 2 }, (_, i) => YEAR_RANGE_START + i))}>All</button>
+                      <span className="text-slate-300">|</span>
+                      <button className="text-[10px] text-indigo-600 font-bold hover:underline"
+                        onClick={() => setSelectedYears([currentYear])}>Reset</button>
+                    </div>
+                  )}
+                </button>
+                {!collapsedSections['years'] && (
+                  <div className="grid grid-cols-3 gap-1 max-h-[110px] overflow-y-auto pr-0.5 custom-scrollbar">
+                    {Array.from({ length: currentYear - YEAR_RANGE_START + 2 }, (_, i) => currentYear - i).map(yr => {
+                      const active = selectedYears.includes(yr);
+                      return (
+                        <label key={yr} className={`flex items-center gap-1 text-xs font-medium cursor-pointer px-1.5 py-1 rounded transition-colors select-none ${
+                          active ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'
+                        }`}>
+                          <input type="checkbox" className="rounded border-slate-300 text-indigo-600 h-3 w-3"
+                            checked={active}
+                            onChange={e => {
+                              if (e.target.checked) setSelectedYears(prev => [...prev, yr].sort((a, b) => a - b));
+                              else {
+                                const next = selectedYears.filter(y => y !== yr);
+                                if (next.length > 0) setSelectedYears(next);
+                              }
+                            }} />
+                          {yr}
+                        </label>
+                      );
+                    })}
                   </div>
-                </h4>
-                <div className="grid grid-cols-3 gap-1 max-h-[110px] overflow-y-auto pr-0.5 custom-scrollbar">
-                  {Array.from({ length: currentYear - YEAR_RANGE_START + 2 }, (_, i) => currentYear - i).map(yr => {
-                    const active = selectedYears.includes(yr);
-                    return (
-                      <label key={yr} className={`flex items-center gap-1 text-xs font-medium cursor-pointer px-1.5 py-1 rounded transition-colors select-none ${
-                        active ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'
-                      }`}>
-                        <input type="checkbox" className="rounded border-slate-300 text-indigo-600 h-3 w-3"
-                          checked={active}
-                          onChange={e => {
-                            if (e.target.checked) setSelectedYears(prev => [...prev, yr].sort((a, b) => a - b));
-                            else {
-                              const next = selectedYears.filter(y => y !== yr);
-                              if (next.length > 0) setSelectedYears(next); // keep at least one
-                            }
-                          }} />
-                        {yr}
-                      </label>
-                    );
-                  })}
-                </div>
+                )}
                 {selectedSources.length === 1 && (selectedSources.includes('VAT') || selectedSources.includes('PAYROLL')) && (
                   <div className={`mt-3 p-3 rounded-xl border ${selectedSources.includes('VAT') ? 'bg-amber-50 border-amber-200' : 'bg-purple-50 border-purple-200'}`}>
                     <div className="flex flex-col gap-3">
@@ -1439,72 +1493,113 @@ export function AccountsReportBuilder({
 
               {/* Months */}
               <div>
-                <h4 className="font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-2 flex items-center justify-between">
-                  {selectedSources.includes('VAT') && !isMultiSource ? 'VAT Period Month' : 'Months'}
-                  <div className="flex gap-2">
-                    <button className="text-[10px] text-indigo-600 font-bold hover:underline" onClick={() => setSelectedMonths(MONTHS.map(m => m.key))}>All</button>
-                    <span className="text-slate-300">|</span>
-                    <button className="text-[10px] text-indigo-600 font-bold hover:underline" onClick={() => setSelectedMonths([])}>None</button>
+                <button
+                  onClick={() => toggleSection('months')}
+                  className="w-full font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-2 flex items-center justify-between hover:text-slate-600 transition-colors"
+                >
+                  <span className="flex items-center gap-1">
+                    {collapsedSections['months'] ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    {selectedSources.includes('VAT') && !isMultiSource ? 'VAT Period Month' : 'Months'}
+                  </span>
+                  {!collapsedSections['months'] && (
+                    <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                      <button className="text-[10px] text-indigo-600 font-bold hover:underline" onClick={() => setSelectedMonths(MONTHS.map(m => m.key))}>All</button>
+                      <span className="text-slate-300">|</span>
+                      <button className="text-[10px] text-indigo-600 font-bold hover:underline" onClick={() => setSelectedMonths([])}>None</button>
+                    </div>
+                  )}
+                </button>
+                {!collapsedSections['months'] && (
+                  <div className="grid grid-cols-3 gap-1">
+                    {MONTHS.map(m => {
+                      const active = selectedMonths.includes(m.key);
+                      return (
+                        <label key={m.key} className={`flex items-center gap-1 text-xs font-medium cursor-pointer px-1.5 py-1 rounded transition-colors select-none ${active ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}>
+                          <input type="checkbox" className="rounded border-slate-300 text-indigo-600 h-3 w-3" checked={active}
+                            onChange={e => {
+                              if (e.target.checked) setSelectedMonths([...selectedMonths, m.key]);
+                              else setSelectedMonths(selectedMonths.filter(k => k !== m.key));
+                            }} />
+                          {m.label}
+                        </label>
+                      );
+                    })}
                   </div>
-                </h4>
-                <div className="grid grid-cols-3 gap-1">
-                  {MONTHS.map(m => {
-                    const active = selectedMonths.includes(m.key);
-                    return (
-                      <label key={m.key} className={`flex items-center gap-1 text-xs font-medium cursor-pointer px-1.5 py-1 rounded transition-colors select-none ${active ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}>
-                        <input type="checkbox" className="rounded border-slate-300 text-indigo-600 h-3 w-3" checked={active}
-                          onChange={e => {
-                            if (e.target.checked) setSelectedMonths([...selectedMonths, m.key]);
-                            else setSelectedMonths(selectedMonths.filter(k => k !== m.key));
-                          }} />
-                        {m.label}
-                      </label>
-                    );
-                  })}
-                </div>
+                )}
               </div>
 
               {/* Clients */}
               {!selectedSources.includes('PAYROLL') && (
                 <div>
-                  <h4 className="font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-2 flex items-center justify-between">
-                    Clients
-                    <div className="flex gap-2">
-                      <button className="text-[10px] text-indigo-600 font-bold hover:underline" onClick={() => setSelectedClients(availableClients)}>All</button>
-                      <span className="text-slate-300">|</span>
-                      <button className="text-[10px] text-indigo-600 font-bold hover:underline" onClick={() => setSelectedClients([])}>None</button>
+                  <button
+                    onClick={() => toggleSection('clients')}
+                    className="w-full font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-2 flex items-center justify-between hover:text-slate-600 transition-colors"
+                  >
+                    <span className="flex items-center gap-1">
+                      {collapsedSections['clients']
+                        ? <ChevronRight className="h-3 w-3" />
+                        : <ChevronDown className="h-3 w-3" />}
+                      Clients
+                      {selectedClients.length < availableClients.length && (
+                        <span className="ml-1 text-[9px] bg-indigo-100 text-indigo-600 font-bold px-1.5 py-0.5 rounded-full">
+                          {selectedClients.length}/{availableClients.length}
+                        </span>
+                      )}
+                    </span>
+                    {!collapsedSections['clients'] && (
+                      <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                        <button
+                          className="text-[10px] text-indigo-600 font-bold hover:underline"
+                          onClick={() => { userClearedClients.current = false; setSelectedClients(availableClients); }}
+                        >All</button>
+                        <span className="text-slate-300">|</span>
+                        <button
+                          className="text-[10px] text-indigo-600 font-bold hover:underline"
+                          onClick={() => { userClearedClients.current = true; setSelectedClients([]); }}
+                        >None</button>
+                      </div>
+                    )}
+                  </button>
+                  {!collapsedSections['clients'] && (
+                    <div className="flex flex-col gap-0.5 max-h-[130px] overflow-y-auto pr-1 custom-scrollbar">
+                      {availableClients.map(c => (
+                        <label key={c} className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-50 px-1.5 py-1 rounded select-none">
+                          <input type="checkbox" className="rounded border-slate-300 text-indigo-600 shrink-0 h-3 w-3" checked={selectedClients.includes(c)}
+                            onChange={e => {
+                              if (e.target.checked) setSelectedClients(prev => [...prev, c]);
+                              else setSelectedClients(prev => prev.filter(x => x !== c));
+                            }} />
+                          <span className="truncate">{c}</span>
+                        </label>
+                      ))}
                     </div>
-                  </h4>
-                  <div className="flex flex-col gap-0.5 max-h-[130px] overflow-y-auto pr-1 custom-scrollbar">
-                    {availableClients.map(c => (
-                      <label key={c} className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-50 px-1.5 py-1 rounded select-none">
-                        <input type="checkbox" className="rounded border-slate-300 text-indigo-600 shrink-0 h-3 w-3" checked={selectedClients.includes(c)}
-                          onChange={e => {
-                            if (e.target.checked) setSelectedClients(prev => [...prev, c]);
-                            else setSelectedClients(prev => prev.filter(x => x !== c));
-                          }} />
-                        <span className="truncate">{c}</span>
-                      </label>
-                    ))}
-                  </div>
+                  )}
                 </div>
               )}
 
               {/* Columns Map Builder */}
               <div>
-                <h4 className="font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-1 flex items-center justify-between">
-                  {isMultiSource ? 'Summary Columns' : 'Columns Map Builder'}
-                  <div className="flex gap-2">
-                    <button className="text-[10px] text-indigo-600 font-bold hover:underline" onClick={() => setSelectedColumns(relevantCols.map(c => c.id))}>All</button>
-                    <span className="text-slate-300">|</span>
-                    <button className="text-[10px] text-indigo-600 font-bold hover:underline" onClick={() => setSelectedColumns([])}>None</button>
-                  </div>
-                </h4>
-                {isMultiSource && (
+                <button
+                  onClick={() => toggleSection('columns')}
+                  className="w-full font-bold text-[11px] text-slate-400 uppercase tracking-wide mb-1 flex items-center justify-between hover:text-slate-600 transition-colors"
+                >
+                  <span className="flex items-center gap-1">
+                    {collapsedSections['columns'] ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    {isMultiSource ? 'Summary Columns' : 'Columns Map Builder'}
+                  </span>
+                  {!collapsedSections['columns'] && (
+                    <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                      <button className="text-[10px] text-indigo-600 font-bold hover:underline" onClick={() => setSelectedColumns(relevantCols.map(c => c.id))}>All</button>
+                      <span className="text-slate-300">|</span>
+                      <button className="text-[10px] text-indigo-600 font-bold hover:underline" onClick={() => setSelectedColumns([])}>None</button>
+                    </div>
+                  )}
+                </button>
+                {!collapsedSections['columns'] && isMultiSource && (
                   <p className="text-[10px] text-amber-600 mb-2 italic">Balance Due uses all-time data, not just the filtered period.</p>
                 )}
 
-                <div className="flex flex-col gap-0.5 mb-12">
+                {!collapsedSections['columns'] && <div className="flex flex-col gap-0.5 mb-12">
                   {(() => {
                     let lastGroup = '';
                     return relevantCols.map(col => {
@@ -1568,7 +1663,7 @@ export function AccountsReportBuilder({
                       );
                     });
                   })()}
-                </div>
+                </div>}
               </div>
 
             </div>{/* end scroll */}

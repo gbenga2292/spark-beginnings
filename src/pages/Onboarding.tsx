@@ -228,7 +228,7 @@ export function Onboarding() {
   const privUsers = usePriv('users');
   const isAdmin = privUsers.canManage;
   const navigate = useNavigate();
-  const { createMainTask, subtasks, updateSubtaskStatus, addReminder, updateReminder, reminders, users } = useAppData();
+  const { createMainTask, mainTasks, subtasks, updateSubtaskStatus, addReminder, updateReminder, reminders, users } = useAppData();
   const { user } = useAuth();
   const hrVariables = useAppStore(s => s.hrVariables);
   const onboardingEmployees = useAppStore(s => s.employees);
@@ -245,6 +245,7 @@ export function Onboarding() {
       .filter(u => u.email && hrEmails.has(u.email.toLowerCase()))
       .map(u => u.id as string);
   }, [onboardingEmployees, users]);
+
 
   // Local buffer for account number to avoid keystroke-delete bug (store update on every key causes re-render)
   const [localAccountNo, setLocalAccountNo] = useState('');
@@ -467,27 +468,6 @@ export function Onboarding() {
 
     const startDate = cl.verifiedStartDate || selectedEmployee.startDate;
     
-    // Auto-spawn probation evaluation reminder if applicable
-    if (selectedEmployee.probationPeriod && selectedEmployee.probationPeriod > 0 && addReminder && user) {
-      const evaluationDate = new Date(startDate);
-      evaluationDate.setDate(evaluationDate.getDate() + selectedEmployee.probationPeriod);
-      evaluationDate.setHours(8, 0, 0, 0);
-      try {
-        await addReminder({
-          title: `Probation Evaluation: ${selectedEmployee.firstname} ${selectedEmployee.surname}`,
-          body: `Reminder to conduct a ${selectedEmployee.probationPeriod}-day probation evaluation for ${selectedEmployee.firstname} ${selectedEmployee.surname} (${selectedEmployee.department} - ${selectedEmployee.position}).`,
-          remindAt: evaluationDate.toISOString(),
-          frequency: 'once',
-          recipientIds: [user.id],
-          createdBy: user.id,
-          isActive: true,
-          sendEmail: false
-        });
-      } catch (e) {
-        console.error("Failed to create probation evaluation reminder", e);
-      }
-    }
-
     updateEmployee(selectedEmployee.id, {
       status: 'Active',
       startDate: startDate,

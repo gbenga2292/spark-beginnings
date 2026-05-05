@@ -5,6 +5,8 @@ import { toast } from '@/src/components/ui/toast';
 import logoSrc from '../../logo/logo-2.png';
 import type { MainTask, SubTask, TaskComment, AppUser, CommentAttachment } from '@/src/types/tasks';
 import { useAppStore } from '@/src/store/appStore';
+import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { useRef } from 'react';
 
 // ── Typed context interface ──────────────────────────────────────────────────
 interface AppDataContextType {
@@ -1200,6 +1202,125 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             toast.success('Reminder snoozed ⏳');
         }
     }, []);
+
+    // ── Global Probation Scan ────────────────────────────────────────────────
+    // Automatically identifies employees whose probation period ended in the 
+    // current month and generates a high-priority HR evaluation task.
+    // This runs once per login session after initial data sync.
+    const probationScanDone = useRef(false);
+    const employees = useAppStore(state => state.employees);
+    const hrVariables = useAppStore(state => state.hrVariables);
+
+    useEffect(() => {
+        if (probationScanDone.current) return;
+        if (sessionStorage.getItem('probation_scan_done')) {
+            probationScanDone.current = true;
+            return;
+        }
+
+        const t = setTimeout(async () => {
+            if (!employees.length || !mainTasks?.length || !user) return;
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // Filter logic: Only check for employees whose probation ended in the current month
+            // This prevents triggering tasks for staff employed years ago.
+            const startOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            startOfCurrentMonth.setHours(0, 0, 0, 0);
+
+            const defaultProbDays = hrVariables.defaultProbationDays || 90;
+            const candidates = employees.filter(e => e.status === 'Active' && e.startDate);
+            if (candidates.length === 0) return;
+
+            // 1. Find ALL eligible HR users (Internal and External)
+            const hrUsers = users.filter((u: any) => {
+                if (u.privileges?.tasks?.isExternalHr) return true;
+                const profileDept = (u.department || u.privileges?.department || '').toLowerCase();
+                if (profileDept.includes('hr') || profileDept.includes('human resource')) return true;
+                const emp = employees.find(e => e.email?.toLowerCase() === u.email?.toLowerCase());
+                const empDept = (emp?.department || '').toLowerCase();
+                return empDept.includes('hr') || empDept.includes('human resource');
+            });
+
+            // 2. Identify the target assignees/creators
+            let targetAssigneeId = '';
+            let targetCreatorId = '';
+            
+            if (hrUsers.length > 0) {
+                // Join all HR user IDs with commas for multi-assignment
+                targetAssigneeId = hrUsers.map(u => u.id).join(',');
+                targetCreatorId = hrUsers[0].id; // Use the first HR user as the primary creator
+            } else {
+                // Fallback: Find highest seniority user (lowest level)
+                const usersWithLevel = users.map(u => {
+                    const emp = employees.find(e => e.email?.toLowerCase() === u.email?.toLowerCase());
+                    return { id: u.id, level: (emp && emp.level !== undefined) ? emp.level : 999 };
+                }).sort((a, b) => a.level - b.level);
+                
+                const topUserId = usersWithLevel[0]?.id || user.id;
+                targetAssigneeId = topUserId;
+                targetCreatorId = topUserId;
+            }
+
+            const existingTitles = new Set(mainTasks.map((t: any) => (t.title || '').trim().toLowerCase()));
+            let createdCount = 0;
+
+            for (const emp of candidates) {
+                const probDays = (emp.probationPeriod && emp.probationPeriod > 0) ? emp.probationPeriod : defaultProbDays;
+                const start = new Date(emp.startDate);
+                if (isNaN(start.getTime())) continue;
+
+                const evalDate = new Date(start);
+                evalDate.setDate(evalDate.getDate() + probDays);
+                evalDate.setHours(8, 0, 0, 0);
+
+                // CONDITION: Probation must have ended THIS MONTH (between 1st and Today)
+                if (evalDate < startOfCurrentMonth || evalDate > today) continue;
+
+                const taskTitle = `Probation Evaluation: ${emp.firstname} ${emp.surname}`;
+                
+                // Unique check per title to avoid duplicates
+                const alreadyExists = mainTasks.some((t: any) => 
+                    (t.title || '').trim().toLowerCase() === taskTitle.trim().toLowerCase()
+                );
+
+                if (alreadyExists) continue;
+
+                try {
+                    await createMainTask(
+                        {
+                            title: taskTitle,
+                            description: `PROBATION REVIEW: ${probDays}-day probation period for ${emp.firstname} ${emp.surname} (${emp.department} — ${emp.position}) ended on ${formatDisplayDate(evalDate)}. Review required as per this month's automated scan.`,
+                            deadline: evalDate.toISOString(),
+                            assignedTo: targetAssigneeId,
+                            createdBy: targetCreatorId,
+                            priority: 'High',
+                            is_hr_task: true,
+                        },
+                        [
+                            { title: 'Schedule evaluation meeting with employee',        assignedTo: targetAssigneeId, priority: 'High'   },
+                            { title: 'Complete probation evaluation form',               assignedTo: targetAssigneeId, priority: 'High'   },
+                            { title: 'Document performance feedback and outcome',        assignedTo: targetAssigneeId, priority: 'Medium' },
+                            { title: 'Update employee status (Confirm / Extend / End)',  assignedTo: targetAssigneeId, priority: 'High'   },
+                        ]
+                    );
+                    createdCount++;
+                } catch (e) {
+                    console.error("Probation task creation failed", e);
+                }
+            }
+
+            if (createdCount > 0) {
+                toast.info(`Probation Scan: Created ${createdCount} evaluation task(s) for employees who finished probation this month.`);
+            }
+            
+            probationScanDone.current = true;
+            sessionStorage.setItem('probation_scan_done', 'true');
+        }, 5000); // 5s delay to ensure all data (employees/tasks) is fully synced into context
+
+        return () => clearTimeout(t);
+    }, [employees, mainTasks, hrVariables, user, createMainTask]);
 
     // ── Memoize context value to prevent unnecessary re-renders ───────────────
     const value = useMemo<AppDataContextType>(() => ({

@@ -70,13 +70,16 @@ export function FinancialReports() {
   const clientProfiles = useAppStore(state => state.clientProfiles);
   const pendingSites = useAppStore(state => state.pendingSites);
 
-  // Look up client TIN from clientProfiles first, then fall back to pendingSites phase4
+  // O(1) TIN Lookup
+  const tinDictionary = useMemo(() => {
+    const map = new Map<string, string>();
+    clientProfiles.forEach(p => { if (p.name && p.tinNumber) map.set(p.name.trim(), p.tinNumber); });
+    pendingSites.forEach(s => { if (s.clientName && s.phase4?.clientTinNumber) map.set(s.clientName.trim(), s.phase4.clientTinNumber); });
+    return map;
+  }, [clientProfiles, pendingSites]);
+
   const getTin = (clientName: string): string => {
-    const profile = clientProfiles.find(p => p.name === clientName);
-    if (profile?.tinNumber) return profile.tinNumber;
-    // Search pendingSites for a tin number entered during onboarding
-    const site = pendingSites.find(s => s.clientName === clientName && s.phase4?.clientTinNumber);
-    return site?.phase4?.clientTinNumber || '';
+    return clientName ? (tinDictionary.get(clientName.trim()) || '') : '';
   };
   const [accountsTab, setAccountsTab] = useState<'payroll' | 'loans'>('payroll');
   const [filterYear, setFilterYear] = useState<string>(String(new Date().getFullYear()));
@@ -170,12 +173,20 @@ export function FinancialReports() {
   const fmRaw = (n: number) => hideAmounts ? '***' : '₦' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // Canonical pre-computation of all payroll data to prevent multiple O(N) calculations
+  // OPTIMIZED: Only calculate if we are actually looking at payroll data
   const allMonthsPayroll = useMemo(() => {
-    return MONTHS.reduce((acc, m) => {
-      acc[m.key] = calculatePayrollForMonth(m.key);
+    if (mainTab !== 'payroll-summary' && accountsTab !== 'payroll') return {};
+    
+    // Only calculate the specific month if filtered, otherwise all
+    const monthsToProcess = (filterMonth === "All" ? null : parseInt(filterMonth, 10))
+      ? [MONTHS_LIST.find(m => m.value === (filterMonth === "All" ? null : parseInt(filterMonth, 10)))?.key || 'jan']
+      : MONTHS.map(m => m.key);
+      
+    return monthsToProcess.reduce((acc, monthKey) => {
+      acc[monthKey] = calculatePayrollForMonth(monthKey);
       return acc;
     }, {} as Record<string, any[]>);
-  }, [calculatePayrollForMonth, MONTHS]);
+  }, [calculatePayrollForMonth, MONTHS, mainTab, accountsTab, filterMonth]);
 
   // Payroll Exposure calculations
   const payrollStats = useMemo(() => {
@@ -344,21 +355,34 @@ export function FinancialReports() {
 
   // Core Metrics
   const globalStats = useMemo(() => {
-    const totalBilled = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
-    const totalVATInvoiced = invoices.reduce((sum, inv) => sum + (inv.vat || 0), 0);
-    const totalCollectedCash = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-    const totalWHT = payments.reduce((sum, p) => sum + (p.withholdingTax || 0), 0);
-    const totalDiscount = payments.reduce((sum, p) => sum + (p.discount || 0), 0);
+    let totalBilled = 0, totalVATInvoiced = 0;
+    invoices.forEach(inv => {
+      totalBilled += (inv.amount || 0);
+      totalVATInvoiced += (inv.vat || 0);
+    });
+
+    let totalCollectedCash = 0, totalWHT = 0, totalDiscount = 0, totalVATCollected = 0;
+    const clientVatMap = new Map<string, number>();
+    
+    // OPTIMIZED: O(1) Site Lookup to prevent O(N*M) loop
+    const siteIndex = new Map<string, any>();
+    sites.forEach(s => siteIndex.set(`${(s.client || '').trim()}|${(s.name || '').trim()}`, s));
+
+    payments.forEach(p => {
+      totalCollectedCash += (p.amount || 0);
+      totalWHT += (p.withholdingTax || 0);
+      totalDiscount += (p.discount || 0);
+      
+      const siteKey = `${(p.client || '').trim()}|${(p.site || '').trim()}`;
+      const payVat = p.payVat || siteIndex.get(siteKey)?.vat || 'No';
+      const { vat } = getVatDetails(p.amount || 0, payVat, vatRate);
+      
+      if (vat > 0) clientVatMap.set(p.client, (clientVatMap.get(p.client) || 0) + vat);
+      totalVATCollected += (vat || 0);
+    });
+
     const totalValueCleared = totalCollectedCash + totalWHT + totalDiscount;
     const totalOutstanding = Math.max(0, totalBilled - totalValueCleared);
-    
-    const clientVatMap = new Map<string, number>();
-    const totalVATCollected = payments.reduce((sum, p) => {
-        const payVat = p.payVat || (sites.find(s => s.name === p.site && s.client === p.client)?.vat as any) || 'No';
-        const { vat } = getVatDetails(p.amount || 0, payVat, vatRate);
-        if (vat > 0) clientVatMap.set(p.client, (clientVatMap.get(p.client) || 0) + vat);
-        return sum + (vat || 0);
-    }, 0);
     
     const vatSources = Array.from(clientVatMap.entries())
       .map(([client, amount]) => ({ client, amount }))
@@ -366,6 +390,7 @@ export function FinancialReports() {
     
     const totalVATRemitted = vatPayments.reduce((sum, vp) => sum + (vp.amount || 0), 0);
     const vatDeficit = Math.max(0, totalVATCollected - totalVATRemitted);
+    
     return { totalBilled, totalVATInvoiced, totalCollectedCash, totalValueCleared, totalOutstanding, totalWHT, totalDiscount, totalVATCollected, totalVATRemitted, vatDeficit, vatSources };
   }, [invoices, payments, vatPayments, sites, vatRate]);
 

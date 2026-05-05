@@ -789,6 +789,8 @@ interface AppState {
     disciplinaryExpirationMonths: number;
     actionLevels: string[];
     defaultProbationDays: number;
+    officeProbationDays?: number;
+    fieldProbationDays?: number;
     investigationPeriodDays: number;
     appealPeriodDays: number;
     onboardingStageLabels?: Record<string, string>;
@@ -909,6 +911,8 @@ export const useAppStore = create<AppState>()(
         disciplinaryExpirationMonths: 6,
         actionLevels: ['Verbal Warning', 'Written Warning', 'Final Written Warning', 'Suspension', 'Termination'],
         defaultProbationDays: 90,
+        officeProbationDays: 90,
+        fieldProbationDays: 90,
         investigationPeriodDays: 5,
         appealPeriodDays: 7,
         sanctionThresholds: [

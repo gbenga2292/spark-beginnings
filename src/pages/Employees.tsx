@@ -182,6 +182,7 @@ export function Employees() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isAdding, isEditing]);
+  
 
   const handleSave = () => {
     if (!formData.surname || !formData.firstname) {

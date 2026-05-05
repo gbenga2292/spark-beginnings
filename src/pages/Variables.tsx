@@ -3028,13 +3028,29 @@ export function Variables() {
                 <p className="text-xs font-bold text-slate-500 uppercase">Evaluations &amp; Lifecycle Checks</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Default Probation Period</label>
+                    <label className="text-xs font-semibold text-slate-700">Office Staff Probation Period</label>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" value={localHrVars.officeProbationDays ?? 90}
+                        onChange={e => updateLocalHrVariables({ officeProbationDays: parseInt(e.target.value) || 0 })} />
+                      <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700">Field Staff Probation Period</label>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" value={localHrVars.fieldProbationDays ?? 90}
+                        onChange={e => updateLocalHrVariables({ fieldProbationDays: parseInt(e.target.value) || 0 })} />
+                      <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700">Global Default Probation</label>
                     <div className="flex items-center gap-2">
                       <Input type="number" value={localHrVars.defaultProbationDays}
                         onChange={e => updateLocalHrVariables({ defaultProbationDays: parseInt(e.target.value) || 0 })} />
                       <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
                     </div>
-                    <p className="text-xs text-slate-400">Triggers probation review process</p>
+                    <p className="text-[10px] text-slate-400">Fallback if staff type specific period is not set.</p>
                   </div>
                 </div>
               </div>
