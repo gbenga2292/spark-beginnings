@@ -391,7 +391,38 @@ export function Evaluations() {
 
         {/* Right Content Area */}
         <div className={`flex-1 flex flex-col overflow-hidden ${isDark ? 'bg-slate-950' : 'bg-slate-50/50'}`}>
-          {!selectedEmployeeId ? (
+          {isAppraisalAdding && selectedEmp ? (
+            <AppraisalScoreSheet
+              employee={selectedEmp}
+              record={editingId ? (records.find(r => r.id === editingId) || undefined) : undefined}
+              onClose={() => { setIsAppraisalAdding(false); setEditingId(null); setFormData(emptyForm); }}
+              onSave={(data) => {
+                if (editingId) {
+                  updateEvaluation(editingId, data);
+                  toast.success('Appraisal sheet updated.');
+                } else {
+                  const newId = crypto.randomUUID();
+                  addEvaluation({
+                    ...(data as EvaluationRecord),
+                    id: newId,
+                    createdBy: currentUser?.name || 'System',
+                    mainTaskId: formData.mainTaskId,
+                    subtaskId: formData.subtaskId,
+                  });
+
+                  if (formData.subtaskId && formData.mainTaskId) {
+                    updateSubtaskStatus(formData.subtaskId, 'completed', currentUser?.id);
+                    postComment(formData.subtaskId, formData.mainTaskId, currentUser?.id || '', `📋 **Appraisal Sheet Recorded** — Score: ${data.overallScore}%`);
+                  }
+
+                  toast.success('Appraisal sheet recorded.');
+                }
+                setIsAppraisalAdding(false);
+                setEditingId(null);
+                setFormData(emptyForm);
+              }}
+            />
+          ) : !selectedEmployeeId ? (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-4 p-8">
                 <div className="h-24 w-24 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 shadow-sm">
                   <UserCheck className="h-10 w-10 text-slate-300" />
@@ -673,38 +704,6 @@ export function Evaluations() {
         </button>
       )}
 
-      {isAppraisalAdding && selectedEmp && (
-        <AppraisalScoreSheet
-          employee={selectedEmp}
-          record={editingId ? (records.find(r => r.id === editingId) || undefined) : undefined}
-          onClose={() => { setIsAppraisalAdding(false); setEditingId(null); setFormData(emptyForm); }}
-          onSave={(data) => {
-            if (editingId) {
-              updateEvaluation(editingId, data);
-              toast.success('Appraisal sheet updated.');
-            } else {
-              const newId = crypto.randomUUID();
-              addEvaluation({
-                ...(data as EvaluationRecord),
-                id: newId,
-                createdBy: currentUser?.name || 'System',
-                mainTaskId: formData.mainTaskId,
-                subtaskId: formData.subtaskId,
-              });
-
-              if (formData.subtaskId && formData.mainTaskId) {
-                updateSubtaskStatus(formData.subtaskId, 'completed', currentUser?.id);
-                postComment(formData.subtaskId, formData.mainTaskId, currentUser?.id || '', `📋 **Appraisal Sheet Recorded** — Score: ${data.overallScore}%`);
-              }
-
-              toast.success('Appraisal sheet recorded.');
-            }
-            setIsAppraisalAdding(false);
-            setEditingId(null);
-            setFormData(emptyForm);
-          }}
-        />
-      )}
     </div>
   );
 }

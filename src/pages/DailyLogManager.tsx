@@ -3,7 +3,8 @@ import {
   ArrowLeft, Calendar, Clock, AlertTriangle, 
   CheckCircle2, Fuel, User, MessageSquare, 
   BarChart3, History, Plus, Save, Trash2, Edit2, Wrench, Activity,
-  ChevronLeft, ChevronRight, ChevronDown, Eye, Lock
+  ChevronLeft, ChevronRight, ChevronDown, Eye, Lock,
+  Image as ImageIcon, Video, X, UploadCloud, FileVideo
 } from 'lucide-react';
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore } from '../store/appStore';
@@ -70,6 +71,12 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   const [dtReason, setDtReason] = useState('');
   const [dtDuration, setDtDuration] = useState('1');
   const [dtSeverity, setDtSeverity] = useState<'low' | 'medium' | 'high'>('medium');
+  
+  // Media State
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [mediaPreviews, setMediaPreviews] = useState<{ url: string; type: 'image' | 'video'; name: string }[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const logs = useMemo(() => {
     return dailyMachineLogs
@@ -92,9 +99,31 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     setShowDowntimeDialog(false);
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setMediaFiles(prev => [...prev, ...files]);
+    
+    const newPreviews = files.map(file => ({
+      url: URL.createObjectURL(file),
+      type: file.type.startsWith('video/') ? 'video' as const : 'image' as const,
+      name: file.name
+    }));
+    setMediaPreviews(prev => [...prev, ...newPreviews]);
+  };
+
+  const removeMedia = (index: number) => {
+    setMediaFiles(prev => prev.filter((_, i) => i !== index));
+    setMediaPreviews(prev => {
+      URL.revokeObjectURL(prev[index].url);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
   const handleSaveLog = async () => {
     try {
-      await logDailyActivity({
+      const logId = await logDailyActivity({
         assetId,
         assetName,
         siteId,
@@ -109,6 +138,36 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
         downtimeEntries,
         loggedBy: currentUser?.name || 'Unknown'
       });
+
+      // Handle Media Upload if any
+      if (mediaFiles.length > 0) {
+        setIsUploading(true);
+        const formData = new FormData();
+        mediaFiles.forEach(file => {
+          formData.append('files', file);
+        });
+        formData.append('siteName', siteName);
+        formData.append('loggedBy', currentUser?.name || 'Unknown');
+        formData.append('date', date);
+
+        try {
+          // Replace with your actual backend URL
+          const response = await fetch('http://your-web-server.com/api/upload-log-media', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) throw new Error('Failed to upload media');
+          toast.success(`${mediaFiles.length} media files uploaded successfully`);
+        } catch (uploadErr) {
+          console.error('Media upload error:', uploadErr);
+          toast.error('Log saved, but media upload failed. Please try again later.');
+        } finally {
+          setIsUploading(false);
+        }
+      }
+
+      toast.success('Daily log saved successfully');
       if (isEmbedded) {
         onBack();
       } else {
@@ -419,62 +478,75 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                   </div>
                 )}
 
-                {/* Downtime Section */}
-                {isActive && (
-                  <div className="space-y-4 pt-6 border-t border-slate-100 dark:border-slate-800">
+                {/* Media Upload Section */}
+                <div className="space-y-4 pt-6 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-rose-500" />
-                      <h3 className="font-semibold text-slate-800 dark:text-white">Downtime Incidents</h3>
+                      <ImageIcon className="h-4 w-4 text-blue-500" />
+                      <h3 className="font-semibold text-slate-800 dark:text-white">Photos & Videos</h3>
                     </div>
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="gap-2 h-8 text-xs font-medium rounded-md border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-900/30 dark:hover:bg-rose-900/20"
-                      onClick={() => setShowDowntimeDialog(true)}
+                      className="gap-2 h-8 text-xs font-medium rounded-md border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-900/30 dark:hover:bg-blue-900/20"
+                      onClick={() => fileInputRef.current?.click()}
                     >
-                      <Plus className="h-3.5 w-3.5" /> Add Incident
+                      <Plus className="h-3.5 w-3.5" /> Add Media
                     </Button>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      multiple 
+                      accept="image/*,video/*" 
+                      onChange={handleFileChange}
+                    />
                   </div>
 
-                  {downtimeEntries.length === 0 ? (
-                    <div className="py-6 px-4 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-center">
-                      <p className="text-sm font-medium text-slate-500">No downtime incidents recorded for this period.</p>
+                  {mediaPreviews.length === 0 ? (
+                    <div 
+                      className="py-10 px-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/30 border-2 border-dashed border-slate-200 dark:border-slate-800 text-center cursor-pointer hover:bg-slate-50 transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <UploadCloud className="h-8 w-8 text-slate-300 mx-auto mb-3" />
+                      <p className="text-sm font-medium text-slate-500">Click or drag photos and videos here</p>
+                      <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">Supports JPG, PNG, MP4, MOV</p>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      {downtimeEntries.map(entry => (
-                        <div key={entry.id} className="flex items-center justify-between p-3 rounded-lg bg-rose-50/30 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/20 group">
-                          <div className="flex items-center gap-3">
-                            <div className={cn(
-                              "h-8 w-8 rounded-md flex items-center justify-center shrink-0",
-                              entry.severity === 'high' ? "bg-rose-100 text-rose-600" :
-                              entry.severity === 'medium' ? "bg-amber-100 text-amber-600" :
-                              "bg-blue-100 text-blue-600"
-                            )}>
-                              <AlertTriangle className="h-4 w-4" />
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {mediaPreviews.map((preview, idx) => (
+                        <div key={idx} className="group relative aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                          {preview.type === 'image' ? (
+                            <img src={preview.url} alt="Preview" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900">
+                              <FileVideo className="h-8 w-8 text-white/50" />
+                              <span className="text-[9px] text-white/40 mt-1 truncate px-2 w-full text-center">{preview.name}</span>
                             </div>
-                            <div>
-                              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{entry.reason}</p>
-                              <p className="text-[11px] text-slate-500 font-medium">
-                                {entry.durationHours} Hours · {entry.severity} Severity
-                              </p>
-                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Button 
+                              variant="destructive" 
+                              size="icon" 
+                              className="h-8 w-8 rounded-full"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeMedia(idx);
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-900/30"
-                            onClick={() => setDowntimeEntries(downtimeEntries.filter(e => e.id !== entry.id))}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {preview.type === 'video' && (
+                            <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded text-[9px] font-bold text-white flex items-center gap-1">
+                              <Video className="h-2.5 w-2.5" /> VIDEO
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
-                )}
               </div>
 
               <div className="bg-slate-50/50 dark:bg-slate-800/50 p-4 sm:p-5 flex flex-col sm:flex-row justify-end gap-3 border-t border-slate-100 dark:border-slate-800 rounded-b-lg">
@@ -488,8 +560,14 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                 <Button 
                   className="rounded-md bg-blue-600 hover:bg-blue-700 text-white gap-2 w-full sm:w-auto"
                   onClick={handleSaveLog}
+                  disabled={isUploading}
                 >
-                  <Save className="h-4 w-4" /> {selectedLog ? 'Update Log' : 'Save Daily Log'}
+                  {isUploading ? (
+                    <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  {isUploading ? 'Uploading Media...' : (selectedLog ? 'Update Log' : 'Save Daily Log')}
                 </Button>
               </div>
             </Card>

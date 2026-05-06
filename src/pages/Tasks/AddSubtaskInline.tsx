@@ -23,13 +23,24 @@ export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSu
   const { user: currentUser } = useAuth();
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
   const [requiresApproval, setRequiresApproval] = useState(false);
+  const [approverId, setApproverId] = useState("");
 
   const handleAdd = () => {
     if (!title.trim()) return;
     const assignee = isPersonal ? (currentUser?.id ?? null) : (assignedTo.length > 0 ? assignedTo.join(',') : null);
     const combinedDeadline = deadline ? (deadlineTime ? `${deadline}T${deadlineTime}` : deadline) : undefined;
-    onAdd({ mainTaskId, title: title.trim(), description: desc.trim(), assignedTo: assignee, status: "not_started", deadline: combinedDeadline, priority, requiresApproval });
-    setTitle(""); setDesc(""); setAssignedTo([]); setDeadline(""); setDeadlineTime(""); setPriority(undefined); setRequiresApproval(false); setOpen(false);
+    onAdd({ 
+      mainTaskId, 
+      title: title.trim(), 
+      description: desc.trim(), 
+      assignedTo: assignee, 
+      status: (requiresApproval ? "pending_approval" : "not_started"), 
+      deadline: combinedDeadline, 
+      priority, 
+      requiresApproval,
+      approverId: requiresApproval ? approverId : undefined
+    });
+    setTitle(""); setDesc(""); setAssignedTo([]); setDeadline(""); setDeadlineTime(""); setPriority(undefined); setRequiresApproval(false); setApproverId(""); setOpen(false);
   };
 
   const accentColor = isPersonal ? 'text-indigo-600 hover:text-indigo-700' : 'text-primary hover:text-primary/80';
@@ -99,12 +110,29 @@ export function AddSubtaskInline({ mainTaskId, users, isPersonal, onAdd }: AddSu
           {PRIORITY_ORDER.map(p => <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>)}
         </select>
       </div>
-      <div className="flex items-center gap-1.5 mt-2">
+      <div className="flex flex-col gap-2 mt-2">
         <label className="flex items-center gap-1.5 cursor-pointer">
           <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)}
             className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20" />
-          <span className="text-xs font-medium text-foreground">Requires review before completion</span>
+          <span className="text-xs font-medium text-foreground">Approval Needed</span>
         </label>
+        
+        {requiresApproval && (
+          <div className="w-full max-w-[250px]">
+            <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Select Approver</label>
+            <select 
+              value={approverId} 
+              onChange={e => setApproverId(e.target.value)}
+              required={requiresApproval}
+              className="w-full px-3 py-1.5 rounded-lg border border-border bg-card text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="">Choose an approver...</option>
+              {users.map(u => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
       <div className="flex gap-2 justify-end pt-1">
         <button onClick={() => setOpen(false)} className="px-4 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:bg-muted transition-colors">Cancel</button>

@@ -28,9 +28,10 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
   const [deadlineTime, setDeadlineTime] = useState("");
   const [priority, setPriority] = useState<TaskPriority | undefined>(undefined);
   const [requiresApproval, setRequiresApproval] = useState(false);
+  const [approverId, setApproverId] = useState<string>("");
   const [isHrTask, setIsHrTask] = useState(isExternalHr ?? false);
   const [showSubs, setShowSubs] = useState(true);
-  const [subtasks, setSubs] = useState<{ title: string; assignedTo: string[]; deadline: string; deadlineTime: string; priority: TaskPriority | undefined; requiresApproval: boolean }[]>([]);
+  const [subtasks, setSubs] = useState<{ title: string; assignedTo: string[]; deadline: string; deadlineTime: string; priority: TaskPriority | undefined; requiresApproval: boolean; approverId?: string }[]>([]);
 
   // ── Reminder state ────────────────────────────────────────────────────────
   const [enableReminder, setEnableReminder] = useState(false);
@@ -49,7 +50,7 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
   const [openMainDropdown, setOpenMainDropdown] = useState(false);
   const [openSubDropdown, setOpenSubDropdown] = useState<number | null>(null);
 
-  const addRow = () => setSubs(p => [...p, { title: "", assignedTo: [], deadline: "", deadlineTime: "", priority: undefined, requiresApproval: false }]);
+  const addRow = () => setSubs(p => [...p, { title: "", assignedTo: [], deadline: "", deadlineTime: "", priority: undefined, requiresApproval: false, approverId: "" }]);
   const removeRow = (i: number) => setSubs(p => p.filter((_, idx) => idx !== i));
   const updateRow = (i: number, k: string, v: any) =>
     setSubs(p => p.map((r, idx) => idx === i ? { ...r, [k]: v } : r));
@@ -76,17 +77,31 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
         title: s.title.trim(),
         description: "",
         assignedTo: s.assignedTo.length > 0 ? s.assignedTo.join(',') : null,
-        status: "not_started" as SubTaskStatus,
+        status: (s.requiresApproval ? "pending_approval" : "not_started") as SubTaskStatus,
         deadline: s.deadline ? (s.deadlineTime ? `${s.deadline}T${s.deadlineTime}` : s.deadline) : undefined,
         priority: s.priority,
         requiresApproval: s.requiresApproval,
+        approverId: s.requiresApproval ? s.approverId : undefined,
       });
     });
 
     const mainAssignedToStr = assignedTo.length > 0 ? assignedTo.join(',') : undefined;
 
     const createdTask = await createMainTask(
-      { title: title.trim(), description: description.trim(), createdBy: currentUserId, teamId, workspaceId: workspaceId ?? teamId, assignedTo: mainAssignedToStr, deadline: combinedDeadline, priority, requiresApproval, is_hr_task: isHrTask },
+      { 
+        title: title.trim(), 
+        description: description.trim(), 
+        createdBy: currentUserId, 
+        teamId, 
+        workspaceId: workspaceId ?? teamId, 
+        assignedTo: mainAssignedToStr, 
+        deadline: combinedDeadline, 
+        priority, 
+        requiresApproval, 
+        approverId: requiresApproval ? approverId : undefined,
+        is_hr_task: isHrTask,
+        skipAutoSubtask: finalSubs.length > 0
+      },
       finalSubs
     );
 
@@ -216,11 +231,29 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
             </div>
           </div>
           
-          <label className="flex items-center gap-2 cursor-pointer mt-1">
-            <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)}
-              className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 transition-all" />
-            <span className="text-xs font-medium text-foreground">Requires review before completion</span>
-          </label>
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2 cursor-pointer mt-1">
+              <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)}
+                className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 transition-all" />
+              <span className="text-xs font-medium text-foreground">Approval Needed</span>
+            </label>
+            {requiresApproval && (
+              <div className="ml-6">
+                <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Select Approver</label>
+                <select 
+                  value={approverId} 
+                  onChange={e => setApproverId(e.target.value)}
+                  required={requiresApproval}
+                  className="w-full px-3 py-1.5 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">Choose an approver...</option>
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
           
           <label className="flex items-center gap-2 cursor-pointer mt-1 group">
             <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isHrTask ? 'bg-rose-500 border-rose-500 text-white' : 'border-border bg-background'}`}>
@@ -298,12 +331,28 @@ export function CreateTaskDialog({ onClose, onSubmit, users, currentUserId, team
                             {PRIORITY_ORDER.map(p => <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>)}
                           </select>
                         </div>
-                        <div className="ml-6 flex items-center">
+                        <div className="ml-6 flex flex-col gap-2">
                           <label className="flex items-center gap-1.5 cursor-pointer">
                             <input type="checkbox" checked={sub.requiresApproval} onChange={e => updateRow(i, "requiresApproval", e.target.checked)}
                               className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/20" />
-                            <span className="text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">Requires Review</span>
+                            <span className="text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">Approval Needed</span>
                           </label>
+                          {sub.requiresApproval && (
+                            <div className="w-full max-w-[200px]">
+                              <label className="block text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Select Approver</label>
+                              <select 
+                                value={sub.approverId} 
+                                onChange={e => updateRow(i, "approverId", e.target.value)}
+                                required={sub.requiresApproval}
+                                className="w-full px-2 py-1 rounded-lg border border-border bg-background text-[11px] focus:outline-none focus:ring-2 focus:ring-primary/20"
+                              >
+                                <option value="">Choose an approver...</option>
+                                {users.map(u => (
+                                  <option key={u.id} value={u.id}>{u.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}

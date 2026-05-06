@@ -13,13 +13,14 @@ import type { TaskPriority, SubTaskStatus } from "@/src/types/tasks";
 export const statusConfig: Record<SubTaskStatus, { label: string; pillClass: string; dot: string; icon: React.ElementType }> = {
   not_started: { label: "Not Started", pillClass: "chip-pending", dot: "bg-gray-400", icon: Circle },
   in_progress: { label: "In Progress", pillClass: "chip-in-progress", dot: "bg-blue-600", icon: Loader2 },
-  pending_approval: { label: "Pending Approval", pillClass: "chip-pending-approval", dot: "bg-amber-400", icon: Circle },
+  pending_approval: { label: "Approval Needed", pillClass: "chip-pending-approval", dot: "bg-amber-400", icon: Circle },
   completed: { label: "Completed", pillClass: "chip-completed", dot: "bg-green-600", icon: CheckCircle2 },
 };
 
 export const mainStatusConfig = {
   not_started: { label: "Not Started", pillClass: "chip-pending" },
   in_progress: { label: "In Progress", pillClass: "chip-in-progress" },
+  pending_approval: { label: "Approval Needed", pillClass: "chip-pending-approval" },
   completed: { label: "Completed", pillClass: "chip-completed" },
 };
 
@@ -276,7 +277,7 @@ export function ScopePicker({ scope, setScope, myCount, pendingCount }: { scope:
   const SCOPES = [
     { value: 'mine', label: 'Mine', icon: User, count: myCount },
     { value: 'all', label: 'All', icon: LayoutGrid },
-    { value: 'pending_review', label: 'Review', icon: Clock, count: pendingCount },
+    { value: 'pending_review', label: 'Approval Needed', icon: Clock, count: pendingCount },
     { value: 'projects', label: 'Projects', icon: FolderOpen },
   ];
 

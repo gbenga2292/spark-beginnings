@@ -70,10 +70,11 @@ function showNativeNotification(title: string, body?: string) {
     }
 }
 
-export function deriveMainTaskStatus(mainTaskId: string, subtasks: any[]): 'not_started'|'in_progress'|'completed' {
+export function deriveMainTaskStatus(mainTaskId: string, subtasks: any[]): 'not_started'|'in_progress'|'pending_approval'|'completed' {
     const subs = subtasks.filter(s => s.main_task_id === mainTaskId || s.mainTaskId === mainTaskId);
     if (!subs.length) return 'not_started';
     if (subs.every(s => s.status === 'completed')) return 'completed';
+    if (subs.some(s => s.status === 'pending_approval')) return 'pending_approval';
     if (subs.some(s => s.status === 'in_progress' || s.status === 'completed')) return 'in_progress';
     return 'not_started';
 }
@@ -110,6 +111,7 @@ export function mapMainTaskToCamel(m: any) {
         isProject: m.is_project ?? m.isProject,
         isHrTask: m.is_hr_task ?? m.isHrTask,
         requiresApproval: m.requires_approval ?? m.requiresApproval,
+        approverId: m.approver_id || m.approverId,
         completedAt: m.completed_at || m.completedAt,
         deletedAt: m.deleted_at || m.deletedAt,
         createdAt: m.created_at || m.createdAt,
@@ -125,6 +127,7 @@ export function mapSubtaskToCamel(s: any) {
         workspaceId: s.workspaceId || s.workspace_id,
         assignedTo: s.assignedTo || s.assigned_to,
         requiresApproval: s.requires_approval ?? s.requiresApproval,
+        approverId: s.approver_id || s.approverId,
         pendingApprovalSince: s.pending_approval_since || s.pendingApprovalSince,
         approvedBy: s.approvedBy || s.approved_by,
         rejectedAt: s.rejectedAt || s.rejected_at,
@@ -398,6 +401,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             priority: task.priority || null,
             is_project: task.is_project || false,
             requires_approval: task.requiresApproval || false,
+            approver_id: task.approverId || null,
             is_hr_task: task.is_hr_task || false,
         };
         const { data, error } = await supabase.from('main_tasks').insert(payload).select().single();
@@ -407,7 +411,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             return null;
         }
         if (data) {
-            setMainTasks(prev => [...prev, mapMainTaskToCamel(data)]);
+            setMainTasks(prev => {
+                if (prev.some(t => t.id === data.id)) return prev;
+                return [...prev, mapMainTaskToCamel(data)];
+            });
             toast.success('Task created successfully');
             let targetSubs = subs;
             
@@ -417,10 +424,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     title: payload.title,
                     description: payload.description,
                     assignedTo: payload.assignedTo,
-                    status: 'not_started',
+                    status: task.requiresApproval ? 'pending_approval' : 'not_started',
                     deadline: payload.deadline,
                     priority: payload.priority,
                     requiresApproval: task.requiresApproval || false,
+                    approverId: task.approverId || null,
                 }];
             }
 
@@ -433,6 +441,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                     deadline: s.deadline || null,
                     priority: s.priority || null,
                     requires_approval: s.requiresApproval || false,
+                    approver_id: s.approverId || null,
                     mainTaskId: data.id,
                 }));
                 const { data: insertedSubs, error: subErr } = await supabase.from('subtasks').insert(subTasksPayload).select();
@@ -442,7 +451,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 }
                 if (insertedSubs) {
                     const mapped = insertedSubs.map(mapSubtaskToCamel);
-                    setSubtasks(prev => [...prev, ...mapped]);
+                    setSubtasks(prev => {
+                        const newOnes = mapped.filter(m => !prev.some(s => s.id === m.id));
+                        if (newOnes.length === 0) return prev;
+                        return [...prev, ...newOnes];
+                    });
                 }
             }
 
@@ -998,7 +1011,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             }
         }
 
-        const payload: any = { subtask_id: subId || null, main_task_id: mainId, text: text || '', author_id: authorId };
+        const payload: any = { subtask_id: subId || null, text: text || '' };
+        if (mainId) payload.main_task_id = mainId;
+        if (authorId) payload.author_id = authorId;
         if (uploadedAttachments.length > 0) payload.attachments = uploadedAttachments;
         if (_fileLinks && _fileLinks.length > 0) payload.file_links = _fileLinks;
 

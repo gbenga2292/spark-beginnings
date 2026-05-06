@@ -49,6 +49,7 @@ const COLUMNS: { status: SubTaskStatus; label: string; icon: React.ElementType; 
 const MAIN_COLUMNS: { status: string; label: string; icon: React.ElementType; color: string; bg: string }[] = [
   { status: "not_started", label: "Not Started", icon: Circle, color: "text-muted-foreground", bg: "bg-muted/50" },
   { status: "in_progress", label: "In Progress", icon: Loader2, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950/20" },
+  { status: "pending_approval", label: "Pending", icon: Hourglass, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950/20" },
   { status: "completed", label: "Done", icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50 dark:bg-green-950/20" },
 ];
 
@@ -200,6 +201,7 @@ export function MainTaskKanbanView({
     { type: 'col', status: 'not_started' },
     { type: 'col', status: 'in_progress' },
     { type: 'reminders', status: 'reminders' },
+    { type: 'col', status: 'pending_approval' },
     { type: 'col', status: 'completed' }
   ];
 

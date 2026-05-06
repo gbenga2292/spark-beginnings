@@ -458,8 +458,8 @@ function PersonalTasksView() {
                         <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
                           <PriorityPicker value={mt.priority} onChange={p => updateMainTask(mt.id, { priority: p })} />
                         </div>
-                        <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full flex items-center gap-1 w-max flex-shrink-0 ${sc.pillClass}`}>
-                          {sc.label}
+                        <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full flex items-center gap-1 w-max flex-shrink-0 ${sc?.pillClass || 'bg-slate-100 text-slate-500'}`}>
+                          {sc?.label || status}
                         </span>
                       </div>
 
@@ -786,6 +786,7 @@ function AdminTasksView() {
     { label: "All", value: "all" },
     { label: "Not Started", value: "not_started" },
     { label: "In Progress", value: "in_progress" },
+    { label: "Approval Needed", value: "pending_approval" },
     { label: "Completed", value: "completed" },
   ] as const;
 
@@ -793,7 +794,7 @@ function AdminTasksView() {
     { label: "All", value: "all" },
     { label: "Not Started", value: "not_started" },
     { label: "In Progress", value: "in_progress" },
-    { label: "Review", value: "pending_approval" },
+    { label: "Approval Needed", value: "pending_approval" },
     { label: "Done", value: "completed" },
   ] as const;
 
@@ -1027,8 +1028,17 @@ function AdminTasksView() {
       {viewMode === 'inbox' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <TaskInboxView
-            subtasks={scope === 'mine' ? mySubs : scope === 'projects' ? teamSubtasks.filter(s => tabFiltered.find(m => m.is_project && m.id === s.mainTaskId)) : teamSubtasks}
-            mainTasks={scope === 'projects' ? tabFiltered.filter(m => m.is_project) : teamTasks}
+            subtasks={
+              scope === 'mine' ? mySubs : 
+              scope === 'pending_review' ? pendingApprovalSubs :
+              scope === 'projects' ? teamSubtasks.filter(s => tabFiltered.find(m => m.is_project && m.id === s.mainTaskId)) : 
+              teamSubtasks
+            }
+            mainTasks={
+              scope === 'projects' ? tabFiltered.filter(m => m.is_project) : 
+              scope === 'pending_review' ? teamTasks.filter(mt => pendingApprovalSubs.some(s => s.mainTaskId === mt.id)) :
+              teamTasks
+            }
             users={activeUsers}
             activeSubtaskId={openSubtaskId}
             onSelectSubtask={id => setOpenSubtaskId(id)}
@@ -1607,8 +1617,8 @@ function AdminTasksView() {
                           </div>
                         </>
                       )}
-                      <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full flex items-center gap-1 w-max flex-shrink-0 ${sc.pillClass}`}>
-                        {sc.label}
+                      <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full flex items-center gap-1 w-max flex-shrink-0 ${sc?.pillClass || 'bg-slate-100 text-slate-500'}`}>
+                        {sc?.label || status}
                       </span>
                     </div>
 
@@ -2672,11 +2682,22 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
   const [deadline, setDeadline] = useState(subtask.deadline ?? '');
   const [status, setStatus] = useState<SubTaskStatus>(subtask.status);
   const [priority, setPriority] = useState<TaskPriority | undefined>(subtask.priority);
+  const [requiresApproval, setRequiresApproval] = useState(subtask.requiresApproval || false);
+  const [approverId, setApproverId] = useState(subtask.approverId || '');
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onSave({ title: title.trim(), description: description.trim(), assignedTo: assignedTo || null, deadline: deadline || undefined, status, priority });
+    onSave({ 
+      title: title.trim(), 
+      description: description.trim(), 
+      assignedTo: assignedTo || null, 
+      deadline: deadline || undefined, 
+      status: (requiresApproval && status === 'not_started') ? 'pending_approval' : status, 
+      priority,
+      requiresApproval,
+      approverId: requiresApproval ? approverId : undefined
+    });
   };
 
   const statusOptions: { value: SubTaskStatus; label: string; cls: string }[] = [
@@ -2760,6 +2781,29 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
                 </button>
               ))}
             </div>
+          </div>
+          <div className="bg-muted/20 p-4 rounded-xl border border-border/50 space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)}
+                className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 transition-all" />
+              <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">Requires Approval</span>
+            </label>
+            {requiresApproval && (
+              <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
+                <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Approving Authority</label>
+                <select 
+                  value={approverId} 
+                  onChange={e => setApproverId(e.target.value)}
+                  required={requiresApproval}
+                  className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                >
+                  <option value="">Choose an approver...</option>
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </motion.div>
+            )}
           </div>
           <div className="flex justify-end gap-3 pt-1">
             <Button type="button" onClick={onClose}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { format, isPast } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '@/src/hooks/useAuth';
@@ -12,7 +12,7 @@ import {
   User, Users, Calendar, Clock, ChevronDown, ChevronRight,
   MessageSquare, Hash, Paperclip, Send, FolderOpen, X,
   ArrowRight, ArrowLeft, Plus, Hourglass, FileText, FileSpreadsheet, Presentation,
-  Pencil, Reply, Link as LinkIcon, Check, Trash2
+  Pencil, Reply, Link as LinkIcon, Check, Trash2, ShieldCheck
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/src/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
@@ -23,7 +23,7 @@ import { AppraisalScoreSheet } from "../evaluations/AppraisalScoreSheet";
 const statusConfig: Record<SubTaskStatus, { label: string; pillClass: string; dotColor: string; icon: React.ElementType }> = {
   not_started: { label: "Not Started", pillClass: "bg-slate-100 text-slate-600 border border-slate-200", dotColor: "bg-slate-400", icon: Circle },
   in_progress: { label: "In Progress", pillClass: "bg-blue-100 text-blue-700 border border-blue-200", dotColor: "bg-blue-500", icon: Loader2 },
-  pending_approval: { label: "Review", pillClass: "bg-amber-100 text-amber-700 border border-amber-200", dotColor: "bg-amber-500", icon: Hourglass },
+  pending_approval: { label: "Approval Needed", pillClass: "bg-amber-100 text-amber-700 border border-amber-200", dotColor: "bg-amber-500", icon: Hourglass },
   completed: { label: "Completed", pillClass: "bg-green-100 text-green-700 border border-green-200", dotColor: "bg-green-500", icon: CheckCircle2 },
 };
 
@@ -31,7 +31,7 @@ const STATUS_FLOW: SubTaskStatus[] = ["not_started", "in_progress", "pending_app
 const STATUS_LABELS: Record<SubTaskStatus, string> = {
   not_started: "Not Started",
   in_progress: "In Progress",
-  pending_approval: "Review",
+  pending_approval: "Approval Needed",
   completed: "Completed",
 };
 
@@ -176,11 +176,15 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
 
   const [showListOnMobile, setShowListOnMobile] = useState(true);
 
-  // Panel Invitation State
   const [panelInvite, setPanelInvite] = useState<{ isOpen: boolean; panelists: string[] }>({
     isOpen: false,
     panelists: []
   });
+
+  const [rejectionPrompt, setRejectionPrompt] = useState<{ isOpen: boolean; subtaskId: string | null; isStandard: boolean }>({ 
+    isOpen: false, subtaskId: null, isStandard: false 
+  });
+  const [rejectionReason, setRejectionReason] = useState("");
 
   // Group subtasks under their MainTasks — normalize snake_case from Supabase
   const groupedTasks = useMemo(() => {
@@ -199,9 +203,9 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
       groups[mtId].push(sub);
     });
     const priorityMap: Record<string, number> = { 
-      not_started: 0, 
+      pending_approval: 0, 
       in_progress: 1, 
-      pending_approval: 2, 
+      not_started: 2, 
       completed: 3 
     };
 
@@ -676,7 +680,21 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                     const isStandardApproval = (activeSubtask.requiresApproval || (activeSubtask as any).requires_approval) && activeSubtask.status === 'pending_approval';
                     if (isStandardApproval) {
                         isApprovalTask = true;
-                        isApprover = activeMainTask.createdBy === currentUser?.id || currentUser?.role === 'admin';
+                        
+                        // "Trump" logic: Subtask approver first, then Main Task approver, then fallback to Creator/Admin
+                        const subApproverId = activeSubtask.approverId || (activeSubtask as any).approver_id;
+                        const mainApproverId = (activeMainTask as any).approver_id || activeMainTask.approverId;
+                        
+                        if (subApproverId) {
+                            // Subtask has a specific approver, they MUST be the one
+                            isApprover = subApproverId === currentUser?.id || currentUser?.role === 'admin';
+                        } else if (mainApproverId) {
+                            // Fall back to main task approver
+                            isApprover = mainApproverId === currentUser?.id || currentUser?.role === 'admin';
+                        } else {
+                            // Final fallback to creator or admin
+                            isApprover = activeMainTask.createdBy === currentUser?.id || currentUser?.role === 'admin';
+                        }
                     }
 
                     if (isApprovalTask) {
@@ -690,7 +708,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                               if (isStandardApproval) {
                                 // Pass bypassApproval=true so the requiresApproval interception is skipped
                                 updateSubtaskStatus(activeSubtask.id!, 'completed', currentUser?.id, true);
-                                postComment(activeSubtask.id!, activeMainTask.id, `✅ **Approved** — Task marked as completed.`, currentUser?.id);
+                                postComment(activeSubtask.id!, activeMainTask.id, currentUser?.id || '', `✅ **Approved** — Task marked as completed.`);
                               } else {
                                 // Check if it's a vehicle doc renewal
                                 let isVehicleDoc = false;
@@ -722,16 +740,8 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                           <button
                             onClick={() => {
                               if (!isApprover || hasActed) return;
-                              const reason = window.prompt("Rejection reason (optional):");
-                              if (reason !== null) {
-                                  if (isStandardApproval) {
-                                      // Standard task: revert to in_progress and post comment
-                                      updateSubtaskStatus(activeSubtask.id!, 'in_progress', currentUser?.id);
-                                      if (reason) postComment(activeSubtask.id!, activeMainTask.id, `❌ **Rejected**\nReason: ${reason}`, currentUser?.id);
-                                  } else {
-                                      rejectSubtask(activeSubtask.id!, currentUser?.id, reason);
-                                  }
-                              }
+                              setRejectionPrompt({ isOpen: true, subtaskId: activeSubtask.id || null, isStandard: isStandardApproval });
+                              setRejectionReason("");
                             }}
                             disabled={!isApprover || hasActed}
                             className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold border transition-all ${
@@ -843,8 +853,8 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                 <div className="mb-10">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">STATUS:</p>
                   <div className="flex items-center gap-0">
-                    {STATUS_FLOW.map((status, i) => {
-                      const currentIdx = STATUS_FLOW.indexOf(activeSubtask.status);
+                    {STATUS_FLOW.filter(s => s !== 'pending_approval' || activeSubtask.requiresApproval || (activeSubtask as any).requires_approval || activeSubtask.status === 'pending_approval').map((status, i, filtered) => {
+                      const currentIdx = filtered.indexOf(activeSubtask.status);
                       const isActive = activeSubtask.status === status;
                       const isPastPhase = i < currentIdx;
                       return (
@@ -863,7 +873,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                           >
                             {STATUS_LABELS[status]}
                           </div>
-                          {i < STATUS_FLOW.length - 1 && (
+                          {i < filtered.length - 1 && (
                             <div className={`flex-1 h-[2px] mx-1 border-t-2 border-dashed ${isPastPhase ? 'border-primary/40' : 'border-slate-200'}`} />
                           )}
                         </React.Fragment>
@@ -905,6 +915,28 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                     {" → "}
                     {activeSubtask.deadline ? format(new Date(activeSubtask.deadline), "MMM d") : "—"}
                   </div>
+
+                  {(activeSubtask.requiresApproval || (activeSubtask as any).requires_approval || (activeMainTask as any).requires_approval || activeMainTask.requiresApproval) && (
+                    <>
+                      <span className="font-semibold text-slate-500 flex items-center">Approver:</span>
+                      <div className="flex items-center gap-2 font-medium text-slate-800">
+                        {(() => {
+                          const resolvedApproverId = activeSubtask.approverId || (activeSubtask as any).approver_id || (activeMainTask as any).approver_id || activeMainTask.approverId;
+                          const approver = users.find(u => u.id === resolvedApproverId);
+                          if (approver) {
+                            return (
+                              <div className="flex items-center gap-1.5 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">
+                                <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                                <span className="text-xs text-amber-900">{approver.name}</span>
+                                {(activeSubtask.approverId || (activeSubtask as any).approver_id) && <span className="text-[9px] bg-amber-200 text-amber-700 px-1 rounded uppercase font-bold">Subtask Authority</span>}
+                              </div>
+                            );
+                          }
+                          return <span className="text-xs text-slate-400 italic">None designated (Admin fallback)</span>;
+                        })()}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Task Narration & Description */}
@@ -1493,7 +1525,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                       deadline: activeMainTask?.deadline || new Date().toISOString()
                     });
                   });
-                  postComment(activeSubtask.id!, activeMainTaskId!, `📢 **Panel Invited** — Created review tasks for: ${panelInvite.panelists.map(id => users.find(u => u.id === id)?.name).join(', ')}.\n**Session ID**: \`${sessionId}\``, currentUser?.id);
+                  postComment(activeSubtask.id!, activeMainTaskId!, currentUser?.id || '', `📢 **Panel Invited** — Created review tasks for: ${panelInvite.panelists.map(id => users.find(u => u.id === id)?.name).join(', ')}.\n**Session ID**: \`${sessionId}\``);
                   setPanelInvite({ isOpen: false, panelists: [] });
                   toast.success(`Invited ${panelInvite.panelists.length} panel members.`);
                 }}
@@ -1504,6 +1536,71 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
           </motion.div>
         </div>
       )}
+
+      {/* ── Rejection Prompt Modal ── */}
+      <AnimatePresence>
+        {rejectionPrompt.isOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/20 backdrop-blur-[2px]">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }} 
+              animate={{ opacity: 1, scale: 1, y: 0 }} 
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+            >
+              <div className="px-6 py-4 border-b border-border bg-rose-50/30 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center text-rose-600">
+                    <X className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-sm font-bold text-foreground">Reject Request</h3>
+                </div>
+                <button onClick={() => setRejectionPrompt({ ...rejectionPrompt, isOpen: false })} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Reason for Rejection (Optional)</label>
+                  <textarea 
+                    autoFocus
+                    value={rejectionReason}
+                    onChange={e => setRejectionReason(e.target.value)}
+                    placeholder="Explain why this request is being rejected..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-rose-100 resize-none min-h-[100px]"
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button 
+                    onClick={() => setRejectionPrompt({ ...rejectionPrompt, isOpen: false })}
+                    className="flex-1 px-4 py-2.5 rounded-xl border border-border text-xs font-bold hover:bg-muted transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (!rejectionPrompt.subtaskId) return;
+                      if (rejectionPrompt.isStandard) {
+                        updateSubtaskStatus(rejectionPrompt.subtaskId, 'in_progress', currentUser?.id);
+                        if (rejectionReason.trim()) {
+                          const mtId = activeMainTask?.id || "";
+                          postComment(rejectionPrompt.subtaskId, mtId, currentUser?.id || '', `❌ **Rejected**\nReason: ${rejectionReason.trim()}`);
+                        }
+                      } else {
+                        rejectSubtask(rejectionPrompt.subtaskId, currentUser?.id, rejectionReason.trim());
+                      }
+                      setRejectionPrompt({ ...rejectionPrompt, isOpen: false });
+                      setRejectionReason("");
+                    }}
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all active:scale-95"
+                  >
+                    Reject Request
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
@@ -1907,11 +2004,11 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
             );
           });
         })()}
-        <div ref={endRef} />
-      </div>
+          <div ref={endRef} />
+        </div>
 
-      {/* WhatsApp-style Compose Bar */}
-      <div className="flex-shrink-0 relative z-20 bg-[#f0f2f5] dark:bg-[#202c33] border-t border-[#d9dbde] dark:border-[#313d45]">
+        {/* ── WhatsApp-style Compose Bar ── */}
+        <div className="flex-shrink-0 relative z-20 bg-[#f0f2f5] dark:bg-[#202c33] border-t border-[#d9dbde] dark:border-[#313d45]">
         {/* Reply preview */}
         {replyingTo && (
           <div className="mx-3 mt-2 px-3 py-2 bg-white dark:bg-[#2a3942] rounded-xl border-l-4 flex items-start justify-between" style={{ borderLeftColor: getAuthorColor(replyingTo.author_id || replyingTo.authorId || 'x') }}>

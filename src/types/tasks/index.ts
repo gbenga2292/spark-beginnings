@@ -85,6 +85,7 @@ export interface SubTask {
     requiresApproval?: boolean;
     pendingApprovalSince?: string;
     approvedBy?: string;
+    approverId?: string;
     rejectedAt?: string;
 }
 
@@ -100,6 +101,7 @@ export interface MainTask {
     isDeleted?: boolean;
     is_project?: boolean;
     requiresApproval?: boolean;
+    approverId?: string;
     is_hr_task?: boolean;         // Manual flag for external HR visibility
     createdAt: string;
     updatedAt: string;
