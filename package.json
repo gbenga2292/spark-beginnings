@@ -1,7 +1,7 @@
 {
   "name": "dcel-hr-app",
   "private": true,
-  "version": "1.4.8",
+  "version": "1.4.9",
   "description": "DCEL Office Suite - Comprehensive HR and Operations Management for Construction",
   "author": "Gbenga",
   "type": "module",
@@ -148,6 +148,10 @@
       "allowToChangeInstallationDirectory": true
     },
     "publish": [
+      {
+        "provider": "generic",
+        "url": "file://///MYCLOUDEX2ULTRA/DCEL_Share/Updates/"
+      },
       {
         "provider": "github",
         "owner": "gbenga2292",

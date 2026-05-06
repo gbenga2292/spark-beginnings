@@ -27,6 +27,21 @@ const isDev = !app.isPackaged;
 function initAutoUpdater() {
   if (isDev) return; // skip in dev mode
 
+  const fs = require('fs');
+  const nasPath = '\\\\MYCLOUDEX2ULTRA\\DCEL_Share\\Updates\\';
+  
+  // If the NAS is reachable, use it as the primary update source
+  if (fs.existsSync(nasPath)) {
+    autoUpdater.setFeedURL({
+      provider: 'generic',
+      url: `file:///${nasPath.replace(/\\/g, '/')}`
+    });
+  } else {
+    // If NAS is not found (e.g. user is off-site), it will use the GitHub 
+    // provider configured in package.json automatically.
+    console.log('NAS not reachable, defaulting to GitHub for updates.');
+  }
+
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
 
