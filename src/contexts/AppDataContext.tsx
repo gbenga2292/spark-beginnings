@@ -1207,19 +1207,29 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     // Automatically identifies employees whose probation period ended in the 
     // current month and generates a high-priority HR evaluation task.
     // This runs once per login session after initial data sync.
+    // ── Global Probation Scan ────────────────────────────────────────────────
+    // Automatically identifies employees whose probation period ended in the 
+    // current month and generates a high-priority HR evaluation task.
+    // This runs once per login session after initial data sync.
     const probationScanDone = useRef(false);
+    const scanInProgress = useRef(false); // Prevent overlapping runs
     const employees = useAppStore(state => state.employees);
     const hrVariables = useAppStore(state => state.hrVariables);
 
     useEffect(() => {
+        // Prevent re-running if already done or currently scanning
+        if (probationScanDone.current || scanInProgress.current || !employees.length || !user || !users.length) return;
+
         const t = setTimeout(async () => {
-            if (!employees.length || !user) return;
+            // Final check inside timeout to prevent race conditions
+            if (probationScanDone.current || scanInProgress.current) return;
+            
+            scanInProgress.current = true;
             
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
             // Filter logic: Check for employees whose probation ended recently (this month or last month)
-            // This ensures we catch anyone who was missed or whose task was recently deleted.
             const startDateLimit = new Date(today);
             startDateLimit.setDate(1); 
             startDateLimit.setMonth(startDateLimit.getMonth() - 1); 
@@ -1231,40 +1241,26 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 e.startDate && 
                 (e.staffType === 'OFFICE' || e.staffType === 'FIELD')
             );
-            if (candidates.length === 0) return;
-
-            // 1. Find ALL eligible HR users (Internal and External)
-            const hrUsers = users.filter((u: any) => {
-                if (u.privileges?.tasks?.isExternalHr) return true;
-                const profileDept = (u.department || u.privileges?.department || '').toLowerCase();
-                if (profileDept.includes('hr') || profileDept.includes('human resource')) return true;
-                const emp = employees.find(e => e.email?.toLowerCase() === u.email?.toLowerCase());
-                const empDept = (emp?.department || '').toLowerCase();
-                return empDept.includes('hr') || empDept.includes('human resource');
-            });
-
-            // 2. Identify the target assignees/creators
-            let targetAssigneeId = '';
-            let targetCreatorId = '';
             
-            if (hrUsers.length > 0) {
-                // Join all HR user IDs with commas for multi-assignment
-                targetAssigneeId = hrUsers.map(u => u.id).join(',');
-                targetCreatorId = hrUsers[0].id; // Use the first HR user as the primary creator
-            } else {
-                // Fallback: Find highest seniority user (lowest level)
-                const usersWithLevel = users.map(u => {
-                    const emp = employees.find(e => e.email?.toLowerCase() === u.email?.toLowerCase());
-                    return { id: u.id, level: (emp && emp.level !== undefined) ? emp.level : 999 };
-                }).sort((a, b) => a.level - b.level);
-                
-                const topUserId = usersWithLevel[0]?.id || user.id;
-                targetAssigneeId = topUserId;
-                targetCreatorId = topUserId;
+            if (candidates.length === 0) {
+                scanInProgress.current = false;
+                probationScanDone.current = true;
+                return;
             }
 
+            // 1. Find ALL eligible HR users using robust department filtering
+            // Prioritize users whose employee record says 'HR' or who have external HR privileges
+            const hrUsers = users.filter((u: any) => {
+                if (u.isExternalHr || u.privileges?.tasks?.isExternalHr) return true;
+                const profileDept = (u.department || u.privileges?.department || '').toLowerCase();
+                if (profileDept.includes('hr') || profileDept.includes('human resource')) return true;
+                
+                const empRecord = employees.find(e => e.email?.toLowerCase() === u.email?.toLowerCase());
+                const empDept = (empRecord?.department || '').toLowerCase();
+                return empDept === 'hr' || empDept.includes('human resource');
+            });
+
             const evaluations = useAppStore.getState().evaluations;
-            const existingTitles = new Set(mainTasks.map((t: any) => (t.title || '').trim().toLowerCase()));
             let createdCount = 0;
 
             for (const emp of candidates) {
@@ -1281,12 +1277,40 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
                 const taskTitle = `Probation Evaluation: ${emp.firstname} ${emp.surname}`;
                 
-                // Unique check: Avoid duplicates if task title exists OR if a probation evaluation already exists for this employee
+                // Unique check: Avoid duplicates if task title exists OR if a probation evaluation already exists
                 const alreadyExists = mainTasks.some((t: any) => 
                     (t.title || '').trim().toLowerCase() === taskTitle.trim().toLowerCase()
                 ) || evaluations.some(ev => ev.employeeId === emp.id && (ev.type === 'Probation' || ev.sessionId));
 
                 if (alreadyExists) continue;
+
+                // 2. Identify the target assignee for THIS specific employee
+                let targetAssigneeId = '';
+                let targetCreatorId = '';
+
+                if (hrUsers.length > 0) {
+                    targetAssigneeId = hrUsers.map(u => u.id).join(',');
+                    targetCreatorId = hrUsers[0].id;
+                } else if (emp.lineManager) {
+                    // Fallback 1: Employee's Line Manager
+                    const managerUser = users.find((u: any) => u.id === emp.lineManager);
+                    if (managerUser) {
+                        targetAssigneeId = managerUser.id;
+                        targetCreatorId = managerUser.id;
+                    }
+                }
+
+                // Fallback 2: General fallback (Top seniority or Current User)
+                if (!targetAssigneeId) {
+                    const usersWithLevel = users.map(u => {
+                        const eRec = employees.find(e => e.email?.toLowerCase() === u.email?.toLowerCase());
+                        return { id: u.id, level: (eRec && eRec.level !== undefined) ? eRec.level : 999 };
+                    }).sort((a, b) => a.level - b.level);
+                    
+                    const topUserId = usersWithLevel[0]?.id || user.id;
+                    targetAssigneeId = topUserId;
+                    targetCreatorId = topUserId;
+                }
 
                 try {
                     await createMainTask(
@@ -1315,10 +1339,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             if (createdCount > 0) {
                 toast.info(`Probation Scan: Created ${createdCount} evaluation task(s) for employees who finished probation this month.`);
             }
-        }, 5000); // 5s delay to ensure all data (employees/tasks) is fully synced into context
+
+            scanInProgress.current = false;
+            probationScanDone.current = true;
+        }, 5000); 
 
         return () => clearTimeout(t);
-    }, [employees, mainTasks, hrVariables, user, createMainTask]);
+    }, [employees, mainTasks, hrVariables, user, users, createMainTask]);
 
     // ── Memoize context value to prevent unnecessary re-renders ───────────────
     const value = useMemo<AppDataContextType>(() => ({

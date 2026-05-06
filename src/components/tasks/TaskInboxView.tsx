@@ -17,6 +17,7 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from "@/src/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
 import type { SubTask, MainTask, AppUser, SubTaskStatus, CommentAttachment } from "@/src/types/tasks";
+import { AppraisalScoreSheet } from "../evaluations/AppraisalScoreSheet";
 
 // ── Status Config ─────────────────────────────────────────────────────────────
 const statusConfig: Record<SubTaskStatus, { label: string; pillClass: string; dotColor: string; icon: React.ElementType }> = {
@@ -512,6 +513,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                     let link = '';
                     let label = 'Preview';
                     let privKey: keyof UserPrivileges | null = null;
+                    let onClick: (() => void) | undefined = undefined;
                     const mtTitle = activeMainTask.title.toLowerCase();
                     const stTitle = activeSubtask.title.toLowerCase();
 
@@ -530,7 +532,9 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                       if (meta.refId && (meta.refType === 'site' || mtTitle.includes('onboard'))) { link = `/sites/onboarding/${meta.refId}`; label = 'View Onboarding'; privKey = 'sites'; }
                       if (meta.refType === 'vehicle_doc_renewal') { link = '/operations/vehicles'; label = 'View Vehicle'; privKey = 'operations'; }
                       if (meta.refType === 'employee' || meta.refType === 'new_hire') { link = `/employees`; label = 'View Employee'; privKey = 'employees'; }
-                      if (meta.refType === 'probation_eval' && meta.employeeId) { link = `/evaluations?employeeId=${meta.employeeId}&mainTaskId=${activeMainTask.id}`; label = 'Log Evaluation'; privKey = 'evaluations'; }
+                      if (meta.refType === 'probation_eval' && meta.employeeId) { link = `/evaluations?employeeId=${meta.employeeId}&mainTaskId=${activeMainTask.id}&subtaskId=${activeSubtask.id}`; label = 'Log Evaluation'; privKey = 'evaluations'; }
+                      if (meta.refType === 'probation_panel_invite') { label = 'Invite Panel'; onClick = () => setPanelInvite({ isOpen: true, panelists: [] }); }
+                      if (meta.refType === 'panel_approval') { label = 'Review & Finalize'; }
                     } catch(e) {}
 
                     if (!link) {
@@ -569,7 +573,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                       }
                     }
 
-                    if (!link) return null;
+                    if (!link && !onClick) return null;
 
                     let hasAccess = true;
                     if (privKey && subUser) {
@@ -589,7 +593,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
 
                     return (
                       <button 
-                        onClick={() => navigate(link)}
+                        onClick={() => onClick ? onClick() : navigate(link)}
                         className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-sm active:translate-y-px"
                       >
                         <LinkIcon className="w-4 h-4" /> {label}
@@ -617,6 +621,8 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                       if (meta.refType === 'probation_panel') {
                           isPanelReview = true;
                           panelMeta = meta;
+                      } else if (meta.refType === 'panel_approval' || meta.refType === 'probation_panel_invite') {
+                          // Special handling below
                       } else if (meta.refType && meta.refType !== 'hmo') {
                           isApprovalTask = true;
                           isApprover = activeSubtask.assignedTo?.split(',').includes(currentUser?.id || '') ?? false;
@@ -977,13 +983,17 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                   const isAdminOrHr = currentUser?.role === 'admin' || currentUser?.role === 'co-admin' || subUser?.department?.toLowerCase() === 'hr' || subUser?.privileges?.tasks?.isExternalHr;
                   if (!isAdminOrHr) return null;
 
-                  const panelSubtask = subtasks.find(s => s.mainTaskId === activeMainTask.id && s.description && s.description.includes('probation_panel') && s.description.includes('sessionId'));
-                  if (!panelSubtask) return null;
-                  
                   let actualSessionId = null;
                   try {
-                    const meta = JSON.parse(panelSubtask.description);
-                    actualSessionId = meta.sessionId;
+                    const meta = JSON.parse(activeSubtask.description || '{}');
+                    if (meta.sessionId) actualSessionId = meta.sessionId;
+                    else {
+                      const panelSubtask = subtasks.find(s => s.mainTaskId === activeMainTask.id && s.description && s.description.includes('probation_panel') && s.description.includes('sessionId'));
+                      if (panelSubtask) {
+                        const pMeta = JSON.parse(panelSubtask.description);
+                        actualSessionId = pMeta.sessionId;
+                      }
+                    }
                   } catch(e) {}
                   
                   if (!actualSessionId) return null;
@@ -1009,7 +1019,8 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                            sessionId: actualSessionId,
                            evaluationRole: 'CONSENSUS'
                          });
-                         postComment(activeSubtask.id!, activeMainTask.id, `✅ **Panel Conclusion Reached**\nDecision: ${data.conclusion}\nScore: ${data.score}%`, currentUser?.id);
+                         updateSubtaskStatus(activeSubtask.id!, 'completed', currentUser?.id);
+                         postComment(activeSubtask.id!, activeMainTask.id, currentUser?.id || '', `✅ **Panel Conclusion Reached**\nDecision: ${data.conclusion}\nScore: ${data.score}%`);
                          toast.success("Consensus submitted successfully. Panel is now locked.");
                       }}
                     />
@@ -1175,139 +1186,234 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
       )}
 
       {evalPrompt.isOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md border border-slate-200 dark:border-slate-800">
-             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                 <h3 className="text-[15px] font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                   <Presentation className="w-5 h-5 text-indigo-500" /> Panelist Evaluation
-                 </h3>
-                 <button onClick={() => setEvalPrompt(p => ({ ...p, isOpen: false }))} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
-             </div>
-             <div className="p-5 space-y-4">
-                <p className="text-sm text-slate-500">Evaluating: <span className="font-bold text-slate-800">{evalPrompt.employeeName}</span></p>
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Overall Score (0-100)</label>
-                  <input 
-                    type="number" 
-                    min="0" max="100"
-                    value={evalPrompt.score} 
-                    onChange={e => setEvalPrompt(p => ({ ...p, score: e.target.value }))}
-                    className="w-full h-10 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Your Conclusion</label>
-                  <select
-                    value={evalPrompt.conclusion}
-                    onChange={e => setEvalPrompt(p => ({ ...p, conclusion: e.target.value }))}
-                    className="w-full h-10 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="Confirm Employment">✅ Confirm Employment</option>
-                    <option value="Extend Probation">⏳ Extend Probation</option>
-                    <option value="End Employment">🚫 End Employment</option>
-                    <option value="Confirm with Salary Increase">💰 Confirm with Salary Increase</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Panelist Notes</label>
-                  <textarea 
-                    value={evalPrompt.notes} 
-                    onChange={e => setEvalPrompt(p => ({ ...p, notes: e.target.value }))}
-                    rows={4}
-                    className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" 
-                    placeholder="Enter your independent feedback..."
-                  />
-                </div>
-             </div>
-             <div className="p-5 bg-slate-50 dark:bg-slate-800/50 rounded-b-xl flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
-                <button onClick={() => setEvalPrompt(p => ({ ...p, isOpen: false }))} className="px-4 py-2 rounded-lg text-sm font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50">Cancel</button>
-                <button 
-                  onClick={async () => {
-                     const numScore = parseInt(evalPrompt.score) || 0;
-                     if (!evalPrompt.notes.trim()) { toast.error("Please provide your notes."); return; }
-                     
-                     if (evalPrompt.id && updateEvaluation) {
-                        updateEvaluation(evalPrompt.id, {
-                          overallScore: numScore,
-                          scores: { "Panelist Score": numScore },
-                          managerNotes: evalPrompt.notes,
-                          type: evalPrompt.conclusion,
-                        });
-                     } else {
-                        addEvaluation({
-                           id: crypto.randomUUID(),
-                           employeeId: evalPrompt.employeeId,
-                           date: new Date().toISOString(),
-                           type: evalPrompt.conclusion,
-                           scores: { "Panelist Score": numScore },
-                           overallScore: numScore,
-                           managerNotes: evalPrompt.notes,
-                           status: 'Review',
-                           acknowledged: false,
-                           createdBy: subUser?.name || 'System',
-                           sessionId: evalPrompt.sessionId,
-                           evaluationRole: 'PANELIST'
-                        });
-                     }
-                     
-                     if (evalPrompt.subtaskId) {
-                        updateSubtaskStatus(evalPrompt.subtaskId, 'completed', currentUser?.id);
-                        const verb = evalPrompt.id ? 'Updated' : 'Submitted';
-                        postComment(evalPrompt.subtaskId, activeMainTaskId!, currentUser?.id || '', `📋 **Evaluation ${verb}** — Score: ${numScore}/100 | Verdict: ${evalPrompt.conclusion}`);
-                     }
+        (() => {
+          const evalEmployee = employees.find(e => e.id === evalPrompt.employeeId);
+          
+          if (evalEmployee) {
+            return (
+              <AppraisalScoreSheet
+                employee={evalEmployee}
+                record={evalPrompt.id ? evaluations.find(e => e.id === evalPrompt.id) : undefined}
+                onClose={() => setEvalPrompt(p => ({ ...p, isOpen: false }))}
+                onSave={async (data) => {
+                  const numScore = data.overallScore || 0;
+                  const verdict = data.type || evalPrompt.conclusion;
+                  
+                  if (evalPrompt.id && updateEvaluation) {
+                    updateEvaluation(evalPrompt.id, {
+                      ...data,
+                      overallScore: numScore,
+                      type: verdict,
+                    });
+                  } else {
+                    addEvaluation({
+                      id: crypto.randomUUID(),
+                      employeeId: evalPrompt.employeeId,
+                      date: new Date().toISOString(),
+                      type: verdict,
+                      scores: { "Panelist Score": numScore },
+                      overallScore: numScore,
+                      managerNotes: data.managerNotes || data.strengths || '',
+                      status: 'Review',
+                      acknowledged: false,
+                      createdBy: subUser?.name || 'System',
+                      sessionId: evalPrompt.sessionId,
+                      evaluationRole: 'PANELIST',
+                      ...data
+                    });
+                  }
 
-                     // ─── Auto-trigger CEO approval task once ALL panelists are done ───
-                     const panelSubtasksForSession = subtasks.filter(s => 
-                       s.mainTaskId === activeMainTaskId && 
-                       s.description && 
-                       s.description.includes(evalPrompt.sessionId)
-                     );
-                     const allDone = panelSubtasksForSession.length > 0 && 
-                       panelSubtasksForSession.every(s => s.status === 'completed' || (evalPrompt.subtaskId && s.id === evalPrompt.subtaskId));
+                  if (evalPrompt.subtaskId) {
+                    updateSubtaskStatus(evalPrompt.subtaskId, 'completed', currentUser?.id);
+                    const verb = evalPrompt.id ? 'Updated' : 'Submitted';
+                    postComment(evalPrompt.subtaskId, activeMainTaskId!, currentUser?.id || '', `📋 **Detailed Appraisal ${verb}** — Score: ${numScore}/100 | Verdict: ${verdict}`);
+                  }
 
-                     if (allDone && !evalPrompt.id) {
-                       const ceoUser = users.find(u => (u as any).role === 'admin' || (u as any).jobTitle?.toLowerCase().includes('ceo'));
-                       if (ceoUser && createMainTask) {
-                         const allEvals = (evaluations || []).filter(e => e.sessionId === evalPrompt.sessionId && e.evaluationRole === 'PANELIST');
-                         const panelSummary = allEvals.map(e => `• ${e.createdBy}: ${e.overallScore}% — ${e.type}\n  "${e.managerNotes}"`).join('\n');
-                         const avgScore = allEvals.length > 0 ? Math.round(allEvals.reduce((a, e) => a + (e.overallScore || 0), 0) / allEvals.length) : numScore;
-                         await createMainTask({
-                           title: `🔒 Panel Verdict: ${evalPrompt.employeeName} — Probation Review`,
-                           description: `Panel evaluation session for **${evalPrompt.employeeName}** is complete.\n\n**Average Score:** ${avgScore}/100\n\n**Individual Verdicts:**\n${panelSummary}\n\nPlease review the panel's conclusions and approve the final decision.`,
-                           assignedTo: ceoUser.id,
-                           createdBy: currentUser?.id,
-                           priority: 'high',
-                           is_hr_task: true,
-                           skipAutoSubtask: false,
-                         }, [{
-                           title: `Approve Panel Verdict: ${evalPrompt.employeeName}`,
-                           description: JSON.stringify({
-                             refType: 'panel_approval',
-                             sessionId: evalPrompt.sessionId,
-                             employeeName: evalPrompt.employeeName,
-                             employeeId: evalPrompt.employeeId,
-                             avgScore,
-                             narration: `Final approval required for probation panel outcome for ${evalPrompt.employeeName}.`
-                           }),
-                           assignedTo: ceoUser.id,
-                           status: 'not_started',
-                           priority: 'high',
-                           requiresApproval: true,
-                         }]);
-                         toast.success(`All panelists submitted! A private approval task has been created for the CEO.`);
-                       }
-                     }
-                     
-                     toast.success(evalPrompt.id ? "Evaluation updated!" : "Evaluation submitted successfully!");
-                     setEvalPrompt(p => ({ ...p, isOpen: false }));
-                  }}
-                  className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-2"
-                >
-                  <CheckCircle2 className="w-4 h-4" /> Submit
-                </button>
-             </div>
-          </div>
-        </div>
+                  // ─── Auto-trigger CEO approval task once ALL panelists are done ───
+                  const panelSubtasksForSession = subtasks.filter(s => 
+                    s.mainTaskId === activeMainTaskId && 
+                    s.description && 
+                    s.description.includes(evalPrompt.sessionId)
+                  );
+                  const allDone = panelSubtasksForSession.length > 0 && 
+                    panelSubtasksForSession.every(s => s.status === 'completed' || (evalPrompt.subtaskId && s.id === evalPrompt.subtaskId));
+
+                  if (allDone && !evalPrompt.id) {
+                    const ceoUser = users.find(u => (u as any).role === 'admin' || (u as any).jobTitle?.toLowerCase().includes('ceo'));
+                    if (ceoUser && createMainTask) {
+                      const allEvals = (evaluations || []).filter(e => e.sessionId === evalPrompt.sessionId && e.evaluationRole === 'PANELIST');
+                      const panelSummary = allEvals.map(e => `• ${e.createdBy}: ${e.overallScore}% — ${e.type}\n  "${e.managerNotes}"`).join('\n');
+                      const avgScore = allEvals.length > 0 ? Math.round(allEvals.reduce((a, e) => a + (e.overallScore || 0), 0) / allEvals.length) : numScore;
+                      await createMainTask({
+                        title: `🔒 Panel Verdict: ${evalPrompt.employeeName} — Probation Review`,
+                        description: `Panel evaluation session for **${evalPrompt.employeeName}** is complete.\n\n**Average Score:** ${avgScore}/100\n\n**Individual Verdicts:**\n${panelSummary}\n\nPlease review the panel's conclusions and approve the final decision.`,
+                        assignedTo: ceoUser.id,
+                        createdBy: currentUser?.id,
+                        priority: 'high',
+                        is_hr_task: true,
+                        skipAutoSubtask: false,
+                      }, [{
+                        title: `Approve Panel Verdict: ${evalPrompt.employeeName}`,
+                        description: JSON.stringify({
+                          refType: 'panel_approval',
+                          sessionId: evalPrompt.sessionId,
+                          employeeName: evalPrompt.employeeName,
+                          employeeId: evalPrompt.employeeId,
+                          avgScore,
+                          narration: `Final approval required for probation panel outcome for ${evalPrompt.employeeName}.`
+                        }),
+                        assignedTo: ceoUser.id,
+                        status: 'not_started',
+                        priority: 'high',
+                        requiresApproval: true,
+                      }]);
+                      toast.success(`All panelists submitted! A private approval task has been created for the CEO.`);
+                    }
+                  }
+
+                  toast.success(evalPrompt.id ? "Evaluation updated!" : "Evaluation submitted successfully!");
+                  setEvalPrompt(p => ({ ...p, isOpen: false }));
+                }}
+              />
+            );
+          }
+
+          return (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md border border-slate-200 dark:border-slate-800">
+                 <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                     <h3 className="text-[15px] font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                       <Presentation className="w-5 h-5 text-indigo-500" /> Panelist Evaluation
+                     </h3>
+                     <button onClick={() => setEvalPrompt(p => ({ ...p, isOpen: false }))} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+                 </div>
+                 <div className="p-5 space-y-4">
+                    <p className="text-sm text-slate-500">Evaluating: <span className="font-bold text-slate-800">{evalPrompt.employeeName}</span></p>
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Overall Score (0-100)</label>
+                      <input 
+                        type="number" 
+                        min="0" max="100"
+                        value={evalPrompt.score} 
+                        onChange={e => setEvalPrompt(p => ({ ...p, score: e.target.value }))}
+                        className="w-full h-10 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Your Conclusion</label>
+                      <select
+                        value={evalPrompt.conclusion}
+                        onChange={e => setEvalPrompt(p => ({ ...p, conclusion: e.target.value }))}
+                        className="w-full h-10 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      >
+                        <option value="Confirm Employment">✅ Confirm Employment</option>
+                        <option value="Extend Probation">⏳ Extend Probation</option>
+                        <option value="End Employment">🚫 End Employment</option>
+                        <option value="Confirm with Salary Increase">💰 Confirm with Salary Increase</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Panelist Notes</label>
+                      <textarea 
+                        value={evalPrompt.notes} 
+                        onChange={e => setEvalPrompt(p => ({ ...p, notes: e.target.value }))}
+                        rows={4}
+                        className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" 
+                        placeholder="Enter your independent feedback..."
+                      />
+                    </div>
+                 </div>
+                 <div className="p-5 bg-slate-50 dark:bg-slate-800/50 rounded-b-xl flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                    <button onClick={() => setEvalPrompt(p => ({ ...p, isOpen: false }))} className="px-4 py-2 rounded-lg text-sm font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50">Cancel</button>
+                    <button 
+                      onClick={async () => {
+                         const numScore = parseInt(evalPrompt.score) || 0;
+                         if (!evalPrompt.notes.trim()) { toast.error("Please provide your notes."); return; }
+                         
+                         if (evalPrompt.id && updateEvaluation) {
+                            updateEvaluation(evalPrompt.id, {
+                              overallScore: numScore,
+                              scores: { "Panelist Score": numScore },
+                              managerNotes: evalPrompt.notes,
+                              type: evalPrompt.conclusion,
+                            });
+                         } else {
+                            addEvaluation({
+                               id: crypto.randomUUID(),
+                               employeeId: evalPrompt.employeeId,
+                               date: new Date().toISOString(),
+                               type: evalPrompt.conclusion,
+                               scores: { "Panelist Score": numScore },
+                               overallScore: numScore,
+                               managerNotes: evalPrompt.notes,
+                               status: 'Review',
+                               acknowledged: false,
+                               createdBy: subUser?.name || 'System',
+                               sessionId: evalPrompt.sessionId,
+                               evaluationRole: 'PANELIST'
+                            });
+                         }
+                         
+                         if (evalPrompt.subtaskId) {
+                            updateSubtaskStatus(evalPrompt.subtaskId, 'completed', currentUser?.id);
+                            const verb = evalPrompt.id ? 'Updated' : 'Submitted';
+                            postComment(evalPrompt.subtaskId, activeMainTaskId!, currentUser?.id || '', `📋 **Evaluation ${verb}** — Score: ${numScore}/100 | Verdict: ${evalPrompt.conclusion}`);
+                         }
+
+                         // ─── Auto-trigger CEO approval task once ALL panelists are done ───
+                         const panelSubtasksForSession = subtasks.filter(s => 
+                           s.mainTaskId === activeMainTaskId && 
+                           s.description && 
+                           s.description.includes(evalPrompt.sessionId)
+                         );
+                         const allDone = panelSubtasksForSession.length > 0 && 
+                           panelSubtasksForSession.every(s => s.status === 'completed' || (evalPrompt.subtaskId && s.id === evalPrompt.subtaskId));
+
+                         if (allDone && !evalPrompt.id) {
+                           const ceoUser = users.find(u => (u as any).role === 'admin' || (u as any).jobTitle?.toLowerCase().includes('ceo'));
+                           if (ceoUser && createMainTask) {
+                             const allEvals = (evaluations || []).filter(e => e.sessionId === evalPrompt.sessionId && e.evaluationRole === 'PANELIST');
+                             const panelSummary = allEvals.map(e => `• ${e.createdBy}: ${e.overallScore}% — ${e.type}\n  "${e.managerNotes}"`).join('\n');
+                             const avgScore = allEvals.length > 0 ? Math.round(allEvals.reduce((a, e) => a + (e.overallScore || 0), 0) / allEvals.length) : numScore;
+                             await createMainTask({
+                               title: `🔒 Panel Verdict: ${evalPrompt.employeeName} — Probation Review`,
+                               description: `Panel evaluation session for **${evalPrompt.employeeName}** is complete.\n\n**Average Score:** ${avgScore}/100\n\n**Individual Verdicts:**\n${panelSummary}\n\nPlease review the panel's conclusions and approve the final decision.`,
+                               assignedTo: ceoUser.id,
+                               createdBy: currentUser?.id,
+                               priority: 'high',
+                               is_hr_task: true,
+                               skipAutoSubtask: false,
+                             }, [{
+                               title: `Approve Panel Verdict: ${evalPrompt.employeeName}`,
+                               description: JSON.stringify({
+                                 refType: 'panel_approval',
+                                 sessionId: evalPrompt.sessionId,
+                                 employeeName: evalPrompt.employeeName,
+                                 employeeId: evalPrompt.employeeId,
+                                 avgScore,
+                                 narration: `Final approval required for probation panel outcome for ${evalPrompt.employeeName}.`
+                               }),
+                               assignedTo: ceoUser.id,
+                               status: 'not_started',
+                               priority: 'high',
+                               requiresApproval: true,
+                             }]);
+                             toast.success(`All panelists submitted! A private approval task has been created for the CEO.`);
+                           }
+                         }
+                         
+                         toast.success(evalPrompt.id ? "Evaluation updated!" : "Evaluation submitted successfully!");
+                         setEvalPrompt(p => ({ ...p, isOpen: false }));
+                      }}
+                      className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-2"
+                    >
+                      <CheckCircle2 className="w-4 h-4" /> Submit
+                    </button>
+                 </div>
+              </div>
+            </div>
+          );
+        })()
       )}
 
       {/* Panel Invitation Dialog */}

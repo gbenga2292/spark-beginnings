@@ -6,8 +6,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog } from '@/src/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
-import { Search, Plus, ArrowLeft, Save, Pencil, Trash2, ClipboardList, Eye, UserCheck, PanelLeftClose, PanelLeftOpen, Users } from 'lucide-react';
+import { Search, Plus, ArrowLeft, Save, Pencil, Trash2, ClipboardList, Eye, UserCheck, PanelLeftClose, PanelLeftOpen, Users, ChevronDown, FileText, LayoutList } from 'lucide-react';
 import { useAppStore, EvaluationRecord } from '@/src/store/appStore';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/src/components/ui/dropdown-menu';
+import { AppraisalScoreSheet } from '@/src/components/evaluations/AppraisalScoreSheet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { usePriv } from '@/src/hooks/usePriv';
@@ -17,6 +19,7 @@ import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useTheme } from '@/src/hooks/useTheme';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { useAppData } from '@/src/contexts/AppDataContext';
 
 export function Evaluations() {
   const { isDark } = useTheme();
@@ -26,6 +29,7 @@ export function Evaluations() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   
   const [isAdding, setIsAdding] = useState(false);
+  const [isAppraisalAdding, setIsAppraisalAdding] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewingRecord, setViewingRecord] = useState<any | null>(null);
@@ -39,6 +43,7 @@ export function Evaluations() {
   const currentUser = useUserStore(s => s.getCurrentUser());
   const allUsers = useUserStore(s => s.users);
   const priv = usePriv('evaluations');
+  const { updateSubtaskStatus, postComment } = useAppData();
 
   const internalEmployees = filterAndSortEmployeesExcludingCEO(
     employees.filter(e => e.staffType?.toLowerCase().includes('internal') || ['OFFICE', 'FIELD'].includes(e.staffType))
@@ -58,12 +63,15 @@ export function Evaluations() {
     panelConclusion: undefined,
     invitedPanelists: [],
     mainTaskId: '',
+    subtaskId: '',
   };
 
   // ── Deep-link: pre-select employee from URL param (e.g. from probation task) ──
   useEffect(() => {
     const empId = searchParams.get('employeeId');
     const taskId = searchParams.get('mainTaskId');
+    const subId = searchParams.get('subtaskId');
+    const sessionId = searchParams.get('sessionId');
     if (!empId || !internalEmployees.length) return;
     const emp = internalEmployees.find(e => e.id === empId);
     if (!emp) return;
@@ -72,7 +80,10 @@ export function Evaluations() {
       ...emptyForm, 
       employeeId: empId, 
       type: 'Probation',
-      mainTaskId: taskId || ''
+      mainTaskId: taskId || '',
+      subtaskId: subId || '',
+      sessionId: sessionId || '',
+      evaluationRole: sessionId ? 'CONSENSUS' : 'INDIVIDUAL'
     }));
     setIsAdding(true);
     // Clear the query param so navigating back doesn't re-trigger
@@ -92,6 +103,12 @@ export function Evaluations() {
       createdBy: currentUser?.name || 'System',
     };
     addEvaluation(record);
+
+    if (formData.subtaskId && formData.mainTaskId) {
+      updateSubtaskStatus(formData.subtaskId, 'completed', currentUser?.id);
+      postComment(formData.subtaskId, formData.mainTaskId, currentUser?.id || '', `📋 **Evaluation Recorded** — Score: ${record.overallScore}% | Outcome: ${record.panelConclusion || 'Logged'}`);
+    }
+
     setIsAdding(false);
     setFormData(emptyForm);
     toast.success('Performance evaluation recorded.');
@@ -107,6 +124,12 @@ export function Evaluations() {
   };
 
   const startEdit = (record: EvaluationRecord) => {
+    if (record.isAppraisal) {
+      setFormData(record);
+      setEditingId(record.id);
+      setIsAppraisalAdding(true); // Open appraisal sheet in edit mode
+      return;
+    }
     setFormData(record);
     setEditingId(record.id);
     setIsEditing(true);
@@ -396,9 +419,25 @@ export function Evaluations() {
                     </div>
                   </div>
                   {priv.canAdd && (
-                    <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-sm px-3 md:px-6 shrink-0" onClick={() => { setFormData({...emptyForm, employeeId: selectedEmployeeId}); setIsAdding(true); }}>
-                      <Plus className="h-4 w-4 md:mr-2" /><span className="hidden md:inline">Log Evaluation</span>
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button className="bg-indigo-600 hover:bg-indigo-700 shadow-sm px-3 md:px-6 shrink-0">
+                          <Plus className="h-4 w-4 md:mr-2" />
+                          <span className="hidden md:inline">Log Evaluation</span>
+                          <ChevronDown className="h-4 w-4 md:ml-2 opacity-50" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem onClick={() => { setFormData({...emptyForm, employeeId: selectedEmployeeId}); setIsAdding(true); }}>
+                          <LayoutList className="h-4 w-4 mr-2 text-indigo-500" />
+                          Standard Evaluation
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setFormData({...emptyForm, employeeId: selectedEmployeeId}); setIsAppraisalAdding(true); }}>
+                          <FileText className="h-4 w-4 mr-2 text-indigo-500" />
+                          Appraisal Score Sheet
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
                 
@@ -477,7 +516,15 @@ export function Evaluations() {
                                      </TableCell>
                                      <TableCell className="text-right">
                                        <div className="flex justify-end gap-1">
-                                         <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => { setViewingRecord({ ...r, employeeName: `${selectedEmp?.surname} ${selectedEmp?.firstname}` }); setActiveDetailTab('main'); }}>
+                                         <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => { 
+                                           if (r.isAppraisal) {
+                                             setFormData(r);
+                                             setIsAppraisalAdding(true);
+                                           } else {
+                                             setViewingRecord({ ...r, employeeName: `${selectedEmp?.surname} ${selectedEmp?.firstname}` }); 
+                                             setActiveDetailTab('main'); 
+                                           }
+                                         }}>
                                            <Eye className="h-4 w-4" />
                                          </Button>
                                          {priv.canEdit && (r.createdBy === currentUser?.id || r.createdBy === currentUser?.name) && (
@@ -624,6 +671,39 @@ export function Evaluations() {
           <Users className="h-5 w-5" />
           <span className="text-sm font-semibold">Employees</span>
         </button>
+      )}
+
+      {isAppraisalAdding && selectedEmp && (
+        <AppraisalScoreSheet
+          employee={selectedEmp}
+          record={editingId ? (records.find(r => r.id === editingId) || undefined) : undefined}
+          onClose={() => { setIsAppraisalAdding(false); setEditingId(null); setFormData(emptyForm); }}
+          onSave={(data) => {
+            if (editingId) {
+              updateEvaluation(editingId, data);
+              toast.success('Appraisal sheet updated.');
+            } else {
+              const newId = crypto.randomUUID();
+              addEvaluation({
+                ...(data as EvaluationRecord),
+                id: newId,
+                createdBy: currentUser?.name || 'System',
+                mainTaskId: formData.mainTaskId,
+                subtaskId: formData.subtaskId,
+              });
+
+              if (formData.subtaskId && formData.mainTaskId) {
+                updateSubtaskStatus(formData.subtaskId, 'completed', currentUser?.id);
+                postComment(formData.subtaskId, formData.mainTaskId, currentUser?.id || '', `📋 **Appraisal Sheet Recorded** — Score: ${data.overallScore}%`);
+              }
+
+              toast.success('Appraisal sheet recorded.');
+            }
+            setIsAppraisalAdding(false);
+            setEditingId(null);
+            setFormData(emptyForm);
+          }}
+        />
       )}
     </div>
   );

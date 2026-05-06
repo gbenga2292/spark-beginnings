@@ -423,16 +423,27 @@ export interface DisciplinaryRecord {
   workspaceId?: string;
 }
 
+export interface AppraisalCriterionData {
+  rating: number;
+  comment: string;
+}
+
+export interface AppraisalActionPlan {
+  area: string;
+  action: string;
+  target: string;
+}
+
 export interface EvaluationRecord {
   id: string;
   employeeId: string;
   date: string;
   type: string;
-  scores: Record<string, number>;
+  scores?: Record<string, number>;
   overallScore: number;
-  managerNotes: string;
+  managerNotes?: string;
   status: 'Draft' | 'Review' | 'Acknowledged';
-  acknowledged: boolean;
+  acknowledged?: boolean;
   employeeComment?: string;
   createdBy: string;
   sessionId?: string;
@@ -440,6 +451,16 @@ export interface EvaluationRecord {
   panelConclusion?: 'Confirm' | 'Extend' | 'End' | 'Salary Increase';
   invitedPanelists?: string[]; // profile IDs
   mainTaskId?: string; // link to the automated probation task if applicable
+  subtaskId?: string; // link to the specific subtask if applicable
+  
+  // Appraisal-specific fields
+  isAppraisal?: boolean;
+  appraisalCriteria?: Record<string, AppraisalCriterionData>; // Keyed by criterion number 1-12
+  strengths?: string;
+  actionPlans?: AppraisalActionPlan[];
+  reviewerSignature?: { signed: boolean; date?: string; name?: string };
+  hrSignature?: { signed: boolean; date?: string; name?: string };
+  reviewPeriod?: string;
 }
 
 export interface AttendanceRecord {
