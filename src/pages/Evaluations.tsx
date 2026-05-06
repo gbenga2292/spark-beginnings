@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog } from '@/src/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { Search, Plus, ArrowLeft, Save, Pencil, Trash2, ClipboardList, Eye, UserCheck, PanelLeftClose, PanelLeftOpen, Users } from 'lucide-react';
 import { useAppStore, EvaluationRecord } from '@/src/store/appStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/src/components/ui/card';
@@ -14,9 +16,11 @@ import { Avatar, AvatarFallback } from '@/src/components/ui/avatar';
 import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useTheme } from '@/src/hooks/useTheme';
+import { formatDisplayDate } from '@/src/lib/dateUtils';
 
 export function Evaluations() {
   const { isDark } = useTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
@@ -27,11 +31,13 @@ export function Evaluations() {
   const [viewingRecord, setViewingRecord] = useState<any | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileListOpen, setIsMobileListOpen] = useState(false);
+  const [activeDetailTab, setActiveDetailTab] = useState<'main' | 'panelists'>('main');
 
   const employees = useAppStore(s => s.employees);
   const records = useAppStore(s => s.evaluations);
   const { addEvaluation, updateEvaluation, deleteEvaluation } = useAppStore();
   const currentUser = useUserStore(s => s.getCurrentUser());
+  const allUsers = useUserStore(s => s.users);
   const priv = usePriv('evaluations');
 
   const internalEmployees = filterAndSortEmployeesExcludingCEO(
@@ -47,7 +53,25 @@ export function Evaluations() {
     managerNotes: '',
     status: 'Draft',
     acknowledged: false,
+    evaluationRole: 'INDIVIDUAL',
+    sessionId: '',
+    panelConclusion: undefined,
+    invitedPanelists: [],
   };
+
+  // ── Deep-link: pre-select employee from URL param (e.g. from probation task) ──
+  useEffect(() => {
+    const empId = searchParams.get('employeeId');
+    if (!empId || !internalEmployees.length) return;
+    const emp = internalEmployees.find(e => e.id === empId);
+    if (!emp) return;
+    setSelectedEmployeeId(empId);
+    setFormData(prev => ({ ...emptyForm, employeeId: empId, type: 'Probation' }));
+    setIsAdding(true);
+    // Clear the query param so navigating back doesn't re-trigger
+    setSearchParams({}, { replace: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, internalEmployees.length]);
   const [formData, setFormData] = useState<Partial<EvaluationRecord>>(emptyForm);
 
   const handleSave = () => {
@@ -87,6 +111,21 @@ export function Evaluations() {
       deleteEvaluation(id);
       toast.success('Evaluation deleted.');
     }
+  };
+
+  const resolveCreatedBy = (val: string) => {
+    if (!val) return 'System';
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+    if (isUuid) {
+      const u = allUsers.find(user => user.id === val);
+      return u ? u.name : val;
+    }
+    return val;
+  };
+
+  const getInitials = (name: string) => {
+    if (!name) return '??';
+    return name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().substring(0, 3);
   };
 
   const renderForm = () => (
@@ -142,6 +181,52 @@ export function Evaluations() {
                 <option value="Acknowledged">Acknowledged by Employee</option>
               </select>
             </div>
+
+            {formData.type?.toLowerCase().includes('probation') && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Evaluation Role</label>
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-indigo-500/20" 
+                    value={formData.evaluationRole} 
+                    onChange={e => setFormData({ ...formData, evaluationRole: e.target.value as any, sessionId: formData.sessionId || crypto.randomUUID() })}
+                  >
+                    <option value="INDIVIDUAL">Individual Review</option>
+                    <option value="PANELIST">Panelist Entry</option>
+                    <option value="CONSENSUS">Final Consensus Decision</option>
+                  </select>
+                </div>
+                {(formData.evaluationRole === 'CONSENSUS' || formData.evaluationRole === 'PANELIST') && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      {formData.evaluationRole === 'PANELIST' ? 'Your Recommendation' : 'Final Panel Conclusion'}
+                    </label>
+                    <select 
+                      className="flex h-10 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-indigo-500/20" 
+                      value={formData.panelConclusion} 
+                      onChange={e => setFormData({ ...formData, panelConclusion: e.target.value as any })}
+                    >
+                      <option value="">Select Outcome...</option>
+                      <option value="Confirm">Confirm Employment</option>
+                      <option value="Extend">Extend Probation</option>
+                      <option value="End">End Employment</option>
+                      <option value="Salary Increase">End with Salary Increase</option>
+                    </select>
+                  </div>
+                )}
+                {(formData.evaluationRole === 'PANELIST' || formData.evaluationRole === 'CONSENSUS') && (
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Session ID (Shared with Panel)</label>
+                    <Input 
+                      value={formData.sessionId} 
+                      onChange={e => setFormData({ ...formData, sessionId: e.target.value })} 
+                      placeholder="Paste Session ID to group with other panelists..."
+                    />
+                    <p className="text-[10px] text-slate-500">Share this ID with other panel members to group your evaluations together.</p>
+                  </div>
+                )}
+              </>
+            )}
             <div className="space-y-2 md:col-span-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Manager Notes</label>
               <textarea className="flex w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" rows={5} value={formData.managerNotes} onChange={e => setFormData({ ...formData, managerNotes: e.target.value })} placeholder="Provide constructive feedback, areas of improvement, and goals..." />
@@ -153,7 +238,9 @@ export function Evaluations() {
   );
 
   const selectedEmp = internalEmployees.find(e => e.id === selectedEmployeeId);
-  const empRecords = records.filter(r => r.employeeId === selectedEmployeeId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const empRecords = records
+    .filter(r => r.employeeId === selectedEmployeeId)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const activeCount = internalEmployees.filter(emp => records.some(r => r.employeeId === emp.id && r.status === 'Review')).length;
 
   useSetPageTitle(
@@ -324,6 +411,8 @@ export function Evaluations() {
                           <TableHeader>
                               <TableRow className="bg-slate-50/80">
                                 <TableHead className="w-28">Date</TableHead>
+                                <TableHead>Outcome</TableHead>
+                                <TableHead>Panelist</TableHead>
                                 <TableHead>Type</TableHead>
                                 <TableHead>Score</TableHead>
                                 <TableHead>Status</TableHead>
@@ -331,38 +420,74 @@ export function Evaluations() {
                               </TableRow>
                           </TableHeader>
                           <TableBody>
-                              {empRecords.map(r => (
-                                <TableRow key={r.id} className="hover:bg-slate-50/50">
-                                    <TableCell className="font-mono text-[11px] text-slate-500">{r.date}</TableCell>
-                                    <TableCell className="font-semibold text-slate-800 text-sm">{r.type}</TableCell>
-                                    <TableCell>
-                                      <span className={`font-bold ${r.overallScore >= 70 ? 'text-emerald-600' : r.overallScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}>
-                                        {r.overallScore}%
-                                      </span>
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge variant={r.status === 'Acknowledged' ? 'default' : r.status === 'Review' ? 'secondary' : 'outline'} className="text-[10px]">{r.status}</Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      <div className="flex justify-end gap-1">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => setViewingRecord({ ...r, employeeName: `${selectedEmp?.surname} ${selectedEmp?.firstname}` })}>
-                                          <Eye className="h-4 w-4" />
-                                        </Button>
-                                        {priv.canEdit && (
-                                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => startEdit(r as any)}>
-                                            <Pencil className="h-4 w-4" />
-                                          </Button>
-                                        )}
-                                        {priv.canDelete && (
-                                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(r.id)}>
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
-                                        )}
-                                      </div>
-                                    </TableCell>
-                                </TableRow>
-                              ))}
-                          </TableBody>
+                               {empRecords.map(r => (
+                                 <TableRow key={r.id} className="hover:bg-slate-50/50">
+                                     <TableCell className="font-mono text-[11px] text-slate-500 whitespace-nowrap">{formatDisplayDate(r.date)}</TableCell>
+                                     <TableCell>
+                                       {(() => {
+                                         const sessionOutcome = r.sessionId 
+                                           ? records.find(rec => rec.sessionId === r.sessionId && rec.evaluationRole === 'CONSENSUS')?.panelConclusion
+                                           : r.panelConclusion;
+                                         
+                                         if (sessionOutcome) {
+                                           return (
+                                             <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 font-bold text-[10px] py-0.5">
+                                               {sessionOutcome}
+                                             </Badge>
+                                           );
+                                         }
+                                         
+                                         if (r.sessionId && !sessionOutcome) {
+                                           return <span className="text-amber-500 text-[10px] font-medium italic">Pending Consensus</span>;
+                                         }
+
+                                         return <span className="text-slate-400 text-xs italic">N/A</span>;
+                                       })()}
+                                     </TableCell>
+                                     <TableCell>
+                                       {r.evaluationRole === 'PANELIST' ? (
+                                         <div className="flex justify-start" title={`Panelist: ${resolveCreatedBy(r.createdBy)}`}>
+                                           <div className="h-7 w-7 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[10px] font-black text-indigo-600 shadow-sm hover:bg-indigo-100 transition-colors cursor-help">
+                                             {getInitials(resolveCreatedBy(r.createdBy))}
+                                           </div>
+                                         </div>
+                                       ) : (
+                                         <Badge variant="outline" className="text-[9px] uppercase tracking-tighter px-1.5 py-0.5 font-bold">
+                                           {r.evaluationRole || 'Individual'}
+                                         </Badge>
+                                       )}
+                                     </TableCell>
+                                     <TableCell className="font-semibold text-slate-800 text-sm">
+                                       {r.sessionId || r.type === 'Probation' ? 'Probation Review' : r.type}
+                                     </TableCell>
+                                     <TableCell>
+                                       <span className={`font-bold ${r.overallScore >= 70 ? 'text-emerald-600' : r.overallScore >= 40 ? 'text-amber-600' : 'text-rose-600'}`}>
+                                         {r.overallScore}%
+                                       </span>
+                                     </TableCell>
+                                     <TableCell>
+                                       <Badge variant={r.status === 'Acknowledged' ? 'default' : r.status === 'Review' ? 'secondary' : 'outline'} className="text-[10px]">{r.status}</Badge>
+                                     </TableCell>
+                                     <TableCell className="text-right">
+                                       <div className="flex justify-end gap-1">
+                                         <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => { setViewingRecord({ ...r, employeeName: `${selectedEmp?.surname} ${selectedEmp?.firstname}` }); setActiveDetailTab('main'); }}>
+                                           <Eye className="h-4 w-4" />
+                                         </Button>
+                                         {priv.canEdit && (r.createdBy === currentUser?.id || r.createdBy === currentUser?.name) && (
+                                           <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" onClick={() => startEdit(r as any)}>
+                                             <Pencil className="h-4 w-4" />
+                                           </Button>
+                                         )}
+                                         {priv.canDelete && (r.createdBy === currentUser?.id || r.createdBy === currentUser?.name) && (
+                                           <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(r.id)}>
+                                             <Trash2 className="h-4 w-4" />
+                                           </Button>
+                                         )}
+                                       </div>
+                                     </TableCell>
+                                 </TableRow>
+                               ))}
+                           </TableBody>
                         </Table>
                         </div>
                     </div>
@@ -378,23 +503,92 @@ export function Evaluations() {
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
                   <h4 className="font-bold text-slate-800 text-lg">{viewingRecord.employeeName}</h4>
-                  <p className="text-sm text-slate-500">{viewingRecord.date} • {viewingRecord.type}</p>
+                  <p className="text-sm text-slate-500">{viewingRecord.date} • {viewingRecord.sessionId ? 'Probation Review' : viewingRecord.type}</p>
                 </div>
-                <span className={`text-2xl font-black ${viewingRecord.overallScore >= 70 ? 'text-emerald-500' : viewingRecord.overallScore >= 40 ? 'text-amber-500' : 'text-rose-500'}`}>
-                  {viewingRecord.overallScore}%
-                </span>
-              </div>
-              
-              <div>
-                <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Manager Notes / Feedback</h5>
-                <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-700 whitespace-pre-wrap border border-slate-100">
-                  {viewingRecord.managerNotes || 'No notes provided.'}
+                <div className="flex flex-col items-end">
+                  <span className={`text-2xl font-black ${viewingRecord.overallScore >= 70 ? 'text-emerald-500' : viewingRecord.overallScore >= 40 ? 'text-amber-500' : 'text-rose-500'}`}>
+                    {viewingRecord.overallScore}%
+                  </span>
+                  <Badge variant={viewingRecord.status === 'Acknowledged' ? 'default' : viewingRecord.status === 'Review' ? 'secondary' : 'outline'} className="text-[10px]">{viewingRecord.status}</Badge>
                 </div>
               </div>
 
-              <div className="pt-2 text-xs text-slate-400 border-t border-slate-100 flex items-center justify-between">
-                <span>Recorded by: {viewingRecord.createdBy || 'System'}</span>
-                <Badge variant={viewingRecord.status === 'Acknowledged' ? 'default' : viewingRecord.status === 'Review' ? 'secondary' : 'outline'}>{viewingRecord.status}</Badge>
+              {viewingRecord.sessionId ? (
+                <Tabs className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-4">
+                    <TabsTrigger 
+                      active={activeDetailTab === 'main'} 
+                      onClick={() => setActiveDetailTab('main')}
+                    >
+                      Consensus/Verdict
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      active={activeDetailTab === 'panelists'} 
+                      onClick={() => setActiveDetailTab('panelists')}
+                    >
+                      Panelist Feedback
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent active={activeDetailTab === 'main'} className="space-y-4 mt-0">
+                    <div>
+                      <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Final Conclusion & Recommendation</h5>
+                      <div className="bg-indigo-50/50 p-4 rounded-lg border border-indigo-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-indigo-700">Outcome Verdict</span>
+                          {(() => {
+                            const consensus = records.find(rec => rec.sessionId === viewingRecord.sessionId && rec.evaluationRole === 'CONSENSUS');
+                            return consensus?.panelConclusion ? (
+                              <Badge className="bg-indigo-600 text-white font-bold">{consensus.panelConclusion}</Badge>
+                            ) : <Badge variant="outline">Pending Decision</Badge>;
+                          })()}
+                        </div>
+                        <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                          {records.find(rec => rec.sessionId === viewingRecord.sessionId && rec.evaluationRole === 'CONSENSUS')?.managerNotes || 'The final verdict and summary notes have not been recorded yet.'}
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent active={activeDetailTab === 'panelists'} className="space-y-4 mt-0">
+                    <div className="space-y-3">
+                      {records
+                        .filter(r => r.sessionId === viewingRecord.sessionId && r.evaluationRole === 'PANELIST')
+                        .map(p => (
+                          <div key={p.id} className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <div className="flex justify-between items-center mb-2">
+                              <div className="flex items-center gap-2">
+                                <Users className="h-3 w-3 text-slate-400" />
+                                <span className="font-bold text-slate-800 text-xs">{resolveCreatedBy(p.createdBy)}</span>
+                              </div>
+                              <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 font-bold">{p.overallScore}%</Badge>
+                            </div>
+                            <div className="text-[12px] text-slate-600 italic leading-relaxed bg-white/50 p-2 rounded border border-dashed border-slate-200">
+                              "{p.managerNotes || 'No qualitative feedback provided.'}"
+                            </div>
+                          </div>
+                        ))}
+                      {records.filter(r => r.sessionId === viewingRecord.sessionId && r.evaluationRole === 'PANELIST').length === 0 && (
+                        <div className="text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                          <Users className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                          <p className="text-xs text-slate-400">No panelist entries recorded yet.</p>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <div>
+                  <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Manager Notes / Feedback</h5>
+                  <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-700 whitespace-pre-wrap border border-slate-100">
+                    {viewingRecord.managerNotes || 'No notes provided.'}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2 text-[10px] text-slate-400 border-t border-slate-100 flex items-center justify-between">
+                <span>Ref: {viewingRecord.id.substring(0, 8)}</span>
+                <span>Created by: {resolveCreatedBy(viewingRecord.createdBy)}</span>
               </div>
             </div>
           )}
@@ -414,4 +608,3 @@ export function Evaluations() {
     </div>
   );
 }
-

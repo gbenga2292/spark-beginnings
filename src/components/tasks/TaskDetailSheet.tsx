@@ -25,14 +25,13 @@ export function TaskDetailSheet({ subtaskId, onClose }: TaskDetailSheetProps) {
   const visibleMainTasks = mainTasks.filter(mt => {
     const isCreator = mt.created_by === myId || (mt as any).createdBy === myId;
     const isAssigned = (mt.assignedTo || (mt as any).assigned_to || '').includes(myId);
+    const isHr = mt.is_hr_task || (mt as any).isHrTask;
 
-    if (mt.is_hr_task) {
-      return hasHrAccess || isCreator || isAssigned;
-    }
     if (isExternalHr) {
-      // External HR only sees non-HR tasks they explicitly own
+      if (isHr) return true;
       return isCreator || isAssigned;
     }
+    
     return true;
   });
 

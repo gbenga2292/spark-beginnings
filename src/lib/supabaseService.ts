@@ -604,12 +604,16 @@ function disciplinaryToDb(d: DisciplinaryRecord) {
 }
 
 function evaluationToDb(e: EvaluationRecord) {
-  return {
-    id: e.id, employee_id: e.employeeId, date: e.date, type: e.type,
+  const safeEmployeeId = (!e.employeeId || e.employeeId === '00000000-0000-0000-0000-000000000000' || e.employeeId === '') ? null : e.employeeId;
+  const payload: any = {
+    id: e.id, employee_id: safeEmployeeId, date: e.date, type: e.type,
     scores: e.scores, overall_score: e.overallScore, manager_notes: e.managerNotes,
     status: e.status, acknowledged: e.acknowledged, employee_comment: e.employeeComment,
     created_by: e.createdBy,
   };
+  if (e.sessionId !== undefined) payload.session_id = e.sessionId;
+  if (e.evaluationRole !== undefined) payload.evaluation_role = e.evaluationRole;
+  return payload;
 }
 
 function ledgerEntryToDb(e: LedgerEntry) {

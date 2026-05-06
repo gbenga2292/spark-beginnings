@@ -435,6 +435,10 @@ export interface EvaluationRecord {
   acknowledged: boolean;
   employeeComment?: string;
   createdBy: string;
+  sessionId?: string;
+  evaluationRole?: 'INDIVIDUAL' | 'PANELIST' | 'CONSENSUS';
+  panelConclusion?: 'Confirm' | 'Extend' | 'End' | 'Salary Increase';
+  invitedPanelists?: string[]; // profile IDs
 }
 
 export interface AttendanceRecord {

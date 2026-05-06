@@ -664,19 +664,16 @@ function AdminTasksView() {
       const isVisible = mt.isProject || mt.isHrTask || mt.createdBy === myId || subtasks.some(s => s.mainTaskId === mt.id);
       if (!isVisible) return false;
 
-      // Access control for HR tasks
-      if (mt.isHrTask) {
-        const isAssigned = (mt.assignedTo || '').includes(myId);
-        const isCreator = mt.createdBy === myId;
-        // Authorized HR personnel can see all HR tasks; others only see them if assigned or they created them
-        return hasHrAccess || isCreator || isAssigned;
-      }
-
+      // If user is an External HR Consultant, they can see all HR tasks,
+      // but they are restricted from seeing standard company tasks unless explicitly assigned/created.
       if (isExternalHr) {
+        if (mt.isHrTask) return true;
+        
         const isAssigned = (mt.assignedTo || '').includes(myId);
         return mt.createdBy === myId || isAssigned;
       }
 
+      // Normal users (and admins) can see all tasks, including HR tasks.
       return true;
     });
   }, [rawTeamTasks, subtasks, isExternalHr]);

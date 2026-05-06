@@ -1300,9 +1300,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                         },
                         [
                             { title: 'Schedule evaluation meeting with employee',        assignedTo: targetAssigneeId, priority: 'High'   },
-                            { title: 'Complete probation evaluation form',               assignedTo: targetAssigneeId, priority: 'High'   },
+                            { title: 'Complete probation evaluation form',               assignedTo: targetAssigneeId, priority: 'High', description: JSON.stringify({ refType: 'probation_eval', employeeId: emp.id }) },
                             { title: 'Document performance feedback and outcome',        assignedTo: targetAssigneeId, priority: 'Medium' },
-                            { title: 'Update employee status (Confirm / Extend / End)',  assignedTo: targetAssigneeId, priority: 'High'   },
+                            { title: 'Update employee status (Confirm / Extend / End)',  assignedTo: targetAssigneeId, priority: 'High', description: JSON.stringify({ refType: 'employee', employeeId: emp.id }) },
                         ]
                     );
                     createdCount++;
