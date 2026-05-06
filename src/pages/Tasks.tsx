@@ -1689,9 +1689,19 @@ function AdminTasksView() {
                                                 label = `Site Onboarding Workflow`;
                                               } else if (m.refType === 'vehicle_doc_renewal') {
                                                 label = `Vehicle Document Renewal`;
+                                              } else if (m.refType === 'probation_eval') {
+                                                label = `Probation Review Action`;
+                                              } else if (m.refType === 'employee') {
+                                                label = `Staff Status Update`;
                                               }
+                                              
                                               if (label) return <p className="text-xs text-indigo-500 truncate font-medium">{label}</p>;
+                                              
+                                              // If it's JSON but we don't have a label, hide it
+                                              return null;
                                             }
+                                            // If it's JSON but no refType, hide it
+                                            return null;
                                           }
                                         } catch {}
                                         return <p className="text-xs text-muted-foreground truncate">{raw}</p>;
