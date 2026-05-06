@@ -528,6 +528,8 @@ function PersonalTasksView() {
                                         <DeleteSubtaskButton
                                           hasActivity={comments.some(c => c.subtaskId === sub.id) || sub.status !== 'not_started'}
                                           onConfirm={() => deleteSubtask(sub.id ?? '')}
+                                          isCompleted={sub.status === 'completed'}
+                                          canManageUsers={me?.privileges?.users?.canManage}
                                         />
                                       </div>
                                       <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full ${sc2.pillClass} flex-shrink-0`}>
@@ -540,7 +542,11 @@ function PersonalTasksView() {
 
                               <div className="px-5 py-3 border-t border-indigo-100 dark:border-indigo-900/30 flex items-center justify-between gap-2">
                                 <AddSubtaskInline mainTaskId={mt.id} users={users} onAdd={sub => addSubtask(sub)} isPersonal />
-                                <DeleteTaskButton onConfirm={() => deleteMainTask(mt.id)} />
+                                <DeleteTaskButton 
+                                  onConfirm={() => deleteMainTask(mt.id)} 
+                                  isCompleted={status === 'completed'}
+                                  canManageUsers={me?.privileges?.users?.canManage}
+                                />
                               </div>
                             </div>
                           </motion.div>
@@ -1270,7 +1276,11 @@ function AdminTasksView() {
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-primary hover:border-primary/30 transition-all">
                                     <MessageSquare className="w-3 h-3" /> Chat
                                   </button>
-                                  <DeleteTaskButton onConfirm={() => deleteMainTask(mt.id)} />
+                                  <DeleteTaskButton 
+                                    onConfirm={() => deleteMainTask(mt.id)} 
+                                    isCompleted={pct === 100}
+                                    canManageUsers={me?.privileges?.users?.canManage}
+                                  />
                                 </div>
                               </div>
                             </div>
@@ -1721,6 +1731,8 @@ function AdminTasksView() {
                                           <DeleteSubtaskButton
                                             hasActivity={comments.some(c => c.subtaskId === sub.id) || sub.status !== 'not_started'}
                                             onConfirm={() => deleteSubtask(sub.id)}
+                                            isCompleted={sub.status === 'completed'}
+                                            canManageUsers={me?.privileges?.users?.canManage}
                                           />
                                         </>
                                       )}
@@ -1740,7 +1752,11 @@ function AdminTasksView() {
                                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-primary hover:border-primary/30 transition-all">
                                   <MessageSquare className="w-3 h-3" /> Chat
                                 </button>
-                                <DeleteTaskButton onConfirm={() => deleteMainTask(mt.id)} />
+                                <DeleteTaskButton 
+                                  onConfirm={() => deleteMainTask(mt.id)} 
+                                  isCompleted={status === 'completed'}
+                                  canManageUsers={me?.privileges?.users?.canManage}
+                                />
                               </div>
                             </div>
                           </div>

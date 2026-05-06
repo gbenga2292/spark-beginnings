@@ -31,7 +31,7 @@ export function Evaluations() {
   const [viewingRecord, setViewingRecord] = useState<any | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileListOpen, setIsMobileListOpen] = useState(false);
-  const [activeDetailTab, setActiveDetailTab] = useState<'main' | 'panelists'>('main');
+  const [activeDetailTab, setActiveDetailTab] = useState<string>('main');
 
   const employees = useAppStore(s => s.employees);
   const records = useAppStore(s => s.evaluations);
@@ -57,16 +57,23 @@ export function Evaluations() {
     sessionId: '',
     panelConclusion: undefined,
     invitedPanelists: [],
+    mainTaskId: '',
   };
 
   // ── Deep-link: pre-select employee from URL param (e.g. from probation task) ──
   useEffect(() => {
     const empId = searchParams.get('employeeId');
+    const taskId = searchParams.get('mainTaskId');
     if (!empId || !internalEmployees.length) return;
     const emp = internalEmployees.find(e => e.id === empId);
     if (!emp) return;
     setSelectedEmployeeId(empId);
-    setFormData(prev => ({ ...emptyForm, employeeId: empId, type: 'Probation' }));
+    setFormData(prev => ({ 
+      ...emptyForm, 
+      employeeId: empId, 
+      type: 'Probation',
+      mainTaskId: taskId || ''
+    }));
     setIsAdding(true);
     // Clear the query param so navigating back doesn't re-trigger
     setSearchParams({}, { replace: true });
@@ -515,67 +522,80 @@ export function Evaluations() {
 
               {viewingRecord.sessionId ? (
                 <Tabs className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 mb-4">
-                    <TabsTrigger 
-                      active={activeDetailTab === 'main'} 
-                      onClick={() => setActiveDetailTab('main')}
-                    >
-                      Consensus/Verdict
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      active={activeDetailTab === 'panelists'} 
-                      onClick={() => setActiveDetailTab('panelists')}
-                    >
-                      Panelist Feedback
-                    </TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent active={activeDetailTab === 'main'} className="space-y-4 mt-0">
-                    <div>
-                      <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Final Conclusion & Recommendation</h5>
-                      <div className="bg-indigo-50/50 p-4 rounded-lg border border-indigo-100">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-indigo-700">Outcome Verdict</span>
-                          {(() => {
-                            const consensus = records.find(rec => rec.sessionId === viewingRecord.sessionId && rec.evaluationRole === 'CONSENSUS');
-                            return consensus?.panelConclusion ? (
-                              <Badge className="bg-indigo-600 text-white font-bold">{consensus.panelConclusion}</Badge>
-                            ) : <Badge variant="outline">Pending Decision</Badge>;
-                          })()}
-                        </div>
-                        <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
-                          {records.find(rec => rec.sessionId === viewingRecord.sessionId && rec.evaluationRole === 'CONSENSUS')?.managerNotes || 'The final verdict and summary notes have not been recorded yet.'}
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent active={activeDetailTab === 'panelists'} className="space-y-4 mt-0">
-                    <div className="space-y-3">
-                      {records
-                        .filter(r => r.sessionId === viewingRecord.sessionId && r.evaluationRole === 'PANELIST')
-                        .map(p => (
-                          <div key={p.id} className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                            <div className="flex justify-between items-center mb-2">
-                              <div className="flex items-center gap-2">
-                                <Users className="h-3 w-3 text-slate-400" />
-                                <span className="font-bold text-slate-800 text-xs">{resolveCreatedBy(p.createdBy)}</span>
+                  {(() => {
+                    const panelists = records.filter(r => r.sessionId === viewingRecord.sessionId && r.evaluationRole === 'PANELIST');
+                    return (
+                      <>
+                        <TabsList className={`grid w-full mb-4 ${panelists.length > 0 ? (panelists.length > 1 ? 'grid-cols-3' : 'grid-cols-2') : 'grid-cols-1'}`}>
+                          <TabsTrigger 
+                            active={activeDetailTab === 'main'} 
+                            onClick={() => setActiveDetailTab('main')}
+                          >
+                            Consensus
+                          </TabsTrigger>
+                          {panelists.map((p, idx) => (
+                            <TabsTrigger 
+                              key={p.id}
+                              active={activeDetailTab === `panelist-${p.id}`} 
+                              onClick={() => setActiveDetailTab(`panelist-${p.id}`)}
+                              className="truncate"
+                            >
+                              {getInitials(resolveCreatedBy(p.createdBy))}
+                            </TabsTrigger>
+                          ))}
+                        </TabsList>
+                        
+                        <TabsContent active={activeDetailTab === 'main'} className="space-y-4 mt-0">
+                          <div>
+                            <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Final Conclusion & Recommendation</h5>
+                            <div className="bg-indigo-50/50 p-4 rounded-lg border border-indigo-100">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-bold text-indigo-700">Outcome Verdict</span>
+                                {(() => {
+                                  const consensus = records.find(rec => rec.sessionId === viewingRecord.sessionId && rec.evaluationRole === 'CONSENSUS');
+                                  return consensus?.panelConclusion ? (
+                                    <Badge className="bg-indigo-600 text-white font-bold">{consensus.panelConclusion}</Badge>
+                                  ) : <Badge variant="outline">Pending Decision</Badge>;
+                                })()}
                               </div>
-                              <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 font-bold">{p.overallScore}%</Badge>
-                            </div>
-                            <div className="text-[12px] text-slate-600 italic leading-relaxed bg-white/50 p-2 rounded border border-dashed border-slate-200">
-                              "{p.managerNotes || 'No qualitative feedback provided.'}"
+                              <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                                {records.find(rec => rec.sessionId === viewingRecord.sessionId && rec.evaluationRole === 'CONSENSUS')?.managerNotes || 'The final verdict and summary notes have not been recorded yet.'}
+                              </div>
                             </div>
                           </div>
+                        </TabsContent>
+
+                        {panelists.map(p => (
+                          <TabsContent key={p.id} active={activeDetailTab === `panelist-${p.id}`} className="space-y-4 mt-0">
+                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                              <div className="flex justify-between items-center mb-3">
+                                <div className="flex items-center gap-2">
+                                  <Users className="h-4 w-4 text-slate-400" />
+                                  <span className="font-bold text-slate-800 text-sm">{resolveCreatedBy(p.createdBy)}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase">Score:</span>
+                                  <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 font-bold">{p.overallScore}%</Badge>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recommendation</p>
+                                <div className="bg-white p-2 rounded border border-slate-100 text-xs font-semibold text-slate-700">
+                                  {p.panelConclusion || 'No specific outcome recommended.'}
+                                </div>
+                              </div>
+                              <div className="mt-4 space-y-2">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Feedback & Notes</p>
+                                <div className="text-sm text-slate-600 italic leading-relaxed bg-white/50 p-3 rounded border border-dashed border-slate-200 whitespace-pre-wrap">
+                                  {p.managerNotes || 'No qualitative feedback provided.'}
+                                </div>
+                              </div>
+                            </div>
+                          </TabsContent>
                         ))}
-                      {records.filter(r => r.sessionId === viewingRecord.sessionId && r.evaluationRole === 'PANELIST').length === 0 && (
-                        <div className="text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                          <Users className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                          <p className="text-xs text-slate-400">No panelist entries recorded yet.</p>
-                        </div>
-                      )}
-                    </div>
-                  </TabsContent>
+                      </>
+                    );
+                  })()}
                 </Tabs>
               ) : (
                 <div>

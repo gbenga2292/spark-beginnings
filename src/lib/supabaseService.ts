@@ -215,6 +215,11 @@ export function dbToEvaluation(r: any): EvaluationRecord {
     scores: r.scores || {}, overallScore: Number(r.overall_score), managerNotes: r.manager_notes,
     status: r.status, acknowledged: r.acknowledged, employeeComment: r.employee_comment,
     createdBy: r.created_by,
+    sessionId: r.session_id || undefined,
+    evaluationRole: r.evaluation_role || undefined,
+    panelConclusion: r.panel_conclusion || undefined,
+    invitedPanelists: r.invited_panelists || undefined,
+    mainTaskId: r.main_task_id || undefined,
   };
 }
 
@@ -613,6 +618,9 @@ function evaluationToDb(e: EvaluationRecord) {
   };
   if (e.sessionId !== undefined) payload.session_id = e.sessionId;
   if (e.evaluationRole !== undefined) payload.evaluation_role = e.evaluationRole;
+  if (e.panelConclusion !== undefined) payload.panel_conclusion = e.panelConclusion;
+  if (e.invitedPanelists !== undefined) payload.invited_panelists = e.invitedPanelists;
+  if (e.mainTaskId !== undefined) payload.main_task_id = e.mainTaskId;
   return payload;
 }
 

@@ -136,8 +136,12 @@ export function PriorityPicker({ value, onChange }: { value?: TaskPriority; onCh
 }
 
 // ─── Delete confirm inline ──────────────────────────────────────────────────────────
-export function DeleteTaskButton({ onConfirm }: { onConfirm: () => void }) {
+export function DeleteTaskButton({ onConfirm, isCompleted, canManageUsers }: { onConfirm: () => void; isCompleted?: boolean; canManageUsers?: boolean }) {
   const [confirming, setConfirming] = useState(false);
+  
+  // Restriction: Completed tasks can only be deleted by users with 'user management' permission
+  if (isCompleted && !canManageUsers) return null;
+
   if (!confirming) return (
     <button onClick={e => { e.stopPropagation(); setConfirming(true); }}
       className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 transition-all"
@@ -162,8 +166,11 @@ export function DeleteTaskButton({ onConfirm }: { onConfirm: () => void }) {
   );
 }
 
-export function DeleteSubtaskButton({ hasActivity, onConfirm }: { hasActivity: boolean; onConfirm: () => void }) {
+export function DeleteSubtaskButton({ hasActivity, onConfirm, isCompleted, canManageUsers }: { hasActivity: boolean; onConfirm: () => void; isCompleted?: boolean; canManageUsers?: boolean }) {
   const [confirming, setConfirming] = useState(false);
+
+  // Restriction: Completed subtasks can only be deleted by users with 'user management' permission
+  if (isCompleted && !canManageUsers) return null;
 
   if (hasActivity) {
     return (

@@ -1212,25 +1212,25 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     const hrVariables = useAppStore(state => state.hrVariables);
 
     useEffect(() => {
-        if (probationScanDone.current) return;
-        if (sessionStorage.getItem('probation_scan_done')) {
-            probationScanDone.current = true;
-            return;
-        }
-
         const t = setTimeout(async () => {
-            if (!employees.length || !mainTasks?.length || !user) return;
+            if (!employees.length || !user) return;
             
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            // Filter logic: Only check for employees whose probation ended in the current month
-            // This prevents triggering tasks for staff employed years ago.
-            const startOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-            startOfCurrentMonth.setHours(0, 0, 0, 0);
+            // Filter logic: Check for employees whose probation ended recently (this month or last month)
+            // This ensures we catch anyone who was missed or whose task was recently deleted.
+            const startDateLimit = new Date(today);
+            startDateLimit.setDate(1); 
+            startDateLimit.setMonth(startDateLimit.getMonth() - 1); 
+            startDateLimit.setHours(0, 0, 0, 0);
 
             const defaultProbDays = hrVariables.defaultProbationDays || 90;
-            const candidates = employees.filter(e => e.status === 'Active' && e.startDate);
+            const candidates = employees.filter(e => 
+                e.status === 'Active' && 
+                e.startDate && 
+                (e.staffType === 'OFFICE' || e.staffType === 'FIELD')
+            );
             if (candidates.length === 0) return;
 
             // 1. Find ALL eligible HR users (Internal and External)
@@ -1263,6 +1263,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 targetCreatorId = topUserId;
             }
 
+            const evaluations = useAppStore.getState().evaluations;
             const existingTitles = new Set(mainTasks.map((t: any) => (t.title || '').trim().toLowerCase()));
             let createdCount = 0;
 
@@ -1275,15 +1276,15 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
                 evalDate.setDate(evalDate.getDate() + probDays);
                 evalDate.setHours(8, 0, 0, 0);
 
-                // CONDITION: Probation must have ended THIS MONTH (between 1st and Today)
-                if (evalDate < startOfCurrentMonth || evalDate > today) continue;
+                // CONDITION: Probation must have ended RECENTLY (last 60 days approx)
+                if (evalDate < startDateLimit || evalDate > today) continue;
 
                 const taskTitle = `Probation Evaluation: ${emp.firstname} ${emp.surname}`;
                 
-                // Unique check per title to avoid duplicates
+                // Unique check: Avoid duplicates if task title exists OR if a probation evaluation already exists for this employee
                 const alreadyExists = mainTasks.some((t: any) => 
                     (t.title || '').trim().toLowerCase() === taskTitle.trim().toLowerCase()
-                );
+                ) || evaluations.some(ev => ev.employeeId === emp.id && (ev.type === 'Probation' || ev.sessionId));
 
                 if (alreadyExists) continue;
 
@@ -1314,9 +1315,6 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             if (createdCount > 0) {
                 toast.info(`Probation Scan: Created ${createdCount} evaluation task(s) for employees who finished probation this month.`);
             }
-            
-            probationScanDone.current = true;
-            sessionStorage.setItem('probation_scan_done', 'true');
         }, 5000); // 5s delay to ensure all data (employees/tasks) is fully synced into context
 
         return () => clearTimeout(t);

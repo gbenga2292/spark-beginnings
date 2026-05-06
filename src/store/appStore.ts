@@ -439,6 +439,7 @@ export interface EvaluationRecord {
   evaluationRole?: 'INDIVIDUAL' | 'PANELIST' | 'CONSENSUS';
   panelConclusion?: 'Confirm' | 'Extend' | 'End' | 'Salary Increase';
   invitedPanelists?: string[]; // profile IDs
+  mainTaskId?: string; // link to the automated probation task if applicable
 }
 
 export interface AttendanceRecord {

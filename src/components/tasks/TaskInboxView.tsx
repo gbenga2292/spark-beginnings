@@ -530,7 +530,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                       if (meta.refId && (meta.refType === 'site' || mtTitle.includes('onboard'))) { link = `/sites/onboarding/${meta.refId}`; label = 'View Onboarding'; privKey = 'sites'; }
                       if (meta.refType === 'vehicle_doc_renewal') { link = '/operations/vehicles'; label = 'View Vehicle'; privKey = 'operations'; }
                       if (meta.refType === 'employee' || meta.refType === 'new_hire') { link = `/employees`; label = 'View Employee'; privKey = 'employees'; }
-                      if (meta.refType === 'probation_eval' && meta.employeeId) { link = `/evaluations?employeeId=${meta.employeeId}`; label = 'Log Evaluation'; privKey = 'evaluations'; }
+                      if (meta.refType === 'probation_eval' && meta.employeeId) { link = `/evaluations?employeeId=${meta.employeeId}&mainTaskId=${activeMainTask.id}`; label = 'Log Evaluation'; privKey = 'evaluations'; }
                     } catch(e) {}
 
                     if (!link) {
