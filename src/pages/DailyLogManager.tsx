@@ -75,8 +75,13 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   // Media State
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [mediaPreviews, setMediaPreviews] = useState<{ url: string; type: 'image' | 'video'; name: string }[]>([]);
+  const [uploadedMedia, setUploadedMedia] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Constants - Replace with your actual deployment URL
+  const MEDIA_SERVER_URL = 'https://media.dcel-suite.com'; 
+
 
   const logs = useMemo(() => {
     return dailyMachineLogs
@@ -97,6 +102,18 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     setDtReason('');
     setDtDuration('1');
     setShowDowntimeDialog(false);
+  };
+
+  const fetchUploadedMedia = async (sId: string, aId: string, lDate: string) => {
+    try {
+      const response = await fetch(`${MEDIA_SERVER_URL}/list.php?site_id=${sId}&asset_id=${aId}&log_date=${lDate}`);
+      if (response.ok) {
+        const data = await response.json();
+        setUploadedMedia(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch media:', err);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -121,6 +138,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     });
   };
 
+
   const handleSaveLog = async () => {
     try {
       const logId = await logDailyActivity({
@@ -142,30 +160,45 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
       // Handle Media Upload if any
       if (mediaFiles.length > 0) {
         setIsUploading(true);
-        const formData = new FormData();
-        mediaFiles.forEach(file => {
-          formData.append('files', file);
-        });
-        formData.append('siteName', siteName);
-        formData.append('loggedBy', currentUser?.name || 'Unknown');
-        formData.append('date', date);
-
+        
         try {
-          // Replace with your actual backend URL
-          const response = await fetch('http://your-web-server.com/api/upload-log-media', {
-            method: 'POST',
-            body: formData,
+          // Upload files sequentially or in parallel
+          const uploadPromises = mediaFiles.map(async (file) => {
+            const formData = new FormData();
+            formData.append('media', file);
+            formData.append('site_id', siteId);
+            formData.append('site_name', siteName);
+            formData.append('asset_id', assetId);
+            formData.append('asset_name', assetName);
+            formData.append('log_date', date);
+            formData.append('uploaded_by', currentUser?.id || 'unknown');
+            formData.append('uploaded_by_name', currentUser?.name || 'Unknown');
+
+            const response = await fetch(`${MEDIA_SERVER_URL}/upload.php`, {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (!response.ok) throw new Error(`Failed to upload ${file.name}`);
+            return response.json();
           });
 
-          if (!response.ok) throw new Error('Failed to upload media');
-          toast.success(`${mediaFiles.length} media files uploaded successfully`);
+          await Promise.all(uploadPromises);
+          toast.success(`${mediaFiles.length} media files uploaded to MySQL storage`);
+          
+          // Clear local state after success
+          setMediaFiles([]);
+          setMediaPreviews([]);
+          // Refresh list
+          fetchUploadedMedia(siteId, assetId, date);
         } catch (uploadErr) {
           console.error('Media upload error:', uploadErr);
-          toast.error('Log saved, but media upload failed. Please try again later.');
+          toast.error('Log saved, but media upload failed. Please check connection.');
         } finally {
           setIsUploading(false);
         }
       }
+
 
       toast.success('Daily log saved successfully');
       if (isEmbedded) {
@@ -201,8 +234,13 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     setMaintenanceDetails(log.maintenanceDetails || '');
     setIssuesOnSite(log.issuesOnSite || '');
     setDowntimeEntries(log.downtimeEntries || []);
+    
+    // Fetch associated media from custom storage
+    fetchUploadedMedia(log.siteId, log.assetId, log.date);
+    
     setView('form');
   };
+
 
   const openDetailView = (log: DailyMachineLog) => {
     setViewingLog(log);
@@ -503,19 +541,45 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                     />
                   </div>
 
-                  {mediaPreviews.length === 0 ? (
-                    <div 
-                      className="py-10 px-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/30 border-2 border-dashed border-slate-200 dark:border-slate-800 text-center cursor-pointer hover:bg-slate-50 transition-colors"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <UploadCloud className="h-8 w-8 text-slate-300 mx-auto mb-3" />
-                      <p className="text-sm font-medium text-slate-500">Click or drag photos and videos here</p>
-                      <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">Supports JPG, PNG, MP4, MOV</p>
-                    </div>
-                  ) : (
+                  {/* Combined Media Display: Uploaded + Previews */}
+                  {(mediaPreviews.length > 0 || uploadedMedia.length > 0) ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {/* Already Uploaded Media */}
+                      {uploadedMedia.map((media, idx) => (
+                        <div key={`uploaded-${idx}`} className="group relative aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                          {media.file_type === 'image' ? (
+                            <img src={media.url} alt="Uploaded" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900">
+                              <FileVideo className="h-8 w-8 text-white/50" />
+                              <span className="text-[9px] text-white/40 mt-1 truncate px-2 w-full text-center">{media.file_name}</span>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                             <a 
+                               href={media.url} 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               className="h-8 w-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-colors"
+                             >
+                               <Eye className="h-4 w-4" />
+                             </a>
+                             <span className="text-[8px] text-white/70 font-medium">Uploaded</span>
+                          </div>
+                          <div className="absolute top-2 right-2 bg-blue-600/80 backdrop-blur-md p-1 rounded-full text-white">
+                            <CheckCircle2 className="h-2.5 w-2.5" />
+                          </div>
+                          {media.file_type === 'video' && (
+                            <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded text-[9px] font-bold text-white flex items-center gap-1">
+                              <Video className="h-2.5 w-2.5" /> VIDEO
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* New Previews (To be uploaded) */}
                       {mediaPreviews.map((preview, idx) => (
-                        <div key={idx} className="group relative aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                        <div key={`preview-${idx}`} className="group relative aspect-square rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800 border-2 border-dashed border-blue-200 dark:border-blue-800/50">
                           {preview.type === 'image' ? (
                             <img src={preview.url} alt="Preview" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                           ) : (
@@ -537,15 +601,23 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                               <X className="h-4 w-4" />
                             </Button>
                           </div>
-                          {preview.type === 'video' && (
-                            <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded text-[9px] font-bold text-white flex items-center gap-1">
-                              <Video className="h-2.5 w-2.5" /> VIDEO
-                            </div>
-                          )}
+                          <div className="absolute bottom-2 left-2 right-2 bg-blue-600/90 py-1 rounded text-[8px] font-bold text-white text-center">
+                            READY TO UPLOAD
+                          </div>
                         </div>
                       ))}
                     </div>
+                  ) : (
+                    <div 
+                      className="py-10 px-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/30 border-2 border-dashed border-slate-200 dark:border-slate-800 text-center cursor-pointer hover:bg-slate-50 transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <UploadCloud className="h-8 w-8 text-slate-300 mx-auto mb-3" />
+                      <p className="text-sm font-medium text-slate-500">Click or drag photos and videos here</p>
+                      <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">Supports JPG, PNG, MP4, MOV</p>
+                    </div>
                   )}
+
                 </div>
               </div>
 

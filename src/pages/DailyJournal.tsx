@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef, ChangeEvent } from 'react';
 import { useAppStore, DailyJournal as DailyJournalType, SiteJournalEntry } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { generateId, cn } from '@/src/lib/utils';
@@ -6,7 +6,11 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
 import { toast } from '@/src/components/ui/toast';
-import { Search, Plus, Calendar, MapPin, X, ChevronLeft, ChevronRight, FileText, Download, Filter, Wrench, CheckCircle2, AlertTriangle, Package } from 'lucide-react';
+import { 
+  Search, Plus, Calendar, MapPin, X, ChevronLeft, ChevronRight, 
+  FileText, Download, Filter, Wrench, CheckCircle2, AlertTriangle, 
+  Package, Image as ImageIcon, Video, UploadCloud, FileVideo, Eye
+} from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay } from 'date-fns';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { DiaryDetailView } from './DiaryDetailView';
@@ -38,6 +42,112 @@ function SiteLogCard({
   const [activeTab, setActiveTab] = useState<'general' | 'machines' | 'consumables'>('general');
   const [isBulkConsumableOpen, setIsBulkConsumableOpen] = useState(false);
   const [isBulkMachineOpen, setIsBulkMachineOpen] = useState(false);
+  
+  // Media State
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [mediaPreviews, setMediaPreviews] = useState<{ url: string; type: 'image' | 'video'; name: string }[]>([]);
+  const [uploadedMedia, setUploadedMedia] = useState<any[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const currentUser = useUserStore(s => s.getCurrentUser());
+
+  const MEDIA_SERVER_URL = 'https://media.dcel-suite.com'; // Replace with actual URL
+
+  const fetchUploadedMedia = async () => {
+    if (!entry.siteId || !formDate) return;
+    try {
+      const response = await fetch(`${MEDIA_SERVER_URL}/list.php?site_id=${entry.siteId}&asset_id=JOURNAL&log_date=${formDate}`);
+      if (response.ok) {
+        const data = await response.json();
+        setUploadedMedia(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch media:', err);
+    }
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setMediaFiles(prev => [...prev, ...files]);
+    const newPreviews = files.map(file => ({
+      url: URL.createObjectURL(file),
+      type: file.type.startsWith('video/') ? 'video' as const : 'image' as const,
+      name: file.name
+    }));
+    setMediaPreviews(prev => [...prev, ...newPreviews]);
+  };
+
+  const removeMedia = (index: number) => {
+    setMediaFiles(prev => prev.filter((_, i) => i !== index));
+    setMediaPreviews(prev => {
+      URL.revokeObjectURL(prev[index].url);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const handleUploadMedia = async () => {
+    if (mediaFiles.length === 0) return;
+    setIsUploading(true);
+    try {
+      const uploadPromises = mediaFiles.map(async (file) => {
+        const formData = new FormData();
+        formData.append('media', file);
+        formData.append('site_id', entry.siteId!);
+        formData.append('site_name', entry.siteName!);
+        formData.append('asset_id', 'JOURNAL');
+        formData.append('asset_name', 'Daily Journal');
+        formData.append('log_date', formDate);
+        formData.append('uploaded_by', currentUser?.id || 'unknown');
+        formData.append('uploaded_by_name', currentUser?.name || 'Unknown');
+
+        const response = await fetch(`${MEDIA_SERVER_URL}/upload.php`, {
+          method: 'POST',
+          body: formData,
+        });
+        if (!response.ok) throw new Error(`Failed to upload ${file.name}`);
+        return response.json();
+      });
+
+      await Promise.all(uploadPromises);
+      toast.success(`${mediaFiles.length} files uploaded successfully`);
+      setMediaFiles([]);
+      setMediaPreviews([]);
+      fetchUploadedMedia();
+    } catch (err) {
+      console.error('Upload error:', err);
+      toast.error('Failed to upload some files');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeleteMedia = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this media?')) return;
+    try {
+      const response = await fetch(`${MEDIA_SERVER_URL}/delete.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (response.ok) {
+        toast.success('Media deleted');
+        fetchUploadedMedia();
+      } else {
+        throw new Error('Failed to delete');
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+      toast.error('Failed to delete media');
+    }
+  };
+
+
+  useEffect(() => {
+    fetchUploadedMedia();
+  }, [entry.siteId, formDate]);
+
 
   const machineItems = useMemo(() => {
     if (!entry.siteId) return [];
@@ -118,9 +228,100 @@ function SiteLogCard({
 
       <div className="pl-2">
         {activeTab === 'general' ? (
-          <textarea value={entry.narration || ''} onChange={e => onChangeNarration(e.target.value)}
-            rows={4} placeholder="Type your field notes here..."
-            className="w-full text-base sm:text-sm border border-slate-200 dark:border-slate-700 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 dark:bg-slate-950 transition-all placeholder:text-slate-400" />
+          <div className="space-y-4">
+            <textarea value={entry.narration || ''} onChange={e => onChangeNarration(e.target.value)}
+              rows={4} placeholder="Type your field notes here..."
+              className="w-full text-base sm:text-sm border border-slate-200 dark:border-slate-700 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 dark:bg-slate-950 transition-all placeholder:text-slate-400" />
+            
+            {/* Media Storage Section */}
+            <div className="border-t border-slate-100 dark:border-slate-800 pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="h-3.5 w-3.5 text-indigo-500" />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Photos & Videos</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {mediaFiles.length > 0 && (
+                    <Button 
+                      size="sm" 
+                      onClick={handleUploadMedia} 
+                      disabled={isUploading}
+                      className="h-7 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 gap-1"
+                    >
+                      {isUploading ? <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <UploadCloud className="h-3 w-3" />}
+                      Upload {mediaFiles.length}
+                    </Button>
+                  )}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-7 text-[10px] font-bold border-indigo-200 text-indigo-600 hover:bg-indigo-50 px-3 gap-1"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Plus className="h-3 w-3" /> Add Media
+                  </Button>
+                </div>
+                <input type="file" ref={fileInputRef} className="hidden" multiple accept="image/*,video/*" onChange={handleFileChange} />
+              </div>
+
+              {(uploadedMedia.length > 0 || mediaPreviews.length > 0) ? (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                  {/* Uploaded */}
+                  {uploadedMedia.map((m, i) => (
+                    <div key={`up-${i}`} className="group relative aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                      {m.file_type === 'image' ? (
+                        <img src={m.url} className="w-full h-full object-cover" alt="site-media" />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900">
+                          <FileVideo className="h-6 w-6 text-white/50" />
+                          <span className="text-[8px] text-white/30 mt-1 truncate px-1 w-full text-center">{m.file_name}</span>
+                        </div>
+                      )}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <a href={m.url} target="_blank" rel="noreferrer" className="h-7 w-7 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-colors">
+                              <Eye className="h-3.5 w-3.5" />
+                            </a>
+                            <button 
+                              onClick={() => handleDeleteMedia(m.id)} 
+                              className="h-7 w-7 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center text-white transition-colors"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                      <div className="absolute top-1 right-1 bg-emerald-500 rounded-full p-0.5 text-white">
+                        <CheckCircle2 className="h-2 w-2" />
+                      </div>
+                    </div>
+                  ))}
+                  {/* Previews */}
+                  {mediaPreviews.map((p, i) => (
+                    <div key={`pre-${i}`} className="group relative aspect-square rounded-lg overflow-hidden bg-indigo-50/50 border-2 border-dashed border-indigo-200 dark:border-indigo-800/50">
+                      {p.type === 'image' ? (
+                        <img src={p.url} className="w-full h-full object-cover opacity-60" alt="preview" />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-800 opacity-60">
+                          <FileVideo className="h-5 w-5 text-indigo-400" />
+                        </div>
+                      )}
+                      <button onClick={() => removeMedia(i)} className="absolute top-1 right-1 h-5 w-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm">
+                        <X className="h-3 w-3" />
+                      </button>
+                      <div className="absolute bottom-0 left-0 right-0 bg-indigo-600 py-0.5 text-[7px] font-black text-white text-center">PENDING</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div onClick={() => fileInputRef.current?.click()} className="border border-dashed border-slate-200 dark:border-slate-800 rounded-lg py-6 flex flex-col items-center justify-center bg-slate-50/50 dark:bg-slate-950/30 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors">
+                  <UploadCloud className="h-5 w-5 text-slate-300 mb-2" />
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Add photos/videos for this site</span>
+                </div>
+              )}
+            </div>
+          </div>
+
         ) : activeTab === 'machines' ? (
           <div className="space-y-2">
             {machineItems.length === 0 ? (
