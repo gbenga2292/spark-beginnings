@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -146,10 +146,21 @@ export function SiteOnboarding() {
   const { user } = useAuth();
 
   const { clientBalanceStatus } = useMemo(() => {
-    if (!form.clientName) return { clientBalanceStatus: null };
+    // 1. Never show for pending sites (per user request)
+    // 2. Only show if we have both client and site names
+    if (form.status === 'Pending' || !form.clientName || !form.siteName) {
+      return { clientBalanceStatus: null };
+    }
 
-    const cInvoices = invoices.filter(i => i.client === form.clientName);
-    const cPayments = payments.filter(p => p.client === form.clientName);
+    // Filter to the specific site+client combo
+    const cInvoices = invoices.filter(i => 
+      i.client === form.clientName && 
+      (i.siteName === form.siteName || i.project === form.siteName)
+    );
+    const cPayments = payments.filter(p => 
+      p.client === form.clientName && 
+      p.site === form.siteName
+    );
 
     // No invoices at all → no badge (nothing to judge)
     if (cInvoices.length === 0) return { clientBalanceStatus: null };
@@ -168,7 +179,7 @@ export function SiteOnboarding() {
     }
 
     return { clientBalanceStatus: null };
-  }, [invoices, payments, form.clientName]);
+  }, [invoices, payments, form.clientName, form.siteName, form.status]);
 
 
   const [wantsProject, setWantsProject] = useState(true);
@@ -191,11 +202,14 @@ export function SiteOnboarding() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasChanges]);
 
+  // Track if we have already loaded the initial data for the current ID to prevent overwriting local state
+  const [hasLoadedInitial, setHasLoadedInitial] = useState<string | null>(null);
+
   useEffect(() => {
-    if (!isNew && id) {
+    if (!isNew && id && id !== hasLoadedInitial) {
       const existing = pendingSites.find(s => s.id === id);
       if (existing) {
-        let loadedForm = existing;
+        let loadedForm = { ...existing };
         
         // Auto-populate TIN if it's currently empty but we have it on record
         if (!loadedForm.phase4?.clientTinNumber && loadedForm.clientName) {
@@ -212,15 +226,21 @@ export function SiteOnboarding() {
 
         setForm(loadedForm);
         setInitialForm(loadedForm);
+        setHasLoadedInitial(id); // Mark this specific ID as loaded
+
         if (loadedForm.status === 'Pending') {
           const next = [1, 2, 3, 4, 5].find(p => !(loadedForm as any)[`phase${p}`].completed) as any ?? 5;
           setActivePhase(next);
         }
       } else {
-        toast.error('Onboarding record not found.');
-        navigate('/sites');
+        // If we're here, we might be waiting for the initial fetch to complete
+        // but if we have sites and still can't find it, then it's actually missing
+        if (pendingSites.length > 0) {
+          toast.error('Onboarding record not found.');
+          navigate('/sites');
+        }
       }
-    } else {
+    } else if (isNew && hasLoadedInitial !== 'new') {
       const linked = location.state?.linkedSite;
       if (linked) {
         const newActive = {
@@ -238,8 +258,16 @@ export function SiteOnboarding() {
         setForm(blank);
         setInitialForm(blank);
       }
+      setHasLoadedInitial('new');
     }
-  }, [id, pendingSites, navigate, location.state]);
+  }, [id, pendingSites, navigate, location.state, isNew, hasLoadedInitial]);
+
+  // Reset the "hasLoaded" flag if the ID in the URL actually changes (e.g. going from one site to another)
+  useEffect(() => {
+    if (id && id !== hasLoadedInitial) {
+      setHasLoadedInitial(null);
+    }
+  }, [id]);
 
   // ─── Updaters ──────────────────────────────────────────────────────────────
   const upd = (patch: Partial<SiteQuestionnaire>) => setForm(p => ({ ...p, ...patch }));
@@ -248,33 +276,35 @@ export function SiteOnboarding() {
   ) => setForm(p => ({ ...p, [key]: { ...p[key], ...(patch as any) } }));
 
   const markDone = (phase: 1 | 2 | 3 | 4 | 5) => {
-    updPhase(`phase${phase}` as any, { completed: true });
+    const updatedForm = {
+      ...form,
+      [`phase${phase}`]: { ...form[`phase${phase}` as keyof SiteQuestionnaire] as any, completed: true },
+      updatedAt: new Date().toISOString()
+    };
+    
+    setForm(updatedForm);
+    setInitialForm(updatedForm);
+    
+    // Explicitly save the progress when a phase is marked done
+    updatePendingSite(form.id, updatedForm);
+    
     if (phase < 5) setActivePhase((phase + 1) as any);
+    toast.success(`Phase ${phase} complete and saved.`);
   };
 
   // ─── Save ──────────────────────────────────────────────────────────────────
-  const handleSave = () => {
-    if (!form.clientName.trim() || !form.siteName.trim()) {
-      toast.error('Client Name and Site Name are required.');
-      return;
-    }
-
-    if (isNew && wantsProject) {
-      // If it's a new site and user checked the "create project" button
-      setShowProjectDialog(true);
-      return;
-    }
-
-    executeSave();
-  };
-
-  const executeSave = () => {
+  const executeSave = useCallback(() => {
+    // Ensure we have a clean copy of the form to save
+    const dataToSave = { ...form, updatedAt: new Date().toISOString() };
+    
     if (isNew) {
-      addPendingSite(form);
+      addPendingSite(dataToSave);
       navigate(`/sites/onboarding/${form.id}`, { replace: true });
       toast.success('Site onboarding started.');
     } else {
-      updatePendingSite(form.id, { ...form, updatedAt: new Date().toISOString() });
+      updatePendingSite(form.id, dataToSave);
+      
+      // Update the real site if it's already active
       if (form.status === 'Active') {
         const sites = useAppStore.getState().sites;
         // Find matching site by siteId (preferred) or name/client
@@ -286,6 +316,7 @@ export function SiteOnboarding() {
           if (form.phase1.timelineStartDate && form.phase1.timelineStartDate !== matchingSite.startDate) {
             updates.startDate = form.phase1.timelineStartDate;
           }
+
           if (form.phase5.actualEndDate !== matchingSite.endDate) {
             updates.endDate = form.phase5.actualEndDate || '';
           }
@@ -305,7 +336,22 @@ export function SiteOnboarding() {
       setInitialForm(form);
       toast.success('Progress saved.');
     }
-  };
+  }, [form, isNew, addPendingSite, updatePendingSite, updateSite, navigate]);
+
+  const handleSave = useCallback(() => {
+    if (!form.clientName.trim() || !form.siteName.trim()) {
+      toast.error('Client Name and Site Name are required.');
+      return;
+    }
+
+    if (isNew && wantsProject) {
+      // If it's a new site and user checked the "create project" button
+      setShowProjectDialog(true);
+      return;
+    }
+
+    executeSave();
+  }, [form, isNew, wantsProject, executeSave]);
 
   const handleProjectSubmit = async (payload: any) => {
     await createProject(payload);
@@ -399,7 +445,7 @@ export function SiteOnboarding() {
     isNew ? 'New Site Onboarding' : `Site Onboarding — ${form.siteName}`,
     isNew ? 'Start a new project inquiry' : `${form.status === 'Active' ? 'Site Active' : 'Activation Pending'} • Fill all phases. Activation unlocks at Phase 4.`,
     headerActions,
-    [form.siteName, form.status, canActivate, isNew]
+    [form.siteName, form.status, canActivate, isNew, form]
   );
 
   const completedCount = [1, 2, 3, 4, 5].filter(p => (form as any)[`phase${p}`].completed).length;
@@ -1082,4 +1128,6 @@ export function SiteOnboarding() {
     </div>
   );
 }
+
+export default SiteOnboarding;
 

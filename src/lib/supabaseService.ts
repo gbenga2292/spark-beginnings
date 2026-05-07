@@ -948,12 +948,23 @@ export const db = {
     if (error) { console.error('insertPendingSite:', error); throw error; }
   },
   async updatePendingSite(id: string, p: Partial<SiteQuestionnaire>) {
-    // For pending sites, we overwrite the whole object as we're saving all phases.
-    if (p.id) {
-       const mapped = pendingSiteToDb(p as SiteQuestionnaire);
-       const { error } = await supabase.from('pending_sites').update(mapped).eq('id', id);
-       if (error) { console.error('updatePendingSite:', error); throw error; }
+    // For pending sites, we typically overwrite the data blob. 
+    // We ensure we don't overwrite top-level columns with undefined.
+    const update: any = { updated_at: new Date().toISOString() };
+    if (p.clientName !== undefined) update.client_name = p.clientName;
+    if (p.siteName !== undefined) update.site_name = p.siteName;
+    if (p.status !== undefined) update.status = p.status;
+    
+    // If we have phase data, we need to be careful. 
+    // In this app's architecture, the 'data' column holds the phases.
+    // If the caller passed a full object (like in SiteOnboarding), we map it.
+    const { id: _unused, clientName, siteName, status, createdAt, updatedAt, ...restData } = p as any;
+    if (Object.keys(restData).length > 0) {
+      update.data = restData;
     }
+
+    const { error } = await supabase.from('pending_sites').update(update).eq('id', id);
+    if (error) { console.error('updatePendingSite:', error); throw error; }
   },
   async deletePendingSite(id: string) {
     const { error } = await supabase.from('pending_sites').delete().eq('id', id);

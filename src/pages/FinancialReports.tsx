@@ -367,6 +367,15 @@ export function FinancialReports() {
     // OPTIMIZED: O(1) Site Lookup to prevent O(N*M) loop
     const siteIndex = new Map<string, any>();
     sites.forEach(s => siteIndex.set(`${(s.client || '').trim()}|${(s.name || '').trim()}`, s));
+    pendingSites.forEach(ps => {
+      const key = `${(ps.clientName || '').trim()}|${(ps.siteName || '').trim()}`;
+      if (!siteIndex.has(key)) {
+        siteIndex.set(key, { 
+          vat: ps.phase4?.clientTaxStatus?.includes('Add') ? 'Add' : 
+               ps.phase4?.clientTaxStatus?.includes('Yes') ? 'Yes' : 'No' 
+        });
+      }
+    });
 
     payments.forEach(p => {
       totalCollectedCash += (p.amount || 0);
@@ -389,7 +398,7 @@ export function FinancialReports() {
       .sort((a, b) => b.amount - a.amount);
     
     const totalVATRemitted = vatPayments.reduce((sum, vp) => sum + (vp.amount || 0), 0);
-    const vatDeficit = Math.max(0, totalVATCollected - totalVATRemitted);
+    const vatDeficit = totalVATCollected - totalVATRemitted;
     
     return { totalBilled, totalVATInvoiced, totalCollectedCash, totalValueCleared, totalOutstanding, totalWHT, totalDiscount, totalVATCollected, totalVATRemitted, vatDeficit, vatSources };
   }, [invoices, payments, vatPayments, sites, vatRate]);
@@ -494,6 +503,19 @@ export function FinancialReports() {
       rowMap.get(key)!.totalInvoices += (inv.amount || 0);
       rowMap.get(key)!.vatInvoiced += (inv.vat || 0);
     });
+    // O(1) Site Lookup to prevent O(N*M) loop - consistent with globalStats
+    const siteIndex = new Map<string, any>();
+    sites.forEach(s => siteIndex.set(`${(s.client || '').trim()}|${(s.name || '').trim()}`, s));
+    pendingSites.forEach(ps => {
+      const key = `${(ps.clientName || '').trim()}|${(ps.siteName || '').trim()}`;
+      if (!siteIndex.has(key)) {
+        siteIndex.set(key, { 
+          vat: ps.phase4?.clientTaxStatus?.includes('Add') ? 'Add' : 
+               ps.phase4?.clientTaxStatus?.includes('Yes') ? 'Yes' : 'No' 
+        });
+      }
+    });
+
     payments.forEach(pay => {
       const siteName = (pay.site || 'Unknown Site').trim();
       const clientName = (pay.client || '').trim();
@@ -511,25 +533,27 @@ export function FinancialReports() {
         vatPaid: 0, 
         vatRemitted: 0 
       });
-      rowMap.get(key)!.totalPayment += (pay.amount || 0);
-      rowMap.get(key)!.discount += (pay.discount || 0);
-      rowMap.get(key)!.withholdingTax += (pay.withholdingTax || 0);
-      rowMap.get(key)!.vatPaid += (pay.vat || 0);
+      
+      const r = rowMap.get(key)!;
+      r.totalPayment += (pay.amount || 0);
+      r.discount += (pay.discount || 0);
+      r.withholdingTax += (pay.withholdingTax || 0);
+      
+      // Calculate VAT Paid dynamically based on payment amount and site VAT settings
+      const siteKey = `${clientName}|${siteName}`;
+      const payVatSetting = pay.payVat || siteIndex.get(siteKey)?.vat || 'No';
+      const { vat } = getVatDetails(pay.amount || 0, payVatSetting, vatRate);
+      r.vatPaid += (vat || 0);
     });
 
     // Add VAT Remitted (Payments to FIRS)
     vatPayments.forEach(vp => {
       const clientName = (vp.client || '').trim();
-      // We can only attribute this accurately in Client Summary because VatPayment lacks site field
       if (summaryTab === 'client') {
         const key = clientName;
         if (rowMap.has(key)) {
           rowMap.get(key)!.vatRemitted += (vp.amount || 0);
         }
-      } else {
-        // In Site Summary, we could try to attribute it if the client only has one site, 
-        // but it's safer to just show it at the client level. 
-        // For now, we'll leave it as 0 for site rows unless we find a better way.
       }
     });
 
@@ -559,7 +583,8 @@ export function FinancialReports() {
         balance = 0;
         status = 'FULLY PAID';
       }
-      const vatOwed = Math.max(0, r.vatPaid - r.vatRemitted);
+      // VAT Owed represents the company's liability (Collected - Remitted). Negative means overpayment/surplus.
+      const vatOwed = r.vatPaid - r.vatRemitted;
       return { ...r, bf, balance, status, vatOwed };
     }).sort((a, b) => a.client.localeCompare(b.client));
   }, [invoices, payments, vatPayments, summaryTab, bfData]);
@@ -1642,7 +1667,9 @@ export function FinancialReports() {
             <div className="flex justify-between items-start mb-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">VAT Liability</p>
-                <h3 className="text-2xl font-bold font-mono text-rose-600">{formatCurrCompact(globalStats.vatDeficit)}</h3>
+                <h3 className={`text-2xl font-bold font-mono ${globalStats.vatDeficit < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {globalStats.vatDeficit < 0 ? `(${formatCurrCompact(Math.abs(globalStats.vatDeficit))})` : formatCurrCompact(globalStats.vatDeficit)}
+                </h3>
               </div>
               <div className="h-10 w-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-600"><Landmark className="w-5 h-5" /></div>
             </div>
@@ -1744,7 +1771,7 @@ export function FinancialReports() {
                 <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Discounts</TableHead>
                 <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">WHT</TableHead>
                 <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT INV</TableHead>
-                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT PAID</TableHead>
+                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT ON PAYMENTS</TableHead>
                 <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-indigo-200 px-5 py-4 text-right">VAT REMIT</TableHead>
                 <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">VAT OWED</TableHead>
                 <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-center">Health</TableHead>
@@ -1773,13 +1800,15 @@ export function FinancialReports() {
                     <div className="bg-slate-100 text-slate-600 rounded-md px-2 py-0.5 inline-block text-[11px] font-bold">{row.noOfInvoices || '0'}</div>
                   </TableCell>
                   <TableCell className="px-5 py-3 text-right font-mono font-medium text-slate-700">{row.totalInvoices ? row.totalInvoices.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                  <TableCell className="px-5 py-3 text-right font-mono font-medium text-emerald-700">{row.totalPayment ? row.totalPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                  <TableCell className="px-5 py-3 text-right font-mono text-slate-400">{row.discount ? row.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                  <TableCell className="px-5 py-3 text-right font-mono text-indigo-600/70">{row.withholdingTax ? row.withholdingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                  <TableCell className="px-5 py-3 text-right font-mono text-indigo-600/70">{row.vatInvoiced ? row.vatInvoiced.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                  <TableCell className="px-5 py-3 text-right font-mono text-emerald-600/70">{row.vatPaid ? row.vatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                  <TableCell className="px-5 py-3 text-right font-mono text-sky-600/70">{row.vatRemitted ? row.vatRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                  <TableCell className="px-5 py-3 text-right font-mono text-rose-600 font-bold">{row.vatOwed ? row.vatOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                  <TableCell className="px-5 py-3 text-right font-mono font-medium text-emerald-700 text-xs">{row.totalPayment ? row.totalPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                  <TableCell className="px-5 py-3 text-right font-mono text-slate-400 text-xs">{row.discount ? row.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                  <TableCell className="px-5 py-3 text-right font-mono text-indigo-600/70 text-xs">{row.withholdingTax ? row.withholdingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                  <TableCell className="px-5 py-3 text-right font-mono text-indigo-600/70 text-xs">{row.vatInvoiced ? row.vatInvoiced.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                  <TableCell className="px-5 py-3 text-right font-mono text-emerald-600/70 text-xs">{row.vatPaid ? row.vatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                  <TableCell className="px-5 py-3 text-right font-mono text-sky-600/70 text-xs">{row.vatRemitted ? row.vatRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                  <TableCell className={`px-5 py-3 text-right font-mono font-bold text-xs ${row.vatOwed < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {row.vatOwed !== 0 ? (row.vatOwed < 0 ? `(${Math.abs(row.vatOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.vatOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
+                  </TableCell>
                   <TableCell className="px-5 py-3 text-center">
                     <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase shadow-sm
                       ${row.status === 'OWING' ? 'bg-rose-100 border border-rose-200 text-rose-700' :
@@ -1822,7 +1851,13 @@ export function FinancialReports() {
                     <TableCell className="px-5 py-4 text-right font-mono font-medium text-indigo-300">{globalStats.totalVATInvoiced ? globalStats.totalVATInvoiced.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                     <TableCell className="px-5 py-4 text-right font-mono font-medium text-emerald-400">{globalStats.totalVATCollected ? globalStats.totalVATCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                     <TableCell className="px-5 py-4 text-right font-mono font-medium text-sky-400">{globalStats.totalVATRemitted ? globalStats.totalVATRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                    <TableCell className="px-5 py-4 text-right font-mono font-bold text-rose-400">{globalStats.vatDeficit ? globalStats.vatDeficit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                    <TableCell className={`px-5 py-4 text-right font-mono font-bold text-xs ${globalStats.vatDeficit < 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {globalStats.vatDeficit !== 0 
+                        ? (globalStats.vatDeficit < 0 
+                            ? `(${Math.abs(globalStats.vatDeficit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` 
+                            : globalStats.vatDeficit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) 
+                        : '-'}
+                    </TableCell>
                     <TableCell className="px-5 py-4"></TableCell>
                   </TableRow>
                 );
