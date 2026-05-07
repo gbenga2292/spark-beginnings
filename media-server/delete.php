@@ -2,57 +2,46 @@
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
+header('Content-Type: application/json');
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit;
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
+
+$env_file = __DIR__ . '/.env';
+if (!file_exists($env_file)) {
+    echo json_encode(['error' => '.env not found']); exit;
 }
+$env = parse_ini_file($env_file);
 
-// Load .env
-$env = parse_ini_file('.env');
-$host = $env['DB_HOST'];
-$db   = $env['DB_NAME'];
-$user = $env['DB_USER'];
-$pass = $env['DB_PASS'];
-
-// Database Connection
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$db", $user, $pass);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo = new PDO(
+        "mysql:host={$env['DB_HOST']};dbname={$env['DB_NAME']};charset=utf8mb4",
+        $env['DB_USER'], $env['DB_PASS'],
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+    );
 } catch (PDOException $e) {
-    echo json_encode(['error' => 'Database connection failed: ' . $e->getMessage()]);
-    exit;
+    http_response_code(500);
+    echo json_encode(['error' => 'DB error: ' . $e->getMessage()]); exit;
 }
 
-$data = json_decode(file_get_contents('php://input'), true);
-$id = $data['id'] ?? '';
+$body = json_decode(file_get_contents('php://input'), true);
+$id   = (int)($body['id'] ?? 0);
 
 if (!$id) {
-    echo json_encode(['error' => 'Missing ID']);
-    exit;
+    http_response_code(400);
+    echo json_encode(['error' => 'Missing id']); exit;
 }
 
-try {
-    // Get file path first
-    $stmt = $pdo->prepare("SELECT file_path FROM media_logs WHERE id = ?");
-    $stmt->execute([$id]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($row) {
-        $filePath = $row['file_path'];
-        // Delete from filesystem
-        if (file_exists($filePath)) {
-            unlink($filePath);
-        }
-        
-        // Delete from database
-        $stmt = $pdo->prepare("DELETE FROM media_logs WHERE id = ?");
-        $stmt->execute([$id]);
-        
-        echo json_encode(['success' => true]);
-    } else {
-        echo json_encode(['error' => 'Record not found']);
-    }
-} catch (PDOException $e) {
-    echo json_encode(['error' => 'Delete failed: ' . $e->getMessage()]);
+// Get file path before deleting record
+$stmt = $pdo->prepare("SELECT file_path FROM site_media WHERE id = ?");
+$stmt->execute([$id]);
+$row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Delete physical file
+if ($row && file_exists($row['file_path'])) {
+    unlink($row['file_path']);
 }
-?>
+
+// Delete DB record
+$pdo->prepare("DELETE FROM site_media WHERE id = ?")->execute([$id]);
+
+echo json_encode(['success' => true]);

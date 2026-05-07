@@ -2,9 +2,35 @@ node_modules/
 release/
 dist/
 andriod/
-.env
+dist-web/
 temp_genesis/
 temp-genesis-glow/
 .temp_fresh_start/
 .agent/
-dist-web/
+
+# --- Environment / Secrets (NEVER commit these) ---
+.env
+.env.local
+.env.production
+media-server/.env
+media-server-php/.env
+
+# --- Build logs & temp files ---
+*.log
+build.txt
+build_debug.txt
+build_error.log
+build_errors.txt
+build_output.log
+ts_errors.log
+tsc_errors.log
+tsc.log
+typescript_errors.log
+vite_build_debug.txt
+vite_debug.txt
+lint_output*.txt
+tsc*.txt
+typescript-errors.txt
+compile_errors.txt
+temp.log
+diff.txt

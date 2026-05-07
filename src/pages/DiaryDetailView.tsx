@@ -1,10 +1,90 @@
+import React, { useState, useEffect } from 'react';
 import { useAppStore, DailyJournal as DailyJournalType, SiteJournalEntry } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { useTheme } from '@/src/hooks/useTheme';
 import { cn } from '@/src/lib/utils';
-import { ArrowLeft, MapPin, Edit, Trash2, BookOpen, Plus, FileText } from 'lucide-react';
+import { ArrowLeft, MapPin, Edit, Trash2, BookOpen, Plus, FileText, Image as ImageIcon, FileVideo, Play } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { useOperations } from '../contexts/OperationsContext';
+import { MediaViewer, type MediaItem } from '@/src/components/ui/MediaViewer';
+
+const MEDIA_SERVER_URL = import.meta.env.VITE_MEDIA_SERVER_URL || 'https://dewaterconstruct.com/dcel-media';
+
+/** Fetches & displays photos/videos for one (siteId, date) pair. */
+function EntryMediaStrip({ siteId, date, journalId }: { siteId: string; date: string; journalId?: string }) {
+  const [media, setMedia] = useState<MediaItem[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const url = journalId 
+      ? `${MEDIA_SERVER_URL}/list.php?journal_id=${journalId}`
+      : `${MEDIA_SERVER_URL}/list.php?site_id=${siteId}&asset_id=JOURNAL&log_date=${date}`;
+
+    fetch(url)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        if (!cancelled) {
+          const items: MediaItem[] = Array.isArray(data)
+            ? data.map((m: any) => ({ id: m.id, url: m.url, file_type: m.file_type as 'image' | 'video', file_name: m.file_name }))
+            : [];
+          setMedia(items);
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [siteId, date, journalId]);
+
+  if (loading || media.length === 0) return null;
+
+  return (
+    <div className="mt-3">
+      <div className="flex items-center gap-1.5 mb-2">
+        <ImageIcon className="h-3 w-3 text-slate-400" />
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          {media.length} Photo{media.length !== 1 ? 's' : ''}/Video{media.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+      <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
+        {media.map((m, i) => (
+          <div
+            key={m.id ?? i}
+            className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 cursor-pointer group border border-slate-200 dark:border-slate-700"
+            onClick={() => setLightboxIndex(i)}
+          >
+            {m.file_type === 'image' ? (
+              <img src={m.url} alt={m.file_name || 'photo'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-slate-900">
+                <FileVideo className="h-5 w-5 text-white/40" />
+              </div>
+            )}
+            {m.file_type === 'video' && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="h-8 w-8 rounded-full bg-black/60 flex items-center justify-center">
+                  <Play className="h-3.5 w-3.5 text-white fill-white ml-0.5" />
+                </div>
+              </div>
+            )}
+            {/* WhatsApp-style dark overlay on hover */}
+            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+        ))}
+      </div>
+
+      {lightboxIndex !== null && (
+        <MediaViewer
+          items={media}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
+    </div>
+  );
+}
 
 interface DiaryDetailViewProps {
   date: string;
@@ -155,6 +235,8 @@ export function DiaryDetailView({
                                 ) : (
                                   <p className="text-xs text-slate-400 italic mt-2">No general note recorded.</p>
                                 )}
+                                {/* Media strip — photos & videos for this site entry */}
+                                <EntryMediaStrip siteId={entry.siteId} date={date} journalId={journal.id} />
                                 {(() => {
                                   const machineLogs = dailyMachineLogs.filter(l => l.siteId === entry.siteId && l.date === date);
                                   if (machineLogs.length === 0) return null;

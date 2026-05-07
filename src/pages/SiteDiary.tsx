@@ -1,11 +1,77 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useAppStore } from '@/src/store/appStore';
-import { Calendar, BookOpen, ArrowLeft, Building2 } from 'lucide-react';
+import { Calendar, BookOpen, ArrowLeft, Building2, Image as ImageIcon, FileVideo, Play } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { format } from 'date-fns';
 import { cn } from '@/src/lib/utils';
+import { MediaViewer, type MediaItem } from '@/src/components/ui/MediaViewer';
+
+const MEDIA_SERVER_URL = import.meta.env.VITE_MEDIA_SERVER_URL || 'https://dewaterconstruct.com/dcel-media';
+
+function EntryMediaStrip({ siteId, date, journalId }: { siteId: string; date: string; journalId?: string }) {
+  const [media, setMedia] = useState<MediaItem[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const url = journalId 
+      ? `${MEDIA_SERVER_URL}/list.php?journal_id=${journalId}`
+      : `${MEDIA_SERVER_URL}/list.php?site_id=${siteId}&asset_id=JOURNAL&log_date=${date}`;
+
+    fetch(url)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        if (!cancelled && Array.isArray(data)) {
+          setMedia(data.map((m: any) => ({ id: m.id, url: m.url, file_type: m.file_type as 'image' | 'video', file_name: m.file_name })));
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [siteId, date, journalId]);
+
+  if (media.length === 0) return null;
+
+  return (
+    <div className="mt-4 pt-3 border-t border-slate-100">
+      <div className="flex items-center gap-1.5 mb-2">
+        <ImageIcon className="h-3 w-3 text-slate-400" />
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          {media.length} Attachment{media.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+      <div className="flex gap-1.5 flex-wrap">
+        {media.map((m, i) => (
+          <div
+            key={m.id ?? i}
+            onClick={() => setLightboxIndex(i)}
+            className="relative h-16 w-16 rounded-lg overflow-hidden cursor-pointer group border border-slate-200 bg-slate-100 flex-shrink-0"
+          >
+            {m.file_type === 'image' ? (
+              <img src={m.url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" alt="" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-slate-800">
+                <FileVideo className="h-5 w-5 text-white/50" />
+              </div>
+            )}
+            {m.file_type === 'video' && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="h-7 w-7 rounded-full bg-black/60 flex items-center justify-center">
+                  <Play className="h-3 w-3 text-white fill-white ml-0.5" />
+                </div>
+              </div>
+            )}
+            <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+        ))}
+      </div>
+      {lightboxIndex !== null && (
+        <MediaViewer items={media} initialIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
+      )}
+    </div>
+  );
+}
 
 export function SiteDiary() {
   const { siteId } = useParams();
@@ -117,6 +183,10 @@ export function SiteDiary() {
                     <p className="text-slate-700 whitespace-pre-line leading-relaxed text-[15px]">
                       {entry.narration}
                     </p>
+                    {/* Media — only journal entries have photos/videos */}
+                    {entry.type === 'Journal' && siteId && (
+                      <EntryMediaStrip siteId={siteId} date={entry.date} journalId={entry.id} />
+                    )}
                   </div>
                 </div>
               ))}

@@ -1,6 +1,8 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft, ArrowUpCircle, RefreshCw } from 'lucide-react';
+import { toast } from '@/src/components/ui/toast';
 import { StatusIndicator } from '@/src/components/offline/StatusIndicator';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/src/store/auth';
@@ -223,7 +225,93 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+
+  const CURRENT_VERSION = '1.4.10';
+  const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
+
+  // ── Platform Detection ─────────────────────────────────────────────────
+  const isAndroidNative = Capacitor.getPlatform() === 'android';
+  const isElectron = !!(window as any).electronAPI?.isElectron;
+
+  const startDownload = async (url: string) => {
+    try {
+      setDownloadProgress(0);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Download failed');
+
+      const contentLength = Number(response.headers.get('Content-Length'));
+      if (!contentLength) {
+        window.open(url, '_blank');
+        setDownloadProgress(null);
+        return;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Could not start download');
+
+      let receivedLength = 0;
+      while(true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        receivedLength += value.length;
+        setDownloadProgress(Math.round((receivedLength / contentLength) * 100));
+      }
+
+      setDownloadProgress(null);
+      window.open(url, '_blank');
+      toast.success('Download complete! Installing...');
+    } catch (err) {
+      console.error('Download failed:', err);
+      toast.error('Download failed. Please try again.');
+      setDownloadProgress(null);
+    }
+  };
+
+  const handleManualUpdateCheck = async () => {
+    setCheckingUpdate(true);
+    try {
+      const response = await fetch(`${UPDATE_SERVER_URL}/version.json?t=${Date.now()}`);
+      if (!response.ok) throw new Error('Could not connect to update server');
+      
+      const data = await response.json();
+      if (data.version && data.version !== CURRENT_VERSION) {
+        toast.success(
+          <div className="flex flex-col gap-0.5">
+            <div className="font-bold">New version v{data.version} available!</div>
+            <div className="text-[11px] opacity-80 leading-tight">{data.notes || 'A new update is ready for download.'}</div>
+          </div>,
+          {
+            label: 'Download Now',
+            onClick: () => {
+              // Open sidebar or just start download?
+              // For Header, we'll just trigger the download directly with progress
+              startDownload(data.url);
+            }
+          }
+        );
+      } else {
+        toast.info(
+          <div className="flex flex-col gap-0.5">
+            <div className="font-bold">App is up to date</div>
+            <div className="text-[11px] opacity-80">You are currently on version {CURRENT_VERSION}</div>
+          </div>
+        );
+      }
+    } catch (err) {
+      toast.error(
+        <div className="flex flex-col gap-0.5">
+          <div className="font-bold">Update check failed</div>
+          <div className="text-[11px] opacity-80">Please check your internet connection and try again.</div>
+        </div>
+      );
+    } finally {
+      setCheckingUpdate(false);
+      setIsProfileOpen(false);
+    }
+  };
 
   const searchRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -234,7 +322,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     const handler = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false);
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setIsProfileOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -244,7 +332,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   useEffect(() => {
     setSearchOpen(false);
     setNotifOpen(false);
-    setProfileOpen(false);
+    setIsProfileOpen(false);
     setSearchQuery('');
   }, [location.pathname]);
 
@@ -338,7 +426,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         {/* Notification Bell */}
         <div ref={notifRef} className="relative">
           <button
-            onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); }}
+            onClick={() => { setNotifOpen(!notifOpen); setIsProfileOpen(false); }}
             className={`relative h-8 w-8 rounded-lg flex items-center justify-center transition-colors ${
               isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'
             }`}
@@ -450,7 +538,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         {/* Profile Dropdown */}
         <div ref={profileRef} className="relative">
           <button
-            onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); }}
+            onClick={() => { setIsProfileOpen(!isProfileOpen); setNotifOpen(false); }}
             className={`flex items-center gap-2.5 rounded-lg px-2 py-1 transition-colors ${
               isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-50'
             }`}
@@ -467,7 +555,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             </Avatar>
           </button>
 
-          {profileOpen && (
+          {isProfileOpen && (
             <div className={`absolute right-0 top-full mt-1 w-64 border rounded-lg shadow-xl z-50 overflow-hidden ${
               isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
             }`}>
@@ -481,8 +569,8 @@ export function Header({ onMenuClick }: HeaderProps) {
                     <AvatarFallback className="bg-indigo-700 text-white font-bold uppercase">{(currentUser?.name || user?.name || '?').charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <p className={`text-sm font-bold truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{currentUser?.name || user?.name}</p>
-                    <p className="text-[11px] text-slate-500 truncate">{currentUser?.email || user?.email}</p>
+                    <p className={`text-[12px] font-bold truncate leading-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{currentUser?.name || user?.name}</p>
+                    <p className="text-[10px] text-slate-500 truncate mt-0.5">{currentUser?.email || user?.email}</p>
                   </div>
                 </div>
 
@@ -491,7 +579,7 @@ export function Header({ onMenuClick }: HeaderProps) {
               {/* Menu Items */}
               <div className="py-1">
                 <button
-                  onClick={() => { setProfileOpen(false); navigate('/profile'); }}
+                  onClick={() => { setIsProfileOpen(false); navigate('/profile'); }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs transition-colors ${
                     isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-50'
                   }`}
@@ -502,7 +590,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                 {/* Settings — super-admin only */}
                 {!currentUser && (
                   <button
-                    onClick={() => { setProfileOpen(false); navigate('/settings'); }}
+                    onClick={() => { setIsProfileOpen(false); navigate('/settings'); }}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs transition-colors ${
                       isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-50'
                     }`}
@@ -513,13 +601,30 @@ export function Header({ onMenuClick }: HeaderProps) {
                 )}
                 {currentUser?.privileges?.users?.canView && (
                   <button
-                    onClick={() => { setProfileOpen(false); navigate('/users'); }}
+                    onClick={() => { setIsProfileOpen(false); navigate('/users'); }}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs transition-colors ${
                       isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-50'
                     }`}
                   >
                     <User className="h-3.5 w-3.5 text-slate-400" />
                     User Management
+                  </button>
+                )}
+
+                {isAndroidNative && !isElectron && (
+                  <button
+                    onClick={handleManualUpdateCheck}
+                    disabled={checkingUpdate || downloadProgress !== null}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs transition-colors ${
+                      isDark ? 'text-emerald-400 hover:bg-slate-700' : 'text-emerald-600 hover:bg-emerald-50'
+                    }`}
+                  >
+                    {checkingUpdate || downloadProgress !== null ? (
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <ArrowUpCircle className="h-3.5 w-3.5" />
+                    )}
+                    {downloadProgress !== null ? `Downloading ${downloadProgress}%` : checkingUpdate ? 'Checking...' : 'Check for Update'}
                   </button>
                 )}
               </div>

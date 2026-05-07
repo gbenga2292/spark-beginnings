@@ -1,45 +1,52 @@
 <?php
 header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
 header('Content-Type: application/json');
 
-// Load .env
-$env = parse_ini_file('.env');
-$host = $env['DB_HOST'];
-$db   = $env['DB_NAME'];
-$user = $env['DB_USER'];
-$pass = $env['DB_PASS'];
-$baseUrl = $env['BASE_URL'];
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 
-// Database Connection
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$db", $user, $pass);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    echo json_encode(['error' => 'Database connection failed: ' . $e->getMessage()]);
-    exit;
-}
-
-$siteId = $_GET['site_id'] ?? '';
-$assetId = $_GET['asset_id'] ?? '';
-$logDate = $_GET['log_date'] ?? '';
-
-if (!$siteId || !$assetId || !$logDate) {
-    echo json_encode(['error' => 'Missing parameters']);
-    exit;
-}
+$env_file = __DIR__ . '/.env';
+if (!file_exists($env_file)) { echo json_encode(['error' => 'No .env']); exit; }
+$env = parse_ini_file($env_file);
 
 try {
-    $stmt = $pdo->prepare("SELECT * FROM media_logs WHERE site_id = ? AND asset_id = ? AND log_date = ? ORDER BY created_at DESC");
-    $stmt->execute([$siteId, $assetId, $logDate]);
-    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Append base URL to file path if needed
-    foreach ($results as &$row) {
-        $row['url'] = $baseUrl . '/' . $row['file_path'];
+    $pdo = new PDO(
+        "mysql:host={$env['DB_HOST']};dbname={$env['DB_NAME']};charset=utf8mb4",
+        $env['DB_USER'], $env['DB_PASS'],
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+    );
+} catch (PDOException $e) { echo json_encode(['error' => $e->getMessage()]); exit; }
+
+$site_id    = trim($_GET['site_id'] ?? '');
+$journal_id = trim($_GET['journal_id'] ?? ''); 
+$asset_id   = trim($_GET['asset_id'] ?? 'JOURNAL');
+$log_date   = trim($_GET['log_date'] ?? '');
+
+$results = [];
+
+try {
+    $column_check = $pdo->query("SHOW COLUMNS FROM site_media LIKE 'journal_id'")->fetch();
+
+    if ($column_check && $journal_id) {
+        $stmt = $pdo->prepare("SELECT id, url, file_name, file_type, uploaded_by_name FROM site_media WHERE journal_id = ? ORDER BY created_at ASC");
+        $stmt->execute([$journal_id]);
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    if (empty($results) && $site_id && $log_date) {
+        // Fallback to site/date
+        $query = "SELECT id, url, file_name, file_type, uploaded_by_name FROM site_media WHERE site_id = ? AND asset_id = ? AND log_date = ?";
+        if ($column_check) {
+            $query .= " AND (journal_id IS NULL OR journal_id = '')";
+        }
+        $query .= " ORDER BY created_at ASC";
+        
+        $stmt = $pdo->prepare($query);
+        $stmt->execute([$site_id, $asset_id, $log_date]);
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     
     echo json_encode($results);
 } catch (PDOException $e) {
-    echo json_encode(['error' => 'Query failed: ' . $e->getMessage()]);
+    echo json_encode(['error' => $e->getMessage()]);
 }
-?>

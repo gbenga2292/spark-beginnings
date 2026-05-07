@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { cn, IS_LIMITED_WEB_WEB } from '@/src/lib/utils';
 import { prefetchRoute } from '@/src/lib/routePrefetch';
 import { useUserStore, UserPrivileges } from '@/src/store/userStore';
@@ -42,9 +43,23 @@ import {
   Undo2,
   ShoppingCart,
   Activity,
+  DownloadCloud,
+  Info,
+  Sparkles,
+  ArrowUpCircle,
+  RefreshCw
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NairaSign } from '@/src/components/ui/naira-sign';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription, 
+  DialogFooter 
+} from '@/src/components/ui/dialog';
+import { Button } from '@/src/components/ui/button';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -167,6 +182,80 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const navigate = useNavigate();
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  
+  // ── Platform Detection ─────────────────────────────────────────────────
+  // We only want to show the APK update UI on the actual Android device.
+  // Capacitor.getPlatform() returns 'android', 'ios', or 'web'.
+  const isAndroidNative = Capacitor.getPlatform() === 'android';
+  const isElectron = !!(window as any).electronAPI?.isElectron;
+
+  // ── Android Auto-Update Logic (mobile-only) ────────────────────────────
+  const CURRENT_VERSION = '1.4.10'; // Matches package.json
+  const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
+  
+  const [updateInfo, setUpdateInfo] = useState<{ version: string; url: string; notes: string } | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+
+  const startDownload = async (url: string) => {
+    try {
+      setDownloadProgress(0);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Download failed');
+
+      const contentLength = Number(response.headers.get('Content-Length'));
+      if (!contentLength) {
+        window.open(url, '_blank');
+        setDownloadProgress(null);
+        return;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Could not start download');
+
+      let receivedLength = 0;
+      while(true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        receivedLength += value.length;
+        setDownloadProgress(Math.round((receivedLength / contentLength) * 100));
+      }
+
+      setDownloadProgress(null);
+      setIsUpdateModalOpen(false);
+      window.open(url, '_blank');
+      toast.success('Download complete! Installing...');
+    } catch (err) {
+      console.error('Download failed:', err);
+      toast.error('Download failed. Please try again.');
+      setDownloadProgress(null);
+    }
+  };
+
+  useEffect(() => {
+    // ONLY check for updates if we are on a native Android platform and NOT Electron
+    if (!isAndroidNative || isElectron) return;
+
+    const checkForUpdates = async () => {
+      try {
+        const response = await fetch(`${UPDATE_SERVER_URL}/version.json?t=${Date.now()}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        
+        // Simple version comparison (e.g. "1.4.11" > "1.4.10")
+        if (data.version && data.version !== CURRENT_VERSION) {
+          setUpdateInfo(data);
+        }
+      } catch (err) {
+        console.error('Update check failed:', err);
+      }
+    };
+
+    checkForUpdates();
+    // Re-check every 4 hours if the app stays open
+    const interval = setInterval(checkForUpdates, 4 * 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [isAndroidNative, isElectron]);
 
   const handleLinkClick = async (e: React.MouseEvent, href: string) => {
     const { isVariablesDirty, setVariablesDirty, isLedgerDirty, setLedgerDirty, isEmployeeFormDirty, setEmployeeFormDirty } = useAppStore.getState();
@@ -442,6 +531,157 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
               );
             })}
           </nav>
+
+          {/* ── Android Update Banner (hidden in Web/Electron) ────────────── */}
+          {isAndroidNative && !isElectron && updateInfo && (
+            <div className={cn("mt-auto px-3 pb-4", isCollapsed ? "flex justify-center" : "")}>
+              <button
+                onClick={() => setIsUpdateModalOpen(true)}
+                title={`Update v${updateInfo.version} Available`}
+                className={cn(
+                  "group relative flex items-center gap-2.5 rounded-xl transition-all duration-200",
+                  isCollapsed
+                    ? "h-9 w-9 justify-center"
+                    : "w-full px-3 py-2.5",
+                  isDark
+                    ? "bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40"
+                    : "bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80"
+                )}
+              >
+                {/* Dot indicator */}
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                {!isCollapsed && (
+                  <>
+                    <span className={cn("flex-1 text-left text-xs font-semibold", isDark ? "text-emerald-400" : "text-emerald-700")}>
+                      Update available
+                      <span className={cn("ml-1.5 text-[10px] font-normal", isDark ? "text-emerald-500" : "text-emerald-500")}>
+                        v{updateInfo.version}
+                      </span>
+                    </span>
+                    <ArrowUpCircle className={cn("h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-y-[-1px]", isDark ? "text-emerald-500" : "text-emerald-600")} />
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* ── Android Update Modal (hidden in Web/Electron) ─────────────── */}
+          {isAndroidNative && !isElectron && (
+            <Dialog open={isUpdateModalOpen} onOpenChange={(o) => { if (downloadProgress === null) setIsUpdateModalOpen(o); }}>
+            <DialogContent
+              className={cn(
+                "w-[calc(100vw-2rem)] max-w-sm rounded-2xl border-0 p-0 shadow-2xl overflow-hidden",
+                isDark ? "bg-slate-900" : "bg-white"
+              )}
+            >
+              {/* Header band */}
+              <div className={cn(
+                "relative px-6 pt-6 pb-5",
+                isDark ? "bg-slate-800/60" : "bg-gradient-to-br from-emerald-50 to-teal-50"
+              )}>
+                {/* Version badge */}
+                <span className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider mb-3",
+                  isDark ? "bg-emerald-500/15 text-emerald-400" : "bg-emerald-100 text-emerald-700"
+                )}>
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                  v{updateInfo?.version}
+                </span>
+
+                <DialogTitle className={cn("text-lg font-bold leading-snug", isDark ? "text-white" : "text-slate-900")}>
+                  Update Ready
+                </DialogTitle>
+                <DialogDescription className={cn("mt-0.5 text-xs", isDark ? "text-slate-400" : "text-slate-500")}>
+                  A new version of the app is available to install.
+                </DialogDescription>
+              </div>
+
+              {/* Body */}
+              <div className="px-6 py-5 space-y-4">
+                {downloadProgress !== null ? (
+                  /* ── Download Progress ── */
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className={cn("text-xs font-semibold", isDark ? "text-slate-300" : "text-slate-700")}>
+                        Downloading...
+                      </span>
+                      <span className={cn("text-xs font-bold tabular-nums", isDark ? "text-emerald-400" : "text-emerald-600")}>
+                        {downloadProgress}%
+                      </span>
+                    </div>
+                    {/* Track */}
+                    <div className={cn("h-1.5 w-full rounded-full overflow-hidden", isDark ? "bg-slate-700" : "bg-slate-100")}>
+                      <div
+                        className="h-full rounded-full bg-emerald-500 transition-[width] duration-300 ease-out"
+                        style={{ width: `${downloadProgress}%` }}
+                      />
+                    </div>
+                    <p className={cn("text-[10px] text-center", isDark ? "text-slate-500" : "text-slate-400")}>
+                      Keep the app open until the download completes.
+                    </p>
+                  </div>
+                ) : (
+                  /* ── Release Notes ── */
+                  <div className={cn(
+                    "rounded-xl px-4 py-3 text-xs leading-relaxed",
+                    isDark ? "bg-slate-800 text-slate-300" : "bg-slate-50 text-slate-600"
+                  )}>
+                    <p className={cn("text-[10px] font-semibold uppercase tracking-widest mb-1.5", isDark ? "text-slate-500" : "text-slate-400")}>
+                      What's New
+                    </p>
+                    {updateInfo?.notes || 'General improvements and bug fixes.'}
+                  </div>
+                )}
+
+                {/* Version row */}
+                <div className="flex items-center justify-between">
+                  <span className={cn("text-[10px]", isDark ? "text-slate-600" : "text-slate-400")}>
+                    Current: v{CURRENT_VERSION}
+                  </span>
+                  <span className={cn("text-[10px]", isDark ? "text-slate-600" : "text-slate-400")}>
+                    Platform: Android
+                  </span>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className={cn("flex gap-2 px-6 pb-6")}>
+                <button
+                  onClick={() => setIsUpdateModalOpen(false)}
+                  disabled={downloadProgress !== null}
+                  className={cn(
+                    "flex-1 rounded-xl py-2.5 text-xs font-semibold transition-colors disabled:opacity-40",
+                    isDark
+                      ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  )}
+                >
+                  Later
+                </button>
+                <button
+                  onClick={() => { if (updateInfo?.url) startDownload(updateInfo.url); }}
+                  disabled={downloadProgress !== null}
+                  className={cn(
+                    "flex-[2] flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-white transition-all disabled:opacity-60",
+                    downloadProgress !== null
+                      ? "bg-emerald-600"
+                      : "bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98]"
+                  )}
+                >
+                  {downloadProgress !== null ? (
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <DownloadCloud className="h-3.5 w-3.5" />
+                  )}
+                  {downloadProgress !== null ? `Downloading ${downloadProgress}%` : 'Download & Install'}
+                </button>
+              </div>
+            </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
     </>

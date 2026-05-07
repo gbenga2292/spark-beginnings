@@ -9,8 +9,9 @@ import { toast } from '@/src/components/ui/toast';
 import { 
   Search, Plus, Calendar, MapPin, X, ChevronLeft, ChevronRight, 
   FileText, Download, Filter, Wrench, CheckCircle2, AlertTriangle, 
-  Package, Image as ImageIcon, Video, UploadCloud, FileVideo, Eye
+  Package, Image as ImageIcon, Video, UploadCloud, FileVideo, Eye, Camera, Play
 } from 'lucide-react';
+import { MediaViewer, type MediaItem } from '@/src/components/ui/MediaViewer';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay } from 'date-fns';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { DiaryDetailView } from './DiaryDetailView';
@@ -48,15 +49,22 @@ function SiteLogCard({
   const [mediaPreviews, setMediaPreviews] = useState<{ url: string; type: 'image' | 'video'; name: string }[]>([]);
   const [uploadedMedia, setUploadedMedia] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const currentUser = useUserStore(s => s.getCurrentUser());
 
-  const MEDIA_SERVER_URL = 'https://media.dcel-suite.com'; // Replace with actual URL
+  const MEDIA_SERVER_URL = import.meta.env.VITE_MEDIA_SERVER_URL || 'https://dewaterconstruct.com/dcel-media';
 
   const fetchUploadedMedia = async () => {
     if (!entry.siteId || !formDate) return;
     try {
-      const response = await fetch(`${MEDIA_SERVER_URL}/list.php?site_id=${entry.siteId}&asset_id=JOURNAL&log_date=${formDate}`);
+      // Use journalId (session ID) for precise matching in the form view
+      const url = entry.journalId 
+        ? `${MEDIA_SERVER_URL}/list.php?journal_id=${entry.journalId}`
+        : `${MEDIA_SERVER_URL}/list.php?site_id=${entry.siteId}&asset_id=JOURNAL&log_date=${formDate}`;
+        
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setUploadedMedia(Array.isArray(data) ? data : []);
@@ -70,7 +78,16 @@ function SiteLogCard({
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    setMediaFiles(prev => [...prev, ...files]);
+    // Get current pending files from parent or local state
+    // @ts-ignore
+    const currentPending = entry.pendingFiles || [];
+    const newFiles = [...currentPending, ...files];
+    
+    // Update parent's state for this card
+    // @ts-ignore
+    entry.pendingFiles = newFiles;
+    onChangeNarration(entry.narration || ''); // Trigger parent re-render
+
     const newPreviews = files.map(file => ({
       url: URL.createObjectURL(file),
       type: file.type.startsWith('video/') ? 'video' as const : 'image' as const,
@@ -80,47 +97,16 @@ function SiteLogCard({
   };
 
   const removeMedia = (index: number) => {
-    setMediaFiles(prev => prev.filter((_, i) => i !== index));
+    // @ts-ignore
+    const currentPending = entry.pendingFiles || [];
+    // @ts-ignore
+    entry.pendingFiles = currentPending.filter((_, i) => i !== index);
+    onChangeNarration(entry.narration || ''); // Trigger parent re-render
+
     setMediaPreviews(prev => {
       URL.revokeObjectURL(prev[index].url);
       return prev.filter((_, i) => i !== index);
     });
-  };
-
-  const handleUploadMedia = async () => {
-    if (mediaFiles.length === 0) return;
-    setIsUploading(true);
-    try {
-      const uploadPromises = mediaFiles.map(async (file) => {
-        const formData = new FormData();
-        formData.append('media', file);
-        formData.append('site_id', entry.siteId!);
-        formData.append('site_name', entry.siteName!);
-        formData.append('asset_id', 'JOURNAL');
-        formData.append('asset_name', 'Daily Journal');
-        formData.append('log_date', formDate);
-        formData.append('uploaded_by', currentUser?.id || 'unknown');
-        formData.append('uploaded_by_name', currentUser?.name || 'Unknown');
-
-        const response = await fetch(`${MEDIA_SERVER_URL}/upload.php`, {
-          method: 'POST',
-          body: formData,
-        });
-        if (!response.ok) throw new Error(`Failed to upload ${file.name}`);
-        return response.json();
-      });
-
-      await Promise.all(uploadPromises);
-      toast.success(`${mediaFiles.length} files uploaded successfully`);
-      setMediaFiles([]);
-      setMediaPreviews([]);
-      fetchUploadedMedia();
-    } catch (err) {
-      console.error('Upload error:', err);
-      toast.error('Failed to upload some files');
-    } finally {
-      setIsUploading(false);
-    }
   };
 
   const handleDeleteMedia = async (id: number) => {
@@ -146,7 +132,7 @@ function SiteLogCard({
 
   useEffect(() => {
     fetchUploadedMedia();
-  }, [entry.siteId, formDate]);
+  }, [entry.siteId, formDate, entry.journalId]);
 
 
   const machineItems = useMemo(() => {
@@ -235,40 +221,65 @@ function SiteLogCard({
             
             {/* Media Storage Section */}
             <div className="border-t border-slate-100 dark:border-slate-800 pt-4">
+              {/* Hidden file inputs */}
+              {/* Camera capture — opens native camera on Android */}
+              <input
+                type="file"
+                ref={cameraInputRef}
+                className="hidden"
+                accept="image/*,video/*"
+                capture="environment"
+                onChange={handleFileChange}
+              />
+              {/* Gallery picker — allows multi-select from files */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                multiple
+                accept="image/*,video/*"
+                onChange={handleFileChange}
+              />
+
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <ImageIcon className="h-3.5 w-3.5 text-indigo-500" />
                   <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Photos & Videos</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {mediaFiles.length > 0 && (
-                    <Button 
-                      size="sm" 
-                      onClick={handleUploadMedia} 
-                      disabled={isUploading}
-                      className="h-7 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 gap-1"
-                    >
-                      {isUploading ? <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <UploadCloud className="h-3 w-3" />}
-                      Upload {mediaFiles.length}
-                    </Button>
+                  {uploadedMedia.length > 0 && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">{uploadedMedia.length}</span>
                   )}
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-7 text-[10px] font-bold border-indigo-200 text-indigo-600 hover:bg-indigo-50 px-3 gap-1"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Plus className="h-3 w-3" /> Add Media
-                  </Button>
                 </div>
-                <input type="file" ref={fileInputRef} className="hidden" multiple accept="image/*,video/*" onChange={handleFileChange} />
+                <div className="flex items-center gap-1.5">
+                  {/* Camera button — triggers native camera on Android */}
+                  <button
+                    title="Take Photo or Video"
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="h-8 w-8 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition-colors active:scale-90"
+                  >
+                    <Camera className="h-4 w-4" />
+                  </button>
+                  {/* Gallery button */}
+                  <button
+                    title="Attach from Gallery"
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-8 w-8 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors active:scale-90"
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               {(uploadedMedia.length > 0 || mediaPreviews.length > 0) ? (
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                  {/* Uploaded */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {/* Uploaded — clickable to open lightbox */}
                   {uploadedMedia.map((m, i) => (
-                    <div key={`up-${i}`} className="group relative aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                    <div
+                      key={`up-${i}`}
+                      className="group relative aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                      onClick={() => setLightboxIndex(i)}
+                    >
                       {m.file_type === 'image' ? (
                         <img src={m.url} className="w-full h-full object-cover" alt="site-media" />
                       ) : (
@@ -277,26 +288,37 @@ function SiteLogCard({
                           <span className="text-[8px] text-white/30 mt-1 truncate px-1 w-full text-center">{m.file_name}</span>
                         </div>
                       )}
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
-                          <div className="flex items-center gap-2">
-                            <a href={m.url} target="_blank" rel="noreferrer" className="h-7 w-7 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-colors">
-                              <Eye className="h-3.5 w-3.5" />
-                            </a>
-                            <button 
-                              onClick={() => handleDeleteMedia(m.id)} 
-                              className="h-7 w-7 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center text-white transition-colors"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
+                      {/* Video play icon overlay */}
+                      {m.file_type === 'video' && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="h-9 w-9 rounded-full bg-black/60 flex items-center justify-center">
+                            <Play className="h-4 w-4 text-white fill-white ml-0.5" />
                           </div>
                         </div>
-
-                      <div className="absolute top-1 right-1 bg-emerald-500 rounded-full p-0.5 text-white">
+                      )}
+                      {/* Hover overlay */}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); setLightboxIndex(i); }}
+                          className="h-7 w-7 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); handleDeleteMedia(m.id); }}
+                          className="h-7 w-7 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center text-white"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <div className="absolute top-1 left-1 bg-emerald-500 rounded-full p-0.5 text-white">
                         <CheckCircle2 className="h-2 w-2" />
                       </div>
                     </div>
                   ))}
-                  {/* Previews */}
+                  {/* Pending previews */}
                   {mediaPreviews.map((p, i) => (
                     <div key={`pre-${i}`} className="group relative aspect-square rounded-lg overflow-hidden bg-indigo-50/50 border-2 border-dashed border-indigo-200 dark:border-indigo-800/50">
                       {p.type === 'image' ? (
@@ -306,20 +328,59 @@ function SiteLogCard({
                           <FileVideo className="h-5 w-5 text-indigo-400" />
                         </div>
                       )}
-                      <button onClick={() => removeMedia(i)} className="absolute top-1 right-1 h-5 w-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm">
+                      <button type="button" onClick={() => removeMedia(i)} className="absolute top-1 right-1 h-5 w-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm">
                         <X className="h-3 w-3" />
                       </button>
-                      <div className="absolute bottom-0 left-0 right-0 bg-indigo-600 py-0.5 text-[7px] font-black text-white text-center">PENDING</div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-indigo-600 py-0.5 text-[7px] font-black text-white text-center">AUTO-UPLOAD ON PUBLISH</div>
                     </div>
                   ))}
+                  {/* Add more tile */}
+                  <div
+                    className="aspect-square rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors gap-1"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Plus className="h-4 w-4 text-slate-400" />
+                    <span className="text-[8px] text-slate-400 font-bold">Add</span>
+                  </div>
                 </div>
               ) : (
-                <div onClick={() => fileInputRef.current?.click()} className="border border-dashed border-slate-200 dark:border-slate-800 rounded-lg py-6 flex flex-col items-center justify-center bg-slate-50/50 dark:bg-slate-950/30 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors">
-                  <UploadCloud className="h-5 w-5 text-slate-300 mb-2" />
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Add photos/videos for this site</span>
+                /* Empty state: camera tile + gallery tile side by side */
+                <div className="grid grid-cols-2 gap-2">
+                  <div
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="rounded-xl border-2 border-dashed border-indigo-200 dark:border-indigo-800 py-5 flex flex-col items-center justify-center cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors gap-2 group"
+                  >
+                    <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-500 group-hover:scale-110 transition-transform">
+                      <Camera className="h-5 w-5" />
+                    </div>
+                    <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest">Camera</span>
+                  </div>
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 py-5 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors gap-2 group"
+                  >
+                    <div className="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:scale-110 transition-transform">
+                      <ImageIcon className="h-5 w-5" />
+                    </div>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Gallery</span>
+                  </div>
                 </div>
               )}
             </div>
+
+            {/* WhatsApp-style fullscreen media viewer */}
+            {lightboxIndex !== null && uploadedMedia.length > 0 && (
+              <MediaViewer
+                items={uploadedMedia.map((m: any) => ({
+                  id: m.id,
+                  url: m.url,
+                  file_type: m.file_type as 'image' | 'video',
+                  file_name: m.file_name,
+                }))}
+                initialIndex={lightboxIndex}
+                onClose={() => setLightboxIndex(null)}
+              />
+            )}
           </div>
 
         ) : activeTab === 'machines' ? (
@@ -493,38 +554,113 @@ export function DailyJournal() {
     return Object.keys(groups).sort().map(d => ({ date: d, journals: groups[d] }));
   }, [dailyJournals, siteJournalEntries, exportFilters]);
 
-  const openModal = (journal?: DailyJournalType, date?: string) => {
-    if (journal) {
-      setEditingId(journal.id); setFormDate(journal.date);
-      setFormEntries(siteJournalEntries.filter(e => e.journalId === journal.id).map(e => ({ ...e })));
-    } else {
-      setEditingId(null); setFormDate(date || new Date().toISOString().split('T')[0]); setFormEntries([]);
-    }
-    setIsModalOpen(true);
-  };
+  // Main Save Logic with Auto-Upload
+  const [isPublishing, setIsPublishing] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formDate.trim()) return toast.error('Date is required');
     if (formEntries.length === 0) return toast.error('Add at least one site log');
 
-    // Check that at least one entry has content (notes or machine/consumable logs)
+    // Validation
     const hasAnyContent = formEntries.some(e => {
       const hasNarration = e.narration && e.narration.trim().length > 0;
       const hasMachines = e.siteId && dailyMachineLogs.some(l => l.siteId === e.siteId && l.date === formDate);
       return hasNarration || hasMachines;
     });
     if (!hasAnyContent) {
-      return toast.error('Please fill in notes or log machine activity for at least one site before publishing.');
+      return toast.error('Please fill in notes or log machine activity before publishing.');
     }
-    if (editingId) {
-      updateDailyJournal(editingId, { date: formDate, generalNotes: '' }, formEntries.map(e => ({ id: e.id || generateId(), journalId: editingId, siteId: e.siteId!, siteName: e.siteName!, clientName: e.clientName!, narration: e.narration!, createdAt: e.createdAt || new Date().toISOString(), loggedBy: e.loggedBy || currentUser?.name || 'System' })));
-      toast.success('Log updated');
+
+    setIsPublishing(true);
+    const MEDIA_SERVER_URL = import.meta.env.VITE_MEDIA_SERVER_URL || 'https://dewaterconstruct.com/dcel-media';
+
+    try {
+      const journalId = editingId || generateId();
+      
+      // Step 1: Upload media for each card that has pending files
+      const uploadPromises: Promise<any>[] = [];
+      
+      formEntries.forEach((entry) => {
+        // @ts-ignore - we'll add pendingFiles to the entry object temporarily
+        if (entry.pendingFiles && entry.pendingFiles.length > 0) {
+          // @ts-ignore
+          entry.pendingFiles.forEach((file: File) => {
+            const formData = new FormData();
+            formData.append('media', file);
+            formData.append('site_id', entry.siteId!);
+            formData.append('journal_id', journalId); // Link to specific session
+            formData.append('site_name', entry.siteName!);
+            formData.append('log_date', formDate);
+            formData.append('uploaded_by', currentUser?.id || 'unknown');
+            formData.append('uploaded_by_name', currentUser?.name || 'Unknown');
+
+            uploadPromises.push(
+              fetch(`${MEDIA_SERVER_URL}/upload.php`, {
+                method: 'POST',
+                body: formData,
+              }).then(r => {
+                if (!r.ok) throw new Error(`Upload failed for ${file.name}`);
+                return r.json();
+              })
+            );
+          });
+        }
+      });
+
+      if (uploadPromises.length > 0) {
+        toast.info(`Uploading ${uploadPromises.length} files...`);
+        await Promise.all(uploadPromises);
+      }
+
+      // Step 2: Save Journal to Store (Supabase)
+      if (editingId) {
+        updateDailyJournal(editingId, { date: formDate }, formEntries.map(e => ({ 
+          id: e.id || generateId(), 
+          journalId: editingId, 
+          siteId: e.siteId!, 
+          siteName: e.siteName!, 
+          clientName: e.clientName!, 
+          narration: e.narration!, 
+          createdAt: e.createdAt || new Date().toISOString(), 
+          loggedBy: e.loggedBy || currentUser?.name || 'System' 
+        })));
+        toast.success('Log and media updated');
+      } else {
+        addDailyJournal({ 
+          id: journalId, 
+          date: formDate, 
+          generalNotes: '', 
+          loggedBy: currentUser?.name || 'System', 
+          createdAt: new Date().toISOString() 
+        }, formEntries.map(e => ({ 
+          id: generateId(), 
+          journalId: journalId, 
+          siteId: e.siteId!, 
+          siteName: e.siteName!, 
+          clientName: e.clientName!, 
+          narration: e.narration!, 
+          createdAt: new Date().toISOString(), 
+          loggedBy: currentUser?.name || 'System' 
+        })));
+        toast.success('Log published successfully');
+      }
+      setIsModalOpen(false);
+    } catch (err) {
+      console.error('Save error:', err);
+      toast.error('Failed to save log or upload media');
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const openModal = (journal?: DailyJournalType, date?: string) => {
+    if (journal) {
+      setEditingId(journal.id); setFormDate(journal.date);
+      setFormEntries(siteJournalEntries.filter(e => e.journalId === journal.id).map(e => ({ ...e, pendingFiles: [] } as any)));
     } else {
-      const id = generateId();
-      addDailyJournal({ id, date: formDate, generalNotes: '', loggedBy: currentUser?.name || 'System', createdAt: new Date().toISOString() }, formEntries.map(e => ({ id: generateId(), journalId: id, siteId: e.siteId!, siteName: e.siteName!, clientName: e.clientName!, narration: e.narration!, createdAt: new Date().toISOString(), loggedBy: currentUser?.name || 'System' })));
-      toast.success('Log published');
+      setEditingId(null); setFormDate(date || new Date().toISOString().split('T')[0]); setFormEntries([]);
     }
-    setIsModalOpen(false);
+    setIsModalOpen(true);
   };
 
   const confirmDelete = () => {

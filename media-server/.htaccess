@@ -1,0 +1,16 @@
+# Minimal .htaccess — only what's needed for the media server
+# CORS headers are set in PHP directly, so we don't need mod_headers here
+
+# Increase upload limits if your host allows php_value in .htaccess
+# (comment these out if you still get 500)
+php_value upload_max_filesize 200M
+php_value post_max_size 210M
+php_value max_execution_time 300
+
+# Video MIME types for correct streaming
+AddType video/mp4 .mp4
+AddType video/webm .webm
+AddType video/quicktime .mov
+
+# Allow byte-range requests for mobile video scrubbing
+Header set Accept-Ranges bytes
