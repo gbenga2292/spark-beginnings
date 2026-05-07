@@ -1,3 +1,0 @@
-﻿src/pages/Payroll.tsx(1325,121): error TS2339: Property 'payeNumber' does not exist on type 'PayrollRecord'.
-src/pages/Payroll.tsx(1325,147): error TS2339: Property 'taxId' does not exist on type 'PayrollRecord'.
-src/pages/Payroll.tsx(1326,121): error TS2339: Property 'pensionNumber' does not exist on type 'PayrollRecord'.
