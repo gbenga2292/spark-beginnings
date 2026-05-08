@@ -243,19 +243,19 @@ export function AssetManager() {
   useSetPageTitle(
     'Inventory Management',
     'Track equipment, tools, and consumables across all sites',
-    <div className="hidden sm:flex items-center gap-2">
+    <div className="flex items-center gap-2 md:gap-3">
       {canExport && (
-        <Button variant="outline" size="sm" className="gap-2 h-9 text-slate-700 hover:text-slate-900 border-slate-200" onClick={() => setShowExportModal(true)}>
-          <Download className="h-4 w-4" /> Export
+        <Button variant="outline" size="sm" className="gap-2 h-9 px-2 sm:px-3 text-slate-700 hover:text-slate-900 border-slate-200" onClick={() => setShowExportModal(true)}>
+          <Download className="h-4 w-4" /> <span className="hidden sm:inline">Export</span>
         </Button>
       )}
       {canImport && (
-        <Button variant="outline" size="sm" className="gap-2 h-9 text-slate-700 hover:text-slate-900 border-slate-200" onClick={() => fileInputRef.current?.click()}>
-          <Upload className="h-4 w-4" /> Bulk Import
+        <Button variant="outline" size="sm" className="gap-2 h-9 px-2 sm:px-3 text-slate-700 hover:text-slate-900 border-slate-200" onClick={() => fileInputRef.current?.click()}>
+          <Upload className="h-4 w-4" /> <span className="hidden sm:inline">Bulk Import</span>
         </Button>
       )}
-      <Button variant="outline" size="sm" className="gap-2 h-9 text-slate-700 hover:text-slate-900 border-slate-200" onClick={() => setShowRestockModal(true)}>
-        <Package className="h-4 w-4" /> Restock
+      <Button variant="outline" size="sm" className="gap-2 h-9 px-2 sm:px-3 text-slate-700 hover:text-slate-900 border-slate-200" onClick={() => setShowRestockModal(true)}>
+        <Package className="h-4 w-4" /> <span className="hidden sm:inline">Restock</span>
       </Button>
     </div>
   );
@@ -316,14 +316,7 @@ export function AssetManager() {
 
       <input type="file" ref={fileInputRef} onChange={handleBulkImport} className="hidden" accept=".xlsx,.xls,.csv" />
 
-      {/* Mobile Actions */}
-      <div className="flex sm:hidden flex-wrap gap-2 px-1">
-        {canExport && (
-          <Button variant="outline" className="flex-1 gap-2 text-slate-700 hover:text-slate-900 border-slate-200" onClick={() => setShowExportModal(true)}>
-            <Download className="h-4 w-4" /> Export
-          </Button>
-        )}
-      </div>
+      {/* Mobile Actions Removed */}
 
       {/* Table Card */}
       <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">

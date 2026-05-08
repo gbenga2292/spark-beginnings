@@ -46,7 +46,10 @@ export function Evaluations() {
   const { updateSubtaskStatus, postComment } = useAppData();
 
   const internalEmployees = filterAndSortEmployeesExcludingCEO(
-    employees.filter(e => e.staffType?.toLowerCase().includes('internal') || ['OFFICE', 'FIELD'].includes(e.staffType))
+    employees.filter(e => 
+      (e.staffType?.toLowerCase().includes('internal') || ['OFFICE', 'FIELD'].includes(e.staffType)) &&
+      e.status !== 'Onboarding'
+    )
   );
 
   const emptyForm: Partial<EvaluationRecord> = {

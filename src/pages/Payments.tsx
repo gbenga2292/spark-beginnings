@@ -366,7 +366,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
     useSetPageTitle(
         'Payment Records',
         `Tracking ${payments.length} transactions with automated VAT and withholding tax calculations`,
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
             {priv.canExport && (
                 <Button 
                     variant="outline" 
@@ -390,10 +390,10 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
             {priv.canAdd && (
                 <Button
                     size="sm"
-                    className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
+                    className="h-9 px-3 sm:px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
                     onClick={() => { handleClear(); setIsModalOpen(true); }}
                 >
-                    <Plus className="w-4 h-4" /> Add Payment
+                    <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Payment</span>
                 </Button>
             )}
         </div>,

@@ -28,7 +28,6 @@ export function PerformanceConduct() {
   const [showNotices, setShowNotices] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileListOpen, setIsMobileListOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const employees = useAppStore(s => s.employees);
   const records = useAppStore(s => s.disciplinaryRecords);
@@ -411,49 +410,27 @@ export function PerformanceConduct() {
     'Performance & Conduct',
     'Staff Merits & Demerits • Due Process • Active Evaluation',
     <div className="relative flex items-center gap-2">
-      {/* ── Desktop controls ── */}
-      <div className="hidden sm:flex items-center gap-2">
+      <div className="flex items-center gap-2 md:gap-3">
         <Button
           variant="outline"
           size="sm"
-          className={`relative h-9 ${showNotices ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white dark:bg-slate-900'}`}
-          onClick={() => { setShowNotices(!showNotices); setSelectedEmployeeId(null); setIsAdding(false); setIsEditing(false); setSidebarCollapsed(false); }}
-        >
-          {showNotices ? <X className="h-4 w-4 mr-2" /> : <BellRing className="h-4 w-4 mr-2" />}
-          {showNotices ? 'Close Notices' : 'Notices'}
-          {!showNotices && noticeRecords.length > 0 && <span className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-rose-500 text-white text-[9px] flex items-center justify-center rounded-full font-bold shadow-sm">{noticeRecords.length}</span>}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="bg-white px-3 h-9"
-        >
-          {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4 mr-2 text-slate-500" /> : <PanelLeftClose className="h-4 w-4 mr-2 text-slate-500" />}
-          {sidebarCollapsed ? 'Expand' : 'Collapse'}
-        </Button>
-      </div>
-
-      {/* ── Mobile: icon-only buttons ── */}
-      <div className="flex sm:hidden items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className={`relative h-9 w-9 ${showNotices ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white dark:bg-slate-900'}`}
+          className={`relative h-9 px-2 sm:px-3 ${showNotices ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white dark:bg-slate-900'}`}
           onClick={() => { setShowNotices(!showNotices); setSelectedEmployeeId(null); setIsAdding(false); setIsEditing(false); setSidebarCollapsed(false); }}
           title={showNotices ? "Close Notices" : "Notices"}
         >
-          {showNotices ? <X className="h-4 w-4" /> : <BellRing className="h-4 w-4" />}
+          {showNotices ? <X className="h-4 w-4 sm:mr-2" /> : <BellRing className="h-4 w-4 sm:mr-2" />}
+          <span className="hidden sm:inline">{showNotices ? 'Close Notices' : 'Notices'}</span>
           {!showNotices && noticeRecords.length > 0 && <span className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-rose-500 text-white text-[9px] flex items-center justify-center rounded-full font-bold shadow-sm">{noticeRecords.length}</span>}
         </Button>
         <Button
           variant="outline"
           size="sm"
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="h-9 w-9 bg-white"
+          className="bg-white px-2 sm:px-3 h-9"
           title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4 text-slate-500" /> : <PanelLeftClose className="h-4 w-4 text-slate-500" />}
+          {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4 sm:mr-2 text-slate-500" /> : <PanelLeftClose className="h-4 w-4 sm:mr-2 text-slate-500" />}
+          <span className="hidden sm:inline">{sidebarCollapsed ? 'Expand' : 'Collapse'}</span>
         </Button>
       </div>
     </div>

@@ -138,46 +138,46 @@ export function VehicleManager() {
   useSetPageTitle(
     'Vehicle Management',
     'Manage company fleet and track daily movement logs',
-    <div className="hidden sm:flex items-center gap-2">
+    <div className="flex items-center gap-2 md:gap-3">
       {priv.canImport && (
         <Button 
           variant="outline" size="sm" 
-          className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
+          className="gap-2 h-9 px-2 sm:px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
           onClick={() => {
             setImportType(activeTab === 'logs' ? 'logs' : 'vehicles');
             setShowImportDialog(true);
           }}
         >
-          <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
+          <Download className="h-3.5 w-3.5 text-indigo-500" /> <span className="hidden sm:inline">Import</span>
         </Button>
       )}
       {priv.canExport && (
         <Button 
           variant="outline" size="sm" 
-          className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
+          className="gap-2 h-9 px-2 sm:px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
           onClick={() => handleExport()}
         >
-          <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export
+          <Upload className="h-3.5 w-3.5 text-emerald-500" /> <span className="hidden sm:inline">Export</span>
         </Button>
       )}
       {activeTab === 'logs' && priv.canAddLogs && (
         <Button 
-          variant="outline" size="sm" className="gap-2 h-9"
+          variant="outline" size="sm" className="gap-2 h-9 px-2 sm:px-3"
           onClick={() => setShowTripForm(true)}
         >
-          <ClipboardList className="h-4 w-4" /> Record Trip
+          <ClipboardList className="h-4 w-4" /> <span className="hidden sm:inline">Record Trip</span>
         </Button>
       )}
       {activeTab === 'fleet' && priv.canAddFleet && (
         <Button 
-          size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9"
+          size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 px-2 sm:px-3"
           onClick={() => {
             setEditingVehicle(null);
             setVForm({ name: '', registration_number: '', type: 'van', status: 'active' });
             setShowVehicleForm(true);
           }}
         >
-          <Plus className="h-4 w-4" /> Add Vehicle
+          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Add Vehicle</span>
         </Button>
       )}
     </div>

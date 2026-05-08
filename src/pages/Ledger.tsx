@@ -76,7 +76,6 @@ export function Ledger() {
   const setLedgerDirty = useAppStore((state) => state.setLedgerDirty);
 
   const [hasUnsavedPending, setHasUnsavedPending] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   const [quickVendor, setQuickVendor] = useState('');
@@ -691,29 +690,35 @@ export function Ledger() {
       ? 'Record vouchers, manage expenses, and track financial outflows across banks and sites'
       : `Click any voucher to view its transactions. Showing ${voucherSummaries.length} voucher${voucherSummaries.length !== 1 ? 's' : ''}.`,
     <div className="relative flex items-center gap-2">
-      {/* ── Desktop controls ── */}
-      <div className="hidden sm:flex items-center gap-2">
+      <div className="flex items-center gap-2 md:gap-3">
         <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60 shadow-sm backdrop-blur-sm">
-          <button onClick={() => setTab('entry')} className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${tab === 'entry' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}>
-            <FileText className="h-3 w-3" /> Entry
+          <button onClick={() => setTab('entry')} className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${tab === 'entry' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}>
+            <FileText className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Entry</span>
           </button>
-          <button onClick={() => setTab('records')} className={`px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${tab === 'records' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}>
-            <History className="h-3 w-3" /> History
+          <button onClick={() => setTab('records')} className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 flex items-center gap-1.5 ${tab === 'records' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}>
+            <History className="h-3.5 w-3.5" /> <span className="hidden sm:inline">History</span>
           </button>
         </div>
-        <div className="h-8 w-[1px] bg-slate-200 mx-1" />
+        <div className="hidden sm:block h-8 w-[1px] bg-slate-200 mx-1" />
         {tab === 'records' && (
-          <div className="flex items-center gap-2">
+          <>
+            <button
+              className={`sm:hidden h-9 w-9 flex items-center justify-center rounded-xl border ${showMobileFilters ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600'} shadow-sm transition-all`}
+              onClick={() => setShowMobileFilters(o => !o)}
+              title="Toggle filters"
+            >
+              <Filter className="h-4 w-4" />
+            </button>
             {priv.canAdd && (
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm">
-                <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-9 px-2 sm:px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm transition-all">
+                <Download className="h-4 w-4 text-indigo-500" /> <span className="hidden sm:inline">Import</span>
               </Button>
             )}
             {priv.canExport && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm">
-                    <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
+                  <Button variant="outline" size="sm" className="h-9 px-2 sm:px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 shadow-sm transition-all">
+                    <Upload className="h-4 w-4 text-emerald-500" /> <span className="hidden sm:inline">Export</span> <ChevronDown className="h-3 w-3 text-slate-400" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
@@ -734,68 +739,11 @@ export function Ledger() {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-          </div>
-        )}
-      </div>
-
-      {/* ── Mobile: icon tab toggle + context action icons + 3-dot ── */}
-      <div className="flex sm:hidden items-center gap-2">
-        {/* Tab toggle */}
-        <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60 shadow-sm">
-          <button onClick={() => setTab('entry')} className={`h-8 px-2 flex items-center gap-1 rounded-md text-[10px] font-extrabold uppercase tracking-wide transition-all ${tab === 'entry' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'}`} title="Entry">
-            <FileText className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={() => setTab('records')} className={`h-8 px-2 flex items-center gap-1 rounded-md text-[10px] font-extrabold uppercase tracking-wide transition-all ${tab === 'records' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'}`} title="History">
-            <History className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        {/* Entry quick actions (moved to page content) */}
-        {/* Records: 3-dot for import/export */}
-        {tab === 'records' && (
-          <>
-            <button
-              className={`h-9 w-9 flex items-center justify-center rounded-xl border ${showMobileFilters ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600'} shadow-sm`}
-              onClick={() => setShowMobileFilters(o => !o)}
-              title="Toggle filters"
-            >
-              <Filter className="h-4 w-4" />
-            </button>
-            <button
-              className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm"
-              onClick={() => setMobileMenuOpen(o => !o)}
-              title="More options"
-            >
-              <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
-            </button>
           </>
         )}
       </div>
-
-      {/* ── Mobile dropdown panel ── */}
-      {mobileMenuOpen && (
-        <>
-          <div className="sm:hidden fixed inset-0 z-40" onClick={() => setMobileMenuOpen(false)} />
-          <div className="sm:hidden fixed top-16 right-3 z-50 w-48 bg-white border border-slate-200 rounded-md shadow-md p-1">
-            {priv.canAdd && (
-              <button onClick={() => { fileInputRef.current?.click(); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">
-                <Download className="h-4 w-4 text-indigo-500" /> Import
-              </button>
-            )}
-            {priv.canExport && (
-              <>
-                <button onClick={() => { handleExport('bare'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">
-                  <Upload className="h-4 w-4 text-emerald-500" /> Export Basic
-                </button>
-                <button onClick={() => { handleExport('detailed'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">
-                  <Upload className="h-4 w-4 text-indigo-500" /> Export Detailed
-                </button>
-              </>
-            )}
-          </div>
-        </>
-      )}
     </div>,
-    [tab, priv, hasUnsavedPending, activeVoucherNo, ledgerEntries, voucherDate, paidFrom, items, currentUser, voucherSummaries.length, mobileMenuOpen, showMobileFilters]
+    [tab, priv, hasUnsavedPending, activeVoucherNo, ledgerEntries, voucherDate, paidFrom, items, currentUser, voucherSummaries.length, showMobileFilters]
   );
 
   if (!priv?.canView) {

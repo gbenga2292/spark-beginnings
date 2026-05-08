@@ -123,7 +123,6 @@ function PersonalTasksView() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { hrVariables } = useAppStore();
   
   const [viewMode, setViewModeState] = useState<TaskViewMode>(() => (localStorage.getItem('tf_default_view') as TaskViewMode) || loadDefaultView());
@@ -200,79 +199,32 @@ function PersonalTasksView() {
   useSetPageTitle(
     'My Tasks',
     'Manage your private tasks and to-do list across different view modes',
-    <div className="relative flex items-center gap-2">
-      {/* Desktop */}
-      <div className="hidden sm:flex items-center gap-3">
-        <ViewToggle value={viewMode} onChange={setViewMode} />
-        <div className="h-8 w-[1px] bg-slate-200 mx-1" />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-9 gap-2 text-slate-600 font-bold text-[11px] uppercase tracking-tight border border-slate-200 bg-white hover:bg-slate-50">
-              <ArrowUpDown className="w-3.5 h-3.5" />
-              {SORT_OPTIONS.find(o => o.value === sortBy)?.label}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            {SORT_OPTIONS.map(opt => (
-              <DropdownMenuItem key={opt.value} onClick={() => setSortBy(opt.value)} className={sortBy === opt.value ? 'bg-indigo-50 text-indigo-700 font-bold' : ''}>
-                {opt.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Button size="sm" variant="outline" onClick={() => navigate('/tasks/archive')} className="h-9 px-4 gap-2 border-slate-200 text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50">
-          <Archive className="w-4 h-4 text-slate-400" /> Archive
-        </Button>
-        <Button size="sm" onClick={() => setShowCreate(true)} className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95">
-          <Plus className="w-4 h-4" /> New Task
-        </Button>
-      </div>
-      {/* Mobile */}
-      <div className="flex sm:hidden items-center gap-2">
-        <Button size="sm" onClick={() => setShowCreate(true)} className="h-9 w-9 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md" title="New Task">
-          <Plus className="w-4 h-4" />
-        </Button>
-        <button className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm" onClick={() => setMobileMenuOpen(o => !o)} title="More options">
-          <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
-        </button>
-      </div>
-      {mobileMenuOpen && (
-        <>
-          <div className="sm:hidden fixed inset-0 z-40" onClick={() => setMobileMenuOpen(false)} />
-          <div className="sm:hidden fixed top-16 right-3 z-50 w-48 bg-white border border-slate-200 rounded-md shadow-md p-2 space-y-2">
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-2">View & Sort</p>
-              <div className="flex gap-1 px-1">
-                {(['board', 'list'] as const).map(mode => (
-                  <button key={mode} onClick={() => { setViewMode(mode); setMobileMenuOpen(false); }}
-                    className={`flex-1 py-1.5 rounded text-xs font-bold uppercase transition-colors flex items-center justify-center gap-1 ${
-                      viewMode === mode ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'
-                    }`}>
-                    {mode === 'board' ? <KanbanSquare className="w-3.5 h-3.5" /> : <LayoutList className="w-3.5 h-3.5" />}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-2 pt-1 border-t border-slate-100">Sort By</p>
-              <div className="flex flex-col gap-1 px-1">
-                {SORT_OPTIONS.map(opt => (
-                  <button key={opt.value} onClick={() => { setSortBy(opt.value); setMobileMenuOpen(false); }} className={`w-full text-left px-2 py-2 rounded text-sm transition-colors ${sortBy === opt.value ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="pt-1 border-t border-slate-100 px-1">
-              <button onClick={() => { navigate('/tasks/archive'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-2 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded">
-                <Archive className="w-4 h-4" /> Archive
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+    <div className="relative flex items-center gap-2 md:gap-3">
+      <ViewToggle value={viewMode} onChange={setViewMode} />
+      <div className="hidden sm:block h-8 w-[1px] bg-slate-200 mx-1" />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" title="Sort Tasks" className="h-9 w-9 p-0 text-slate-600 border border-slate-200 bg-white hover:bg-slate-50 transition-all">
+            <ArrowUpDown className="w-4 h-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          {SORT_OPTIONS.map(opt => (
+            <DropdownMenuItem key={opt.value} onClick={() => setSortBy(opt.value)} className={sortBy === opt.value ? 'bg-indigo-50 text-indigo-700 font-bold' : ''}>
+              {opt.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Button size="sm" variant="outline" title="Archive" onClick={() => navigate('/tasks/archive')} className="h-9 w-9 p-0 border-slate-200 text-slate-600 shadow-sm hover:bg-slate-50 transition-all">
+        <Archive className="w-4 h-4 text-slate-400" /> 
+      </Button>
+      <Button size="sm" onClick={() => setShowCreate(true)} className="h-9 px-2 sm:px-3 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95">
+        <Plus className="w-4 h-4" /> 
+        <span className="hidden sm:inline">New Task</span>
+      </Button>
     </div>,
-    [viewMode, sortBy, search, mobileMenuOpen]
+    [viewMode, sortBy, search]
   );
 
   const toggle = (id: string) =>
@@ -357,7 +309,7 @@ function PersonalTasksView() {
       {viewMode === 'list' && (
         <>
           {/* Status tabs */}
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0 overflow-x-auto hide-scrollbar">
             {STATUS_TABS.map(tab => {
               const isActive = statusFilter === tab.value;
               const count = tab.value === "all" 
@@ -366,7 +318,7 @@ function PersonalTasksView() {
               if (tab.value !== 'all' && count === 0) return null;
               return (
                 <button key={tab.value} onClick={() => setStatusFilter(tab.value)}
-                  className={`relative px-4 py-2 text-sm font-medium transition-colors rounded-t-md ${isActive ? "text-indigo-600 dark:text-indigo-400" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"}`}>
+                  className={`relative px-4 py-2 text-sm font-medium transition-colors rounded-t-md whitespace-nowrap flex-shrink-0 ${isActive ? "text-indigo-600 dark:text-indigo-400" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"}`}>
                   {tab.label}
                   {count > 0 && (
                     <span className={`ml-1.5 text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${isActive ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400" : "bg-muted text-muted-foreground"}`}>{count}</span>
@@ -411,19 +363,19 @@ function PersonalTasksView() {
                           {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm text-foreground font-medium truncate">{mt.title}</p>
-                            {mt.priority && <PriorityBadge priority={mt.priority} size="xs" />}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm text-foreground font-semibold truncate max-w-[200px] sm:max-w-none">{mt.title}</p>
+                            {/* PriorityPicker handles display, so we don't need the badge here */}
                           </div>
                           <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                            <span>{progress.completed}/{progress.total} tasks</span>
-                            <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <span className="whitespace-nowrap">{progress.completed}/{progress.total} tasks</span>
+                            <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden hidden sm:block">
                               <div className="h-full rounded-full bg-indigo-400 dark:bg-indigo-500" style={{ width: `${pct}%` }} />
                             </div>
-                            <span className="font-medium">{pct}%</span>
+                            <span className="font-medium hidden sm:inline">{pct}%</span>
                           </div>
                           {/* Creator / Assignee info */}
-                          <div className="flex items-center gap-2 mt-1.5 min-h-[20px]">
+                          <div className="flex flex-wrap items-center gap-2 mt-1.5 min-h-[20px]">
                             {(() => {
                               const creator = mt.createdBy ? users.find(u => u.id === mt.createdBy) : null;
                               const assignee = mt.assignedTo ? users.find(u => u.id === mt.assignedTo?.split(',')[0]) : null;
@@ -455,12 +407,14 @@ function PersonalTasksView() {
                             <Calendar className="w-3 h-3" />{format(new Date(mt.deadline), "MMM d")}
                           </div>
                         )}
-                        <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
-                          <PriorityPicker value={mt.priority} onChange={p => updateMainTask(mt.id, { priority: p })} />
+                        <div className="flex flex-wrap items-center gap-2 ml-auto">
+                          <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
+                            <PriorityPicker value={mt.priority} onChange={p => updateMainTask(mt.id, { priority: p })} />
+                          </div>
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap shadow-sm ${sc?.pillClass || 'bg-slate-100 text-slate-500'}`}>
+                            {sc?.label || status}
+                          </span>
                         </div>
-                        <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full flex items-center gap-1 w-max flex-shrink-0 ${sc?.pillClass || 'bg-slate-100 text-slate-500'}`}>
-                          {sc?.label || status}
-                        </span>
                       </div>
 
                       {/* Subtasks */}
@@ -482,59 +436,66 @@ function PersonalTasksView() {
                                       initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                                       transition={{ delay: i * 0.03, duration: 0.25 }}
                                       onClick={() => setOpenSubtaskId(sub.id ?? null)}
-                                      className="flex items-center gap-3 px-5 py-3 hover:bg-indigo-50/60 dark:hover:bg-indigo-950/30 transition-colors cursor-pointer group">
-                                      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc2.dot}`} />
-                                      <div className="min-w-0 flex-1">
-                                        <p className={`text-sm font-medium truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"} group-hover:text-indigo-600 transition-colors`}>
-                                          {sub.title}
-                                        </p>
-                                        <div className="flex items-center gap-2 mt-0.5">
-                                         {(() => {
-                                           const raw = (sub as SubTask).description || '';
-                                           if (!raw) return null;
-                                           try {
-                                             if (raw.trim().startsWith('{')) {
-                                               const m = JSON.parse(raw);
-                                               if (m.narration) return <p className="text-xs text-indigo-500 truncate font-medium">{m.narration}</p>;
-                                               
-                                               if (m.refType) {
-                                                 let label = '';
-                                                 if (m.refType === 'leave' && m.workflowStep) {
-                                                   label = `Step ${m.workflowStep}/4 · ${m.leaveType || ''} Leave Approval${m.duration ? ` · ${m.duration} day(s)` : ''}`;
-                                                 } else if (m.refType === 'hmo') {
-                                                   label = `HMO Renewal Request`;
-                                                 } else if (m.refType === 'salary_advance' || m.refType === 'loan') {
-                                                   label = `${m.refType === 'loan' ? 'Loan' : 'Salary Advance'} Application`;
-                                                 } else if (m.refType === 'site') {
-                                                   label = `Site Onboarding Workflow`;
-                                                 } else if (m.refType === 'vehicle_doc_renewal') {
-                                                   label = `Vehicle Document Renewal`;
+                                      className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 px-5 py-3 hover:bg-indigo-50/60 dark:hover:bg-indigo-950/30 transition-colors cursor-pointer group relative">
+                                      <div className="flex items-center gap-3 w-full sm:w-auto min-w-0">
+                                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc2.dot}`} />
+                                        <div className="min-w-0 flex-1">
+                                          <p className={`text-sm font-semibold truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"} group-hover:text-indigo-600 transition-colors max-w-[200px] sm:max-w-none`}>
+                                            {sub.title}
+                                          </p>
+                                          <div className="flex items-center gap-2 mt-0.5">
+                                           {(() => {
+                                             const raw = (sub as SubTask).description || '';
+                                             if (!raw) return null;
+                                             try {
+                                               if (raw.trim().startsWith('{')) {
+                                                 const m = JSON.parse(raw);
+                                                 if (m.narration) return <p className="text-[11px] text-indigo-500 truncate font-medium">{m.narration}</p>;
+                                                 
+                                                 if (m.refType) {
+                                                   let label = '';
+                                                   if (m.refType === 'leave' && m.workflowStep) {
+                                                     label = `Step ${m.workflowStep}/4 · ${m.leaveType || ''} Leave Approval${m.duration ? ` · ${m.duration} day(s)` : ''}`;
+                                                   } else if (m.refType === 'hmo') {
+                                                     label = `HMO Renewal Request`;
+                                                   } else if (m.refType === 'salary_advance' || m.refType === 'loan') {
+                                                     label = `${m.refType === 'loan' ? 'Loan' : 'Salary Advance'} Application`;
+                                                   } else if (m.refType === 'site') {
+                                                     label = `Site Onboarding Workflow`;
+                                                   } else if (m.refType === 'vehicle_doc_renewal') {
+                                                     label = `Vehicle Document Renewal`;
+                                                   }
+                                                   if (label) return <p className="text-[11px] text-indigo-500 truncate font-medium">{label}</p>;
                                                  }
-                                                 if (label) return <p className="text-xs text-indigo-500 truncate font-medium">{label}</p>;
                                                }
-                                             }
-                                           } catch {}
-                                           return <p className="text-xs text-muted-foreground truncate">{raw}</p>;
-                                         })()}
+                                             } catch {}
+                                             return <p className="text-[11px] text-muted-foreground truncate">{raw}</p>;
+                                           })()}
+                                          </div>
                                         </div>
                                       </div>
-                                      {(sub as SubTask).priority && <PriorityBadge priority={(sub as SubTask).priority} size="xs" />}
-                                      {sub.deadline && (
-                                        <span className={`text-[11px] flex items-center gap-1 flex-shrink-0 hidden md:flex ${isOverdue ? "text-red-500" : "text-muted-foreground"}`}>
-                                          <Clock className="w-3 h-3" />{formatDueDate(sub.deadline)}
-                                        </span>
-                                      )}
-                                      <div onClick={e => e.stopPropagation()} className="flex items-center gap-1 flex-shrink-0">
-                                        <DeleteSubtaskButton
-                                          hasActivity={comments.some(c => c.subtaskId === sub.id) || sub.status !== 'not_started'}
-                                          onConfirm={() => deleteSubtask(sub.id ?? '')}
-                                          isCompleted={sub.status === 'completed'}
-                                          canManageUsers={me?.privileges?.users?.canManage}
-                                        />
+
+                                      <div className="flex flex-wrap items-center gap-2 sm:ml-auto w-full sm:w-auto">
+                                        {(sub as SubTask).priority && <PriorityBadge priority={(sub as SubTask).priority} size="xs" />}
+                                        {sub.deadline && (
+                                          <span className={`text-[10px] font-medium flex items-center gap-1 flex-shrink-0 ${isOverdue ? "text-red-500" : "text-muted-foreground"}`}>
+                                            <Clock className="w-3 h-3" />{formatDueDate(sub.deadline)}
+                                          </span>
+                                        )}
+                                        <div className="flex items-center gap-2 ml-auto sm:ml-0">
+                                          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap shadow-sm ${sc2.pillClass}`}>
+                                            {sc2.label}
+                                          </span>
+                                          <div onClick={e => e.stopPropagation()} className="flex items-center gap-1 flex-shrink-0">
+                                            <DeleteSubtaskButton
+                                              hasActivity={comments.some(c => c.subtaskId === sub.id) || sub.status !== 'not_started'}
+                                              onConfirm={() => deleteSubtask(sub.id ?? '')}
+                                              isCompleted={sub.status === 'completed'}
+                                              canManageUsers={me?.privileges?.users?.canManage}
+                                            />
+                                          </div>
+                                        </div>
                                       </div>
-                                      <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full ${sc2.pillClass} flex-shrink-0`}>
-                                        {sc2.label}
-                                      </span>
                                     </motion.div>
                                   );
                                 })}
@@ -661,7 +622,7 @@ function AdminTasksView() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [showCreateProject, setShowCreateProject] = useState(false);
-  const [teamMobileMenuOpen, setTeamMobileMenuOpen] = useState(false);
+
   const { hrVariables } = useAppStore();
   const { wsTasks: rawTeamTasks, wsMembers, workspace: teamWs } = useWorkspace();
   const teamTasks = React.useMemo(() => {
@@ -836,17 +797,15 @@ function AdminTasksView() {
     'Team Tasks',
     'Coordinate with your team, track projects, and manage subtasks in real-time',
     <div className="relative flex items-center gap-2">
-      {/* ── Desktop ── */}
-      <div className="hidden sm:flex items-center gap-2">
+      <div className="flex items-center gap-2 md:gap-3">
         <ViewToggle value={viewMode} onChange={setViewMode} />
-        <div className="h-8 w-[1px] bg-slate-200 mx-1" />
+        <div className="hidden sm:block h-8 w-[1px] bg-slate-200 mx-1" />
         <ScopePicker scope={scope} setScope={setScope} myCount={mySubs.length} pendingCount={pendingApprovalSubs.length} />
-        <div className="h-8 w-[1px] bg-slate-200 mx-1" />
+        <div className="hidden sm:block h-8 w-[1px] bg-slate-200 mx-1" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-9 gap-2 text-slate-600 font-bold text-[11px] uppercase tracking-tight border border-slate-200 bg-white hover:bg-slate-50">
-              <ArrowUpDown className="w-3.5 h-3.5 text-indigo-500" />
-              {SORT_OPTIONS.find(o => o.value === sortBy)?.label}
+            <Button variant="ghost" size="sm" title="Sort Tasks" className="h-9 w-9 p-0 text-slate-600 border border-slate-200 bg-white hover:bg-slate-50 transition-all">
+              <ArrowUpDown className="w-4 h-4 text-indigo-500" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
@@ -859,68 +818,16 @@ function AdminTasksView() {
             <DropdownMenuItem onClick={handleSetDefault} className="text-[10px] text-indigo-600 font-bold">SET AS DEFAULT SORT</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button size="sm" variant="outline" onClick={() => navigate('/tasks/archive')} className="h-9 px-4 gap-2 border-slate-200 text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50">
-          <Archive className="w-4 h-4 text-slate-400" /> Archive
+        <Button size="sm" variant="outline" title="Archive" onClick={() => navigate('/tasks/archive')} className="h-9 w-9 p-0 border-slate-200 text-slate-600 shadow-sm hover:bg-slate-50 transition-all">
+          <Archive className="w-4 h-4 text-slate-400" /> 
         </Button>
-        <Button size="sm" onClick={() => scope === 'projects' ? setShowCreateProject(true) : setShowCreate(true)} className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95">
+        <Button size="sm" onClick={() => scope === 'projects' ? setShowCreateProject(true) : setShowCreate(true)} className="h-9 px-2 sm:px-3 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95">
           {scope === 'projects' ? <FolderOpen className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-          {scope === 'projects' ? 'New Project' : 'New Task'}
+          <span className="hidden sm:inline">{scope === 'projects' ? 'New Project' : 'New Task'}</span>
         </Button>
       </div>
-
-      {/* ── Mobile ── */}
-      <div className="flex sm:hidden items-center gap-2">
-        <Button size="sm" onClick={() => scope === 'projects' ? setShowCreateProject(true) : setShowCreate(true)} className="h-9 w-9 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md" title={scope === 'projects' ? 'New Project' : 'New Task'}>
-          {scope === 'projects' ? <FolderOpen className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-        </Button>
-        <button className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm" onClick={() => setTeamMobileMenuOpen(o => !o)} title="More options">
-          <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
-        </button>
-      </div>
-
-      {teamMobileMenuOpen && (
-        <>
-          <div className="sm:hidden fixed inset-0 z-40" onClick={() => setTeamMobileMenuOpen(false)} />
-          <div className="sm:hidden fixed top-16 right-3 z-50 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-md p-2 space-y-2">
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-2">View</p>
-              <div className="flex gap-1 px-1">
-                {(['board', 'list'] as const).map(mode => (
-                  <button key={mode} onClick={() => { setViewMode(mode); setTeamMobileMenuOpen(false); }}
-                    className={`flex-1 py-1.5 rounded text-xs font-bold uppercase transition-colors flex items-center justify-center gap-1 ${
-                      viewMode === mode ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'
-                    }`}>
-                    {mode === 'board' ? <KanbanSquare className="w-3.5 h-3.5" /> : <LayoutList className="w-3.5 h-3.5" />}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-2 pt-1 border-t border-slate-100">Scope</p>
-              <div className="px-1">
-                <ScopePicker scope={scope} setScope={(s) => { setScope(s); setTeamMobileMenuOpen(false); }} myCount={mySubs.length} pendingCount={pendingApprovalSubs.length} />
-              </div>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-2 pt-1 border-t border-slate-100">Sort By</p>
-              <div className="flex flex-col gap-1 px-1">
-                {SORT_OPTIONS.map(opt => (
-                  <button key={opt.value} onClick={() => { setSortBy(opt.value); setTeamMobileMenuOpen(false); }} className={`w-full text-left px-2 py-2 rounded text-sm transition-colors ${sortBy === opt.value ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="pt-1 border-t border-slate-100 px-1">
-              <button onClick={() => { navigate('/tasks/archive'); setTeamMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-2 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded">
-                <Archive className="w-4 h-4" /> Archive
-              </button>
-            </div>
-          </div>
-        </>
-      )}
     </div>,
-    [viewMode, scope, sortBy, mySubs.length, pendingApprovalSubs.length, teamMobileMenuOpen]
+    [viewMode, scope, sortBy, mySubs.length, pendingApprovalSubs.length]
   );
 
   const toggle = (id: string) => {
@@ -1365,36 +1272,41 @@ function AdminTasksView() {
                       initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.02, duration: 0.25 }}
                       onClick={() => setOpenSubtaskId(sub.id ?? null)}
-                      className={`flex items-center gap-3 px-4 py-3.5 bg-card border rounded-xl hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer group ${(sub as SubTask).priority && PRIORITY_CONFIG[(sub as SubTask).priority!] ? `border-l-4 ${PRIORITY_CONFIG[(sub as SubTask).priority!].border}` : ''}`}>
-                      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc.dot}`} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <p className={`text-sm font-medium group-hover:text-primary transition-colors truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                            {sub.title}
-                          </p>
-                          {subMentioned && (
-                            <span title="You were mentioned" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[9px] font-bold bg-indigo-600 text-white flex-shrink-0">
-                              <AtSign className="w-2.5 h-2.5" />
-                            </span>
-                          )}
-                          {!subMentioned && subUnseenCount > 0 && (
-                            <span title={`${subUnseenCount} unread update${subUnseenCount !== 1 ? 's' : ''}`}
-                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500 text-white flex-shrink-0 min-w-[16px] justify-center">
-                              {subUnseenCount}
-                            </span>
-                          )}
+                      className={`flex flex-col sm:flex-row items-start sm:items-center gap-3 px-4 py-3.5 bg-card border rounded-xl hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer group ${(sub as SubTask).priority && PRIORITY_CONFIG[(sub as SubTask).priority!] ? `border-l-4 ${PRIORITY_CONFIG[(sub as SubTask).priority!].border}` : ''}`}>
+                      <div className="flex items-center gap-3 w-full sm:w-auto min-w-0">
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc.dot}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <p className={`text-sm font-semibold group-hover:text-primary transition-colors truncate max-w-[200px] sm:max-w-none ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                              {sub.title}
+                            </p>
+                            {subMentioned && (
+                              <span title="You were mentioned" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[9px] font-bold bg-indigo-600 text-white flex-shrink-0">
+                                <AtSign className="w-2.5 h-2.5" />
+                              </span>
+                            )}
+                            {!subMentioned && subUnseenCount > 0 && (
+                              <span title={`${subUnseenCount} unread update${subUnseenCount !== 1 ? 's' : ''}`}
+                                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500 text-white flex-shrink-0 min-w-[16px] justify-center">
+                                {subUnseenCount}
+                              </span>
+                            )}
+                          </div>
+                          {mt && <p className="text-xs text-muted-foreground truncate mt-0.5">{mt.title}</p>}
                         </div>
-                        {mt && <p className="text-xs text-muted-foreground truncate mt-0.5">{mt.title}</p>}
                       </div>
-                      {(sub as SubTask).priority && <PriorityBadge priority={(sub as SubTask).priority} size="xs" />}
-                      {sub.deadline && (
-                        <span className={`text-[11px] flex items-center gap-1 flex-shrink-0 hidden md:flex ${isOverdue ? "text-red-500" : "text-muted-foreground"}`}>
-                          <Clock className="w-3 h-3" />{formatDueDate(sub.deadline)}
+                      
+                      <div className="flex flex-wrap items-center gap-2 sm:ml-auto w-full sm:w-auto">
+                        {(sub as SubTask).priority && <PriorityBadge priority={(sub as SubTask).priority} size="xs" />}
+                        {sub.deadline && (
+                          <span className={`text-[10px] font-medium flex items-center gap-1 flex-shrink-0 ${isOverdue ? "text-red-500" : "text-muted-foreground"}`}>
+                            <Clock className="w-3 h-3" />{formatDueDate(sub.deadline)}
+                          </span>
+                        )}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shadow-sm ${sc.pillClass} ml-auto sm:ml-0`}>
+                          {sc.label}
                         </span>
-                      )}
-                      <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full w-max flex-shrink-0 ${sc.pillClass}`}>
-                        {sc.label}
-                      </span>
+                      </div>
                     </motion.div>
                   );
                 })}
@@ -1424,32 +1336,44 @@ function AdminTasksView() {
                     initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.03, duration: 0.25 }}
                     onClick={() => setOpenSubtaskId(sub.id ?? null)}
-                    className="flex items-center gap-3 px-4 py-3.5 bg-card border border-amber-200 dark:border-amber-800/30 rounded-xl hover:shadow-sm transition-all cursor-pointer group border-l-4 border-l-amber-400">
-                    <div className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-foreground truncate">{sub.title}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {parentTask && <span className="text-xs text-muted-foreground truncate">{parentTask.title}</span>}
-                        {sub.deadline && (
-                          <span className={`text-[10px] flex items-center gap-0.5 ${isOverdue ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
-                            <Clock className="w-2.5 h-2.5" />{formatDueDate(sub.deadline)}
-                          </span>
-                        )}
+                    className="flex flex-col sm:flex-row items-start sm:items-center gap-3 px-4 py-3.5 bg-card border border-amber-200 dark:border-amber-800/30 rounded-xl hover:shadow-sm transition-all cursor-pointer group border-l-4 border-l-amber-400 relative">
+                    
+                    <div className="flex items-center gap-3 w-full sm:w-auto min-w-0">
+                      <div className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-foreground truncate max-w-[200px] sm:max-w-none">{sub.title}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {parentTask && <span className="text-xs text-muted-foreground truncate">{parentTask.title}</span>}
+                          {sub.deadline && (
+                            <span className={`text-[10px] flex items-center gap-0.5 ${isOverdue ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
+                              <Clock className="w-2.5 h-2.5" />{formatDueDate(sub.deadline)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    {submitter && (
-                      <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
-                        <div className={`w-5 h-5 rounded-full ${submitter.avatarColor} flex items-center justify-center text-white text-[8px] font-bold`}>
-                          {submitter.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+
+                    <div className="flex flex-wrap items-center gap-3 sm:ml-auto w-full sm:w-auto">
+                      {submitter && (
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <div className={`w-5 h-5 rounded-full ${submitter.avatarColor} flex items-center justify-center text-white text-[8px] font-bold`}>
+                            {submitter.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                          </div>
+                          <span className="text-xs text-muted-foreground">{submitter.name.split(' ')[0]}</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">{submitter.name.split(' ')[0]}</span>
+                      )}
+                      
+                      <div className="flex items-center gap-2 ml-auto sm:ml-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Implementation for quick approve if needed
+                          }}
+                          className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-full transition-colors shadow-sm">
+                          Review
+                        </button>
                       </div>
-                    )}
-                    <button
-                      onClick={e => { e.stopPropagation(); setOpenSubtaskId(sub.id ?? null); }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-[11px] font-semibold transition-colors shadow-sm whitespace-nowrap flex-shrink-0">
-                      Review →
-                    </button>
+                    </div>
                   </motion.div>
                 );
               })}
@@ -1460,14 +1384,14 @@ function AdminTasksView() {
 
       {/* ── LIST VIEW: ALL TASKS ── */}
       {viewMode === 'list' && scope === 'all' && (<>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0 overflow-x-auto hide-scrollbar">
           {STATUS_TABS.map(tab => {
             const isActive = statusFilter === tab.value;
             const count = tab.value === "all" ? teamTasks.filter(mt => deriveMainTaskStatus(mt.id, teamSubtasks) !== 'completed').length
               : teamTasks.filter(mt => deriveMainTaskStatus(mt.id, teamSubtasks) === tab.value).length;
             return (
               <button key={tab.value} onClick={() => setStatusFilter(tab.value)}
-                className={`relative px-4 py-2 text-sm font-medium transition-colors rounded-t-md
+                className={`relative px-4 py-2 text-sm font-medium transition-colors rounded-t-md whitespace-nowrap flex-shrink-0
                   ${isActive ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"}`}>
                 {tab.label}
                 {count > 0 && (
@@ -1540,86 +1464,73 @@ function AdminTasksView() {
                     <div role="button" tabIndex={0}
                       onClick={() => toggle(mt.id)}
                       onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggle(mt.id)}
-                      className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-primary/5 transition-colors text-left cursor-pointer">
-                      <div className="text-muted-foreground flex-shrink-0">
-                        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm text-foreground font-medium truncate">{mt.title}</p>
-                          {mt.priority && <PriorityBadge priority={mt.priority} size="xs" />}
-                          {/* WhatsApp-style @ mention badge */}
-                          {isMentioned && (
-                            <span
-                              title="You were mentioned in this task"
-                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white flex-shrink-0">
-                              <AtSign className="w-2.5 h-2.5" />
-                            </span>
-                          )}
-                          {/* Unread update count badge */}
-                          {!isMentioned && unseenCount > 0 && (
-                            <span
-                              title={`${unseenCount} update${unseenCount !== 1 ? 's' : ''} on this task`}
-                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white flex-shrink-0 min-w-[18px] justify-center">
-                              {unseenCount}
-                            </span>
-                          )}
+                      className="w-full flex flex-col sm:flex-row items-start sm:items-center gap-3 px-4 py-3.5 hover:bg-primary/5 transition-colors text-left cursor-pointer relative">
+                      
+                      <div className="flex items-center gap-3 w-full sm:w-auto min-w-0">
+                        <div className="text-muted-foreground flex-shrink-0">
+                          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                         </div>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                          <span>{progress.completed}/{progress.total} subtasks</span>
-                          <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden hidden sm:block">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm text-foreground font-semibold truncate max-w-[200px] sm:max-w-none">{mt.title}</p>
+                            {isMentioned && (
+                              <span title="You were mentioned" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white flex-shrink-0">
+                                <AtSign className="w-2.5 h-2.5" />
+                              </span>
+                            )}
+                            {!isMentioned && unseenCount > 0 && (
+                              <span title={`${unseenCount} unread update${unseenCount !== 1 ? 's' : ''}`}
+                                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white flex-shrink-0 min-w-[18px] justify-center">
+                                {unseenCount}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto sm:ml-auto sm:flex-nowrap">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="whitespace-nowrap">{progress.completed}/{progress.total} subtasks</span>
+                          <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden hidden md:block">
                             <div className={`h-full rounded-full ${status === "completed" ? "bg-green-500" : "bg-primary"}`} style={{ width: `${pct}%` }} />
                           </div>
-                          <span className="font-medium hidden sm:inline">{pct}%</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
                           {(() => {
                             const creator = mt.createdBy ? users.find(u => u.id === mt.createdBy) : null;
                             const assignee = mt.assignedTo ? users.find(u => u.id === mt.assignedTo?.split(',')[0]) : null;
                             return (
-                              <div className="flex items-center gap-2 ml-1">
+                              <div className="flex items-center -space-x-1">
                                 {creator && (
-                                  <span className="flex items-center gap-1 bg-muted px-1.5 py-0.5 rounded-full" title="Created by">
-                                    <div className={`w-3.5 h-3.5 rounded-full ${creator.avatarColor || 'bg-slate-400'} flex items-center justify-center text-white text-[7px] font-bold`}>
-                                      {creator.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || 'U'}
-                                    </div>
-                                    <span className="text-[10px]">{creator.name?.split(" ")[0]}</span>
-                                  </span>
+                                  <div className={`w-5 h-5 rounded-full ring-2 ring-card ${creator.avatarColor || 'bg-slate-400'} flex items-center justify-center text-white text-[8px] font-bold`} title={`Created by: ${creator.name}`}>
+                                    {creator.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || 'U'}
+                                  </div>
                                 )}
                                 {assignee && (
-                                  <span className="flex items-center gap-1 bg-primary/10 px-1.5 py-0.5 rounded-full" title="Assigned to">
-                                    <div className={`w-3.5 h-3.5 rounded-full ${assignee.avatarColor} flex items-center justify-center text-white text-[7px] font-bold`}>
-                                      {assignee.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
-                                    </div>
-                                    <span className="text-[10px]">{assignee.name.split(" ")[0]}</span>
-                                  </span>
+                                  <div className={`w-5 h-5 rounded-full ring-2 ring-card ${assignee.avatarColor} flex items-center justify-center text-white text-[8px] font-bold`} title={`Assigned to: ${assignee.name}`}>
+                                    {assignee.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+                                  </div>
                                 )}
                               </div>
                             );
                           })()}
                         </div>
-                      </div>
-                      {mt.deadline && (
-                        <span className={`hidden sm:flex items-center gap-1 text-xs flex-shrink-0 ${isPast(new Date(mt.deadline)) && status !== "completed" ? "text-red-500" : "text-muted-foreground"}`}>
-                          <Calendar className="w-3 h-3" />{format(new Date(mt.deadline), "MMM d")}
+
+                        {mt.deadline && (
+                          <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground whitespace-nowrap">
+                            <Calendar className="w-3 h-3" />{format(new Date(mt.deadline), "MMM d")}
+                          </div>
+                        )}
+
+                        <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
+                          <PriorityPicker value={mt.priority} onChange={p => updateMainTask(mt.id, { priority: p })} />
+                        </div>
+
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap shadow-sm ${sc?.pillClass || 'bg-slate-100 text-slate-500'}`}>
+                          {sc?.label || status}
                         </span>
-                      )}
-                      {currentUser?.id === mt.createdBy && (
-                        <>
-                          <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
-                            <PriorityPicker value={mt.priority} onChange={p => updateMainTask(mt.id, { priority: p })} />
-                          </div>
-                          <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
-                            <button
-                              onClick={() => setEditingTask(mt)}
-                              className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-all"
-                              title="Edit task">
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </>
-                      )}
-                      <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full flex items-center gap-1 w-max flex-shrink-0 ${sc?.pillClass || 'bg-slate-100 text-slate-500'}`}>
-                        {sc?.label || status}
-                      </span>
+                      </div>
                     </div>
 
                     {/* Subtask rows */}
@@ -1913,237 +1824,7 @@ function AdminTasksView() {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════════
-   USER VIEW
-═══════════════════════════════════════════════════════════════════════════════ */
-function UserTasksView() {
-  const { user: currentUser } = useAuth();
-  const { subtasks, mainTasks, users, createMainTask, updateSubtaskStatus } = useAppData();
-  const me = React.useMemo(() => users.find(u => u.id === currentUser?.id), [users, currentUser?.id]);
-  const isExternalHr = me?.privileges?.tasks?.isExternalHr;
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<SubTaskStatus | "all">("all");
-  const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
-  const [sortBy, setSortBy] = useState<SortOption>(loadDefaultSort());
-  const [showSortMenu, setShowSortMenu] = useState(false);
-  const [viewMode, setViewMode] = useState<TaskViewMode>(loadDefaultView());
-  const handleSetDefault = () => localStorage.setItem('tf_default_sort', sortBy);
 
-  useEffect(() => {
-    const openId = searchParams.get("open");
-    if (openId) {
-      setOpenSubtaskId(openId);
-      navigate("/tasks", { replace: true });
-    }
-    const openTaskId = searchParams.get("openTask");
-    if (openTaskId) {
-      navigate("/tasks", { replace: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => { localStorage.setItem('tf_default_view', viewMode); }, [viewMode]);
-
-  const { wsTasks: teamTasks, wsMembers, workspace: teamWs } = useWorkspace();
-  const activeUsers = wsMembers;
-  const teamSubtaskIds = new Set(teamTasks.map(mt => mt.id));
-  const teamSubtasks = subtasks.filter(s => teamSubtaskIds.has(s.mainTaskId));
-  const allSubs = teamSubtasks;
-  const mySubs = teamSubtasks.filter(s => {
-    if (!s.assignedTo) return false;
-    const assignees = typeof s.assignedTo === 'string' 
-      ? s.assignedTo.split(',').map((id: string) => id.trim()) 
-      : Array.isArray(s.assignedTo) ? s.assignedTo : [];
-    return assignees.includes(currentUser?.id || '');
-  });
-
-  const [scope, setScope] = useState<'mine' | 'all'>('mine');
-  const pool = scope === 'mine' ? mySubs : allSubs;
-
-  const filtered = applySortToSubs(pool.filter(s => {
-    if (search && !s.title.toLowerCase().includes(search.toLowerCase())) return false;
-    if (statusFilter !== "all" && s.status !== statusFilter) return false;
-    return true;
-  }), sortBy) as SubTask[];
-
-  const STATUS_TABS: { label: string; value: SubTaskStatus | "all" }[] = [
-    { label: "All", value: "all" },
-    { label: "Not Started", value: "not_started" },
-    { label: "In Progress", value: "in_progress" },
-    { label: "Pending Approval", value: "pending_approval" },
-    { label: "Completed", value: "completed" },
-  ];
-
-  return (
-    <motion.div variants={container} initial="hidden" animate="show" className="space-y-0">
-
-      {/* Toolbar */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-2 mb-3 flex-wrap relative z-50">
-        <ViewToggle value={viewMode} onChange={setViewMode} />
-
-        <div className="flex items-center bg-muted rounded-full p-0.5 z-10 relative">
-          <button onClick={() => setScope('mine')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${scope === 'mine' ? 'bg-card shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
-            Mine {mySubs.length > 0 && <span className="ml-1 text-[10px] bg-primary/10 text-primary px-1 rounded-full">{mySubs.length}</span>}
-          </button>
-          <button onClick={() => setScope('all')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${scope === 'all' ? 'bg-card shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
-            All
-          </button>
-        </div>
-
-        <div className="relative z-50">
-          <button onClick={() => setShowSortMenu(p => !p)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-muted text-xs font-medium text-muted-foreground hover:text-foreground transition-colors border border-transparent hover:border-border">
-            <ArrowUpDown className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{SORT_OPTIONS.find(o => o.value === sortBy)?.label}</span>
-          </button>
-          {showSortMenu && (
-            <div className="absolute right-0 top-full mt-1 z-30 bg-card border border-border rounded-xl shadow-lg py-1 w-52">
-              {SORT_OPTIONS.map(opt => (
-                <button key={opt.value} onClick={() => { setSortBy(opt.value); setShowSortMenu(false); }}
-                  className={`w-full text-left px-4 py-2 text-sm transition-colors ${sortBy === opt.value ? 'bg-primary/10 text-primary font-medium' : 'text-foreground hover:bg-muted'}`}>
-                  {opt.label}
-                </button>
-              ))}
-              <div className="border-t border-border mt-1 pt-1 px-4 py-2">
-                <button onClick={() => { handleSetDefault(); setShowSortMenu(false); }}
-                  className="text-xs text-primary hover:text-primary/80 font-medium transition-colors">
-                  Set as default sort
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="flex-1" />
-        <span className="text-sm text-muted-foreground hidden sm:block">{filtered.length} task{filtered.length !== 1 ? "s" : ""}</span>
-        <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm">
-          <Plus className="w-4 h-4" /><span className="hidden sm:inline">New Task</span>
-        </button>
-      </motion.div>
-
-      {/* Search */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="mb-4">
-        <div className="relative w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input type="text" placeholder="Search tasks…" value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-muted text-sm text-foreground placeholder:text-muted-foreground
-              focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-card transition-all border border-border focus:border-primary/30" />
-          {search && <button onClick={() => setSearch("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>}
-        </div>
-      </motion.div>
-
-      {/* ── BOARD VIEW ── */}
-      {viewMode === 'board' && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-          <SubtaskKanbanView
-            subtasks={filtered as SubTask[]}
-            mainTasks={mainTasks}
-            users={activeUsers}
-            onClickSubtask={id => setOpenSubtaskId(id)}
-          />
-        </motion.div>
-      )}
-
-      {/* ── FOCUS VIEW ── */}
-      {viewMode === 'focus' && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-          <TaskFocusView
-            subtasks={pool}
-            mainTasks={mainTasks}
-            users={activeUsers}
-            onClickSubtask={id => setOpenSubtaskId(id)}
-          />
-        </motion.div>
-      )}
-
-      {/* ── LIST VIEW ── */}
-      {viewMode === 'list' && (
-        <>
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0 overflow-x-auto">
-            {STATUS_TABS.map(tab => {
-              const isActive = statusFilter === tab.value;
-              const count = tab.value === "all" ? pool.length : pool.filter(s => s.status === tab.value).length;
-              if (tab.value !== 'all' && count === 0) return null;
-              return (
-                <button key={tab.value} onClick={() => setStatusFilter(tab.value)}
-                  className={`relative px-4 py-2 text-sm font-medium transition-colors rounded-t-md whitespace-nowrap
-                    ${isActive ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"}`}>
-                  {tab.label}
-                  {count > 0 && (
-                    <span className={`ml-1.5 text-[11px] font-semibold px-1.5 py-0.5 rounded-full
-                      ${isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>{count}</span>
-                  )}
-                  {isActive && <motion.div layoutId="user-status-indicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />}
-                </button>
-              );
-            })}
-          </motion.div>
-
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-            {filtered.length === 0 ? (
-              <div className="text-center py-24 bg-card border border-border rounded-xl">
-                <p className="text-4xl mb-3">📋</p>
-                <p className="text-base font-medium text-foreground">No tasks found</p>
-                <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {filtered.map((sub, i) => {
-                  const sc = statusConfig[sub.status as SubTaskStatus];
-                  const mt = mainTasks.find(m => m.id === sub.mainTaskId);
-                  const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== "completed";
-                  return (
-                    <motion.div key={sub.id ?? i}
-                      initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.02, duration: 0.25 }}
-                      onClick={() => setOpenSubtaskId(sub.id ?? null)}
-                      className={`flex items-center gap-3 px-4 py-3.5 bg-card border rounded-xl hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer group ${(sub as SubTask).priority && PRIORITY_CONFIG[(sub as SubTask).priority!] ? `border-l-4 ${PRIORITY_CONFIG[(sub as SubTask).priority!].border}` : ''}`}>
-                      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc.dot}`} />
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-sm font-medium group-hover:text-primary transition-colors truncate ${sub.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                          {sub.title}
-                        </p>
-                        {mt && <p className="text-xs text-muted-foreground truncate mt-0.5">{mt.title}</p>}
-                      </div>
-                      {(sub as SubTask).priority && <PriorityBadge priority={(sub as SubTask).priority} size="xs" />}
-                      {sub.deadline && (
-                        <span className={`text-[11px] flex items-center gap-1 flex-shrink-0 hidden md:flex ${isOverdue ? "text-red-500" : "text-muted-foreground"}`}>
-                          <Clock className="w-3 h-3" />{formatDueDate(sub.deadline)}
-                        </span>
-                      )}
-                      <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full w-max flex-shrink-0 ${sc.pillClass}`}>
-                        {sc.label}
-                      </span>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            )}
-          </motion.div>
-        </>
-      )}
-
-      <TaskDetailSheet subtaskId={openSubtaskId} onClose={() => setOpenSubtaskId(null)} />
-
-      {showCreate && (
-        <CreateTaskDialog
-          onClose={() => setShowCreate(false)}
-          onSubmit={createMainTask}
-          users={activeUsers}
-          currentUserId={currentUser?.id ?? ""}
-          teamId={teamWs?.id ?? ""}
-          workspaceId={teamWs?.id ?? ""}
-          isExternalHr={isExternalHr}
-        />
-      )}
-    </motion.div>
-  );
-}
 
 
 

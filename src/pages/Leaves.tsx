@@ -747,24 +747,24 @@ export function Leaves() {
   useSetPageTitle(
     'Staff Leave Management',
     'File, track, and manage employee leave requests',
-    <div className="hidden sm:flex items-center gap-2">
+    <div className="flex items-center gap-2 md:gap-3">
       {priv.canViewSummary && (
         <Button
           variant="outline"
           size="sm"
-          className="gap-2 h-9"
+          className="gap-2 h-9 px-2 sm:px-3"
           onClick={() => navigate('/leave-summary')}
         >
-          <CalendarClock className="h-4 w-4" /> Summary
+          <CalendarClock className="h-4 w-4" /> <span className="hidden sm:inline">Summary</span>
         </Button>
       )}
       {priv.canAdd && (
         <Button
           size="sm"
-          className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9"
+          className="gap-2 bg-teal-600 hover:bg-teal-700 text-white h-9 px-2 sm:px-3"
           onClick={() => { resetForm(); resetPreviewFormState(); setShowFormOverlay(true); }}
         >
-          <Plus className="h-4 w-4" /> File Leave
+          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">File Leave</span>
         </Button>
       )}
     </div>
@@ -774,26 +774,7 @@ export function Leaves() {
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
 
-      {/* ── Mobile Actions ── */}
-      <div className="flex sm:hidden flex-wrap gap-2 px-1">
-        {priv.canAdd && (
-          <Button
-            className="flex-1 gap-2 bg-teal-600 hover:bg-teal-700 text-white shadow-sm"
-            onClick={() => { resetForm(); resetPreviewFormState(); setShowFormOverlay(true); }}
-          >
-            <Plus className="h-4 w-4" /> File Leave
-          </Button>
-        )}
-        {priv.canViewSummary && (
-          <Button
-            variant="outline"
-            className="flex-1 gap-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 shadow-sm"
-            onClick={() => navigate('/leave-summary')}
-          >
-            <CalendarClock className="h-4 w-4" /> Summary
-          </Button>
-        )}
-      </div>
+      {/* ── Mobile Actions Removed ── */}
 
       {/* ─── Leave Records Table ─── */}
       <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">

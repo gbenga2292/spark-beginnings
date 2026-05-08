@@ -133,46 +133,46 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
   useSetPageTitle(
     `${waybill.type === 'return' ? 'Return' : 'Waybill'} REF-${waybill.id.substring(0, 8).toUpperCase()}`,
     waybill.siteName || 'Logistics Management',
-    <div className="hidden sm:flex items-center gap-2">
+    <div className="flex items-center gap-2 md:gap-3">
       <Button
         variant="outline"
         size="sm"
-        className="h-9 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-xs"
+        className="h-9 px-2 sm:px-3 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
         onClick={handlePreview}
       >
-        <Eye className="h-4 w-4" /> Preview
+        <Eye className="h-4 w-4" /> <span className="hidden sm:inline">Preview</span>
       </Button>
       <Button
         variant="outline"
         size="sm"
-        className="h-9 gap-2 text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100 font-semibold text-xs"
+        className="h-9 px-2 sm:px-3 gap-2 text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
         onClick={handleShare}
       >
-        <Share2 className="h-4 w-4" /> Share
+        <Share2 className="h-4 w-4" /> <span className="hidden sm:inline">Share</span>
       </Button>
       <Button
         size="sm"
-        className="h-9 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm"
+        className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
         onClick={handleDownload}
       >
-        <Download className="h-4 w-4" /> Download
+        <Download className="h-4 w-4" /> <span className="hidden sm:inline">Download</span>
       </Button>
       {waybill.type === 'waybill' && waybill.status === 'outstanding' && (
         <Button
           size="sm"
-          className="h-9 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm"
+          className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
           onClick={() => setShowDateDialog(true)}
         >
-          <CheckCircle2 className="h-4 w-4" /> Mark as Sent
+          <CheckCircle2 className="h-4 w-4" /> <span className="hidden sm:inline">Mark as Sent</span>
         </Button>
       )}
       {waybill.type === 'return' && waybill.status === 'outstanding' && (
         <Button
           size="sm"
-          className="h-9 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm"
+          className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
           onClick={handleOpenReturnDialog}
         >
-          <CheckCircle2 className="h-4 w-4" /> Process Return
+          <CheckCircle2 className="h-4 w-4" /> <span className="hidden sm:inline">Process Return</span>
         </Button>
       )}
     </div>,
@@ -191,45 +191,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
           <ArrowLeft className="h-4 w-4" /> Back to Waybills
         </button>
 
-        {/* ── Mobile action buttons ─────────────────────────────────────────── */}
-        <div className="flex sm:hidden flex-wrap gap-2">
-          <Button
-            variant="outline"
-            className="flex-1 gap-2 text-slate-600 border-slate-200 font-semibold text-xs"
-            onClick={handlePreview}
-          >
-            <Eye className="h-4 w-4" /> Preview
-          </Button>
-          <Button
-            variant="outline"
-            className="flex-1 gap-2 text-blue-700 border-blue-200 bg-blue-50 font-semibold text-xs"
-            onClick={handleShare}
-          >
-            <Share2 className="h-4 w-4" /> Share
-          </Button>
-          <Button
-            className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs"
-            onClick={handleDownload}
-          >
-            <Download className="h-4 w-4" /> Download PDF
-          </Button>
-          {waybill.type === 'waybill' && waybill.status === 'outstanding' && (
-            <Button
-              className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs mt-2"
-              onClick={() => setShowDateDialog(true)}
-            >
-              <CheckCircle2 className="h-4 w-4" /> Mark as Sent
-            </Button>
-          )}
-          {waybill.type === 'return' && waybill.status === 'outstanding' && (
-            <Button
-              className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs mt-2"
-              onClick={handleOpenReturnDialog}
-            >
-              <CheckCircle2 className="h-4 w-4" /> Complete Return
-            </Button>
-          )}
-        </div>
+
 
         {/* ── Waybill info card ─────────────────────────────────────────────── */}
         <div className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">

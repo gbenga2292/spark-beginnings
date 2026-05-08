@@ -270,7 +270,6 @@ export function Attendance() {
   const [staffTypeFilter, setStaffTypeFilter] = useState<'OFFICE' | 'FIELD'>('FIELD');
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false);
   const [desktopCalendarOpen, setDesktopCalendarOpen] = useState(false);
 
@@ -1337,26 +1336,25 @@ export function Attendance() {
     'Daily Register',
     'Attendance & site allocation',
     <div className="relative flex items-center gap-2">
-      {/* ── Desktop controls ── */}
-      <div className="hidden sm:flex items-center gap-2">
+      <div className="flex items-center gap-2 md:gap-3">
         {activeTab === 'database' && (
           <>
             {priv.canImport && (
-              <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm mb-0">
-                <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
+              <label className="flex items-center gap-2 px-2 sm:px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm mb-0">
+                <Download className="h-4 w-4 text-indigo-500" /> <span className="hidden sm:inline">Import</span>
                 <Input type="file" accept=".xlsx" className="hidden" onChange={handleImportExcel} />
               </label>
             )}
             {priv.canDelete && dbSelectedIds.size > 0 && (
-              <Button onClick={handleBulkDelete} size="sm" variant="destructive" className="h-9 px-3 text-[11px] font-bold uppercase tracking-tight gap-2 shadow-sm">
-                <Trash2 className="h-3.5 w-3.5" /> Delete ({dbSelectedIds.size})
+              <Button onClick={handleBulkDelete} size="sm" variant="destructive" className="h-9 px-2 sm:px-3 text-[11px] font-bold uppercase tracking-tight gap-2 shadow-sm">
+                <Trash2 className="h-4 w-4" /> <span className="hidden sm:inline">Delete ({dbSelectedIds.size})</span>
               </Button>
             )}
             {priv.canExport && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50">
-                    <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
+                  <Button variant="outline" size="sm" className="h-9 px-2 sm:px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight shadow-sm hover:bg-slate-50">
+                    <Upload className="h-4 w-4 text-emerald-500" /> <span className="hidden sm:inline">Export</span> <ChevronDown className="h-3 w-3 text-slate-400" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -1377,207 +1375,19 @@ export function Attendance() {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            <div className="w-px h-5 bg-slate-200 mx-1" />
+            <div className="hidden sm:block w-px h-5 bg-slate-200 mx-1" />
           </>
         )}
-        <TabsList className="bg-slate-100/80 p-1 h-10 border border-slate-200/50 shadow-sm">
-          <TabsTrigger active={activeTab === 'entry'} onClick={() => setActiveTab('entry')} className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-4 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all">
-            <CalendarIcon className="h-3.5 w-3.5 text-indigo-500" /> Entry
+        <TabsList className="bg-slate-100/80 p-1 h-10 border border-slate-200/50 shadow-sm flex">
+          <TabsTrigger active={activeTab === 'entry'} onClick={() => setActiveTab('entry')} className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-2 sm:px-4 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all">
+            <CalendarIcon className="h-3.5 w-3.5 text-indigo-500" /> <span className="hidden sm:inline">Entry</span>
           </TabsTrigger>
-          <TabsTrigger active={activeTab === 'database'} onClick={() => setActiveTab('database')} className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-4 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all">
-            <Database className="h-3.5 w-3.5 text-emerald-500" /> Database
+          <TabsTrigger active={activeTab === 'database'} onClick={() => setActiveTab('database')} className="gap-2 text-[11px] font-bold uppercase tracking-tight h-8 px-2 sm:px-4 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm transition-all">
+            <Database className="h-3.5 w-3.5 text-emerald-500" /> <span className="hidden sm:inline">Database</span>
           </TabsTrigger>
         </TabsList>
       </div>
-
-      {/* ── Mobile: tab icons + 3-dot ── */}
-      <div className="flex sm:hidden items-center gap-2">
-        {activeTab === 'entry' && (
-          <Popover open={mobileCalendarOpen} onOpenChange={setMobileCalendarOpen}>
-            <PopoverTrigger asChild>
-              <button className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-indigo-600 shadow-sm" title="Attendance Calendar Overview">
-                <CalendarIcon className="h-4 w-4" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 z-[130]" align="end">
-              <DayPicker
-                mode="single"
-                selected={parseISO(registerDate)}
-                onDayClick={(date) => { setRegisterDate(format(date, 'yyyy-MM-dd')); setMobileCalendarOpen(false); }}
-                disabled={{ after: parseISO(maxSelectableDate) }}
-                modifiers={{
-                  fully: calendarModifiers.fullyDates,
-                  special: calendarModifiers.specialDates,
-                  viewing: [parseISO(registerDate)],
-                  missing: calendarModifiers.missingDates,
-                }}
-                modifiersStyles={{
-                  today: { color: 'inherit', fontWeight: 'bold' },
-                  viewing: { backgroundColor: '#f8fafc', border: '2px solid #cbd5e1', borderRadius: '4px' },
-                  fully: { backgroundColor: '#d1fae5', color: '#065f46', fontWeight: 'bold', borderRadius: '4px' },
-                  special: { backgroundColor: '#e0e7ff', color: '#3730a3', fontWeight: 'bold', borderRadius: '4px' },
-                  missing: { border: '2px solid #ef4444', borderRadius: '50%' },
-                }}
-                className="bg-white dark:bg-slate-900"
-              />
-              <div className="mt-3 text-[10px] flex flex-col gap-1.5 p-3 pt-0">
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#d1fae5]"></div> Attendance Entered</div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#e0e7ff]"></div> Attendance Entered (Holiday/Sun)</div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full border-2 border-red-500"></div> Missing/Due Attendance</div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-[#f8fafc] border-2 border-[#cbd5e1]"></div> Date Currently Viewing</div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-transparent border border-slate-200"></div> No Entry</div>
-              </div>
-            </PopoverContent>
-          </Popover>
-        )}
-        <div className="flex bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/50 shadow-sm">
-          <button onClick={() => setActiveTab('entry')} className={`h-8 w-8 flex items-center justify-center rounded-md transition-all ${activeTab === 'entry' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`} title="Entry">
-            <CalendarIcon className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={() => setActiveTab('database')} className={`h-8 w-8 flex items-center justify-center rounded-md transition-all ${activeTab === 'database' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500'}`} title="Database">
-            <Database className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        <button
-          className="h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm"
-          onClick={() => setMobileMenuOpen(o => !o)}
-          title="More options"
-        >
-          <span className="text-lg font-black leading-none tracking-tighter">⋮</span>
-        </button>
-      </div>
-
-      {/* ── Mobile dropdown panel ── */}
-      {mobileMenuOpen && (
-        <>
-          <div className="sm:hidden fixed inset-0 z-40 bg-slate-900/40 transition-opacity" onClick={() => setMobileMenuOpen(false)} />
-          <div className="sm:hidden fixed top-16 right-3 z-50 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-4 space-y-5 animate-in slide-in-from-top-2 duration-200">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 -mt-1">
-                <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">
-                    {activeTab === 'database' ? 'Database Actions' : 'Entry Filters'}
-                </h4>
-                <button onClick={() => setMobileMenuOpen(false)} className="text-[10px] font-bold text-indigo-600 uppercase tracking-tight">Done</button>
-            </div>
-
-            {activeTab === 'database' ? (
-              <div className="space-y-2">
-                {priv.canImport && (
-                  <label className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 cursor-pointer rounded-lg">
-                    <Download className="h-4 w-4 text-indigo-500" /> Import Excel
-                    <Input type="file" accept=".xlsx" className="hidden" onChange={(e) => { handleImportExcel(e); setMobileMenuOpen(false); }} />
-                  </label>
-                )}
-                {priv.canDelete && dbSelectedIds.size > 0 && (
-                  <button onClick={() => { handleBulkDelete(); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg">
-                    <Trash2 className="h-4 w-4" /> Delete ({dbSelectedIds.size})
-                  </button>
-                )}
-                {priv.canExport && (
-                  <>
-                    <button onClick={() => { handleExportExcel('bare'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-lg">
-                      <Upload className="h-4 w-4 text-emerald-500" /> Export Bare
-                    </button>
-                    <button onClick={() => { handleExportExcel('detailed'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-lg">
-                      <Upload className="h-4 w-4 text-indigo-500" /> Export Detailed
-                    </button>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {/* Date Controls */}
-                <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center justify-between mb-2 px-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date / Latest</span>
-
-                    </div>
-                    <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
-                      {lastAttendanceDate ? formatDisplayDate(lastAttendanceDate) : 'None'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setRegisterDate(getNextDayStr(registerDate, -1))}
-                      className="h-10 w-10 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex-shrink-0 shadow-sm"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <div className="relative flex-1">
-                      <Input
-                        type="date"
-                        value={registerDate}
-                        max={maxSelectableDate}
-                        onChange={(e) => setRegisterDate(e.target.value)}
-                        className="h-10 pl-9 pr-2 text-xs bg-white dark:bg-slate-800 shadow-sm border-slate-200 dark:border-slate-700 w-full"
-                      />
-                      <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => {
-                        const nextDate = getNextDayStr(registerDate, 1);
-                        if (nextDate <= maxSelectableDate) {
-                          setRegisterDate(nextDate);
-                        }
-                      }}
-                      disabled={registerDate >= maxSelectableDate}
-                      className="h-10 w-10 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex-shrink-0 shadow-sm disabled:opacity-50"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Staff Type filter */}
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 px-1">Staff Type</p>
-                  <div className="relative">
-                    <select
-                      value={staffTypeFilter}
-                      onChange={(e) => setStaffTypeFilter(e.target.value as any)}
-                      className="h-10 w-full pl-9 pr-8 text-xs font-bold uppercase tracking-tight rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-sm appearance-none cursor-pointer outline-none"
-                    >
-                      <option value="OFFICE">OFFICE STAFF</option>
-                      <option value="FIELD">FIELD STAFF</option>
-                    </select>
-                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                  </div>
-                </div>
-                
-                {/* Search */}
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 px-1">Search Staff</p>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                    <Input
-                      placeholder="Search..."
-                      className="h-10 pl-9 text-xs bg-white dark:bg-slate-800 shadow-sm border-slate-200 dark:border-slate-700 rounded-xl"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <Button 
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-tight rounded-xl shadow-md mt-2"
-                >
-                    Apply Filters
-                </Button>
-              </div>
-            )}
-          </div>
-        </>
-      )}
     </div>,
-    // mobileMenuOpen intentionally excluded — it only controls an overlay rendered *outside*
-    // this memo. Including it caused the entire expensive header to re-compute on every tap.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [activeTab, priv.canImport, priv.canDelete, priv.canExport, dbSelectedIds.size, handleImportExcel, handleExportExcel, handleBulkDelete, mobileCalendarOpen, desktopCalendarOpen, staffTypeFilter, debouncedSearchTerm, registerDate, lastAttendanceDate, maxSelectableDate, calendarModifiers]
   );
 
@@ -1588,7 +1398,7 @@ export function Attendance() {
           {/* Toolbar: date, filters, search, actions — all in one row */}
           <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-end justify-between gap-2 py-2 px-1">
             {/* Date controls */}
-            <div className="hidden sm:flex flex-col gap-1.5 w-full sm:w-auto shrink-0">
+            <div className="flex flex-col gap-1.5 w-full sm:w-auto shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest px-0.5">
@@ -1682,7 +1492,7 @@ export function Attendance() {
               </div>
             </div>
 
-            <div className="hidden sm:flex flex-wrap items-center gap-2 flex-1 w-full sm:w-auto min-w-[300px]">
+            <div className="flex flex-wrap items-center gap-2 flex-1 w-full sm:w-auto min-w-0 sm:min-w-[300px]">
               {/* Staff Type filter */}
               <div className="relative shrink-0">
               <select

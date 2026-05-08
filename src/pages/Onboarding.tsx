@@ -701,34 +701,37 @@ export function Onboarding() {
   useSetPageTitle(
     'Lifecycle & Flow',
     'Manage onboarding, offboarding, and seamless employee transitions',
-    <div className="hidden sm:flex items-center gap-2">
+    <div className="hidden sm:flex items-center gap-2 md:gap-3">
       {priv.canAdd && (
         <Button 
           variant="outline" 
           size="sm"
-          className="gap-2 h-9" 
+          className="gap-2 h-9 px-3" 
           onClick={() => navigate('/onboarding/contract')}
         >
-          <FileText className="h-4 w-4 text-indigo-500" /> Contract
+          <FileText className="h-4 w-4 text-indigo-500" /> 
+          <span className="hidden lg:inline">Contract</span>
         </Button>
       )}
       {priv.canAdd && (
         <Button 
           size="sm"
-          className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9" 
+          className="gap-2 h-9 px-3 bg-indigo-600 hover:bg-indigo-700 text-white" 
           onClick={() => navigate('/onboarding/new')}
         >
-          <UserPlus className="h-4 w-4" /> Start New Hire
+          <UserPlus className="h-4 w-4" /> 
+          <span className="hidden md:inline">Start New Hire</span>
         </Button>
       )}
       {priv.canDelete && (
         <Button
           variant="outline"
           size="sm"
-          className="gap-2 h-9 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-medium"
+          className="gap-2 h-9 px-3 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-medium"
           onClick={() => navigate('/onboarding/offboard')}
         >
-          <UserMinus className="h-4 w-4" /> Offboarding
+          <UserMinus className="h-4 w-4" /> 
+          <span className="hidden lg:inline">Offboarding</span>
         </Button>
       )}
     </div>

@@ -173,9 +173,9 @@ export function ActivityLog() {
   useSetPageTitle(
     'System Activity Log',
     'Automated enterprise audit trail — who modified what and when',
-    <div className="hidden sm:flex items-center gap-2">
-      <Button variant="outline" size="sm" onClick={() => fetchLogs()} className="gap-2 h-9">
-        <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+    <div className="flex items-center gap-2 md:gap-3">
+      <Button variant="outline" size="sm" onClick={() => fetchLogs()} className="h-9 px-3 sm:px-4 gap-2 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm transition-all active:scale-95">
+        <RefreshCcw className={`h-4 w-4 text-indigo-500 ${loading ? 'animate-spin' : ''}`} /> <span className="hidden sm:inline">Refresh</span>
       </Button>
     </div>
   );

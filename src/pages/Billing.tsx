@@ -1077,12 +1077,12 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       : activeTab === 'quotations' 
       ? 'Review and process quotation drafts'
       : 'Review invoices for sites with consolidated payments',
-    <div className="hidden sm:flex items-center gap-2">
+    <div className="flex items-center gap-2 md:gap-3">
       {priv.canExport && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm">
-              <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export <ChevronDown className="h-3 w-3 text-slate-400" />
+              <Upload className="h-3.5 w-3.5 text-emerald-500" /> <span className="hidden sm:inline">Export</span> <ChevronDown className="h-3 w-3 text-slate-400" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
@@ -1105,7 +1105,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
       )}
       {priv.canImport && (
         <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
-          <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
+          <Download className="h-3.5 w-3.5 text-indigo-500" /> <span className="hidden sm:inline">Import</span>
           <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
         </label>
       )}
@@ -1115,7 +1115,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
           className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9 px-4 font-bold text-[11px] uppercase tracking-tight shadow-md"
           onClick={() => { handleClear(); setIsModalOpen(true); }}
         >
-          <Plus className="w-4 h-4" /> Add {activeTab === 'active' ? 'Invoice' : 'Quotation'}
+          <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add {activeTab === 'active' ? 'Invoice' : 'Quotation'}</span>
         </Button>
       )}
     </div>
@@ -1165,14 +1165,14 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
             </button>
           </div>
 
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="flex items-center gap-2 md:gap-3">
             {priv.canCreate && (activeTab === 'all' || activeTab === 'quotations') && (
               <Button
                 size="sm"
                 className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-9 px-4"
                 onClick={() => { handleClear(); setIsModalOpen(true); }}
               >
-                <Plus className="w-4 h-4" /> Add {activeTab === 'all' ? 'Invoice' : 'Quotation'}
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add {activeTab === 'all' ? 'Invoice' : 'Quotation'}</span>
               </Button>
             )}
           </div>

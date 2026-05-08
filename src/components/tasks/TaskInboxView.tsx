@@ -1489,7 +1489,19 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-slate-700 truncate">{u.name}</p>
-                        <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">{((u as any).jobTitle || u.role || u.department || 'N/A')}</p>
+                        <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
+                          {(() => {
+                            const emp = employees.find(e => 
+                              e.id === u.id || 
+                              (e.email && u.email && e.email.toLowerCase() === u.email.toLowerCase()) ||
+                              (`${e.firstname} ${e.surname}`.toLowerCase() === u.name.toLowerCase()) ||
+                              (`${e.surname} ${e.firstname}`.toLowerCase() === u.name.toLowerCase())
+                            );
+                            const jobTitle = (u as any).jobTitle || u.role;
+                            const empPos = emp?.position === 'Stipend Payee' ? null : emp?.position;
+                            return jobTitle || empPos || emp?.department || u.department || emp?.position || 'N/A';
+                          })()}
+                        </p>
                       </div>
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
                         isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-200'

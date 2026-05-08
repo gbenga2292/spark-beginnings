@@ -102,35 +102,23 @@ export function Users() {
   useSetPageTitle(
     'User Management',
     'Configure system users and granular page privileges',
-    <div className="hidden sm:flex items-center gap-3">
-      <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 border border-slate-200 rounded-lg px-3 py-1.5 bg-white shadow-sm cursor-pointer select-none transition-all hover:border-indigo-200">
+    <div className="flex items-center gap-2 md:gap-3">
+      <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 border border-slate-200 rounded-lg px-2 sm:px-3 py-1.5 bg-white shadow-sm cursor-pointer select-none transition-all hover:border-indigo-200 mb-0">
         <button type="button" onClick={() => setSuperAdminSignupEnabled(!superAdminSignupEnabled)}
           className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${superAdminSignupEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}>
           <span className={`pointer-events-none inline-block h-3 w-3 rounded-full bg-white shadow transition ${superAdminSignupEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
         </button>
-        Signup Toggle
+        <span className="hidden sm:inline">Signup Toggle</span>
       </label>
-      <Button onClick={() => navigate('/users/new')} size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9">
-        <Plus className="h-4 w-4" /> New User
+      <Button onClick={() => navigate('/users/new')} size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9 px-2 sm:px-3">
+        <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New User</span>
       </Button>
     </div>
   );
 
   return (
     <div className="flex flex-col gap-6 h-full pb-4">
-      {/* ── Mobile Actions ── */}
-      <div className="sm:hidden grid grid-cols-2 gap-2 mb-2">
-        <Button 
-          variant="outline" 
-          onClick={() => setSuperAdminSignupEnabled(!superAdminSignupEnabled)}
-          className={`gap-2 h-11 text-xs font-bold uppercase tracking-wider ${superAdminSignupEnabled ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-500'}`}
-        >
-          {superAdminSignupEnabled ? 'Signup ON' : 'Signup OFF'}
-        </Button>
-        <Button onClick={() => navigate('/users/new')} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-11 text-xs font-bold uppercase tracking-wider shadow-sm">
-          <Plus className="h-4 w-4" /> New User
-        </Button>
-      </div>
+
 
       {/* ── Search ─────────────────────────────────────────── */}
       <div className="relative max-w-md">

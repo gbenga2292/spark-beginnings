@@ -1449,35 +1449,35 @@ export function Beneficiaries() {
       ? 'View terminated contractors and welfare staff'
       : 'Manage directors, contractors, and welfare staff',
     (!isAdding && !isEditing)
-      ? <div className="hidden sm:flex items-center gap-2">
+      ? <div className="flex items-center gap-2 md:gap-3">
           {selectedIds.length > 0 && priv.canEdit && (
             <Button
               variant="outline"
               size="sm"
-              className="gap-2 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 h-9"
+              className="gap-2 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 h-9 px-3 sm:px-4"
               onClick={() => { setBulkFormData({}); setIsBulkEditing(true); }}
             >
-              <Settings2 className="h-4 w-4" /> Bulk Edit ({selectedIds.length})
+              <Settings2 className="h-4 w-4" /> <span className="hidden sm:inline">Bulk Edit ({selectedIds.length})</span>
             </Button>
           )}
           {priv.canExport && (
-            <Button variant="outline" size="sm" className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 h-9" onClick={handleExportCSV}>
-              <Download className="h-4 w-4 text-slate-500" /> Export CSV
+            <Button variant="outline" size="sm" className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 h-9 px-3 sm:px-4" onClick={handleExportCSV}>
+              <Download className="h-4 w-4 text-slate-500" /> <span className="hidden sm:inline">Export</span>
             </Button>
           )}
           {priv.canImport && (
-            <label className="flex items-center gap-2 bg-white text-slate-700 hover:bg-slate-50 shadow-sm border border-slate-200 rounded-md h-9 px-4 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap">
-              <Upload className="h-4 w-4 text-slate-500" /> Import Data
+            <label className="flex items-center gap-2 bg-white text-slate-700 hover:bg-slate-50 shadow-sm border border-slate-200 rounded-md h-9 px-3 sm:px-4 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap">
+              <Upload className="h-4 w-4 text-slate-500" /> <span className="hidden sm:inline">Import</span>
               <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
             </label>
           )}
           {priv.canAdd && (
             <Button
               size="sm"
-              className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md h-9 px-4"
+              className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md h-9 px-3 sm:px-4"
               onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'NON-EMPLOYEE', status: 'Active', payeTax: false, withholdingTax: false, payeeType: '', typeOfPay: 'Monthly', monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}
             >
-              <Plus className="h-4 w-4" /> Add Record
+              <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Add Record</span>
             </Button>
           )}
         </div>
@@ -1534,18 +1534,7 @@ export function Beneficiaries() {
           </div>
         </div>
 
-        {/* Mobile-only action strip */}
-        {priv.canAdd && (
-          <div className="md:hidden flex justify-end px-4 py-2 border-b border-slate-100 bg-slate-50/50">
-            <Button
-              size="sm"
-              className="h-8 px-3 gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm"
-              onClick={() => { setIsAdding(true); setOpenMenuId(null); setFormData({ staffType: 'NON-EMPLOYEE', status: 'Active', payeTax: false, withholdingTax: false, payeeType: '', typeOfPay: 'Monthly', monthlySalaries: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 } }); }}
-            >
-              <Plus className="h-3.5 w-3.5" /> Add Record
-            </Button>
-          </div>
-        )}
+
         {/* ── Mobile Card List (< md) ─────────────────────────────────── */}
         <div className="md:hidden divide-y divide-slate-100">
           {filteredBeneficiaries.length === 0 ? (

@@ -464,30 +464,30 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
     useSetPageTitle(
         'VAT Remittance',
         'Record and track VAT remittances to FIRS',
-        <div className="hidden sm:flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
             {priv.canExport && (
                 <Button 
                     variant="outline" 
                     size="sm" 
-                    className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm transition-all" 
+                    className="h-9 px-2 sm:px-3 gap-2 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm transition-all" 
                     onClick={handleExportCSV}
                 >
-                    <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export
+                    <Upload className="h-3.5 w-3.5 text-emerald-500" /> <span className="hidden sm:inline">Export</span>
                 </Button>
             )}
             {priv.canImport && (
-                <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
-                    <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
+                <label className="flex items-center gap-2 px-2 sm:px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm mb-0">
+                    <Download className="h-3.5 w-3.5 text-indigo-500" /> <span className="hidden sm:inline">Import</span>
                     <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
                 </label>
             )}
             {priv.canManageVat && (
                 <Button
                     size="sm"
-                    className="h-9 px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
+                    className="h-9 px-2 sm:px-4 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
                     onClick={() => { handleClear(); setIsModalOpen(true); }}
                 >
-                    <Plus className="w-4 h-4" /> Add VAT Payment
+                    <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add VAT Payment</span>
                 </Button>
             )}
         </div>
@@ -497,25 +497,7 @@ export function VatPayments({ setPreviewModal, searchTerm = '' }: { setPreviewMo
         <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
             <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
 
-                {/* Mobile-only actions */}
-                <div className="flex sm:hidden justify-end gap-2">
-                    {priv.canExport && (
-                        <Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-200 bg-white text-slate-600 font-bold text-[10px] uppercase tracking-tight" onClick={handleExportCSV}>
-                            <Upload className="h-3.5 w-3.5 text-emerald-500" /> Export
-                        </Button>
-                    )}
-                    {priv.canImport && (
-                        <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-tight cursor-pointer">
-                            <Download className="h-3.5 w-3.5 text-indigo-500" /> Import
-                            <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
-                        </label>
-                    )}
-                    {priv.canManageVat && (
-                        <Button size="sm" className="h-9 px-3 gap-2 bg-indigo-600 text-white font-bold text-[10px] uppercase tracking-tight" onClick={() => { handleClear(); setIsModalOpen(true); }}>
-                            <Plus className="w-4 h-4" /> Add
-                        </Button>
-                    )}
-                </div>
+
 
                 <div className="flex flex-1 gap-6 items-start flex-col">
                     <div className="flex-1 w-full flex flex-col gap-6 min-w-0">

@@ -25,10 +25,10 @@ function WaybillManagerHeader({ onCreate, activeTab }: { onCreate: () => void, a
   useSetPageTitle(
     'Logistics Management',
     'Track and manage asset deliveries (Waybills) and site returns',
-    <div className="hidden sm:flex items-center gap-2">
+    <div className="flex items-center gap-2 md:gap-3">
       {activeTab === 'waybill' && (
-        <Button size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9" onClick={onCreate}>
-          <Plus className="h-4 w-4" /> Create Waybill
+        <Button size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 px-2 sm:px-3" onClick={onCreate}>
+          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Create Waybill</span>
         </Button>
       )}
     </div>
@@ -128,12 +128,6 @@ export function WaybillManager() {
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
       <WaybillManagerHeader onCreate={() => setShowCreateModal(true)} activeTab={activeTab} />
 
-      {/* Mobile Actions */}
-      <div className={cn("flex sm:hidden flex-wrap gap-2 px-1", activeTab === 'return' && "hidden")}>
-        <Button className="flex-1 gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm" onClick={() => setShowCreateModal(true)}>
-          <Plus className="h-4 w-4" /> Create Waybill
-        </Button>
-      </div>
 
       {/* Table Card */}
       <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">

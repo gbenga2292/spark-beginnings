@@ -860,10 +860,10 @@ export function Sites() {
   useSetPageTitle(
     selectedClient ? `${selectedClient.name} Sites` : 'Sites Management',
     selectedClient ? `Manage sites, view communications and details for ${selectedClient.name}` : 'Manage project sites, clients, and technical onboarding summaries',
-    <div className="hidden sm:flex items-center gap-2">
+    <div className="flex items-center gap-2 md:gap-3">
       {canImport && (
-        <label className="flex items-center gap-2 px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
-          <Upload className="h-3.5 w-3.5 text-indigo-500" /> Import Sites
+        <label className="flex items-center gap-2 px-2 sm:px-3 h-9 bg-white rounded-md border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-tight cursor-pointer hover:bg-slate-50 transition-all shadow-sm">
+          <Upload className="h-3.5 w-3.5 text-indigo-500" /> <span className="hidden sm:inline">Import Sites</span>
           <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
         </label>
       )}
@@ -871,10 +871,10 @@ export function Sites() {
         <Button 
           variant="outline" 
           size="sm" 
-          className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
+          className="gap-2 h-9 px-2 sm:px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight shadow-sm"
           onClick={handleExportExcel}
         >
-          <Download className="h-3.5 w-3.5 text-emerald-500" /> Export Excel
+          <Download className="h-3.5 w-3.5 text-emerald-500" /> <span className="hidden sm:inline">Export Excel</span>
         </Button>
       )}
 
@@ -885,17 +885,7 @@ export function Sites() {
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
       
-      {/* ── Mobile Actions ── */}
-      <div className="flex sm:hidden flex-col gap-3 px-1">
-        <div className="flex flex-wrap gap-2">
-
-          {canExport && (
-            <Button variant="outline" className="flex-1 gap-2 text-[11px] font-bold uppercase tracking-tight" onClick={handleExportExcel}>
-              <Download className="h-4 w-4 text-emerald-500" /> Export
-            </Button>
-          )}
-        </div>
-      </div>
+      {/* ── Mobile Actions Removed ── */}
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col min-h-[500px]">
         {/* Unified Header with Tabs and Search */}
