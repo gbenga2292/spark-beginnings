@@ -172,8 +172,28 @@ function SiteLogCard({
       <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500" />
       <div className="flex items-start sm:items-center justify-between mb-3 pl-2">
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 pr-6">
-          <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{entry.siteName}</span>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 font-medium w-fit">
+          <div className="flex items-center gap-2 flex-wrap w-full">
+            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{entry.siteName}</span>
+            <div className="flex items-center gap-1.5 ml-10 sm:ml-16">
+              <button 
+                type="button"
+                title="Take Photo or Video"
+                onClick={() => cameraInputRef.current?.click()}
+                className="h-7 w-7 rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 active:scale-90 transition-transform shadow-sm"
+              >
+                <Camera className="h-3.5 w-3.5" />
+              </button>
+              <button 
+                type="button"
+                title="Add from Gallery"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-7 w-7 rounded-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-90 transition-transform shadow-sm"
+              >
+                <ImageIcon className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 font-medium w-fit mt-1 sm:mt-0">
             {entry.clientName}
           </span>
         </div>
@@ -215,63 +235,35 @@ function SiteLogCard({
       <div className="pl-2">
         {activeTab === 'general' ? (
           <div className="space-y-4">
-            <textarea value={entry.narration || ''} onChange={e => onChangeNarration(e.target.value)}
-              rows={4} placeholder="Type your field notes here..."
-              className="w-full text-base sm:text-sm border border-slate-200 dark:border-slate-700 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 dark:bg-slate-950 transition-all placeholder:text-slate-400" />
-            
-            {/* Media Storage Section */}
-            <div className="border-t border-slate-100 dark:border-slate-800 pt-4">
-              {/* Hidden file inputs */}
-              {/* Camera capture — opens native camera on Android */}
-              <input
-                type="file"
-                ref={cameraInputRef}
-                className="hidden"
-                accept="image/*,video/*"
-                capture="environment"
-                onChange={handleFileChange}
-              />
-              {/* Gallery picker — allows multi-select from files */}
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                multiple
-                accept="image/*,video/*"
-                onChange={handleFileChange}
-              />
+            {/* Hidden file inputs */}
+            <input
+              type="file"
+              ref={cameraInputRef}
+              className="hidden"
+              accept="image/*,video/*"
+              capture="environment"
+              onChange={handleFileChange}
+            />
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              multiple
+              accept="image/*,video/*"
+              onChange={handleFileChange}
+            />
 
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
+            {/* Media Storage Section - Images above text area, completely hidden if empty */}
+            {(uploadedMedia.length > 0 || mediaPreviews.length > 0) && (
+              <div className="pt-1 pb-2">
+                <div className="flex items-center gap-2 mb-3">
                   <ImageIcon className="h-3.5 w-3.5 text-indigo-500" />
                   <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Photos & Videos</span>
-                  {uploadedMedia.length > 0 && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">{uploadedMedia.length}</span>
-                  )}
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
+                    {uploadedMedia.length + mediaPreviews.length}
+                  </span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  {/* Camera button — triggers native camera on Android */}
-                  <button
-                    title="Take Photo or Video"
-                    type="button"
-                    onClick={() => cameraInputRef.current?.click()}
-                    className="h-8 w-8 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition-colors active:scale-90"
-                  >
-                    <Camera className="h-4 w-4" />
-                  </button>
-                  {/* Gallery button */}
-                  <button
-                    title="Attach from Gallery"
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="h-8 w-8 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors active:scale-90"
-                  >
-                    <ImageIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              {(uploadedMedia.length > 0 || mediaPreviews.length > 0) ? (
+                
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {/* Uploaded — clickable to open lightbox */}
                   {uploadedMedia.map((m, i) => (
@@ -343,30 +335,12 @@ function SiteLogCard({
                     <span className="text-[8px] text-slate-400 font-bold">Add</span>
                   </div>
                 </div>
-              ) : (
-                /* Empty state: camera tile + gallery tile side by side */
-                <div className="grid grid-cols-2 gap-2">
-                  <div
-                    onClick={() => cameraInputRef.current?.click()}
-                    className="rounded-xl border-2 border-dashed border-indigo-200 dark:border-indigo-800 py-5 flex flex-col items-center justify-center cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors gap-2 group"
-                  >
-                    <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-500 group-hover:scale-110 transition-transform">
-                      <Camera className="h-5 w-5" />
-                    </div>
-                    <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest">Camera</span>
-                  </div>
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 py-5 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors gap-2 group"
-                  >
-                    <div className="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:scale-110 transition-transform">
-                      <ImageIcon className="h-5 w-5" />
-                    </div>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Gallery</span>
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
+
+            <textarea value={entry.narration || ''} onChange={e => onChangeNarration(e.target.value)}
+              rows={4} placeholder="Type your field notes here..."
+              className="w-full text-base sm:text-sm border border-slate-200 dark:border-slate-700 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 dark:bg-slate-950 transition-all placeholder:text-slate-400" />
 
             {/* WhatsApp-style fullscreen media viewer */}
             {lightboxIndex !== null && uploadedMedia.length > 0 && (
@@ -829,22 +803,30 @@ export function DailyJournal() {
       const entryCount = siteJournalEntries.filter(e => dayJs.some(j => j.id === e.journalId)).length;
       const isT = isSameDay(day, new Date());
       return (
-        <div key={ds} className={cn('border-b border-r border-border p-2 flex flex-col min-h-[100px] group relative', isT && 'bg-blue-50/50 dark:bg-blue-950/20')}>
-          <div className="flex items-center justify-between mb-1">
-            <span className={cn('text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full transition-colors', isT ? 'bg-blue-600 text-white' : 'text-muted-foreground group-hover:text-blue-600')}>
+        <div key={ds} className={cn('border-b border-r border-border p-1 sm:p-2 flex flex-col min-h-[70px] sm:min-h-[100px] group relative', isT && 'bg-blue-50/50 dark:bg-blue-950/20')}>
+          <div className="flex items-center justify-center sm:justify-between mb-1">
+            <span className={cn('text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full transition-colors mx-auto sm:mx-0', isT ? 'bg-blue-600 text-white' : 'text-muted-foreground group-hover:text-blue-600')}>
               {format(day, 'd')}
             </span>
             {currentUser?.privileges?.dailyJournal?.canAdd && (
               <button onClick={e => { e.stopPropagation(); openModal(undefined, ds); }}
-                className="w-5 h-5 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-sm text-xs">
+                className="hidden sm:flex w-5 h-5 rounded-full bg-blue-600 hover:bg-blue-700 text-white items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-sm text-xs">
                 <Plus className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
           {dayJs.length > 0 && (
-            <button onClick={() => setDiaryDate(ds)} className="mt-1 text-left w-full">
-              <div className="text-[10px] font-medium px-1.5 py-1 rounded bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-100 transition-colors">
+            <button onClick={() => setDiaryDate(ds)} className="mt-auto sm:mt-1 text-left w-full">
+              {/* Desktop View */}
+              <div className="hidden sm:block text-[10px] font-medium px-1.5 py-1 rounded bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-100 transition-colors truncate">
                 {entryCount} log{entryCount !== 1 ? 's' : ''} · {dayJs.length} session{dayJs.length !== 1 ? 's' : ''}
+              </div>
+              {/* Mobile View */}
+              <div className="sm:hidden flex items-center justify-center">
+                <div className="flex items-center justify-center gap-1 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
+                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0"></div>
+                  <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 leading-none">{entryCount}</span>
+                </div>
               </div>
             </button>
           )}
@@ -911,19 +893,18 @@ export function DailyJournal() {
     return (
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen} fullScreenMobile>
         <DialogContent className="max-w-none w-full h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-w-2xl sm:max-h-[90vh] flex flex-col overflow-hidden p-0 !rounded-none sm:!rounded-xl border-0 sm:border !m-0 sm:!m-auto">
-          <DialogHeader className="px-4 sm:px-6 py-4 sm:py-5 border-b border-border bg-slate-50 dark:bg-slate-900 flex-shrink-0">
-            <DialogTitle className="text-lg font-bold">{editingId ? 'Edit Log Session' : 'New Log Session'}</DialogTitle>
+          <DialogHeader className="pl-4 pr-10 sm:px-6 py-3 sm:py-4 border-b border-border bg-slate-50 dark:bg-slate-900 flex-shrink-0 relative">
+            <div className="flex items-center justify-start gap-4">
+              <DialogTitle className="text-sm sm:text-lg font-bold truncate shrink-0">{editingId ? 'Edit Log' : 'New Log'}</DialogTitle>
+              <Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} className="h-8 sm:h-10 w-[130px] sm:w-44 text-xs sm:text-sm font-medium bg-white dark:bg-slate-950 shrink-0 px-2 sm:px-3" />
+            </div>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-6 bg-white dark:bg-slate-950">
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Date</label>
-              <Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} className="h-11 w-full sm:max-w-xs text-base sm:text-sm" />
-            </div>
-            <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Add Site Activity</label>
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-col sm:flex-row gap-2 w-full">
                 <select value={selectedSiteId} onChange={e => setSelectedSiteId(e.target.value)}
-                  className="flex-1 h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-slate-900 dark:border-slate-700">
+                  className="w-full sm:flex-1 h-11 rounded-md border border-slate-200 bg-white px-3 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-slate-900 dark:border-slate-700">
                   <option value="">Select site...</option>
                   {activeSites.map(s => <option key={s.id} value={s.id}>{s.name} ({s.client})</option>)}
                 </select>
