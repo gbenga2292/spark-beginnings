@@ -77,7 +77,7 @@ export function Tasks() {
 ═══════════════════════════════════════════════════════════════════════════════ */
 function applySortToMainTasks(tasks: MainTask[], sortBy: SortOption, allSubtasks: SubTask[]) {
   return [...tasks].sort((a, b) => {
-    const statusRank: Record<string, number> = { "not_started": 1, "in_progress": 2, "pending_approval": 3, "completed": 4 };
+    const statusRank: Record<string, number> = { "pending_approval": 1, "not_started": 2, "in_progress": 3, "completed": 4 };
     const statusA = deriveMainTaskStatus(a.id, allSubtasks);
     const statusB = deriveMainTaskStatus(b.id, allSubtasks);
 

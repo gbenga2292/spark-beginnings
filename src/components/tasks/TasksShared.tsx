@@ -226,7 +226,7 @@ export function urgencyScore(sub: { deadline?: string; status: string }) {
 
 export function applySortToSubs<T extends { title: string; deadline?: string; status: string; createdAt?: string; created_at?: string }>(list: T[], sort: SortOption): T[] {
   const sorted = [...list];
-  const statusRank: Record<string, number> = { "not_started": 1, "in_progress": 2, "pending_approval": 3, "completed": 4 };
+  const statusRank: Record<string, number> = { "pending_approval": 1, "not_started": 2, "in_progress": 3, "completed": 4 };
 
   sorted.sort((a, b) => {
     // 1. Always group by status first

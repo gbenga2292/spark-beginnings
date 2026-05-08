@@ -1206,7 +1206,7 @@ export function Employees() {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-indigo-600 p-4 flex justify-between items-center rounded-t-lg">
+          <div className="sticky top-0 z-20 bg-indigo-600 p-4 flex justify-between items-center rounded-t-lg">
             <h3 className="text-white font-bold text-lg">Employee Details</h3>
             <Button variant="ghost" size="sm" className="text-white hover:bg-indigo-700" onClick={closeViewModal}>
               <X className="h-5 w-5" />
