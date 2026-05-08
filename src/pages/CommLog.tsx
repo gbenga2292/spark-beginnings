@@ -18,7 +18,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Badge } from '@/src/components/ui/badge';
 import type { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
-import { useAppData } from '@/src/contexts/AppDataContext';
+import { useAppData, deriveMainTaskStatus } from '@/src/contexts/AppDataContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 
@@ -1295,6 +1295,7 @@ interface LogCardProps {
   isAdmin: boolean;
   isChild?: boolean;
   mainTasks: any[];
+  subtasks: any[];
   onNavigateTask: (taskId: string) => void;
   // thread collapse props (only meaningful on parent/non-child cards)
   childCount?: number;
@@ -1302,7 +1303,7 @@ interface LogCardProps {
   onToggleThread?: () => void;
 }
 
-function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, isDark, expanded, onToggleExpand, currentUserName, isAdmin, isChild, mainTasks, onNavigateTask, childCount, isThreadCollapsed, onToggleThread }: LogCardProps) {
+function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, isDark, expanded, onToggleExpand, currentUserName, isAdmin, isChild, mainTasks, subtasks, onNavigateTask, childCount, isThreadCollapsed, onToggleThread }: LogCardProps) {
   const canDelete = isAdmin || log.loggedBy === currentUserName;
   const isOverdue = log.followUpDate && !log.followUpDone && isBefore(parseISO(log.followUpDate), startOfDay(new Date()));
 
@@ -1528,7 +1529,7 @@ function LogCard({ log, onEdit, onDelete, onToggleFollowUp, onAddFollowUpNote, i
                 <ClipboardList className="w-3.5 h-3.5 opacity-70" />
                 {t.title}
                 <Badge variant="outline" className="ml-1 h-4 px-1.5 text-[9px] bg-white/50 dark:bg-black/20 border-current/20 font-bold uppercase rounded text-current">
-                  {t.status?.replace('_', ' ') || 'pending'}
+                  {deriveMainTaskStatus(t.id, subtasks).replace(/_/g, ' ')}
                 </Badge>
               </button>
             ))}
@@ -1551,7 +1552,7 @@ export function CommLog() {
   const addCommLog = useAppStore(s => s.addCommLog);
   const updateCommLog = useAppStore(s => s.updateCommLog);
   const deleteCommLog = useAppStore(s => s.deleteCommLog);
-  const { mainTasks } = useAppData();
+  const { mainTasks, subtasks } = useAppData();
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1946,6 +1947,7 @@ export function CommLog() {
                       currentUserName={currentUser?.name || ''}
                       isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
                       mainTasks={mainTasks}
+                      subtasks={subtasks}
                       onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
                     />
 
@@ -1964,6 +1966,7 @@ export function CommLog() {
                         currentUserName={currentUser?.name || ''}
                         isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
                         mainTasks={mainTasks}
+                        subtasks={subtasks}
                         onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
                       />
                     ))}
@@ -1990,7 +1993,7 @@ export function CommLog() {
                         {linkedTasks.map(task => (
                           <button
                             key={task.id}
-                            onClick={() => navigate('/tasks')}
+                            onClick={() => navigate(`/tasks?openTask=${task.id}`)}
                             className={cn(
                               'w-full text-left flex items-center gap-3 p-3 rounded-lg border transition-all hover:shadow-sm',
                               isDark
@@ -2014,7 +2017,7 @@ export function CommLog() {
                                 ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400'
                                 : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                             )}>
-                              {task.status?.replace('_', ' ') || 'pending'}
+                              {deriveMainTaskStatus(task.id, subtasks).replace(/_/g, ' ')}
                             </span>
                           </button>
                         ))}
@@ -2231,6 +2234,7 @@ export function CommLog() {
                                         currentUserName={currentUser?.name || ''}
                                         isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
                                         mainTasks={mainTasks}
+                                        subtasks={subtasks}
                                         onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
                                         childCount={hasChildren ? children.length : undefined}
                                         isThreadCollapsed={isThreadCollapsed}
@@ -2271,6 +2275,7 @@ export function CommLog() {
                                         currentUserName={currentUser?.name || ''}
                                         isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'co-admin'}
                                         mainTasks={mainTasks}
+                                        subtasks={subtasks}
                                         onNavigateTask={(taskId) => navigate(`/tasks?openTask=${taskId}`)}
                                       />
                                     </div>

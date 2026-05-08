@@ -190,7 +190,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const isElectron = !!(window as any).electronAPI?.isElectron;
 
   // ── Android Auto-Update Logic (mobile-only) ────────────────────────────
-  const CURRENT_VERSION = '1.4.12'; // Matches package.json
+  const CURRENT_VERSION = '1.4.13'; // Matches package.json
   const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
   
   const [updateInfo, setUpdateInfo] = useState<{ version: string; url: string; notes: string } | null>(null);
@@ -200,11 +200,15 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const startDownload = async (url: string) => {
     try {
       setDownloadProgress(0);
+      
       const response = await fetch(url);
-      if (!response.ok) throw new Error('Download failed');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const contentLength = Number(response.headers.get('Content-Length'));
       if (!contentLength) {
+        // If the server doesn't send Content-Length or CORS blocks it, fallback to direct open
         window.open(url, '_blank');
         setDownloadProgress(null);
         return;
@@ -214,7 +218,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
       if (!reader) throw new Error('Could not start download');
 
       let receivedLength = 0;
-      while(true) {
+      while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         receivedLength += value.length;
@@ -223,11 +227,15 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
 
       setDownloadProgress(null);
       setIsUpdateModalOpen(false);
-      window.open(url, '_blank');
+      
+      // Open the URL to trigger the actual Android file download/install intent
+      // We MUST use '_system' so it escapes the WebView and uses the native Android download manager
+      window.open(url, '_system');
       toast.success('Download complete! Installing...');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Download failed:', err);
-      toast.error('Download failed. Please try again.');
+      // If it fails due to CORS, provide a clear fallback
+      toast.error(`Download failed: ${err.message}. Check CORS or URL.`);
       setDownloadProgress(null);
     }
   };

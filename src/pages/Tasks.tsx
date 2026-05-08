@@ -84,7 +84,7 @@ function applySortToMainTasks(tasks: MainTask[], sortBy: SortOption, allSubtasks
     if (statusA !== statusB) {
       return (statusRank[statusA] || 99) - (statusRank[statusB] || 99);
     }
-    
+
     switch (sortBy) {
       case 'alpha': return (a.title || '').localeCompare(b.title || '');
       case 'date_asc': return (a.deadline ?? '9999').localeCompare(b.deadline ?? '9999');
@@ -124,7 +124,7 @@ function PersonalTasksView() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const { hrVariables } = useAppStore();
-  
+
   const [viewMode, setViewModeState] = useState<TaskViewMode>(() => (localStorage.getItem('tf_default_view') as TaskViewMode) || loadDefaultView());
 
   const setViewMode = (v: TaskViewMode) => {
@@ -152,15 +152,15 @@ function PersonalTasksView() {
       }
       setTimeout(() => document.getElementById(`task-row-${openTaskId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
     }
-    
+
     // Clear 'open' and 'openTask' params
     if (openId || openTaskId) {
-       setSearchParams(prev => {
-         const next = new URLSearchParams(prev);
-         next.delete("open");
-         next.delete("openTask");
-         return next;
-       }, { replace: true });
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.delete("open");
+        next.delete("openTask");
+        return next;
+      }, { replace: true });
     }
   }, [searchParams, setSearchParams, subtasks]);
 
@@ -179,18 +179,18 @@ function PersonalTasksView() {
     const status = deriveMainTaskStatus(mt.id, wsSubs);
     const searchMatch = (mt.title.toLowerCase().includes(search.toLowerCase()) ||
       mt.description.toLowerCase().includes(search.toLowerCase())) &&
-    (priorityFilter === 'all' || mt.priority === priorityFilter);
-    
+      (priorityFilter === 'all' || mt.priority === priorityFilter);
+
     if (!searchMatch) return false;
-    
+
     if (statusFilter === 'all') return status !== 'completed';
     return status === statusFilter;
   });
 
-  const viewableReminders = React.useMemo(() => 
+  const viewableReminders = React.useMemo(() =>
     reminders.filter(r => r.isActive && (
-      r.createdBy === currentUser?.id || 
-      r.recipientIds?.length === 0 || 
+      r.createdBy === currentUser?.id ||
+      r.recipientIds?.length === 0 ||
       r.recipientIds?.includes(currentUser?.id ?? '')
     )),
     [reminders, currentUser?.id]
@@ -217,10 +217,10 @@ function PersonalTasksView() {
         </DropdownMenuContent>
       </DropdownMenu>
       <Button size="sm" variant="outline" title="Archive" onClick={() => navigate('/tasks/archive')} className="h-9 w-9 p-0 border-slate-200 text-slate-600 shadow-sm hover:bg-slate-50 transition-all">
-        <Archive className="w-4 h-4 text-slate-400" /> 
+        <Archive className="w-4 h-4 text-slate-400" />
       </Button>
       <Button size="sm" onClick={() => setShowCreate(true)} className="h-9 px-2 sm:px-3 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95">
-        <Plus className="w-4 h-4" /> 
+        <Plus className="w-4 h-4" />
         <span className="hidden sm:inline">New Task</span>
       </Button>
     </div>,
@@ -235,14 +235,14 @@ function PersonalTasksView() {
       {/* Unified Search Toolbar */}
       <div className="relative w-full max-w-md">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-        <Input 
-          placeholder="Search tasks..." 
-          className="pl-9 h-10 text-sm border-slate-200 bg-white shadow-sm transition-all hover:bg-slate-50 focus:bg-white" 
-          value={search} 
-          onChange={e => setSearch(e.target.value)} 
+        <Input
+          placeholder="Search tasks..."
+          className="pl-9 h-10 text-sm border-slate-200 bg-white shadow-sm transition-all hover:bg-slate-50 focus:bg-white"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
         />
         {search && (
-          <button 
+          <button
             onClick={() => setSearch('')}
             className="absolute right-3 top-2.5 p-1 rounded-full hover:bg-slate-100 transition-colors"
           >
@@ -312,8 +312,8 @@ function PersonalTasksView() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0 overflow-x-auto hide-scrollbar">
             {STATUS_TABS.map(tab => {
               const isActive = statusFilter === tab.value;
-              const count = tab.value === "all" 
-                ? wsTasks.filter(mt => deriveMainTaskStatus(mt.id, wsSubs) !== 'completed').length 
+              const count = tab.value === "all"
+                ? wsTasks.filter(mt => deriveMainTaskStatus(mt.id, wsSubs) !== 'completed').length
                 : wsTasks.filter(mt => deriveMainTaskStatus(mt.id, wsSubs) === tab.value).length;
               if (tab.value !== 'all' && count === 0) return null;
               return (
@@ -444,33 +444,33 @@ function PersonalTasksView() {
                                             {sub.title}
                                           </p>
                                           <div className="flex items-center gap-2 mt-0.5">
-                                           {(() => {
-                                             const raw = (sub as SubTask).description || '';
-                                             if (!raw) return null;
-                                             try {
-                                               if (raw.trim().startsWith('{')) {
-                                                 const m = JSON.parse(raw);
-                                                 if (m.narration) return <p className="text-[11px] text-indigo-500 truncate font-medium">{m.narration}</p>;
-                                                 
-                                                 if (m.refType) {
-                                                   let label = '';
-                                                   if (m.refType === 'leave' && m.workflowStep) {
-                                                     label = `Step ${m.workflowStep}/4 · ${m.leaveType || ''} Leave Approval${m.duration ? ` · ${m.duration} day(s)` : ''}`;
-                                                   } else if (m.refType === 'hmo') {
-                                                     label = `HMO Renewal Request`;
-                                                   } else if (m.refType === 'salary_advance' || m.refType === 'loan') {
-                                                     label = `${m.refType === 'loan' ? 'Loan' : 'Salary Advance'} Application`;
-                                                   } else if (m.refType === 'site') {
-                                                     label = `Site Onboarding Workflow`;
-                                                   } else if (m.refType === 'vehicle_doc_renewal') {
-                                                     label = `Vehicle Document Renewal`;
-                                                   }
-                                                   if (label) return <p className="text-[11px] text-indigo-500 truncate font-medium">{label}</p>;
-                                                 }
-                                               }
-                                             } catch {}
-                                             return <p className="text-[11px] text-muted-foreground truncate">{raw}</p>;
-                                           })()}
+                                            {(() => {
+                                              const raw = (sub as SubTask).description || '';
+                                              if (!raw) return null;
+                                              try {
+                                                if (raw.trim().startsWith('{')) {
+                                                  const m = JSON.parse(raw);
+                                                  if (m.narration) return <p className="text-[11px] text-indigo-500 truncate font-medium">{m.narration}</p>;
+
+                                                  if (m.refType) {
+                                                    let label = '';
+                                                    if (m.refType === 'leave' && m.workflowStep) {
+                                                      label = `Step ${m.workflowStep}/4 · ${m.leaveType || ''} Leave Approval${m.duration ? ` · ${m.duration} day(s)` : ''}`;
+                                                    } else if (m.refType === 'hmo') {
+                                                      label = `HMO Renewal Request`;
+                                                    } else if (m.refType === 'salary_advance' || m.refType === 'loan') {
+                                                      label = `${m.refType === 'loan' ? 'Loan' : 'Salary Advance'} Application`;
+                                                    } else if (m.refType === 'site') {
+                                                      label = `Site Onboarding Workflow`;
+                                                    } else if (m.refType === 'vehicle_doc_renewal') {
+                                                      label = `Vehicle Document Renewal`;
+                                                    }
+                                                    if (label) return <p className="text-[11px] text-indigo-500 truncate font-medium">{label}</p>;
+                                                  }
+                                                }
+                                              } catch { }
+                                              return <p className="text-[11px] text-muted-foreground truncate">{raw}</p>;
+                                            })()}
                                           </div>
                                         </div>
                                       </div>
@@ -503,8 +503,8 @@ function PersonalTasksView() {
 
                               <div className="px-5 py-3 border-t border-indigo-100 dark:border-indigo-900/30 flex items-center justify-between gap-2">
                                 <AddSubtaskInline mainTaskId={mt.id} users={users} onAdd={sub => addSubtask(sub)} isPersonal />
-                                <DeleteTaskButton 
-                                  onConfirm={() => deleteMainTask(mt.id)} 
+                                <DeleteTaskButton
+                                  onConfirm={() => deleteMainTask(mt.id)}
                                   isCompleted={status === 'completed'}
                                   canManageUsers={me?.privileges?.users?.canManage}
                                 />
@@ -550,18 +550,18 @@ function PersonalTasksView() {
         <CreateProjectDialog
           isEditing={true}
           initialData={{
-             name: editingTask.title,
-             serviceType: "",
-             status: "Active",
-             endDate: editingTask.deadline,
+            name: editingTask.title,
+            serviceType: "",
+            status: "Active",
+            endDate: editingTask.deadline,
           }}
           onClose={() => setEditingTask(null)}
           onSubmit={(payload) => {
-             updateMainTask(editingTask.id, {
-                 title: payload.name,
-                 deadline: payload.endDate || undefined,
-             });
-             setEditingTask(null);
+            updateMainTask(editingTask.id, {
+              title: payload.name,
+              deadline: payload.endDate || undefined,
+            });
+            setEditingTask(null);
           }}
           users={[]}
           currentUserId={currentUser?.id ?? ""}
@@ -604,7 +604,7 @@ function AdminTasksView() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [assignDialog, setAssignDialog] = useState<{ subtaskId: string; current: string | null } | null>(null);
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
-  
+
   const [scope, setScopeState] = useState<'all' | 'mine' | 'pending_review' | 'projects'>(() => (localStorage.getItem('tf_default_scope') as any) || 'mine');
   const [viewMode, setViewModeState] = useState<TaskViewMode>(() => (localStorage.getItem('tf_default_view') as TaskViewMode) || loadDefaultView());
 
@@ -635,7 +635,7 @@ function AdminTasksView() {
       // but they are restricted from seeing standard company tasks unless explicitly assigned/created.
       if (isExternalHr) {
         if (mt.isHrTask) return true;
-        
+
         const isAssigned = (mt.assignedTo || '').includes(myId);
         return mt.createdBy === myId || isAssigned;
       }
@@ -668,7 +668,7 @@ function AdminTasksView() {
       setExpanded(prev => new Set([...prev, openTaskId]));
       setTimeout(() => document.getElementById(`task-row-${openTaskId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
     }
-    
+
     // Process scope
     const paramScope = searchParams.get("scope");
     if (paramScope === 'projects') {
@@ -681,29 +681,29 @@ function AdminTasksView() {
       if (proj) {
         const mt = mainTasks.find(m => m.id === proj.mainTaskId || (m.isProject && m.title === proj.name));
         if (mt) {
-           setExpanded(prev => new Set([...prev, mt.id]));
+          setExpanded(prev => new Set([...prev, mt.id]));
         }
         setTimeout(() => {
-           const el = document.getElementById(`proj-card-${proj.id}`);
-           if (el) {
-             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-             el.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'transition-all', 'duration-500');
-             setTimeout(() => el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2'), 1500);
-           }
+          const el = document.getElementById(`proj-card-${proj.id}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'transition-all', 'duration-500');
+            setTimeout(() => el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2'), 1500);
+          }
         }, 300);
       }
     }
 
     // Clear params
     if (openId || openTaskId || paramScope || openProjectName) {
-       setSearchParams(prev => {
-         const next = new URLSearchParams(prev);
-         next.delete("open");
-         next.delete("openTask");
-         next.delete("scope");
-         next.delete("openProject");
-         return next;
-       }, { replace: true });
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.delete("open");
+        next.delete("openTask");
+        next.delete("scope");
+        next.delete("openProject");
+        return next;
+      }, { replace: true });
     }
   }, [searchParams, setSearchParams, subtasks, projects, mainTasks, statusFilter, myStatusFilter, teamWs?.id, hrVariables.taskArchiveRetentionDays]);
 
@@ -716,21 +716,21 @@ function AdminTasksView() {
 
   const employees = useAppStore(state => state.employees);
   const activeEmpIds = new Set(employees.filter(e => e.status === 'Active' || e.status === 'On Leave').map(e => e.id));
-  
+
   const activeUsers = wsMembers;
   const teamSubtaskIds = new Set(teamTasks.map(mt => mt.id));
   const teamSubtasks = subtasks.filter(s => teamSubtaskIds.has(s.mainTaskId));
   const mySubs = teamSubtasks.filter(s => {
     if (!currentUser?.id) return false;
-    
+
     const mt = teamTasks.find(m => m.id === s.mainTaskId);
     const isHr = !!mt?.isHrTask;
     const isCreator = s.createdBy === currentUser.id || mt?.createdBy === currentUser.id;
-    
+
     let isAssigned = false;
     if (s.assignedTo) {
-      const assignees = typeof s.assignedTo === 'string' 
-        ? s.assignedTo.split(',').map((id: string) => id.trim()) 
+      const assignees = typeof s.assignedTo === 'string'
+        ? s.assignedTo.split(',').map((id: string) => id.trim())
         : Array.isArray(s.assignedTo) ? s.assignedTo : [];
       isAssigned = assignees.includes(currentUser.id);
     }
@@ -747,7 +747,7 @@ function AdminTasksView() {
     { label: "All", value: "all" },
     { label: "Not Started", value: "not_started" },
     { label: "In Progress", value: "in_progress" },
-    { label: "Approval Needed", value: "pending_approval" },
+    { label: "Approval", value: "pending_approval" },
     { label: "Completed", value: "completed" },
   ] as const;
 
@@ -755,7 +755,7 @@ function AdminTasksView() {
     { label: "All", value: "all" },
     { label: "Not Started", value: "not_started" },
     { label: "In Progress", value: "in_progress" },
-    { label: "Approval Needed", value: "pending_approval" },
+    { label: "Approval", value: "pending_approval" },
     { label: "Done", value: "completed" },
   ] as const;
 
@@ -775,19 +775,19 @@ function AdminTasksView() {
 
   const filteredMySubs = mySubs.filter(sub => {
     const mt = mainTasks.find(m => m.id === sub.mainTaskId);
-    const searchMatch = (sub.title?.toLowerCase().includes(mySearch.toLowerCase()) || 
-                         mt?.title?.toLowerCase().includes(mySearch.toLowerCase()));
-    
+    const searchMatch = (sub.title?.toLowerCase().includes(mySearch.toLowerCase()) ||
+      mt?.title?.toLowerCase().includes(mySearch.toLowerCase()));
+
     if (!searchMatch) return false;
-    
+
     if (myStatusFilter === 'all') return sub.status !== 'completed';
     return sub.status === myStatusFilter;
   });
 
-  const viewableReminders = React.useMemo(() => 
+  const viewableReminders = React.useMemo(() =>
     reminders.filter(r => r.isActive && (
-      r.createdBy === currentUser?.id || 
-      r.recipientIds?.length === 0 || 
+      r.createdBy === currentUser?.id ||
+      r.recipientIds?.length === 0 ||
       r.recipientIds?.includes(currentUser?.id ?? '')
     )),
     [reminders, currentUser?.id]
@@ -819,7 +819,7 @@ function AdminTasksView() {
           </DropdownMenuContent>
         </DropdownMenu>
         <Button size="sm" variant="outline" title="Archive" onClick={() => navigate('/tasks/archive')} className="h-9 w-9 p-0 border-slate-200 text-slate-600 shadow-sm hover:bg-slate-50 transition-all">
-          <Archive className="w-4 h-4 text-slate-400" /> 
+          <Archive className="w-4 h-4 text-slate-400" />
         </Button>
         <Button size="sm" onClick={() => scope === 'projects' ? setShowCreateProject(true) : setShowCreate(true)} className="h-9 px-2 sm:px-3 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95">
           {scope === 'projects' ? <FolderOpen className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
@@ -848,14 +848,14 @@ function AdminTasksView() {
       {/* Unified Search Toolbar */}
       <div className="relative w-full max-w-md">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-        <Input 
-          placeholder="Search tasks..." 
-          className="pl-9 h-10 text-sm border-slate-200 bg-white shadow-sm transition-all hover:bg-slate-50 focus:bg-white" 
-          value={scope === 'mine' ? mySearch : search} 
-          onChange={e => scope === 'mine' ? setMySearch(e.target.value) : setSearch(e.target.value)} 
+        <Input
+          placeholder="Search tasks..."
+          className="pl-9 h-10 text-sm border-slate-200 bg-white shadow-sm transition-all hover:bg-slate-50 focus:bg-white"
+          value={scope === 'mine' ? mySearch : search}
+          onChange={e => scope === 'mine' ? setMySearch(e.target.value) : setSearch(e.target.value)}
         />
         {(scope === 'mine' ? mySearch : search) && (
-          <button 
+          <button
             onClick={() => scope === 'mine' ? setMySearch('') : setSearch('')}
             className="absolute right-3 top-2.5 p-1 rounded-full hover:bg-slate-100 transition-colors"
           >
@@ -936,15 +936,15 @@ function AdminTasksView() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <TaskInboxView
             subtasks={
-              scope === 'mine' ? mySubs : 
-              scope === 'pending_review' ? pendingApprovalSubs :
-              scope === 'projects' ? teamSubtasks.filter(s => tabFiltered.find(m => m.is_project && m.id === s.mainTaskId)) : 
-              teamSubtasks
+              scope === 'mine' ? mySubs :
+                scope === 'pending_review' ? pendingApprovalSubs :
+                  scope === 'projects' ? teamSubtasks.filter(s => tabFiltered.find(m => m.is_project && m.id === s.mainTaskId)) :
+                    teamSubtasks
             }
             mainTasks={
-              scope === 'projects' ? tabFiltered.filter(m => m.is_project) : 
-              scope === 'pending_review' ? teamTasks.filter(mt => pendingApprovalSubs.some(s => s.mainTaskId === mt.id)) :
-              teamTasks
+              scope === 'projects' ? tabFiltered.filter(m => m.is_project) :
+                scope === 'pending_review' ? teamTasks.filter(mt => pendingApprovalSubs.some(s => s.mainTaskId === mt.id)) :
+                  teamTasks
             }
             users={activeUsers}
             activeSubtaskId={openSubtaskId}
@@ -1040,10 +1040,10 @@ function AdminTasksView() {
                 {wsProjects.map(proj => {
                   let mt = mainTasks.find(m => m.id === proj.mainTaskId);
                   if (!mt) {
-                      // fallback for site objects
-                      mt = mainTasks.find(m => m.is_project && m.title === proj.name);
+                    // fallback for site objects
+                    mt = mainTasks.find(m => m.is_project && m.title === proj.name);
                   }
-                  
+
                   const projSubs = mt ? subtasks.filter(s => s.mainTaskId === mt.id || s.main_task_id === mt.id) : [];
                   const completed = projSubs.filter(s => s.status === 'completed').length;
                   const total = projSubs.length;
@@ -1077,9 +1077,9 @@ function AdminTasksView() {
                           }
                         }}
                         className="p-4 hover:bg-muted/30 cursor-pointer transition-colors relative group">
-                        
+
                         {mt && currentUser?.id === mt.createdBy && (
-                          <button 
+                          <button
                             onClick={(e) => { e.stopPropagation(); setEditingTask(mt); }}
                             className="absolute top-4 right-4 p-1.5 opacity-0 group-hover:opacity-100 rounded-md hover:bg-muted text-muted-foreground hover:text-primary transition-all z-10"
                             title="Edit underlying Main Task"
@@ -1090,10 +1090,10 @@ function AdminTasksView() {
 
                         <div className="flex items-start justify-between gap-3 pr-8">
                           <div className="min-w-0 flex-1 flex items-start gap-2">
-                             <div className="text-muted-foreground flex-shrink-0 mt-0.5">
-                               {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                             </div>
-                             <div>
+                            <div className="text-muted-foreground flex-shrink-0 mt-0.5">
+                              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            </div>
+                            <div>
                               <div className="flex items-center gap-2 mb-1">
                                 <h4 className="text-sm font-semibold text-foreground truncate">{proj.name}</h4>
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase">{proj.serviceType}</span>
@@ -1193,8 +1193,8 @@ function AdminTasksView() {
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-primary hover:border-primary/30 transition-all">
                                     <MessageSquare className="w-3 h-3" /> Chat
                                   </button>
-                                  <DeleteTaskButton 
-                                    onConfirm={() => deleteMainTask(mt.id)} 
+                                  <DeleteTaskButton
+                                    onConfirm={() => deleteMainTask(mt.id)}
                                     isCompleted={pct === 100}
                                     canManageUsers={me?.privileges?.users?.canManage}
                                   />
@@ -1221,7 +1221,7 @@ function AdminTasksView() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex items-center gap-1 mb-4 border-b border-border pb-0 overflow-x-auto">
             {MY_STATUS_TABS.map(tab => {
               const isActive = myStatusFilter === tab.value;
-              const count = tab.value === "all" ? mySubs.filter(s => s.status !== 'completed').length 
+              const count = tab.value === "all" ? mySubs.filter(s => s.status !== 'completed').length
                 : mySubs.filter(s => s.status === tab.value).length;
               if (tab.value !== 'all' && count === 0) return null;
               return (
@@ -1295,7 +1295,7 @@ function AdminTasksView() {
                           {mt && <p className="text-xs text-muted-foreground truncate mt-0.5">{mt.title}</p>}
                         </div>
                       </div>
-                      
+
                       <div className="flex flex-wrap items-center gap-2 sm:ml-auto w-full sm:w-auto">
                         {(sub as SubTask).priority && <PriorityBadge priority={(sub as SubTask).priority} size="xs" />}
                         {sub.deadline && (
@@ -1337,7 +1337,7 @@ function AdminTasksView() {
                     transition={{ delay: i * 0.03, duration: 0.25 }}
                     onClick={() => setOpenSubtaskId(sub.id ?? null)}
                     className="flex flex-col sm:flex-row items-start sm:items-center gap-3 px-4 py-3.5 bg-card border border-amber-200 dark:border-amber-800/30 rounded-xl hover:shadow-sm transition-all cursor-pointer group border-l-4 border-l-amber-400 relative">
-                    
+
                     <div className="flex items-center gap-3 w-full sm:w-auto min-w-0">
                       <div className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
                       <div className="min-w-0 flex-1">
@@ -1362,7 +1362,7 @@ function AdminTasksView() {
                           <span className="text-xs text-muted-foreground">{submitter.name.split(' ')[0]}</span>
                         </div>
                       )}
-                      
+
                       <div className="flex items-center gap-2 ml-auto sm:ml-0">
                         <button
                           onClick={(e) => {
@@ -1451,9 +1451,9 @@ function AdminTasksView() {
                 );
                 const unseenCount = isInvolved
                   ? taskComments.filter(c =>
-                      c.authorId !== myId &&
-                      c.createdAt > readAt
-                    ).length
+                    c.authorId !== myId &&
+                    c.createdAt > readAt
+                  ).length
                   : 0;
 
                 return (
@@ -1465,7 +1465,7 @@ function AdminTasksView() {
                       onClick={() => toggle(mt.id)}
                       onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggle(mt.id)}
                       className="w-full flex flex-col sm:flex-row items-start sm:items-center gap-3 px-4 py-3.5 hover:bg-primary/5 transition-colors text-left cursor-pointer relative">
-                      
+
                       <div className="flex items-center gap-3 w-full sm:w-auto min-w-0">
                         <div className="text-muted-foreground flex-shrink-0">
                           {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -1552,7 +1552,7 @@ function AdminTasksView() {
                                 const parentId = sub.mainTaskId;
                                 const subCmts = comments.filter(c => {
                                   const cMainId = c.main_task_id ?? c.mainTaskId;
-                                  const cSubId  = c.subtask_id  ?? c.subtaskId;
+                                  const cSubId = c.subtask_id ?? c.subtaskId;
                                   return cMainId === parentId || cSubId === sub.id;
                                 });
                                 // Use whichever readAt is more recent (subtask or its parent)
@@ -1615,16 +1615,16 @@ function AdminTasksView() {
                                               } else if (m.refType === 'employee') {
                                                 label = `Staff Status Update`;
                                               }
-                                              
+
                                               if (label) return <p className="text-xs text-indigo-500 truncate font-medium">{label}</p>;
-                                              
+
                                               // If it's JSON but we don't have a label, hide it
                                               return null;
                                             }
                                             // If it's JSON but no refType, hide it
                                             return null;
                                           }
-                                        } catch {}
+                                        } catch { }
                                         return <p className="text-xs text-muted-foreground truncate">{raw}</p>;
                                       })()}
                                     </div>
@@ -1683,8 +1683,8 @@ function AdminTasksView() {
                                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-primary hover:border-primary/30 transition-all">
                                   <MessageSquare className="w-3 h-3" /> Chat
                                 </button>
-                                <DeleteTaskButton 
-                                  onConfirm={() => deleteMainTask(mt.id)} 
+                                <DeleteTaskButton
+                                  onConfirm={() => deleteMainTask(mt.id)}
                                   isCompleted={status === 'completed'}
                                   canManageUsers={me?.privileges?.users?.canManage}
                                 />
@@ -1741,37 +1741,37 @@ function AdminTasksView() {
         <CreateProjectDialog
           isEditing={true}
           initialData={{
-             name: editingTask.title,
-             serviceType: "",
-             status: "Active",
-             endDate: editingTask.deadline,
-             linkedSite: sites.find(s => s.name === editingTask.title)?.name || null,
-             subtasks: teamSubtasks.filter(s => s.mainTaskId === editingTask.id).map(s => ({
-                id: s.id,
-                title: s.title,
-                assignee: s.assignedTo || '',
-                deadline: s.deadline || '',
-                hasUpdate: comments.some(c => c.subtaskId === s.id)
-             }))
+            name: editingTask.title,
+            serviceType: "",
+            status: "Active",
+            endDate: editingTask.deadline,
+            linkedSite: sites.find(s => s.name === editingTask.title)?.name || null,
+            subtasks: teamSubtasks.filter(s => s.mainTaskId === editingTask.id).map(s => ({
+              id: s.id,
+              title: s.title,
+              assignee: s.assignedTo || '',
+              deadline: s.deadline || '',
+              hasUpdate: comments.some(c => c.subtaskId === s.id)
+            }))
           }}
           onClose={() => setEditingTask(null)}
           onSubmit={(payload) => {
-             updateMainTask(editingTask.id, {
-                 title: payload.name,
-                 deadline: payload.endDate || undefined,
-             });
-             if (payload.subtasks) {
-                 payload.subtasks.forEach((s: any) => {
-                     if (s.id) {
-                         const patch: any = { title: s.title };
-                         if (s.deadline !== undefined) patch.deadline = s.deadline || null;
-                         updateSubtask(s.id, patch);
-                     } else {
-                         addSubtask({ title: s.title, mainTaskId: editingTask.id, assignedTo: s.assignee });
-                     }
-                 });
-             }
-             setEditingTask(null);
+            updateMainTask(editingTask.id, {
+              title: payload.name,
+              deadline: payload.endDate || undefined,
+            });
+            if (payload.subtasks) {
+              payload.subtasks.forEach((s: any) => {
+                if (s.id) {
+                  const patch: any = { title: s.title };
+                  if (s.deadline !== undefined) patch.deadline = s.deadline || null;
+                  updateSubtask(s.id, patch);
+                } else {
+                  addSubtask({ title: s.title, mainTaskId: editingTask.id, assignedTo: s.assignee });
+                }
+              });
+            }
+            setEditingTask(null);
           }}
           users={activeUsers}
           currentUserId={currentUser?.id ?? ""}
@@ -1840,7 +1840,7 @@ function EditTaskReminderSection({ taskId, assignedTo, users }: { taskId: string
 
   const [enableReminder, setEnableReminder] = useState(false);
   const [reminderAt, setReminderAt] = useState('');
-  const [reminderFreq, setReminderFreq] = useState<'once'|'hourly'|'every_6_hours'|'daily'|'weekly'|'monthly'>('once');
+  const [reminderFreq, setReminderFreq] = useState<'once' | 'hourly' | 'every_6_hours' | 'daily' | 'weekly' | 'monthly'>('once');
   const [saved, setSaved] = useState(false);
 
   // Recipients = the current assignee(s), or fall back to current user
@@ -1914,11 +1914,10 @@ function EditTaskReminderSection({ taskId, assignedTo, users }: { taskId: string
                       key={f}
                       type="button"
                       onClick={() => { setReminderFreq(f as any); setSaved(false); }}
-                      className={`py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${
-                        reminderFreq === f
-                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700'
-                          : 'border-border text-muted-foreground hover:border-indigo-300 hover:text-foreground'
-                      }`}
+                      className={`py-1.5 rounded-lg text-xs font-semibold border-2 transition-all ${reminderFreq === f
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700'
+                        : 'border-border text-muted-foreground hover:border-indigo-300 hover:text-foreground'
+                        }`}
                     >
                       {FREQ_LABELS[f]}
                     </button>
@@ -1958,13 +1957,12 @@ function EditTaskReminderSection({ taskId, assignedTo, users }: { taskId: string
                 type="button"
                 disabled={!reminderAt || saved}
                 onClick={handleSaveReminder}
-                className={`w-full py-2 rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-2 ${
-                  saved
-                    ? 'bg-green-500 text-white border border-green-500'
-                    : !reminderAt
+                className={`w-full py-2 rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-2 ${saved
+                  ? 'bg-green-500 text-white border border-green-500'
+                  : !reminderAt
                     ? 'bg-muted text-muted-foreground border border-border cursor-not-allowed opacity-50'
                     : 'bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-600'
-                }`}
+                  }`}
               >
                 <Bell className="w-3.5 h-3.5" />
                 {saved ? 'Reminder Added ✓' : 'Add Reminder to this Task'}
@@ -2208,10 +2206,10 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
                         const refBody = m[2];
                         const refComm = allFeedEntries.find((pc: any) => pc.id === refId);
                         const refAuthor = refComm ? users.find((u: any) => u.id === refComm.authorId) : null;
-                        
+
                         return (
                           <div className="mb-1">
-                            <div 
+                            <div
                               onClick={() => {
                                 const el = document.getElementById(`comment-${refId}`);
                                 if (el) {
@@ -2222,8 +2220,8 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
                               }}
                               className={`mb-2 p-2 rounded-xl border cursor-pointer flex flex-col gap-0.5 shadow-sm transition-all ${isMe ? 'bg-primary-foreground/10 border-primary-foreground/20 hover:bg-primary-foreground/20' : 'bg-slate-50 hover:bg-slate-100 border-slate-200'}`}
                             >
-                                <span className={`text-[9px] font-bold flex items-center gap-1.5 ${isMe ? 'text-primary-foreground/90' : 'text-blue-700'}`}><Reply className="w-2.5 h-2.5"/> Reply to {refAuthor?.name || 'Unknown'}</span>
-                                <span className={`text-[11px] truncate ${isMe ? 'text-primary-foreground/80' : 'text-slate-500'}`}>{refComm?.text.replace(/^\[reply_to:[^\]]+\]\n/, '') || 'Message deleted'}</span>
+                              <span className={`text-[9px] font-bold flex items-center gap-1.5 ${isMe ? 'text-primary-foreground/90' : 'text-blue-700'}`}><Reply className="w-2.5 h-2.5" /> Reply to {refAuthor?.name || 'Unknown'}</span>
+                              <span className={`text-[11px] truncate ${isMe ? 'text-primary-foreground/80' : 'text-slate-500'}`}>{refComm?.text.replace(/^\[reply_to:[^\]]+\]\n/, '') || 'Message deleted'}</span>
                             </div>
                             <p className="whitespace-pre-wrap text-[13px]">{renderText(refBody)}</p>
                           </div>
@@ -2252,32 +2250,32 @@ function MainTaskChatSheet({ mainTaskId, users, currentUserId, getComments, onPo
                     {/* File path links */}
                     {Array.isArray(c.file_links) && c.file_links.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
-                         {c.file_links.map((lnk: string, li: number) => {
-                            const isElectron = !!(window as any).electronAPI;
-                            const linkName = lnk.split(/[/\\]/).pop() || lnk;
-                            return isElectron ? (
-                              <button
-                                key={li}
-                                onClick={() => (window as any).electronAPI.shellOpenPath(lnk)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 border hover:opacity-80 transition-colors cursor-pointer text-left shadow-sm ${isMe ? 'bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground rounded-lg' : 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100 rounded-lg'}`}
-                                title={`Open: ${lnk}`}
-                              >
-                                 <LinkIcon className={`w-3.5 h-3.5 flex-shrink-0 ${isMe ? 'opacity-80' : ''}`} />
-                                 <span className="truncate max-w-[280px] text-xs font-semibold hover:underline underline-offset-2">{linkName}</span>
-                              </button>
-                            ) : (
-                              <div key={li} className={`flex items-center gap-1.5 px-3 py-1.5 border ${isMe ? 'bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground rounded-lg' : 'bg-background border-border text-foreground rounded-lg'}`}>
-                                <LinkIcon className={`w-3.5 h-3.5 ${isMe ? 'opacity-80' : 'text-muted-foreground'}`} />
-                                <span className="truncate max-w-[280px] text-xs font-semibold select-all cursor-text">{lnk}</span>
-                              </div>
-                            );
-                         })}
+                        {c.file_links.map((lnk: string, li: number) => {
+                          const isElectron = !!(window as any).electronAPI;
+                          const linkName = lnk.split(/[/\\]/).pop() || lnk;
+                          return isElectron ? (
+                            <button
+                              key={li}
+                              onClick={() => (window as any).electronAPI.shellOpenPath(lnk)}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 border hover:opacity-80 transition-colors cursor-pointer text-left shadow-sm ${isMe ? 'bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground rounded-lg' : 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100 rounded-lg'}`}
+                              title={`Open: ${lnk}`}
+                            >
+                              <LinkIcon className={`w-3.5 h-3.5 flex-shrink-0 ${isMe ? 'opacity-80' : ''}`} />
+                              <span className="truncate max-w-[280px] text-xs font-semibold hover:underline underline-offset-2">{linkName}</span>
+                            </button>
+                          ) : (
+                            <div key={li} className={`flex items-center gap-1.5 px-3 py-1.5 border ${isMe ? 'bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground rounded-lg' : 'bg-background border-border text-foreground rounded-lg'}`}>
+                              <LinkIcon className={`w-3.5 h-3.5 ${isMe ? 'opacity-80' : 'text-muted-foreground'}`} />
+                              <span className="truncate max-w-[280px] text-xs font-semibold select-all cursor-text">{lnk}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
                   <span className="text-[10px] text-muted-foreground/50 px-1">
-                    {c.createdAt && !isNaN(new Date(c.createdAt).getTime()) 
-                      ? format(new Date(c.createdAt), 'MMM d · h:mm a') 
+                    {c.createdAt && !isNaN(new Date(c.createdAt).getTime())
+                      ? format(new Date(c.createdAt), 'MMM d · h:mm a')
                       : ''}
                   </span>
                 </div>
@@ -2369,12 +2367,12 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onSave({ 
-      title: title.trim(), 
-      description: description.trim(), 
-      assignedTo: assignedTo || null, 
-      deadline: deadline || undefined, 
-      status: (requiresApproval && status === 'not_started') ? 'pending_approval' : status, 
+    onSave({
+      title: title.trim(),
+      description: description.trim(),
+      assignedTo: assignedTo || null,
+      deadline: deadline || undefined,
+      status: (requiresApproval && status === 'not_started') ? 'pending_approval' : status,
       priority,
       requiresApproval,
       approverId: requiresApproval ? approverId : undefined
@@ -2472,8 +2470,8 @@ function EditSubtaskDialog({ subtask, users, onClose, onSave }: {
             {requiresApproval && (
               <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
                 <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Approving Authority</label>
-                <select 
-                  value={approverId} 
+                <select
+                  value={approverId}
                   onChange={e => setApproverId(e.target.value)}
                   required={requiresApproval}
                   className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
