@@ -12,9 +12,10 @@ interface MediaViewerProps {
   items: MediaItem[];
   initialIndex?: number;
   onClose: () => void;
+  onAddMedia?: () => void;
 }
 
-export function MediaViewer({ items, initialIndex = 0, onClose }: MediaViewerProps) {
+export function MediaViewer({ items, initialIndex = 0, onClose, onAddMedia }: MediaViewerProps) {
   const [current, setCurrent] = useState(initialIndex);
 
   const prev = useCallback(() => setCurrent(i => (i - 1 + items.length) % items.length), [items.length]);
@@ -126,9 +127,9 @@ export function MediaViewer({ items, initialIndex = 0, onClose }: MediaViewerPro
       )}
 
       {/* Thumbnail strip */}
-      {items.length > 1 && (
+      {(items.length > 1 || onAddMedia) && (
         <div
-          className="flex-shrink-0 flex gap-1.5 px-4 py-3 bg-black/80 overflow-x-auto scrollbar-hide"
+          className="flex-shrink-0 flex gap-1.5 px-4 py-3 bg-black/80 overflow-x-auto scrollbar-hide items-center"
           onClick={e => e.stopPropagation()}
         >
           {items.map((m, i) => (
@@ -148,6 +149,14 @@ export function MediaViewer({ items, initialIndex = 0, onClose }: MediaViewerPro
               )}
             </button>
           ))}
+          {onAddMedia && (
+            <button
+              onClick={onAddMedia}
+              className="flex-shrink-0 h-14 w-14 rounded-lg overflow-hidden border-2 border-dashed border-white/40 hover:border-white/80 hover:bg-white/10 transition-all flex items-center justify-center text-white/60 hover:text-white ml-1"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            </button>
+          )}
         </div>
       )}
     </div>

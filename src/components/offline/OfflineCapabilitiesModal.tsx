@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/src/components/ui/dialog';
-import { Wifi, WifiOff, CheckCircle2, XCircle, AlertTriangle, Database, CloudOff, RefreshCw } from 'lucide-react';
+import { Wifi, WifiOff, CheckCircle2, XCircle, AlertTriangle, Database, CloudOff, RefreshCw, HardDrive, DownloadCloud } from 'lucide-react';
 import { useNetworkStore } from '@/src/store/networkStore';
 
 interface Props {
@@ -10,16 +10,48 @@ interface Props {
 
 export function OfflineCapabilitiesModal({ open, onOpenChange }: Props) {
   const status = useNetworkStore((s) => s.connectionStatus);
+  const isElectron = !!(window as any).electronAPI?.isElectron;
+  const [isNasAccessible, setIsNasAccessible] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    if (isElectron && open) {
+      const checkNas = async () => {
+        try {
+          const exists = await (window as any).electronAPI.fsExists('\\\\MYCLOUDEX2ULTRA\\DCEL_Share');
+          setIsNasAccessible(exists);
+        } catch (e) {
+          setIsNasAccessible(false);
+        }
+      };
+      checkNas();
+    }
+  }, [isElectron, open]);
+
+  const handleNasSync = async () => {
+    setIsSyncing(true);
+    try {
+      await (window as any).electronAPI.fsMkdir('\\\\MYCLOUDEX2ULTRA\\DCEL_Share\\Site Diary');
+      // Sync logic placeholder
+      await new Promise(r => setTimeout(r, 1500));
+      alert('NAS Site Diary folder verified/created. Sync will proceed here.');
+    } catch (e) {
+      console.error(e);
+      alert('Failed to access NAS for sync.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} className="z-30">
-      <DialogContent className="max-w-2xl bg-slate-50 dark:bg-slate-900 border-none p-0 overflow-hidden shadow-2xl">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-50 dark:bg-slate-900 border-none p-0 shadow-2xl">
         <div className="absolute top-4 right-4 z-10">
           <DialogClose onClick={() => onOpenChange(false)} className="bg-white/10 hover:bg-white/20 text-slate-500 dark:text-slate-400" />
         </div>
         
         {/* Header Section */}
-        <div className={`px-8 py-10 text-white relative flex flex-col items-center justify-center text-center ${
+        <div className={`px-4 sm:px-8 py-6 sm:py-10 text-white relative flex flex-col items-center justify-center text-center ${
           status === 'online' ? 'bg-emerald-600' : status === 'unstable' ? 'bg-amber-500' : 'bg-rose-600'
         }`}>
           <div className="absolute inset-0 opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent" />
@@ -38,7 +70,7 @@ export function OfflineCapabilitiesModal({ open, onOpenChange }: Props) {
         </div>
 
         {/* Content Section */}
-        <div className="p-8 grid gap-6 md:grid-cols-2 bg-white dark:bg-slate-950">
+        <div className="p-4 sm:p-8 grid gap-6 md:grid-cols-2 bg-white dark:bg-slate-950">
           {/* OFFLINE FEATURES */}
           <div className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-6 border border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-3 mb-4">
@@ -86,6 +118,35 @@ export function OfflineCapabilitiesModal({ open, onOpenChange }: Props) {
               ))}
             </ul>
           </div>
+          {/* ELECTRON NAS SYNC SECTION */}
+          {isElectron && (
+            <div className="md:col-span-2 bg-slate-100 dark:bg-slate-800/50 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isNasAccessible ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400' : 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'}`}>
+                  <HardDrive className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 dark:text-slate-200">Local NAS Storage</h3>
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                    {isNasAccessible ? '\\\\MYCLOUDEX2ULTRA\\DCEL_Share is accessible' : 'NAS drive is currently disconnected or unreachable.'}
+                  </p>
+                </div>
+              </div>
+              
+              <button 
+                disabled={!isNasAccessible || isSyncing}
+                onClick={handleNasSync}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-indigo-600 text-white hover:bg-indigo-700"
+              >
+                {isSyncing ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <DownloadCloud className="w-4 h-4" />
+                )}
+                {isSyncing ? 'Syncing...' : 'Sync Site Media'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

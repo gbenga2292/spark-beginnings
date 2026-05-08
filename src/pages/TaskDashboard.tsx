@@ -225,22 +225,22 @@ function PersonalSpaceDashboard() {
 
       {/* ── Upcoming Tasks ── */}
       <motion.div variants={item} className="bg-card border border-border rounded-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
               <Zap className="w-4 h-4 text-violet-600 dark:text-violet-400" />
             </div>
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Upcoming Tasks</h3>
-              <p className="text-[11px] text-muted-foreground">Sorted by urgency</p>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-foreground truncate">Upcoming Tasks</h3>
+              <p className="text-[11px] text-muted-foreground truncate">Sorted by urgency</p>
             </div>
             {urgent.length > 0 && (
-              <span className="text-[10px] bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 px-2 py-0.5 rounded-full font-bold border border-violet-200 dark:border-violet-800">
+              <span className="text-[10px] bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 px-2 py-0.5 rounded-full font-bold border border-violet-200 dark:border-violet-800 shrink-0">
                 {urgent.length}
               </span>
             )}
           </div>
-          <button onClick={() => navigate('/tasks')} className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-500 transition-colors">
+          <button onClick={() => navigate('/tasks')} className="flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-500 transition-colors shrink-0 pl-2">
             View all <ArrowUpRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -477,21 +477,21 @@ function AdminDashboard() {
       </motion.div>
 
       {/* ── Main content ── */}
-      <div className="grid lg:grid-cols-5 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
         {/* Urgent tasks */}
         <motion.div variants={item} className="lg:col-span-3 bg-card border border-border rounded-2xl overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+          <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-border">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                 <Flame className="w-4 h-4 text-red-500" />
               </div>
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Top Urgent Tasks</h3>
-                <p className="text-[11px] text-muted-foreground">{urgentTasks.length} items need attention</p>
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-foreground truncate">Top Urgent Tasks</h3>
+                <p className="text-[11px] text-muted-foreground truncate">{urgentTasks.length} items need attention</p>
               </div>
             </div>
-            <button onClick={() => navigate("/tasks")} className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
+            <button onClick={() => navigate("/tasks")} className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors shrink-0 pl-2">
               View all <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -750,20 +750,20 @@ function UserDashboard() {
         </div>
       </motion.div>
 
-      <div className="grid lg:grid-cols-5 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         {/* Urgent tasks */}
         <motion.div variants={item} className="lg:col-span-3 bg-card border border-border rounded-2xl overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+          <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-border">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
                 <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               </div>
-              <div>
-                <div className="relative flex items-center">
+              <div className="min-w-0">
+                <div className="relative flex items-center min-w-0">
                   <select
                     value={taskFilter}
                     onChange={(e) => setTaskFilter(e.target.value as any)}
-                    className="text-sm font-semibold text-foreground bg-transparent border-none py-0 pl-0 pr-5 focus:ring-0 cursor-pointer appearance-none outline-none z-10"
+                    className="text-sm font-semibold text-foreground bg-transparent border-none py-0 pl-0 pr-5 focus:ring-0 cursor-pointer appearance-none outline-none z-10 truncate max-w-[140px] sm:max-w-none"
                   >
                     <option className="bg-card text-foreground" value="my_tasks">{isExternalHr ? 'HR Tasks' : 'My Tasks'}</option>
                     <option className="bg-card text-foreground" value="urgent">Urgent Tasks</option>
@@ -771,14 +771,14 @@ function UserDashboard() {
                     <option className="bg-card text-foreground" value="completed">Completed Tasks</option>
                     <option className="bg-card text-foreground" value="under_review">Under Review Tasks</option>
                   </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground absolute right-0 pointer-events-none" />
+                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground absolute right-0 pointer-events-none shrink-0" />
                 </div>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground truncate">
                   {taskFilter === 'urgent' ? 'Sorted by deadline' : 'Sorted by urgency'}
                 </p>
               </div>
             </div>
-            <button onClick={() => navigate('/tasks')} className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
+            <button onClick={() => navigate('/tasks')} className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors shrink-0 pl-2">
               View all <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -805,11 +805,11 @@ function UserDashboard() {
                       <div className={`w-1 h-10 rounded-full flex-shrink-0 hidden sm:block ${isOverdue ? 'bg-red-500' : sub.status === 'in_progress' ? 'bg-primary' : sub.status === 'pending_approval' ? 'bg-amber-400' : 'bg-muted-foreground/20'}`} />
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-medium truncate group-hover:text-primary transition-colors ${sub.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{sub.title}</p>
-                        <div className="flex items-center gap-2 mt-0.5 text-[11px] sm:text-xs text-muted-foreground">
-                          <span className="truncate">{mt?.title ?? ''}</span>
+                        <div className="flex flex-wrap sm:flex-nowrap items-center gap-x-2 gap-y-1 mt-0.5 text-[11px] sm:text-xs text-muted-foreground">
+                          <span className="truncate flex-1 min-w-0">{mt?.title ?? ''}</span>
                           {sub.deadline && <>
                             <span className="hidden sm:inline">·</span>
-                            <span className={`flex items-center gap-0.5 ${isOverdue ? 'text-red-500 font-medium' : ''}`}>
+                            <span className={`flex items-center gap-0.5 shrink-0 ${isOverdue ? 'text-red-500 font-medium' : ''}`}>
                               <Clock className="w-3 h-3" />{safeFmt(sub.deadline)}
                             </span>
                           </>}

@@ -27,6 +27,8 @@ interface ElectronAPI {
   openPathDialog: (opts: any) => Promise<string | null>;
   savePathDialog: (opts: any) => Promise<string | null>;
   writeFile: (filePath: string, content: any, encoding?: string) => Promise<boolean>;
+  fsExists: (path: string) => Promise<boolean>;
+  fsMkdir: (path: string) => Promise<boolean>;
   shellOpenPath: (path: string) => void;
   notify: (title: string, body: string) => void;
 }

@@ -34,6 +34,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Write file natively
   writeFile: (filePath, content, encoding = 'utf8') => ipcRenderer.invoke('file:write', { filePath, content, encoding }),
 
+  // File system utilities
+  fsExists: (path) => ipcRenderer.invoke('fs:exists', path),
+  fsMkdir: (path) => ipcRenderer.invoke('fs:mkdir', path),
+
   // OS Shell integration (open file/folder natively)
   shellOpenPath: (path) => ipcRenderer.send('shell:open-path', path),
 

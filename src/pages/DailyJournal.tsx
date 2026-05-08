@@ -74,7 +74,7 @@ function SiteLogCard({
     }
   };
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
@@ -93,7 +93,16 @@ function SiteLogCard({
       type: file.type.startsWith('video/') ? 'video' as const : 'image' as const,
       name: file.name
     }));
-    setMediaPreviews(prev => [...prev, ...newPreviews]);
+    
+    setMediaPreviews(prev => {
+      const updated = [...prev, ...newPreviews];
+      // Emulate WhatsApp: auto-open the previewer to the newly captured image
+      setLightboxIndex(uploadedMedia.length + prev.length);
+      return updated;
+    });
+
+    // Reset input so same file can be chosen again if needed
+    e.target.value = '';
   };
 
   const removeMedia = (index: number) => {
@@ -240,7 +249,7 @@ function SiteLogCard({
               type="file"
               ref={cameraInputRef}
               className="hidden"
-              accept="image/*,video/*"
+              accept="image/*"
               capture="environment"
               onChange={handleFileChange}
             />
@@ -343,16 +352,24 @@ function SiteLogCard({
               className="w-full text-base sm:text-sm border border-slate-200 dark:border-slate-700 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 dark:bg-slate-950 transition-all placeholder:text-slate-400" />
 
             {/* WhatsApp-style fullscreen media viewer */}
-            {lightboxIndex !== null && uploadedMedia.length > 0 && (
+            {lightboxIndex !== null && (uploadedMedia.length > 0 || mediaPreviews.length > 0) && (
               <MediaViewer
-                items={uploadedMedia.map((m: any) => ({
-                  id: m.id,
-                  url: m.url,
-                  file_type: m.file_type as 'image' | 'video',
-                  file_name: m.file_name,
-                }))}
+                items={[
+                  ...uploadedMedia.map((m: any) => ({
+                    id: m.id,
+                    url: m.url,
+                    file_type: m.file_type as 'image' | 'video',
+                    file_name: m.file_name,
+                  })),
+                  ...mediaPreviews.map((p: any) => ({
+                    url: p.url,
+                    file_type: p.type,
+                    file_name: p.name,
+                  }))
+                ]}
                 initialIndex={lightboxIndex}
                 onClose={() => setLightboxIndex(null)}
+                onAddMedia={() => cameraInputRef.current?.click()}
               />
             )}
           </div>
@@ -896,7 +913,18 @@ export function DailyJournal() {
           <DialogHeader className="pl-4 pr-10 sm:px-6 py-3 sm:py-4 border-b border-border bg-slate-50 dark:bg-slate-900 flex-shrink-0 relative">
             <div className="flex items-center justify-start gap-4">
               <DialogTitle className="text-sm sm:text-lg font-bold truncate shrink-0">{editingId ? 'Edit Log' : 'New Log'}</DialogTitle>
-              <Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} className="h-8 sm:h-10 w-[130px] sm:w-44 text-xs sm:text-sm font-medium bg-white dark:bg-slate-950 shrink-0 px-2 sm:px-3" />
+              <div className="relative inline-flex h-8 sm:h-10 w-[115px] sm:w-[130px] shrink-0 items-center justify-between rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2 sm:px-3 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors cursor-pointer">
+                <span className="text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">
+                  {formDate ? `${formDate.split('-')[2]}/${formDate.split('-')[1]}/${formDate.split('-')[0]}` : 'dd/mm/yyyy'}
+                </span>
+                <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-500" />
+                <input
+                  type="date"
+                  value={formDate}
+                  onChange={e => setFormDate(e.target.value)}
+                  className="absolute inset-0 h-full w-full opacity-0 cursor-pointer"
+                />
+              </div>
             </div>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-6 bg-white dark:bg-slate-950">

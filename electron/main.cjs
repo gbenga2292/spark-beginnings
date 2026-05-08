@@ -365,6 +365,23 @@ function initIPC() {
     }
   });
 
+  // File system utilities for NAS sync
+  ipcMain.handle('fs:exists', (_event, pathToCheck) => {
+    try {
+      return require('fs').existsSync(pathToCheck);
+    } catch { return false; }
+  });
+
+  ipcMain.handle('fs:mkdir', (_event, dirPath) => {
+    try {
+      require('fs').mkdirSync(dirPath, { recursive: true });
+      return true;
+    } catch (err) {
+      console.error('Mkdir error:', err);
+      return false;
+    }
+  });
+
   // Open a file or folder in the default OS File Explorer / App
   ipcMain.on('shell:open-path', (event, filePath) => {
     if (filePath) shell.openPath(filePath);
