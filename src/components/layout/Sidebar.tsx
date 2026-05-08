@@ -190,7 +190,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
   const isElectron = !!(window as any).electronAPI?.isElectron;
 
   // ── Android Auto-Update Logic (mobile-only) ────────────────────────────
-  const CURRENT_VERSION = '1.4.11'; // Matches package.json
+  const CURRENT_VERSION = '1.4.12'; // Matches package.json
   const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
   
   const [updateInfo, setUpdateInfo] = useState<{ version: string; url: string; notes: string } | null>(null);
@@ -242,7 +242,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: SidebarProps) {
         if (!response.ok) return;
         const data = await response.json();
         
-        // Simple version comparison (e.g. "1.4.11" > "1.4.10")
+        // Simple version comparison (e.g. "1.4.12" > "1.4.11")
         if (data.version && data.version !== CURRENT_VERSION) {
           setUpdateInfo(data);
         }
