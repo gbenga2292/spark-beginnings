@@ -522,9 +522,9 @@ export function AccountsReportBuilder({
         .forEach(r => rows.push({ _source: 'PAYMENT', _raw: r }));
     }
     if (selectedSources.includes('VAT')) {
-      if (selectedSources.length === 1) {
-        // Single-source VAT: derive liability from client payments.
-        // The month the client paid us = the month VAT is due (regardless of when we remit).
+      // 1. Liability from client payments
+      // ONLY add these if the 'PAYMENT' source isn't already adding them to avoid duplicates
+      if (!selectedSources.includes('PAYMENT')) {
         rawPayments
           .filter(r => {
             if (!keepByDate(r.date, (r as any).client || '')) return false;
@@ -533,19 +533,24 @@ export function AccountsReportBuilder({
             const { vat } = getVatDetails((r as any).amount || 0, pvVal, vatRate);
             return vat > 0; // only payments that carry VAT
           })
-          .sort((a, b) => new Date((a as any).date).getTime() - new Date((b as any).date).getTime())
-          .forEach(r => rows.push({ _source: 'VAT', _raw: r }));
-      } else {
-        // Multi-source: keep using the stored vatPayments records for aggregation
-        rawVatPayments
-          .filter(keepVat)
-          .sort((a, b) => {
-            const yr = Number(a.year) - Number(b.year);
-            if (yr !== 0) return yr;
-            return MONTHS.findIndex(m => m.key === monthNameToKey(a.month)) -
-                   MONTHS.findIndex(m => m.key === monthNameToKey(b.month));
-          })
-          .forEach(r => rows.push({ _source: 'VAT', _raw: r }));
+          .forEach(r => rows.push({ _source: 'VAT', _raw: { ...r, _isVatLiability: true } }));
+      }
+
+      // 2. Actual remittances made to government
+      rawVatPayments
+        .filter(keepVat)
+        .forEach(r => rows.push({ _source: 'VAT', _raw: { ...r, _isVatRemittance: true } }));
+
+      if (selectedSources.length === 1) {
+        rows.sort((a, b) => {
+          const da = new Date(a._raw.date || 0).getTime();
+          const db = new Date(b._raw.date || 0).getTime();
+          if (da !== db) return da - db;
+          const yr = Number(a._raw.year || 0) - Number(b._raw.year || 0);
+          if (yr !== 0) return yr;
+          return MONTHS.findIndex(m => m.key === monthNameToKey(a._raw.month)) -
+                 MONTHS.findIndex(m => m.key === monthNameToKey(b._raw.month));
+        });
       }
     }
 
@@ -613,24 +618,28 @@ export function AccountsReportBuilder({
             groupedMap.set(client, {
               _source: 'VAT',
               _raw: {
-                ...rec._raw,
+                client,
+                _isVatGrouped: true,
                 vatDate: '—', remMonth: '—', remYear: '—', date: '—',
                 vatAmtPaid: 0, vatableAmt: 0, vatOwed: 0, vatPaid: 0, vatBalDue: 0
               }
             });
           }
           const g = groupedMap.get(client)!;
-          const pvVal = rec._raw.payVat || (sites.find(s => s.name === rec._raw.site && s.client === rec._raw.client)?.vat as any) || 'No';
-          const { vat, amountForVat } = getVatDetails(rec._raw.amount || 0, pvVal, vatRate);
-          const mKey = monthNameToKey(rec._raw.month || '');
-          const payYr = rec._raw.date ? normalizeDate(rec._raw.date)?.substring(0, 4) : '';
-          const vatPaidAmt = vatRemittanceMap.get(`${client}_${mKey || ''}_${payYr}`) || 0;
-
-          g._raw.vatAmtPaid += rec._raw.amount || 0;
-          g._raw.vatableAmt += amountForVat;
-          g._raw.vatOwed    += vat;
-          g._raw.vatPaid    += vatPaidAmt;
-          g._raw.vatBalDue  += (vat - vatPaidAmt);
+          if (rec._raw._isVatLiability) {
+            const pvVal = rec._raw.payVat || (sites.find(s => s.name === rec._raw.site && s.client === rec._raw.client)?.vat as any) || 'No';
+            const { vat, amountForVat } = getVatDetails(rec._raw.amount || 0, pvVal, vatRate);
+            g._raw.vatAmtPaid += rec._raw.amount || 0;
+            g._raw.vatableAmt += amountForVat;
+            g._raw.vatOwed    += vat;
+          }
+          if (rec._raw._isVatRemittance) {
+            g._raw.vatPaid += rec._raw.amount || 0;
+          }
+        });
+        // Calculate balance after summing all events
+        groupedMap.forEach(g => {
+          g._raw.vatBalDue = g._raw.vatOwed - g._raw.vatPaid;
         });
         return Array.from(groupedMap.values()).sort((a, b) => a._raw.client.localeCompare(b._raw.client));
       }
@@ -721,8 +730,16 @@ export function AccountsReportBuilder({
         const { vat } = getVatDetails(r.amount || 0, pvVal, vatRate);
         row.vatOwedFromPayments += vat;
       } else if (rec._source === 'VAT') {
-        row.vatCount++;
-        row.vatRemitted += r.amount || 0;
+        // Only count actual remittances towards the 'remitted' total.
+        // Liability records (client payments) are handled either by PAYMENT source or the _isVatLiability branch below.
+        if (r._isVatRemittance || (!r._isVatLiability && !r._isVatRemittance)) {
+          row.vatCount++;
+          row.vatRemitted += r.amount || 0;
+        } else if (r._isVatLiability) {
+          const pvVal = r.payVat || (sites.find(s => s.name === r.site && s.client === r.client)?.vat as any) || 'No';
+          const { vat } = getVatDetails(r.amount || 0, pvVal, vatRate);
+          row.vatOwedFromPayments += vat;
+        }
       } else if (rec._source === 'LEDGER') {
         row.ledgerTotal += r.amount || 0;
       } else if (rec._source === 'SITE') {
@@ -894,34 +911,50 @@ export function AccountsReportBuilder({
       if (src !== 'VAT') return '—';
       
       // If we are in grouped/pivot view, check if the value is pre-calculated
-      if (isGroupedView && r[colId] !== undefined) {
-        return r[colId];
+      if (r._isVatGrouped) {
+        return r[colId] ?? '—';
       }
 
-      // Detailed view: calculate on the fly from payment record
-      const pvVal = r.payVat ||
-        (sites.find(s => s.name === r.site && s.client === r.client)?.vat as any) || 'No';
-      const { vat, amountForVat } = getVatDetails(r.amount || 0, pvVal, vatRate);
-      
-      const norm = normalizeDate(r.date);
-      const payMoIdx = norm ? parseInt(norm.substring(5, 7), 10) - 1 : -1;
-      const payYr    = norm ? norm.substring(0, 4) : '';
-      const mKey     = payMoIdx >= 0 ? (MONTHS[payMoIdx]?.key || '') : '';
-      const mLabel   = payMoIdx >= 0 ? (MONTHS[payMoIdx]?.label || '—') : '—';
-      const client   = (r.client || '').trim();
-      const vatPaidAmt = vatRemittanceMap.get(`${client}_${mKey}_${payYr}`) || 0;
+      // Detailed view: Return values based on record type to ensure total sum is correct
+      if (r._isVatLiability) {
+        const pvVal = r.payVat || (sites.find(s => s.name === r.site && s.client === r.client)?.vat as any) || 'No';
+        const { vat, amountForVat } = getVatDetails(r.amount || 0, pvVal, vatRate);
+        const norm = normalizeDate(r.date);
+        const payMoIdx = norm ? parseInt(norm.substring(5, 7), 10) - 1 : -1;
+        const payYr    = norm ? norm.substring(0, 4) : '';
+        const mLabel   = payMoIdx >= 0 ? (MONTHS[payMoIdx]?.label || '—') : '—';
 
-      switch (colId) {
-        case 'vatDate':    return formatDisplayDate(r.date);
-        case 'remMonth':   return mLabel;
-        case 'remYear':    return payYr || '—';
-        case 'vatAmtPaid': return r.amount || 0;
-        case 'vatableAmt': return amountForVat;
-        case 'vatOwed':    return vat;
-        case 'vatPaid':    return vatPaidAmt;
-        case 'vatBalDue':  return vat - vatPaidAmt;
-        default: return '—';
+        switch (colId) {
+          case 'vatDate':    return formatDisplayDate(r.date);
+          case 'remMonth':   return mLabel;
+          case 'remYear':    return payYr || '—';
+          case 'vatAmtPaid': return r.amount || 0;
+          case 'vatableAmt': return amountForVat;
+          case 'vatOwed':    return vat;
+          case 'vatPaid':    return 0; // Don't show remittance here, it has its own row
+          case 'vatBalDue':  return 0; // Balanced at the total row
+          default: return '—';
+        }
       }
+
+      if (r._isVatRemittance) {
+        const mKey = monthNameToKey(r.month);
+        const mLabel = mKey ? MONTHS.find(m => m.key === mKey)?.label || r.month : r.month;
+
+        switch (colId) {
+          case 'vatDate':    return formatDisplayDate(r.date);
+          case 'remMonth':   return mLabel;
+          case 'remYear':    return r.year || '—';
+          case 'vatAmtPaid': return 0;
+          case 'vatableAmt': return 0;
+          case 'vatOwed':    return 0;
+          case 'vatPaid':    return r.amount || 0;
+          case 'vatBalDue':  return 0; // Balanced at the total row
+          default: return '—';
+        }
+      }
+
+      return '—';
     }
 
     if (src === 'PAYROLL') {

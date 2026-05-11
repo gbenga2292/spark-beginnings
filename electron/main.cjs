@@ -453,9 +453,10 @@ function createWindow() {
     show: false, // wait for ready-to-show for a flash-free launch
   });
 
-  // Smooth launch — set zoom to 75% before first paint
+  // Smooth launch — set zoom and maximize before first paint
   mainWindow.once('ready-to-show', () => {
     mainWindow.webContents.setZoomFactor(1.0);
+    mainWindow.maximize();
     mainWindow.show();
   });
 

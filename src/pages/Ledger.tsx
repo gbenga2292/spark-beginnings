@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { TabsContent } from '@/src/components/ui/tabs';
 import { Search, Download, Upload, FileText, ChevronLeft, ChevronRight, X, Eye, BookOpen, RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, ChevronDown, Filter, Plus, Users, Edit2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/src/components/ui/dropdown-menu';
+import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/src/components/ui/dialog';
 import { useAppStore, LedgerEntry } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
@@ -50,6 +51,8 @@ export function Ledger() {
   const updateLedgerEntry = useAppStore((state) => state.updateLedgerEntry);
   const deleteLedgerEntry = useAppStore((state) => state.deleteLedgerEntry);
   const addLedgerCategory = useAppStore((state) => state.addLedgerCategory);
+  const updateLedgerCategory = useAppStore((state) => state.updateLedgerCategory);
+  const removeLedgerCategory = useAppStore((state) => state.removeLedgerCategory);
   const addLedgerBank = useAppStore((state) => state.addLedgerBank);
   const addLedgerVendor = useAppStore((state) => state.addLedgerVendor);
   const updateLedgerVendor = useAppStore((state) => state.updateLedgerVendor);
@@ -84,6 +87,31 @@ export function Ledger() {
   const [editingVendorId, setEditingVendorId] = useState<string | null>(null);
   const [vendorRenameValue, setVendorRenameValue] = useState('');
   const [tinRenameValue, setTinRenameValue] = useState('');
+
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
+  const [quickCategory, setQuickCategory] = useState('');
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [categoryRenameValue, setCategoryRenameValue] = useState('');
+
+  const [showAddVendorForm, setShowAddVendorForm] = useState(false);
+  const [showAddCategoryForm, setShowAddCategoryForm] = useState(false);
+
+  // Sorting state for History tab
+  const [sortField, setSortField] = useState<keyof LedgerEntry>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const toggleSort = (field: keyof LedgerEntry) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('desc');
+    }
+  };
+
+  const [historyViewMode, setHistoryViewMode] = useState<'detailed' | 'grouped'>('detailed');
+  const [voucherSortField, setVoucherSortField] = useState<string>('date');
+  const [voucherSortOrder, setVoucherSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const handleAddVendor = () => {
     if (!quickVendor.trim()) return;
@@ -122,6 +150,40 @@ export function Ledger() {
       toast.success('Vendor deleted');
     }
   };
+
+  const handleAddCategory = () => {
+    if (!quickCategory.trim()) return;
+    const exists = ledgerCategories.some(c => c.name.toLowerCase() === quickCategory.trim().toLowerCase());
+    if (exists) {
+      toast.error('Category already exists');
+      return;
+    }
+    addLedgerCategory({ id: generateId(), name: quickCategory.trim() });
+    setQuickCategory('');
+    toast.success(`Category "${quickCategory.trim()}" added`);
+  };
+
+  const handleRenameCategory = (id: string) => {
+    if (!categoryRenameValue.trim()) return;
+    updateLedgerCategory(id, { name: categoryRenameValue.trim() });
+    setEditingCategoryId(null);
+    setCategoryRenameValue('');
+    toast.success('Category updated');
+  };
+
+  const handleRemoveCategory = async (id: string, name: string) => {
+    const usage = ledgerEntries.filter(l => l.category === name).length;
+    if (usage > 0) {
+      toast.error(`Cannot delete: Category is used in ${usage} ledger entries.`);
+      return;
+    }
+    const ok = await showConfirm(`Delete category "${name}"?`);
+    if (ok) {
+      removeLedgerCategory(id);
+      toast.success('Category deleted');
+    }
+  };
+
 
   const isLedgerDirty = useMemo(() => {
     return JSON.stringify(items) !== originalItemsJSON || hasUnsavedPending;
@@ -484,6 +546,73 @@ export function Ledger() {
     });
   }, [ledgerEntries, search, searchKey, fromDate, toDate, dateFilterType]);
 
+  const voucherSummaries = useMemo(() => {
+    const groups: Record<string, { voucherNo: string; date: string; bank: string; total: number; count: number }> = {};
+    filteredEntries.forEach(e => {
+      const v = e.voucherNo || '—';
+      if (!groups[v]) {
+        groups[v] = { voucherNo: v, date: e.date, bank: e.bank || '—', total: 0, count: 0 };
+      }
+      groups[v].total += Number(e.amount) || 0;
+      groups[v].count += 1;
+    });
+    
+    const results = Object.values(groups);
+    
+    return results.sort((a, b) => {
+      let valA: any = (a as any)[voucherSortField];
+      let valB: any = (b as any)[voucherSortField];
+      
+      if (voucherSortField === 'date') {
+        const d1 = new Date(valA || 0).getTime();
+        const d2 = new Date(valB || 0).getTime();
+        return voucherSortOrder === 'asc' ? d1 - d2 : d2 - d1;
+      }
+      
+      if (voucherSortField === 'total' || voucherSortField === 'count') {
+        return voucherSortOrder === 'asc' ? valA - valB : valB - valA;
+      }
+      
+      const s1 = String(valA || '').toLowerCase();
+      const s2 = String(valB || '').toLowerCase();
+      if (s1 < s2) return voucherSortOrder === 'asc' ? -1 : 1;
+      if (s1 > s2) return voucherSortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredEntries, voucherSortField, voucherSortOrder]);
+
+  const toggleVoucherSort = (field: string) => {
+    if (voucherSortField === field) {
+      setVoucherSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setVoucherSortField(field);
+      setVoucherSortOrder('asc');
+    }
+  };
+
+  const sortedEntries = useMemo(() => {
+    const data = [...filteredEntries];
+    data.sort((a, b) => {
+      const field = sortField;
+      let valA = a[field];
+      let valB = b[field];
+
+      if (field === 'amount') {
+        const numA = Number(valA) || 0;
+        const numB = Number(valB) || 0;
+        return sortOrder === 'asc' ? numA - numB : numB - numA;
+      }
+
+      const strA = String(valA || '').toLowerCase();
+      const strB = String(valB || '').toLowerCase();
+
+      if (strA < strB) return sortOrder === 'asc' ? -1 : 1;
+      if (strA > strB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return data;
+  }, [filteredEntries, sortField, sortOrder]);
+
   const handleExport = async (mode: 'bare' | 'detailed' = 'detailed') => {
     if (!priv?.canExport) return;
     let data: any[];
@@ -659,23 +788,6 @@ export function Ledger() {
   };
 
 
-  // Group filtered entries by voucher number (one row per voucher in the records view)
-  const voucherSummaries = useMemo(() => {
-    const map = new Map<string, { voucherNo: string; date: string; bank: string; total: number; count: number }>();
-    filteredEntries.forEach(e => {
-      const key = e.voucherNo || '';
-      if (!map.has(key)) {
-        map.set(key, { voucherNo: e.voucherNo || '', date: e.date || '', bank: e.bank || '', total: 0, count: 0 });
-      }
-      const v = map.get(key)!;
-      // Coerce amount to number — DB may return it as a string
-      v.total += Number(e.amount) || 0;
-      v.count += 1;
-      // Use earliest date for display
-      if (e.date && (!v.date || e.date < v.date)) v.date = e.date;
-    });
-    return Array.from(map.values()).sort((a, b) => b.voucherNo.localeCompare(a.voucherNo));
-  }, [filteredEntries]);
 
   // Transactions for the dialog (all lines — no cap)
   const dialogTransactions = useMemo(() =>
@@ -832,13 +944,22 @@ export function Ledger() {
 
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Directory</label>
-              <Button 
-                variant="outline" 
-                className="h-9 w-full sm:w-auto px-4 border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-indigo-600 font-bold text-[11px] uppercase tracking-wider gap-2 shadow-sm transition-all active:scale-95 bg-white justify-start" 
-                onClick={() => setShowVendorDialog(true)}
-              >
-                <Users className="h-3.5 w-3.5" /> Manage Vendors
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  className="h-9 flex-1 sm:w-auto px-3 border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-indigo-600 font-bold text-[11px] uppercase tracking-wider gap-2 shadow-sm transition-all active:scale-95 bg-white justify-start" 
+                  onClick={() => setShowVendorDialog(true)}
+                >
+                  <Users className="h-3.5 w-3.5" /> Manage Vendors
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="h-9 flex-1 sm:w-auto px-3 border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-indigo-600 font-bold text-[11px] uppercase tracking-wider gap-2 shadow-sm transition-all active:scale-95 bg-white justify-start" 
+                  onClick={() => setShowCategoryDialog(true)}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" /> Manage Categories
+                </Button>
+              </div>
             </div>
 
             {/* Desktop Actions */}
@@ -1169,26 +1290,60 @@ export function Ledger() {
         </div>
       )}
 
-      <TabsContent active={tab === 'records'} className="m-0 space-y-4">
-        <Card>
-          <CardHeader className="pb-4 border-b border-slate-100">
-            <div className={`flex-wrap items-center justify-end gap-3 w-full ${!showMobileFilters ? 'hidden sm:flex' : 'flex'}`}>
-                <div className="flex flex-wrap items-center gap-2">
+      <TabsContent active={tab === 'records'} className="mt-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <Card className="border-none shadow-xl shadow-slate-200/50 overflow-hidden bg-white/80 backdrop-blur-sm">
+          <CardHeader className="border-b border-slate-100 p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-indigo-50 rounded-lg">
+                  <History className="h-4 w-4 text-indigo-600" />
+                </div>
+                <h3 className="font-bold text-slate-800 tracking-tight">Records</h3>
+              </div>
+              
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 self-start sm:self-center">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setHistoryViewMode('detailed')}
+                  className={`h-8 px-3 rounded-lg text-xs font-bold transition-all ${historyViewMode === 'detailed' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5 mr-1.5" /> Detailed View
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setHistoryViewMode('grouped')}
+                  className={`h-8 px-3 rounded-lg text-xs font-bold transition-all ${historyViewMode === 'grouped' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <FileText className="h-3.5 w-3.5 mr-1.5" /> Voucher View
+                </Button>
+              </div>
+            </div>
+
+            {/* Filters Row */}
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-100">
                   <select 
-                    className="h-9 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-600 font-medium" 
+                    className="h-8 px-2 rounded-md border-none bg-transparent text-xs text-slate-600 font-bold focus:ring-0" 
                     value={dateFilterType} 
                     onChange={e => setDateFilterType(e.target.value as any)}
                   >
                     <option value="transaction">Trans Date</option>
                     <option value="voucher">Voucher Date</option>
                   </select>
-                  <Input type="date" className="h-9 w-32 text-xs" value={fromDate} onChange={e => setFromDate(e.target.value)} />
-                  <span className="text-slate-400 text-xs px-1">to</span>
-                  <Input type="date" className="h-9 w-32 text-xs" value={toDate} onChange={e => setToDate(e.target.value)} />
+                  <div className="h-4 w-px bg-slate-200 mx-1" />
+                  <Input type="date" className="h-8 w-32 text-xs border-none bg-transparent focus-visible:ring-0 p-0" value={fromDate} onChange={e => setFromDate(e.target.value)} />
+                  <span className="text-slate-300 text-[10px] font-bold uppercase">to</span>
+                  <Input type="date" className="h-8 w-32 text-xs border-none bg-transparent focus-visible:ring-0 p-0" value={toDate} onChange={e => setToDate(e.target.value)} />
                 </div>
-                <div className="flex items-center gap-2">
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center bg-slate-50 p-1 rounded-lg border border-slate-100">
                   <select 
-                    className="h-9 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-600 font-medium max-w-[120px]" 
+                    className="h-8 px-2 rounded-md border-none bg-transparent text-xs text-slate-600 font-bold focus:ring-0 max-w-[110px]" 
                     value={searchKey} 
                     onChange={e => setSearchKey(e.target.value)}
                   >
@@ -1201,60 +1356,95 @@ export function Ledger() {
                     <option value="vendor">Vendor</option>
                     <option value="voucherNo">Voucher No.</option>
                   </select>
-                  <div className="relative w-full md:w-52">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                    <Input placeholder="Search..." className="pl-8 h-9 text-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
+                  <div className="h-4 w-px bg-slate-200 mx-1" />
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-slate-400" />
+                    <Input 
+                      placeholder="Search records..." 
+                      className="pl-7 h-8 w-40 md:w-56 text-xs border-none bg-transparent focus-visible:ring-0" 
+                      value={search} 
+                      onChange={(e) => setSearch(e.target.value)} 
+                    />
                   </div>
-                  {search.trim() && (
-                    <button
-                      onClick={() => setSearch('')}
-                      className="h-9 w-9 shrink-0 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
-                      title="Clear search"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
                 </div>
               </div>
-              {/* Search mode indicator */}
-              {search.trim() && (
-                <div className="flex items-center gap-2 pt-3 border-t border-slate-100 mt-3">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold">
-                    <Search className="h-3 w-3" />
-                    {filteredEntries.length} line{filteredEntries.length !== 1 ? 's' : ''} found
-                  </span>
-                  <span className="text-xs text-slate-400">— Showing individual entry lines for your search</span>
-                </div>
-              )}
+            </div>
+
+            {search.trim() && (
+              <div className="flex items-center gap-2 py-1.5 px-3 bg-indigo-50/50 rounded-lg border border-indigo-100 w-fit">
+                <Search className="h-3 w-3 text-indigo-500" />
+                <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">
+                  Results for: <span className="text-slate-900">{search}</span>
+                </span>
+                <button onClick={() => setSearch('')} className="ml-1 text-indigo-400 hover:text-indigo-600 flex items-center justify-center p-0.5 rounded hover:bg-indigo-100/50 transition-colors">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              {/* ── FLAT SEARCH VIEW (active when search query is present) ── */}
-              {search.trim() ? (
+              {historyViewMode === 'detailed' ? (
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="py-2.5 px-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-44">Voucher No.</th>
-                      <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">Date</th>
-                      <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                      <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Category</th>
-                      <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">Client</th>
-                      <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">Site</th>
-                      <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">Bank</th>
-                      <th className="py-2.5 px-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Amount</th>
-                      <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">Vendor</th>
+                      <th className="py-2.5 px-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-44 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('voucherNo')}>
+                        <div className="flex items-center gap-1.5">
+                          Voucher No. {sortField === 'voucherNo' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        </div>
+                      </th>
+                      <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('date')}>
+                        <div className="flex items-center gap-1.5">
+                          Date {sortField === 'date' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        </div>
+                      </th>
+                      <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('description')}>
+                        <div className="flex items-center gap-1.5">
+                          Description {sortField === 'description' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        </div>
+                      </th>
+                      <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('category')}>
+                        <div className="flex items-center gap-1.5">
+                          Category {sortField === 'category' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        </div>
+                      </th>
+                      <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('client')}>
+                        <div className="flex items-center gap-1.5">
+                          Client {sortField === 'client' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        </div>
+                      </th>
+                      <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('site')}>
+                        <div className="flex items-center gap-1.5">
+                          Site {sortField === 'site' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        </div>
+                      </th>
+                      <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-24 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('bank')}>
+                        <div className="flex items-center gap-1.5">
+                          Bank {sortField === 'bank' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        </div>
+                      </th>
+                      <th className="py-2.5 px-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-32 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('amount')}>
+                        <div className="flex items-center justify-end gap-1.5">
+                          Amount {sortField === 'amount' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        </div>
+                      </th>
+                      <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleSort('vendor')}>
+                        <div className="flex items-center gap-1.5">
+                          Vendor {sortField === 'vendor' ? (sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                        </div>
+                      </th>
                       <th className="py-2.5 px-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-20">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredEntries.length === 0 ? (
+                    {sortedEntries.length === 0 ? (
                       <tr>
                         <td colSpan={10} className="py-12 text-center text-slate-400 italic text-sm">
-                          No entries match your search.
+                          No entries found.
                         </td>
                       </tr>
                     ) : (
-                      filteredEntries.map((entry, idx) => (
+                      sortedEntries.map((entry, idx) => (
                         <tr
                           key={entry.id || `flat-${idx}`}
                           className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}
@@ -1330,12 +1520,12 @@ export function Ledger() {
                   </tbody>
                 </table>
               ) : (
-                /* ── GROUPED VOUCHER VIEW (default when no search) ── */
+                /* ── GROUPED VOUCHER VIEW ── */
                 <>
                   {/* Mobile card list */}
                   <div className="md:hidden divide-y divide-slate-100">
                     {voucherSummaries.length === 0 ? (
-                      <div className="py-12 text-center text-slate-400 text-sm">No vouchers found.</div>
+                      <div className="py-12 text-center text-slate-400 text-sm italic">No vouchers found.</div>
                     ) : (
                       voucherSummaries.map((v, i) => (
                         <div
@@ -1344,12 +1534,6 @@ export function Ledger() {
                           key={v.voucherNo || `v-${i}`}
                           className="flex items-center gap-3 px-4 py-3.5 hover:bg-indigo-50/30 active:bg-indigo-100/40 cursor-pointer transition-colors"
                           onClick={() => setDialogVoucher(v.voucherNo)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              setDialogVoucher(v.voucherNo);
-                            }
-                          }}
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
@@ -1365,7 +1549,7 @@ export function Ledger() {
                             <p className="font-bold text-slate-900 text-sm tabular-nums">
                               ₦{(isNaN(v.total) ? 0 : v.total).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                             </p>
-                            <p className="text-[10px] text-indigo-500">Tap to view</p>
+                            <p className="text-[10px] text-indigo-500 font-medium">Tap to view</p>
                           </div>
                         </div>
                       ))
@@ -1373,84 +1557,73 @@ export function Ledger() {
                   </div>
 
                   {/* Desktop table */}
-                  <Table className="hidden md:table">
-                    <TableHeader className="bg-slate-50">
-                      <TableRow>
-                        <TableHead className="w-44">Voucher No.</TableHead>
-                        <TableHead className="w-32">Date</TableHead>
-                        <TableHead>Bank</TableHead>
-                        <TableHead className="text-right w-40">Amount</TableHead>
-                        <TableHead className="w-16 text-center">Lines</TableHead>
-                        <TableHead className="w-36">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {voucherSummaries.map((v, i) => (
-                        <TableRow
-                          key={v.voucherNo || `v-${i}`}
-                          className="hover:bg-indigo-50/30 cursor-pointer transition-colors"
-                          onClick={() => setDialogVoucher(v.voucherNo)}
-                        >
-                          <TableCell className="font-mono font-bold text-indigo-600">
-                            {v.voucherNo || '—'}
-                          </TableCell>
-                          <TableCell className="text-slate-600 text-sm whitespace-nowrap">
-                            {v.date ? formatDisplayDate(v.date) : '—'}
-                          </TableCell>
-                          <TableCell className="text-slate-600">{v.bank || '—'}</TableCell>
-                          <TableCell className="font-bold text-slate-900 text-right tabular-nums">
-                            ₦{(isNaN(v.total) ? 0 : v.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
-                              {v.count}
-                            </span>
-                          </TableCell>
-                          <TableCell onClick={e => e.stopPropagation()}>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 gap-1 h-8 px-2"
-                                onClick={() => setDialogVoucher(v.voucherNo)}
-                              >
-                                <Eye className="h-3.5 w-3.5" /> View
-                              </Button>
-                              {priv?.canDelete && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 h-8 w-8 p-0"
-                                  title="Delete Voucher"
-                                  onClick={async () => {
+                  <table className="w-full text-sm hidden md:table">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      <tr>
+                        <th className="py-2.5 px-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-44 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVoucherSort('voucherNo')}>
+                          <div className="flex items-center gap-1.5">
+                            Voucher No. {voucherSortField === 'voucherNo' ? (voucherSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVoucherSort('date')}>
+                          <div className="flex items-center gap-1.5">
+                            Date {voucherSortField === 'date' ? (voucherSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVoucherSort('bank')}>
+                          <div className="flex items-center gap-1.5">
+                            Bank {voucherSortField === 'bank' ? (voucherSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-40 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVoucherSort('total')}>
+                          <div className="flex items-center justify-end gap-1.5">
+                            Total Amount {voucherSortField === 'total' ? (voucherSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-20 cursor-pointer hover:bg-slate-100 transition-colors group" onClick={() => toggleVoucherSort('count')}>
+                          <div className="flex items-center justify-center gap-1.5">
+                            Lines {voucherSortField === 'count' ? (voucherSortOrder === 'asc' ? <ArrowUp className="h-3 w-3 text-indigo-600" /> : <ArrowDown className="h-3 w-3 text-indigo-600" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 group-hover:text-slate-400" />}
+                          </div>
+                        </th>
+                        <th className="py-2.5 px-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-36">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {voucherSummaries.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-12 text-center text-slate-400 italic text-sm">No vouchers found.</td>
+                        </tr>
+                      ) : (
+                        voucherSummaries.map((v, i) => (
+                          <tr key={v.voucherNo || `v-${i}`} className="border-b border-slate-100 hover:bg-indigo-50/30 cursor-pointer transition-colors" onClick={() => setDialogVoucher(v.voucherNo)}>
+                            <td className="py-2.5 px-4 font-mono font-bold text-indigo-600">{v.voucherNo || '—'}</td>
+                            <td className="py-2.5 px-3 text-slate-600 text-xs whitespace-nowrap">{v.date ? formatDisplayDate(v.date) : '—'}</td>
+                            <td className="py-2.5 px-3 text-slate-600 text-xs">{v.bank || '—'}</td>
+                            <td className="py-2.5 px-3 font-bold text-slate-900 text-right tabular-nums text-xs">₦{(isNaN(v.total) ? 0 : v.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="py-2.5 px-3 text-center"><span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-bold border border-indigo-100">{v.count}</span></td>
+                            <td className="py-2.5 px-3 text-center" onClick={e => e.stopPropagation()}>
+                              <div className="flex items-center justify-center gap-1">
+                                <Button variant="ghost" size="sm" className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 gap-1 h-8 px-2 text-xs font-bold" onClick={() => setDialogVoucher(v.voucherNo)}>
+                                  <Eye className="h-3.5 w-3.5" /> View
+                                </Button>
+                                {priv?.canDelete && (
+                                  <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 h-8 w-8 p-0" title="Delete Voucher" onClick={async () => {
                                     const vno = v.voucherNo;
                                     const count = ledgerEntries.filter(e => e.voucherNo === vno).length;
-                                    const ok = await showConfirm(
-                                      `Delete voucher ${vno}?\n\nThis will permanently remove all ${count} transaction(s) in this voucher.`,
-                                      { variant: 'danger', confirmLabel: 'Yes, Delete' }
-                                    );
+                                    const ok = await showConfirm(`Delete voucher ${vno}?\n\nThis will permanently remove all ${count} transaction(s) in this voucher.`, { variant: 'danger', confirmLabel: 'Yes, Delete' });
                                     if (ok) {
                                       ledgerEntries.filter(e => e.voucherNo === vno).forEach(r => deleteLedgerEntry(r.id));
                                       toast.success(`Deleted voucher ${vno}.`);
                                     }
-                                  }}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {voucherSummaries.length === 0 && (
-                        <TableRow key="no-results">
-                          <TableCell colSpan={6} className="text-center py-12 text-slate-500 bg-slate-50/30">
-                            No vouchers found.
-                          </TableCell>
-                        </TableRow>
+                                  }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))
                       )}
-                    </TableBody>
-                  </Table>
+                    </tbody>
+                  </table>
                 </>
               )}
             </div>
@@ -1752,49 +1925,71 @@ export function Ledger() {
       <Dialog open={showVendorDialog} onOpenChange={setShowVendorDialog}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0 border-none shadow-2xl">
           <DialogHeader className="p-6 pb-5 border-b border-slate-100 bg-white shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-indigo-50 border border-indigo-100/50 rounded-xl">
-                <Users className="h-5 w-5 text-indigo-600" />
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-50 border border-indigo-100/50 rounded-xl">
+                  <Users className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-black tracking-tight text-slate-800">Vendor Directory</DialogTitle>
+                  <p className="text-slate-500 text-xs mt-0.5 font-medium">Manage global vendors for ledger entries</p>
+                </div>
               </div>
-              <div>
-                <DialogTitle className="text-xl font-black tracking-tight text-slate-800">Vendor Directory</DialogTitle>
-                <p className="text-slate-500 text-xs mt-0.5 font-medium">Manage global vendors for ledger entries</p>
-              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowAddVendorForm(!showAddVendorForm)}
+                className={`hidden sm:flex gap-2 h-9 border-slate-200 font-bold text-[10px] uppercase tracking-wider transition-all ${showAddVendorForm ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}
+              >
+                <Plus className={`h-3.5 w-3.5 transition-transform duration-300 ${showAddVendorForm ? 'rotate-45' : ''}`} />
+                {showAddVendorForm ? 'Close Form' : 'Add New Vendor'}
+              </Button>
+              {/* Mobile version of the toggle button */}
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => setShowAddVendorForm(!showAddVendorForm)}
+                className={`sm:hidden h-9 w-9 border-slate-200 transition-all ${showAddVendorForm ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'text-slate-500'}`}
+              >
+                <Plus className={`h-4 w-4 transition-transform duration-300 ${showAddVendorForm ? 'rotate-45' : ''}`} />
+              </Button>
             </div>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/30">
-            {/* Add New Vendor */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-              <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                <Plus className="h-3 w-3 text-indigo-500" /> Add New Vendor
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-[1.5fr_1.5fr_auto] gap-3 items-end">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500">Vendor Name</label>
-                  <Input 
-                    placeholder="e.g. Amorsil..." 
-                    value={quickVendor}
-                    onChange={e => setQuickVendor(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleAddVendor()}
-                    className="h-9 text-xs shadow-sm border-slate-200 focus:border-indigo-500 transition-colors"
-                  />
+            {/* Add New Vendor Form (integrated with header toggle) */}
+            {showAddVendorForm && (
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                  <Plus className="h-3 w-3 text-indigo-500" /> Add New Vendor
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-[1.5fr_1.5fr_auto] gap-3 items-end">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-semibold text-slate-500">Vendor Name</label>
+                    <Input 
+                      placeholder="e.g. Amorsil..." 
+                      value={quickVendor}
+                      onChange={e => setQuickVendor(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleAddVendor()}
+                      className="h-9 text-xs shadow-sm border-slate-200 focus:border-indigo-500 transition-colors"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-semibold text-slate-500">TIN Number <span className="text-slate-400 font-normal">(Optional)</span></label>
+                    <Input 
+                      placeholder="Enter TIN..." 
+                      value={quickTin}
+                      onChange={e => setQuickTin(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleAddVendor()}
+                      className="h-9 text-xs shadow-sm border-slate-200 focus:border-indigo-500 font-mono transition-colors"
+                    />
+                  </div>
+                  <Button onClick={handleAddVendor} className="h-9 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm gap-2 px-6 w-full sm:w-auto">
+                    Add Vendor
+                  </Button>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500">TIN Number <span className="text-slate-400 font-normal">(Optional)</span></label>
-                  <Input 
-                    placeholder="Enter TIN..." 
-                    value={quickTin}
-                    onChange={e => setQuickTin(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleAddVendor()}
-                    className="h-9 text-xs shadow-sm border-slate-200 focus:border-indigo-500 font-mono transition-colors"
-                  />
-                </div>
-                <Button onClick={handleAddVendor} className="h-9 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm gap-2 px-6 w-full sm:w-auto">
-                  Add Vendor
-                </Button>
               </div>
-            </div>
+            )}
 
             {/* Vendor List */}
             <div className="space-y-3">
@@ -1875,6 +2070,150 @@ export function Ledger() {
                                   size="sm" 
                                   className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
                                   onClick={() => handleRemoveVendor(v.id, v.name)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="p-4 bg-slate-50 border-t border-slate-100 shrink-0 flex justify-end">
+            <DialogClose className="w-auto h-10 px-6 bg-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-200 font-semibold border-none rounded-lg transition-colors">
+              Close Directory
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Category Management Dialog ─────────────────────────────────────── */}
+      <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
+        <DialogContent className="max-w-xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0 border-none shadow-2xl">
+          <DialogHeader className="p-6 pb-5 border-b border-slate-100 bg-white shrink-0">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-50 border border-indigo-100/50 rounded-xl">
+                  <LayoutGrid className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-black tracking-tight text-slate-800">Category Directory</DialogTitle>
+                  <p className="text-slate-500 text-xs mt-0.5 font-medium">Manage categories for ledger entries</p>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowAddCategoryForm(!showAddCategoryForm)}
+                className={`hidden sm:flex gap-2 h-9 border-slate-200 font-bold text-[10px] uppercase tracking-wider transition-all ${showAddCategoryForm ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}
+              >
+                <Plus className={`h-3.5 w-3.5 transition-transform duration-300 ${showAddCategoryForm ? 'rotate-45' : ''}`} />
+                {showAddCategoryForm ? 'Close Form' : 'Add New Category'}
+              </Button>
+              {/* Mobile version of the toggle button */}
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => setShowAddCategoryForm(!showAddCategoryForm)}
+                className={`sm:hidden h-9 w-9 border-slate-200 transition-all ${showAddCategoryForm ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'text-slate-500'}`}
+              >
+                <Plus className={`h-4 w-4 transition-transform duration-300 ${showAddCategoryForm ? 'rotate-45' : ''}`} />
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/30">
+            {/* Add New Category Form (integrated with header toggle) */}
+            {showAddCategoryForm && (
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                  <Plus className="h-3 w-3 text-indigo-500" /> Add New Category
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-semibold text-slate-500">Category Name</label>
+                    <Input 
+                      placeholder="e.g. Fuel, Transport..." 
+                      value={quickCategory}
+                      onChange={e => setQuickCategory(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
+                      className="h-9 text-xs shadow-sm border-slate-200 focus:border-indigo-500 transition-colors"
+                    />
+                  </div>
+                  <Button onClick={handleAddCategory} className="h-9 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm gap-2 px-6 w-full sm:w-auto">
+                    Add Category
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Category List */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registered Categories ({ledgerCategories.length})</h4>
+              </div>
+              <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                <Table>
+                  <TableHeader className="bg-slate-50">
+                    <TableRow>
+                      <TableHead className="text-[10px] uppercase font-bold text-slate-500 h-10 px-4">Category Name</TableHead>
+                      <TableHead className="text-[10px] uppercase font-bold text-slate-500 h-10 text-right px-4">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedCategories.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={2} className="h-24 text-center text-slate-400 text-xs italic">No categories registered yet.</TableCell>
+                      </TableRow>
+                    ) : (
+                      sortedCategories.map(c => (
+                        <TableRow key={c.id} className="hover:bg-slate-50/50 transition-colors group">
+                          <TableCell className="py-2 px-4">
+                            {editingCategoryId === c.id ? (
+                              <Input 
+                                value={categoryRenameValue} 
+                                onChange={e => setCategoryRenameValue(e.target.value)}
+                                className="h-8 text-xs font-semibold focus:ring-indigo-500/20"
+                                autoFocus
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleRenameCategory(c.id);
+                                  if (e.key === 'Escape') setEditingCategoryId(null);
+                                }}
+                              />
+                            ) : (
+                              <span className="font-semibold text-slate-700 text-sm">{c.name}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-2 px-4 text-right">
+                            {editingCategoryId === c.id ? (
+                              <div className="flex justify-end gap-1">
+                                <Button size="sm" onClick={() => handleRenameCategory(c.id)} className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white px-3">Save</Button>
+                                <Button size="sm" variant="ghost" onClick={() => setEditingCategoryId(null)} className="h-8 text-slate-400 hover:text-slate-600">Cancel</Button>
+                              </div>
+                            ) : (
+                              <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                  onClick={() => {
+                                    setEditingCategoryId(c.id);
+                                    setCategoryRenameValue(c.name);
+                                  }}
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                  onClick={() => handleRemoveCategory(c.id, c.name)}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
