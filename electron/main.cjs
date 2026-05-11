@@ -21,6 +21,7 @@ if (!gotTheLock) {
 /* ─── Globals ──────────────────────────────────────────────────── */
 let mainWindow = null;
 let tray = null;
+let manualCheck = false;
 const isDev = !app.isPackaged;
 
 /* ─── Auto‑Updater Setup ──────────────────────────────────────── */
@@ -60,7 +61,15 @@ function initAutoUpdater() {
   });
 
   autoUpdater.on('update-not-available', () => {
-    // silent — no notification needed
+    if (manualCheck) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'No Updates',
+        message: 'You are already on the latest version.',
+        buttons: ['OK']
+      });
+      manualCheck = false;
+    }
   });
 
   autoUpdater.on('download-progress', (progress) => {
@@ -136,6 +145,7 @@ function buildMenus() {
         if (isDev) {
           dialog.showMessageBox(mainWindow, { type: 'info', message: 'Updates are disabled in dev mode.' });
         } else {
+          manualCheck = true;
           autoUpdater.checkForUpdates();
         }
       },
@@ -290,6 +300,7 @@ function initIPC() {
     if (isDev) {
       dialog.showMessageBox(mainWindow, { type: 'info', message: 'Updates are disabled in development mode.' });
     } else {
+      manualCheck = true;
       autoUpdater.checkForUpdates();
     }
   });
