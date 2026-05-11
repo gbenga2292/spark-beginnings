@@ -229,7 +229,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
 
-  const CURRENT_VERSION = '1.4.13';
+  const CURRENT_VERSION = '1.4.14'; // Matches package.json
   const UPDATE_SERVER_URL = import.meta.env.VITE_UPDATE_SERVER_URL || 'https://dewaterconstruct.com/app-updates';
 
   // ── Platform Detection ─────────────────────────────────────────────────

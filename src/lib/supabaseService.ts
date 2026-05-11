@@ -365,7 +365,7 @@ export function dbToVehicleMovement(r: any): VehicleTripLeg {
     purpose: r.purpose,
     departure_time: r.departure_time,
     arrival_time: r.arrival_time || undefined,
-    remark: r.remark || undefined,
+    remark: r.notes || undefined,   // DB column is 'notes'
     odometer_start: r.odometer_start || undefined,
     odometer_end: r.odometer_end || undefined,
   };
@@ -721,7 +721,7 @@ function vehicleToDb(v: Vehicle) {
   };
 }
 
-function vehicleMovementToDb(v: VehicleTripLeg & { vehicle_id: string; vehicle_reg: string; driver_name: string; driver_employee_id?: string; created_by_id?: string; created_by_name?: string }) {
+function vehicleMovementToDb(v: any) {
   return {
     id: v.id,
     workspace_id: getWS(),
@@ -1836,8 +1836,13 @@ export const db = {
 
   // Vehicle Trip Logs
   async insertVehicleTripRecords(logs: any[]) {
-    const { error } = await supabase.from('vehicle_movement_log').insert(logs.map(vehicleMovementToDb));
-    if (error) { console.error('Database error:', error); throw error; }
+    const data = logs.map(vehicleMovementToDb);
+    console.log('[Supabase] Inserting vehicle trip records:', data);
+    const { error } = await supabase.from('vehicle_movement_log').insert(data);
+    if (error) {
+      console.error('[Supabase] Insert error:', error);
+      throw error;
+    }
   },
   async setVehicleTripRecords(logs: any[]) {
     await supabase.from('vehicle_movement_log').delete().neq('id', '00000000-0000-0000-0000-000000000000');

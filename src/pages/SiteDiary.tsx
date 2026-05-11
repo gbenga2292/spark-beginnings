@@ -88,6 +88,7 @@ export function SiteDiary() {
       .filter(e => e.siteId === siteId && e.isInternal === true)
       .map(entry => ({
         id: entry.id,
+        journalId: undefined as string | undefined,
         date: entry.date,
         timestamp: entry.createdAt,
         loggedBy: entry.loggedBy || 'Unknown',
@@ -102,6 +103,7 @@ export function SiteDiary() {
         const parent = dailyJournals.find(j => j.id === entry.journalId);
         return {
           id: entry.id,
+          journalId: entry.journalId, // parent DailyJournal.id — used for media lookup
           date: parent?.date || entry.createdAt.split('T')[0],
           timestamp: entry.createdAt,
           loggedBy: entry.loggedBy || 'Unknown',
@@ -185,7 +187,7 @@ export function SiteDiary() {
                     </p>
                     {/* Media — only journal entries have photos/videos */}
                     {entry.type === 'Journal' && siteId && (
-                      <EntryMediaStrip siteId={siteId} date={entry.date} journalId={entry.id} />
+                      <EntryMediaStrip siteId={siteId} date={entry.date} journalId={entry.journalId} />
                     )}
                   </div>
                 </div>

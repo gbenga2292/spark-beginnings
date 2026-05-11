@@ -1375,7 +1375,23 @@ export const useAppStore = create<AppState>()(
       setVehicles: async (vehicles) => { set({ vehicles }); await db.setVehicles(vehicles); },
       updateVehicle: (id, vehicle) => { set((s) => ({ vehicles: s.vehicles.map(v => v.id === id ? { ...v, ...vehicle } : v) })); db.updateVehicle(id, vehicle); },
       deleteVehicle: (id) => { set((s) => ({ vehicles: s.vehicles.filter(v => v.id !== id) })); db.deleteVehicle(id); },
-      addVehicleTripRecords: (logs) => { set((s) => ({ vehicleTrips: [...logs, ...s.vehicleTrips] })); db.insertVehicleTripRecords(logs); },
+      addVehicleTripRecords: async (logs) => {
+        const logsWithIds = logs.map(l => ({ ...l, id: l.id || crypto.randomUUID() }));
+        const originalTrips = get().vehicleTrips;
+        
+        // Optimistic update
+        set((s) => ({ vehicleTrips: [...logsWithIds, ...s.vehicleTrips] }));
+
+        try {
+          await db.insertVehicleTripRecords(logsWithIds);
+        } catch (err: any) {
+          console.error('[Vehicle] Failed to save trip records:', err);
+          set({ vehicleTrips: originalTrips });
+          const { toast } = await import('sonner');
+          toast.error('Failed to save trip. Please try again.', { description: err?.message });
+          throw err;
+        }
+      },
       setVehicleTripRecords: async (logs) => { set({ vehicleTrips: logs }); await db.setVehicleTripRecords(logs); },
       addVehicleDocumentType: (type) => { set((s) => ({ vehicleDocumentTypes: [...s.vehicleDocumentTypes, type] })); db.insertVehicleDocumentType(type); },
       deleteVehicleDocumentType: (id) => { set((s) => ({ vehicleDocumentTypes: s.vehicleDocumentTypes.filter(t => t.id !== id) })); db.deleteVehicleDocumentType(id); },
@@ -1388,13 +1404,33 @@ export const useAppStore = create<AppState>()(
           return { vehicles: s.vehicles.map(v => v.id === vehicleId ? { ...v, documents: updatedDocs } : v) };
         });
       },
-      updateVehicleTripRecord: (id, log) => {
+      updateVehicleTripRecord: async (id, log) => {
+        const originalTrips = get().vehicleTrips;
         set((s) => ({ vehicleTrips: s.vehicleTrips.map(t => t.id === id ? { ...t, ...log } : t) }));
-        db.updateVehicleTripRecord(id, log);
+
+        try {
+          await db.updateVehicleTripRecord(id, log);
+        } catch (err: any) {
+          console.error('[Vehicle] Failed to update trip record:', err);
+          set({ vehicleTrips: originalTrips });
+          const { toast } = await import('sonner');
+          toast.error('Failed to update trip record.', { description: err?.message });
+          throw err;
+        }
       },
-      deleteVehicleTripRecord: (id) => {
+      deleteVehicleTripRecord: async (id) => {
+        const originalTrips = get().vehicleTrips;
         set((s) => ({ vehicleTrips: s.vehicleTrips.filter(t => t.id !== id) }));
-        db.deleteVehicleTripRecord(id);
+
+        try {
+          await db.deleteVehicleTripRecord(id);
+        } catch (err: any) {
+          console.error('[Vehicle] Failed to delete trip record:', err);
+          set({ vehicleTrips: originalTrips });
+          const { toast } = await import('sonner');
+          toast.error('Failed to delete trip record.', { description: err?.message });
+          throw err;
+        }
       },
 
       // Consumables
