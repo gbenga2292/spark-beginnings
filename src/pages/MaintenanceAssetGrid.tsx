@@ -15,15 +15,23 @@ interface MaintenanceAssetGridProps {
   category: 'machine' | 'vehicle';
   selectedAssetId: string | null;
   onSelectAsset: (id: string | null) => void;
+  logViewAssetId: string | null;
+  onSetLogViewAssetId: (id: string | null) => void;
   onLogAsset?: (id: string) => void;
 }
 
 
-export function MaintenanceAssetGrid({ category, selectedAssetId, onSelectAsset, onLogAsset }: MaintenanceAssetGridProps) {
+export function MaintenanceAssetGrid({ 
+  category, 
+  selectedAssetId, 
+  onSelectAsset, 
+  logViewAssetId,
+  onSetLogViewAssetId,
+  onLogAsset 
+}: MaintenanceAssetGridProps) {
   const { maintenanceAssets } = useOperations();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [logViewAssetId, setLogViewAssetId] = useState<string | null>(null);
 
   const filteredAssets = maintenanceAssets
     .filter(a => a.category === category)
@@ -50,8 +58,8 @@ export function MaintenanceAssetGrid({ category, selectedAssetId, onSelectAsset,
     return (
       <MaintenanceLogView
         asset={logViewAsset}
-        onBack={() => setLogViewAssetId(null)}
-        onLogService={() => { setLogViewAssetId(null); onLogAsset?.(logViewAsset.id); }}
+        onBack={() => onSetLogViewAssetId(null)}
+        onLogService={() => { onSetLogViewAssetId(null); onLogAsset?.(logViewAsset.id); }}
       />
     );
   }
@@ -142,7 +150,7 @@ export function MaintenanceAssetGrid({ category, selectedAssetId, onSelectAsset,
                   <Eye className="h-3.5 w-3.5" /> Details
                 </Button>
                 <Button
-                  onClick={() => setLogViewAssetId(asset.id)}
+                  onClick={() => onSetLogViewAssetId(asset.id)}
                   variant="outline"
                   size="sm"
                   className="rounded-lg h-9 font-semibold text-xs gap-1.5 border-blue-200 text-blue-600 hover:text-blue-700 hover:bg-blue-50"

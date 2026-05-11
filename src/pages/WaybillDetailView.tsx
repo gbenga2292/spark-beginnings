@@ -131,68 +131,100 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
 
   // ── Page header ──────────────────────────────────────────────────────────────
   useSetPageTitle(
-    `${waybill.type === 'return' ? 'Return' : 'Waybill'} REF-${waybill.id.substring(0, 8).toUpperCase()}`,
+    showPdfPreview ? 'PDF Preview' : `${waybill.type === 'return' ? 'Return' : 'Waybill'} REF-${waybill.id.substring(0, 8).toUpperCase()}`,
     waybill.siteName || 'Logistics Management',
-    <div className="flex items-center gap-2 md:gap-3">
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-9 px-2 sm:px-3 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
-        onClick={handlePreview}
-      >
-        <Eye className="h-4 w-4" /> <span className="hidden sm:inline">Preview</span>
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-9 px-2 sm:px-3 gap-2 text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
-        onClick={handleShare}
-      >
-        <Share2 className="h-4 w-4" /> <span className="hidden sm:inline">Share</span>
-      </Button>
-      <Button
-        size="sm"
-        className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
-        onClick={handleDownload}
-      >
-        <Download className="h-4 w-4" /> <span className="hidden sm:inline">Download</span>
-      </Button>
-      {waybill.type === 'waybill' && waybill.status === 'outstanding' && (
+    showPdfPreview ? (
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 px-2 sm:px-3 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+          onClick={() => setShowPdfPreview(false)}
+        >
+          <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back to Waybill Info</span>
+        </Button>
+        <Button
+          size="sm"
+          className="h-9 px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+          onClick={handleDownload}
+        >
+          <Download className="h-4 w-4" /> <span className="hidden sm:inline">Download PDF</span>
+        </Button>
+      </div>
+    ) : (
+      <div className="flex items-center gap-2 md:gap-3">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 px-2 sm:px-3 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+          onClick={onClose}
+        >
+          <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back to Waybills</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 px-2 sm:px-3 gap-2 text-slate-600 border-slate-200 bg-white hover:bg-slate-50 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+          onClick={handlePreview}
+        >
+          <Eye className="h-4 w-4" /> <span className="hidden sm:inline">Preview</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 px-2 sm:px-3 gap-2 text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100 font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+          onClick={handleShare}
+        >
+          <Share2 className="h-4 w-4" /> <span className="hidden sm:inline">Share</span>
+        </Button>
         <Button
           size="sm"
           className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
-          onClick={() => setShowDateDialog(true)}
+          onClick={handleDownload}
         >
-          <CheckCircle2 className="h-4 w-4" /> <span className="hidden sm:inline">Mark as Sent</span>
+          <Download className="h-4 w-4" /> <span className="hidden sm:inline">Download</span>
         </Button>
-      )}
-      {waybill.type === 'return' && waybill.status === 'outstanding' && (
-        <Button
-          size="sm"
-          className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
-          onClick={handleOpenReturnDialog}
-        >
-          <CheckCircle2 className="h-4 w-4" /> <span className="hidden sm:inline">Process Return</span>
-        </Button>
-      )}
-    </div>,
-    [waybill.id]
+        {waybill.type === 'waybill' && waybill.status === 'outstanding' && (
+          <Button
+            size="sm"
+            className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+            onClick={() => setShowDateDialog(true)}
+          >
+            <CheckCircle2 className="h-4 w-4" /> <span className="hidden sm:inline">Mark as Sent</span>
+          </Button>
+        )}
+        {waybill.type === 'return' && waybill.status === 'outstanding' && (
+          <Button
+            size="sm"
+            className="h-9 px-2 sm:px-3 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] uppercase tracking-tight shadow-sm transition-all"
+            onClick={handleOpenReturnDialog}
+          >
+            <CheckCircle2 className="h-4 w-4" /> <span className="hidden sm:inline">Process Return</span>
+          </Button>
+        )}
+      </div>
+    ),
+    [waybill.id, showPdfPreview]
   );
 
   return (
     <>
-      <div className="flex flex-col gap-6 max-w-5xl mx-auto pb-10">
-
-        {/* ── Back button ──────────────────────────────────────────────────────── */}
-        <button
-          onClick={onClose}
-          className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-700 dark:hover:text-blue-400 font-semibold transition-colors w-fit"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to Waybills
-        </button>
-
-
-
+      {showPdfPreview ? (
+        <div className="flex flex-col gap-6 max-w-5xl mx-auto pb-10 h-[80vh] min-h-[600px] animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex-1 w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
+            {/* PDF iframe */}
+            <div className="flex-1 overflow-hidden bg-slate-100 dark:bg-slate-950 min-h-[500px]">
+              <embed
+                src={pdfDataUri}
+                type="application/pdf"
+                className="w-full h-full border-0"
+                title="Waybill PDF Preview"
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-6 max-w-5xl mx-auto pb-10">
         {/* ── Waybill info card ─────────────────────────────────────────────── */}
         <div className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
           {/* Card header */}
@@ -287,54 +319,7 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
             </div>
           </div>
         </div>
-      </div>
-
-      {/* ── PDF Preview Modal ─────────────────────────────────────────────────── */}
-      {showPdfPreview && (
-        <Dialog open onOpenChange={() => setShowPdfPreview(false)}>
-          <DialogContent
-            aria-describedby={undefined}
-            className="max-w-4xl h-[88vh] flex flex-col p-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl"
-          >
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
-                  <FileText className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="font-bold text-slate-800 dark:text-white text-sm">PDF Preview</p>
-                  <p className="text-xs text-slate-400 font-medium">REF-{waybill.id.substring(0, 8).toUpperCase()} · {waybill.siteName}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  className="h-8 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs"
-                  onClick={handleDownload}
-                >
-                  <Download className="h-3.5 w-3.5" /> Download
-                </Button>
-                <button
-                  onClick={() => setShowPdfPreview(false)}
-                  className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* PDF iframe */}
-            <div className="flex-1 overflow-hidden bg-slate-100 dark:bg-slate-950">
-              <embed
-                src={pdfDataUri}
-                type="application/pdf"
-                className="w-full h-full border-0"
-                title="Waybill PDF Preview"
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
+        </div>
       )}
 
       {/* ── Date Picker Dialog ─────────────────────────────────────────────────── */}

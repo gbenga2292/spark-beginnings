@@ -31,6 +31,7 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 export function MaintenanceManager() {
   const [activeTab, setActiveTab] = useState<MaintenanceTab>('dashboard');
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [logViewAssetId, setLogViewAssetId] = useState<string | null>(null);
   const [logAssetId, setLogAssetId] = useState<string | null>(null);
   const { maintenanceAssets } = useOperations();
   
@@ -38,6 +39,7 @@ export function MaintenanceManager() {
     setLogAssetId(id);
     setActiveTab('log');
     setSelectedAssetId(null);
+    setLogViewAssetId(null);
   };
   
   const machinesCount = maintenanceAssets.filter(a => a.category === 'machine').length;
@@ -64,28 +66,32 @@ export function MaintenanceManager() {
     toast.success('Export downloaded successfully');
   };
 
+  const isSubViewActive = !!selectedAssetId || !!logViewAssetId;
+
   useSetPageTitle(
-    'Equipment Maintenance',
-    'Track and manage heavy machinery and vehicle service schedules',
-    <div className="flex items-center gap-2">
-       <Button 
-         variant="outline" 
-         size="sm" 
-         className="gap-2 h-9 border-slate-200 hidden sm:flex"
-         onClick={handleExport}
-       >
-         <FileDown className="h-4 w-4" /> Export
-       </Button>
-       {activeTab !== 'log' && (
-         <Button 
-           size="sm" 
-           className="gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-sm" 
-           onClick={() => setActiveTab('log')}
-         >
-           <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Log Service</span>
-         </Button>
-       )}
-    </div>
+    isSubViewActive ? '' : 'Equipment Maintenance',
+    isSubViewActive ? '' : 'Track and manage heavy machinery and vehicle service schedules',
+    !isSubViewActive && (
+      <div className="flex items-center gap-2">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="gap-2 h-9 border-slate-200 hidden sm:flex"
+          onClick={handleExport}
+        >
+          <FileDown className="h-4 w-4" /> Export
+        </Button>
+        {activeTab !== 'log' && (
+          <Button 
+            size="sm" 
+            className="gap-2 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-sm" 
+            onClick={() => setActiveTab('log')}
+          >
+            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Log Service</span>
+          </Button>
+        )}
+      </div>
+    )
   );
 
   const tabs = [
@@ -97,26 +103,34 @@ export function MaintenanceManager() {
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10 px-4 sm:px-6 lg:px-8">
-      {/* Tabs - Hidden if viewing details */}
-      {!selectedAssetId && (
-        <div className="bg-card rounded-xl shadow-sm border border-border flex overflow-x-auto overflow-y-hidden scrollbar-hide shrink-0">
+      {/* Tabs - Hidden if viewing details or log */}
+      {!isSubViewActive && (
+        <div className="bg-white/80 backdrop-blur-sm sticky top-0 z-10 rounded-2xl shadow-sm border border-slate-200/60 p-1.5 flex overflow-x-auto overflow-y-hidden scrollbar-hide shrink-0 gap-1 mb-2">
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as MaintenanceTab)}
+              onClick={() => {
+                setActiveTab(tab.id as MaintenanceTab);
+                setSelectedAssetId(null);
+                setLogAssetId(null);
+                setLogViewAssetId(null);
+              }}
               className={cn(
-                "flex items-center justify-center gap-2 flex-1 min-w-[64px] sm:min-w-[120px] py-4 text-sm font-semibold border-b-2 transition-all whitespace-nowrap",
+                "flex items-center justify-center gap-2.5 flex-1 min-w-[100px] sm:min-w-[140px] py-3 text-sm font-bold rounded-xl transition-all whitespace-nowrap group",
                 activeTab === tab.id 
-                  ? 'border-blue-600 text-blue-600 bg-blue-50/50 dark:bg-blue-900/10' 
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                  ? 'bg-blue-50/50 text-blue-600 shadow-sm border-b-2 border-blue-600 rounded-b-none' 
+                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
               )}
             >
-              <tab.icon className="h-5 w-5 sm:h-4 sm:w-4 shrink-0" />
-              <span className="hidden sm:inline">{tab.label}</span>
+              <tab.icon className={cn(
+                "h-4 w-4 shrink-0 transition-colors",
+                activeTab === tab.id ? "text-blue-600" : "text-slate-300 group-hover:text-slate-400"
+              )} />
+              <span>{tab.label}</span>
               {tab.count !== undefined && (
                 <span className={cn(
-                  "ml-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tighter",
-                  activeTab === tab.id ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600" : "bg-slate-100 dark:bg-slate-800 text-slate-400"
+                  "ml-1 px-1.5 py-0.5 rounded-lg text-[10px] font-black tracking-tight",
+                  activeTab === tab.id ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"
                 )}>
                   {tab.count}
                 </span>
@@ -134,6 +148,8 @@ export function MaintenanceManager() {
             category="machine" 
             selectedAssetId={selectedAssetId}
             onSelectAsset={setSelectedAssetId}
+            logViewAssetId={logViewAssetId}
+            onSetLogViewAssetId={setLogViewAssetId}
             onLogAsset={handleLogAsset}
           />
         )}
@@ -142,6 +158,8 @@ export function MaintenanceManager() {
             category="vehicle" 
             selectedAssetId={selectedAssetId}
             onSelectAsset={setSelectedAssetId}
+            logViewAssetId={logViewAssetId}
+            onSetLogViewAssetId={setLogViewAssetId}
             onLogAsset={handleLogAsset}
           />
         )}
