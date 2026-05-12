@@ -97,6 +97,17 @@ export interface WeeklyReportPriv {
   canViewFinance: boolean;
 }
 
+// ─── Interviews ──────────────────────────────────────────────
+export interface InterviewsPriv {
+  canView: boolean;
+  canAdd: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canConductInterview: boolean;
+  canRecordVerdict: boolean;
+  canForwardToOnboarding: boolean;
+}
+
 // ─── Master interface ─────────────────────────────────────────
 export interface UserPrivileges {
   dashboard:         DashboardPriv;
@@ -131,6 +142,7 @@ export interface UserPrivileges {
   beneficiaries:     BeneficiariesPriv;
   dailyJournal:      DailyJournalPriv;
   weeklyReport:      WeeklyReportPriv;
+  interviews:        InterviewsPriv;
 }
 
 export interface AppUser {
@@ -195,6 +207,7 @@ export const FULL_ACCESS: UserPrivileges = {
   beneficiaries:    { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
   dailyJournal:     { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
   weeklyReport:     { canView: true, canViewHr: true, canViewOps: true, canViewComm: true, canViewFinance: true },
+  interviews:       { canView: true, canAdd: true, canEdit: true, canDelete: true, canConductInterview: true, canRecordVerdict: true, canForwardToOnboarding: true },
 };
 
 // ─── NO ACCESS ───────────────────────────────────────────────
@@ -238,6 +251,7 @@ export const NO_ACCESS: UserPrivileges = {
   beneficiaries:    { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
   dailyJournal:     { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
   weeklyReport:     { canView: false, canViewHr: false, canViewOps: false, canViewComm: false, canViewFinance: false },
+  interviews:       { canView: false, canAdd: false, canEdit: false, canDelete: false, canConductInterview: false, canRecordVerdict: false, canForwardToOnboarding: false },
 };
 
 // ─── DEFAULT PRESETS ─────────────────────────────────────────
@@ -257,6 +271,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       salaryLoans: { canView: true, canAdd: true, canEdit: false, canDelete: false, canViewAmounts: true },
       hmo:         { canView: true, canAdd: true, canEdit: true, canExport: true },
       reports:     { canView: true, canExport: true },
+      interviews:  { canView: true, canAdd: true, canEdit: true, canDelete: false, canConductInterview: true, canRecordVerdict: true, canForwardToOnboarding: true },
       payroll:     { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true, canViewWithholdingSchedule: true },
       tasks:       { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: false, isExternalHr: false },
       beneficiaries:{ canView: true, canAdd: true, canEdit: true, canDelete: false, canImport: true, canExport: true },

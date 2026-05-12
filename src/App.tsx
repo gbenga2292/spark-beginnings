@@ -69,6 +69,7 @@ const MaintenanceManager = lazy(() => import('./pages/MaintenanceManager').then(
 const VehicleManager = lazy(() => import('./pages/VehicleManager').then(m => ({ default: m.VehicleManager })));
 const EmployeeAnalytics = lazy(() => import('./pages/EmployeeAnalytics').then(m => ({ default: m.EmployeeAnalytics })));
 const NotificationsPage = lazy(() => import('./pages/Notifications').then(m => ({ default: m.NotificationsPage })));
+const InterviewManager = lazy(() => import('./pages/InterviewManager').then(m => ({ default: m.default })));
 import { OperationsProvider } from './contexts/OperationsContext';
 import { useVehicleDocumentSync } from './hooks/useVehicleDocumentSync';
 
@@ -208,6 +209,7 @@ function AppContent() {
             <Route path="hmo" element={<Page label="HMO Management"><ProtectedRoute requiredModule="hmo"><HmoManagement /></ProtectedRoute></Page>} />
             <Route path="performance-conduct" element={<Page label="Performance & Conduct"><ProtectedRoute requiredModule="disciplinary"><PerformanceConduct /></ProtectedRoute></Page>} />
             <Route path="evaluations" element={<Page label="Evaluations"><ProtectedRoute requiredModule="evaluations"><Evaluations /></ProtectedRoute></Page>} />
+            <Route path="interviews" element={<Page label="Interviews"><ProtectedRoute requiredModule="interviews"><InterviewManager /></ProtectedRoute></Page>} />
             <Route path="ledger" element={<Page label="Ledger"><ProtectedRoute requiredModule="ledger"><Ledger /></ProtectedRoute></Page>} />
             <Route path="clients" element={<Navigate to="/sites" replace />} />
             

@@ -36,7 +36,7 @@ const MODULE_ICONS: Record<string, any> = {
 /* Quick check which groups the user has access to */
 const GROUP_CHECK: { name: string; keys: (keyof UserPrivileges)[]; field: string }[] = [
   { name: 'Dashboard',  keys: ['dashboard'], field: 'canView' },
-  { name: 'HR',         keys: ['employees', 'onboarding', 'attendance', 'leaves', 'salaryLoans', 'evaluations', 'disciplinary', 'reports'], field: 'canView' },
+  { name: 'HR',         keys: ['employees', 'onboarding', 'attendance', 'leaves', 'salaryLoans', 'evaluations', 'interviews', 'disciplinary', 'reports'], field: 'canView' },
   { name: 'Operations', keys: ['operations'], field: 'canView' },
   { name: 'Clients',      keys: ['sites'], field: 'canView' },
   { name: 'Tasks',      keys: ['tasks'], field: 'canView' },

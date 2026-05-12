@@ -121,6 +121,7 @@ const navigation: NavCategory[] = [
       { name: 'Salary & Loan Advance', href: '/salary-loans', icon: NairaSign, privKey: 'salaryLoans', privField: 'canView' },
       { name: 'HMO Management', href: '/hmo', icon: ShieldCheck, privKey: 'hmo', privField: 'canView' },
       { name: 'Evaluations', href: '/evaluations', icon: ClipboardList, privKey: 'evaluations', privField: 'canView' },
+      { name: 'Interviews', href: '/interviews', icon: Users, privKey: 'interviews', privField: 'canView' },
       { name: 'Performance & Conduct', href: '/performance-conduct', icon: AlertTriangle, privKey: 'disciplinary', privField: 'canView' },
       { name: 'HR Reports', href: '/reports', icon: FileText, privKey: 'reports', privField: 'canView' },
     ],

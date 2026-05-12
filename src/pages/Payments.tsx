@@ -24,10 +24,21 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
     const sites = useAppStore((state) => state.sites);
     const payments = useAppStore((state) => state.payments);
     const clientProfiles = useAppStore((state) => state.clientProfiles);
+    const pendingSites = useAppStore((state) => state.pendingSites);
     const addPayment = useAppStore((state) => state.addPayment);
     const updatePayment = useAppStore((state) => state.updatePayment);
     const deletePayment = useAppStore((state) => state.deletePayment);
     const vatRate = useAppStore((state) => state.payrollVariables.vatRate);
+
+    // Case-insensitive TIN lookup with pendingSites fallback
+    const getTinForClient = (clientName: string): string => {
+        if (!clientName) return '';
+        const key = clientName.trim().toLowerCase();
+        const profile = clientProfiles.find(cp => cp.name?.trim().toLowerCase() === key);
+        if (profile?.tinNumber) return profile.tinNumber;
+        const pending = pendingSites.find(s => s.clientName?.trim().toLowerCase() === key && s.phase4?.clientTinNumber);
+        return pending?.phase4?.clientTinNumber || '';
+    };
 
     // ─── Permissions ───────────────────────────────────────────
     const priv = usePriv('payments');
@@ -258,7 +269,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
 
             const rows = payments.map(pay => {
                 const { vat, amountForVat: amtForVat } = getVatDetails(pay.amount || 0, pay.payVat, vatRate);
-                const tin = clientProfiles.find(cp => cp.name === pay.client)?.tinNumber || '';
+                const tin = getTinForClient(pay.client);
                 
                 const data = [
                     pay.id, pay.client, tin, pay.site, formatDisplayDate(pay.date), pay.amount, pay.withholdingTax, pay.discount, pay.payVat, vat, amtForVat
@@ -620,7 +631,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                                         <TableCell className="px-4 py-3 text-slate-500">{formatDisplayDate(p.date)}</TableCell>
                                         <TableCell className="px-4 py-3 font-semibold text-slate-800">{p.client}</TableCell>
                                         <TableCell className="px-4 py-3 text-slate-500 font-mono text-xs">
-                                            {clientProfiles.find(cp => cp.name === p.client)?.tinNumber || <span className="text-slate-300">—</span>}
+                                            {getTinForClient(p.client) || <span className="text-slate-300">—</span>}
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-slate-600">{p.site}</TableCell>
                                         <TableCell className="px-4 py-3 text-right font-mono font-bold text-slate-900">

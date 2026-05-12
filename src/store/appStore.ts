@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { db } from '@/src/lib/supabaseService';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import { Vehicle, VehicleTripLeg, VehicleDocumentType, ConsumableUsageLog } from '@/src/types/operations';
+import { InterviewCandidate } from '@/src/types/interviews';
 
 export interface CommLog {
   id: string;
@@ -664,6 +665,12 @@ interface AppState {
   vehicleDocumentTypes: VehicleDocumentType[];
   consumableLogs: ConsumableUsageLog[];
   addConsumableLogs: (logs: ConsumableUsageLog[]) => void;
+
+  interviewCandidates: InterviewCandidate[];
+  addInterviewCandidate: (candidate: InterviewCandidate) => void;
+  updateInterviewCandidate: (id: string, updates: Partial<InterviewCandidate>) => void;
+  deleteInterviewCandidate: (id: string) => void;
+  setInterviewCandidates: (candidates: InterviewCandidate[]) => void;
   addSite: (site: Site) => void;
   setSites: (sites: Site[]) => void;
   updateSite: (id: string, site: Partial<Site>) => void;
@@ -904,6 +911,7 @@ export const useAppStore = create<AppState>()(
       vehicleDocumentTypes: [],
       consumableLogs: [],
       clientContacts: [],
+      interviewCandidates: [],
       
       onboardingTemplates: [],
 
@@ -1436,6 +1444,24 @@ export const useAppStore = create<AppState>()(
       // Consumables
       addConsumableLogs: (logs) => {
         set((s) => ({ consumableLogs: [...logs, ...s.consumableLogs] }));
+      },
+
+      // Interview Candidates
+      addInterviewCandidate: (candidate) => {
+        set((s) => ({ interviewCandidates: [candidate, ...s.interviewCandidates] }));
+      },
+      updateInterviewCandidate: (id, updates) => {
+        set((s) => ({
+          interviewCandidates: s.interviewCandidates.map((c) =>
+            c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c
+          ),
+        }));
+      },
+      deleteInterviewCandidate: (id) => {
+        set((s) => ({ interviewCandidates: s.interviewCandidates.filter((c) => c.id !== id) }));
+      },
+      setInterviewCandidates: (candidates) => {
+        set({ interviewCandidates: candidates });
       },
 
       // Onboarding Templates
