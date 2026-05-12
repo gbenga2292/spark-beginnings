@@ -3,6 +3,7 @@ import { useAppStore } from '@/src/store/appStore';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { useAppData } from '@/src/contexts/AppDataContext';
+import { WeeklyReportPreview } from '@/src/components/reports/WeeklyReportPreview';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isWithinInterval, addWeeks, subWeeks, addMonths, subMonths } from 'date-fns';
 import { 
   ChevronLeft, ChevronRight, Users, Fuel, Truck, BookOpen, UserPlus, 
@@ -52,8 +53,7 @@ export function WeeklyReport() {
   const startStr = start.toISOString();
   const endStr = end.toISOString();
 
-  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
   // ── Permissions ───────────────────────────────────────
@@ -277,15 +277,15 @@ export function WeeklyReport() {
 
   // ── Page Header ───────────────────────────────────────
   useSetPageTitle(
-    pdfPreviewUrl ? 'Report Document Preview' : (reportMode === 'monthly' ? 'Monthly Operations Report' : 'Weekly Operations Report'),
-    pdfPreviewUrl ? 'Professional Site Operations Ledger' : 'Aggregated enterprise activity and financial summaries',
+    showPreview ? 'Report Document Preview' : (reportMode === 'monthly' ? 'Monthly Operations Report' : 'Weekly Operations Report'),
+    showPreview ? 'Professional Site Operations Ledger' : 'Aggregated enterprise activity and financial summaries',
     <div className="relative flex items-center gap-2">
-      {pdfPreviewUrl ? (
+      {showPreview ? (
         <>
-          <Button size="sm" variant="outline" onClick={() => { setPdfPreviewUrl(null); setIsPreviewOpen(false); }} className="h-9 w-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm" title="Close Preview">
+          <Button size="sm" variant="outline" onClick={() => setShowPreview(false)} className="h-9 w-9 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm" title="Close Preview">
             <X className="h-5 w-5 text-slate-400" />
           </Button>
-          <Button size="sm" onClick={() => generateProfessionalPDF('download')} className="h-9 w-9 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200" title="Save PDF">
+          <Button size="sm" onClick={() => generateProfessionalPDF('download')} className="h-9 w-9 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200" title="Download PDF">
             <Printer className="h-5 w-5" />
           </Button>
         </>
@@ -316,19 +316,19 @@ export function WeeklyReport() {
             <div className="flex items-center gap-2 mt-1 sm:mt-0">
               <button onClick={() => setAnchor(new Date())} className="h-8 sm:h-9 px-2 sm:px-3 text-[10px] sm:text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg sm:rounded-xl hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm whitespace-nowrap flex-1 sm:flex-none">Today</button>
               <Button variant="outline" size="sm" onClick={handleExportXLSX} className="h-8 w-8 sm:h-9 sm:w-9 p-0 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm shrink-0" title="Export Excel"><Download className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-500" /></Button>
-              <Button size="sm" onClick={() => generateProfessionalPDF('preview')} className="h-8 w-8 sm:h-9 sm:w-9 p-0 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200 shrink-0" title="View PDF Report"><FileText className="h-4 w-4 sm:h-5 sm:w-5" /></Button>
+              <Button size="sm" onClick={() => setShowPreview(true)} className="h-8 w-8 sm:h-9 sm:w-9 p-0 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200 shrink-0" title="View PDF Report"><FileText className="h-4 w-4 sm:h-5 sm:w-5" /></Button>
             </div>
           </div>
         </>
       )}
     </div>,
-    [reportLabel, reportMode, pdfPreviewUrl]
+    [reportLabel, reportMode, showPreview]
   );
 
-  async function generateProfessionalPDF(mode: 'preview' | 'download') {
+  async function generateProfessionalPDF(mode: 'download') {
     setIsGenerating(true);
     const doc = new jsPDF();
-    
+
     const margin = 15;
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -585,13 +585,7 @@ export function WeeklyReport() {
       doc.text(`Page ${i} of ${pageCount} · Dewatering Construction Etc Limited · Generated ${format(new Date(), 'PPP')}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
     }
 
-    if (mode === 'download') {
-      doc.save(`Operations_Report_${format(start, 'yyyy_MM_dd')}.pdf`);
-    } else {
-      const blobUrl = doc.output('bloburl').toString();
-      setPdfPreviewUrl(blobUrl);
-      setIsPreviewOpen(true);
-    }
+    doc.save(`Operations_Report_${format(start, 'yyyy_MM_dd')}.pdf`);
     setIsGenerating(false);
   }
 
@@ -632,13 +626,39 @@ export function WeeklyReport() {
     XLSX.writeFile(wb, `Weekly_Report_${format(start, 'dd-MMM-yyyy')}.xlsx`);
   }
 
+  const activeSiteNames = useMemo(() => Array.from(new Set([
+    ...weekMachineLogs.map(m => m.siteName),
+    ...weekJournalEntries.filter(e => weekJournals.some(j => j.id === e.journalId)).map(e => e.siteName),
+    ...weekLedger.map(e => e.site),
+  ].filter(Boolean))), [weekMachineLogs, weekJournalEntries, weekJournals, weekLedger]);
+
   return (
-    <div className={cn("flex flex-col bg-slate-50 dark:bg-slate-950/50 overflow-hidden font-sans", pdfPreviewUrl ? "h-full" : "h-full pb-10")}>
+    <div className={cn("flex flex-col bg-slate-50 dark:bg-slate-950/50 overflow-hidden font-sans", showPreview ? "h-full" : "h-full pb-10")}>
       
-      {/* Main Content Area */}
-      {pdfPreviewUrl ? (
-        <div className="flex-1 w-full h-full bg-slate-800 relative z-10">
-           <iframe src={`${pdfPreviewUrl}#toolbar=0&navpanes=0`} className="w-full h-full bg-white" title="Operations Ledger Preview" />
+      {/* HTML Preview Mode — works on all platforms */}
+      {showPreview ? (
+        <div className="flex-1 w-full h-full overflow-y-auto">
+          <WeeklyReportPreview
+            reportMode={reportMode}
+            start={start}
+            end={end}
+            reportLabel={reportLabel}
+            uniqueStaffDeployed={uniqueStaffDeployed}
+            totalDiesel={totalDiesel}
+            totalIncome={totalIncome}
+            totalExpenses={totalExpenses}
+            employeesTotal={employees.length}
+            completedTasksCount={weekTasks.filter(t => t.status === 'completed').length}
+            completedSubtasksCount={weekSubtasks.filter(s => s.status === 'completed').length}
+            totalShifts={summarizedAttendance.reduce((sum, s) => sum + s.totalShifts, 0)}
+            summarizedAttendance={summarizedAttendance}
+            weekMachineLogs={weekMachineLogs}
+            weekLedger={weekLedger}
+            waybills={waybills}
+            weekJournals={weekJournals}
+            weekJournalEntries={weekJournalEntries}
+            activeSiteNames={activeSiteNames}
+          />
         </div>
       ) : (
       <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-5 sm:space-y-8 max-w-7xl mx-auto w-full">
