@@ -435,17 +435,22 @@ html.ui-glass body {
 html.dark.ui-glass body {
   background: radial-gradient(circle at top left, #1e293b, #0f172a) !important;
 }
-.ui-glass .bg-card, .ui-glass [data-radix-popper-content-wrapper], .ui-glass table th {
+.ui-glass .bg-card, .ui-glass [data-radix-popper-content-wrapper], .ui-glass table th:not(.bg-slate-900) {
   background: rgba(255, 255, 255, 0.6) !important;
   backdrop-filter: blur(16px) !important;
   -webkit-backdrop-filter: blur(16px) !important;
   border: 1px solid rgba(255, 255, 255, 0.8) !important;
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05) !important;
 }
-.dark.ui-glass .bg-card, .dark.ui-glass [data-radix-popper-content-wrapper], .dark.ui-glass table th {
+.dark.ui-glass .bg-card, .dark.ui-glass [data-radix-popper-content-wrapper], .dark.ui-glass table th:not(.bg-slate-900) {
   background: rgba(15, 23, 42, 0.6) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+}
+.ui-glass table th.bg-slate-900, .dark.ui-glass table th.bg-slate-900 {
+  background: #0f172a !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* ── Neo-Brutalism ────────────────────────────────────────────────────── */

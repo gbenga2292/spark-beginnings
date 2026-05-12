@@ -793,7 +793,7 @@ export function DailyJournal() {
             </div>
             {currentUser?.privileges?.dailyJournal?.canAdd && (
               <Button size="sm" onClick={() => openModal(undefined, diaryDate || undefined)}
-                className="h-8 sm:h-9 px-2 sm:px-4 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs tracking-tight shadow-sm active:scale-95">
+                className="hidden sm:flex h-8 sm:h-9 px-2 sm:px-4 gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs tracking-tight shadow-sm active:scale-95">
                 <Plus className="w-4 h-4" /><span className="hidden sm:inline">New Log</span>
               </Button>
             )}
@@ -1181,6 +1181,14 @@ export function DailyJournal() {
 
   return (
     <div className="space-y-5">
+      {/* Mobile "New Log" Action Button */}
+      <div className="sm:hidden">
+        {currentUser?.privileges?.dailyJournal?.canAdd && (
+          <Button onClick={() => openModal(undefined, diaryDate || undefined)} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2 shadow-md rounded-xl text-base">
+            <Plus className="h-5 w-5" /> New Log
+          </Button>
+        )}
+      </div>
       {/* Search (list view only) */}
       {viewMode === 'list' && (
         <div className="relative w-full max-w-md">

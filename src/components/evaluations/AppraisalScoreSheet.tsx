@@ -583,7 +583,7 @@ export function AppraisalScoreSheet({ employee, record, onSave, onClose }: Appra
             </Button>
             
             <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-lg font-black text-slate-900 tracking-tight leading-none">Performance Center</h2>
                 <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-100 text-[10px] font-bold px-2 py-0 h-5">APPRAISAL MODE</Badge>
               </div>
@@ -606,7 +606,7 @@ export function AppraisalScoreSheet({ employee, record, onSave, onClose }: Appra
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="hidden md:flex items-center gap-3 shrink-0">
             <div className="hidden sm:flex items-center bg-slate-50 border border-slate-200 rounded-lg p-1 mr-2">
               <Button 
                 variant="ghost" 

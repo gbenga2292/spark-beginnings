@@ -12,7 +12,7 @@ import {
   User, Users, Calendar, Clock, ChevronDown, ChevronRight,
   MessageSquare, Hash, Paperclip, Send, FolderOpen, X,
   ArrowRight, ArrowLeft, Plus, Hourglass, FileText, FileSpreadsheet, Presentation,
-  Pencil, Reply, Link as LinkIcon, Check, Trash2, ShieldCheck
+  Pencil, Reply, Link as LinkIcon, Check, Trash2, ShieldCheck, Menu, MoreVertical
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/src/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
@@ -174,7 +174,17 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
     isOpen: false, subtaskId: null, sessionId: '', employeeName: '', employeeId: '', score: '80', notes: '', conclusion: 'Confirm Employment'
   });
 
-  const [showListOnMobile, setShowListOnMobile] = useState(true);
+  const [showListOnMobile, setShowListOnMobile] = useState(!activeSubtaskId);
+  const [showUpdatesOnMobile, setShowUpdatesOnMobile] = useState(false);
+
+  useEffect(() => {
+    if (activeSubtaskId) {
+      setShowListOnMobile(false);
+      setShowUpdatesOnMobile(false);
+    } else {
+      setShowListOnMobile(true);
+    }
+  }, [activeSubtaskId]);
 
   const [panelInvite, setPanelInvite] = useState<{ isOpen: boolean; panelists: string[] }>({
     isOpen: false,
@@ -287,7 +297,7 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
   };
 
   return (
-    <div className={className || "flex flex-col md:flex-row h-[calc(100vh-140px)] rounded-2xl border border-border overflow-hidden shadow-sm bg-white"}>
+    <div className={className || "flex flex-col md:flex-row h-[calc(100dvh-140px)] rounded-2xl border border-border overflow-hidden shadow-sm bg-white"}>
 
       {/* ── LEFT SIDEBAR ─────────────────────────────────────────────────── */}
       <div className={`w-full md:w-72 flex-shrink-0 border-r border-border bg-white flex-col ${(!activeSubtaskId || showListOnMobile) ? 'flex' : 'hidden md:flex'}`}>
@@ -471,15 +481,15 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
         <div className={`flex-1 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden min-w-0 ${!showListOnMobile ? 'flex' : 'hidden md:flex'}`}>
 
           {/* MIDDLE: Task Detail */}
-          <div className="flex flex-col xl:flex-1 xl:overflow-hidden bg-slate-50">
+          <div className={`flex-col xl:flex-1 xl:overflow-hidden bg-slate-50 ${showUpdatesOnMobile ? 'hidden xl:flex' : 'flex'}`}>
             {/* Top nav */}
             <div className="h-16 border-b border-border bg-slate-50/50 flex items-center justify-between px-4 xl:px-6 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowListOnMobile(true)}
-                  className="md:hidden p-2 -ml-2 rounded-lg hover:bg-slate-200 text-slate-500"
+                  className="md:hidden flex items-center gap-1.5 p-2 -ml-2 rounded-lg hover:bg-slate-200 text-slate-500 text-sm font-semibold"
                 >
-                  <ArrowLeft className="w-5 h-5" />
+                  <Menu className="w-5 h-5" /> Tasks
                 </button>
                 <button
                   onClick={() => navigateSubtask(-1)}
@@ -490,8 +500,16 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
                 </button>
               </div>
 
-              <div className="text-xs font-bold tracking-widest text-slate-400 uppercase">
-                Task Navigation
+              <div className="flex flex-col items-center">
+                <div className="text-xs font-bold tracking-widest text-slate-400 uppercase">
+                  Task Navigation
+                </div>
+                <button 
+                  onClick={() => setShowUpdatesOnMobile(true)}
+                  className="xl:hidden mt-0.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-full text-[10px] font-bold transition-colors"
+                >
+                  View Updates
+                </button>
               </div>
 
               <button
@@ -1064,8 +1082,14 @@ export function TaskInboxView({ subtasks, mainTasks, users, activeSubtaskId, onS
           </div>
 
           {/* RIGHT: Updates Panel */}
-          <div className="w-full xl:w-[400px] 2xl:w-[520px] flex-shrink-0 bg-white dark:bg-slate-900 border-t xl:border-t-0 xl:border-l border-border dark:border-slate-800 flex flex-col xl:overflow-hidden min-h-[600px] xl:min-h-0">
+          <div className={`w-full xl:w-[400px] 2xl:w-[520px] flex-shrink-0 bg-white dark:bg-slate-900 border-t xl:border-t-0 xl:border-l border-border dark:border-slate-800 flex-col xl:overflow-hidden min-h-[600px] xl:min-h-0 ${showUpdatesOnMobile ? 'flex' : 'hidden xl:flex'}`}>
             <div className="flex bg-slate-50 dark:bg-[#111827] border-b border-border dark:border-slate-800" style={{ flexShrink: 0 }}>
+              <button
+                onClick={() => setShowUpdatesOnMobile(false)}
+                className="xl:hidden flex items-center justify-center px-4 text-slate-500 hover:bg-slate-200 border-r border-slate-200"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
               {(['updates', 'workflow', 'files'] as const).map(tab => (
                 <button
                   key={tab}
@@ -2057,15 +2081,24 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
         <div className="flex items-end gap-2 px-3 py-2">
           {/* Left toolbar */}
           <div className="flex items-center gap-0.5 flex-shrink-0 pb-1">
-            <button onClick={() => fileInputRef.current?.click()} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/8 text-slate-500 hover:text-slate-700 transition-colors" title="Attach file">
-              <Paperclip className="w-4.5 h-4.5" style={{ width: 18, height: 18 }} />
-            </button>
-            <button onClick={() => handleAttachLink(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/8 text-slate-500 hover:text-slate-700 transition-colors" title="Link file">
-              <LinkIcon style={{ width: 17, height: 17 }} />
-            </button>
-            <button onClick={() => handleAttachLink(true)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/8 text-slate-500 hover:text-slate-700 transition-colors" title="Link folder">
-              <FolderOpen style={{ width: 17, height: 17 }} />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/8 text-slate-500 hover:text-slate-700 transition-colors" title="Attach">
+                  <MoreVertical style={{ width: 18, height: 18 }} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-40 border-slate-200">
+                <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="gap-2 text-slate-600 font-medium cursor-pointer">
+                  <Paperclip className="w-4 h-4 text-slate-400" /> Attach file
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleAttachLink(false)} className="gap-2 text-slate-600 font-medium cursor-pointer">
+                  <LinkIcon className="w-4 h-4 text-slate-400" /> Link file
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleAttachLink(true)} className="gap-2 text-slate-600 font-medium cursor-pointer">
+                  <FolderOpen className="w-4 h-4 text-slate-400" /> Link folder
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Input pill */}
@@ -2181,7 +2214,7 @@ function UpdatesFeed({ subtask, mainTask, users, currentUser, postComment, getSu
             <Send style={{ width: 17, height: 17 }} />
           </button>
         </div>
-        <p className="text-[10px] text-slate-400 text-center pb-1.5">Enter to send · Shift+Enter for new line · @mention · #subtask</p>
+        <p className="text-[10px] text-slate-400 text-center pb-1.5 pt-1 px-2 leading-tight">Enter to send · Shift+Enter for new line · @mention · #subtask</p>
       </div>
     </div>
   );
