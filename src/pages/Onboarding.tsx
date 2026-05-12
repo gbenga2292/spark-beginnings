@@ -8,7 +8,7 @@ import {
   Clock, FileText, UserPlus, UserMinus, Users, Building, Activity,
   CalendarDays, Check, Search, AlertCircle, Mail, RotateCcw,
   ShieldCheck, CalendarCheck2, FileSignature, GraduationCap, Package,
-  ChevronDown, ChevronUp, Lock, Unlock, Siren, UserCheck, Pencil, PauseCircle, PlayCircle, X, CheckCircle2
+  ChevronDown, ChevronUp, Lock, Unlock, Siren, UserCheck, Pencil, PauseCircle, PlayCircle, X, CheckCircle2, Star
 } from 'lucide-react';
 import { useAppStore, Employee, OnboardingTask, OnboardingChecklist, GuarantorInfo } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -108,24 +108,28 @@ function Section({
   const [open, setOpen] = useState(defaultOpen);
   if (locked) {
     return (
-      <div className="rounded-xl border border-slate-200 overflow-hidden opacity-50">
-        <div className={`w-full flex items-center justify-between px-4 py-3 text-sm font-bold bg-slate-100 text-slate-400 gap-2`}>
-          <span className="flex items-center gap-2"><Lock className="h-4 w-4" />{label}</span>
-          <span className="text-[11px] font-normal italic">{lockMsg || 'Complete previous task to unlock'}</span>
+      <div className="rounded-3xl border border-slate-200/60 overflow-hidden opacity-50 bg-slate-50/50">
+        <div className={`w-full flex items-center justify-between px-6 py-4 text-sm font-black bg-slate-100 text-slate-400 gap-2 uppercase tracking-wider`}>
+          <span className="flex items-center gap-3"><Lock className="h-4 w-4" />{label}</span>
+          <span className="text-[10px] font-bold italic opacity-60">{lockMsg || 'LOCKED'}</span>
         </div>
       </div>
     );
   }
   return (
-    <div className="rounded-xl border border-slate-100 overflow-hidden shadow-sm">
+    <div className="rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm bg-white dark:bg-slate-900 transition-all hover:shadow-md">
       <button
-        className={`w-full flex items-center justify-between px-4 py-3 text-sm font-bold ${color} gap-2 hover:opacity-90 transition-opacity`}
+        className={`w-full flex items-center justify-between px-6 py-4 text-sm font-black ${color} gap-2 hover:brightness-95 transition-all uppercase tracking-wider`}
         onClick={() => setOpen(o => !o)}
       >
-        <span className="flex items-center gap-2"><Icon className="h-4 w-4" />{label}</span>
-        {open ? <ChevronUp className="h-4 w-4 opacity-60" /> : <ChevronDown className="h-4 w-4 opacity-60" />}
+        <span className="flex items-center gap-3"><Icon className="h-5 w-5" />{label}</span>
+        {open ? <ChevronUp className="h-5 w-5 opacity-40" /> : <ChevronDown className="h-5 w-5 opacity-40" />}
       </button>
-      {open && <div className="p-4 bg-white dark:bg-slate-900 space-y-3">{children}</div>}
+      {open && (
+        <div className="p-6 bg-white dark:bg-slate-950/20 space-y-4 animate-in slide-in-from-top-1 duration-200">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -139,27 +143,27 @@ function SubSection({
   const [open, setOpen] = useState(true);
   if (locked) {
     return (
-      <div className="rounded-lg border border-slate-200 overflow-hidden opacity-40 mt-2">
-        <div className="flex items-center justify-between px-3 py-2 bg-slate-100 text-slate-400 text-xs font-bold">
-          <span className="flex items-center gap-1.5"><Lock className="h-3 w-3" />{label}</span>
-          <span className="text-[10px] font-normal italic">{lockMsg || 'Complete previous step first'}</span>
+      <div className="rounded-2xl border border-slate-200/50 overflow-hidden opacity-40 mt-2">
+        <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest">
+          <span className="flex items-center gap-2"><Lock className="h-3.5 w-3.5" />{label}</span>
+          <span className="italic opacity-50">{lockMsg || 'PENDING'}</span>
         </div>
       </div>
     );
   }
   return (
-    <div className={`rounded-lg border overflow-hidden mt-2 transition-colors ${done ? 'border-emerald-200 bg-emerald-50/20' : 'border-slate-100'}`}>
+    <div className={`rounded-2xl border transition-all mt-2 ${done ? 'border-emerald-100 bg-emerald-50/10' : 'border-slate-100 dark:border-slate-800'}`}>
       <button
-        className={`w-full flex items-center justify-between px-3 py-2 text-xs font-bold gap-1 transition-opacity hover:opacity-90 ${done ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-600'}`}
+        className={`w-full flex items-center justify-between px-4 py-2.5 text-[11px] font-black uppercase tracking-widest gap-2 transition-all hover:brightness-95 ${done ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400'}`}
         onClick={() => setOpen(o => !o)}
       >
-        <span className="flex items-center gap-1.5">
-          {done ? <Check className="h-3 w-3 text-emerald-600" /> : null}
+        <span className="flex items-center gap-2">
+          {done ? <div className="h-4 w-4 rounded-full bg-emerald-600 flex items-center justify-center"><Check className="h-2.5 w-2.5 text-white" strokeWidth={4} /></div> : null}
           {label}
         </span>
-        {open ? <ChevronUp className="h-3 w-3 opacity-50" /> : <ChevronDown className="h-3 w-3 opacity-50" />}
+        {open ? <ChevronUp className="h-4 w-4 opacity-40" /> : <ChevronDown className="h-4 w-4 opacity-40" />}
       </button>
-      {open && <div className="p-3 space-y-2 bg-white dark:bg-slate-900">{children}</div>}
+      {open && <div className="p-4 space-y-3 bg-white/50 dark:bg-slate-950/10 animate-in slide-in-from-top-1 duration-200">{children}</div>}
     </div>
   );
 }
@@ -679,8 +683,18 @@ export function Onboarding() {
     if (!selectedEmployee) return;
     const tasks = (selectedEmployee.offboardingTasks || []).map(t => {
       if (t.id !== taskId) return t;
-      return { ...t, status: t.status === 'Completed' ? 'Pending' : t.status === 'In Progress' ? 'Completed' : 'In Progress' } as OnboardingTask;
+      const newStatus = t.status === 'Completed' ? 'Pending' : 'Completed';
+      // clear reason when marking complete
+      return { ...t, status: newStatus, reason: newStatus === 'Completed' ? '' : t.reason } as OnboardingTask;
     });
+    updateEmployee(selectedEmployee.id, { offboardingTasks: tasks });
+  };
+
+  const updateOffboardingTaskReason = (taskId: string, reason: string) => {
+    if (!selectedEmployee) return;
+    const tasks = (selectedEmployee.offboardingTasks || []).map(t =>
+      t.id === taskId ? { ...t, reason } : t
+    );
     updateEmployee(selectedEmployee.id, { offboardingTasks: tasks });
   };
 
@@ -691,7 +705,8 @@ export function Onboarding() {
   };
 
   const offTasks = selectedEmployee?.offboardingTasks || [];
-  const offDone = offTasks.filter(t => t.status === 'Completed').length;
+  // A task counts toward progress if it's Completed OR has a reason entered
+  const offDone = offTasks.filter(t => t.status === 'Completed' || (t.reason && t.reason.trim().length > 0)).length;
   const offPct = offTasks.length > 0 ? Math.round((offDone / offTasks.length) * 100) : 0;
 
   const isOnboarding = activeTaskType === 'Onboarding' && selectedEmployee?.status === 'Onboarding';
@@ -1048,6 +1063,45 @@ export function Onboarding() {
                 )}
 
                 <div className={`space-y-3 transition-opacity duration-300 ${isHistory && !checklistEditMode ? 'opacity-60 pointer-events-none grayscale-[15%]' : ''}`}>
+                  {/* ─ Interview Background (Insights) ─ */}
+                  {(selectedEmployee.qualifications?.length > 0 || selectedEmployee.workExperience?.length > 0 || selectedEmployee.onboardingNotes) && (
+                    <Section icon={Star} label="Interview Insights & Background" color="bg-amber-50 text-amber-700" defaultOpen={false}>
+                      <div className="space-y-6">
+                        {selectedEmployee.onboardingNotes && (
+                          <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100">
+                            <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-2"><FileText className="h-3 w-3" /> Interviewer Notes</p>
+                            <p className="text-xs text-amber-900 font-medium whitespace-pre-line leading-relaxed">{selectedEmployee.onboardingNotes}</p>
+                          </div>
+                        )}
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {selectedEmployee.qualifications && selectedEmployee.qualifications.length > 0 && (
+                            <div className="space-y-3">
+                              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Academic Credentials</p>
+                              {selectedEmployee.qualifications.map((q, i) => (
+                                <div key={i} className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                                  <p className="text-xs font-black text-slate-800 dark:text-slate-200">{q.qualification}</p>
+                                  <p className="text-[10px] text-slate-500 font-medium mt-0.5">{q.institution} • {q.dates}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {selectedEmployee.workExperience && selectedEmployee.workExperience.length > 0 && (
+                            <div className="space-y-3">
+                              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Professional History</p>
+                              {selectedEmployee.workExperience.map((w, i) => (
+                                <div key={i} className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                                  <p className="text-xs font-black text-slate-800 dark:text-slate-200">{w.jobTitle}</p>
+                                  <p className="text-[10px] text-slate-500 font-medium mt-0.5">{w.organisation} • {w.date}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Section>
+                  )}
+
                   {/* ─ Task 1 ─ */}
                 <Section icon={Mail} label={l['1'] || "1. Send Necessary Information (Forms)"} color="bg-indigo-50 text-indigo-700"
                   defaultOpen={!t1Done}>
@@ -1480,10 +1534,11 @@ export function Onboarding() {
             {isOffboarding && selectedEmployee && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-slate-400">{offDone} of {offTasks.length} tasks completed</p>
+                  <p className="text-sm font-medium text-slate-400">{offDone} of {offTasks.length} tasks addressed</p>
                   <span className="text-2xl font-black text-rose-500">{offPct}%</span>
                 </div>
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-rose-500 transition-all duration-700" style={{ width: `${offPct}%` }} /></div>
+
                 <div className="space-y-4 mt-5">
                   {offTasks.length === 0 ? (
                     <p className="text-sm text-slate-400 text-center py-8">No offboarding tasks configured.</p>
@@ -1501,23 +1556,53 @@ export function Onboarding() {
                       <Section key={group} label={group} color="bg-rose-50 text-rose-700" defaultOpen={true} icon={Lock}>
                         <div className="space-y-2 mt-1">
                           {groupTasks.map(task => (
-                            <div key={task.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:shadow-sm transition-shadow">
-                              <button
-                                className={`h-5 w-5 rounded border-[1.5px] p-0 flex items-center justify-center shrink-0 transition-colors ${
-                                  task.status === 'Completed' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 hover:border-emerald-400'
-                                }`}
-                                onClick={() => priv.canEdit && toggleOffboardingTask(task.id)}
-                                disabled={!priv.canEdit}
-                              >
-                                {task.status === 'Completed' && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
-                              </button>
-                              <span className={`text-[13px] font-medium flex-1 ${task.status === 'Completed' ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
-                                {task.shortTitle}
-                              </span>
-                              {priv.canEdit && (
-                                <Button variant="ghost" size="sm" className="h-6 text-[10px] text-slate-500 hover:text-rose-600 hover:bg-rose-50 px-2" onClick={() => toggleOffboardingTask(task.id)}>
-                                  {task.status === 'Completed' ? 'Undo' : 'Done'}
-                                </Button>
+                            <div key={task.id} className="flex flex-col gap-1.5 p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:shadow-sm transition-shadow">
+                              {/* Row: checkbox + label + undo/done */}
+                              <div className="flex items-center gap-3">
+                                <button
+                                  className={`h-5 w-5 rounded border-[1.5px] p-0 flex items-center justify-center shrink-0 transition-all ${
+                                    task.status === 'Completed'
+                                      ? 'border-emerald-500 bg-emerald-500 scale-110'
+                                      : 'border-slate-300 hover:border-emerald-400'
+                                  }`}
+                                  onClick={() => priv.canEdit && toggleOffboardingTask(task.id)}
+                                  disabled={!priv.canEdit}
+                                >
+                                  {task.status === 'Completed' && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+                                </button>
+                                <span className={`text-[13px] font-medium flex-1 leading-snug ${
+                                  task.status === 'Completed' ? 'text-slate-400 line-through' : 'text-slate-700'
+                                }`}>
+                                  {task.shortTitle}
+                                </span>
+                                {priv.canEdit && (
+                                  <button
+                                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 transition-colors ${
+                                      task.status === 'Completed'
+                                        ? 'bg-slate-100 text-slate-500 hover:bg-rose-100 hover:text-rose-600'
+                                        : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                                    }`}
+                                    onClick={() => toggleOffboardingTask(task.id)}
+                                  >
+                                    {task.status === 'Completed' ? 'Undo' : 'Done'}
+                                  </button>
+                                )}
+                              </div>
+                              {/* Reason input — visible when task is NOT completed */}
+                              {task.status !== 'Completed' && priv.canEdit && (
+                                <div className="ml-8">
+                                  <input
+                                    type="text"
+                                    placeholder="Reason for skipping (optional)…"
+                                    value={task.reason || ''}
+                                    onChange={e => updateOffboardingTaskReason(task.id, e.target.value)}
+                                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 placeholder:text-slate-400 focus:outline-none focus:border-rose-300 focus:ring-1 focus:ring-rose-200 transition-all"
+                                  />
+                                </div>
+                              )}
+                              {/* Show saved reason in read-only mode when completed */}
+                              {task.status === 'Completed' && task.reason && (
+                                <p className="ml-8 text-[11px] text-slate-400 italic">Previously: "{task.reason}"</p>
                               )}
                             </div>
                           ))}
@@ -1526,6 +1611,24 @@ export function Onboarding() {
                     ))
                   )}
                 </div>
+
+                {/* ── Closing Remarks ── */}
+                {offTasks.length > 0 && (
+                  <div className="mt-4 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 space-y-2">
+                    <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                      <FileText className="h-3.5 w-3.5 text-rose-400" />
+                      Closing Remarks
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="Add any overall notes or comments about this offboarding process…"
+                      disabled={!priv.canEdit}
+                      value={selectedEmployee.offboardingRemarks || ''}
+                      onChange={e => updateEmployee(selectedEmployee.id, { offboardingRemarks: e.target.value })}
+                      className="w-full text-sm px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300 transition-all resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                )}
               </div>
             )}
 

@@ -281,6 +281,7 @@ export interface OnboardingTask {
   assignee: string;
   status: 'Completed' | 'In Progress' | 'Pending';
   date: string;
+  reason?: string; // reason for skipping/not completing the task
 }
 
 export interface GuarantorInfo {
@@ -391,6 +392,10 @@ export interface Employee {
   lashmaExpiryDate?: string;
   lashmaDuration?: number;
   secondaryDepartments?: string[];
+  qualifications?: { dates: string; institution: string; qualification: string }[];
+  workExperience?: { date: string; organisation: string; jobTitle: string }[];
+  onboardingNotes?: string;
+  offboardingRemarks?: string;
 }
 
 export interface DisciplinaryRecord {
