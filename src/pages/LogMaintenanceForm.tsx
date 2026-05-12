@@ -15,10 +15,12 @@ import { useTheme } from '@/src/hooks/useTheme';
 
 interface LogMaintenanceFormProps {
   initialAssetId?: string | null;
+  editSessionId?: string | null;
+  onSuccess?: () => void;
 }
 
-export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) {
-  const { logMaintenance, maintenanceAssets, assets } = useOperations();
+export function LogMaintenanceForm({ initialAssetId, editSessionId, onSuccess }: LogMaintenanceFormProps) {
+  const { logMaintenance, updateMaintenance, maintenanceSessions, maintenanceAssets, assets } = useOperations();
   const { isDark } = useTheme();
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [type, setType] = useState<MaintenanceLogType>('scheduled');
@@ -36,6 +38,7 @@ export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) 
   
   // Form State for Modals
   const [inventoryPartFilter, setInventoryPartFilter] = useState('');
+  const [inventoryAddQty, setInventoryAddQty] = useState<Record<string, number>>({});
   const [customPartForm, setCustomPartForm] = useState({ name: '', qty: 1, cost: '' });
   
   const reusables = assets.filter(a => a.type === 'reusables' || a.type === 'consumable');
@@ -53,12 +56,40 @@ export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) 
 
   const selectedAssets = maintenanceAssets.filter(a => selectedAssetIds.includes(a.id));
 
+  React.useEffect(() => {
+    if (editSessionId) {
+      const session = maintenanceSessions.find(s => s.id === editSessionId);
+      if (session) {
+        setDate(session.date);
+        setType(session.type);
+        setTechnician(session.technician);
+        setGeneralRemark(session.generalRemark || '');
+        setSelectedAssetIds(session.assets.map(a => a.assetId));
+        
+        const initialAssetData: Record<string, any> = {};
+        session.assets.forEach(a => {
+          initialAssetData[a.assetId] = {
+            workDone: a.workDone,
+            remark: a.remark,
+            location: a.location,
+            shutdown: a.shutdown,
+            parts: a.parts?.map(p => ({
+              ...p,
+              addedQty: p.quantity // Initialize for form display
+            })) || []
+          };
+        });
+        setAssetData(initialAssetData);
+      }
+    }
+  }, [editSessionId, maintenanceSessions]);
+
   const handleLog = () => {
     if (!technician || selectedAssetIds.length === 0) {
       toast.error('Please provide technician and at least one machine.');
       return;
     }
-    logMaintenance({
+    const payload = {
       date, type, technician, generalRemark,
       assets: selectedAssets.map(a => {
         const data = assetData[a.id] || {};
@@ -82,21 +113,32 @@ export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) 
           }))
         };
       })
-    });
-    toast.success(`Successfully logged maintenance for ${selectedAssetIds.length} assets.`);
-    setDate(new Date().toISOString().split('T')[0]);
-    setType('scheduled');
-    setTechnician('');
-    setGeneralRemark('');
-    setSelectedAssetIds([]);
-    setAssetData({});
+    };
+
+    if (editSessionId) {
+      updateMaintenance(editSessionId, payload);
+      toast.success('Successfully updated maintenance record.');
+      if (onSuccess) onSuccess();
+    } else {
+      logMaintenance(payload);
+      toast.success(`Successfully logged maintenance for ${selectedAssetIds.length} assets.`);
+      setDate(new Date().toISOString().split('T')[0]);
+      setType('scheduled');
+      setTechnician('');
+      setGeneralRemark('');
+      setSelectedAssetIds([]);
+      setAssetData({});
+      if (onSuccess) onSuccess();
+    }
   };
 
   const handleAddInventoryPart = (assetId: string, part: any) => {
+    const qty = inventoryAddQty[part.id] || 1;
     const existingParts = assetData[assetId]?.parts || [];
-    updateAssetData(assetId, 'parts', [...existingParts, { ...part, type: 'inventory', addedQty: 1 }]);
+    updateAssetData(assetId, 'parts', [...existingParts, { ...part, type: 'inventory', addedQty: qty }]);
     setIsInventoryPartModalOpen(false);
-    toast.success(`${part.name} added to parts!`);
+    toast.success(`${qty}x ${part.name} added to parts!`);
+    setInventoryAddQty(prev => ({ ...prev, [part.id]: 1 }));
   };
 
   const handleAddCustomPart = () => {
@@ -126,16 +168,16 @@ export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) 
         <CardContent className="p-5 sm:p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Maintenance Date *</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Maintenance Date *</label>
               <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input type="date" value={date} onChange={(e) => setDate(e.target.value)}
                   className="pl-10 h-11 rounded-xl bg-slate-50/50 dark:bg-slate-950 border-transparent font-medium text-sm" />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Maintenance Type *</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Maintenance Type *</label>
               <select value={type} onChange={(e) => setType(e.target.value as any)} className={selectClass}>
                 <option value="scheduled">Scheduled / Preventive</option>
                 <option value="repair">Repair / Fix</option>
@@ -145,13 +187,13 @@ export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) 
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Technician *</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Technician *</label>
               <Input placeholder="Select Technician" value={technician} onChange={(e) => setTechnician(e.target.value)}
                 className="h-11 rounded-xl bg-slate-50/50 dark:bg-slate-950 border-transparent font-medium text-sm" />
             </div>
 
             <div className="md:col-span-3 space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">General Remark</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">General Remark</label>
               <textarea placeholder="General notes for this session..." value={generalRemark} onChange={(e) => setGeneralRemark(e.target.value)}
                 className="w-full h-20 rounded-xl bg-slate-50/50 dark:bg-slate-950 border border-transparent p-4 font-medium text-sm text-slate-700 dark:text-slate-200 outline-none resize-none" />
             </div>
@@ -162,8 +204,8 @@ export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) 
       <Card className="rounded-xl border-border shadow-sm overflow-hidden bg-card transition-all">
         <CardHeader className="p-5 sm:p-6 border-b border-border flex flex-row items-center justify-between space-y-0 bg-slate-50/50">
           <div>
-            <CardTitle className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Machines for Maintenance</CardTitle>
-            <CardDescription className="font-bold text-xs mt-0.5">Select the equipment handled in this session</CardDescription>
+            <CardTitle className="text-base font-bold text-foreground">Machines for Maintenance</CardTitle>
+            <CardDescription className="font-medium text-xs mt-1">Select the equipment handled in this session</CardDescription>
           </div>
           <Button variant="outline" onClick={() => setIsSelectModalOpen(true)} size="sm"
             className="rounded-xl border-slate-200 dark:border-slate-700 font-bold text-[10px] uppercase tracking-widest text-blue-600 gap-1.5 h-9">
@@ -175,7 +217,7 @@ export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) 
             <div className="flex flex-col items-center justify-center p-12 sm:p-16 bg-slate-50 dark:bg-slate-800/20 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 mt-2">
               <Plus className="h-8 w-8 text-slate-300 dark:text-slate-600 mb-4" />
               <p className="text-slate-400 font-bold text-sm">No machines added yet</p>
-              <p className="text-slate-300 dark:text-slate-600 text-xs font-medium mt-1">Click "Add Machines" to select</p>
+              <p className="text-slate-400 text-xs font-medium mt-1">Click "Add Machines" to select</p>
             </div>
           ) : (
             <div className="space-y-6 mt-4">
@@ -199,18 +241,18 @@ export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) 
                   {/* Form fields for this asset */}
                   <div className="space-y-6">
                      <div className="space-y-2">
-                       <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Maintenance Performed *</label>
+                       <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Maintenance Performed *</label>
                        <textarea 
                           placeholder="Describe the maintenance work done..." 
                           value={assetData[asset.id]?.workDone || ''}
                           onChange={(e) => updateAssetData(asset.id, 'workDone', e.target.value)}
-                          className="w-full h-24 rounded-lg bg-slate-50/50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-3 text-sm text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-blue-500 resize-none font-medium" 
+                          className="w-full h-24 rounded-lg bg-slate-50/50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-blue-500 resize-none font-medium" 
                        />
                      </div>
                      
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                        <div className="space-y-2">
-                          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Location</label>
+                          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Location</label>
                           <select 
                             value={assetData[asset.id]?.location || ''}
                             onChange={(e) => updateAssetData(asset.id, 'location', e.target.value)}
@@ -224,7 +266,7 @@ export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) 
                           </select>
                        </div>
                        <div className="flex flex-col justify-center space-y-2 pt-1 md:pt-6">
-                           <label className="flex items-center gap-3 text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                           <label className="flex items-center gap-3 text-sm font-bold text-foreground cursor-pointer">
                               <input 
                                 type="checkbox" 
                                 checked={assetData[asset.id]?.shutdown || false}
@@ -238,7 +280,7 @@ export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) 
                      </div>
 
                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Next Maintenance Date</label>
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Maintenance Date</label>
                         <div className="relative">
                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                            <Input 
@@ -252,7 +294,7 @@ export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) 
                      </div>
                      
                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Parts Replaced</label>
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Parts Replaced</label>
                         
                         {/* Display Added Parts */}
                         {assetData[asset.id]?.parts?.length > 0 && (
@@ -287,7 +329,7 @@ export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) 
                      </div>
 
                      <div className="space-y-2 pt-2">
-                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Machine-Specific Remark (optional)</label>
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Machine-Specific Remark (optional)</label>
                         <Input 
                           placeholder="Specific notes for this machine (overrides general remark)" 
                           value={assetData[asset.id]?.remark || ''}
@@ -307,7 +349,7 @@ export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) 
         <Button variant="outline" className="h-11 rounded-xl px-6 font-bold text-sm text-foreground hover:bg-secondary">Cancel</Button>
         <Button onClick={handleLog} disabled={selectedAssetIds.length === 0}
           className="h-11 rounded-xl px-8 bg-blue-500 hover:bg-blue-600 text-white font-bold text-sm shadow-sm gap-2 disabled:opacity-50">
-          <CheckCircle2 className="h-4 w-4" /> SAVE LOGS {selectedAssetIds.length > 0 && `(${selectedAssetIds.length})`}
+          <CheckCircle2 className="h-4 w-4" /> {editSessionId ? 'UPDATE LOG' : `SAVE LOGS ${selectedAssetIds.length > 0 ? `(${selectedAssetIds.length})` : ''}`}
         </Button>
       </div>
 
@@ -334,17 +376,33 @@ export function LogMaintenanceForm({ initialAssetId }: LogMaintenanceFormProps) 
                 </div>
               ) : (
                 reusables.filter((r: any) => r.name.toLowerCase().includes(inventoryPartFilter.toLowerCase())).map((item: any) => (
-                  <button 
+                  <div 
                     key={item.id} 
-                    onClick={() => { if (activeAssetId) handleAddInventoryPart(activeAssetId, item); }}
                     className="w-full flex items-center justify-between p-3 rounded-xl border border-border hover:bg-secondary/50 text-left transition-colors"
                   >
-                    <div>
+                    <div className="flex-1">
                       <h4 className="text-sm font-bold text-foreground">{item.name}</h4>
-                      <p className="text-[11px] text-muted-foreground uppercase">{item.type} • Stock: {item.quantity || 0}</p>
+                      <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">{item.type} • Stock: {item.quantity || 0}</p>
                     </div>
-                    <PlusCircle className="h-4 w-4 text-primary" />
-                  </button>
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        type="number" 
+                        min="1" 
+                        max={item.quantity || 1} 
+                        value={inventoryAddQty[item.id] || 1}
+                        onChange={(e) => setInventoryAddQty(prev => ({ ...prev, [item.id]: parseInt(e.target.value) || 1 }))}
+                        className="w-16 h-8 text-xs text-center px-1 rounded-md bg-background border-border"
+                      />
+                      <Button 
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => { if (activeAssetId) handleAddInventoryPart(activeAssetId, item); }}
+                        className="h-8 px-3 rounded-md text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100"
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  </div>
                 ))
               )}
             </div>

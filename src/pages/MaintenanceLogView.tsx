@@ -10,6 +10,8 @@ import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { cn } from '@/src/lib/utils';
+import { Dialog, DialogContent } from '@/src/components/ui/dialog';
+import { LogMaintenanceForm } from './LogMaintenanceForm';
 
 interface MaintenanceLogViewProps {
   asset: MaintenanceAsset;
@@ -27,6 +29,7 @@ const typeColors: Record<string, string> = {
 export function MaintenanceLogView({ asset, onBack, onLogService }: MaintenanceLogViewProps) {
   const { maintenanceSessions } = useOperations();
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
 
   const logs = useMemo(() => {
     return maintenanceSessions
@@ -34,7 +37,7 @@ export function MaintenanceLogView({ asset, onBack, onLogService }: MaintenanceL
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .map(s => {
         const al = s.assets.find(a => a.assetId === asset.id)!;
-        return { ...al, date: s.date, technician: s.technician, type: s.type };
+        return { ...al, date: s.date, technician: s.technician, type: s.type, sessionId: s.id };
       });
   }, [maintenanceSessions, asset.id]);
 
@@ -199,6 +202,17 @@ export function MaintenanceLogView({ asset, onBack, onLogService }: MaintenanceL
                         {log.remark && (
                           <p className="text-xs text-slate-400 italic">Note: {log.remark}</p>
                         )}
+
+                        <div className="pt-2 border-t border-slate-100 flex justify-end">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="h-8 gap-1.5 text-xs font-semibold text-blue-600 border-blue-200 hover:bg-blue-50"
+                            onClick={() => setEditingSessionId(log.sessionId)}
+                          >
+                            <Wrench className="h-3.5 w-3.5" /> Edit Full Log
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -208,6 +222,19 @@ export function MaintenanceLogView({ asset, onBack, onLogService }: MaintenanceL
           </div>
         )}
       </div>
+
+      {editingSessionId && (
+        <Dialog open={!!editingSessionId} onOpenChange={(o) => !o && setEditingSessionId(null)}>
+          <DialogContent className="max-w-5xl p-0 h-[90vh] overflow-hidden flex flex-col bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
+              <LogMaintenanceForm 
+                editSessionId={editingSessionId} 
+                onSuccess={() => setEditingSessionId(null)} 
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

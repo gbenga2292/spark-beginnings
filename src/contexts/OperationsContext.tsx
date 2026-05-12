@@ -39,6 +39,7 @@ interface OperationsContextType {
 
   // Maintenance methods
   logMaintenance: (session: Omit<MaintenanceSession, 'id'>) => void;
+  updateMaintenance: (id: string, updates: Partial<Omit<MaintenanceSession, 'id'>>) => void;
   
   // Analytics
   getAssetAnalytics: () => any;
@@ -737,6 +738,67 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     persistMaintenance(newSession);
   };
 
+  const updateMaintenance = (id: string, updates: Partial<Omit<MaintenanceSession, 'id'>>) => {
+    setMaintenanceSessions(prev => {
+      const oldSession = prev.find(s => s.id === id);
+      if (!oldSession) return prev;
+
+      // Handle inventory parts diff
+      if (updates.assets) {
+        // Collect old parts used
+        const oldParts = new Map<string, number>();
+        oldSession.assets.forEach(asset => {
+          asset.parts?.forEach(part => {
+            if (part.type === 'inventory' && (part as any).id) {
+              const partId = (part as any).id;
+              oldParts.set(partId, (oldParts.get(partId) || 0) + (part.quantity || 1));
+            }
+          });
+        });
+
+        // Collect new parts used
+        const newParts = new Map<string, number>();
+        updates.assets.forEach(asset => {
+          asset.parts?.forEach(part => {
+            if (part.type === 'inventory' && (part as any).id) {
+              const partId = (part as any).id;
+              newParts.set(partId, (newParts.get(partId) || 0) + (part.quantity || 1));
+            }
+          });
+        });
+
+        // Determine diff: old - new. If positive, we return to inventory. If negative, we take from inventory.
+        const allPartIds = new Set([...oldParts.keys(), ...newParts.keys()]);
+        
+        allPartIds.forEach(partId => {
+          const oldQty = oldParts.get(partId) || 0;
+          const newQty = newParts.get(partId) || 0;
+          const diff = oldQty - newQty;
+          
+          if (diff !== 0) {
+            setAssets(assetsPrev => assetsPrev.map(a => {
+              if (a.id === partId) {
+                const updatedQty = Math.max(0, a.quantity + diff);
+                const updatedAsset: Asset = {
+                  ...a,
+                  quantity: updatedQty,
+                  availableQuantity: Math.max(0, updatedQty - ((a.reservedQuantity || 0) + (a.usedQuantity || 0) + (a.missingQuantity || 0) + (a.damagedQuantity || 0)))
+                };
+                persistAsset(updatedAsset);
+                return updatedAsset;
+              }
+              return a;
+            }));
+          }
+        });
+      }
+
+      const updatedSession = { ...oldSession, ...updates } as MaintenanceSession;
+      persistMaintenance(updatedSession);
+      return prev.map(s => s.id === id ? updatedSession : s);
+    });
+  };
+
   const getAssetAnalytics = () => {
     // Basic stats for dashboard
     return {
@@ -846,6 +908,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       updateCheckoutStatus,
       deleteCheckout,
       logMaintenance,
+      updateMaintenance,
       getAssetAnalytics,
       getSiteAnalytics,
       getMaintenanceStats,

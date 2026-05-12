@@ -105,7 +105,7 @@ export function MaintenanceManager() {
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10 px-4 sm:px-6 lg:px-8">
       {/* Tabs - Hidden if viewing details or log */}
       {!isSubViewActive && (
-        <div className="bg-white/80 backdrop-blur-sm sticky top-0 z-10 rounded-2xl shadow-sm border border-slate-200/60 p-1.5 flex overflow-x-auto overflow-y-hidden scrollbar-hide shrink-0 gap-1 mb-2">
+        <div className="flex border-b border-slate-200 dark:border-slate-800 gap-8 px-2 mx-1 mb-6 overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -116,21 +116,17 @@ export function MaintenanceManager() {
                 setLogViewAssetId(null);
               }}
               className={cn(
-                "flex items-center justify-center gap-2.5 flex-1 min-w-[100px] sm:min-w-[140px] py-3 text-sm font-bold rounded-xl transition-all whitespace-nowrap group",
+                "pb-3 text-sm font-bold transition-all border-b-2 whitespace-nowrap flex items-center gap-2",
                 activeTab === tab.id 
-                  ? 'bg-blue-50/50 text-blue-600 shadow-sm border-b-2 border-blue-600 rounded-b-none' 
-                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                  ? 'border-blue-600 text-blue-600' 
+                  : 'border-transparent text-slate-400 hover:text-slate-600'
               )}
             >
-              <tab.icon className={cn(
-                "h-4 w-4 shrink-0 transition-colors",
-                activeTab === tab.id ? "text-blue-600" : "text-slate-300 group-hover:text-slate-400"
-              )} />
               <span>{tab.label}</span>
               {tab.count !== undefined && (
                 <span className={cn(
-                  "ml-1 px-1.5 py-0.5 rounded-lg text-[10px] font-black tracking-tight",
-                  activeTab === tab.id ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"
+                  "px-1.5 py-0.5 rounded-lg text-[10px]",
+                  activeTab === tab.id ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                 )}>
                   {tab.count}
                 </span>

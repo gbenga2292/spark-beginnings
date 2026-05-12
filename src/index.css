@@ -646,4 +646,11 @@ html.ui-midnight tbody tr:hover { background-color: rgb(var(--color-muted)) !imp
   overflow-x: hidden;
 }
 
+/* Make text visible in mobile action menus, since they are often hidden by sm:inline */
+.mobile-action-menu span.hidden.sm\:inline,
+.mobile-action-menu span.hidden.md\:inline,
+.mobile-action-menu span.hidden.lg\:inline {
+  display: inline !important;
+}
+
 

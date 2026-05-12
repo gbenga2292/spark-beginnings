@@ -53,11 +53,11 @@ function DescriptionDialog({ asset, onClose }: { asset: Asset; onClose: () => vo
           <div className="grid grid-cols-2 gap-3">
             {[
               { label: 'Category', value: asset.category },
-              { label: 'Type',     value: asset.type },
+              { label: 'Type', value: asset.type },
               { label: 'Location', value: asset.location || 'Not set' },
-              { label: 'Condition',value: asset.condition },
-              { label: 'Unit',     value: asset.unitOfMeasurement },
-              { label: 'Status',   value: asset.status },
+              { label: 'Condition', value: asset.condition },
+              { label: 'Unit', value: asset.unitOfMeasurement },
+              { label: 'Status', value: asset.status },
             ].map(({ label, value }) => (
               <div key={label} className="rounded-xl bg-muted/40 p-3 border border-border">
                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
@@ -215,18 +215,18 @@ export function AssetManager() {
   const canExport = priv?.canExport ?? false;
   const canImport = priv?.canImport ?? false;
 
-  const [showAddForm, setShowAddForm]       = useState(false);
-  const [editingAsset, setEditingAsset]     = useState<Asset | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [showRestockModal, setShowRestockModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [importFile, setImportFile]         = useState<File | null>(null);
-  const [search, setSearch]                 = useState('');
-  const [filter, setFilter]                 = useState<AssetCategory | 'all'>('all');
-  const [activeAsset, setActiveAsset]       = useState<Asset | null>(null);
-  const [activeModal, setActiveModal]       = useState<ActionModal>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<AssetCategory | 'all'>('all');
+  const [activeAsset, setActiveAsset] = useState<Asset | null>(null);
+  const [activeModal, setActiveModal] = useState<ActionModal>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [sortKey, setSortKey]               = useState<string | null>(null);
-  const [sortDir, setSortDir]               = useState<'asc' | 'desc'>('asc');
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const toggleSort = (key: string) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -241,7 +241,7 @@ export function AssetManager() {
   };
 
   useSetPageTitle(
-    'Inventory Management',
+    'Inventory',
     'Track equipment, tools, and consumables across all sites',
     <div className="flex items-center gap-2 md:gap-3">
       {canExport && (
@@ -284,12 +284,12 @@ export function AssetManager() {
     if (!sortKey) return base;
     return [...base].sort((a, b) => {
       let aVal: any, bVal: any;
-      if (sortKey === 'name')      { aVal = a.name; bVal = b.name; }
-      else if (sortKey === 'quantity')  { aVal = a.quantity; bVal = b.quantity; }
-      else if (sortKey === 'reserved')  { aVal = a.reservedQuantity || 0; bVal = b.reservedQuantity || 0; }
+      if (sortKey === 'name') { aVal = a.name; bVal = b.name; }
+      else if (sortKey === 'quantity') { aVal = a.quantity; bVal = b.quantity; }
+      else if (sortKey === 'reserved') { aVal = a.reservedQuantity || 0; bVal = b.reservedQuantity || 0; }
       else if (sortKey === 'available') { aVal = a.availableQuantity || 0; bVal = b.availableQuantity || 0; }
-      else if (sortKey === 'status')    { aVal = a.availableQuantity || 0; bVal = b.availableQuantity || 0; }
-      else if (sortKey === 'location')  { aVal = a.location || ''; bVal = b.location || ''; }
+      else if (sortKey === 'status') { aVal = a.availableQuantity || 0; bVal = b.availableQuantity || 0; }
+      else if (sortKey === 'location') { aVal = a.location || ''; bVal = b.location || ''; }
       else return 0;
       if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
@@ -309,10 +309,10 @@ export function AssetManager() {
       {showRestockModal && <RestockModal onClose={() => setShowRestockModal(false)} />}
       {showExportModal && <ExportAssetsDialog onClose={() => setShowExportModal(false)} />}
       {importFile && <BulkImportAssetsDialog file={importFile} onClose={() => setImportFile(null)} />}
-      {activeModal === 'description'    && activeAsset && <DescriptionDialog    asset={activeAsset} onClose={closeModal} />}
-      {activeModal === 'analytics'      && activeAsset && <AssetAnalyticsDialog asset={activeAsset} onClose={closeModal} />}
-      {activeModal === 'restock-history'&& activeAsset && <RestockHistoryDialog asset={activeAsset} onClose={closeModal} />}
-      {activeModal === 'restock'        && activeAsset && <RestockModal preselectedAssetId={activeAsset.id} onClose={closeModal} />}
+      {activeModal === 'description' && activeAsset && <DescriptionDialog asset={activeAsset} onClose={closeModal} />}
+      {activeModal === 'analytics' && activeAsset && <AssetAnalyticsDialog asset={activeAsset} onClose={closeModal} />}
+      {activeModal === 'restock-history' && activeAsset && <RestockHistoryDialog asset={activeAsset} onClose={closeModal} />}
+      {activeModal === 'restock' && activeAsset && <RestockModal preselectedAssetId={activeAsset.id} onClose={closeModal} />}
 
       <input type="file" ref={fileInputRef} onChange={handleBulkImport} className="hidden" accept=".xlsx,.xls,.csv" />
 
@@ -322,13 +322,47 @@ export function AssetManager() {
       <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 flex-1 flex flex-col min-h-[500px]">
         {/* Toolbar */}
         <div className="border-b border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-slate-50/50 dark:bg-slate-800/30">
-          <div className="flex items-center gap-2 ml-1">
-            <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
-              <ListFilter className="h-4 w-4" />
+          <div className="flex items-center gap-2 ml-1 w-full justify-between sm:w-auto">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+                <ListFilter className="h-4 w-4" />
+              </div>
+              <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
+                Assets <span className="text-slate-400 font-normal">({filtered.length})</span>
+              </p>
             </div>
-            <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
-              Assets <span className="text-slate-400 font-normal">({filtered.length})</span>
-            </p>
+
+            {/* Mobile Sort Dropdown */}
+            <div className="sm:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 shadow-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                    <ChevronsUpDown className="h-3.5 w-3.5" />
+                    Sort
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44 rounded-xl shadow-lg border-slate-200 dark:border-slate-700 p-1">
+                  <DropdownMenuItem onClick={() => toggleSort('name')} className="text-xs font-medium cursor-pointer rounded-lg mb-0.5 justify-between">
+                    Name {sortKey === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => toggleSort('quantity')} className="text-xs font-medium cursor-pointer rounded-lg mb-0.5 justify-between">
+                    Total Stock {sortKey === 'quantity' && (sortDir === 'asc' ? '↑' : '↓')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => toggleSort('reserved')} className="text-xs font-medium cursor-pointer rounded-lg mb-0.5 justify-between">
+                    Reserved {sortKey === 'reserved' && (sortDir === 'asc' ? '↑' : '↓')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => toggleSort('available')} className="text-xs font-medium cursor-pointer rounded-lg mb-0.5 justify-between">
+                    Available {sortKey === 'available' && (sortDir === 'asc' ? '↑' : '↓')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => toggleSort('location')} className="text-xs font-medium cursor-pointer rounded-lg mb-0.5 justify-between">
+                    Location {sortKey === 'location' && (sortDir === 'asc' ? '↑' : '↓')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => toggleSort('status')} className="text-xs font-medium cursor-pointer rounded-lg justify-between">
+                    Status {sortKey === 'status' && (sortDir === 'asc' ? '↑' : '↓')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
             <div className="relative">
@@ -450,10 +484,10 @@ export function AssetManager() {
                           asset.availableQuantity <= 0
                             ? 'bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200'
                             : (asset.criticalStockLevel && asset.criticalStockLevel > 0 && asset.availableQuantity <= asset.criticalStockLevel)
-                            ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-200'
-                            : (asset.lowStockLevel && asset.lowStockLevel > 0 && asset.availableQuantity <= asset.lowStockLevel)
-                            ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200'
-                            : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200'
+                              ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-200'
+                              : (asset.lowStockLevel && asset.lowStockLevel > 0 && asset.availableQuantity <= asset.lowStockLevel)
+                                ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200'
+                                : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200'
                         )}
                       >
                         {asset.availableQuantity <= 0 ? 'Out' : (asset.criticalStockLevel && asset.criticalStockLevel > 0 && asset.availableQuantity <= asset.criticalStockLevel) ? 'Critical' : (asset.lowStockLevel && asset.lowStockLevel > 0 && asset.availableQuantity <= asset.lowStockLevel) ? 'Low Stock' : 'In Stock'}
@@ -505,8 +539,8 @@ export function AssetManager() {
                         asset.availableQuantity > 100
                           ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200'
                           : asset.availableQuantity > 0
-                          ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200'
-                          : 'bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200'
+                            ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200'
+                            : 'bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200'
                       )}
                     >
                       {asset.availableQuantity > 100 ? 'In Stock' : asset.availableQuantity > 0 ? 'Critical' : 'Out of Stock'}

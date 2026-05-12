@@ -141,6 +141,7 @@ export interface MaintenanceAssetLog {
   shutdown?: boolean;
   cost: number;
   parts?: {
+    id?: string;
     type: 'inventory' | 'custom';
     name: string;
     quantity: number;
