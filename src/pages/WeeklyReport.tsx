@@ -291,31 +291,33 @@ export function WeeklyReport() {
         </>
       ) : (
         <>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 sm:p-1 gap-1 border border-slate-200 dark:border-slate-700">
               {(['weekly', 'monthly'] as const).map(mode => (
                 <button key={mode} onClick={() => setReportMode(mode)}
-                  className={cn("px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all duration-150",
+                  className={cn("px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all duration-150 flex-1",
                     reportMode === mode ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200")}>
                   {mode.slice(0, 1)}<span className="hidden sm:inline">{mode.slice(1)}</span>
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-              <button onClick={() => setAnchor(a => reportMode === 'monthly' ? subMonths(a, 1) : subWeeks(a, 1))} className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 active:scale-90 transition-all duration-100 border-r border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 justify-between sm:justify-start">
+              <button onClick={() => setAnchor(a => reportMode === 'monthly' ? subMonths(a, 1) : subWeeks(a, 1))} className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 active:scale-90 transition-all duration-100 border-r border-slate-100 dark:border-slate-800 shrink-0">
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 min-w-[120px] sm:min-w-[170px] justify-center">
+              <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 min-w-[120px] sm:min-w-[170px] justify-center flex-1">
                 <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
                 <span className="text-[10px] sm:text-[12px] font-bold text-slate-800 dark:text-slate-100 tracking-tight text-center whitespace-nowrap">{reportLabel}</span>
               </div>
-              <button onClick={() => setAnchor(a => reportMode === 'monthly' ? addMonths(a, 1) : addWeeks(a, 1))} className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 active:scale-90 transition-all duration-100 border-l border-slate-100 dark:border-slate-800">
+              <button onClick={() => setAnchor(a => reportMode === 'monthly' ? addMonths(a, 1) : addWeeks(a, 1))} className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 active:scale-90 transition-all duration-100 border-l border-slate-100 dark:border-slate-800 shrink-0">
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
-            <button onClick={() => setAnchor(new Date())} className="h-8 sm:h-9 px-2 sm:px-3 text-[10px] sm:text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg sm:rounded-xl hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm whitespace-nowrap">Today</button>
-            <Button variant="outline" size="sm" onClick={handleExportXLSX} className="h-8 w-8 sm:h-9 sm:w-9 p-0 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm" title="Export Excel"><Download className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-500" /></Button>
-            <Button size="sm" onClick={() => generateProfessionalPDF('preview')} className="h-8 w-8 sm:h-9 sm:w-9 p-0 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200" title="View PDF Report"><FileText className="h-4 w-4 sm:h-5 sm:w-5" /></Button>
+            <div className="flex items-center gap-2 mt-1 sm:mt-0">
+              <button onClick={() => setAnchor(new Date())} className="h-8 sm:h-9 px-2 sm:px-3 text-[10px] sm:text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg sm:rounded-xl hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm whitespace-nowrap flex-1 sm:flex-none">Today</button>
+              <Button variant="outline" size="sm" onClick={handleExportXLSX} className="h-8 w-8 sm:h-9 sm:w-9 p-0 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm shrink-0" title="Export Excel"><Download className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-500" /></Button>
+              <Button size="sm" onClick={() => generateProfessionalPDF('preview')} className="h-8 w-8 sm:h-9 sm:w-9 p-0 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200 shrink-0" title="View PDF Report"><FileText className="h-4 w-4 sm:h-5 sm:w-5" /></Button>
+            </div>
           </div>
         </>
       )}

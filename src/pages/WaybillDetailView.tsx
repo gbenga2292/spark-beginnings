@@ -13,6 +13,7 @@ import { Input } from '@/src/components/ui/input';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { jsPDF } from 'jspdf';
 import logoSrc from '@/logo/logo-2.png';
+import { PdfViewer } from '@/src/components/PdfViewer';
 
 interface WaybillDetailViewProps {
   waybill: Waybill;
@@ -212,14 +213,9 @@ export function WaybillDetailView({ waybill, onClose }: WaybillDetailViewProps) 
       {showPdfPreview ? (
         <div className="flex flex-col gap-6 max-w-5xl mx-auto pb-10 h-[80vh] min-h-[600px] animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="flex-1 w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
-            {/* PDF iframe */}
-            <div className="flex-1 overflow-hidden bg-slate-100 dark:bg-slate-950 min-h-[500px]">
-              <embed
-                src={pdfDataUri}
-                type="application/pdf"
-                className="w-full h-full border-0"
-                title="Waybill PDF Preview"
-              />
+            {/* PDF Viewer – works on desktop and Android */}
+            <div className="flex-1 overflow-hidden min-h-[500px] flex flex-col">
+              <PdfViewer src={pdfDataUri} className="flex-1" />
             </div>
           </div>
         </div>

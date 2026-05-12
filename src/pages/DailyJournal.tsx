@@ -19,6 +19,7 @@ import { useOperations } from '../contexts/OperationsContext';
 import { DailyLogManager } from './DailyLogManager';
 import { jsPDF } from 'jspdf';
 import logoSrc from '@/logo/logo-2.png';
+import { PdfViewer } from '@/src/components/PdfViewer';
 
 import { BulkConsumableLogModal } from './BulkConsumableLogModal';
 import { BulkMachineLogModal } from './BulkMachineLogModal';
@@ -1046,8 +1047,8 @@ export function DailyJournal() {
               </button>
             </div>
           </div>
-          <div className="flex-1 overflow-hidden bg-slate-100 dark:bg-slate-950">
-            <embed src={pdfDataUri} type="application/pdf" className="w-full h-full border-0" title="Diary PDF Preview" />
+          <div className="flex-1 overflow-hidden">
+            <PdfViewer src={pdfDataUri} className="h-full" />
           </div>
         </DialogContent>
       </Dialog>

@@ -575,3 +575,75 @@ html.ui-midnight .text-slate-600, html.ui-midnight .text-slate-500 { color: rgb(
 html.ui-midnight table { color: rgb(var(--color-foreground)) !important; }
 html.ui-midnight thead tr { background-color: rgb(var(--color-background)) !important; }
 html.ui-midnight tbody tr:hover { background-color: rgb(var(--color-muted)) !important; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   BOTTOM SHEET ANIMATION — used by the mobile 3-dot action menu
+   ══════════════════════════════════════════════════════════════════════ */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.25s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MOBILE ACTION MENU — makes injected header button groups fit inside
+   the 3-dot dropdown without horizontal overflow or squishing.
+   Strategy: only constrain width at the outermost level; let inner
+   UI components (date pickers, segment tabs, icon rows) stay horizontal.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Stretch every direct child of the dropdown to full width */
+.mobile-action-menu > * {
+  width: 100% !important;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* The flex wrapper each page passes as headerButtons: go vertical */
+.mobile-action-menu > .flex,
+.mobile-action-menu > .relative > .flex,
+.mobile-action-menu > div > .flex:first-child {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  gap: 0.5rem;
+}
+
+/* Any direct child that is itself a flex row should stretch full-width */
+.mobile-action-menu .flex.flex-col,
+.mobile-action-menu .flex.flex-col > * {
+  width: 100% !important;
+}
+
+/* Large text/action buttons (non-icon) → full width, left-aligned */
+.mobile-action-menu button:not([class*="w-7"]):not([class*="w-8"]):not([class*="w-9"]):not([class*="h-5"]):not([class*="h-6"]) {
+  width: 100% !important;
+  justify-content: flex-start !important;
+  min-height: 2.5rem;
+  text-align: left;
+}
+
+/* Icon-only square buttons keep their fixed dimensions */
+.mobile-action-menu button[class*="w-8"],
+.mobile-action-menu button[class*="w-9"],
+.mobile-action-menu button[class*="w-7"] {
+  width: auto !important;
+  min-width: 2rem;
+  flex-shrink: 0 !important;
+}
+
+/* Prevent overflow without breaking scrollable content */
+.mobile-action-menu {
+  overflow-x: hidden;
+}
+
+

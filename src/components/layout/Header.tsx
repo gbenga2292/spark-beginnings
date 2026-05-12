@@ -1,7 +1,7 @@
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft, ArrowUpCircle, RefreshCw } from 'lucide-react';
+import { Bell, Search, LogOut, Menu, X, User, Settings, ChevronRight, CalendarClock, Users, MapPin, Wallet, FileText, Landmark, Library, UserPlus, ShieldCheck, LayoutDashboard, Clock, AlertCircle, AtSign, ArrowLeft, ArrowUpCircle, RefreshCw, MoreVertical } from 'lucide-react';
 import { toast } from '@/src/components/ui/toast';
 import { StatusIndicator } from '@/src/components/offline/StatusIndicator';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -226,6 +226,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [mobileOverflowOpen, setMobileOverflowOpen] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
 
@@ -316,6 +317,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const searchRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const overflowRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -323,6 +325,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false);
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setIsProfileOpen(false);
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) setMobileOverflowOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -333,6 +336,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     setSearchOpen(false);
     setNotifOpen(false);
     setIsProfileOpen(false);
+    setMobileOverflowOpen(false);
     setSearchQuery('');
   }, [location.pathname]);
 
@@ -374,7 +378,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     : 0;
 
   return (
-    <header className={`flex h-14 items-center justify-between border-b px-4 md:px-6 gap-4 transition-colors duration-200 relative z-40 ${
+    <header className={`flex min-h-[56px] py-2 sm:py-0 h-auto items-center justify-between border-b px-3 md:px-6 gap-2 md:gap-4 transition-colors duration-200 relative z-40 ${
       isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-slate-200'
     }`}>
       {/* Left: Menu + Page Title */}
@@ -399,14 +403,14 @@ export function Header({ onMenuClick }: HeaderProps) {
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             )}
-            <h1 className={`text-base md:text-lg font-bold tracking-tight truncate ${
+            <h1 className={`text-[14px] sm:text-base md:text-lg font-bold tracking-tight line-clamp-2 sm:truncate leading-tight ${
               isDark ? 'text-slate-100' : 'text-slate-900'
             }`}>
               {title || 'Dashboard'}
             </h1>
           </div>
           {subtitle && (
-            <p className={`text-[10px] truncate font-medium mt-0.5 ${
+            <p className={`text-[10px] line-clamp-2 sm:truncate leading-tight font-medium mt-0.5 ${
               isDark ? 'text-slate-400' : 'text-slate-500'
             } ${showBackButton ? 'ml-8' : ''}`}>
               {subtitle}
@@ -417,10 +421,82 @@ export function Header({ onMenuClick }: HeaderProps) {
 
       {/* Center/Right Actions */}
       <div className="flex items-center gap-2">
-        {/* Portal target for page-level header buttons */}
-        <div id={HEADER_PORTAL_ID} className="flex items-center gap-2" />
-        {headerButtons}
-        
+
+        {/* ── Mobile 3-dot overflow button (only when page has actions) ── */}
+        {headerButtons && (
+          <div ref={overflowRef} className="relative sm:hidden">
+            <button
+              onClick={() => {
+                setMobileOverflowOpen(v => !v);
+                setNotifOpen(false);
+                setIsProfileOpen(false);
+              }}
+              className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all ${
+                mobileOverflowOpen
+                  ? isDark ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-700'
+                  : isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'
+              }`}
+            >
+              <MoreVertical className="h-4 w-4" />
+            </button>
+
+            {mobileOverflowOpen && (
+              <>
+                {/* Transparent backdrop to catch outside taps */}
+                <div
+                  className="fixed inset-0 z-[58]"
+                  onClick={() => setMobileOverflowOpen(false)}
+                />
+
+                {/* Dropdown panel — fixed below header, left-aligned to screen edge */}
+                <div
+                  className={`fixed left-2 right-2 top-[57px] z-[59] rounded-2xl border shadow-2xl ${
+                    isDark
+                      ? 'bg-slate-900 border-slate-700/80 shadow-black/70'
+                      : 'bg-white border-slate-200 shadow-slate-300/60'
+                  }`}
+                >
+                  {/* Panel header */}
+                  <div className={`px-4 py-2.5 border-b flex items-center justify-between rounded-t-2xl ${
+                    isDark ? 'bg-slate-800/60 border-slate-700' : 'bg-slate-50 border-slate-100'
+                  }`}>
+                    <span className={`text-[10px] font-bold uppercase tracking-widest ${
+                      isDark ? 'text-slate-400' : 'text-slate-500'
+                    }`}>Page Actions</span>
+                    <button
+                      onClick={() => setMobileOverflowOpen(false)}
+                      className={`h-6 w-6 rounded-full flex items-center justify-center transition-colors ${
+                        isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                      }`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Actions area */}
+                  <div className="mobile-action-menu px-4 py-3 flex flex-col gap-3 max-h-[70vh] overflow-y-auto rounded-b-2xl">
+                    {headerButtons}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/*
+          Portal div + headerButtons container.
+          - Desktop (sm+): always visible as a flex row.
+          - Mobile: `display:none` keeps it out of view BUT the DOM node still
+            exists so React portals continue to mount into it correctly.
+          The mobile overflow button above re-renders `headerButtons` inside
+          its own dropdown — both copies are conditionally shown via CSS, never
+          simultaneously visible to the user.
+        */}
+        <div className="hidden sm:flex items-center gap-2">
+          <div id={HEADER_PORTAL_ID} className="flex items-center gap-2" />
+          {headerButtons}
+        </div>
+
         <StatusIndicator />
         <div className={`h-6 w-px hidden sm:block ${isDark ? 'bg-slate-700' : 'bg-slate-200'} mx-1`} />
         {/* Notification Bell */}
@@ -440,8 +516,8 @@ export function Header({ onMenuClick }: HeaderProps) {
           </button>
 
           {notifOpen && (
-            <div className={`absolute right-0 top-full mt-1 w-80 border rounded-lg shadow-xl z-50 overflow-hidden flex flex-col ${
-              isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+            <div className={`fixed right-3 top-[57px] w-80 max-w-[calc(100vw-1.5rem)] border rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col ${
+              isDark ? 'bg-slate-800 border-slate-700/80 shadow-black/60' : 'bg-white border-slate-200 shadow-slate-300/60'
             }`}>
               <div className={`px-4 py-3 border-b flex items-center justify-between ${
                 isDark ? 'bg-slate-900/40 border-slate-700' : 'bg-slate-50 border-slate-100'
@@ -533,7 +609,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           )}
         </div>
 
-        <div className={`h-6 w-px ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
+        <div className={`h-6 w-px hidden sm:block ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
 
         {/* Profile Dropdown */}
         <div ref={profileRef} className="relative">
@@ -556,8 +632,8 @@ export function Header({ onMenuClick }: HeaderProps) {
           </button>
 
           {isProfileOpen && (
-            <div className={`absolute right-0 top-full mt-1 w-64 border rounded-lg shadow-xl z-50 overflow-hidden ${
-              isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+            <div className={`fixed right-3 top-[57px] w-64 max-w-[calc(100vw-1.5rem)] border rounded-xl shadow-2xl z-50 overflow-hidden ${
+              isDark ? 'bg-slate-800 border-slate-700/80 shadow-black/60' : 'bg-white border-slate-200 shadow-slate-300/60'
             }`}>
               {/* Profile Header */}
               <div className={`px-4 py-4 border-b ${
