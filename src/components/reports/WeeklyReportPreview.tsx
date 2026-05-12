@@ -70,6 +70,7 @@ export interface WeeklyReportPreviewProps {
   weekJournals: Journal[];
   weekJournalEntries: JournalEntry[];
   activeSiteNames: string[];
+  canViewFinance?: boolean;
 }
 
 // ── Helper sub-components ──────────────────────────────────────────────
@@ -138,7 +139,7 @@ export function WeeklyReportPreview({
   uniqueStaffDeployed, totalDiesel, totalIncome, totalExpenses,
   employeesTotal, completedTasksCount, completedSubtasksCount, totalShifts,
   summarizedAttendance, weekMachineLogs, weekLedger, waybills,
-  weekJournals, weekJournalEntries, activeSiteNames,
+  weekJournals, weekJournalEntries, activeSiteNames, canViewFinance = false
 }: WeeklyReportPreviewProps) {
   const attRate = employeesTotal > 0 ? Math.round((uniqueStaffDeployed / employeesTotal) * 100) : 0;
   const generatedAt = format(new Date(), 'PPP p');
@@ -172,11 +173,12 @@ export function WeeklyReportPreview({
         <SectionTitle number={1} title="Executive Summary" />
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-8">
           {[
-            { label: 'Attendance Rate', value: `${attRate}% (${uniqueStaffDeployed}/${employeesTotal})` },
             { label: 'Total Shifts', value: totalShifts },
             { label: 'Diesel Used', value: `${totalDiesel.toFixed(0)} L` },
-            { label: 'Income', value: `₦${totalIncome.toLocaleString()}` },
-            { label: 'Expenses', value: `₦${totalExpenses.toLocaleString()}` },
+            ...(canViewFinance ? [
+              { label: 'Income', value: `₦${totalIncome.toLocaleString()}` },
+              { label: 'Expenses', value: `₦${totalExpenses.toLocaleString()}` }
+            ] : []),
             { label: 'Tasks Completed', value: `${completedTasksCount} main / ${completedSubtasksCount} sub` },
           ].map(stat => (
             <div key={stat.label} className="bg-slate-50 border border-slate-100 rounded-md p-3 sm:p-4">
@@ -207,16 +209,20 @@ export function WeeklyReportPreview({
                 {sName}
               </h3>
 
-              <SubTitle label="A. Expenses" />
-              <DataTable
-                headers={['Date', 'Category', 'Description', 'Amount']}
-                rows={siteExpenses.map(e => [
-                  formatDisplayDate(e.date), e.category, e.description, `₦${e.amount.toLocaleString()}`
-                ])}
-                emptyText="No expenses recorded"
-              />
+              {canViewFinance && (
+                <>
+                  <SubTitle label="A. Expenses" />
+                  <DataTable
+                    headers={['Date', 'Category', 'Description', 'Amount']}
+                    rows={siteExpenses.map(e => [
+                      formatDisplayDate(e.date), e.category, e.description, `₦${e.amount.toLocaleString()}`
+                    ])}
+                    emptyText="No expenses recorded"
+                  />
+                </>
+              )}
 
-              <SubTitle label="B. Machinery & Diesel Usage" />
+              <SubTitle label={canViewFinance ? "B. Machinery & Diesel Usage" : "A. Machinery & Diesel Usage"} />
               <DataTable
                 headers={['Date', 'Machine', 'Diesel (L)', 'Status', 'Issues']}
                 rows={siteMachines.map(m => [
@@ -228,7 +234,7 @@ export function WeeklyReportPreview({
                 emptyText="No machine logs"
               />
 
-              <SubTitle label="C. Consumables / Waybills" />
+              <SubTitle label={canViewFinance ? "C. Consumables / Waybills" : "B. Consumables / Waybills"} />
               <DataTable
                 headers={['Date', 'Items', 'Status', 'Driver']}
                 rows={siteWaybills.map(w => [
@@ -239,7 +245,7 @@ export function WeeklyReportPreview({
                 emptyText="No deliveries recorded"
               />
 
-              <SubTitle label="D. Operations Log" />
+              <SubTitle label={canViewFinance ? "D. Operations Log" : "C. Operations Log"} />
               {siteJournalEntries.length === 0 ? (
                 <p className="text-xs text-slate-400 italic my-2">No journal updates.</p>
               ) : siteJournalEntries.map((entry, i) => {

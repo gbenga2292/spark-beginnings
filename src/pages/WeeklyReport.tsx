@@ -314,9 +314,15 @@ export function WeeklyReport() {
               </button>
             </div>
             <div className="flex items-center gap-2 mt-1 sm:mt-0">
-              <button onClick={() => setAnchor(new Date())} className="h-8 sm:h-9 px-2 sm:px-3 text-[10px] sm:text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg sm:rounded-xl hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm whitespace-nowrap flex-1 sm:flex-none">Today</button>
-              <Button variant="outline" size="sm" onClick={handleExportXLSX} className="h-8 w-8 sm:h-9 sm:w-9 p-0 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm shrink-0" title="Export Excel"><Download className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-500" /></Button>
-              <Button size="sm" onClick={() => setShowPreview(true)} className="h-8 w-8 sm:h-9 sm:w-9 p-0 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200 shrink-0" title="View PDF Report"><FileText className="h-4 w-4 sm:h-5 sm:w-5" /></Button>
+              <button onClick={() => setAnchor(new Date())} className="h-8 sm:h-9 px-3 sm:px-3 text-[10px] sm:text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg sm:rounded-xl hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm whitespace-nowrap">Today</button>
+              <Button variant="outline" size="sm" onClick={handleExportXLSX} className="h-8 sm:h-9 px-3 gap-1.5 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm shrink-0" title="Export Excel">
+                <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500" />
+                <span className="text-[10px] sm:text-xs font-semibold">Export</span>
+              </Button>
+              <Button size="sm" onClick={() => setShowPreview(true)} className="h-8 sm:h-9 px-3 gap-1.5 bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-200 shrink-0" title="View PDF Report">
+                <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="text-[10px] sm:text-xs font-semibold">Preview</span>
+              </Button>
             </div>
           </div>
         </>
@@ -658,6 +664,7 @@ export function WeeklyReport() {
             weekJournals={weekJournals}
             weekJournalEntries={weekJournalEntries}
             activeSiteNames={activeSiteNames}
+            canViewFinance={privs.canViewFinance}
           />
         </div>
       ) : (
