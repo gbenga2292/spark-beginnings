@@ -16,6 +16,8 @@ import { generateId, cn } from '@/src/lib/utils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/src/components/ui/dropdown-menu';
 import { NumericFormat } from 'react-number-format';
 import { supabase } from '@/src/integrations/supabase/client';
+import { InvoiceRuntimeTracker } from './InvoiceRuntimeTracker';
+import { InvoiceDetailDialog } from './InvoiceDetailDialog';
 
 export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
   const sites = useAppStore((state) => state.sites);
@@ -30,6 +32,20 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
   const deleteInvoice = useAppStore(state => state.deleteInvoice);
   const vatRate = useAppStore(state => state.payrollVariables.vatRate);
 
+  const handleSyncInvoiceDates = async (invoiceId: string, newEndDate: string) => {
+    const inv = invoices.find(i => i.id === invoiceId);
+    if (!inv) return;
+    
+    const updated = {
+      ...inv,
+      dueDate: newEndDate,
+      endDate: newEndDate, 
+    };
+    
+    updateInvoice(invoiceId, updated);
+    toast.success(`Updated invoice ${inv.invoiceNumber} end date to ${formatDisplayDate(newEndDate)}`);
+  };
+
   // ─── Permissions ───────────────────────────────────────────
   const priv = usePriv('billing');
   const { addReminder } = useAppData();
@@ -37,6 +53,7 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'quotations' | 'all' | 'active' | 'unpaid' | 'completed'>('all');
+  const [showFilters, setShowFilters] = useState(false);
   const isViewingAll = activeTab === 'all';
   const isViewingActive = activeTab === 'active';
   const isViewingQuotations = activeTab === 'quotations';
@@ -57,6 +74,8 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
   const [nextInvoiceDialog, setNextInvoiceDialog] = useState(false);
   const [nextInvoiceSource, setNextInvoiceSource] = useState<Invoice | null>(null);
   const [selectedNextMachines, setSelectedNextMachines] = useState<number[]>([]);
+  const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
+
 
   // ── Master Site Registry ────────────────────────────────────
   const siteRegistry = useMemo(() => {
@@ -1109,13 +1128,13 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
           <input type="file" accept=".csv" className="hidden" onChange={handleImportCSVSelected} />
         </label>
       )}
-          {priv.canCreate && activeTab !== 'completed' && (
-        <Button
-          size="sm"
-          className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9 px-4 font-bold text-[11px] uppercase tracking-tight shadow-md"
+      {priv.canCreate && (
+        <Button 
+          size="sm" 
+          className="gap-2 h-9 px-3 sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-tight shadow-md transition-all active:scale-95"
           onClick={() => { handleClear(); setIsModalOpen(true); }}
         >
-          <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add {activeTab === 'active' ? 'Invoice' : 'Quotation'}</span>
+          <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Create Invoice</span>
         </Button>
       )}
     </div>
@@ -1166,15 +1185,6 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
           </div>
 
           <div className="flex items-center gap-2 md:gap-3">
-            {priv.canCreate && (activeTab === 'all' || activeTab === 'quotations') && (
-              <Button
-                size="sm"
-                className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white shadow-md transition-all h-9 px-4"
-                onClick={() => { handleClear(); setIsModalOpen(true); }}
-              >
-                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add {activeTab === 'all' ? 'Invoice' : 'Quotation'}</span>
-              </Button>
-            )}
           </div>
         </div>
 
@@ -1183,53 +1193,82 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
           <div className="border-b border-slate-100 p-4 bg-slate-50/50 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
-                {activeTab === 'active' ? 'Active Invoices' : activeTab === 'quotations' ? 'Quotations' : 'Completed paid sites'}
+                {activeTab === 'active' ? 'Active Invoices' : 
+                 activeTab === 'quotations' ? 'Quotations' : 
+                 activeTab === 'all' ? 'All Invoices' : 
+                 activeTab === 'unpaid' ? 'Unpaid Site Records' :
+                 'Completed paid sites'}
               </h3>
-              <Badge variant="secondary" className="ml-2 font-mono">{activeTab === 'completed' ? completedSites.length : currentList.length}</Badge>
+              <Badge variant="secondary" className="ml-2 font-mono">
+                {activeTab === 'completed' ? completedSites.length : 
+                 activeTab === 'unpaid' ? unpaidSites.length :
+                 currentList.length}
+              </Badge>
             </div>
             
             <div className="flex items-center gap-6">
               {activeTab === 'quotations' && <p className="hidden md:block text-xs text-slate-500">Double click row to transition to Active.</p>}
               
-              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
-                {/* Filter input */}
-                <div className="flex items-center gap-2 sm:border-r border-slate-200 sm:pr-4">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">From</span>
-                    <Input 
-                        type="month" 
-                        value={filterFromMonth} 
-                        onChange={(e) => setFilterFromMonth(e.target.value)} 
-                        className="h-8 w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
-                    />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">To</span>
-                    <Input 
-                        type="month" 
-                        value={filterToMonth} 
-                        onChange={(e) => setFilterToMonth(e.target.value)} 
-                        className="h-8 w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
-                    />
-                    {(filterFromMonth || filterToMonth) && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => { setFilterFromMonth(''); setFilterToMonth(''); }} title="Clear filter">
-                            <X className="h-3.5 w-3.5"/>
-                        </Button>
-                    )}
-                </div>
+                <div className={cn(
+                  "flex-col sm:flex-row items-end sm:items-center gap-4",
+                  showFilters ? "flex" : "hidden sm:flex"
+                )}>
+                    {/* Filter input */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:border-r border-slate-200 sm:pr-4 w-full sm:w-auto">
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider min-w-[32px]">From</span>
+                          <Input 
+                              type="month" 
+                              value={filterFromMonth} 
+                              onChange={(e) => setFilterFromMonth(e.target.value)} 
+                              className="h-8 flex-1 sm:w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider min-w-[32px]">To</span>
+                          <Input 
+                              type="month" 
+                              value={filterToMonth} 
+                              onChange={(e) => setFilterToMonth(e.target.value)} 
+                              className="h-8 flex-1 sm:w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
+                          />
+                        </div>
+                        {(filterFromMonth || filterToMonth) && (
+                            <Button variant="ghost" size="sm" className="h-8 px-2 text-slate-400 hover:text-red-500 gap-1 w-full sm:w-auto" onClick={() => { setFilterFromMonth(''); setFilterToMonth(''); }} title="Clear filter">
+                                <X className="h-3.5 w-3.5"/>
+                                <span className="sm:hidden">Clear Filters</span>
+                            </Button>
+                        )}
+                    </div>
 
-                {/* Toggle for Actions Column */}
-                <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Show Actions</span>
-                    <button
-                        onClick={() => setShowActions(!showActions)}
-                        className="group relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none"
-                    >
-                        <span className={`absolute h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${showActions ? 'bg-indigo-600' : 'bg-slate-200'}`} />
-                        <span
-                            className={`absolute left-0 inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
-                            style={{ transform: `translateX(${showActions ? '20px' : '2px'})` }}
-                        />
-                    </button>
+                    {/* Toggle for Actions Column */}
+                    <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto py-2 sm:py-0 border-t sm:border-t-0 border-slate-100">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Show Actions</span>
+                        <button
+                            onClick={() => setShowActions(!showActions)}
+                            className="group relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none"
+                        >
+                            <span className={`absolute h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${showActions ? 'bg-indigo-600' : 'bg-slate-200'}`} />
+                            <span
+                                className={`absolute left-0 inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                                style={{ transform: `translateX(${showActions ? '20px' : '2px'})` }}
+                            />
+                        </button>
+                    </div>
                 </div>
-              </div>
+                <div className="sm:hidden">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={cn(
+                      "h-9 w-9 rounded-lg border transition-all",
+                      showFilters ? "bg-indigo-50 border-indigo-200 text-indigo-600" : "bg-white border-slate-200 text-slate-500"
+                    )}
+                  >
+                    <Plus className={cn("h-4 w-4 transition-transform", showFilters && "rotate-45")} />
+                  </Button>
+                </div>
             </div>
           </div>
 
@@ -1443,99 +1482,114 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                   })
                 ) : (
                   currentList.map((inv: any) => (
-                    <TableRow key={inv.id} onDoubleClick={() => { if (activeTab === 'quotations') handleMakeActive(inv) }} className="hover:bg-slate-50 transition-colors cursor-pointer">
-                      <TableCell className="px-4 py-3 font-mono font-bold text-slate-700">{inv.invoiceNo || inv.invoiceNumber}</TableCell>
-                      <TableCell className="px-4 py-3 text-slate-700">
-                        <div className="font-semibold">{inv.client}</div>
-                        <div className="text-slate-500 text-xs">{inv.site || inv.siteName} <span className="ml-1 px-1 rounded bg-slate-100 border text-[10px]">{inv.vatInc || 'No VAT'}</span></div>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-right text-slate-600">
-                        {/* ── Machine column: use machineConfigs when rates differ ── */}
-                        {(() => {
-                          const configs: any[] | undefined = inv.machineConfigs;
-                          if (configs && configs.length > 0) {
-                            // Resolve effective rates respecting "same as first" flags
-                            const firstRate = parseFloat(configs[0]?.rate) || 0;
-                            const firstDur  = parseFloat(configs[0]?.duration) || 0;
-                            const resolved = configs.map((m: any) => ({
-                              rate: m.sameRateAsFirst ? firstRate : (parseFloat(m.rate) || 0),
-                              duration: m.sameDurationAsFirst ? firstDur : (parseFloat(m.duration) || 0),
-                            }));
-                            // Group by unique rate to build compact display
-                            const groups = new Map<number, number>(); // rate → count
-                            resolved.forEach(m => {
-                              if (m.rate > 0) groups.set(m.rate, (groups.get(m.rate) || 0) + 1);
-                            });
-                            const entries = Array.from(groups.entries());
-                            if (entries.length === 1) {
-                              // All same rate — standard display
-                              const [rate, count] = entries[0];
-                              return <div><span className="text-slate-400">Mac:</span> {count} x {priv?.canViewAmounts === false ? '***' : rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>;
-                            }
-                            // Multiple different rates — show each group
-                            return (
-                              <div className="space-y-0.5">
-                                {entries.map(([rate, count], gi) => (
-                                  <div key={gi} className="text-xs">
-                                    <span className="text-slate-400">M{gi + 1}:</span>{' '}
-                                    {count} x {priv?.canViewAmounts === false ? '***' : rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </div>
-                                ))}
-                              </div>
-                            );
+                    <React.Fragment key={inv.id}>
+                      <TableRow 
+                        onDoubleClick={() => { if (activeTab !== 'quotations') setDetailInvoice(inv); }}
+                        className={cn(
+                          "group hover:bg-indigo-50/20 transition-colors cursor-pointer border-b border-slate-100/80",
+                          detailInvoice?.id === inv.id && "bg-indigo-50/40"
+                        )}
+                        onClick={() => {
+                          if (activeTab === 'quotations') {
+                            handleMakeActive(inv);
+                          } else {
+                            setDetailInvoice(inv);
                           }
-                          // Fallback: flat field
-                          return <div><span className="text-slate-400">Mac:</span> {inv.noOfMachine || 0} x {priv?.canViewAmounts === false ? '***' : (inv.dailyRentalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>;
-                        })()}
-                        <div><span className="text-slate-400">Tech:</span> {inv.noOfTechnician || 0} x {priv?.canViewAmounts === false ? '***' : (inv.techniciansDailyRate || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                        <div><span className="text-slate-400">DsLtr:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCostPerLtr || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({(inv.dailyUsage || 0)}L)</div>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-right text-slate-600">
-                        <div className="font-medium text-slate-800">{inv.duration || 0} Days</div>
-                        <div className="text-slate-500 text-xs">{formatDisplayDate(inv.startDate || inv.date)} - {formatDisplayDate(inv.endDate || inv.dueDate)}</div>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-right text-slate-600">
-                        <div><span className="text-slate-400">Rent:</span> {priv?.canViewAmounts === false ? '***' : (inv.rentalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                        <div><span className="text-slate-400">Fuel:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                        <div><span className="text-slate-400">Other:</span> {priv?.canViewAmounts === false ? '***' : ((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-right">
-                        <div className="text-slate-500 text-xs">Gross: {priv?.canViewAmounts === false ? '***' : (inv.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                        <div className="text-slate-500 text-xs">VAT: {priv?.canViewAmounts === false ? '***' : (inv.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                        <div className="font-bold text-indigo-700 mt-1">{priv?.canViewAmounts === false ? '***' : (inv.totalCharge || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                      </TableCell>
-                      {showActions && (priv.canEdit || priv.canDelete) && (
-                        <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
-                          <div className="flex items-center justify-center gap-1">
-                            {activeTab === 'quotations' && priv.canEdit && (
-                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleMakeActive(inv); }} className="h-8 w-8 text-emerald-600 hover:bg-emerald-50" title="Move to Active">
-                                <ArrowRightCircle className="w-4 h-4" />
-                              </Button>
-                            )}
-                            {priv.canEdit && (
-                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(inv); }} className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit row">
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                            )}
-                             {priv.canEdit && activeTab !== 'quotations' && (
-                               <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleGenerateNext(inv); }} className="h-8 w-8 text-orange-600 hover:bg-orange-50" title="Generate Next Invoice">
-                                 <PlusCircle className="w-4 h-4" />
-                               </Button>
-                             )}
-                            {priv.canEdit && (
-                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setPrintInvoiceTarget(inv); }} className="h-8 w-8 text-blue-600 hover:bg-blue-50" title="Print Invoice">
-                                <Printer className="w-4 h-4" />
-                              </Button>
-                            )}
-                            {priv.canDelete && (
-                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(inv.id); }} className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete row">
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
+                        }}
+                      >
+                        <TableCell className="px-4 py-3 font-mono font-bold text-slate-700">{inv.invoiceNo || inv.invoiceNumber}</TableCell>
+                        <TableCell className="px-4 py-3 text-slate-700">
+                          <div className="font-semibold">{inv.client}</div>
+                          <div className="text-slate-500 text-xs">{inv.site || inv.siteName} <span className="ml-1 px-1 rounded bg-slate-100 border text-[10px]">{inv.vatInc || 'No VAT'}</span></div>
                         </TableCell>
-                      )}
-                    </TableRow>
+                        <TableCell className="px-4 py-3 text-right text-slate-600">
+                          {/* ── Machine column: use machineConfigs when rates differ ── */}
+                          {(() => {
+                            const configs: any[] | undefined = inv.machineConfigs;
+                            if (configs && configs.length > 0) {
+                              // Resolve effective rates respecting "same as first" flags
+                              const firstRate = parseFloat(configs[0]?.rate) || 0;
+                              const firstDur  = parseFloat(configs[0]?.duration) || 0;
+                              const resolved = configs.map((m: any) => ({
+                                rate: m.sameRateAsFirst ? firstRate : (parseFloat(m.rate) || 0),
+                                duration: m.sameDurationAsFirst ? firstDur : (parseFloat(m.duration) || 0),
+                              }));
+                              // Group by unique rate to build compact display
+                              const groups = new Map<number, number>(); // rate → count
+                              resolved.forEach(m => {
+                                if (m.rate > 0) groups.set(m.rate, (groups.get(m.rate) || 0) + 1);
+                              });
+                              const entries = Array.from(groups.entries());
+                              if (entries.length === 1) {
+                                // All same rate — standard display
+                                const [rate, count] = entries[0];
+                                return <div><span className="text-slate-400">Mac:</span> {count} x {priv?.canViewAmounts === false ? '***' : rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>;
+                              }
+                              // Multiple different rates — show each group
+                              return (
+                                <div className="space-y-0.5">
+                                  {entries.map(([rate, count], gi) => (
+                                    <div key={gi} className="text-xs">
+                                      <span className="text-slate-400">M{gi + 1}:</span>{' '}
+                                      {count} x {priv?.canViewAmounts === false ? '***' : rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            // Fallback: flat field
+                            return <div><span className="text-slate-400">Mac:</span> {inv.noOfMachine || 0} x {priv?.canViewAmounts === false ? '***' : (inv.dailyRentalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>;
+                          })()}
+                          <div><span className="text-slate-400">Tech:</span> {inv.noOfTechnician || 0} x {priv?.canViewAmounts === false ? '***' : (inv.techniciansDailyRate || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div><span className="text-slate-400">DsLtr:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCostPerLtr || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({(inv.dailyUsage || 0)}L)</div>
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right text-slate-600">
+                          <div className="font-medium text-slate-800">{inv.duration || 0} Days</div>
+                          <div className="text-slate-500 text-xs">{formatDisplayDate(inv.startDate || inv.date)} - {formatDisplayDate(inv.endDate || inv.dueDate)}</div>
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right text-slate-600">
+                          <div><span className="text-slate-400">Rent:</span> {priv?.canViewAmounts === false ? '***' : (inv.rentalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div><span className="text-slate-400">Fuel:</span> {priv?.canViewAmounts === false ? '***' : (inv.dieselCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div><span className="text-slate-400">Other:</span> {priv?.canViewAmounts === false ? '***' : ((inv.techniciansCost || 0) + (inv.installation || 0) + (inv.mobDemob || 0) + (inv.damages || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right">
+                          <div className="text-slate-500 text-xs">Gross: {priv?.canViewAmounts === false ? '***' : (inv.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div className="text-slate-500 text-xs">VAT: {priv?.canViewAmounts === false ? '***' : (inv.vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div className="font-bold text-indigo-700 mt-1">{priv?.canViewAmounts === false ? '***' : (inv.totalCharge || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        </TableCell>
+                        {showActions && (priv.canEdit || priv.canDelete) && (
+                          <TableCell className="px-4 py-3 text-center sticky right-0 bg-white/95 backdrop-blur shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.05)]">
+                            <div className="flex items-center justify-center gap-1">
+                              {activeTab === 'quotations' && priv.canEdit && (
+                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleMakeActive(inv); }} className="h-8 w-8 text-emerald-600 hover:bg-emerald-50" title="Move to Active">
+                                  <ArrowRightCircle className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {priv.canEdit && (
+                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(inv); }} className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" title="Edit row">
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {priv.canEdit && activeTab !== 'quotations' && (
+                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleGenerateNext(inv); }} className="h-8 w-8 text-orange-600 hover:bg-orange-50" title="Generate Next Invoice">
+                                  <PlusCircle className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {priv.canEdit && (
+                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setPrintInvoiceTarget(inv); }} className="h-8 w-8 text-blue-600 hover:bg-blue-50" title="Print Invoice">
+                                  <Printer className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {priv.canDelete && (
+                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(inv.id); }} className="h-8 w-8 text-rose-600 hover:bg-rose-50" title="Delete row">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    </React.Fragment>
                   ))
                 )}
                 {activeTab === 'quotations' && currentList.length > 0 && (
@@ -1575,11 +1629,23 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                 (activeTab === 'completed' ? completedSites : unpaidSites).map((site) => {
                   const siteKey = `${site.client}_${site.id || site.name}_${activeTab}`;
                   return (
-                    <div key={siteKey} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div 
+                      key={siteKey} 
+                      className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden cursor-pointer transition-colors hover:bg-slate-50/50"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setExpandedSiteKey(prev => prev === siteKey ? null : siteKey)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpandedSiteKey(prev => prev === siteKey ? null : siteKey); }}
+                    >
                       <div className="p-3 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
-                        <div>
-                          <div className="font-bold text-slate-800 text-sm leading-tight">{site.client}</div>
-                          <div className="text-slate-500 text-xs mt-0.5">{site.name}</div>
+                        <div className="flex items-center gap-2">
+                          {expandedSiteKey === siteKey 
+                            ? <ChevronDown className="w-3.5 h-3.5 text-indigo-500" /> 
+                            : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+                          <div>
+                            <div className="font-bold text-slate-800 text-sm leading-tight">{site.client}</div>
+                            <div className="text-slate-500 text-xs mt-0.5">{site.name}</div>
+                          </div>
                         </div>
                         <Badge variant="outline" className={cn(
                           "text-[10px] uppercase font-bold shrink-0 ml-2",
@@ -1606,12 +1672,51 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
                           <p className="font-mono font-bold text-indigo-700">₦{formatSum(site.totalPaymentAmount)}</p>
                         </div>
                       </div>
+
+                      {/* Expanded Invoices for Site (Mobile) */}
+                      {expandedSiteKey === siteKey && (
+                        <div className="bg-slate-50 p-2 space-y-2 border-t border-slate-100 animate-in fade-in slide-in-from-top-1 duration-200">
+                          {site.invoices.length === 0 ? (
+                            <p className="text-[10px] text-slate-400 italic p-2">No invoices found.</p>
+                          ) : (
+                            site.invoices.map((inv: any) => (
+                              <div 
+                                key={inv.id} 
+                                className="bg-white p-3 rounded-lg border border-slate-200 flex justify-between items-center active:bg-indigo-50 transition-colors cursor-pointer"
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDetailInvoice(inv);
+                                }}
+                              >
+                                <div>
+                                  <div className="text-[11px] font-bold text-indigo-700 font-mono">{inv.invoiceNumber || inv.invoiceNo}</div>
+                                  <div className="text-[10px] text-slate-500 mt-0.5">{formatDisplayDate(inv.date || inv.startDate)}</div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-[11px] font-bold text-slate-700 font-mono">₦{formatSum(inv.totalCharge || inv.amount || 0)}</div>
+                                  <div className="text-[9px] text-slate-400 uppercase font-bold">{inv.status || 'Sent'}</div>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })
               ) : (
                 currentList.map((inv: any) => (
-                  <div key={inv.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative" onDoubleClick={() => { if (activeTab === 'quotations') handleMakeActive(inv) }}>
+                  <div 
+                    key={inv.id} 
+                    className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative cursor-pointer transition-colors hover:bg-slate-50/50" 
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setDetailInvoice(inv);
+                    }}
+                  >
                     {/* Status accent bar */}
                     <div className={cn(
                       "absolute left-0 top-0 bottom-0 w-1",
@@ -2068,9 +2173,20 @@ export function Billing({ searchTerm = '' }: { searchTerm?: string }) {
             ledgerBeneficiaryBanks={ledgerBeneficiaryBanks}
           />
         )}
+        </div>
+
+        {/* Invoice Detail Dialog - Moved outside animated containers for better stacking context */}
+        <InvoiceDetailDialog
+          invoice={detailInvoice}
+          invoiceList={currentList ?? []}
+          open={detailInvoice !== null}
+          onClose={() => setDetailInvoice(null)}
+          onNavigate={(inv) => setDetailInvoice(inv)}
+          onEdit={(inv) => { setDetailInvoice(null); handleEdit(inv); }}
+          onPrint={(inv) => { setDetailInvoice(null); setPrintInvoiceTarget(inv); }}
+        />
       </div>
-    </div>
-  );
+    );
 }
 
 // ── Invoice Print Component ──

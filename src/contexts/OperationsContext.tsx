@@ -65,6 +65,7 @@ interface OperationsContextType {
   
   // Daily Machine Logs
   logDailyActivity: (log: Omit<DailyMachineLog, 'id' | 'created_at'>) => Promise<void>;
+  deleteDailyLog: (logId: string) => Promise<void>;
 }
 
 const OperationsContext = createContext<OperationsContextType | undefined>(undefined);
@@ -137,12 +138,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       });
 
     // 2. Vehicles: All vehicles from the vehicle page
-    // Note: Vehicles are currently hardcoded to 'Main Office'. 
-    // If the user wants to exclude 'Main Office' as well, we should filter them.
-    // However, usually vehicles belong to the office. 
-    // We'll keep them for now unless they match 'DCEL OFFICE' specifically.
     const mappedVehicles = vehicles
-      .filter(v => !isInternalSite({ name: 'Main Office' })) // This would filter ALL vehicles if Main Office is internal
+      .filter(v => !isInternalSite({ name: 'Main Office' }))
       .map(v => {
         const sessions = maintenanceSessions.filter(s => s.assets.some(sa => sa.assetId === v.id));
         const routineSessions = sessions.filter(s => s.type === 'routine' || s.type === 'scheduled');
@@ -271,6 +268,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             siteName: log.site_name,
             date: log.date,
             isActive: log.is_active,
+            operationalDay: log.operational_day,
             downtimeEntries: log.downtime_entries || [],
             maintenanceDetails: log.maintenance_details,
             clientFeedback: log.client_feedback,
@@ -396,7 +394,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       await persistAsset(newAsset);
       toast.success('Asset added successfully');
     } catch (error) {
-      // Revert local state if DB save fails
       setAssets(prev => prev.filter(a => a.id !== newAsset.id));
     }
   };
@@ -413,7 +410,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     }));
     setAssets(prev => [...prev, ...newAssets]);
     
-    // Bulk upsert
     supabase.from('operations_assets').upsert(newAssets.map(asset => ({
       id: asset.id,
       name: asset.name,
@@ -462,7 +458,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         await persistAsset(targetAsset);
         toast.success('Asset updated successfully');
       } catch (error) {
-        // Revert local state if DB save fails
         setAssets(originalAssets);
       }
     }
@@ -511,10 +506,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         const item = waybill.items.find(i => i.assetId === asset.id);
         if (item) {
           const reservedQuantity = asset.reservedQuantity + item.quantity;
-          const missingQuantity = asset.missingQuantity || 0;
-          const damagedQuantity = asset.damagedQuantity || 0;
-          const usedQuantity = asset.usedQuantity || 0;
-          
           const updated: Asset = {
             ...asset,
             reservedQuantity,
@@ -535,11 +526,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     setWaybills(prev => {
       const waybill = prev.find(w => w.id === id);
       if (!waybill) return prev;
-
-      if (waybill.type === 'waybill' && status === 'sent_to_site' && waybill.status !== 'sent_to_site') {
-        // Items stay in 'Reserved' even when sent to site, as per user requirement.
-        // No quantity change needed here.
-      }
 
       if (waybill.type === 'return' && status === 'return_completed' && waybill.status !== 'return_completed') {
         setAssets(assetsPrev => assetsPrev.map(asset => {
@@ -592,7 +578,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       const waybill = prev.find(w => w.id === id);
       if (!waybill || waybill.status !== 'outstanding') return prev;
 
-      // Reverse old reservations
       if (waybill.type === 'waybill') {
         setAssets(assetsPrev => assetsPrev.map(asset => {
           const oldItem = waybill.items.find(i => i.assetId === asset.id);
@@ -607,7 +592,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         }));
       }
 
-      // Apply new reservations
       const newItems = updates.items || waybill.items;
       if (waybill.type === 'waybill') {
         setAssets(assetsPrev => assetsPrev.map(asset => {
@@ -653,7 +637,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     setCheckouts(prev => [newCheckout, ...prev]);
     persistCheckout(newCheckout);
     
-    // Update asset quantities: reserve the item
     setAssets(assetsPrev => assetsPrev.map(asset => {
       if (asset.id === checkout.assetId) {
         const reservedQuantity = (asset.reservedQuantity || 0) + checkout.quantity;
@@ -675,7 +658,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       if (!checkout) return prev;
       
       if (updates.status && ['partial_returned', 'returned', 'outstanding'].includes(updates.status) && updates.returnedQuantity !== undefined) {
-        // Return logic: reduce reservation based on INCREMENTAL return
         const delta = updates.returnedQuantity - (checkout.returnedQuantity || 0);
         
         if (delta !== 0) {
@@ -712,7 +694,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       id: `MS-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
     };
 
-    // Update inventory for parts used
     session.assets.forEach(assetLog => {
       assetLog.parts?.forEach(part => {
         if (part.type === 'inventory' && (part as any).id) {
@@ -743,9 +724,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       const oldSession = prev.find(s => s.id === id);
       if (!oldSession) return prev;
 
-      // Handle inventory parts diff
       if (updates.assets) {
-        // Collect old parts used
         const oldParts = new Map<string, number>();
         oldSession.assets.forEach(asset => {
           asset.parts?.forEach(part => {
@@ -756,7 +735,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           });
         });
 
-        // Collect new parts used
         const newParts = new Map<string, number>();
         updates.assets.forEach(asset => {
           asset.parts?.forEach(part => {
@@ -767,7 +745,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           });
         });
 
-        // Determine diff: old - new. If positive, we return to inventory. If negative, we take from inventory.
         const allPartIds = new Set([...oldParts.keys(), ...newParts.keys()]);
         
         allPartIds.forEach(partId => {
@@ -800,7 +777,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const getAssetAnalytics = () => {
-    // Basic stats for dashboard
     return {
       totalAssets: assets.length,
       activeWaybills: waybills.filter(w => w.status === 'outstanding' || w.status === 'sent_to_site').length,
@@ -815,7 +791,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     const dueSoon = maintenanceAssets.filter(a => a.status === 'due_soon').length;
     const overdue = maintenanceAssets.filter(a => a.status === 'overdue').length;
     
-    // Calculate monthly cost
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -829,8 +804,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         session.assets.forEach(assetLog => {
           monthlyCost += (assetLog.cost || 0);
           if (assetLog.shutdown) {
-            // Assuming 8 hours for each shutdown if not specified, 
-            // though we could add a downtimeHours field to the log
             totalDowntime += 8; 
           }
         });
@@ -895,6 +868,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       checkouts,
       maintenanceAssets,
       maintenanceSessions,
+      dailyMachineLogs,
       addAsset,
       bulkAddAssets,
       updateAsset,
@@ -944,7 +918,6 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       },
       deleteVehicleDocumentType: storeDeleteVehicleDocumentType,
       updateVehicleDocument: storeUpdateVehicleDocument,
-      dailyMachineLogs,
       logDailyActivity: async (logData: Omit<DailyMachineLog, 'id' | 'created_at'>) => {
         try {
           const payload = {
@@ -954,6 +927,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             site_name: logData.siteName,
             date: logData.date,
             is_active: logData.isActive,
+            operational_day: logData.operationalDay,
             downtime_entries: logData.downtimeEntries,
             maintenance_details: logData.maintenanceDetails,
             client_feedback: logData.clientFeedback,
@@ -979,6 +953,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             siteName: data.site_name,
             date: data.date,
             isActive: data.is_active,
+            operationalDay: data.operational_day,
             downtimeEntries: data.downtime_entries || [],
             maintenanceDetails: data.maintenance_details,
             clientFeedback: data.client_feedback,
@@ -998,11 +973,23 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             }
             return [newLog, ...prev];
           });
-
-          // toast.success('Daily activity logged successfully'); // Need to import toast or use a different feedback mechanism
         } catch (error) {
           console.error('Error logging daily activity:', error);
-          // toast.error('Failed to log daily activity');
+          throw error;
+        }
+      },
+      deleteDailyLog: async (logId: string) => {
+        try {
+          const { error } = await supabase
+            .from('operations_daily_logs')
+            .delete()
+            .eq('id', logId);
+
+          if (error) throw error;
+
+          setDailyMachineLogs(prev => prev.filter(l => l.id !== logId));
+        } catch (error) {
+          console.error('Error deleting daily log:', error);
           throw error;
         }
       }

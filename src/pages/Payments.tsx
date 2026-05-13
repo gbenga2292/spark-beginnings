@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/src/components/ui/badge';
 import { usePriv } from '@/src/hooks/usePriv';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
-import { generateId } from '@/src/lib/utils';
+import { cn, generateId } from '@/src/lib/utils';
 import { NumericFormat } from 'react-number-format';
 
 const getVatDetails = (amount: number, payVat: string, vatRate: number) => {
@@ -50,6 +50,7 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [filterFromMonth, setFilterFromMonth] = useState<string>('');
     const [filterToMonth, setFilterToMonth] = useState<string>('');
+    const [showFilters, setShowFilters] = useState(false);
 
     const initialForm = {
         date: '',
@@ -412,8 +413,9 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
     );
 
     return (
-        <div className="h-full flex flex-col min-h-0 py-6">
-            <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6 px-6">
+        <div className="h-full flex flex-col min-h-0 py-4 sm:py-6">
+            <div className="flex flex-col flex-1 h-full w-full animate-in fade-in duration-300 gap-6">
+
 
             <div className="flex flex-1 gap-6 items-start flex-col">
 
@@ -426,43 +428,66 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                             <Badge variant="secondary" className="ml-2 font-mono bg-emerald-100 text-emerald-800 border-emerald-200">{payments.length}</Badge>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
-                            {/* Filter input */}
-                            <div className="flex items-center gap-2 sm:border-r border-slate-200 sm:pr-4">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">From</span>
-                                <Input 
-                                    type="month" 
-                                    value={filterFromMonth} 
-                                    onChange={(e) => setFilterFromMonth(e.target.value)} 
-                                    className="h-8 w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
-                                />
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">To</span>
-                                <Input 
-                                    type="month" 
-                                    value={filterToMonth} 
-                                    onChange={(e) => setFilterToMonth(e.target.value)} 
-                                    className="h-8 w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
-                                />
-                                {(filterFromMonth || filterToMonth) && (
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => { setFilterFromMonth(''); setFilterToMonth(''); }} title="Clear filter">
-                                        <X className="h-3.5 w-3.5"/>
-                                    </Button>
-                                )}
-                            </div>
-
-                            {/* Toggle for Actions Column */}
-                            <div className="flex items-center gap-3">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Show Actions</span>
-                                <button
-                                    onClick={() => setShowActions(!showActions)}
-                                    className={`group relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none`}
-                                >
-                                    <span className={`absolute h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${showActions ? 'bg-indigo-600' : 'bg-slate-200'}`} />
-                                    <span
-                                        className={`absolute left-0 inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${showActions ? 'translate-x-5' : 'translate-x-0.5'}`}
+                        <div className="flex items-center gap-2">
+                          <div className={cn(
+                              "flex-col sm:flex-row items-end sm:items-center gap-4",
+                              showFilters ? "flex" : "hidden sm:flex"
+                          )}>
+                              {/* Filter input */}
+                              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:border-r border-slate-200 sm:pr-4 w-full sm:w-auto">
+                                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider min-w-[32px]">From</span>
+                                    <Input 
+                                        type="month" 
+                                        value={filterFromMonth} 
+                                        onChange={(e) => setFilterFromMonth(e.target.value)} 
+                                        className="h-8 flex-1 sm:w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
                                     />
-                                </button>
-                            </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider min-w-[32px]">To</span>
+                                    <Input 
+                                        type="month" 
+                                        value={filterToMonth} 
+                                        onChange={(e) => setFilterToMonth(e.target.value)} 
+                                        className="h-8 flex-1 sm:w-36 text-xs border-slate-200 bg-white focus:ring-1 focus:ring-indigo-500 shadow-sm" 
+                                    />
+                                  </div>
+                                  {(filterFromMonth || filterToMonth) && (
+                                      <Button variant="ghost" size="sm" className="h-8 px-2 text-slate-400 hover:text-red-500 gap-1 w-full sm:w-auto" onClick={() => { setFilterFromMonth(''); setFilterToMonth(''); }} title="Clear filter">
+                                          <X className="h-3.5 w-3.5"/>
+                                          <span className="sm:hidden">Clear Filters</span>
+                                      </Button>
+                                  )}
+                              </div>
+
+                              {/* Toggle for Actions Column */}
+                              <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto py-2 sm:py-0 border-t sm:border-t-0 border-slate-100">
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Show Actions</span>
+                                  <button
+                                      onClick={() => setShowActions(!showActions)}
+                                      className={`group relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none`}
+                                  >
+                                      <span className={`absolute h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${showActions ? 'bg-indigo-600' : 'bg-slate-200'}`} />
+                                      <span
+                                          className={`absolute left-0 inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${showActions ? 'translate-x-5' : 'translate-x-0.5'}`}
+                                      />
+                                  </button>
+                              </div>
+                          </div>
+                          <div className="sm:hidden">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => setShowFilters(!showFilters)}
+                              className={cn(
+                                "h-9 w-9 rounded-lg border transition-all",
+                                showFilters ? "bg-indigo-50 border-indigo-200 text-indigo-600" : "bg-white border-slate-200 text-slate-500"
+                              )}
+                            >
+                              <Plus className={cn("h-4 w-4 transition-transform", showFilters && "rotate-45")} />
+                            </Button>
+                          </div>
                         </div>
                     </div>
 
@@ -494,21 +519,21 @@ export function Payments({ setPreviewModal, searchTerm = '' }: { setPreviewModal
                         <div className="md:hidden flex flex-col p-4 bg-slate-50 border-b border-slate-100">
                             <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">Total Sums</h4>
                             <div className="grid grid-cols-2 gap-2">
-                                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase">Amount</p>
-                                    <p className="text-sm font-mono font-black text-indigo-700">₦{formatSum(tableSums.amount)}</p>
+                                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm min-w-0">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase truncate">Amount</p>
+                                    <p className="text-[11px] sm:text-xs font-mono font-black text-indigo-700 break-all" title={'₦' + formatSum(tableSums.amount)}>₦{formatSum(tableSums.amount)}</p>
                                 </div>
-                                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase">VAT</p>
-                                    <p className="text-sm font-mono font-black text-indigo-600">₦{formatSum(tableSums.vat)}</p>
+                                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm min-w-0">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase truncate">VAT</p>
+                                    <p className="text-[11px] sm:text-xs font-mono font-black text-indigo-600 break-all" title={'₦' + formatSum(tableSums.vat)}>₦{formatSum(tableSums.vat)}</p>
                                 </div>
-                                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase">Amt For VAT</p>
-                                    <p className="text-sm font-mono font-black text-emerald-600">₦{formatSum(tableSums.amtForVat)}</p>
+                                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm min-w-0">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase truncate">Amt For VAT</p>
+                                    <p className="text-[11px] sm:text-xs font-mono font-black text-emerald-600 break-all" title={'₦' + formatSum(tableSums.amtForVat)}>₦{formatSum(tableSums.amtForVat)}</p>
                                 </div>
-                                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm">
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase">WHT</p>
-                                    <p className="text-sm font-mono font-black text-slate-600">₦{formatSum(tableSums.wht)}</p>
+                                <div className="bg-white p-2 rounded border border-slate-100 shadow-sm min-w-0">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase truncate">WHT</p>
+                                    <p className="text-[11px] sm:text-xs font-mono font-black text-slate-600 break-all" title={'₦' + formatSum(tableSums.wht)}>₦{formatSum(tableSums.wht)}</p>
                                 </div>
                             </div>
                         </div>

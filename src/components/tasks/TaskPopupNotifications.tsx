@@ -26,6 +26,8 @@ import { supabase } from '@/src/integrations/supabase/client';
 import { useTheme } from '@/src/hooks/useTheme';
 import { addHours, addDays, addMonths, isBefore } from 'date-fns';
 import type { Reminder, ReminderFrequency } from '@/src/types/tasks';
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 export interface TaskPopup {
@@ -181,6 +183,22 @@ export function TaskPopupNotifications() {
       ...p,
     };
     setPopups(prev => [popup, ...prev].slice(0, MAX_POPUPS));
+
+    // Also trigger native push/local notification if on Android
+    if (Capacitor.isNativePlatform()) {
+      LocalNotifications.schedule({
+        notifications: [{
+          id: Math.floor(Math.random() * 1000000),
+          title: p.title,
+          body: p.body,
+        }]
+      }).catch(console.error);
+    } else {
+      // web notification fallback
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(p.title, { body: p.body });
+      }
+    }
   }, []);
 
   const dismiss = useCallback((id: string) => {

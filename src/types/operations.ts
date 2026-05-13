@@ -208,6 +208,8 @@ export interface DowntimeEntry {
   timestamp: string;
 }
 
+export type OperationalDay = 'full' | 'half' | 'none';
+
 export interface DailyMachineLog {
   id: string;
   assetId: string;
@@ -216,6 +218,8 @@ export interface DailyMachineLog {
   siteName: string;
   date: string;
   isActive: boolean;
+  /** 'full' = 1.0 invoice day, 'half' = 0.5, 'none' = 0.0 */
+  operationalDay?: OperationalDay;
   downtimeEntries: DowntimeEntry[];
   maintenanceDetails?: string;
   clientFeedback?: string;

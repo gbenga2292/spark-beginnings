@@ -5,10 +5,11 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Textarea } from '@/src/components/ui/textarea';
-import { Wrench, User, ChevronDown } from 'lucide-react';
+import { Wrench, User, ChevronDown, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '@/src/store/appStore';
 import { cn } from '@/src/lib/utils';
+import { OperationalDay } from '@/src/types/operations';
 
 interface BulkMachineLogModalProps {
   isOpen: boolean;
@@ -28,20 +29,20 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
     e.staffType === 'FIELD'
   );
 
-  const [machineData, setMachineData] = useState<Record<string, { isActive: boolean; dieselUsage: string }>>({});
+  const [machineData, setMachineData] = useState<Record<string, { operationalDay: OperationalDay; dieselUsage: string }>>({});
   const [supervisorOnSite, setSupervisorOnSite] = useState('');
   const [issuesOnSite, setIssuesOnSite] = useState('');
   const [maintenanceDetails, setMaintenanceDetails] = useState('');
   const [clientFeedback, setClientFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const areAllInactive = machines.length > 0 && machines.every(m => machineData[m.id] && !machineData[m.id].isActive);
+  const areAllNoDay = machines.length > 0 && machines.every(m => machineData[m.id]?.operationalDay === 'none');
 
   useEffect(() => {
     if (isOpen) {
-      const initData: Record<string, { isActive: boolean; dieselUsage: string }> = {};
+      const initData: Record<string, { operationalDay: OperationalDay; dieselUsage: string }> = {};
       machines.forEach(m => {
-        initData[m.id] = { isActive: true, dieselUsage: '' };
+        initData[m.id] = { operationalDay: 'full', dieselUsage: '' };
       });
       setMachineData(initData);
       setSupervisorOnSite('');
@@ -51,8 +52,11 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
     }
   }, [isOpen, machines]);
 
-  const handleToggleActive = (id: string, active: boolean) => {
-    setMachineData(p => ({ ...p, [id]: { ...p[id], isActive: active, dieselUsage: active ? p[id].dieselUsage : '' } }));
+  const handleSetOpDay = (id: string, day: OperationalDay) => {
+    setMachineData(p => ({
+      ...p,
+      [id]: { ...p[id], operationalDay: day, dieselUsage: day === 'none' ? '' : p[id].dieselUsage }
+    }));
   };
 
   const handleDieselChange = (id: string, val: string) => {
@@ -65,19 +69,21 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
 
     try {
       const promises = machines.map(m => {
-        const data = machineData[m.id] || { isActive: true, dieselUsage: '' };
+        const data = machineData[m.id] || { operationalDay: 'full' as OperationalDay, dieselUsage: '' };
+        const isActive = data.operationalDay !== 'none';
         return logDailyActivity({
           assetId: m.id,
           assetName: m.name,
           siteId,
           siteName,
           date,
-          isActive: data.isActive,
+          isActive,
+          operationalDay: data.operationalDay,
           dieselUsage: parseFloat(data.dieselUsage) || 0,
           issuesOnSite,
-          clientFeedback: data.isActive ? clientFeedback : '',
-          maintenanceDetails: data.isActive ? maintenanceDetails : '',
-          supervisorOnSite: data.isActive ? supervisorOnSite : '',
+          clientFeedback: isActive ? clientFeedback : '',
+          maintenanceDetails: isActive ? maintenanceDetails : '',
+          supervisorOnSite: isActive ? supervisorOnSite : '',
           downtimeEntries: []
         });
       });
@@ -109,20 +115,30 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
             <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">Machine Status & Diesel</h4>
             <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
               {machines.map(m => {
-                const data = machineData[m.id] || { isActive: true, dieselUsage: '' };
+                const data = machineData[m.id] || { operationalDay: 'full' as OperationalDay, dieselUsage: '' };
+                const isActive = data.operationalDay !== 'none';
                 return (
                   <div key={m.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:px-4 bg-white dark:bg-slate-950 gap-3 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{m.name}</p>
                     <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
-                      <div className="flex p-1 bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-md flex-1 sm:flex-none sm:w-40 shrink-0">
-                        <button type="button" onClick={() => handleToggleActive(m.id, true)} className={cn("flex-1 flex items-center justify-center gap-1.5 py-1 text-[10px] font-bold rounded transition-all", data.isActive ? "bg-white dark:bg-slate-700 text-emerald-600 shadow-sm border border-slate-200/50 dark:bg-slate-600" : "text-slate-500 hover:text-slate-700")}>
-                          ACTIVE
+                      <div className="flex p-1 bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-md flex-1 sm:flex-none gap-0.5">
+                        <button type="button" onClick={() => handleSetOpDay(m.id, 'full')}
+                          className={cn("flex-1 flex items-center justify-center gap-1 py-1 text-[10px] font-bold rounded transition-all",
+                            data.operationalDay === 'full' ? "bg-emerald-500 text-white shadow-sm" : "text-slate-500 hover:text-emerald-600 hover:bg-emerald-50")}>
+                          <CheckCircle2 className="h-3 w-3" /> Full
                         </button>
-                        <button type="button" onClick={() => handleToggleActive(m.id, false)} className={cn("flex-1 flex items-center justify-center gap-1.5 py-1 text-[10px] font-bold rounded transition-all", !data.isActive ? "bg-white dark:bg-slate-700 text-rose-600 shadow-sm border border-slate-200/50 dark:bg-slate-600" : "text-slate-500 hover:text-slate-700")}>
-                          INACTIVE
+                        <button type="button" onClick={() => handleSetOpDay(m.id, 'half')}
+                          className={cn("flex-1 flex items-center justify-center gap-1 py-1 text-[10px] font-bold rounded transition-all",
+                            data.operationalDay === 'half' ? "bg-amber-400 text-white shadow-sm" : "text-slate-500 hover:text-amber-600 hover:bg-amber-50")}>
+                          <Clock className="h-3 w-3" /> Half
+                        </button>
+                        <button type="button" onClick={() => handleSetOpDay(m.id, 'none')}
+                          className={cn("flex-1 flex items-center justify-center gap-1 py-1 text-[10px] font-bold rounded transition-all",
+                            data.operationalDay === 'none' ? "bg-rose-500 text-white shadow-sm" : "text-slate-500 hover:text-rose-600 hover:bg-rose-50")}>
+                          <AlertTriangle className="h-3 w-3" /> None
                         </button>
                       </div>
-                      {data.isActive && (
+                      {isActive && (
                         <div className="w-24 shrink-0 ml-auto sm:ml-0">
                           <Input type="number" min="0" step="0.1" value={data.dieselUsage} onChange={e => handleDieselChange(m.id, e.target.value)} placeholder="Diesel (L)" className="h-8 text-xs font-semibold text-right" />
                         </div>
@@ -137,7 +153,7 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
           <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
             <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">Common Log Details</h4>
             
-            {!areAllInactive && (
+            {!areAllNoDay && (
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Supervisor on Site</Label>
                 <div className="relative">
@@ -151,12 +167,12 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
               </div>
             )}
 
-            <div className={cn("grid gap-4", !areAllInactive ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
+            <div className={cn("grid gap-4", !areAllNoDay ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Issues on Site / General Note</Label>
-                <Textarea value={issuesOnSite} onChange={e => setIssuesOnSite(e.target.value)} placeholder={areAllInactive ? "Describe why machines are inactive (e.g. rain, holiday, site closed)..." : "Notes applied to all selected machines..."} className="min-h-[80px] text-sm" />
+                <Textarea value={issuesOnSite} onChange={e => setIssuesOnSite(e.target.value)} placeholder={areAllNoDay ? "Describe why machines are off today (e.g. rain, holiday, site closed)..." : "Notes applied to all selected machines..."} className="min-h-[80px] text-sm" />
               </div>
-              {!areAllInactive && (
+              {!areAllNoDay && (
                 <div className="space-y-2">
                   <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Maintenance Performed</Label>
                   <Textarea value={maintenanceDetails} onChange={e => setMaintenanceDetails(e.target.value)} placeholder="Repairs done today..." className="min-h-[80px] text-sm" />
@@ -164,7 +180,7 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
               )}
             </div>
 
-            {!areAllInactive && (
+            {!areAllNoDay && (
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Client Feedback</Label>
                 <Textarea value={clientFeedback} onChange={e => setClientFeedback(e.target.value)} placeholder="Client remarks..." className="min-h-[60px] text-sm" />

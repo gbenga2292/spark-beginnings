@@ -9,7 +9,7 @@ import {
 import { useOperations } from '../contexts/OperationsContext';
 import { useAppStore } from '../store/appStore';
 import { useUserStore } from '../store/userStore';
-import { DailyMachineLog, DowntimeEntry } from '../types/operations';
+import { DailyMachineLog, DowntimeEntry, OperationalDay } from '../types/operations';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
@@ -35,7 +35,7 @@ interface DailyLogManagerProps {
 }
 
 export function DailyLogManager({ assetId, assetName, siteId, siteName, initialDate, isEmbedded, onBack }: DailyLogManagerProps) {
-  const { dailyMachineLogs, logDailyActivity, waybills } = useOperations();
+  const { dailyMachineLogs, logDailyActivity, deleteDailyLog, waybills } = useOperations();
   const { employees } = useAppStore();
   const currentUser = useUserStore(s => s.getCurrentUser());
   
@@ -58,7 +58,16 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   
   // Form State
   const [date, setDate] = useState(() => selectedLog?.date || initialDate || new Date().toISOString().split('T')[0]);
-  const [isActive, setIsActive] = useState(selectedLog ? selectedLog.isActive : true);
+
+  // Derive initial operationalDay from existing log, defaulting to 'full'
+  const deriveOpDay = (log: DailyMachineLog | null): OperationalDay => {
+    if (!log) return 'full';
+    if (log.operationalDay) return log.operationalDay;
+    return log.isActive ? 'full' : 'none';
+  };
+  const [operationalDay, setOperationalDay] = useState<OperationalDay>(() => deriveOpDay(selectedLog));
+  // isActive is derived from operationalDay
+  const isActive = operationalDay !== 'none';
   const [dieselUsage, setDieselUsage] = useState<string>(selectedLog ? selectedLog.dieselUsage.toString() : '0');
   const [supervisorOnSite, setSupervisorOnSite] = useState(selectedLog?.supervisorOnSite || '');
   const [clientFeedback, setClientFeedback] = useState(selectedLog?.clientFeedback || '');
@@ -102,6 +111,17 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     setDtReason('');
     setDtDuration('1');
     setShowDowntimeDialog(false);
+  };
+
+  const handleDeleteLog = async (logId: string) => {
+    if (!window.confirm('Are you sure you want to delete this log?')) return;
+    
+    try {
+      await deleteDailyLog(logId);
+      toast.success('Log deleted successfully');
+    } catch (err) {
+      toast.error('Failed to delete log');
+    }
   };
 
   const fetchUploadedMedia = async (sId: string, aId: string, lDate: string) => {
@@ -148,6 +168,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
         siteName,
         date,
         isActive,
+        operationalDay,
         dieselUsage: Number(dieselUsage),
         supervisorOnSite,
         clientFeedback,
@@ -214,7 +235,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
 
   const resetForm = () => {
     setDate(initialDate || new Date().toISOString().split('T')[0]);
-    setIsActive(true);
+    setOperationalDay('full');
     setDieselUsage('0');
     setSupervisorOnSite('');
     setClientFeedback('');
@@ -227,7 +248,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   const editLog = (log: DailyMachineLog) => {
     setSelectedLog(log);
     setDate(log.date);
-    setIsActive(log.isActive);
+    setOperationalDay(deriveOpDay(log));
     setDieselUsage(log.dieselUsage.toString());
     setSupervisorOnSite(log.supervisorOnSite || '');
     setClientFeedback(log.clientFeedback || '');
@@ -328,24 +349,41 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                       <div>
                         <p className="text-base font-bold text-slate-800 dark:text-white">{formatDisplayDate(log.date)}</p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <Badge className={cn(
-                            "text-[10px] font-bold px-2 py-0 rounded-full",
-                            log.isActive ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-700 border-rose-100"
-                          )}>
-                            {log.isActive ? 'OPERATIONAL' : 'INACTIVE'}
-                          </Badge>
-                          {log.downtimeEntries.length > 0 && (
-                            <Badge variant="outline" className="text-[10px] font-bold px-2 py-0 rounded-full bg-amber-50 text-amber-700 border-amber-100">
-                              {log.downtimeEntries.length} DOWNTIME INCIDENTS
-                            </Badge>
-                          )}
-                        </div>
+                            {(() => {
+                              const day = log.operationalDay ?? (log.isActive ? 'full' : 'none');
+                              return (
+                                <Badge className={cn(
+                                  "text-[10px] font-bold px-2 py-0 rounded-full",
+                                  day === 'full' ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
+                                  day === 'half' ? "bg-amber-50 text-amber-700 border-amber-100" :
+                                  "bg-rose-50 text-rose-700 border-rose-100"
+                                )}>
+                                  {day === 'full' ? 'FULL DAY' : day === 'half' ? 'HALF DAY' : 'NO DAY'}
+                                </Badge>
+                              );
+                            })()}
+                            {log.downtimeEntries.length > 0 && (
+                              <Badge variant="outline" className="text-[10px] font-bold px-2 py-0 rounded-full bg-amber-50 text-amber-700 border-amber-100">
+                                {log.downtimeEntries.length} DOWNTIME INCIDENTS
+                              </Badge>
+                            )}
+                          </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => editLog(log)}>
                         <Edit2 className="h-4 w-4" />
                       </Button>
+                      {currentUser?.privileges?.operations?.canDeleteLogs && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20" 
+                          onClick={() => handleDeleteLog(log.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
 
@@ -417,25 +455,40 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Operational Status</label>
-                    <div className="flex p-1 bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-md">
-                      <button 
-                        onClick={() => setIsActive(true)}
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Day Type</label>
+                    <div className="flex p-1 bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-md gap-1">
+                      <button
+                        onClick={() => setOperationalDay('full')}
                         className={cn(
-                          "flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-semibold rounded transition-all",
-                          isActive ? "bg-white dark:bg-slate-700 text-emerald-600 shadow-sm border border-slate-200/50 dark:border-slate-600" : "text-slate-500 hover:text-slate-700"
+                          "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-bold rounded transition-all",
+                          operationalDay === 'full'
+                            ? "bg-emerald-500 text-white shadow-sm"
+                            : "text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                         )}
                       >
-                        <CheckCircle2 className="h-3.5 w-3.5" /> ACTIVE
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Full Day
                       </button>
-                      <button 
-                        onClick={() => setIsActive(false)}
+                      <button
+                        onClick={() => setOperationalDay('half')}
                         className={cn(
-                          "flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-semibold rounded transition-all",
-                          !isActive ? "bg-white dark:bg-slate-700 text-rose-600 shadow-sm border border-slate-200/50 dark:border-slate-600" : "text-slate-500 hover:text-slate-700"
+                          "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-bold rounded transition-all",
+                          operationalDay === 'half'
+                            ? "bg-amber-400 text-white shadow-sm"
+                            : "text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                         )}
                       >
-                        <AlertTriangle className="h-3.5 w-3.5" /> INACTIVE
+                        <Clock className="h-3.5 w-3.5" /> Half Day
+                      </button>
+                      <button
+                        onClick={() => setOperationalDay('none')}
+                        className={cn(
+                          "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-bold rounded transition-all",
+                          operationalDay === 'none'
+                            ? "bg-rose-500 text-white shadow-sm"
+                            : "text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                        )}
+                      >
+                        <AlertTriangle className="h-3.5 w-3.5" /> No Day
                       </button>
                     </div>
                   </div>

@@ -23,6 +23,7 @@ import { PdfViewer } from '@/src/components/PdfViewer';
 
 import { BulkConsumableLogModal } from './BulkConsumableLogModal';
 import { BulkMachineLogModal } from './BulkMachineLogModal';
+import { CustomCamera } from '@/src/components/ui/CustomCamera';
 
 function SiteLogCard({ 
   entry, 
@@ -51,8 +52,7 @@ function SiteLogCard({
   const [uploadedMedia, setUploadedMedia] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [showCustomCamera, setShowCustomCamera] = useState(false);
   const currentUser = useUserStore(s => s.getCurrentUser());
 
   const MEDIA_SERVER_URL = import.meta.env.VITE_MEDIA_SERVER_URL || 'https://dewaterconstruct.com/dcel-media';
@@ -75,35 +75,26 @@ function SiteLogCard({
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    // Get current pending files from parent or local state
+  const handleCapturedFile = (file: File) => {
     // @ts-ignore
     const currentPending = entry.pendingFiles || [];
-    const newFiles = [...currentPending, ...files];
+    const newFiles = [...currentPending, file];
     
-    // Update parent's state for this card
     // @ts-ignore
     entry.pendingFiles = newFiles;
-    onChangeNarration(entry.narration || ''); // Trigger parent re-render
+    onChangeNarration(entry.narration || '');
 
-    const newPreviews = files.map(file => ({
+    const newPreview = {
       url: URL.createObjectURL(file),
       type: file.type.startsWith('video/') ? 'video' as const : 'image' as const,
       name: file.name
-    }));
+    };
     
     setMediaPreviews(prev => {
-      const updated = [...prev, ...newPreviews];
-      // Emulate WhatsApp: auto-open the previewer to the newly captured image
+      const updated = [...prev, newPreview];
       setLightboxIndex(uploadedMedia.length + prev.length);
       return updated;
     });
-
-    // Reset input so same file can be chosen again if needed
-    e.target.value = '';
   };
 
   const removeMedia = (index: number) => {
@@ -187,19 +178,11 @@ function SiteLogCard({
             <div className="flex items-center gap-1.5 ml-10 sm:ml-16">
               <button 
                 type="button"
-                title="Take Photo or Video"
-                onClick={() => cameraInputRef.current?.click()}
-                className="h-7 w-7 rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 active:scale-90 transition-transform shadow-sm"
+                title="Camera"
+                onClick={() => setShowCustomCamera(true)}
+                className="h-10 w-10 sm:h-9 sm:w-9 rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 active:scale-95 transition-transform shadow-sm"
               >
-                <Camera className="h-3.5 w-3.5" />
-              </button>
-              <button 
-                type="button"
-                title="Add from Gallery"
-                onClick={() => fileInputRef.current?.click()}
-                className="h-7 w-7 rounded-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-90 transition-transform shadow-sm"
-              >
-                <ImageIcon className="h-3.5 w-3.5" />
+                <Camera className="h-5 w-5 sm:h-4 sm:w-4" />
               </button>
             </div>
           </div>
@@ -245,23 +228,7 @@ function SiteLogCard({
       <div className="pl-2">
         {activeTab === 'general' ? (
           <div className="space-y-4">
-            {/* Hidden file inputs */}
-            <input
-              type="file"
-              ref={cameraInputRef}
-              className="hidden"
-              accept="image/*"
-              capture="environment"
-              onChange={handleFileChange}
-            />
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              multiple
-              accept="image/*,video/*"
-              onChange={handleFileChange}
-            />
+            {/* Hidden file inputs replaced by CustomCamera */}
 
             {/* Media Storage Section - Images above text area, completely hidden if empty */}
             {(uploadedMedia.length > 0 || mediaPreviews.length > 0) && (
@@ -339,7 +306,7 @@ function SiteLogCard({
                   {/* Add more tile */}
                   <div
                     className="aspect-square rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors gap-1"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => setShowCustomCamera(true)}
                   >
                     <Plus className="h-4 w-4 text-slate-400" />
                     <span className="text-[8px] text-slate-400 font-bold">Add</span>
@@ -370,7 +337,14 @@ function SiteLogCard({
                 ]}
                 initialIndex={lightboxIndex}
                 onClose={() => setLightboxIndex(null)}
-                onAddMedia={() => cameraInputRef.current?.click()}
+                onAddMedia={() => setShowCustomCamera(true)}
+              />
+            )}
+            
+            {showCustomCamera && (
+              <CustomCamera 
+                onClose={() => setShowCustomCamera(false)}
+                onCapture={handleCapturedFile}
               />
             )}
           </div>
@@ -942,7 +916,7 @@ export function DailyJournal() {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen} fullScreenMobile>
         <DialogContent className="max-w-none w-full h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-w-2xl sm:max-h-[90vh] flex flex-col overflow-hidden p-0 !rounded-none sm:!rounded-xl border-0 sm:border !m-0 sm:!m-auto">
           <DialogHeader className="pl-4 pr-10 sm:px-6 py-3 sm:py-4 border-b border-border bg-slate-50 dark:bg-slate-900 flex-shrink-0 relative">
-            <div className="flex items-center justify-start gap-4">
+            <div className="flex items-center justify-between gap-4">
               <DialogTitle className="text-sm sm:text-lg font-bold truncate shrink-0">{editingId ? 'Edit Log' : 'New Log'}</DialogTitle>
               <div className="relative inline-flex h-8 sm:h-10 w-[115px] sm:w-[130px] shrink-0 items-center justify-between rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2 sm:px-3 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors cursor-pointer">
                 <span className="text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">
@@ -953,6 +927,13 @@ export function DailyJournal() {
                   type="date"
                   value={formDate}
                   onChange={e => setFormDate(e.target.value)}
+                  onClick={(e) => {
+                    try {
+                      if ('showPicker' in HTMLInputElement.prototype) {
+                        (e.target as HTMLInputElement).showPicker();
+                      }
+                    } catch (err) {}
+                  }}
                   className="absolute inset-0 h-full w-full opacity-0 cursor-pointer"
                 />
               </div>

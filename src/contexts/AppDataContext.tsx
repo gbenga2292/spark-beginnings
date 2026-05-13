@@ -7,6 +7,8 @@ import type { MainTask, SubTask, TaskComment, AppUser, CommentAttachment } from 
 import { useAppStore } from '@/src/store/appStore';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 // ── Typed context interface ──────────────────────────────────────────────────
 interface AppDataContextType {
@@ -385,6 +387,53 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
             supabase.removeChannel(channel);
         };
     }, [user]);
+
+    // ── Sync Reminders with Device Local Notifications ────────────────────────
+    useEffect(() => {
+        if (!user || !Capacitor.isNativePlatform()) return;
+        
+        const syncLocalNotifications = async () => {
+            try {
+                const permStatus = await LocalNotifications.checkPermissions();
+                if (permStatus.display !== 'granted') {
+                    const reqStatus = await LocalNotifications.requestPermissions();
+                    if (reqStatus.display !== 'granted') return;
+                }
+
+                const pending = await LocalNotifications.getPending();
+                if (pending.notifications.length > 0) {
+                    await LocalNotifications.cancel({ notifications: pending.notifications });
+                }
+
+                const upcoming = reminders.filter(r => {
+                    const isGlobal = !r.recipientIds || r.recipientIds.length === 0;
+                    const isRecipient = isGlobal || (r.recipientIds && r.recipientIds.includes(user.id));
+                    return r.isActive && isRecipient && new Date(r.remindAt).getTime() > Date.now();
+                });
+
+                if (upcoming.length === 0) return;
+
+                const notificationsToSchedule = upcoming.map((r) => {
+                    // Generate a stable integer ID based on string ID hash (Android requires int32)
+                    const id = Math.abs(r.id.split('').reduce((a: number, b: string) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a }, 0));
+                    return {
+                        id,
+                        title: r.title,
+                        body: r.body || 'Task Reminder',
+                        schedule: { at: new Date(r.remindAt) },
+                    };
+                });
+
+                await LocalNotifications.schedule({
+                    notifications: notificationsToSchedule,
+                });
+            } catch (err) {
+                console.error('Failed to sync local notifications', err);
+            }
+        };
+
+        syncLocalNotifications();
+    }, [reminders, user]);
 
     // ── Memoized action callbacks ─────────────────────────────────────────────
     const createMainTask = useCallback(async (task: any, subs: any[] = []) => {

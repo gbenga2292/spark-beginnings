@@ -13,6 +13,10 @@ const TableContainer = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTM
   const handleMouseDown = (e: React.MouseEvent) => {
     // Only capture left-clicks, and skip any interactive elements.
     if (e.button !== 0) return;
+    
+    // Disable drag-scrolling on touch devices or if a modifier key is pressed (like Ctrl for selection)
+    if (e.ctrlKey || e.metaKey || window.matchMedia('(pointer: coarse)').matches) return;
+
     const target = e.target as HTMLElement;
     if (target.closest('button, a, input, select, textarea, [role="button"], label')) return;
     
@@ -56,10 +60,15 @@ const TableContainer = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTM
 
   React.useImperativeHandle(ref, () => innerRef.current as HTMLDivElement);
 
-  return (
+    const isTouch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+    return (
     <div 
       ref={innerRef}
-      className={cn("relative w-full overflow-auto max-h-[70vh]", isDragging ? "cursor-grabbing select-none" : "cursor-grab", className)}
+      className={cn(
+        "relative w-full overflow-auto max-h-[70vh]", 
+        isDragging ? "cursor-grabbing select-none" : (isTouch ? "cursor-default" : "cursor-grab"), 
+        className
+      )}
       onMouseDown={handleMouseDown}
       {...props}
     >

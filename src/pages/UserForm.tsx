@@ -75,6 +75,7 @@ const PRIV_GROUPS: PG[] = [
         fields: [
           { key: 'canView', label: 'View Dashboard' },
           { key: 'canViewAnalytics', label: 'Analytics', special: true },
+          { key: 'canDeleteLogs', label: 'Delete Machine Logs', danger: true },
         ] },
       { key: 'opsInventory', label: 'Inventory (Assets)', parentKey: 'opsInventory', masterField: 'canView',
         fields: [

@@ -560,6 +560,8 @@ export interface Invoice {
   printLayout?: any;
   historyLog?: any[];
   machineConfigs?: { qt: number, rate: number, duration: number }[];
+  /** Asset IDs of machines whose logs count against this invoice's duration */
+  linkedAssetIds?: string[];
 }
 
 export interface SalaryAdvance {

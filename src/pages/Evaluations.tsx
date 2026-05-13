@@ -48,7 +48,7 @@ export function Evaluations() {
   const internalEmployees = filterAndSortEmployeesExcludingCEO(
     employees.filter(e => 
       (e.staffType?.toLowerCase().includes('internal') || ['OFFICE', 'FIELD'].includes(e.staffType)) &&
-      e.status !== 'Onboarding'
+      e.status !== 'Onboarding' && e.status !== 'Terminated'
     )
   );
 

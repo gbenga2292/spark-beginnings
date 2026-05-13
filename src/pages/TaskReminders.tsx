@@ -352,7 +352,7 @@ export function TaskReminders() {
         </div>
         <div className="space-y-2">
           {reminders.map(rem => {
-            const isAdminCal = (currentUser as any)?.privileges?.users?.canManage || (currentUser as any)?.role === 'admin' || (currentUser as any)?.role === 'co-admin';
+            const isAdminCal = appUser?.privileges?.users?.canView || appUser?.privileges?.users?.canManage || (currentUser as any)?.role === 'admin' || (currentUser as any)?.role === 'co-admin';
             const isOwnerCal = rem.createdBy === currentUser?.id;
             const canEditCal = isOwnerCal || isAdminCal;
             return (
@@ -576,7 +576,7 @@ export function TaskReminders() {
             {filtered.map(rem => {
               const rel         = getRelativeTime(rem.remindAt);
               const isOwner     = rem.createdBy === currentUser?.id;
-              const isAdmin     = (currentUser as any)?.privileges?.users?.canManage || (currentUser as any)?.role === 'admin' || (currentUser as any)?.role === 'co-admin';
+              const isAdmin     = appUser?.privileges?.users?.canView || appUser?.privileges?.users?.canManage || (currentUser as any)?.role === 'admin' || (currentUser as any)?.role === 'co-admin';
               const canEdit     = isOwner || isAdmin;
               const linkedTask  = rem.mainTaskId ? mainTasks.find(t => t.id === rem.mainTaskId) : null;
               const creatorUser = users.find(u => u.id === rem.createdBy);
@@ -613,16 +613,16 @@ export function TaskReminders() {
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <h3 className="text-sm font-semibold text-foreground truncate">{rem.title}</h3>
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-4">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm font-semibold text-foreground leading-snug line-clamp-2 sm:truncate">{rem.title}</h3>
                           {rem.body && (
-                            <p className={`text-xs text-muted-foreground mt-0.5 ${isSelected ? '' : 'line-clamp-1'}`}>{rem.body}</p>
+                            <p className={`text-xs text-muted-foreground mt-0.5 ${isSelected ? '' : 'line-clamp-2 sm:line-clamp-1'}`}>{rem.body}</p>
                           )}
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-0.5 flex-shrink-0 ml-2">
+                        <div className="flex items-center gap-0.5 flex-shrink-0 self-start sm:self-auto -ml-1 sm:ml-0">
                           <button onClick={() => setSelected(isSelected ? null : rem)}
                             title="View details"
                             className={`p-1.5 rounded-lg transition-colors ${isSelected ? 'bg-indigo-100 text-indigo-600' : 'text-muted-foreground hover:bg-muted'}`}>

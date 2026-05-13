@@ -42,7 +42,7 @@ export interface SitesPriv {
 
 // ─── Operations ──────────────────────────────────────────────
 // Overview / Dashboard
-export interface OperationsPriv { canView: boolean; canViewAnalytics: boolean; }
+export interface OperationsPriv { canView: boolean; canViewAnalytics: boolean; canDeleteLogs: boolean; }
 // Inventory (Assets)
 export interface OpsInventoryPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canImport: boolean; canExport: boolean; }
 // Waybills
@@ -188,7 +188,7 @@ export const FULL_ACCESS: UserPrivileges = {
   variables:        { canView: true, canEdit: true, canImport: true, canExport: true, canBackup: true, canRestore: true },
   users:            { canView: true, canManage: true, canOverrideDiaryDelete: true },
   tasks:            { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: true, isExternalHr: false },
-  operations:       { canView: true, canViewAnalytics: true },
+  operations:       { canView: true, canViewAnalytics: true, canDeleteLogs: true },
   opsInventory:     { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
   opsWaybills:      { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
   opsCheckout:      { canView: true, canAdd: true },
@@ -232,7 +232,7 @@ export const NO_ACCESS: UserPrivileges = {
   variables:        { canView: false, canEdit: false, canImport: false, canExport: false, canBackup: false, canRestore: false },
   users:            { canView: false, canManage: false, canOverrideDiaryDelete: false },
   tasks:            { canView: false, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false, isExternalHr: false },
-  operations:       { canView: false, canViewAnalytics: false },
+  operations:       { canView: false, canViewAnalytics: false, canDeleteLogs: false },
   opsInventory:     { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
   opsWaybills:      { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
   opsCheckout:      { canView: false, canAdd: false },
@@ -311,7 +311,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       financialReports: { canView: true, canExport: false, canViewAmounts: false, canViewPayrollSummary: false, canViewLoansAndAdvances: false },
       ledger:           { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
       tasks:            { canView: true, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false, isExternalHr: false },
-      operations:       { canView: true, canViewAnalytics: false },
+      operations:       { canView: true, canViewAnalytics: false, canDeleteLogs: false },
       opsInventory:     { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
       opsWaybills:      { canView: true, canAdd: false, canEdit: false, canDelete: false, canExport: false },
       opsCheckout:      { canView: true, canAdd: false },

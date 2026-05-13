@@ -8,11 +8,13 @@ import { useAppStore, OnboardingTask } from '@/src/store/appStore';
 import { toast } from '@/src/components/ui/toast';
 import { useNavigate } from 'react-router-dom';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+import { useAppData } from '@/src/contexts/AppDataContext';
 
 export function StartOffboarding() {
   const employees = useAppStore((state) => state.employees);
   const departmentTasksList = useAppStore((state) => state.departmentTasksList);
   const updateEmployee = useAppStore((state) => state.updateEmployee);
+  const { reminders, users, deleteReminder, updateReminder } = useAppData();
   const navigate = useNavigate();
 
   const [offboardEmployeeId, setOffboardEmployeeId] = useState('');
@@ -63,7 +65,32 @@ export function StartOffboarding() {
       offboardingTasks: offboardTasks 
     });
 
-    toast.success(`${emp.firstname} ${emp.surname} has been terminated. Offboarding checklist initialized.`);
+    // ─── System Reminder Cleanup ─────────────────────────────────────────────
+    // Identify and purge/update system-generated reminders for the terminated employee
+    const employeeUser = users.find(u => u.email?.toLowerCase() === emp.email?.toLowerCase());
+    if (employeeUser) {
+      const SYSTEM_REMINDER_TITLES = ['New Task Created', 'Task Reminder'];
+      const targetReminders = reminders.filter(r => 
+        r.recipientIds?.includes(employeeUser.id) && 
+        (SYSTEM_REMINDER_TITLES.includes(r.title) || 
+         r.title?.startsWith('Mentioned') || 
+         r.title?.startsWith('Update on Assigned Task:'))
+      );
+
+      targetReminders.forEach(r => {
+        if (r.recipientIds.length <= 1) {
+          // If they were the only recipient, purge the reminder entirely
+          deleteReminder(r.id);
+        } else {
+          // If shared, just remove them from the recipient list
+          updateReminder(r.id, {
+            recipientIds: r.recipientIds.filter((id: string) => id !== employeeUser.id)
+          });
+        }
+      });
+    }
+
+    toast.success(`${emp.firstname} ${emp.surname} has been terminated. Offboarding checklist initialized and system reminders purged.`);
     navigate('/onboarding');
   };
 
