@@ -249,7 +249,7 @@ function AppContent() {
         
         <Route path="comm-log" element={<Page label="Communication Log"><ProtectedRoute requiredModule="commLog"><CommLog /></ProtectedRoute></Page>} />
         <Route path="daily-journal" element={<Page label="Daily Journal"><ProtectedRoute requiredModule="dailyJournal"><DailyJournal /></ProtectedRoute></Page>} />
-        <Route path="weekly-report" element={<Page label="Weekly Report"><ProtectedRoute requiredModule="sites"><WeeklyReport /></ProtectedRoute></Page>} />
+        <Route path="weekly-report" element={<Page label="Weekly Report"><ProtectedRoute requiredModule="weeklyReport"><WeeklyReport /></ProtectedRoute></Page>} />
         <Route path="notifications" element={<Page label="Notifications"><ProtectedRoute><NotificationsPage /></ProtectedRoute></Page>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
