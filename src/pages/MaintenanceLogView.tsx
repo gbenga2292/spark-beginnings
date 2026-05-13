@@ -3,11 +3,13 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import {
   ArrowLeft, Clock, User, MapPin, Wrench, Package,
   DollarSign, AlertCircle, ChevronDown, ChevronUp,
-  Activity, History, Truck
+  Activity, History, Truck, Trash2
 } from 'lucide-react';
 import { MaintenanceAsset } from '../types/operations';
 import { useOperations } from '../contexts/OperationsContext';
+import { useUserStore } from '../store/userStore';
 import { Button } from '@/src/components/ui/button';
+import { toast } from 'sonner';
 import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { cn } from '@/src/lib/utils';
 import { Dialog, DialogContent } from '@/src/components/ui/dialog';
@@ -27,7 +29,11 @@ const typeColors: Record<string, string> = {
 };
 
 export function MaintenanceLogView({ asset, onBack, onLogService }: MaintenanceLogViewProps) {
-  const { maintenanceSessions, dailyMachineLogs, vehicleTrips } = useOperations();
+  const { 
+    maintenanceSessions, dailyMachineLogs, vehicleTrips, 
+    deleteDailyLog, deleteVehicleTripRecord 
+  } = useOperations();
+  const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId));
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'maintenance' | 'operational'>('maintenance');
@@ -361,6 +367,29 @@ export function MaintenanceLogView({ asset, onBack, onLogService }: MaintenanceL
                         </p>
                       )}
                     </div>
+
+                    {currentUser?.privileges?.operations?.canDeleteLogs && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                        onClick={async () => {
+                          if (!window.confirm('Are you sure you want to delete this operational log?')) return;
+                          try {
+                            if (asset.category === 'machine') {
+                              await deleteDailyLog(log.id);
+                            } else {
+                              await deleteVehicleTripRecord(log.id);
+                            }
+                            toast.success('Log deleted successfully');
+                          } catch (err) {
+                            toast.error('Failed to delete log');
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}

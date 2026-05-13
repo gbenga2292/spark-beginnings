@@ -37,7 +37,7 @@ interface DailyLogManagerProps {
 export function DailyLogManager({ assetId, assetName, siteId, siteName, initialDate, isEmbedded, onBack }: DailyLogManagerProps) {
   const { dailyMachineLogs, logDailyActivity, deleteDailyLog, waybills } = useOperations();
   const { employees } = useAppStore();
-  const currentUser = useUserStore(s => s.getCurrentUser());
+  const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId));
   
   const [view, setView] = useState<'history' | 'form' | 'analytics' | 'calendar' | 'detail'>(initialDate ? 'form' : 'history');
   const [viewingLog, setViewingLog] = useState<DailyMachineLog | null>(null);
@@ -113,12 +113,13 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     setShowDowntimeDialog(false);
   };
 
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
   const handleDeleteLog = async (logId: string) => {
-    if (!window.confirm('Are you sure you want to delete this log?')) return;
-    
     try {
       await deleteDailyLog(logId);
       toast.success('Log deleted successfully');
+      setDeleteConfirmId(null);
     } catch (err) {
       toast.error('Failed to delete log');
     }
@@ -370,7 +371,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                           </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-2">
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => editLog(log)}>
                         <Edit2 className="h-4 w-4" />
                       </Button>
@@ -379,7 +380,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                           variant="ghost" 
                           size="icon" 
                           className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20" 
-                          onClick={() => handleDeleteLog(log.id)}
+                          onClick={() => setDeleteConfirmId(log.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -674,7 +675,16 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                 </div>
               </div>
 
-              <div className="bg-slate-50/50 dark:bg-slate-800/50 p-4 sm:p-5 flex flex-col sm:flex-row justify-end gap-3 border-t border-slate-100 dark:border-slate-800 rounded-b-lg">
+              <div className="bg-slate-50/50 dark:bg-slate-800/50 p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-800 rounded-b-lg">
+                {selectedLog && currentUser?.privileges?.operations?.canDeleteLogs && (
+                  <Button 
+                    variant="ghost" 
+                    className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 gap-2 w-full sm:w-auto sm:mr-auto font-bold text-xs"
+                    onClick={() => setDeleteConfirmId(selectedLog.id)}
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete This Log
+                  </Button>
+                )}
                 <Button 
                   variant="outline" 
                   className="rounded-md border-slate-200 w-full sm:w-auto"
@@ -967,6 +977,35 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
               onClick={handleAddDowntime}
             >
               Add Incident
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <DialogContent className="sm:max-w-[400px] rounded-2xl bg-white dark:bg-slate-900 p-6 border-slate-200 dark:border-slate-800">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-rose-500" /> Confirm Deletion
+            </DialogTitle>
+            <DialogDescription className="text-sm text-slate-500 dark:text-slate-400 pt-2">
+              Are you sure you want to permanently delete this operational log? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-6 flex flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              className="flex-1 rounded-xl border-slate-200 dark:border-slate-700 font-bold text-xs" 
+              onClick={() => setDeleteConfirmId(null)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs" 
+              onClick={() => deleteConfirmId && handleDeleteLog(deleteConfirmId)}
+            >
+              Delete Log
             </Button>
           </DialogFooter>
         </DialogContent>
